@@ -22,6 +22,8 @@ fix:
     env: {}               # extra variables; the rest is cleared
     timeout: 30s
     scope: file           # edits outside the finding's file are refused
+  model:                  # a model rewrites the extent of the finding; see models.md
+    prompt: "Rename, do not delete."   # optional: added to the fix prompt
   rpc: {}                 # reserved: a language plugin's own fix method; not yet supported
 ```
 
@@ -34,6 +36,14 @@ fix:
   generated into [decisions/fix-operations.md](decisions/fix-operations.md). Semantics that
   need Rust (`reorder` sorting by a key such as `design/group`, registered by a plugin
   through `Plugin::order_keys()`) live in the operation, not in per-rule code.
+- **`model`** asks the project's `chat` model (`[models] chat`) for the new text of the symbol
+  around the finding, or of a small file. The proposal is one `Replace`, `suggested` and never
+  `safe` (`safety: safe` is refused), and a decision without a fix has this one while a `chat`
+  model is bound. Unlike the others it is not a derivation, so the orchestrator keeps it only if
+  the finding is gone, nothing of `warn` or `error` is new in the file and the file is fully
+  analyzed, then writes it or reports a preview by `[approval] fix`, and `--unsafe-fixes` writes it
+  whatever the approval; `[fix] verify` commands must pass over the fixed texts first. Examples
+  need no `fixed` for it. See [models.md](models.md#chat-and-fixes).
 - **`command`** is the simple text contract; structured data goes through `rpc`. It runs a
   program without a shell in a scratch directory that holds a copy of the finding's file.
   *Exit codes:* `0` succeeds with the result per `output` (an empty result changes nothing),
@@ -63,8 +73,9 @@ fix:
   is tagged and length-prefixed, and it is computed from the very bytes the configuration
   and rules were loaded from. Authoring candidates (`decision_create`) are never trusted; any change to
   either withdraws it, and `lighthouse trust --revoke` removes it. `LIGHTHOUSE_TRUST=1`
-  trusts every project, for CI. The repository cannot grant trust itself: a `[fix]` table
-  in `lighthouse.toml` is not accepted. Without trust a command fix is declined with a
+  trusts every project, for CI. The repository cannot grant trust itself: no setting in
+  `lighthouse.toml` does (the commands of `[fix] verify` and of command model providers are listed
+  by `lighthouse trust` like the others). Without trust a command fix is declined with a
   message naming the command, and formatting is skipped with a note.
 - **Validation** (every catalog load, local layers included): exactly one kind; a decision
   with an implementation; `safe` only on mechanical decisions; every CEL expression and

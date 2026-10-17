@@ -36,8 +36,84 @@ command (`decision eval`, `model train`) asks for it.
 The probability that a subject fails comes from the model's own distribution: the logprobs of the
 answer token of a chat model, the score of a classifier, or System One's `noul`. A number a model
 writes in its reply (a verbalized probability) is never one, and neither is the verdict of an
-agent CLI such as `claude -p` or `codex exec`: it has no distribution to read. Agent CLIs become
-`chat` and `edit` providers, a `command` without a protocol, when fixes by models arrive.
+agent CLI such as `claude -p` or `codex exec`: it has no distribution to read. Agent CLIs are
+`chat` providers, a `command` without a protocol (below).
+
+## Chat and fixes
+
+`[models] chat` binds the model that writes the fixes no rule derives: one reference, or a route
+list that fails over on error like a classification route (layers are for classification only).
+It serves the task `chat` (`lighthouse/chat`, whose body is OpenAI's Chat Completions; HTTP twin
+`POST /v1/chat/completions`). A provider serves a task by its handshake (plugin) or its protocol:
+`openai` (HTTP or `command`) and a `command` without a protocol serve `chat`; `typesafe` serves
+classification only; `model-local` serves neither. Binding a provider to a task it does not serve is
+a configuration error naming both.
+
+A decision with a check and no fix of its own then has a fix of type `model`; a decision may also
+say `fix: {type: model, prompt: "..."}` to add an instruction. A decision whose fix is `ops` or
+`command` never uses the model. Without a `chat` binding nothing changes.
+
+```toml
+[models]
+chat = "openrouter/qwen/qwen3-coder:free"
+[approval]
+fix = "preview"            # default; "verified" writes a verified model fix
+[fix]
+verify = [["cargo", "test", "-q"]]   # must pass over the model fixes of a run
+timeout = "10m"            # for each of them
+```
+
+- **What the model sees.** One extent per finding: the symbol the finding is about, else the
+  innermost symbol around it, else the whole file when it has fewer than 400 lines (otherwise the
+  finding is declined, "too large for a model fix without a symbol"). The prompt is fixed text plus
+  the decision (requirement, context, `prompt`), the finding (message, evidence, place in the
+  extent), the extent verbatim and up to three of the decision's invalid examples that have
+  `fixed`. The request is `temperature: 0` with a strict `json_schema` response format
+  `{replacement}` (omitted for plain-text commands, whose answer is searched for the first JSON
+  object). The answer is one `Replace` of the extent, `suggested` and never `safe`.
+- **What keeps it.** The orchestrator applies the replacement in memory, formats, re-checks, and
+  keeps it only if the finding's fingerprint is gone (a new finding of the same rule in the file
+  also counts as "did not resolve the finding"), no new `warn` or `error` appeared in the file
+  ("introduced <decision> at <line>"), and the file is still fully analyzed. Otherwise the file is
+  rolled back and the finding declined with the reason. Deterministic fixes keep their own rule.
+- **`[fix] verify`.** Commands (argument lists, no shell) run once per run, after the fixes, over a
+  scratch copy of the project (what version control keeps, with the fixed texts in place), when the
+  model fixes would be written. A failure withdraws every model fix of the run to a preview and
+  puts the command and the tail of its output in the messages. They need a trusted project and are
+  part of what `lighthouse trust` lists.
+- **Approval.** With `approval.fix = "preview"` a verified fix is not written: the report carries it
+  as a preview with its diff (`previews` in the `fix` JSON, `preview ...` lines in `check --fix`),
+  awaiting a hand. With `"verified"` it is written like any applied fix. `--unsafe-fixes` also
+  writes verified model fixes whatever the approval: the approval is the project's standing
+  permission for model fixes only, the flag is the person's permission for all suggested fixes in one
+  run. `--dry-run` writes nothing either way.
+- **Accounting.** Per decision: `asked`, `answered`, `verified`, `applied`, `previewed` and `declined`
+  by class (`no-extent`, `unanswered`, `unparsed`, `unchanged`, `unresolved`, `introduced`,
+  `incomplete`, `rolled-back`), in `check --fix` and in the `fix` JSON (`models`), with `usage`
+  (requests and cost).
+- **Cost, trust, cache.** Requests count against `[models] budget` at the provider's `cost`; remote
+  providers need the opt-in classification does; `command` providers need `lighthouse trust`; the
+  answers are kept in the result cache under the model, its version and the digest of the request
+  (`--no-cache` skips it, `--no-models` asks no model).
+
+Recipes (the keys are the provider axes of [rule-pipeline.md](rule-pipeline.md#models)):
+
+```toml
+[models.providers.openrouter]     # a free model, key from the environment
+protocol = "openai"
+baseUrl = "https://openrouter.ai/api/v1"
+keyEnv = "OPENROUTER_API_KEY"
+cost = 1
+
+[models.providers.ollama]         # Ollama, LM Studio (:1234) and llama-server (:8080) alike
+protocol = "openai"
+baseUrl = "http://localhost:11434/v1"
+cost = 0
+
+[models.providers.claude]         # a plain-text command: stdin is the conversation, stdout the answer
+command = ["claude", "-p", "--tools", "", "--no-session-persistence"]
+# reference: claude/any; `--tools ""` leaves it no tools, and no flag skips permissions
+```
 
 ## Providers
 
