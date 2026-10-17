@@ -17,6 +17,19 @@ pub struct Repo {
     pub dir: PathBuf,
 }
 
+impl Repo {
+    /// The repository a `name=dir` names.
+    pub fn parse(spec: &str) -> Result<Self> {
+        let (name, dir) = spec
+            .split_once('=')
+            .ok_or_else(|| format!("`{spec}` is not name=dir"))?;
+        Ok(Self {
+            name: Some(name.to_owned()),
+            dir: PathBuf::from(dir),
+        })
+    }
+}
+
 /// What the labels of a decision are drawn from.
 #[derive(Clone, Default)]
 pub struct Labelling {

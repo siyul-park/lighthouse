@@ -10,7 +10,7 @@ use lighthouse_cli::surface::tools::{self, Tool};
 use lighthouse_resource::schema_file;
 use serde_json::Value;
 
-use crate::cli::command::Cli;
+use crate::terminal::command::Cli;
 
 /// The command reference, under the docs directory.
 pub const CLI_DOC: &str = "cli.md";

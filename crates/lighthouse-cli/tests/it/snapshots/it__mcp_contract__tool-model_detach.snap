@@ -16,7 +16,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "properties": {
       "attributedTo": {
         "default": null,
-        "description": "Who approves the revision: `person` or `agent`, with an id after a\ncolon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
+        "description": "Who this is attributed to: `person` or `agent`, with an id after a\ncolon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
         "type": [
           "string",
           "null"
@@ -34,8 +34,9 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
   },
   "name": "model_detach",
   "outputSchema": {
-    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/detach-report.schema.json",
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-detach.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The revision that detached a model: the `ModelDetach` kind.",
     "properties": {
       "decision": {
         "type": "string"
@@ -52,7 +53,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "decision",
       "model"
     ],
-    "title": "DetachReport",
+    "title": "ModelDetach",
     "type": "object"
   },
   "title": "Remove the model a revision attached to a decision"

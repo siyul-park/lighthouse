@@ -1,0 +1,37 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-attach.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What came of asking to attach a model: the `ModelAttach` kind.",
+  "properties": {
+    "decision": {
+      "type": "string"
+    },
+    "evaluation": {
+      "description": "The numbers the gate looked at, as a revision records them."
+    },
+    "model": {
+      "type": "string"
+    },
+    "refused": {
+      "description": "Why the evaluation does not allow it; none when it was attached.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "revision": {
+      "description": "The revision that attached it; none when it was refused.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "decision",
+    "model",
+    "evaluation"
+  ],
+  "title": "ModelAttach",
+  "type": "object"
+}

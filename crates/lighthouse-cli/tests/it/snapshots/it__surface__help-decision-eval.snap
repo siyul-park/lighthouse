@@ -18,11 +18,8 @@ Options:
           
           [env: LIGHTHOUSE_CONFIG=]
 
-      --repo <NAME=DIR>
-          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
-
-      --baseline <FILE>
-          A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists
+      --labels <FILE>
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
 
       --color <COLOR>
           Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
@@ -30,6 +27,9 @@ Options:
           [env: LIGHTHOUSE_COLOR=]
           [default: auto]
           [possible values: auto, always, never]
+
+      --repo <NAME=DIR>
+          A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
 
       --check <FILE>
           A decision file whose check is evaluated beside the current one

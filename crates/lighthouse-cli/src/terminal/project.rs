@@ -9,10 +9,10 @@ use std::{
 use lighthouse_resource::{STATE_DIR, read_optional, write_atomic};
 use lighthouse_session::{DEFAULT_CONFIG, FILE_NAME, Session};
 
-use crate::cli::{Result, command::Agent, setup};
+use crate::terminal::{Result, command::Agent, setup};
 
-pub fn cache_clean() -> Result<u8> {
-    let root = lighthouse_session::project_root()?;
+pub fn cache_clean(config: Option<&Path>) -> Result<u8> {
+    let root = lighthouse_session::project_root(config)?;
     let dir = lighthouse_session::cache::dir(&root);
     let had = lighthouse_session::cache::clean(&dir)?;
     println!(
@@ -29,7 +29,7 @@ pub fn cache_clean() -> Result<u8> {
 
 pub fn trust(config: Option<&Path>, revoke: bool, yes: bool) -> Result<u8> {
     if revoke {
-        let root = lighthouse_session::project_root()?;
+        let root = lighthouse_session::project_root(config)?;
         let had = lighthouse_session::revoke(&root)?;
         println!(
             "{} {}",
@@ -77,7 +77,7 @@ fn confirmed() -> Result<bool> {
     Ok(matches!(answer.trim(), "y" | "Y" | "yes"))
 }
 
-pub fn init(agent: Option<Agent>) -> Result<u8> {
+pub fn init(config: Option<&Path>, agent: Option<Agent>) -> Result<u8> {
     let dir = env::current_dir()?;
     let path = dir.join(FILE_NAME);
     if path.exists() {
@@ -101,7 +101,7 @@ pub fn init(agent: Option<Agent>) -> Result<u8> {
         }
     }
     if let Some(Agent::ClaudeCode) = agent {
-        setup::claude_code(&dir)?;
+        setup::claude_code(config, &dir)?;
     }
     Ok(0)
 }

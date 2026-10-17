@@ -9,6 +9,8 @@ use lighthouse_model::{
 use lighthouse_report::{Briefing, Entry, Format, GroupOptions, Grouped, render};
 use serde_json::{Value, json};
 
+use crate::json_of;
+
 fn span(line: u32) -> Span {
     Span {
         start: Position { line, col: 1 },
@@ -73,7 +75,7 @@ fn grouped_entries() -> Vec<Entry<'static>> {
 #[test]
 fn grouped_of_orders_errors_first_and_cuts_at_the_limit() {
     let all = Grouped::of(grouped_entries(), &GroupOptions::default());
-    let rules: Vec<_> = all.fields()["groups"]
+    let rules: Vec<_> = json_of(&all.data())["groups"]
         .as_array()
         .unwrap()
         .iter()
@@ -89,23 +91,23 @@ fn grouped_of_orders_errors_first_and_cuts_at_the_limit() {
         },
     );
     assert_eq!(
-        cut.fields()["omitted"],
+        json_of(&cut.data())["omitted"],
         json!({ "groups": 0, "findings": 1 })
     );
-    let rows = &cut.fields()["groups"][1]["files"]["x.go"];
+    let rows = &json_of(&cut.data())["groups"][1]["files"]["x.go"];
     assert_eq!(rows[0][0], "1:1", "findings are in file order");
 }
 
 #[test]
 fn grouped_fields_say_how_to_resolve_once_when_a_finding_asks_for_review() {
     let grouped = Grouped::of(grouped_entries(), &GroupOptions::default());
-    let fields = grouped.fields();
+    let fields = json_of(&grouped.data());
     assert!(fields["resolve"].is_string() && fields["judgments"].is_object());
     let errors_only = Grouped::of(
         vec![entry("acme/b", Severity::Error, "y.go", 9, &spread(3))],
         &GroupOptions::default(),
     );
-    assert!(errors_only.fields().get("resolve").is_none());
+    assert!(json_of(&errors_only.data()).get("resolve").is_none());
 }
 
 #[test]
@@ -149,7 +151,7 @@ fn a_mixed_group_asks_for_review_and_marks_the_instances_that_do() {
     for entries in [vec![asking.clone(), plain.clone()], reversed] {
         let grouped = Grouped::of(entries, &GroupOptions::default());
         assert!(grouped.asks_review());
-        let fields = grouped.fields();
+        let fields = json_of(&grouped.data());
         let group = &fields["groups"][0];
         assert_eq!(group["review"], true);
         let rows = group["files"]["x.go"].as_array().unwrap();
@@ -163,7 +165,7 @@ fn a_mixed_group_asks_for_review_and_marks_the_instances_that_do() {
         );
     }
     let only = Grouped::of(vec![asking], &GroupOptions::default());
-    let rows = &only.fields()["groups"][0]["files"]["x.go"];
+    let rows = &json_of(&only.data())["groups"][0]["files"]["x.go"];
     assert_eq!(rows[0].as_array().unwrap().len(), 3, "not mixed: no marker");
 }
 
@@ -176,9 +178,9 @@ fn a_symbol_is_dropped_only_when_the_message_names_it_as_a_word() {
     confusable.message = "function FooBar is bad".to_owned();
     confusable.fingerprint = spread(2);
     confusable.line = 2;
-    let fields = Grouped::of(vec![named], &GroupOptions::default()).fields();
+    let fields = json_of(&Grouped::of(vec![named], &GroupOptions::default()).data());
     assert!(fields["groups"][0].get("evidence").is_none(), "{fields:?}");
-    let fields = Grouped::of(vec![confusable], &GroupOptions::default()).fields();
+    let fields = json_of(&Grouped::of(vec![confusable], &GroupOptions::default()).data());
     assert_eq!(
         fields["groups"][0]["evidence"]["symbol"],
         "pkg::Foo#function"
@@ -192,7 +194,7 @@ fn evidence_note_and_fix_have_their_own_slots() {
     e.note = Some("the real note".to_owned());
     let mut f = entry("acme/a", Severity::Warn, "x.go", 2, &spread(2));
     f.evidence = json!({ "note": "different", "fix": 2, "other": 1 });
-    let fields = Grouped::of(vec![e, f], &GroupOptions::default()).fields();
+    let fields = json_of(&Grouped::of(vec![e, f], &GroupOptions::default()).data());
     let rows = fields["groups"][0]["files"]["x.go"].as_array().unwrap();
     assert_eq!(rows[0][3]["note"], "the real note");
     assert_eq!(rows[0][3]["evidence"]["note"], "evidence called note");

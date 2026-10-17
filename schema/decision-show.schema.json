@@ -1,11 +1,13 @@
 {
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-show.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The `DecisionShow` kind.",
   "properties": {
     "id": {
       "type": "string"
     },
     "markdown": {
+      "description": "Context, requirement, examples and status.",
       "type": "string"
     }
   },

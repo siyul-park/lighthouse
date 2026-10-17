@@ -1,0 +1,250 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-train.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a training run did.",
+  "properties": {
+    "bySource": {
+      "additionalProperties": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "type": "object"
+    },
+    "card": {
+      "description": "The card of the artifact the job made, when it is in the store."
+    },
+    "decision": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "result": {
+      "description": "The job the trainer gave; `None` when no model that learns is bound.",
+      "properties": {
+        "created_at": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "error": {
+          "default": null,
+          "description": "Why a job failed, in OpenAI's words.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "param": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "param"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "estimated_finish": {
+          "default": null,
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fine_tuned_model": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "finished_at": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "hyperparameters": {
+          "default": null
+        },
+        "id": {
+          "type": "string"
+        },
+        "integrations": {
+          "default": null,
+          "items": true,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": null,
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "method": {
+          "default": null,
+          "description": "The method of a fine-tuning job.",
+          "properties": {
+            "supervised": {
+              "description": "OpenAI's supervised fine-tuning method, with optional OpenAI parameters.",
+              "properties": {
+                "hyperparameters": {
+                  "additionalProperties": true,
+                  "default": {},
+                  "description": "Provider-specific supervised fine-tuning parameters.",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "hyperparameters"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "description": "`supervised`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "supervised"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "object": {
+          "description": "`fine_tuning.job`.",
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "result_files": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "seed": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "description": "How far a fine-tuning job is.",
+          "enum": [
+            "validating_files",
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "trained_tokens": {
+          "default": null,
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "training_file": {
+          "type": "string"
+        },
+        "validation_file": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "created_at",
+        "finished_at",
+        "object",
+        "model",
+        "status",
+        "hyperparameters",
+        "organization_id",
+        "trained_tokens",
+        "training_file",
+        "validation_file",
+        "integrations",
+        "seed",
+        "estimated_finish",
+        "method",
+        "metadata",
+        "fine_tuned_model",
+        "result_files",
+        "error"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "subjects": {
+      "description": "Labelled subjects handed over, by source.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "trainingFile": {
+      "description": "The training file, by content: `sha256:<hex>`.",
+      "type": "string"
+    },
+    "unresolved": {
+      "description": "Labels whose subject no longer exists or is not selected.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "decision",
+    "model",
+    "subjects",
+    "bySource",
+    "unresolved",
+    "trainingFile",
+    "result",
+    "card"
+  ],
+  "title": "ModelTrain",
+  "type": "object"
+}

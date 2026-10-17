@@ -7,6 +7,8 @@ use std::{
 
 use lighthouse_model::{Fingerprint, Judgment, Preview, Safety, Severity, squash};
 use lighthouse_spec::{Catalog, Decision, FixKind};
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -32,6 +34,34 @@ const MEANINGS: [(Judgment, &str); 3] = [
         "the decision does not apply here; a hint to narrow it",
     ),
 ];
+
+/// What each judgment says, by judgment.
+pub type Judgments = BTreeMap<&'static str, &'static str>;
+
+/// How many groups and findings a report left out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct Omitted {
+    pub groups: usize,
+    pub findings: usize,
+}
+
+/// Findings grouped by decision, as a program reads them: a group says what
+/// its decision says once, and a finding is one row of `[line:col, message,
+/// fingerprint]` with a last object for what sets it apart.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct Groups {
+    pub groups: Vec<Value>,
+    /// What the limit left out.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub omitted: Option<Omitted>,
+    /// How a judgment is recorded, said once for all groups; present when a
+    /// shown finding asks for review.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolve: Option<&'static str>,
+    /// What each judgment says; present with `resolve`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub judgments: Option<Judgments>,
+}
 
 /// One finding as the compact shape sees it, wherever it comes from: a fresh
 /// diagnostic or a remembered finding.
@@ -165,24 +195,18 @@ impl Grouped {
         self.groups.iter().any(|g| g.review)
     }
 
-    /// `groups`, then when they apply `omitted` (`groups` and `findings` left
-    /// out) and, once for all groups, the `resolve` hint and the `judgments`
-    /// table.
-    pub fn fields(&self) -> Map<String, Value> {
-        let mut fields = Map::new();
-        let groups = self.groups.iter().map(Group::to_json).collect();
-        fields.insert("groups".to_owned(), Value::Array(groups));
-        if self.omitted_findings > 0 {
-            fields.insert(
-                "omitted".to_owned(),
-                json!({ "groups": self.omitted_groups, "findings": self.omitted_findings }),
-            );
+    /// The groups as data for a program.
+    pub fn data(&self) -> Groups {
+        let asks_review = self.asks_review();
+        Groups {
+            groups: self.groups.iter().map(Group::to_json).collect(),
+            omitted: (self.omitted_findings > 0).then_some(Omitted {
+                groups: self.omitted_groups,
+                findings: self.omitted_findings,
+            }),
+            resolve: asks_review.then_some(RESOLVE),
+            judgments: asks_review.then(judgments),
         }
-        if self.asks_review() {
-            fields.insert("resolve".to_owned(), json!(RESOLVE));
-            fields.insert("judgments".to_owned(), judgments());
-        }
-        fields
     }
 
     /// One header per group, its expected structure and shared evidence, then
@@ -401,9 +425,8 @@ impl Instance {
     }
 }
 
-pub(crate) fn judgments() -> Value {
-    let meanings: BTreeMap<&str, &str> = MEANINGS.iter().map(|(j, m)| (j.as_str(), *m)).collect();
-    json!(meanings)
+pub(crate) fn judgments() -> Judgments {
+    MEANINGS.iter().map(|(j, m)| (j.as_str(), *m)).collect()
 }
 
 /// The command line that records a judgment on the finding `fingerprint`

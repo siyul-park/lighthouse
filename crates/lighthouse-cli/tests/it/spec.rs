@@ -85,7 +85,7 @@ fn checked_in_schemas_match_the_types() {
             .success();
     }
     let documents = lighthouse_session::schemas();
-    let outputs = lighthouse_cli::surface::kinds::kinds();
+    let outputs = lighthouse_cli::surface::tools::kinds();
     let total = documents.len() + outputs.len();
     let on_disk = fs::read_dir(&root)
         .unwrap()

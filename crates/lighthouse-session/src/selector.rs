@@ -90,7 +90,7 @@ impl Pattern {
 }
 
 /// Refuses a fingerprint prefix shorter than [`Fingerprint::MIN_PREFIX`].
-pub fn long_enough(prefix: &str) -> Result<()> {
+pub(crate) fn long_enough(prefix: &str) -> Result<()> {
     if prefix.len() < Fingerprint::MIN_PREFIX {
         return Err(lighthouse_store::Error::ShortFingerprint(prefix.to_owned()).into());
     }

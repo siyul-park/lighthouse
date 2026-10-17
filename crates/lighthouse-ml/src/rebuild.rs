@@ -9,13 +9,14 @@ use std::path::Path;
 use lighthouse_model::Result;
 use lighthouse_plugin::{Classifier, FineTuningJobStatus};
 use lighthouse_protocol::hash::digest;
+use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::{artifact, dataset, train::fine_tune};
 
 /// How a rebuild went for one attached model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Status {
     /// The artifact is here and is what its name says.

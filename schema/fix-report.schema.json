@@ -1,10 +1,15 @@
 {
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/fix-report.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A finished fix run: the `FixReport` kind.",
   "properties": {
     "applied": {
       "items": {
+        "description": "A fix that was applied.",
         "properties": {
+          "decision": {
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -20,18 +25,17 @@
           "fixer": {
             "type": "string"
           },
-          "rule": {
-            "type": "string"
-          },
           "safety": {
             "type": "string"
           }
         },
         "required": [
           "fingerprint",
-          "rule",
+          "decision",
           "fixer",
-          "safety"
+          "safety",
+          "description",
+          "files"
         ],
         "type": "object"
       },
@@ -39,11 +43,16 @@
     },
     "declined": {
       "items": {
+        "description": "A finding that was left as it was, and why.",
         "properties": {
+          "decision": {
+            "type": "string"
+          },
           "fingerprint": {
             "type": "string"
           },
           "line": {
+            "format": "uint32",
             "minimum": 0,
             "type": "integer"
           },
@@ -52,14 +61,13 @@
           },
           "reason": {
             "type": "string"
-          },
-          "rule": {
-            "type": "string"
           }
         },
         "required": [
           "fingerprint",
-          "rule",
+          "decision",
+          "path",
+          "line",
           "reason"
         ],
         "type": "object"
@@ -67,18 +75,22 @@
       "type": "array"
     },
     "diff": {
+      "description": "The unified diff of every changed file, in path order.",
       "type": "string"
     },
     "dryRun": {
       "type": "boolean"
     },
     "messages": {
+      "description": "What the user should know, in the order it happened.",
       "items": {
         "type": "string"
       },
       "type": "array"
     },
     "rounds": {
+      "description": "How many times fixing was repeated until nothing was left.",
+      "format": "uint",
       "minimum": 0,
       "type": "integer"
     }

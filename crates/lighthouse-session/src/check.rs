@@ -9,11 +9,11 @@ use std::{
 
 use lighthouse_engine::{Engine, FixPlan, ModelOptions, Run, cache};
 use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed};
-use lighthouse_report::{Briefing, Detail, Format, render, report};
+use lighthouse_report::{Briefing, Compact, Detail, Format, Full, Report, render, report};
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
+use schemars::JsonSchema;
 use serde::Serialize;
-use serde_json::{Value, json};
 
 use crate::{Remembered, Result, Selector, Session, findings, model::attached, review, scope};
 
@@ -55,7 +55,7 @@ pub struct CheckRequest {
 
 /// How a run ended. `Incomplete` wins over everything: "not checked" is never
 /// "passed".
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum RunStatus {
     Clean,
@@ -64,7 +64,7 @@ pub enum RunStatus {
 }
 
 /// The counts of a run, shared by every frontend that reports on one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Summary {
     pub status: RunStatus,
     pub errors: usize,
@@ -78,6 +78,28 @@ pub struct Summary {
     pub suppressed: usize,
     /// Findings that directives in the code suppress.
     pub allowed: usize,
+}
+
+/// The `CheckReport` kind: the findings of a run for a program, with the gaps,
+/// the counts and what the run has to say.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum CheckReport {
+    /// The findings grouped by decision.
+    Compact {
+        #[serde(flatten)]
+        report: Compact,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        messages: Vec<String>,
+    },
+    /// One self-contained record per finding.
+    Full {
+        #[serde(flatten)]
+        report: Full,
+        status: RunStatus,
+        summary: Summary,
+        messages: Vec<String>,
+    },
 }
 
 /// A finished run with what the store decided about it.
@@ -194,12 +216,11 @@ impl Checked {
         }
     }
 
-    /// The `CheckReport` kind: the findings grouped by decision for a program,
-    /// with the gaps and the counts, and what the run has to say.
-    pub fn report(&self, detail: Detail, limit: Option<usize>) -> Value {
+    /// The run as a [`CheckReport`] at `detail`, at most `limit` findings.
+    pub fn report(&self, detail: Detail, limit: Option<usize>) -> CheckReport {
         let limit = Some(limit.unwrap_or(JSON_LIMIT));
         let fixes = self.shown_fixes(limit, detail);
-        let mut body = report(
+        let report = report(
             &self.findings(),
             &self.run.incomplete,
             &Briefing {
@@ -209,23 +230,20 @@ impl Checked {
                 tool_form: true,
                 ..self.briefing(limit)
             },
-        )
-        .fields;
-        match detail {
-            Detail::Compact => {
-                if !self.messages.is_empty() {
-                    body.insert("messages".to_owned(), json!(self.messages));
+        );
+        let messages = self.messages.clone();
+        match report {
+            Report::Compact(report) => CheckReport::Compact { report, messages },
+            Report::Full(report) => {
+                let summary = self.summary();
+                CheckReport::Full {
+                    report,
+                    status: summary.status,
+                    summary,
+                    messages,
                 }
             }
-            Detail::Full => {
-                let summary = self.summary();
-                body.insert("status".to_owned(), json!(summary.status));
-                body.insert("summary".to_owned(), json!(summary));
-                body.insert("messages".to_owned(), json!(self.messages));
-                body.entry("reasons").or_insert(Value::Null);
-            }
         }
-        Value::Object(body)
     }
 
     /// The fixes proposed for `findings`, by fingerprint, computed in memory:

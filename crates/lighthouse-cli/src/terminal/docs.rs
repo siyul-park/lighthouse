@@ -7,7 +7,7 @@ use std::{
 use lighthouse_resource::{read_optional, write_atomic};
 use lighthouse_session::{DOCS_DIR, Session, bundled_docs, skill_for};
 
-use crate::cli::{Result, reference};
+use crate::terminal::{Result, reference};
 
 pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
     let docs = generated();
@@ -35,7 +35,7 @@ fn generated() -> BTreeMap<String, String> {
 }
 
 /// The agent skill of this project: its catalog and configuration.
-fn skill_text(config: Option<&Path>) -> Result<String> {
+pub fn skill_text(config: Option<&Path>) -> Result<String> {
     skill_for(&Session::load_or_default(config)?)
 }
 

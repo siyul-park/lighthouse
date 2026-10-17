@@ -29,8 +29,9 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
   },
   "name": "decision_create",
   "outputSchema": {
-    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/author-report.schema.json",
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-report.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A decision change that passed its gate and was written: the\n`DecisionReport` kind.",
     "properties": {
       "created": {
         "type": "boolean"
@@ -39,28 +40,47 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "type": "string"
       },
       "localPluginListed": {
+        "description": "Whether `lighthouse.toml` lists the `local` plugin, without which the\nproject's own decisions do not run in `check`.",
         "type": "boolean"
       },
       "note": {
+        "description": "What to do next.",
         "type": "string"
       },
       "path": {
         "type": "string"
       },
       "tested": {
+        "description": "What the gate ran before the decision was written.",
         "properties": {
+          "decisions": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "failures": {
+            "description": "One line per failing example; empty when every example holds.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "languages": {
+            "format": "uint",
             "minimum": 0,
             "type": "integer"
           },
           "runs": {
+            "format": "uint",
             "minimum": 0,
             "type": "integer"
           }
         },
         "required": [
+          "decisions",
+          "languages",
           "runs",
-          "languages"
+          "failures"
         ],
         "type": "object"
       }
@@ -73,7 +93,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "localPluginListed",
       "note"
     ],
-    "title": "AuthorReport",
+    "title": "DecisionReport",
     "type": "object"
   },
   "title": "Add a project-local decision from a Decision document"

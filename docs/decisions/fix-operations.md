@@ -12,7 +12,7 @@ fix:
   ops: [...]
 ```
 
-The `ops` type is a list of the generic operations below. Operations state edits over code-model nodes; the orchestrator lowers them to text edits with the spans the language provider reports, formats, re-checks and rolls back what gets worse. Expressions are CEL over `finding` (`rule`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options` (the options the rule ran with). Every operation also takes `when` (CEL bool): the operation is skipped when it is false.
+The `ops` type is a list of the generic operations below. Operations state edits over code-model nodes; the orchestrator lowers them to text edits with the spans the language provider reports, formats, re-checks and rolls back what gets worse. Expressions are CEL over `finding` (`decision`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options` (the options the rule ran with). Every operation also takes `when` (CEL bool): the operation is skipped when it is false.
 
 ## `move`
 
@@ -122,7 +122,7 @@ fix:
 - **Output:** `in-place` diffs the scratch copy against the original; `text` takes the new text of the file from stdout, which carries only that. stderr is for people and is never parsed.
 - **stdin:** `none` (default) or `file`, the content of the target file.
 - **Argv:** `{file}` (the scratch copy), `{line}`, `{symbol}` and `{rule}` fill a whole argument each (`--out={file}` is refused, and so is a value that starts with `-`). The program runs with the scratch directory as its working directory.
-- **Environment:** cleared to `PATH`, `HOME`, `LANG` and `TMPDIR`, plus the declared `env`, plus `LIGHTHOUSE_DECISION` (the finding as JSON: rule, file, line, symbol, fingerprint, evidence), `LIGHTHOUSE_OPTIONS` (the rule's options as JSON) and `LIGHTHOUSE_API_VERSION`.
+- **Environment:** cleared to `PATH`, `HOME`, `LANG` and `TMPDIR`, plus the declared `env`, plus `LIGHTHOUSE_DECISION` (the finding as JSON: decision, file, line, symbol, fingerprint, evidence), `LIGHTHOUSE_OPTIONS` (the rule's options as JSON) and `LIGHTHOUSE_API_VERSION`.
 - **Limits:** the timeout sends SIGTERM to the process group, then SIGKILL after a grace period; stdout and stderr are capped.
 - **Trust:** a command runs only in a project the user trusts (`lighthouse trust`), whoever wrote it; the repository cannot grant trust itself.
 

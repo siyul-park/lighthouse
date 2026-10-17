@@ -5,9 +5,9 @@ Runs the decisions over an indexed project: reads and indexes the files, runs th
 **Layer.** L2; depends on model, plugin, process, resource and spec (no protocol, no checks).
 
 ## Entry points
-- `Engine::new`, `check`, `check_overlaid`: a run over the files, or over files with in-memory texts (`Overlays`); the `Outcome` carries findings, gaps and facts.
+- `Engine::new`, `check`, `check_overlaid`: a run over the files, or over files with in-memory texts (`Overlays`); the `Run` carries findings, gaps and facts.
 - `Engine::fix`, `preview_fixes`: the fix loop and its dry description; `FixPlan`, `FixRun`, `FixReport`.
-- `Outcome::exit_code`: 0, 1 (findings), 3 (`EXIT_INCOMPLETE`).
+- `Run::exit_code`: 0, 1 (findings), 3 (`EXIT_INCOMPLETE`).
 - `RuleTester`: runs the examples of decisions through the whole engine.
 - `cache::Cache`: the result cache (`.lighthouse/cache/results.db`).
 - `CommandModels`, `ModelOptions`: model asking; `Timings`.

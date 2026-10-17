@@ -1,0 +1,954 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-eval.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The result of an evaluation.",
+  "properties": {
+    "agreement": {
+      "description": "How often the candidate answers as the current check does.",
+      "properties": {
+        "high": {
+          "format": "double",
+          "type": "number"
+        },
+        "hits": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "low": {
+          "format": "double",
+          "type": "number"
+        },
+        "of": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "hits",
+        "of",
+        "value",
+        "low",
+        "high"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "audit": {
+      "description": "The table of unflagged subjects written for a person to label.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "candidate": {
+      "description": "One check's numbers.",
+      "properties": {
+        "calls": {
+          "description": "Questions put to models, and what they cost.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "check": {
+          "type": "string"
+        },
+        "cost": {
+          "format": "double",
+          "type": "number"
+        },
+        "layer": {
+          "description": "The model attached by revision this side is graded with, and how.",
+          "properties": {
+            "crossFitted": {
+              "description": "Labelled subjects the model learned from, graded by refits.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "model": {
+              "type": "string"
+            },
+            "refits": {
+              "description": "The models the refits made.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "trainingFile": {
+              "description": "The dataset (`sha256:<hex>`) the model learned from, when its artifact\nis in the store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "model",
+            "crossFitted",
+            "refits"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "metrics": {
+          "description": "The metrics, each `None` where there is nothing to divide.",
+          "properties": {
+            "answered": {
+              "description": "Labelled subjects a model gave a probability of failing; the rest\nabstained and are counted, not scored.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "auroc": {
+              "description": "The probability that a `fail` is given a higher P(fail) than a `pass`,\nties counting half (scikit-learn's `roc_auc_score`); `None` when one\nclass is missing.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "brier": {
+              "description": "Mean (P(fail) - y)^2 over the answered subjects, y = 1 for a `fail`\n(scikit-learn's `brier_score_loss`).",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "coverage": {
+              "description": "The share of selected subjects the check decided; its complement is the\nshare left to review.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "ece": {
+              "description": "Expected calibration error over the answered subjects: the bins of P(fail)\nweigh the gap between the share of fails and the mean P(fail)\n(Guo et al., ICML 2017).",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "fnr": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "fpr": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "labelled": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "precision": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "recall": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "selectorPrecision": {
+              "description": "The share of selected subjects not judged `notApplicable`; kept apart\nfrom conformance.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "labelled",
+            "precision",
+            "fpr",
+            "recall",
+            "fnr",
+            "selectorPrecision",
+            "coverage",
+            "answered",
+            "brier",
+            "auroc",
+            "ece"
+          ],
+          "type": "object"
+        },
+        "modelDecided": {
+          "description": "Subjects a model decided.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "notices": {
+          "description": "What went wrong with the models, or was worth saying: the notices of\nthe run, so that a failing model is not silent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reviews": {
+          "description": "Subjects left to review.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scores": {
+          "description": "The probability each labelled subject was given, by repository and\nfingerprint: the raw answers the metrics are computed from, so that\nreports can be pooled.",
+          "items": {
+            "description": "What a model gave a labelled subject.",
+            "properties": {
+              "fingerprint": {
+                "description": "The label's fingerprint.",
+                "type": "string"
+              },
+              "model": {
+                "description": "The model that gave it: `<reference>@<version>`.",
+                "type": "string"
+              },
+              "probability": {
+                "description": "P(fail) the model gave.",
+                "format": "double",
+                "type": "number"
+              },
+              "repo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "violates": {
+                "description": "Whether the label says the subject violates the requirement.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "fingerprint",
+              "repo",
+              "violates",
+              "probability",
+              "model"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "check",
+        "metrics",
+        "modelDecided",
+        "reviews",
+        "calls",
+        "cost",
+        "scores",
+        "notices"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "current": {
+      "description": "One check's numbers.",
+      "properties": {
+        "calls": {
+          "description": "Questions put to models, and what they cost.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "check": {
+          "type": "string"
+        },
+        "cost": {
+          "format": "double",
+          "type": "number"
+        },
+        "layer": {
+          "description": "The model attached by revision this side is graded with, and how.",
+          "properties": {
+            "crossFitted": {
+              "description": "Labelled subjects the model learned from, graded by refits.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "model": {
+              "type": "string"
+            },
+            "refits": {
+              "description": "The models the refits made.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "trainingFile": {
+              "description": "The dataset (`sha256:<hex>`) the model learned from, when its artifact\nis in the store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "model",
+            "crossFitted",
+            "refits"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "metrics": {
+          "description": "The metrics, each `None` where there is nothing to divide.",
+          "properties": {
+            "answered": {
+              "description": "Labelled subjects a model gave a probability of failing; the rest\nabstained and are counted, not scored.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "auroc": {
+              "description": "The probability that a `fail` is given a higher P(fail) than a `pass`,\nties counting half (scikit-learn's `roc_auc_score`); `None` when one\nclass is missing.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "brier": {
+              "description": "Mean (P(fail) - y)^2 over the answered subjects, y = 1 for a `fail`\n(scikit-learn's `brier_score_loss`).",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "coverage": {
+              "description": "The share of selected subjects the check decided; its complement is the\nshare left to review.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "ece": {
+              "description": "Expected calibration error over the answered subjects: the bins of P(fail)\nweigh the gap between the share of fails and the mean P(fail)\n(Guo et al., ICML 2017).",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "fnr": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "fpr": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "labelled": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "precision": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "recall": {
+              "description": "A proportion with its Wilson 95% interval.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "selectorPrecision": {
+              "description": "The share of selected subjects not judged `notApplicable`; kept apart\nfrom conformance.",
+              "properties": {
+                "high": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "hits": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "low": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "of": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "value": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "of",
+                "value",
+                "low",
+                "high"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "labelled",
+            "precision",
+            "fpr",
+            "recall",
+            "fnr",
+            "selectorPrecision",
+            "coverage",
+            "answered",
+            "brier",
+            "auroc",
+            "ece"
+          ],
+          "type": "object"
+        },
+        "modelDecided": {
+          "description": "Subjects a model decided.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "notices": {
+          "description": "What went wrong with the models, or was worth saying: the notices of\nthe run, so that a failing model is not silent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reviews": {
+          "description": "Subjects left to review.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scores": {
+          "description": "The probability each labelled subject was given, by repository and\nfingerprint: the raw answers the metrics are computed from, so that\nreports can be pooled.",
+          "items": {
+            "description": "What a model gave a labelled subject.",
+            "properties": {
+              "fingerprint": {
+                "description": "The label's fingerprint.",
+                "type": "string"
+              },
+              "model": {
+                "description": "The model that gave it: `<reference>@<version>`.",
+                "type": "string"
+              },
+              "probability": {
+                "description": "P(fail) the model gave.",
+                "format": "double",
+                "type": "number"
+              },
+              "repo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "violates": {
+                "description": "Whether the label says the subject violates the requirement.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "fingerprint",
+              "repo",
+              "violates",
+              "probability",
+              "model"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "check",
+        "metrics",
+        "modelDecided",
+        "reviews",
+        "calls",
+        "cost",
+        "scores",
+        "notices"
+      ],
+      "type": "object"
+    },
+    "decided": {
+      "description": "Labelled subjects the candidate decides that the current check leaves\nfor review.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "labelled": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "meetsPolicy": {
+      "description": "Whether the check (the candidate, when there is one) meets the\nevaluation policy by the point estimates of its precision and, when the\npolicy sets a target, of its recall; the intervals are shown beside.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "policy": {
+      "additionalProperties": false,
+      "description": "How a rule's check is judged by `lighthouse eval`. A policy, not a\nmeaning: changing it moves no meaning version.",
+      "properties": {
+        "precision": {
+          "default": 0.9,
+          "description": "The precision a check must reach, from 0 to 1. Default: 0.9.",
+          "format": "double",
+          "type": "number"
+        },
+        "recall": {
+          "description": "The recall a check must reach, from 0 to 1; no target when absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "precision"
+      ],
+      "type": "object"
+    },
+    "proposal": {
+      "description": "What to do about an attached model that misses the policy: detach it.",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "reason"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "regressions": {
+      "description": "The examples that should pass and the candidate newly fails.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "decision",
+    "labelled",
+    "policy",
+    "current",
+    "candidate",
+    "agreement",
+    "meetsPolicy",
+    "decided",
+    "regressions",
+    "audit"
+  ],
+  "title": "DecisionEval",
+  "type": "object"
+}

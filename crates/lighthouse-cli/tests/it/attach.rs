@@ -10,7 +10,7 @@ use serde_json::Value;
 use crate::{
     cache_fixtures::write,
     models::{count, project, results},
-    models_plugin::{baseline, declared, fingerprints, json, lighthouse},
+    models_plugin::{declared, fingerprints, json, label_table, lighthouse},
 };
 
 pub(crate) const DECISION: &str = "local/naming-ban";
@@ -21,7 +21,7 @@ pub(crate) fn attach(dir: &Path, extra: &[&str]) -> std::process::Output {
         "model",
         "attach",
         DECISION,
-        "--baseline",
+        "--labels",
         "labels.tsv",
         "--model",
         MODEL,
@@ -63,7 +63,7 @@ pub(crate) fn mislabelled(dir: &Path) {
 #[test]
 fn a_model_that_passes_the_gate_is_attached_by_a_revision_and_checks_ask_it_first() {
     let dir = project(&declared());
-    baseline(dir.path());
+    label_table(dir.path());
     assert_eq!(failures(dir.path()), 1);
 
     let out = attach(dir.path(), &[]);
@@ -107,7 +107,7 @@ fn a_model_that_passes_the_gate_is_attached_by_a_revision_and_checks_ask_it_firs
 #[test]
 fn a_model_that_is_already_attached_is_refused() {
     let dir = project(&declared());
-    baseline(dir.path());
+    label_table(dir.path());
     assert_eq!(attach(dir.path(), &[]).status.code(), Some(0));
 
     let out = attach(dir.path(), &[]);
@@ -137,7 +137,7 @@ fn a_model_that_misses_the_policy_is_refused_and_nothing_is_written() {
             "model",
             "attach",
             DECISION,
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--model",
             MODEL,
@@ -151,7 +151,7 @@ fn a_model_that_misses_the_policy_is_refused_and_nothing_is_written() {
 #[test]
 fn detaching_unbinds_the_model_by_a_revision_that_follows_the_attaching_one() {
     let dir = project(&declared());
-    baseline(dir.path());
+    label_table(dir.path());
     let attached = json(&attach(dir.path(), &[]))["revision"]
         .as_str()
         .unwrap()
@@ -211,7 +211,7 @@ fn detaching_with_nothing_attached_is_a_usage_error() {
 #[test]
 fn eval_proposes_detaching_an_attached_model_that_misses_the_policy_and_only_then() {
     let dir = project(&declared());
-    baseline(dir.path());
+    label_table(dir.path());
     assert_eq!(attach(dir.path(), &[]).status.code(), Some(0));
     let eval = |dir: &Path| -> Value {
         json(&lighthouse(
@@ -220,7 +220,7 @@ fn eval_proposes_detaching_an_attached_model_that_misses_the_policy_and_only_the
                 "decision",
                 "eval",
                 DECISION,
-                "--baseline",
+                "--labels",
                 "labels.tsv",
                 "--format",
                 "json",

@@ -5,15 +5,14 @@
 
 use std::{collections::BTreeSet, path::PathBuf};
 
-use lighthouse_engine::{
-    AppliedFix, DeclinedFix, Engine, FixPlan, FixReport, FixRun, unified_diff,
-};
+use lighthouse_engine::{AppliedFix, DeclinedFix, Engine, FixPlan, FixRun, unified_diff};
 use lighthouse_model::Fingerprint;
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
+use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{Result, Selector, Session, findings, long_enough};
+use crate::{Result, Selector, Session, findings, selector::long_enough};
 
 /// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
 /// narrows a run from the whole project.
@@ -39,46 +38,97 @@ pub struct Selection {
     pub store: bool,
 }
 
-/// A finished fix run.
+/// A finished fix run: the `FixReport` kind.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Fixed {
-    pub report: FixReport,
+    pub dry_run: bool,
     /// The unified diff of every changed file, in path order.
     pub diff: String,
+    pub applied: Vec<Applied>,
+    pub declined: Vec<Declined>,
+    /// How many times fixing was repeated until nothing was left.
+    pub rounds: usize,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
-    pub dry_run: bool,
 }
 
-/// The applied fix as a frontend reports it.
-#[derive(Debug, Serialize)]
-pub struct AppliedRow {
+/// A fix that was applied.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Applied {
     pub fingerprint: String,
-    pub rule: String,
+    pub decision: String,
     pub fixer: String,
     pub safety: String,
     pub description: String,
     pub files: Vec<String>,
 }
 
-/// The finding that was left as it was, as a frontend reports it.
-#[derive(Debug, Serialize)]
-pub struct DeclinedRow {
+/// A finding that was left as it was, and why.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Declined {
     pub fingerprint: String,
-    pub rule: String,
+    pub decision: String,
     pub path: String,
     pub line: u32,
     pub reason: String,
 }
 
 impl Fixed {
-    /// The fixes that were applied, as a frontend reports them.
-    pub fn applied(&self) -> Vec<AppliedRow> {
-        self.report.applied.iter().map(applied_row).collect()
+    /// What a person is told about the run, a line each: the messages, every
+    /// fix applied (or that would be) and every finding left alone, and the
+    /// count.
+    pub fn lines(&self) -> Vec<String> {
+        let mut lines = self.messages.clone();
+        let verb = if self.dry_run { "would fix" } else { "fixed" };
+        for fix in &self.applied {
+            lines.push(format!(
+                "{verb} {} [{}] {} ({}): {}",
+                fix.decision,
+                fix.safety,
+                fix.files.join(", "),
+                fix.fixer,
+                fix.description
+            ));
+        }
+        for fix in &self.declined {
+            lines.push(format!(
+                "not fixed {}:{} {}: {}",
+                fix.path, fix.line, fix.decision, fix.reason
+            ));
+        }
+        lines.push(format!(
+            "{} fix(es) {}, {} left alone",
+            self.applied.len(),
+            if self.dry_run { "proposed" } else { "applied" },
+            self.declined.len()
+        ));
+        lines
     }
+}
 
-    /// The findings that were left alone, as a frontend reports them.
-    pub fn declined(&self) -> Vec<DeclinedRow> {
-        self.report.declined.iter().map(declined_row).collect()
+impl From<&AppliedFix> for Applied {
+    fn from(fix: &AppliedFix) -> Self {
+        Self {
+            fingerprint: fix.fingerprint.as_str().to_owned(),
+            decision: fix.rule_id.clone(),
+            fixer: fix.fixer.clone(),
+            safety: fix.safety.to_string(),
+            description: fix.description.clone(),
+            files: fix.files.iter().map(|f| slashed(f)).collect(),
+        }
+    }
+}
+
+impl From<&DeclinedFix> for Declined {
+    fn from(fix: &DeclinedFix) -> Self {
+        Self {
+            fingerprint: fix.fingerprint.as_str().to_owned(),
+            decision: fix.rule_id.clone(),
+            path: slashed(&fix.file),
+            line: fix.line,
+            reason: fix.reason.clone(),
+        }
     }
 }
 
@@ -121,32 +171,13 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         .map(|c| unified_diff(&c.path, &c.before, &c.after))
         .collect();
     Ok(Fixed {
-        report,
-        diff,
-        messages,
         dry_run: request.dry_run,
+        diff,
+        applied: report.applied.iter().map(Applied::from).collect(),
+        declined: report.declined.iter().map(Declined::from).collect(),
+        rounds: report.rounds,
+        messages,
     })
-}
-
-fn applied_row(fix: &AppliedFix) -> AppliedRow {
-    AppliedRow {
-        fingerprint: fix.fingerprint.as_str().to_owned(),
-        rule: fix.rule_id.clone(),
-        fixer: fix.fixer.clone(),
-        safety: fix.safety.to_string(),
-        description: fix.description.clone(),
-        files: fix.files.iter().map(|f| slashed(f)).collect(),
-    }
-}
-
-fn declined_row(fix: &DeclinedFix) -> DeclinedRow {
-    DeclinedRow {
-        fingerprint: fix.fingerprint.as_str().to_owned(),
-        rule: fix.rule_id.clone(),
-        path: slashed(&fix.file),
-        line: fix.line,
-        reason: fix.reason.clone(),
-    }
 }
 
 /// Reads the project as it is before any fix, recording it when the run uses

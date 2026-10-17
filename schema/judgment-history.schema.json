@@ -1,9 +1,11 @@
 {
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/judgment-history.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The `JudgmentHistory` kind: every judgment recorded on a finding, oldest\nfirst.",
   "properties": {
     "events": {
       "items": {
+        "description": "A `Judgment` record with its `id`, its `label` and its `suppressions`.",
         "type": "object"
       },
       "type": "array"

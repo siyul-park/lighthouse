@@ -1,16 +1,19 @@
 //! The metrics of evaluating a check against labels, with Wilson 95%
 //! intervals. A proportion over nothing is `None`, never zero.
 
+use std::fmt;
+
 use lighthouse_model::Judgment;
 use lighthouse_protocol::stats::wilson;
 use lighthouse_spec::Evaluation;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 /// The equal-width bins of P(fail) the expected calibration error uses.
 const BINS: usize = 10;
 
 /// A proportion with its Wilson 95% interval.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
 pub struct Rate {
     pub hits: usize,
     pub of: usize,
@@ -36,6 +39,16 @@ impl Rate {
     }
 }
 
+impl fmt::Display for Rate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:.3} [{:.3}, {:.3}] ({}/{})",
+            self.value, self.low, self.high, self.hits, self.of
+        )
+    }
+}
+
 /// How a check came out for one labelled subject.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -50,7 +63,7 @@ pub enum Outcome {
 }
 
 /// The metrics, each `None` where there is nothing to divide.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Metrics {
     pub labelled: usize,

@@ -35,27 +35,33 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
   },
   "name": "decision_test",
   "outputSchema": {
-    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/test-report.schema.json",
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-test.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The `DecisionTest` kind: the examples of the checked decisions, run.",
     "properties": {
       "decisions": {
+        "format": "uint",
         "minimum": 0,
         "type": "integer"
       },
       "failures": {
+        "description": "One line per failing example; empty when every example holds.",
         "items": {
           "type": "string"
         },
         "type": "array"
       },
       "languages": {
+        "format": "uint",
         "minimum": 0,
         "type": "integer"
       },
       "ok": {
+        "description": "False when any example fails.",
         "type": "boolean"
       },
       "runs": {
+        "format": "uint",
         "minimum": 0,
         "type": "integer"
       }
@@ -67,7 +73,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "runs",
       "failures"
     ],
-    "title": "TestReport",
+    "title": "DecisionTest",
     "type": "object"
   },
   "title": "Run the examples of checked decisions through the whole engine"

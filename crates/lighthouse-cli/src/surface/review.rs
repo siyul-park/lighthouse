@@ -4,52 +4,93 @@
 use std::fmt::Write;
 
 use lighthouse_model::Fingerprint;
-use lighthouse_report::{Entry, GroupOptions, Grouped};
+use lighthouse_report::{Entry, GroupOptions, Grouped, Groups};
 use lighthouse_session::{
-    catalog_at, head, long_enough, project_root,
-    review::{self, FindingRecord, JudgmentEvent, NewJudgment, Query, Recorded, Standing},
+    catalog_at,
+    review::{self, FindingRecord, JudgmentEvent, Query, Recorded, Standing},
 };
-use serde_json::{Map, Value, json};
+use schemars::JsonSchema;
+use serde::Serialize;
+use serde_json::{Map, json};
 
 use crate::surface::{
     Result,
     args::{Detail, FingerprintArgs, ReviewListArgs, ReviewResolveArgs},
     list::{omitted_line, page},
-    reply::{Context, Output, Reply},
+    reply::{Context, Format, Reply},
 };
 
 /// Findings of a JSON listing when `--limit` is not given.
 const JSON_LIMIT: usize = 50;
+/// Said when no check has recorded anything yet.
+const NOTHING_RECORDED: &str = "no findings recorded yet: run `check` first";
+
+/// The `ReviewList` kind: the findings that ask for review.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub(super) enum ReviewList {
+    /// Grouped by decision.
+    Compact {
+        #[serde(flatten)]
+        groups: Groups,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        notices: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        note: Option<&'static str>,
+    },
+    /// One record per finding.
+    Full {
+        tasks: Vec<FindingRecord>,
+        /// How many findings `limit` left out.
+        omitted: usize,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        notices: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        note: Option<&'static str>,
+    },
+}
+
+/// The `JudgmentHistory` kind: every judgment recorded on a finding, oldest
+/// first.
+#[derive(Debug, Serialize, JsonSchema)]
+pub(super) struct JudgmentHistory {
+    fingerprint: String,
+    events: Vec<JudgmentEvent>,
+}
 
 /// `review list`.
-pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
-    let root = project_root()?;
+pub fn list(ctx: &Context, args: &ReviewListArgs, format: Format) -> Result<Reply> {
+    let root = ctx.root()?;
     let query = Query {
         rules: args.decision.clone(),
         status: args.status.into(),
         all_tiers: args.all,
     };
     let Some(tasks) = review::list(&root, &query)? else {
-        let empty = match args.detail {
-            Detail::Compact => "groups",
-            Detail::Full => "tasks",
+        let nothing = Some(NOTHING_RECORDED);
+        let list = match args.detail {
+            Detail::Compact => ReviewList::Compact {
+                groups: Grouped::of(Vec::new(), &GroupOptions::default()).data(),
+                notices: Vec::new(),
+                note: nothing,
+            },
+            Detail::Full => ReviewList::Full {
+                tasks: Vec::new(),
+                omitted: 0,
+                notices: Vec::new(),
+                note: nothing,
+            },
         };
-        let value = json!({ empty: [], "note": "no findings recorded yet: run `check` first" });
-        let notes =
-            vec!["lighthouse: no findings recorded yet (run `lighthouse check`)".to_owned()];
-        let reply = match output {
-            Output::Json => Reply::json(value)?,
-            Output::Text => Reply::default(),
+        let reply = match format {
+            Format::Json => Reply::json(&list)?,
+            Format::Text => Reply::text(String::new()),
         };
-        return Ok(reply.with_notes(notes));
+        return Ok(
+            reply.with_messages(&["no findings recorded yet (run `lighthouse check`)".into()])
+        );
     };
-    let notes: Vec<String> = tasks
-        .notices
-        .iter()
-        .map(|n| format!("lighthouse: {n}"))
-        .collect();
-    let reply = match output {
-        Output::Text => {
+    let reply = match format {
+        Format::Text => {
             let shown = page(tasks.findings, args.limit);
             let ids: Vec<&str> = shown.items.iter().map(|f| f.fingerprint.as_str()).collect();
             let mut text: String = (shown.items.iter().zip(prefixes(&ids)))
@@ -58,132 +99,83 @@ pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
             text.push_str(&omitted_line(shown.omitted));
             Reply::text(text)
         }
-        Output::Json => Reply::json(json_list(&root, &tasks.findings, &tasks.notices, args))?,
+        Format::Json => {
+            let limit = args.limit.unwrap_or(JSON_LIMIT);
+            let notices = tasks.notices.clone();
+            Reply::json(&match args.detail {
+                Detail::Compact => {
+                    let catalog = catalog_at(&root).ok();
+                    let options = GroupOptions {
+                        catalog: catalog.as_ref(),
+                        limit: Some(limit),
+                        tool_form: true,
+                    };
+                    let entries = tasks.findings.iter().map(entry).collect();
+                    ReviewList::Compact {
+                        groups: Grouped::of(entries, &options).data(),
+                        notices,
+                        note: None,
+                    }
+                }
+                Detail::Full => ReviewList::Full {
+                    omitted: tasks.findings.len().saturating_sub(limit),
+                    tasks: tasks.findings.into_iter().take(limit).collect(),
+                    notices,
+                    note: None,
+                },
+            })?
+        }
     };
-    Ok(reply.with_notes(notes))
+    Ok(reply.with_messages(&tasks.notices))
 }
 
 /// `review show`.
-pub fn show(args: &FingerprintArgs, output: Output) -> Result<Reply> {
-    long_enough(&args.fingerprint)?;
-    let finding = review::show(&project_root()?, &args.fingerprint)?;
-    Reply::data(output, &finding, || detail(&finding))
+pub fn show(ctx: &Context, args: &FingerprintArgs, format: Format) -> Result<Reply> {
+    let finding = review::show(&ctx.root()?, &args.fingerprint)?;
+    Reply::data(format, &finding, || detail(&finding))
 }
 
 /// `review history`.
-pub fn history(args: &FingerprintArgs, output: Output) -> Result<Reply> {
-    long_enough(&args.fingerprint)?;
-    let events = review::history(&project_root()?, &args.fingerprint)?;
+pub fn history(ctx: &Context, args: &FingerprintArgs, format: Format) -> Result<Reply> {
+    let events = review::history(&ctx.root()?, &args.fingerprint)?;
     let notes = if events.is_empty() {
-        vec![format!(
-            "lighthouse: no judgments recorded for {}",
-            args.fingerprint
-        )]
+        vec![format!("no judgments recorded for {}", args.fingerprint)]
     } else {
         Vec::new()
     };
-    let value = json!({
-        "fingerprint": args.fingerprint,
-        "events": events.iter().map(JudgmentEvent::to_json).collect::<Vec<_>>(),
-    });
-    let reply = match output {
-        Output::Json => Reply::json(value)?,
-        Output::Text => {
-            let ids: Vec<&str> = events.iter().map(|e| e.id.as_str()).collect();
-            let rows = events.iter().zip(prefixes(&ids));
-            Reply::text(
-                rows.map(|(e, prefix)| event_row(e, prefix) + "\n")
-                    .collect(),
-            )
-        }
+    let history = JudgmentHistory {
+        fingerprint: args.fingerprint.clone(),
+        events,
     };
-    Ok(reply.with_notes(notes))
+    let reply = Reply::data(format, &history, || {
+        let ids: Vec<&str> = history.events.iter().map(|e| e.id.as_str()).collect();
+        let rows = history.events.iter().zip(prefixes(&ids));
+        rows.map(|(e, prefix)| event_row(e, prefix) + "\n")
+            .collect()
+    })?;
+    Ok(reply.with_messages(&notes))
 }
 
 /// `review prune`.
-pub fn prune(older_than: Option<u32>) -> Result<Reply> {
-    let removed = review::prune(&project_root()?, older_than)?;
+pub fn prune(ctx: &Context, older_than: Option<u32>) -> Result<Reply> {
+    let removed = review::prune(&ctx.root()?, older_than)?;
     Ok(Reply::text(format!(
         "removed {removed} unreviewed finding(s) that are resolved or inactive\n"
     )))
 }
 
 /// `review resolve`.
-pub fn resolve(ctx: &Context, args: &ReviewResolveArgs, output: Output) -> Result<Reply> {
-    long_enough(&args.fingerprint)?;
-    let root = project_root()?;
-    let review = NewJudgment {
-        fingerprint: args.fingerprint.clone(),
-        judgment: args.judgment.into(),
-        reason: args.reason.clone(),
-        suppress: args.suppress.clone(),
-        attribution: ctx.attribution(&root, args.attributed_to.as_deref())?,
-        commit: head(&root),
-        expect_seen: args.seen.clone(),
-        lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
-    };
-    let recorded = review::resolve(&root, &review)?;
-    let event = &recorded.event;
-    let value = json!({
-        "recorded": {
-            "fingerprint": event.spec.fingerprint,
-            "decision": event.spec.decision,
-            "judgment": event.spec.judgment.to_string(),
-            "suppression": event.suppressions.first().map(|s| json!({
-                "kind": s.spec.kind, "status": s.spec.status, "justification": s.spec.justification,
-            })),
-            "wasAttributedTo": event.spec.was_attributed_to,
-        },
-        "standing": recorded.standing,
-        "warnings": recorded.warnings,
-        "catalogError": recorded.catalog_error,
-    });
+pub fn resolve(ctx: &Context, args: &ReviewResolveArgs, format: Format) -> Result<Reply> {
+    let recorded = review::resolve(&ctx.root()?, &args.judgment(ctx)?)?;
     let mut notes = Vec::new();
     if let Some(e) = &recorded.catalog_error {
         notes.push(format!(
-            "lighthouse: the catalog cannot be read ({e}); decision and catalog versions are not recorded"
+            "the catalog cannot be read ({e}); decision and catalog versions are not recorded"
         ));
     }
-    notes.extend(
-        recorded
-            .warnings
-            .iter()
-            .map(|w| format!("lighthouse: warning: {w}")),
-    );
-    let reply = match output {
-        Output::Json => Reply::json(value)?,
-        Output::Text => Reply::text(resolved_text(&recorded)),
-    };
-    Ok(reply.with_notes(notes))
-}
-
-/// The `ReviewList` kind.
-fn json_list(
-    root: &std::path::Path,
-    findings: &[FindingRecord],
-    notices: &[String],
-    args: &ReviewListArgs,
-) -> Value {
-    let limit = args.limit.unwrap_or(JSON_LIMIT);
-    if args.detail == Detail::Compact {
-        let catalog = catalog_at(root).ok();
-        let options = GroupOptions {
-            catalog: catalog.as_ref(),
-            limit: Some(limit),
-            tool_form: true,
-        };
-        let mut fields = Grouped::of(findings.iter().map(entry).collect(), &options).fields();
-        if !notices.is_empty() {
-            fields.insert("notices".to_owned(), json!(notices));
-        }
-        return Value::Object(fields);
-    }
-    let tasks: Vec<Value> = findings.iter().take(limit).map(task).collect();
-    json!({
-        "tasks": tasks,
-        "omitted": findings.len().saturating_sub(limit),
-        "notices": notices,
-    })
+    notes.extend(recorded.warnings.iter().map(|w| format!("warning: {w}")));
+    let reply = Reply::data(format, &recorded, || resolved_text(&recorded))?;
+    Ok(reply.with_messages(&notes))
 }
 
 fn resolved_text(recorded: &Recorded) -> String {
@@ -220,11 +212,9 @@ fn resolved_text(recorded: &Recorded) -> String {
 /// (`state` unless open, the latest `judgment`) and its `seen` time, which
 /// `review resolve` takes, ride along as evidence.
 fn entry(f: &FindingRecord) -> Entry<'_> {
-    let start = &f.locator["span"]["start"];
-    let position = |key: &str| start[key].as_u64().map_or(0, |n| n as u32);
     let mut attributes = Map::new();
     attributes.insert("seen".to_owned(), json!(f.last_seen));
-    let state = f.state().to_string();
+    let state = f.state.to_string();
     if state != "open" {
         attributes.insert("state".to_owned(), json!(state));
     }
@@ -237,8 +227,8 @@ fn entry(f: &FindingRecord) -> Entry<'_> {
         authored: f.authored_severity,
         review: f.needs_review(),
         path: f.path.clone(),
-        line: position("line"),
-        col: position("col"),
+        line: f.line(),
+        col: f.col(),
         message: f.message.clone(),
         symbol: f.symbol.clone(),
         evidence: f.evidence.clone(),
@@ -250,26 +240,8 @@ fn entry(f: &FindingRecord) -> Entry<'_> {
     }
 }
 
-fn task(f: &FindingRecord) -> Value {
-    json!({
-        "fingerprint": f.fingerprint,
-        "decision": f.decision,
-        "severity": f.severity,
-        "authored": f.authored_severity,
-        "state": f.state().to_string(),
-        "location": { "path": f.path, "line": f.locator["span"]["start"]["line"] },
-        "symbol": f.symbol,
-        "message": f.message,
-        "evidence": f.evidence,
-        "lastSeen": f.last_seen,
-        "judgment": f.judgment,
-        "standing": f.standing,
-        "justification": f.justification,
-    })
-}
-
-/// One line per finding: fingerprint, rule, severity, location, state, latest
-/// review and message, tab-separated.
+/// One line per finding: fingerprint, decision, severity, location, state,
+/// latest review and message, tab-separated.
 fn row(finding: &FindingRecord, fingerprint: &str) -> String {
     format!(
         "{}\t{}\t{}\t{}:{}\t{}\t{}\t{}",
@@ -277,8 +249,8 @@ fn row(finding: &FindingRecord, fingerprint: &str) -> String {
         finding.decision,
         finding.severity,
         finding.path,
-        line(&finding.locator),
-        finding.state(),
+        finding.line(),
+        finding.state,
         review_text(finding),
         finding.message
     )
@@ -310,17 +282,14 @@ fn detail(finding: &FindingRecord) -> String {
     field("fingerprint:", finding.fingerprint.clone());
     let tier = finding.authored_severity;
     field(
-        "rule:",
+        "decision:",
         format!("{} ({}, {tier})", finding.decision, finding.severity),
     );
-    field(
-        "location:",
-        format!("{}:{}", finding.path, line(&finding.locator)),
-    );
+    field("location:", format!("{}:{}", finding.path, finding.line()));
     if let Some(symbol) = &finding.symbol {
         field("owner:", symbol.clone());
     }
-    field("state:", finding.state().to_string());
+    field("state:", finding.state.to_string());
     field("first seen:", finding.first_seen.clone());
     field("last seen:", finding.last_seen.clone());
     if let Some(resolved) = &finding.resolved_at {
@@ -330,7 +299,10 @@ fn detail(finding: &FindingRecord) -> String {
         );
     }
     if let Some(inactive) = &finding.inactive_at {
-        field("inactive:", format!("{inactive} (its rule is not enabled)"));
+        field(
+            "inactive:",
+            format!("{inactive} (its decision is not enabled)"),
+        );
     }
     field("message:", finding.message.clone());
     if let Some(evidence) = finding.evidence.as_object().filter(|e| !e.is_empty()) {
@@ -358,10 +330,6 @@ fn event_row(event: &JudgmentEvent, id: &str) -> String {
         event.label(),
         event.spec.reason.as_deref().unwrap_or("")
     )
-}
-
-fn line(locator: &Value) -> u64 {
-    locator["span"]["start"]["line"].as_u64().unwrap_or(0)
 }
 
 /// Each id cut to the width that tells it apart from the others listed.

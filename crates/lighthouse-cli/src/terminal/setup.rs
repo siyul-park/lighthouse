@@ -5,10 +5,13 @@
 use std::path::Path;
 
 use lighthouse_resource::{read_optional, write_atomic};
-use lighthouse_session::{SKILL_MARKER, Session, skill_for};
+use lighthouse_session::SKILL_MARKER;
 use serde_json::{Value, json};
 
-use crate::cli::Result;
+use crate::terminal::{
+    Result, docs,
+    hook::{COMMAND, EDIT_TOOLS, Event},
+};
 
 const MCP_FILE: &str = ".mcp.json";
 const SETTINGS_FILE: &str = ".claude/settings.json";
@@ -16,23 +19,17 @@ const SKILL_FILE: &str = ".claude/skills/lighthouse/SKILL.md";
 /// The permission rule that keeps an agent from trusting a project for the
 /// user: trust is the user's decision, made at a terminal.
 const DENY_TRUST: &str = "Bash(lighthouse trust:*)";
-const EDIT_TOOLS: &str = "Edit|Write|MultiEdit";
-const PRE_COMMAND: &str = "lighthouse hook claude-code pre-tool-use";
-const POST_COMMAND: &str = "lighthouse hook claude-code post-tool-use --allow-incomplete";
-const STOP_COMMAND: &str = "lighthouse hook claude-code stop --allow-incomplete";
 /// Seconds a hook may run: it analyzes the whole project, so allow a large
 /// one time; the Stop hook checks every file the session edited.
 const PRE_TIMEOUT: u64 = 120;
 const POST_TIMEOUT: u64 = 120;
 const STOP_TIMEOUT: u64 = 300;
-/// A hook command that starts with this is ours, whatever flags it carries.
-const HOOK_PREFIX: &str = "lighthouse hook claude-code";
 
 /// Sets up Claude Code in the project at `root`, printing what changed.
-pub fn claude_code(root: &Path) -> Result<()> {
+pub fn claude_code(config: Option<&Path>, root: &Path) -> Result<()> {
     mcp(&root.join(MCP_FILE))?;
     hooks(&root.join(SETTINGS_FILE))?;
-    skill(root)
+    skill(config, root)
 }
 
 fn mcp(path: &Path) -> Result<()> {
@@ -61,27 +58,29 @@ fn hooks(path: &Path) -> Result<()> {
     let mut doc = read_json(path)?;
     let hooks = object(&mut doc, "hooks", path)?;
     let mut added = Vec::new();
-    for (event, matcher, command, timeout) in [
-        ("PreToolUse", Some(EDIT_TOOLS), PRE_COMMAND, PRE_TIMEOUT),
-        ("PostToolUse", Some(EDIT_TOOLS), POST_COMMAND, POST_TIMEOUT),
-        ("Stop", None, STOP_COMMAND, STOP_TIMEOUT),
+    let edits = EDIT_TOOLS.join("|");
+    for (event, matcher, timeout) in [
+        (Event::PreToolUse, Some(&edits), PRE_TIMEOUT),
+        (Event::PostToolUse, Some(&edits), POST_TIMEOUT),
+        (Event::Stop, None, STOP_TIMEOUT),
     ] {
+        let name = event.name();
         let groups = hooks
-            .entry(event.to_owned())
+            .entry(name.to_owned())
             .or_insert_with(|| json!([]))
             .as_array_mut()
-            .ok_or_else(|| format!("{}: `hooks.{event}` is not a list", path.display()))?;
+            .ok_or_else(|| format!("{}: `hooks.{name}` is not a list", path.display()))?;
         if groups.iter().any(ours) {
             continue;
         }
         let mut group = json!({
-            "hooks": [{ "type": "command", "command": command, "timeout": timeout }]
+            "hooks": [{ "type": "command", "command": event.command(), "timeout": timeout }]
         });
         if let Some(matcher) = matcher {
             group["matcher"] = json!(matcher);
         }
         groups.push(group);
-        added.push(event);
+        added.push(name);
     }
     let denied = deny_trust(&mut doc, path)?;
     if added.is_empty() && !denied {
@@ -119,14 +118,14 @@ fn ours(group: &Value) -> bool {
         hooks.iter().any(|h| {
             h["command"]
                 .as_str()
-                .is_some_and(|c| c.trim_start().starts_with(HOOK_PREFIX))
+                .is_some_and(|c| c.trim_start().starts_with(COMMAND))
         })
     })
 }
 
-fn skill(root: &Path) -> Result<()> {
+fn skill(config: Option<&Path>, root: &Path) -> Result<()> {
     let path = root.join(SKILL_FILE);
-    let text = skill_for(&Session::load_or_default(None)?)?;
+    let text = docs::skill_text(config)?;
     match read_optional(&path)? {
         Some(current) if current == text => println!("{}: unchanged", path.display()),
         Some(current) if !current.contains(SKILL_MARKER) => println!(

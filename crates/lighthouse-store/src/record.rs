@@ -1,6 +1,7 @@
 use std::{fmt, path::Path};
 
 use lighthouse_model::{Attribution, Diagnostic, Judgment, Severity, evidence_digest};
+use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -185,7 +186,7 @@ pub struct Filter {
 }
 
 /// What the latest judgment does to a finding now.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Standing {
     /// The finding stays out of reports.
@@ -230,8 +231,10 @@ pub struct Ruling {
     pub justification: Option<String>,
 }
 
-/// Where a finding is in its life.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Where a finding is in its life; a judgment that hides it wins over the
+/// rest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum State {
     Open,
     Resolved,
@@ -251,7 +254,7 @@ impl fmt::Display for State {
 }
 
 /// A finding as stored: its latest sighting, its history and its standing.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FindingRecord {
     pub fingerprint: String,
@@ -270,6 +273,7 @@ pub struct FindingRecord {
     pub resolved_at: Option<String>,
     /// Set when the configuration no longer enables the finding's rule.
     pub inactive_at: Option<String>,
+    pub state: State,
     /// How many times it came back after being resolved.
     pub reopened: u32,
     pub message: String,
@@ -301,18 +305,20 @@ impl FindingRecord {
             .needs_review(self.standing.is_some_and(Standing::stands))
     }
 
-    /// Where the finding is in its life; a judgment that hides it wins over
-    /// the rest.
-    pub fn state(&self) -> State {
-        if self.standing == Some(Standing::Suppressed) {
-            State::Suppressed
-        } else if self.inactive_at.is_some() {
-            State::Inactive
-        } else if self.resolved_at.is_some() {
-            State::Resolved
-        } else {
-            State::Open
-        }
+    /// The line the finding starts at; 0 when its locator has no span.
+    pub fn line(&self) -> u32 {
+        self.position("line")
+    }
+
+    /// The column the finding starts at; 0 when its locator has no span.
+    pub fn col(&self) -> u32 {
+        self.position("col")
+    }
+
+    fn position(&self, key: &str) -> u32 {
+        self.locator["span"]["start"][key]
+            .as_u64()
+            .map_or(0, |n| n as u32)
     }
 }
 

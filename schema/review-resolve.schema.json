@@ -1,0 +1,70 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/review-resolve.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A judgment that was recorded, with what the reviewer should know about it:\nthe `ReviewResolve` kind.",
+  "properties": {
+    "catalogError": {
+      "description": "The catalog could not be read, so rule versions were not recorded.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "recorded": {
+      "description": "A `Judgment` record with its `id`, its `label` and its `suppressions`.",
+      "type": "object"
+    },
+    "standing": {
+      "anyOf": [
+        {
+          "description": "What the latest judgment does to a finding now.",
+          "oneOf": [
+            {
+              "const": "suppressed",
+              "description": "The finding stays out of reports.",
+              "type": "string"
+            },
+            {
+              "const": "judged",
+              "description": "The finding is judged and stays in the report (`fail` with no\nsuppression).",
+              "type": "string"
+            },
+            {
+              "const": "rule-changed",
+              "description": "The decision's meaning changed since the judgment: ask again.",
+              "type": "string"
+            },
+            {
+              "const": "evidence-changed",
+              "description": "The finding's evidence changed since the judgment: ask again.",
+              "type": "string"
+            },
+            {
+              "const": "unsuppressible",
+              "description": "Errors are definitive: no judgment hides them, whatever level they\nare configured at.",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "What the judgment does to the finding now."
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "recorded",
+    "warnings",
+    "standing",
+    "catalogError"
+  ],
+  "title": "ReviewResolve",
+  "type": "object"
+}

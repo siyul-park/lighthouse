@@ -13,6 +13,7 @@ use lighthouse_plugin::{
     Classifier, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
     FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, Subject, fails, request_of,
 };
+use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -23,7 +24,7 @@ use crate::{
 };
 
 /// What a training run did.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Trained {
     pub decision: String,

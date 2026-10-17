@@ -1,78 +1,77 @@
-//! `check`: analyze the project, optionally fix what can be fixed, and report.
+//! `check`, and `fix`: analyze the project, apply the fixes the catalog names,
+//! verified, and report.
 
 use std::time::Instant;
 
 use lighthouse_report::Format;
-use lighthouse_session::{CheckRequest, Checked, FailOn, ModelOptions, Session, fix::Fixed};
+use lighthouse_session::{
+    CheckRequest, Checked, FailOn, ModelOptions, Session,
+    fix::{self, Fixed, Selection, Targets},
+};
 
 use crate::surface::{
     Result,
-    args::{CheckArgs, FixArgs, FixOptions},
-    fix,
-    reply::{CheckFormat, Context, Reply},
+    args::{CheckArgs, FixArgs},
+    commands::CheckCommand,
+    reply::{self, CheckFormat, Context, Reply},
 };
 
-/// What `check` is asked to print besides the findings.
-#[derive(Debug, Default, Clone)]
-pub struct Printing {
-    pub format: CheckFormat,
-    /// Print where the time went, to stderr.
-    pub timings: bool,
-    /// Fix first; `None` only checks.
-    pub fixing: Option<FixOptions>,
-}
-
 /// Checks the project, fixing first when asked, and reports. The exit code
-/// says whether the findings fail the run.
-pub fn run(ctx: &Context, args: &CheckArgs, printing: &Printing) -> Result<Reply> {
+/// says whether the findings fail the run. With `--fix` the report is that of
+/// the project after the fix, and the fix run is told in its `messages`.
+pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
     let started = Instant::now();
+    let args = &command.args;
     if args.changed && args.diff.is_some() {
         return Err("`changed` and `diff` are alternatives".into());
     }
-    let mut notes = Vec::new();
-    let mut fixed = None;
-    if let Some(options) = &printing.fixing {
+    let mut messages = Vec::new();
+    if command.fix {
         let selection = FixArgs {
             paths: args.paths.clone(),
             decision: args.decision.clone(),
             fingerprints: Vec::new(),
-            options: options.clone(),
+            options: command.options.clone(),
         };
-        let done = fix::apply(ctx, &selection, !args.no_store)?;
-        notes.extend(fix::notes(&done));
-        if options.dry_run {
-            let reply = report_dry_run(&done, printing)?;
-            return Ok(reply.with_notes(notes));
+        let done = apply(ctx, &selection, !args.no_store)?;
+        messages = done.lines();
+        if command.options.dry_run && command.format != CheckFormat::Json {
+            return Ok(Reply::text(done.diff).with_messages(&messages));
         }
-        fixed = Some(done);
     }
-    let checked = analyze(ctx, args)?;
-    notes.extend(checked.messages.iter().map(|m| format!("lighthouse: {m}")));
+    let mut checked = analyze(ctx, args)?;
+    messages.append(&mut checked.messages);
+    checked.messages = messages;
     let reporting = Instant::now();
-    let mut reply = match (&fixed, printing.format) {
-        (Some(done), CheckFormat::Json) => Reply::json(serde_json::to_value(fix::report(done))?)?,
-        (_, CheckFormat::Json) => Reply::json(checked.report(args.detail.into(), args.limit))?,
-        (_, CheckFormat::Sarif) => Reply::text(checked.render(Format::Sarif, args.limit)),
-        (_, CheckFormat::Text) => Reply::text(checked.render(Format::Text, args.limit)),
-    };
-    if printing.timings {
-        notes.extend(
+    let mut reply = match command.format {
+        CheckFormat::Json => Reply::json(&checked.report(args.detail.into(), args.limit))?,
+        CheckFormat::Sarif => Reply::text(checked.render(Format::Sarif, args.limit)),
+        CheckFormat::Text => Reply::text(checked.render(Format::Text, args.limit)),
+    }
+    .with_messages(&checked.messages);
+    if command.timings {
+        reply.notes.extend(
             checked
                 .run
                 .timings
                 .lines(reporting.elapsed(), started.elapsed()),
         );
     }
-    let code = checked.run.exit_code(
+    reply.code = checked.run.exit_code(
         FailOn {
             strict: args.strict,
             max_warnings: args.max_warnings,
         },
         args.allow_incomplete,
     );
-    reply.notes = notes;
-    reply.code = code;
     Ok(reply)
+}
+
+/// The `fix` tool: fix, and say what happened.
+pub fn fix(ctx: &Context, args: &FixArgs, format: reply::Format) -> Result<Reply> {
+    let fixed = apply(ctx, args, true)?;
+    let reply = Reply::data(format, &fixed, || fixed.diff.clone())?;
+    Ok(reply.with_messages(&fixed.lines()))
 }
 
 /// Analyzes the project and keeps what the arguments report.
@@ -91,15 +90,34 @@ fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
             ..ModelOptions::default()
         },
         record_model_labels: args.record_model_labels,
-        detached: false,
+        ..CheckRequest::default()
     };
     lighthouse_session::check(&session, &request)
 }
 
-/// The reply of a dry run: the diff is the data.
-fn report_dry_run(done: &Fixed, printing: &Printing) -> Result<Reply> {
-    match printing.format {
-        CheckFormat::Json => Reply::json(serde_json::to_value(fix::report(done))?),
-        _ => Ok(Reply::text(done.diff.clone())),
+/// Fixes what `args` selects. `store` says whether the run is remembered.
+fn apply(ctx: &Context, args: &FixArgs, store: bool) -> Result<Fixed> {
+    if ctx.confined()
+        && args.fingerprints.is_empty()
+        && args.paths.is_empty()
+        && args.decision.is_empty()
+    {
+        return Err(
+            "name what to fix: `fingerprints` of findings, `paths`, or `decision`; a fix never defaults to the whole project"
+                .into(),
+        );
     }
+    let session = Session::load(ctx.config.as_deref())?;
+    let request = Selection {
+        targets: Targets {
+            paths: ctx.paths(&session.root, &args.paths)?,
+            fingerprints: args.fingerprints.clone(),
+            rules: args.decision.clone(),
+        },
+        dry_run: args.options.dry_run,
+        unsafe_fixes: args.options.unsafe_fixes,
+        fixer: args.options.fixer.clone(),
+        store,
+    };
+    fix::run(&session, &request)
 }

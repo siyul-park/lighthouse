@@ -2,7 +2,7 @@
 //! operations. Each call runs on the blocking pool because checks start
 //! processes and open SQLite.
 
-use crate::surface::{Context, tools};
+use crate::surface::{Context, Reply, reply::Body, tools};
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
     model::{
@@ -69,7 +69,20 @@ impl ServerHandler for Lighthouse {
                     None,
                 ));
             }
-            (_, Some(Ok(reply))) => CallToolResult::structured(reply.value),
+            (
+                _,
+                Some(Ok(Reply {
+                    body: Body::Json(value),
+                    ..
+                })),
+            ) => CallToolResult::structured(value),
+            (
+                _,
+                Some(Ok(Reply {
+                    body: Body::Text(text),
+                    ..
+                })),
+            ) => CallToolResult::success(vec![ContentBlock::text(text)]),
             (_, Some(Err(e))) => CallToolResult::error(vec![ContentBlock::text(e.to_string())]),
         };
         Ok(result.into())

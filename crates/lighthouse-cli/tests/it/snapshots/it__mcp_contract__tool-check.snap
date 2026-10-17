@@ -121,77 +121,112 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
   "outputSchema": {
     "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/check-report.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "properties": {
-      "counts": {
+    "anyOf": [
+      {
+        "description": "The findings grouped by decision.",
         "properties": {
-          "allowed": {
-            "minimum": 0,
-            "type": "integer"
+          "counts": {
+            "description": "The counts of a compact report: findings by severity (a subject left to\nreview is no finding) and those that ask for review, always; the rest when\nthey are not zero.",
+            "properties": {
+              "allowed": {
+                "description": "Findings source directives suppress.",
+                "format": "uint",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "error": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "info": {
+                "format": "uint",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "review": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "suppressed": {
+                "description": "Findings judgments kept out of the report.",
+                "format": "uint",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "warn": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "error",
+              "warn",
+              "review"
+            ],
+            "type": "object"
           },
-          "error": {
-            "minimum": 0,
-            "type": "integer"
+          "groups": {
+            "items": true,
+            "type": "array"
           },
-          "info": {
-            "minimum": 0,
-            "type": "integer"
+          "incomplete": {
+            "description": "What was not checked: `[path, reason]` pairs.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
           },
-          "review": {
-            "minimum": 0,
-            "type": "integer"
+          "judgments": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "What each judgment says; present with `resolve`.",
+            "type": [
+              "object",
+              "null"
+            ]
           },
-          "suppressed": {
-            "minimum": 0,
-            "type": "integer"
+          "messages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
-          "warn": {
-            "minimum": 0,
-            "type": "integer"
-          }
-        },
-        "required": [
-          "error",
-          "warn",
-          "review"
-        ],
-        "type": "object"
-      },
-      "findings": {
-        "items": {
-          "type": "object"
-        },
-        "type": "array"
-      },
-      "groups": {
-        "items": {
-          "type": "object"
-        },
-        "type": "array"
-      },
-      "incomplete": {
-        "items": {},
-        "type": "array"
-      },
-      "judgments": {},
-      "messages": {
-        "items": {
-          "type": "string"
-        },
-        "type": "array"
-      },
-      "omitted": {
-        "oneOf": [
-          {
-            "minimum": 0,
-            "type": "integer"
-          },
-          {
+          "omitted": {
+            "description": "What the limit left out.",
             "properties": {
               "findings": {
+                "format": "uint",
                 "minimum": 0,
                 "type": "integer"
               },
               "groups": {
+                "format": "uint",
                 "minimum": 0,
                 "type": "integer"
               }
@@ -200,69 +235,193 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               "groups",
               "findings"
             ],
-            "type": "object"
-          }
-        ]
-      },
-      "reasons": {},
-      "resolve": {
-        "type": "string"
-      },
-      "status": {
-        "enum": [
-          "clean",
-          "findings",
-          "incomplete",
-          "review"
-        ]
-      },
-      "summary": {
-        "properties": {
-          "allowed": {
-            "minimum": 0,
-            "type": "integer"
+            "type": [
+              "object",
+              "null"
+            ]
           },
-          "errors": {
-            "minimum": 0,
-            "type": "integer"
+          "resolve": {
+            "description": "How a judgment is recorded, said once for all groups; present when a\nshown finding asks for review.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "How a compact report stands.",
+            "oneOf": [
+              {
+                "enum": [
+                  "clean"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "findings",
+                "description": "Some finding is a decision's verdict.",
+                "type": "string"
+              },
+              {
+                "const": "review",
+                "description": "Every finding is a subject nothing decided, left to review.",
+                "type": "string"
+              },
+              {
+                "const": "incomplete",
+                "description": "Part of the project was not checked.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "counts",
+          "groups"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "One self-contained record per finding.",
+        "properties": {
+          "findings": {
+            "items": true,
+            "type": "array"
           },
           "incomplete": {
-            "minimum": 0,
-            "type": "integer"
+            "items": {
+              "description": "A part of the project that was not checked, and why.",
+              "properties": {
+                "path": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "type": {
+                  "description": "`incomplete`.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "path",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           },
-          "infos": {
-            "minimum": 0,
-            "type": "integer"
+          "judgments": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "What each judgment says; present when a shown finding asks for review.",
+            "type": [
+              "object",
+              "null"
+            ]
           },
-          "reviews": {
+          "messages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "omitted": {
+            "description": "Findings the limit left out.",
+            "format": "uint",
             "minimum": 0,
             "type": "integer"
           },
           "status": {
+            "description": "How a run ended. `Incomplete` wins over everything: \"not checked\" is never\n\"passed\".",
             "enum": [
               "clean",
               "findings",
               "incomplete"
-            ]
+            ],
+            "type": "string"
           },
-          "suppressed": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "warnings": {
-            "minimum": 0,
-            "type": "integer"
+          "summary": {
+            "description": "The counts of a run, shared by every frontend that reports on one.",
+            "properties": {
+              "allowed": {
+                "description": "Findings that directives in the code suppress.",
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "errors": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "incomplete": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "infos": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reviews": {
+                "description": "Findings of decisions that authored `warn` or `info` and that no\njudgment stands for: the ones that ask for review.",
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "description": "How a run ended. `Incomplete` wins over everything: \"not checked\" is never\n\"passed\".",
+                "enum": [
+                  "clean",
+                  "findings",
+                  "incomplete"
+                ],
+                "type": "string"
+              },
+              "suppressed": {
+                "description": "Findings that judgments kept out of the report.",
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "warnings": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "status",
+              "errors",
+              "warnings",
+              "infos",
+              "reviews",
+              "incomplete",
+              "suppressed",
+              "allowed"
+            ],
+            "type": "object"
           }
         },
         "required": [
-          "status"
+          "findings",
+          "incomplete",
+          "omitted",
+          "status",
+          "summary",
+          "messages"
         ],
         "type": "object"
       }
-    },
-    "required": [
-      "status"
     ],
+    "description": "The `CheckReport` kind: the findings of a run for a program, with the gaps,\nthe counts and what the run has to say.",
     "title": "CheckReport",
     "type": "object"
   },

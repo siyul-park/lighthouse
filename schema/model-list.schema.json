@@ -1,31 +1,45 @@
 {
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-list.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The `ModelList` kind.",
   "properties": {
     "models": {
       "items": {
+        "description": "One model and what it is bound to.",
         "properties": {
           "binding": {
-            "enum": [
-              "classification",
-              "rule",
-              "attached"
-            ]
-          },
-          "decision": {
-            "anyOf": [
+            "description": "Where a binding comes from.",
+            "oneOf": [
               {
+                "const": "classification",
+                "description": "`models.classification`: the model for decisions nothing else binds.",
                 "type": "string"
               },
               {
-                "type": "null"
+                "const": "rule",
+                "description": "A rule of the configuration names it.",
+                "type": "string"
+              },
+              {
+                "const": "attached",
+                "description": "A trained model attached by an approved revision.",
+                "type": "string"
               }
             ]
           },
+          "decision": {
+            "description": "The decision it judges; none for the classification models.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "model": {
+            "description": "`<provider>/<model>`.",
             "type": "string"
           },
           "remote": {
+            "description": "Whether asking it reaches a service outside the machine.",
             "type": "boolean"
           }
         },
@@ -40,6 +54,8 @@
       "type": "array"
     },
     "omitted": {
+      "description": "How many models `limit` left out.",
+      "format": "uint",
       "minimum": 0,
       "type": "integer"
     }

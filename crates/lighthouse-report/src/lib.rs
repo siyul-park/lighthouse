@@ -10,8 +10,8 @@ use std::fmt::Write;
 
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 
-pub use group::{Entry, GroupOptions, Grouped};
-pub use report::{Briefing, Detail, Report, report, shown};
+pub use group::{Entry, GroupOptions, Grouped, Groups, Judgments, Omitted};
+pub use report::{Briefing, Compact, Counts, Detail, Full, Gap, Report, Status, report, shown};
 
 /// Output format of [`render`]. The JSON report of a check is [`report`]; it
 /// is not rendered here.

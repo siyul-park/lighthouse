@@ -5,7 +5,7 @@ use rmcp::model::{Resource, ResourceTemplate};
 
 pub const CATALOG: &str = "lighthouse://catalog";
 pub const CONFIG: &str = "lighthouse://config";
-const DECISION_PREFIX: &str = "lighthouse://decisions/";
+const DECISIONS: &str = "lighthouse://decisions/";
 const MARKDOWN: &str = "text/markdown";
 
 pub fn list() -> Vec<Resource> {
@@ -21,7 +21,7 @@ pub fn list() -> Vec<Resource> {
 
 pub fn templates() -> Vec<ResourceTemplate> {
     vec![
-        ResourceTemplate::new("lighthouse://decisions/{id}", "decision")
+        ResourceTemplate::new(format!("{DECISIONS}{{id}}"), "decision")
             .with_description(
                 "One decision rendered as Markdown: intent, requirement, examples, exceptions. The id contains a slash, e.g. lighthouse://decisions/design/exported-doc.",
             )
@@ -44,7 +44,7 @@ pub fn read(uri: &str) -> Result<(String, &'static str), String> {
             .map(|text| (text, "application/json"))
             .map_err(|e| e.to_string());
     }
-    let Some(id) = uri.strip_prefix(DECISION_PREFIX) else {
+    let Some(id) = uri.strip_prefix(DECISIONS) else {
         return Err(format!("unknown resource `{uri}`"));
     };
     decision_text(&session, id)

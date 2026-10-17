@@ -1,36 +1,46 @@
 {
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/review-list.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "properties": {
-    "groups": {
-      "items": {
-        "type": "object"
-      },
-      "type": "array"
-    },
-    "judgments": {},
-    "note": {
-      "type": "string"
-    },
-    "notices": {
-      "items": {
-        "type": "string"
-      },
-      "type": "array"
-    },
-    "omitted": {
-      "oneOf": [
-        {
-          "minimum": 0,
-          "type": "integer"
+  "anyOf": [
+    {
+      "description": "Grouped by decision.",
+      "properties": {
+        "groups": {
+          "items": true,
+          "type": "array"
         },
-        {
+        "judgments": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "What each judgment says; present with `resolve`.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notices": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "omitted": {
+          "description": "What the limit left out.",
           "properties": {
             "findings": {
+              "format": "uint",
               "minimum": 0,
               "type": "integer"
             },
             "groups": {
+              "format": "uint",
               "minimum": 0,
               "type": "integer"
             }
@@ -39,21 +49,303 @@
             "groups",
             "findings"
           ],
-          "type": "object"
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "resolve": {
+          "description": "How a judgment is recorded, said once for all groups; present when a\nshown finding asks for review.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
-      ]
-    },
-    "resolve": {
-      "type": "string"
-    },
-    "tasks": {
-      "items": {
-        "type": "object"
       },
-      "type": "array"
+      "required": [
+        "groups"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "One record per finding.",
+      "properties": {
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notices": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "omitted": {
+          "description": "How many findings `limit` left out.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tasks": {
+          "items": {
+            "description": "A finding as stored: its latest sighting, its history and its standing.",
+            "properties": {
+              "authoredSeverity": {
+                "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
+                "oneOf": [
+                  {
+                    "const": "error",
+                    "description": "Fails the run.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "warn",
+                    "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "info",
+                    "description": "Reported, never fails the run.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "catalogVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "commit": {
+                "description": "Commit and cleanliness of the working tree at the last sighting.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "decision": {
+                "type": "string"
+              },
+              "decisionUid": {
+                "description": "The uid of the finding's decision, when the catalog gave it one.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dirty": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "evidence": true,
+              "facts": true,
+              "fingerprint": {
+                "type": "string"
+              },
+              "firstSeen": {
+                "type": "string"
+              },
+              "inactiveAt": {
+                "description": "Set when the configuration no longer enables the finding's rule.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "judgment": {
+                "anyOf": [
+                  {
+                    "description": "A recorded label on one subject, as SARIF's `result.kind` says it: not\nground truth. `pass` and `fail` label the check's conformance part;\n`notApplicable` labels its applicability part (the decision should not\napply here).",
+                    "oneOf": [
+                      {
+                        "const": "pass",
+                        "description": "The subject conforms: a finding about it was a false positive.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "fail",
+                        "description": "The subject violates the decision: a finding about it is right.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "notApplicable",
+                        "description": "The decision does not apply to the subject.",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest judgment, if the finding was judged."
+              },
+              "justification": {
+                "description": "The justification of the suppression that goes with the judgment.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastSeen": {
+                "type": "string"
+              },
+              "lighthouseVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "locator": true,
+              "meaningVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "narrowing": {
+                "description": "The judgment said the decision does not apply here.",
+                "type": "boolean"
+              },
+              "options": true,
+              "path": {
+                "type": "string"
+              },
+              "reopened": {
+                "description": "How many times it came back after being resolved.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "resolvedAt": {
+                "description": "Set when a complete run no longer reported the finding.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "severity": {
+                "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
+                "oneOf": [
+                  {
+                    "const": "error",
+                    "description": "Fails the run.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "warn",
+                    "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "info",
+                    "description": "Reported, never fails the run.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "standing": {
+                "anyOf": [
+                  {
+                    "description": "What the latest judgment does to a finding now.",
+                    "oneOf": [
+                      {
+                        "const": "suppressed",
+                        "description": "The finding stays out of reports.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "judged",
+                        "description": "The finding is judged and stays in the report (`fail` with no\nsuppression).",
+                        "type": "string"
+                      },
+                      {
+                        "const": "rule-changed",
+                        "description": "The decision's meaning changed since the judgment: ask again.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "evidence-changed",
+                        "description": "The finding's evidence changed since the judgment: ask again.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsuppressible",
+                        "description": "Errors are definitive: no judgment hides them, whatever level they\nare configured at.",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "What that judgment does to the finding now."
+              },
+              "state": {
+                "description": "Where a finding is in its life; a judgment that hides it wins over the\nrest.",
+                "enum": [
+                  "open",
+                  "resolved",
+                  "inactive",
+                  "suppressed"
+                ],
+                "type": "string"
+              },
+              "symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "fingerprint",
+              "decision",
+              "severity",
+              "authoredSeverity",
+              "path",
+              "locator",
+              "symbol",
+              "firstSeen",
+              "lastSeen",
+              "resolvedAt",
+              "inactiveAt",
+              "state",
+              "reopened",
+              "message",
+              "evidence",
+              "facts",
+              "options",
+              "commit",
+              "dirty",
+              "lighthouseVersion",
+              "catalogVersion",
+              "meaningVersion",
+              "judgment",
+              "standing",
+              "narrowing"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tasks",
+        "omitted"
+      ],
+      "type": "object"
     }
-  },
-  "required": [],
+  ],
+  "description": "The `ReviewList` kind: the findings that ask for review.",
   "title": "ReviewList",
   "type": "object"
 }

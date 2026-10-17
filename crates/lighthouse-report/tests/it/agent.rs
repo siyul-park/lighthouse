@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Position, Severity, Span};
 use lighthouse_report::{Briefing, Detail, Format, render, shown};
 
-use crate::plain;
+use crate::{json_of, plain};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
@@ -562,7 +562,7 @@ fn report_has_the_fields_the_json_prints() {
         reason: "plugin crashed".to_owned(),
     }];
     let report = lighthouse_report::report(&findings, &gaps, &briefing);
-    let fields = &report.fields;
+    let fields = &json_of(&report);
     assert_eq!(fields["status"], "incomplete");
     assert_eq!(fields["groups"].as_array().unwrap().len(), 1);
     assert_eq!(fields["omitted"], json!({ "groups": 1, "findings": 1 }));
@@ -581,11 +581,12 @@ fn report_has_the_fields_the_json_prints() {
             ..Briefing::default()
         },
     );
-    assert_eq!(all.fields["status"], "findings");
-    assert_eq!(all.fields["groups"].as_array().unwrap().len(), 2);
-    assert!(all.fields.get("omitted").is_none());
-    assert!(all.fields["judgments"].is_object());
-    assert!(all.fields["resolve"].is_string());
+    let all = json_of(&all);
+    assert_eq!(all["status"], "findings");
+    assert_eq!(all["groups"].as_array().unwrap().len(), 2);
+    assert!(all.get("omitted").is_none());
+    assert!(all["judgments"].is_object());
+    assert!(all["resolve"].is_string());
 
     let full = lighthouse_report::report(
         &findings,
@@ -597,9 +598,10 @@ fn report_has_the_fields_the_json_prints() {
             ..Briefing::default()
         },
     );
-    assert_eq!(full.fields["findings"][0]["type"], "finding");
-    assert_eq!(full.fields["omitted"], 1);
-    assert_eq!(full.fields["incomplete"][0]["reason"], "plugin crashed");
+    let full = json_of(&full);
+    assert_eq!(full["findings"][0]["type"], "finding");
+    assert_eq!(full["omitted"], 1);
+    assert_eq!(full["incomplete"][0]["reason"], "plugin crashed");
 }
 
 #[test]

@@ -9,9 +9,12 @@ use std::{
 };
 
 use clap::{CommandFactory, FromArgMatches};
-use command::{Cli, Command, DocsCommand, HookAgent, SpecCommand};
+use command::{Agent, CacheCommand, Cli, Command, DocsCommand, SpecCommand};
 
-use lighthouse_cli::surface::{Context, Reply, reply::USAGE};
+use lighthouse_cli::surface::{
+    Context, Reply,
+    reply::{Body, USAGE},
+};
 
 mod color;
 mod command;
@@ -51,7 +54,9 @@ fn run(cli: &Cli) -> Result<u8> {
             let ctx = Context::person(cli.config.clone());
             Ok(emit(&lighthouse_cli::surface::run(&ctx, action)?))
         }
-        Command::Cache { .. } => project::cache_clean(),
+        Command::Cache {
+            command: CacheCommand::Clean,
+        } => project::cache_clean(config),
         Command::Spec {
             command: SpecCommand::Validate { paths, examples },
         } => spec::validate(config, paths, *examples),
@@ -64,18 +69,16 @@ fn run(cli: &Cli) -> Result<u8> {
             reference::completions((*shell).into());
             Ok(0)
         }
-        Command::Init { agent } => project::init(*agent),
+        Command::Init { agent } => project::init(config, *agent),
         Command::Trust { revoke, yes } => project::trust(config, *revoke, *yes),
         Command::Mcp => {
             lighthouse_cli::mcp::serve()?;
             Ok(0)
         }
         Command::Hook {
-            agent:
-                HookAgent::ClaudeCode {
-                    event,
-                    allow_incomplete,
-                },
+            agent: Agent::ClaudeCode,
+            event,
+            allow_incomplete,
         } => Ok(hook::run(*event, *allow_incomplete)),
     }
 }
@@ -87,7 +90,10 @@ fn emit(reply: &Reply) -> u8 {
         eprintln!("{note}");
     }
     let mut out = io::stdout().lock();
-    let _ = out.write_all(reply.stdout.as_bytes());
+    let _ = match &reply.body {
+        Body::Text(text) => out.write_all(text.as_bytes()),
+        Body::Json(value) => writeln!(out, "{value}"),
+    };
     let _ = out.flush();
     reply.code
 }

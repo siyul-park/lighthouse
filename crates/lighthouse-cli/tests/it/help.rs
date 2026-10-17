@@ -1,7 +1,7 @@
 //! The help of the loop commands: short summaries, and examples where the
 //! design asks for them.
 
-use lighthouse_cli::surface::cli::{command, command_at, help};
+use lighthouse_cli::surface::commands::{command, command_at, help};
 
 /// The longest summary `--help` lists next to a command.
 const SHORT_HELP_LIMIT: usize = 80;
@@ -21,7 +21,7 @@ fn walk(
 
 #[test]
 fn every_summary_is_at_most_eighty_characters() {
-    walk(&command(), &mut Vec::new(), &mut |path, command| {
+    walk(command(), &mut Vec::new(), &mut |path, command| {
         let about = command
             .get_about()
             .map(ToString::to_string)

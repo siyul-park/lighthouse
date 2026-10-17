@@ -42,7 +42,7 @@ Options:
           Why, written for the next reader
 
       --attributed-to <WHO>
-          Who the judgment is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          Who this is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
           
           [env: LIGHTHOUSE_ATTRIBUTED_TO=]
 

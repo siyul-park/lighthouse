@@ -198,12 +198,16 @@ impl Session {
     }
 }
 
-/// The project root as commands that need no plugins see it: the directory of
-/// the `lighthouse.toml` found upward from the current directory, else the
-/// current directory. Nothing of the project is loaded, so a broken decision or
-/// catalog cannot get in the way.
-pub fn project_root() -> Result<PathBuf> {
+/// The project root as commands that need no plugins see it: the current
+/// directory when `config` names the project file, else the directory of the
+/// `lighthouse.toml` found upward from it, else the current directory. Nothing
+/// of the project is loaded, so a broken decision or catalog cannot get in
+/// the way.
+pub fn project_root(config: Option<&Path>) -> Result<PathBuf> {
     let here = env::current_dir()?;
+    if config.is_some() {
+        return Ok(here);
+    }
     let found = here.ancestors().find(|dir| Config::file_in(dir).is_some());
     Ok(found.map_or(here.clone(), Path::to_owned))
 }

@@ -159,7 +159,7 @@ fn record_inserts_refreshes_and_reopens_findings() {
     assert_eq!(first.authored_severity, Severity::Info);
     assert_eq!(first.lighthouse_version.as_deref(), Some("0.1.0"));
     assert_eq!(first.catalog_version.as_deref(), Some("cat1"));
-    assert_eq!(first.state(), State::Open);
+    assert_eq!(first.state, State::Open);
 
     finding.message = "newer".to_owned();
     finding.facts = json!({ "language": "go", "callers": 9 });
@@ -174,7 +174,7 @@ fn record_inserts_refreshes_and_reopens_findings() {
     assert_eq!(gone.resolved, 1);
     let resolved = store.finding("f1").unwrap();
     assert!(resolved.resolved_at.is_some());
-    assert_eq!(resolved.state(), State::Resolved);
+    assert_eq!(resolved.state, State::Resolved);
 
     let back = store.record(&run(vec![finding])).unwrap();
     assert_eq!(back.reopened, 1);
@@ -251,7 +251,7 @@ fn findings_of_rules_no_longer_configured_go_inactive_and_come_back() {
     assert_eq!(store.record(&only_a).unwrap().deactivated, 1);
     let dropped = store.finding("dropped").unwrap();
     assert!(dropped.inactive_at.is_some());
-    assert_eq!(dropped.state(), State::Inactive);
+    assert_eq!(dropped.state, State::Inactive);
     assert_eq!(fingerprints(&store, &status(StatusFilter::Open)), ["kept"]);
     assert_eq!(
         fingerprints(&store, &status(StatusFilter::Inactive)),
@@ -435,9 +435,9 @@ fn standings_follow_the_latest_judgment() {
 
     judge(&mut store, "reconsidered", Judgment::Fail);
     assert_eq!(standing_of(&store, "reconsidered"), Some(Standing::Judged));
-    assert_eq!(store.finding("reconsidered").unwrap().state(), State::Open);
-    assert_eq!(store.finding("pass").unwrap().state(), State::Suppressed);
-    assert_eq!(store.finding("fail").unwrap().state(), State::Open);
+    assert_eq!(store.finding("reconsidered").unwrap().state, State::Open);
+    assert_eq!(store.finding("pass").unwrap().state, State::Suppressed);
+    assert_eq!(store.finding("fail").unwrap().state, State::Open);
 }
 
 #[test]
@@ -623,6 +623,19 @@ fn observed_records_a_diagnostic_and_digests_its_evidence() {
     assert_eq!(spaced.evidence_digest(), record.evidence_digest());
     spaced.evidence = json!({ "name": "a b", "n": 2 });
     assert_ne!(spaced.evidence_digest(), record.evidence_digest());
+}
+
+#[test]
+fn a_finding_starts_where_its_locator_says_and_at_zero_without_a_span() {
+    let mut located = observed("f1", "design/a", "a.go");
+    located.locator = json!({ "span": { "start": { "line": 7, "col": 3 } } });
+    let mut bare = observed("f2", "design/a", "a.go");
+    bare.locator = json!({});
+    let store = memory_with(&[located, bare]);
+    let at = store.finding("f1").unwrap();
+    assert_eq!((at.line(), at.col()), (7, 3));
+    let nowhere = store.finding("f2").unwrap();
+    assert_eq!((nowhere.line(), nowhere.col()), (0, 0));
 }
 
 #[test]

@@ -2,6 +2,8 @@
 //! first line of a doc comment is the command's one-line summary (its MCP
 //! `title`), the whole comment its long help (its MCP `description`).
 
+use std::sync::OnceLock;
+
 use clap::{Args, Subcommand};
 
 use crate::surface::{
@@ -11,8 +13,8 @@ use crate::surface::{
         DocumentArgs, FingerprintArgs, FixOptions, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
         ModelRebuildArgs, ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
     },
-    attach, check, decision, eval, model, rebuild,
-    reply::{CheckFormat, Context, OutputArg, Reply},
+    check, decision, model,
+    reply::{CheckFormat, Context, FormatArg, Reply},
     review,
 };
 
@@ -98,7 +100,7 @@ pub enum Action {
 }
 
 /// `check`.
-#[derive(Debug, Args)]
+#[derive(Debug, Default, Args)]
 pub struct CheckCommand {
     #[command(flatten)]
     pub args: CheckArgs,
@@ -128,14 +130,14 @@ pub enum DecisionCommand {
         #[command(flatten)]
         args: DecisionListArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Show a decision or rule: context, requirement, examples and status.
     Show {
         #[command(flatten)]
         args: DecisionShowArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Add a project-local decision from a Decision document.
     ///
@@ -148,7 +150,7 @@ pub enum DecisionCommand {
         #[command(flatten)]
         args: DocumentArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Replace a project-local decision with a Decision document.
     ///
@@ -160,7 +162,7 @@ pub enum DecisionCommand {
         #[command(flatten)]
         args: DocumentArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Run the examples of checked decisions through the whole engine.
     ///
@@ -172,7 +174,7 @@ pub enum DecisionCommand {
         #[command(flatten)]
         args: DecisionTestArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Measure a decision's check against its labels.
     ///
@@ -189,7 +191,7 @@ pub enum DecisionCommand {
         #[command(flatten)]
         args: DecisionEvalArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
 }
 
@@ -205,14 +207,14 @@ pub enum ReviewCommand {
         #[command(flatten)]
         args: ReviewListArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Show one finding: where it is, its evidence and its latest review.
     Show {
         #[command(flatten)]
         args: FingerprintArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Record a judgment on a finding.
     ///
@@ -233,14 +235,14 @@ pub enum ReviewCommand {
         #[command(flatten)]
         args: ReviewResolveArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Show every judgment recorded on a finding, oldest first.
     History {
         #[command(flatten)]
         args: FingerprintArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Delete resolved and inactive findings that nobody judged.
     ///
@@ -264,12 +266,12 @@ pub enum ModelCommand {
         #[command(flatten)]
         args: ModelListArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Fit a model on the labels of a decision.
     ///
-    /// The labels are the baseline rows, the judgments recorded under its
-    /// current meaning version, and optionally the answers of another model;
+    /// The labels are the rows of the labels table, the judgments recorded
+    /// under its current meaning version, and optionally the answers of another model;
     /// the decision's examples ride in the question. Writes the dataset under
     /// `.lighthouse/datasets/` and the model under `.lighthouse/models/`, named
     /// by its digest; it binds nothing (bind `local/learned@sha256:<hex>`).
@@ -278,7 +280,7 @@ pub enum ModelCommand {
         #[command(flatten)]
         args: ModelTrainArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Make a model the first layer of a decision, by a revision.
     ///
@@ -293,7 +295,7 @@ pub enum ModelCommand {
         #[command(flatten)]
         args: ModelAttachArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Remove the model a revision attached to a decision.
     ///
@@ -303,7 +305,7 @@ pub enum ModelCommand {
         #[command(flatten)]
         args: ModelDetachArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
     /// Make the missing artifacts of attached models again, from their labels.
     ///
@@ -321,7 +323,7 @@ pub enum ModelCommand {
         #[command(flatten)]
         args: ModelRebuildArgs,
         #[command(flatten)]
-        output: OutputArg,
+        output: FormatArg,
     },
 }
 
@@ -335,44 +337,57 @@ struct Tree {
 /// Runs the command.
 pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
     match action {
-        Action::Check(command) => check::run(
-            ctx,
-            &command.args,
-            &check::Printing {
-                format: command.format,
-                timings: command.timings,
-                fixing: command.fix.then(|| command.options.clone()),
-            },
-        ),
-        Action::Decision { command } => decision_command(ctx, command),
-        Action::Review { command } => review_command(ctx, command),
+        Action::Check(command) => check::check(ctx, command),
+        Action::Decision { command } => match command {
+            DecisionCommand::List { args, output } => decision::list(ctx, args, output.format),
+            DecisionCommand::Show { args, output } => decision::show(ctx, args, output.format),
+            DecisionCommand::Create { args, output } => decision::create(
+                ctx,
+                &decision::read_document(&args.document)?,
+                output.format,
+            ),
+            DecisionCommand::Update { args, output } => decision::update(
+                ctx,
+                &decision::read_document(&args.document)?,
+                output.format,
+            ),
+            DecisionCommand::Test { args, output } => decision::test(ctx, args, output.format),
+            DecisionCommand::Eval { args, output } => decision::eval(ctx, args, output.format),
+        },
+        Action::Review { command } => match command {
+            ReviewCommand::List { args, output } => review::list(ctx, args, output.format),
+            ReviewCommand::Show { args, output } => review::show(ctx, args, output.format),
+            ReviewCommand::Resolve { args, output } => review::resolve(ctx, args, output.format),
+            ReviewCommand::History { args, output } => review::history(ctx, args, output.format),
+            ReviewCommand::Prune { older_than } => review::prune(ctx, *older_than),
+        },
         Action::Model { command } => match command {
             ModelCommand::List { args, output } => model::list(ctx, args, output.format),
-            ModelCommand::Train { args, output } => model::train_model(ctx, args, output.format),
-            ModelCommand::Attach { args, output } => attach::attach(ctx, args, output.format),
-            ModelCommand::Detach { args, output } => attach::detach(ctx, args, output.format),
-            ModelCommand::Rebuild { args, output } => rebuild::run(ctx, args, output.format),
+            ModelCommand::Train { args, output } => model::train(ctx, args, output.format),
+            ModelCommand::Attach { args, output } => model::attach(ctx, args, output.format),
+            ModelCommand::Detach { args, output } => model::detach(ctx, args, output.format),
+            ModelCommand::Rebuild { args, output } => model::rebuild(ctx, args, output.format),
         },
     }
 }
 
-/// The clap command of the agent-loop commands, to walk by path.
-pub fn command() -> clap::Command {
-    <Tree as clap::CommandFactory>::command()
+/// The clap command of the agent-loop commands, built once, to walk by path.
+pub fn command() -> &'static clap::Command {
+    static TREE: OnceLock<clap::Command> = OnceLock::new();
+    TREE.get_or_init(|| {
+        let mut tree = <Tree as clap::CommandFactory>::command();
+        tree.build();
+        tree
+    })
 }
 
 /// The command at `path`, with the arguments it inherits built in.
-pub fn command_at(path: &[&str]) -> clap::Command {
-    let mut root = command();
-    root.build();
-    let mut command = root;
-    for name in path {
-        command = command
+pub fn command_at(path: &[&str]) -> &'static clap::Command {
+    path.iter().fold(command(), |command, name| {
+        command
             .find_subcommand(name)
             .unwrap_or_else(|| panic!("no command `{name}`"))
-            .clone();
-    }
-    command
+    })
 }
 
 /// The one-line summary and the long help of the command at `path`: what the
@@ -391,35 +406,4 @@ pub fn help(path: &[&str]) -> (String, String) {
         long = format!("{long}\n\n{examples}");
     }
     (about, long)
-}
-
-fn decision_command(ctx: &Context, command: &DecisionCommand) -> Result<Reply> {
-    match command {
-        DecisionCommand::List { args, output } => decision::list(ctx, args, output.format),
-        DecisionCommand::Show { args, output } => decision::show(ctx, args, output.format),
-        DecisionCommand::Create { args, output } => decision::author(
-            ctx,
-            &decision::read_document(&args.document)?,
-            true,
-            output.format,
-        ),
-        DecisionCommand::Update { args, output } => decision::author(
-            ctx,
-            &decision::read_document(&args.document)?,
-            false,
-            output.format,
-        ),
-        DecisionCommand::Test { args, output } => decision::test(ctx, args, output.format),
-        DecisionCommand::Eval { args, output } => eval::run(ctx, args, output.format),
-    }
-}
-
-fn review_command(ctx: &Context, command: &ReviewCommand) -> Result<Reply> {
-    match command {
-        ReviewCommand::List { args, output } => review::list(args, output.format),
-        ReviewCommand::Show { args, output } => review::show(args, output.format),
-        ReviewCommand::Resolve { args, output } => review::resolve(ctx, args, output.format),
-        ReviewCommand::History { args, output } => review::history(args, output.format),
-        ReviewCommand::Prune { older_than } => review::prune(*older_than),
-    }
 }

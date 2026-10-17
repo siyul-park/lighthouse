@@ -8,6 +8,7 @@ use std::path::Path;
 use lighthouse_ml::rebuild::{Learned, Status};
 use lighthouse_spec::Decision;
 use lighthouse_store::Records;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::{Labelling, attached, train::labelled};
@@ -20,8 +21,9 @@ pub struct RebuildRequest {
     pub labelling: Labelling,
 }
 
-/// How the model attached to a decision came out.
-#[derive(Debug, Serialize)]
+/// How the model attached to a decision came out: a row of the `ModelRebuild`
+/// kind.
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Rebuilt {
     pub decision: String,
     pub model: String,

@@ -1,12 +1,21 @@
 //! The agent-loop commands as tools: one table says which command each tool
-//! is the twin of, what it returns and what it may do to the world. Titles
-//! and descriptions come from the command's own help; input schemas from the
-//! arguments struct that also holds the command's flags.
+//! is the twin of, what it returns, what it may do to the world and how it
+//! runs. Titles and descriptions come from the command's own help; the
+//! schemas of its arguments and of its result from the structs that hold the
+//! command's flags and the data it prints.
 
-use lighthouse_session::{Session, model::remote_bound};
+use std::collections::BTreeMap;
+
+use lighthouse_resource::{SCHEMA_URL_BASE, schema_file};
+use lighthouse_session::{
+    Authored, CheckReport, Session,
+    fix::Fixed,
+    model::{Attachment, Detachment, EvalReport, Rebuilt, Trained, remote_bound},
+    review::{FindingRecord, Recorded},
+};
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::surface::{
     Result,
@@ -15,9 +24,12 @@ use crate::surface::{
         DocumentArgs, FingerprintArgs, FixArgs, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
         ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
     },
-    attach, check, cli, decision, eval, fix, model,
-    reply::{CheckFormat, Context, Output, Reply},
-    review,
+    check,
+    commands::{self, CheckCommand},
+    decision::{self, DecisionList, DecisionShow, DecisionTested},
+    model::{self, ModelList},
+    reply::{CheckFormat, Context, Format, Reply},
+    review::{self, JudgmentHistory, ReviewList},
 };
 
 /// What the tool `fix` is: the twin of `check --fix`, as its own tool because
@@ -25,169 +37,129 @@ use crate::surface::{
 const FIX_TITLE: &str = "Fix findings with the fixers their decisions name.";
 const FIX_DESCRIPTION: &str = "Fix findings with the fixers the decisions name (`fixable: safe|suggested` in `decision_list`). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafeFixes` is set. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.";
 
-const READ: Hints = Hints {
-    read_only: true,
-    destructive: false,
-    idempotent: true,
-    open_world: false,
-};
+/// The kind of what `model rebuild` prints, which is no tool.
+const REBUILD_KIND: &str = "ModelRebuild";
 
 /// The tools, in the order they are listed.
 pub const TOOLS: [Tool; 16] = [
-    Tool::new(
+    Tool::new::<CheckArgs, CheckReport>(
         "check",
         &["check"],
         "CheckReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: true,
+        Hints::WRITE.open(),
+        |ctx, args| {
+            let command = CheckCommand {
+                args: parse(args)?,
+                format: CheckFormat::Json,
+                ..CheckCommand::default()
+            };
+            check::check(ctx, &command)
         },
-        schema::<CheckArgs>,
     ),
-    Tool::new(
+    Tool::new::<FixArgs, Fixed>(
         "fix",
         &["check"],
         "FixReport",
-        Hints {
-            read_only: false,
-            destructive: true,
-            idempotent: true,
-            open_world: false,
-        },
-        schema::<FixArgs>,
+        Hints::WRITE.destructive(),
+        |ctx, args| check::fix(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<DecisionListArgs, DecisionList>(
         "decision_list",
         &["decision", "list"],
         "DecisionList",
-        READ,
-        schema::<DecisionListArgs>,
+        Hints::READ,
+        |ctx, args| decision::list(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<DecisionShowArgs, DecisionShow>(
         "decision_show",
         &["decision", "show"],
         "DecisionShow",
-        READ,
-        schema::<DecisionShowArgs>,
+        Hints::READ,
+        |ctx, args| decision::show(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<DocumentArgs, Authored>(
         "decision_create",
         &["decision", "create"],
-        "AuthorReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: false,
-            open_world: false,
-        },
-        schema::<DocumentArgs>,
+        "DecisionReport",
+        Hints::WRITE.repeatable(),
+        |ctx, args| decision::create(ctx, &parse::<DocumentArgs>(args)?.document, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<DocumentArgs, Authored>(
         "decision_update",
         &["decision", "update"],
-        "AuthorReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: false,
-        },
-        schema::<DocumentArgs>,
+        "DecisionReport",
+        Hints::WRITE,
+        |ctx, args| decision::update(ctx, &parse::<DocumentArgs>(args)?.document, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<DecisionTestArgs, DecisionTested>(
         "decision_test",
         &["decision", "test"],
-        "TestReport",
-        READ,
-        schema::<DecisionTestArgs>,
+        "DecisionTest",
+        Hints::READ,
+        |ctx, args| decision::test(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<DecisionEvalArgs, EvalReport>(
         "decision_eval",
         &["decision", "eval"],
-        "EvalReport",
-        Hints {
-            open_world: true,
-            ..READ
-        },
-        schema::<DecisionEvalArgs>,
+        "DecisionEval",
+        Hints::READ.open(),
+        |ctx, args| decision::eval(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<ReviewListArgs, ReviewList>(
         "review_list",
         &["review", "list"],
         "ReviewList",
-        READ,
-        schema::<ReviewListArgs>,
+        Hints::READ,
+        |ctx, args| review::list(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<FingerprintArgs, FindingRecord>(
         "review_show",
         &["review", "show"],
         "Finding",
-        READ,
-        schema::<FingerprintArgs>,
+        Hints::READ,
+        |ctx, args| review::show(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<ReviewResolveArgs, Recorded>(
         "review_resolve",
         &["review", "resolve"],
-        "ResolveReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: false,
-        },
-        schema::<ReviewResolveArgs>,
+        "ReviewResolve",
+        Hints::WRITE,
+        |ctx, args| review::resolve(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<FingerprintArgs, JudgmentHistory>(
         "review_history",
         &["review", "history"],
         "JudgmentHistory",
-        READ,
-        schema::<FingerprintArgs>,
+        Hints::READ,
+        |ctx, args| review::history(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<ModelListArgs, ModelList>(
         "model_list",
         &["model", "list"],
         "ModelList",
-        READ,
-        schema::<ModelListArgs>,
+        Hints::READ,
+        |ctx, args| model::list(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<ModelTrainArgs, Trained>(
         "model_train",
         &["model", "train"],
-        "TrainReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: false,
-            open_world: true,
-        },
-        schema::<ModelTrainArgs>,
+        "ModelTrain",
+        Hints::WRITE.repeatable().open(),
+        |ctx, args| model::train(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<ModelAttachArgs, Attachment>(
         "model_attach",
         &["model", "attach"],
-        "AttachReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: true,
-        },
-        schema::<ModelAttachArgs>,
+        "ModelAttach",
+        Hints::WRITE.open(),
+        |ctx, args| model::attach(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new(
+    Tool::new::<ModelDetachArgs, Detachment>(
         "model_detach",
         &["model", "detach"],
-        "DetachReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: false,
-        },
-        schema::<ModelDetachArgs>,
+        "ModelDetach",
+        Hints::WRITE,
+        |ctx, args| model::detach(ctx, &parse(args)?, Format::Json),
     ),
 ];
 
@@ -201,6 +173,45 @@ pub struct Hints {
     pub open_world: bool,
 }
 
+impl Hints {
+    /// Changes nothing.
+    const READ: Self = Self {
+        read_only: true,
+        destructive: false,
+        idempotent: true,
+        open_world: false,
+    };
+    /// Writes, and doing it again changes nothing more.
+    const WRITE: Self = Self {
+        read_only: false,
+        ..Self::READ
+    };
+
+    /// Also overwrites what was there.
+    const fn destructive(self) -> Self {
+        Self {
+            destructive: true,
+            ..self
+        }
+    }
+
+    /// Doing it again changes more.
+    const fn repeatable(self) -> Self {
+        Self {
+            idempotent: false,
+            ..self
+        }
+    }
+
+    /// Also reaches outside the machine when a remote model is bound.
+    const fn open(self) -> Self {
+        Self {
+            open_world: true,
+            ..self
+        }
+    }
+}
+
 /// An agent-loop command as a tool.
 #[derive(Debug, Clone, Copy)]
 pub struct Tool {
@@ -212,29 +223,41 @@ pub struct Tool {
     pub kind: &'static str,
     pub hints: Hints,
     input: fn() -> Value,
+    output: fn() -> Value,
+    call: fn(&Context, Value) -> Result<Reply>,
 }
 
 impl Tool {
-    /// A tool of the table.
-    const fn new(
+    /// A tool of the table: its arguments `A` and the data `D` it returns.
+    const fn new<A: JsonSchema, D: JsonSchema>(
         name: &'static str,
         path: &'static [&'static str],
         kind: &'static str,
         hints: Hints,
-        input: fn() -> Value,
+        call: fn(&Context, Value) -> Result<Reply>,
     ) -> Self {
         Self {
             name,
             path,
             kind,
             hints,
-            input,
+            input: input::<A>,
+            output: output::<D>,
+            call,
         }
     }
 
-    /// The JSON Schema of the arguments, from the struct of the flags.
+    /// The JSON Schema of the arguments, from the struct of the flags: an
+    /// object that takes no other.
     pub fn input_schema(&self) -> Value {
-        (self.input)()
+        let mut schema = (self.input)();
+        schema["additionalProperties"] = Value::Bool(false);
+        schema
+    }
+
+    /// The JSON Schema of the result, as `lighthouse schema` prints it.
+    pub fn output_schema(&self) -> Value {
+        document(self.kind, (self.output)())
     }
 
     /// The one-line summary and the long help of the command.
@@ -242,7 +265,7 @@ impl Tool {
         if self.name == "fix" {
             return (FIX_TITLE.to_owned(), FIX_DESCRIPTION.to_owned());
         }
-        cli::help(self.path)
+        commands::help(self.path)
     }
 
     /// Whether the tool may reach outside the machine in `session`'s project.
@@ -256,10 +279,47 @@ pub fn tools() -> &'static [Tool] {
     &TOOLS
 }
 
-/// The schema of a struct of arguments as a tool's `inputSchema`: an object
-/// with the subschemas inline.
-pub fn schema<T: JsonSchema>() -> Value {
-    let generator = SchemaSettings::draft2020_12()
+/// Every output kind with its schema, by kind name: what the tools return,
+/// and what `model rebuild` prints.
+pub fn kinds() -> BTreeMap<&'static str, Value> {
+    let rebuild = (
+        REBUILD_KIND,
+        document(REBUILD_KIND, output::<Vec<Rebuilt>>()),
+    );
+    tools()
+        .iter()
+        .map(|tool| (tool.kind, tool.output_schema()))
+        .chain([rebuild])
+        .collect()
+}
+
+/// The schema of the arguments `T` a tool takes: what it may be given.
+pub fn input<T: JsonSchema>() -> Value {
+    describe::<T>(SchemaSettings::draft2020_12())
+}
+
+/// Runs the tool `name` with `arguments`. `None` when there is no such tool;
+/// an error when the arguments are not those of its command or the command
+/// fails. The reply is always JSON.
+pub fn call(ctx: &Context, name: &str, arguments: Value) -> Option<Result<Reply>> {
+    let tool = tools().iter().find(|t| t.name == name)?;
+    Some(dispatch(ctx, tool, arguments))
+}
+
+/// The schema of the result `T` a tool returns: what it always prints. The
+/// objects of an untagged enum are alternatives, and MCP wants the root to say
+/// it is an object.
+fn output<T: JsonSchema>() -> Value {
+    let mut schema = describe::<T>(SchemaSettings::draft2020_12().for_serialize());
+    if schema.get("anyOf").is_some() && schema.get("type").is_none() {
+        schema["type"] = json!("object");
+    }
+    schema
+}
+
+/// The schema of `T` with its subschemas inline.
+fn describe<T: JsonSchema>(settings: SchemaSettings) -> Value {
+    let generator = settings
         .with(|settings| settings.inline_subschemas = true)
         .into_generator();
     let mut schema =
@@ -267,32 +327,16 @@ pub fn schema<T: JsonSchema>() -> Value {
     if let Some(map) = schema.as_object_mut() {
         map.remove("$schema");
         map.remove("title");
-        map.insert("additionalProperties".to_owned(), Value::Bool(false));
     }
     schema
 }
 
-/// Runs the tool `name` with `arguments`. `None` when there is no such tool;
-/// an error when the arguments are not those of its command or the command
-/// fails. The reply is always JSON: its `value` is the `structuredContent`.
-pub fn call(ctx: &Context, name: &str, arguments: Value) -> Option<Result<Reply>> {
-    let tool = tools().iter().find(|t| t.name == name)?;
-    Some(dispatch(ctx, tool, arguments))
-}
-
-/// The long flag `--attributed-to` as the argument `attributedTo`.
-pub fn camel_case(flag: &str) -> String {
-    let mut name = String::new();
-    for (n, word) in flag.split('-').enumerate() {
-        if n == 0 {
-            name.push_str(word);
-        } else {
-            let mut letters = word.chars();
-            name.extend(letters.next().map(|c| c.to_ascii_uppercase()));
-            name.push_str(letters.as_str());
-        }
-    }
-    name
+/// The schema of a kind of output as a document: with its `$id` and title.
+fn document(kind: &str, mut schema: Value) -> Value {
+    schema["$schema"] = json!("https://json-schema.org/draft/2020-12/schema");
+    schema["$id"] = json!(format!("{SCHEMA_URL_BASE}/{}", schema_file(kind)));
+    schema["title"] = json!(kind);
+    schema
 }
 
 fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
@@ -302,64 +346,7 @@ fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
         arguments
     };
     known_keys(tool, &arguments)?;
-    let arguments = with_env(tool, arguments);
-    let json = Output::Json;
-    match tool.name {
-        "check" => check::run(
-            ctx,
-            &parse::<CheckArgs>(arguments)?,
-            &check::Printing {
-                format: CheckFormat::Json,
-                ..check::Printing::default()
-            },
-        ),
-        "fix" => fix::run(ctx, &parse::<FixArgs>(arguments)?, json),
-        "decision_list" => decision::list(ctx, &parse(arguments)?, json),
-        "decision_show" => decision::show(ctx, &parse(arguments)?, json),
-        "decision_create" => {
-            decision::author(ctx, &parse::<DocumentArgs>(arguments)?.document, true, json)
-        }
-        "decision_update" => decision::author(
-            ctx,
-            &parse::<DocumentArgs>(arguments)?.document,
-            false,
-            json,
-        ),
-        "decision_test" => decision::test(ctx, &parse(arguments)?, json),
-        "decision_eval" => eval::run(ctx, &parse(arguments)?, json),
-        "review_list" => review::list(&parse(arguments)?, json),
-        "review_show" => review::show(&parse(arguments)?, json),
-        "review_resolve" => review::resolve(ctx, &parse(arguments)?, json),
-        "review_history" => review::history(&parse(arguments)?, json),
-        "model_list" => model::list(ctx, &parse(arguments)?, json),
-        "model_train" => model::train_model(ctx, &parse(arguments)?, json),
-        "model_attach" => attach::attach(ctx, &parse(arguments)?, json),
-        "model_detach" => attach::detach(ctx, &parse(arguments)?, json),
-        other => Err(format!("unknown tool `{other}`").into()),
-    }
-}
-
-/// The arguments with those the caller left out filled from the environment
-/// variables the flags of the command read (`LIGHTHOUSE_ATTRIBUTED_TO`), so
-/// that a tool has the defaults of its command.
-fn with_env(tool: &Tool, mut arguments: Value) -> Value {
-    let schema = tool.input_schema();
-    let command = cli::command_at(tool.path);
-    let Some(given) = arguments.as_object_mut() else {
-        return arguments;
-    };
-    for arg in command.get_arguments() {
-        let (Some(long), Some(env)) = (arg.get_long(), arg.get_env()) else {
-            continue;
-        };
-        let name = camel_case(long);
-        let text = schema["properties"][&name]["type"] == "string";
-        let value = std::env::var(env).ok().filter(|value| !value.is_empty());
-        if let (true, Some(value), false) = (text, value, given.contains_key(&name)) {
-            given.insert(name, Value::String(value));
-        }
-    }
-    arguments
+    (tool.call)(ctx, arguments)
 }
 
 /// Refuses an argument the tool does not have, naming it: the structs that

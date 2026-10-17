@@ -18,6 +18,7 @@
 //! from the cache.
 
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     fs::{self, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
@@ -28,8 +29,8 @@ use lighthouse_model::{Attribution, Judgment, Label, SuppressionKind, Suppressio
 
 use lighthouse_protocol::{canonical, hash};
 use lighthouse_resource::{API_VERSION, Metadata, Resource, Spec};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
+use serde::{Deserialize, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use crate::{Error, Records};
@@ -222,6 +223,25 @@ impl JudgmentEvent {
             value["suppressions"] = Value::Array(suppressions);
         }
         value
+    }
+}
+
+impl Serialize for JudgmentEvent {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_json().serialize(serializer)
+    }
+}
+
+impl JsonSchema for JudgmentEvent {
+    fn schema_name() -> Cow<'static, str> {
+        "JudgmentEvent".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        json_schema!({
+            "type": "object",
+            "description": "A `Judgment` record with its `id`, its `label` and its `suppressions`.",
+        })
     }
 }
 

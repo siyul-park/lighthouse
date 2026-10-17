@@ -12,6 +12,8 @@ use std::{
 
 use lighthouse_resource::{API_VERSION, STATE_DIR, new_uid};
 use lighthouse_spec::{Catalog, local_dir, local_files};
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::{DecisionTest, Result, Session, test_decisions};
@@ -21,15 +23,22 @@ const LOCAL_PACK: &str = "local";
 /// ignore that `init` writes, so it stays out of version control.
 const LOCK_FILE: &str = "authoring.db-lock";
 
-/// A decision change that passed its gate and was written.
+/// A decision change that passed its gate and was written: the
+/// `DecisionReport` kind.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Authored {
     pub id: String,
     pub path: PathBuf,
     pub created: bool,
+    /// What the gate ran before the decision was written.
+    #[serde(rename = "tested")]
     pub test: DecisionTest,
     /// Whether `lighthouse.toml` lists the `local` plugin, without which the
     /// project's own decisions do not run in `check`.
-    pub plugin_listed: bool,
+    pub local_plugin_listed: bool,
+    /// What to do next.
+    pub note: &'static str,
 }
 
 /// Adds the local decision the `Decision` document describes. The document is
@@ -171,12 +180,18 @@ fn commit(
     }
     let dir = local_dir(&root);
     Catalog::write_local(&dir, name, &text)?;
+    let note = if plugin_listed {
+        "the `local` plugin is listed; enable the decision with `extends = [\"local/recommended\"]` or a [rules] entry if it is not on yet"
+    } else {
+        "add \"local\" to `plugins` in lighthouse.toml, and enable the decision, for `check` to run it"
+    };
     Ok(Authored {
         id: id.to_owned(),
         path: dir.join(file_name(name)),
         created,
         test,
-        plugin_listed,
+        local_plugin_listed: plugin_listed,
+        note,
     })
 }
 

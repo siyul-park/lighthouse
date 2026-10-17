@@ -4,12 +4,13 @@ use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_model::ModelRef;
 use lighthouse_spec::Catalog;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{Result, Selector, Session};
 
 /// Where a binding comes from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Binding {
     /// `models.classification`: the model for decisions nothing else binds.
@@ -21,7 +22,7 @@ pub enum Binding {
 }
 
 /// One model and what it is bound to.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct BoundModel {
     /// `<provider>/<model>`.
     pub model: String,

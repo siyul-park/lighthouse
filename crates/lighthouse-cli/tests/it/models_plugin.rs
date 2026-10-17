@@ -69,7 +69,7 @@ pub(crate) fn fingerprints(dir: &Path) -> BTreeMap<String, String> {
 }
 
 /// A table that calls the two flagged functions right and the unsure one wrong.
-pub(crate) fn baseline(dir: &Path) {
+pub(crate) fn label_table(dir: &Path) {
     let fp = fingerprints(dir);
     assert_eq!(fp.len(), 4, "{fp:?}");
     write(
@@ -104,14 +104,14 @@ fn a_model_plugin_bound_to_the_project_decides_the_abstentions() {
 fn eval_measures_the_check_with_a_model_plugin_bound() {
     let dir = project(RPC);
     with_plugin(dir.path());
-    baseline(dir.path());
+    label_table(dir.path());
     let out = lighthouse(
         dir.path(),
         &[
             "decision",
             "eval",
             "local/naming-ban",
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--format",
             "json",
@@ -132,14 +132,14 @@ fn eval_measures_the_check_with_a_model_plugin_bound() {
 #[test]
 fn eval_asks_models_only_about_the_labelled_subjects_and_keeps_each_score() {
     let dir = project(&bound());
-    baseline(dir.path());
+    label_table(dir.path());
     let out = lighthouse(
         dir.path(),
         &[
             "decision",
             "eval",
             "local/naming-ban",
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--format",
             "json",
@@ -170,14 +170,14 @@ fn eval_asks_models_only_about_the_labelled_subjects_and_keeps_each_score() {
 #[test]
 fn eval_says_which_models_failed() {
     let dir = project(&provider("fail"));
-    baseline(dir.path());
+    label_table(dir.path());
     let out = lighthouse(
         dir.path(),
         &[
             "decision",
             "eval",
             "local/naming-ban",
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--format",
             "json",
@@ -193,14 +193,14 @@ fn eval_says_which_models_failed() {
 fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics() {
     let dir = project(RPC);
     with_plugin(dir.path());
-    baseline(dir.path());
+    label_table(dir.path());
     let out = lighthouse(
         dir.path(),
         &[
             "model",
             "train",
             "local/naming-ban",
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--format",
             "json",
@@ -257,7 +257,7 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
             "model",
             "train",
             "local/naming-ban",
-            "--baseline",
+            "--labels",
             "labels.tsv",
         ],
     );
@@ -274,14 +274,14 @@ pub(crate) fn declared() -> String {
 #[test]
 fn eval_grades_a_model_beside_the_check_as_its_first_layer() {
     let dir = project(&declared());
-    baseline(dir.path());
+    label_table(dir.path());
     let out = lighthouse(
         dir.path(),
         &[
             "decision",
             "eval",
             "local/naming-ban",
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--model",
             "fake/learned@sha256:abc",

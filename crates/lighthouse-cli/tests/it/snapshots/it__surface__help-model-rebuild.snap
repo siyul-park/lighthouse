@@ -13,13 +13,13 @@ Arguments:
           Decisions or globs such as `design/*`; default: every decision with an attached model
 
 Options:
-      --baseline <FILE>
-          A table of reviewed findings, for the labels when the dataset the model was attached with is gone
-
       --config <FILE>
           The project file; the project root is then the current directory
           
           [env: LIGHTHOUSE_CONFIG=]
+
+      --labels <FILE>
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
 
       --color <COLOR>
           Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
@@ -29,7 +29,7 @@ Options:
           [possible values: auto, always, never]
 
       --repo <NAME=DIR>
-          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+          A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
 
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)

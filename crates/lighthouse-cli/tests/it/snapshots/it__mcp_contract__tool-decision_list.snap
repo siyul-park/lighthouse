@@ -36,11 +36,14 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
   "outputSchema": {
     "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-list.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The `DecisionList` kind: the decisions with a rule, or every one.",
     "properties": {
       "decisions": {
         "items": {
+          "description": "One decision of a listing.",
           "properties": {
             "enabled": {
+              "description": "Whether this project's configuration enables it.",
               "type": "boolean"
             },
             "id": {
@@ -50,7 +53,34 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               "type": "string"
             },
             "status": {
-              "type": "string"
+              "description": "How far a decision is carried out.",
+              "oneOf": [
+                {
+                  "const": "not-enforced",
+                  "description": "Its status is not accepted: written down, tested, not enforced.",
+                  "type": "string"
+                },
+                {
+                  "const": "implemented",
+                  "description": "A program checks it.",
+                  "type": "string"
+                },
+                {
+                  "const": "judged",
+                  "description": "Agent review checks it.",
+                  "type": "string"
+                },
+                {
+                  "const": "unimplemented",
+                  "description": "A check is named but nothing registers it.",
+                  "type": "string"
+                },
+                {
+                  "const": "doc",
+                  "description": "It has no check.",
+                  "type": "string"
+                }
+              ]
             },
             "title": {
               "type": "string"
@@ -68,6 +98,8 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "type": "array"
       },
       "omitted": {
+        "description": "How many decisions `limit` left out.",
+        "format": "uint",
         "minimum": 0,
         "type": "integer"
       }

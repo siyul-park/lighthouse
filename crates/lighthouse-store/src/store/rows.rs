@@ -10,8 +10,8 @@ use rusqlite::{
 use serde_json::{Value, json};
 
 use crate::{
-    Error, FindingRecord, JudgmentEvent, JudgmentSpec, NewJudgment, Subject, SuppressionEvent,
-    SuppressionSpec, Versions, standings::Standings,
+    Error, FindingRecord, JudgmentEvent, JudgmentSpec, NewJudgment, Standing, State, Subject,
+    SuppressionEvent, SuppressionSpec, Versions, standings::Standings,
 };
 
 use super::{JUDGMENT_COLUMNS, MAX_CANDIDATES, SNAPSHOT_VERSION};
@@ -239,6 +239,18 @@ pub(super) fn finding_record(row: &Row, standings: &Standings) -> rusqlite::Resu
             .unwrap_or_default(),
     };
     let ruling = standings.ruling(&subject);
+    let standing = ruling.as_ref().map(|r| r.standing);
+    let resolved_at: Option<String> = row.get("resolved_at")?;
+    let inactive_at: Option<String> = row.get("inactive_at")?;
+    let state = if standing == Some(Standing::Suppressed) {
+        State::Suppressed
+    } else if inactive_at.is_some() {
+        State::Inactive
+    } else if resolved_at.is_some() {
+        State::Resolved
+    } else {
+        State::Open
+    };
     Ok(FindingRecord {
         fingerprint: subject.fingerprint.clone(),
         decision: row.get("decision")?,
@@ -250,8 +262,9 @@ pub(super) fn finding_record(row: &Row, standings: &Standings) -> rusqlite::Resu
         symbol: row.get("symbol")?,
         first_seen: row.get("first_seen")?,
         last_seen: row.get("last_seen")?,
-        resolved_at: row.get("resolved_at")?,
-        inactive_at: row.get("inactive_at")?,
+        resolved_at,
+        inactive_at,
+        state,
         reopened: row.get("reopened")?,
         message: row.get("last_message")?,
         evidence: json_column(row, "last_evidence")?,
@@ -263,7 +276,7 @@ pub(super) fn finding_record(row: &Row, standings: &Standings) -> rusqlite::Resu
         catalog_version: row.get("catalog_version")?,
         meaning_version: subject.meaning_version,
         judgment: ruling.as_ref().map(|r| r.judgment),
-        standing: ruling.as_ref().map(|r| r.standing),
+        standing,
         justification: ruling.as_ref().and_then(|r| r.justification.clone()),
         narrowing: ruling
             .as_ref()

@@ -383,7 +383,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .unwrap();
     assert_eq!(done["recorded"]["wasAttributedTo"]["type"], "SoftwareAgent");
     assert_eq!(done["recorded"]["wasAttributedTo"]["id"], "test-agent");
-    assert_eq!(done["recorded"]["suppression"]["kind"], "external");
+    assert_eq!(done["recorded"]["suppressions"][0]["kind"], "external");
     assert_eq!(done["recorded"]["fingerprint"], fingerprint);
     assert_eq!(done["standing"], "suppressed");
 
@@ -584,7 +584,10 @@ fn fix_previews_with_dry_run_then_applies_and_reports_both_lists() {
         diff.contains("--- a/src/lib.rs") && diff.contains("+pub struct Store;"),
         "{diff}"
     );
-    assert_eq!(preview["applied"][0]["rule"], "design/declaration-groups");
+    assert_eq!(
+        preview["applied"][0]["decision"],
+        "design/declaration-groups"
+    );
     assert_eq!(preview["applied"][0]["safety"], "safe");
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),

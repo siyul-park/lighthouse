@@ -11,14 +11,14 @@ use serde_json::{Value, json};
 use crate::{
     attach::{DECISION, MODEL, attach, failures},
     models::{project, provider},
-    models_plugin::{baseline, declared, json, lighthouse},
+    models_plugin::{declared, json, label_table, lighthouse},
 };
 
 /// A project with the model attached and a share to explore.
 fn exploring(share: &str) -> tempfile::TempDir {
     let models = declared().replace("[models]\n", &format!("[models]\nexplore = {share}\n"));
     let dir = project(&models);
-    baseline(dir.path());
+    label_table(dir.path());
     assert_eq!(attach(dir.path(), &[]).status.code(), Some(0));
     dir
 }

@@ -10,7 +10,7 @@ use crate::{
     attach::{DECISION, MODEL, mislabelled},
     mcp::{Client, rust_project, text_project},
     models::project,
-    models_plugin::{baseline, declared},
+    models_plugin::{declared, label_table},
 };
 
 /// The `tools/list` result.
@@ -193,7 +193,7 @@ fn a_refused_attach_is_a_result_and_a_detach_is_attributed_to_the_agent() {
     mislabelled(dir.path());
     let mut client = Client::trusting(dir.path());
     let tools = listed(&mut client);
-    let arguments = json!({ "id": DECISION, "model": MODEL, "baseline": "labels.tsv" });
+    let arguments = json!({ "id": DECISION, "model": MODEL, "labels": "labels.tsv" });
 
     let refused = called(&mut client, "model_attach", arguments.clone());
     conforms(&tools, "model_attach", &refused);
@@ -202,7 +202,7 @@ fn a_refused_attach_is_a_result_and_a_detach_is_attributed_to_the_agent() {
     assert!(reasons.contains("misses the policy"), "{reasons}");
     assert!(Records::read(dir.path()).unwrap().revisions.is_empty());
 
-    baseline(dir.path());
+    label_table(dir.path());
     let attached = called(&mut client, "model_attach", arguments);
     conforms(&tools, "model_attach", &attached);
     assert!(attached["structuredContent"]["revision"].is_string());

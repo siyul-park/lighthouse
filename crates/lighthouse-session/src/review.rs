@@ -6,9 +6,11 @@ use std::{env, path::Path};
 use lighthouse_model::{AgentKind, Attribution, Severity};
 use lighthouse_spec::{Catalog, Decision};
 use lighthouse_store::{Filter, State, Store, Versions};
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::Value;
 
-use crate::{Result, Selector, git::user_name, project::catalog_at};
+use crate::{Result, Selector, git::user_name, project::catalog_at, selector::long_enough};
 
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
@@ -17,9 +19,14 @@ pub use lighthouse_store::{
 /// Says who is attributed with what is recorded when no flag does.
 const ATTRIBUTED_VAR: &str = "LIGHTHOUSE_ATTRIBUTED_TO";
 
-/// A judgment that was recorded, with what the reviewer should know about it.
+/// A judgment that was recorded, with what the reviewer should know about it:
+/// the `ReviewResolve` kind.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Recorded {
+    #[serde(rename = "recorded")]
     pub event: JudgmentEvent,
+    #[serde(skip)]
     pub finding: FindingRecord,
     pub warnings: Vec<String>,
     /// What the judgment does to the finding now.
@@ -108,11 +115,13 @@ pub fn list(root: &Path, query: &Query) -> Result<Option<Listed>> {
 
 /// The finding whose fingerprint starts with `fingerprint`, as remembered.
 pub fn show(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
+    long_enough(fingerprint)?;
     Ok(existing_store(root)?.finding(fingerprint)?)
 }
 
 /// Every judgment recorded on a finding, oldest first.
 pub fn history(root: &Path, fingerprint: &str) -> Result<Vec<JudgmentEvent>> {
+    long_enough(fingerprint)?;
     Ok(existing_store(root)?.history(fingerprint)?)
 }
 
@@ -126,6 +135,7 @@ pub fn prune(root: &Path, older_than: Option<u32>) -> Result<usize> {
 /// decision when the catalog can be read; a broken catalog is reported, not
 /// fatal.
 pub fn resolve(root: &Path, review: &NewJudgment) -> Result<Recorded> {
+    long_enough(&review.fingerprint)?;
     resolve_all(root, std::slice::from_ref(review))?.remove(0)
 }
 
@@ -189,7 +199,7 @@ fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Versions {
 /// What the reviewer should know about the finding they just judged.
 fn warnings(finding: &FindingRecord) -> Vec<String> {
     let mut warnings = Vec::new();
-    match finding.state() {
+    match finding.state {
         State::Resolved => warnings.push(
             "the finding was already resolved: no complete run reports it any more, so the judgment only matters if it comes back".to_owned(),
         ),

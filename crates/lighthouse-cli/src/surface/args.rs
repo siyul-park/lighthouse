@@ -3,13 +3,19 @@
 //! docs, so that a flag and its tool argument cannot differ: a tool argument
 //! is the long flag in camelCase, with the same values and default.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Args, ValueEnum};
-use lighthouse_session::{Judgment, review::StatusFilter};
+use lighthouse_session::{
+    Judgment, head,
+    model::{Labelling, Repo},
+    review::NewJudgment,
+};
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+
+use crate::surface::{Context, Result};
 
 /// How much each item of a report carries.
 #[derive(
@@ -65,7 +71,7 @@ impl From<JudgmentArg> for Judgment {
     Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "lowercase")]
-pub enum Status {
+pub enum StatusFilter {
     /// Still reported and not suppressed.
     #[default]
     Open,
@@ -81,15 +87,15 @@ pub enum Status {
     All,
 }
 
-impl From<Status> for StatusFilter {
-    fn from(status: Status) -> Self {
+impl From<StatusFilter> for lighthouse_session::review::StatusFilter {
+    fn from(status: StatusFilter) -> Self {
         match status {
-            Status::Open => Self::Open,
-            Status::Suppressed => Self::Suppressed,
-            Status::Narrowing => Self::Narrowing,
-            Status::Inactive => Self::Inactive,
-            Status::Resolved => Self::Resolved,
-            Status::All => Self::All,
+            StatusFilter::Open => Self::Open,
+            StatusFilter::Suppressed => Self::Suppressed,
+            StatusFilter::Narrowing => Self::Narrowing,
+            StatusFilter::Inactive => Self::Inactive,
+            StatusFilter::Resolved => Self::Resolved,
+            StatusFilter::All => Self::All,
         }
     }
 }
@@ -97,7 +103,7 @@ impl From<Status> for StatusFilter {
 /// `check`: analyze the project and report. Analysis is always whole-project;
 /// the arguments narrow what is reported and how.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct CheckArgs {
     /// Where to report findings; the whole project is analyzed anyway.
     /// Default: the whole project.
@@ -190,7 +196,7 @@ pub struct FixArgs {
 
 /// `decision list`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct DecisionListArgs {
     /// Include every catalog decision with its implementation status.
     #[arg(long)]
@@ -202,7 +208,7 @@ pub struct DecisionListArgs {
 
 /// `decision show`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct DecisionShowArgs {
     /// A decision or rule id such as `design/exported-doc`.
     #[arg(value_name = "ID")]
@@ -211,7 +217,7 @@ pub struct DecisionShowArgs {
 
 /// `decision create` and `decision update`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct DocumentArgs {
     /// A `Decision` document, as YAML or JSON. On the command line this is a
     /// file, or `-` for stdin; the tool takes the text or the object.
@@ -225,7 +231,7 @@ pub struct DocumentArgs {
 
 /// `decision test`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct DecisionTestArgs {
     /// Decisions to test: ids and globs. Default: every checked decision.
     #[arg(value_name = "IDS", value_delimiter = ',')]
@@ -235,50 +241,94 @@ pub struct DecisionTestArgs {
     pub language: Option<String>,
 }
 
+/// Where the labels of a decision come from: the table of reviewed findings
+/// and the repositories it is about. Flags and tool arguments of every command
+/// that learns from labels.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LabelSource {
+    /// A table of reviewed findings (`fingerprint repo location verdict`).
+    /// Default: `labels/<id>.tsv` when it exists.
+    #[arg(long, value_name = "FILE")]
+    pub labels: Option<PathBuf>,
+    /// A repository the labels are about, `name=dir`, where `name` is the
+    /// `repo` column of the table. Repeatable; default: this project.
+    #[arg(long, value_name = "NAME=DIR")]
+    pub repo: Vec<String>,
+}
+
+impl LabelSource {
+    /// What the labels of `decision` are drawn from: the table, else
+    /// `labels/<id>.tsv` when `decision` is one id and the file exists, and
+    /// the repositories, inside the project when the caller is confined.
+    pub fn resolve(&self, ctx: &Context, decision: Option<&str>) -> Result<Labelling> {
+        let root = ctx.root()?;
+        let repos = self
+            .repo
+            .iter()
+            .map(|spec| {
+                let mut repo = Repo::parse(spec)?;
+                repo.dir = ctx.paths(&root, &[repo.dir])?.remove(0);
+                Ok(repo)
+            })
+            .collect::<Result<_>>()?;
+        let table = self.labels.clone().or_else(|| {
+            let path = Path::new("labels").join(format!("{}.tsv", decision?));
+            path.is_file().then_some(path)
+        });
+        Ok(Labelling {
+            repos,
+            table,
+            config: ctx.config.clone(),
+        })
+    }
+}
+
+/// Who a record is attributed to, for the commands that write one.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Attributed {
+    /// Who this is attributed to: `person` or `agent`, with an id after a
+    /// colon (`agent:claude`). Default: the person from `git config
+    /// user.name` on the command line, the client's name through MCP.
+    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
+    pub attributed_to: Option<String>,
+}
+
 /// `decision eval`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct DecisionEvalArgs {
     /// The decision, such as `design/prefer-method`.
     #[arg(value_name = "ID")]
     pub id: String,
-    /// A repository the labels are about, `name=dir`, where `name` is the
-    /// baseline's `repo` column. Repeatable; default: this project.
-    #[arg(long, value_name = "NAME=DIR")]
-    #[serde(default)]
-    pub repo: Vec<String>,
-    /// A table of reviewed findings. Default: `baseline/precision/<id>.tsv`
-    /// when it exists.
-    #[arg(long, value_name = "FILE")]
-    #[serde(default)]
-    pub baseline: Option<PathBuf>,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub labels: LabelSource,
     /// A decision file whose check is evaluated beside the current one.
     #[arg(long, value_name = "FILE", conflicts_with = "model")]
-    #[serde(default)]
     pub check: Option<PathBuf>,
     /// A model to grade as the first layer of the decision, beside the
     /// current check: `<provider>/<model>@sha256:<hex>`. One fitted on labels
     /// is graded on those by refits that leave each fold out.
     #[arg(long, value_name = "REF")]
-    #[serde(default)]
     pub model: Option<String>,
     /// Write this many selected subjects the check did not flag to a table
     /// for a person to label (`TP` or `FP`), to measure recall.
     #[arg(long, value_name = "N")]
-    #[serde(default)]
     pub audit: Option<usize>,
 }
 
 /// `review list`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ReviewListArgs {
     /// Only the findings of these decisions: ids or globs.
     #[arg(long, value_delimiter = ',', value_name = "ID")]
     pub decision: Vec<String>,
     /// Which findings: `open` is still reported and not suppressed.
     #[arg(long, value_enum, default_value_t)]
-    pub status: Status,
+    pub status: StatusFilter,
     /// Also list findings that do not ask for review (errors, and judged
     /// ones).
     #[arg(long)]
@@ -295,7 +345,7 @@ pub struct ReviewListArgs {
 
 /// `review show` and `review history`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct FingerprintArgs {
     /// A fingerprint, or the start of one (at least 7 characters).
     #[arg(value_name = "FP")]
@@ -304,11 +354,11 @@ pub struct FingerprintArgs {
 
 /// `review resolve`.
 #[derive(Debug, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ReviewResolveArgs {
-    /// A fingerprint, or the start of one (at least 7 characters).
-    #[arg(value_name = "FP")]
-    pub fingerprint: String,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub finding: FingerprintArgs,
     /// `fail`: the finding is right. `pass`: the code conforms. `notApplicable`:
     /// the decision does not apply here.
     #[arg(long, value_enum)]
@@ -316,29 +366,40 @@ pub struct ReviewResolveArgs {
     /// With `fail`: why the finding stays, recorded as an external
     /// suppression that keeps it out of later reports.
     #[arg(long, value_name = "JUSTIFICATION")]
-    #[serde(default)]
     pub suppress: Option<String>,
     /// Why, written for the next reader.
     #[arg(long)]
-    #[serde(default)]
     pub reason: Option<String>,
-    /// Who the judgment is attributed to: `person` or `agent`, with an id
-    /// after a colon (`agent:claude`). Default: the person from `git config
-    /// user.name` on the command line, the client's name through MCP.
-    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
-    #[serde(default)]
-    pub attributed_to: Option<String>,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub attributed: Attributed,
     /// The `last seen` time of the finding as you read it (its `seen`
     /// evidence); refuses the judgment if the finding has been seen again
     /// since.
     #[arg(long, value_name = "LAST_SEEN")]
-    #[serde(default)]
     pub seen: Option<String>,
+}
+
+impl ReviewResolveArgs {
+    /// The judgment these arguments record, attributed by `ctx` and made at
+    /// the project's current commit.
+    pub fn judgment(&self, ctx: &Context) -> Result<NewJudgment> {
+        Ok(NewJudgment {
+            fingerprint: self.finding.fingerprint.clone(),
+            judgment: self.judgment.into(),
+            reason: self.reason.clone(),
+            suppress: self.suppress.clone(),
+            attribution: ctx.attribution(self.attributed.attributed_to.as_deref())?,
+            commit: head(&ctx.root()?),
+            expect_seen: self.seen.clone(),
+            lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
+        })
+    }
 }
 
 /// `model list`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ModelListArgs {
     /// Only the models bound to these decisions: ids or globs.
     #[arg(long, value_delimiter = ',', value_name = "ID")]
@@ -350,7 +411,7 @@ pub struct ModelListArgs {
 
 /// `model train`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelTrainArgs {
     /// The decision whose labels the model learns, such as
     /// `design/prefer-method`.
@@ -359,28 +420,20 @@ pub struct ModelTrainArgs {
     /// The model to train, `<provider>/<model>`. Default: the one bound to
     /// the decision.
     #[arg(long, value_name = "REF")]
-    #[serde(default)]
     pub model: Option<String>,
     /// Also label the subjects nobody labelled with this model's answers
     /// (weight 0.5): a fail where it is sure of one, a pass where it is sure
     /// of the other. `<provider>/<model>`.
     #[arg(long, value_name = "REF")]
-    #[serde(default)]
     pub from_model: Option<String>,
-    /// A table of reviewed findings (`fingerprint repo location verdict`).
-    #[arg(long, value_name = "FILE")]
-    #[serde(default)]
-    pub baseline: Option<PathBuf>,
-    /// A repository the labels are about, `name=dir`, where `name` is the
-    /// baseline's `repo` column. Repeatable; default: this project.
-    #[arg(long, value_name = "NAME=DIR")]
-    #[serde(default)]
-    pub repo: Vec<String>,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub labels: LabelSource,
 }
 
 /// `model attach`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelAttachArgs {
     /// The decision the model judges, such as `design/prefer-method`.
     #[arg(value_name = "ID")]
@@ -390,22 +443,12 @@ pub struct ModelAttachArgs {
     /// written.
     #[arg(long, value_name = "REF")]
     pub model: String,
-    /// A table of reviewed findings. Default: `baseline/precision/<id>.tsv`
-    /// when it exists.
-    #[arg(long, value_name = "FILE")]
-    #[serde(default)]
-    pub baseline: Option<PathBuf>,
-    /// A repository the labels are about, `name=dir`, where `name` is the
-    /// baseline's `repo` column. Repeatable; default: this project.
-    #[arg(long, value_name = "NAME=DIR")]
-    #[serde(default)]
-    pub repo: Vec<String>,
-    /// Who approves the revision: `person` or `agent`, with an id after a
-    /// colon (`agent:claude`). Default: the person from `git config
-    /// user.name` on the command line, the client's name through MCP.
-    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
-    #[serde(default)]
-    pub attributed_to: Option<String>,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub labels: LabelSource,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub attributed: Attributed,
 }
 
 /// `model rebuild`.
@@ -414,35 +457,28 @@ pub struct ModelRebuildArgs {
     /// Decisions or globs such as `design/*`; default: every decision with an
     /// attached model.
     #[arg(value_name = "ID")]
-    pub ids: Vec<String>,
-    /// A table of reviewed findings, for the labels when the dataset the model
-    /// was attached with is gone.
-    #[arg(long, value_name = "FILE")]
-    pub baseline: Option<PathBuf>,
-    /// A repository the labels are about, `name=dir`, where `name` is the
-    /// baseline's `repo` column. Repeatable; default: this project.
-    #[arg(long, value_name = "NAME=DIR")]
-    pub repo: Vec<String>,
+    pub decision: Vec<String>,
+    #[command(flatten)]
+    pub labels: LabelSource,
 }
 
 /// `model detach`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelDetachArgs {
     /// The decision whose attached model is detached, such as
     /// `design/prefer-method`.
     #[arg(value_name = "ID")]
     pub id: String,
-    /// Who approves the revision: `person` or `agent`, with an id after a
-    /// colon (`agent:claude`). Default: the person from `git config
-    /// user.name` on the command line, the client's name through MCP.
-    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
-    #[serde(default)]
-    pub attributed_to: Option<String>,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub attributed: Attributed,
 }
 
 /// The text of a document given as text, or an object given as JSON.
-fn text_or_object<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+fn text_or_object<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<String, D::Error> {
     match Value::deserialize(deserializer)? {
         Value::String(text) => Ok(text),
         other => Ok(other.to_string()),

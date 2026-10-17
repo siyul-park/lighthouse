@@ -173,7 +173,7 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
          The `ops` type is a list of the generic operations below. Operations state \
          edits over code-model nodes; the orchestrator lowers them to text edits with \
          the spans the language provider reports, formats, re-checks and rolls back \
-         what gets worse. Expressions are CEL over `finding` (`rule`, `message`, \
+         what gets worse. Expressions are CEL over `finding` (`decision`, `message`, \
          `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the \
          finding's symbol, as in declarative rules) and `options` (the options the \
          rule ran with). Every operation also takes `when` (CEL bool): the \
@@ -216,7 +216,7 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
          argument each (`--out={file}` is refused, and so is a value that starts with `-`). The \
          program runs with the scratch directory as its working directory.\n\
          - **Environment:** cleared to `PATH`, `HOME`, `LANG` and `TMPDIR`, plus the declared \
-         `env`, plus `LIGHTHOUSE_DECISION` (the finding as JSON: rule, file, line, symbol, \
+         `env`, plus `LIGHTHOUSE_DECISION` (the finding as JSON: decision, file, line, symbol, \
          fingerprint, evidence), `LIGHTHOUSE_OPTIONS` (the rule's options as JSON) and \
          `LIGHTHOUSE_API_VERSION`.\n\
          - **Limits:** the timeout sends SIGTERM to the process group, then SIGKILL after a \

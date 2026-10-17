@@ -30,16 +30,19 @@ use lighthouse_report::Format;
 use lighthouse_session::{CheckRequest, Checked, ModelOptions, RunStatus, Session, baseline};
 use serde_json::{Value, json};
 
-use crate::cli::Result;
+use crate::terminal::Result;
 
 /// Findings printed back to the agent by an edit and by the end of a turn.
 const EDIT_LIMIT: usize = 5;
 const STOP_LIMIT: usize = 10;
-const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
+/// The tools of Claude Code that edit a file.
+pub const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
+/// What the command of every hook starts with.
+pub const COMMAND: &str = "lighthouse hook claude-code";
 /// Said with a report that had no baseline to be measured against.
 const NO_BASELINE: &str = "Lighthouse: no pre-edit baseline, so every finding in the file is shown, including ones that were there before this session; `lighthouse init --agent claude-code` adds the PreToolUse hook that records it.";
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Event {
     /// Before Edit, Write or MultiEdit: record the file's findings as the
     /// session's baseline, once per file; prints nothing.
@@ -50,9 +53,37 @@ pub enum Event {
     Stop,
 }
 
+impl Event {
+    /// The name Claude Code gives the event.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::PreToolUse => "PreToolUse",
+            Self::PostToolUse => "PostToolUse",
+            Self::Stop => "Stop",
+        }
+    }
+
+    /// The command that runs the hook of the event: only the first, which
+    /// records a baseline and prints nothing, has no incompleteness to allow.
+    pub fn command(self) -> String {
+        let event = self.to_possible_value().expect("every event has a name");
+        let flag = if self == Self::PreToolUse {
+            ""
+        } else {
+            " --allow-incomplete"
+        };
+        format!("{COMMAND} {}{flag}", event.get_name())
+    }
+}
+
 /// Runs the hook; a failure is reported on stderr and exits 1 (non-blocking).
 pub fn run(event: Event, allow_incomplete: bool) -> u8 {
-    match answer(event, allow_incomplete) {
+    let mut payload = String::new();
+    let answered = std::io::stdin()
+        .read_to_string(&mut payload)
+        .map_err(Into::into)
+        .and_then(|_| reply(event, allow_incomplete, &payload));
+    match answered {
         Ok(Some(reply)) => {
             let _ = writeln!(std::io::stdout(), "{reply}");
             0
@@ -65,12 +96,6 @@ pub fn run(event: Event, allow_incomplete: bool) -> u8 {
     }
 }
 
-fn answer(event: Event, allow_incomplete: bool) -> Result<Option<Value>> {
-    let mut text = String::new();
-    std::io::stdin().read_to_string(&mut text)?;
-    reply(event, allow_incomplete, &text)
-}
-
 /// The JSON to print for `payload`, or `None` to stay silent. Only a payload
 /// that is not JSON is an error (nothing can be said to the agent about it);
 /// whatever else goes wrong is told to the agent, never swallowed.
@@ -78,7 +103,7 @@ fn reply(event: Event, allow_incomplete: bool, payload: &str) -> Result<Option<V
     let payload: Value =
         serde_json::from_str(payload).map_err(|e| format!("the hook payload is not JSON: {e}"))?;
     let active = payload["stop_hook_active"].as_bool().unwrap_or(false);
-    match answer_event(event, allow_incomplete, &payload) {
+    match answer_event(event, allow_incomplete, active, &payload) {
         Err(e) => unchecked(event, active, &e.to_string()).map(Some).ok_or(e),
         reply => reply,
     }
@@ -87,7 +112,12 @@ fn reply(event: Event, allow_incomplete: bool, payload: &str) -> Result<Option<V
 /// The project is the one `cwd` of the payload belongs to; a directory with
 /// no `lighthouse.toml` is not a Lighthouse project and gets silence, but a
 /// config or local decisions that are broken are an error.
-fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result<Option<Value>> {
+fn answer_event(
+    event: Event,
+    allow_incomplete: bool,
+    stop_hook_active: bool,
+    payload: &Value,
+) -> Result<Option<Value>> {
     let here = match payload["cwd"].as_str() {
         Some(cwd) => PathBuf::from(cwd),
         None => env::current_dir()?,
@@ -141,8 +171,7 @@ fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result
             }
             let mut checked = lighthouse_session::check(&session, &request(files, true))?;
             baseline::introduced(&mut checked.run.diagnostics, &before);
-            let active = payload["stop_hook_active"].as_bool().unwrap_or(false);
-            Ok(at_stop(&checked, allow_incomplete, active))
+            Ok(at_stop(&checked, allow_incomplete, stop_hook_active))
         }
     }
 }
@@ -157,12 +186,26 @@ fn unchecked(event: Event, stop_hook_active: bool, error: &str) -> Option<Value>
     );
     match event {
         Event::PreToolUse => None,
-        Event::PostToolUse => Some(json!({
-            "hookSpecificOutput": { "hookEventName": "PostToolUse", "additionalContext": text }
-        })),
-        Event::Stop if stop_hook_active => Some(json!({ "systemMessage": text })),
-        Event::Stop => Some(json!({ "decision": "block", "reason": text })),
+        Event::PostToolUse => Some(context(event, text)),
+        Event::Stop if stop_hook_active => Some(notice(text)),
+        Event::Stop => Some(block(text)),
     }
+}
+
+/// The answer that feeds `reason` back to the agent: after an edit it has
+/// happened, at Stop it keeps the agent going.
+fn block(reason: String) -> Value {
+    json!({ "decision": "block", "reason": reason })
+}
+
+/// The answer that adds `text` to the agent's context without blocking it.
+fn context(event: Event, text: String) -> Value {
+    json!({ "hookSpecificOutput": { "hookEventName": event.name(), "additionalContext": text } })
+}
+
+/// The answer that shows the user `text`.
+fn notice(text: String) -> Value {
+    json!({ "systemMessage": text })
 }
 
 /// A check of `paths`; a baseline is not a run worth remembering (`store`).
@@ -202,14 +245,11 @@ fn after_edit(checked: &Checked, allow_incomplete: bool, unbaselined: bool) -> O
     let summary = checked.summary();
     let incomplete = summary.status == RunStatus::Incomplete;
     if summary.errors + summary.warnings > 0 || (incomplete && !allow_incomplete) {
-        return Some(json!({
-            "decision": "block",
-            "reason": format!(
-                "Lighthouse found problems in the file you just edited. Fix them, then continue.\n{}{}",
-                checked.render(Format::Agent, Some(EDIT_LIMIT)),
-                note.map_or_else(String::new, |n| format!("\n{n}")),
-            ),
-        }));
+        return Some(block(format!(
+            "Lighthouse found problems in the file you just edited. Fix them, then continue.\n{}{}",
+            checked.render(Format::Agent, Some(EDIT_LIMIT)),
+            note.map_or_else(String::new, |n| format!("\n{n}")),
+        )));
     }
     let mut notes = Vec::new();
     if summary.reviews > 0 {
@@ -228,12 +268,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool, unbaselined: bool) -> O
     }
     (!notes.is_empty()).then(|| {
         notes.extend(note.map(str::to_owned));
-        json!({
-            "hookSpecificOutput": {
-                "hookEventName": "PostToolUse",
-                "additionalContext": notes.join("\n"),
-            }
-        })
+        context(Event::PostToolUse, notes.join("\n"))
     })
 }
 
@@ -261,10 +296,11 @@ fn at_stop(checked: &Checked, allow_incomplete: bool, stop_hook_active: bool) ->
                 "The analysis was INCOMPLETE, so the files edited this session are not known to be clean. Resolve the gaps below."
             }.to_owned());
         }
-        return Some(json!({
-            "decision": "block",
-            "reason": format!("Lighthouse: {}\n{}", why.join(" "), checked.render(Format::Agent, Some(STOP_LIMIT))),
-        }));
+        return Some(block(format!(
+            "Lighthouse: {}\n{}",
+            why.join(" "),
+            checked.render(Format::Agent, Some(STOP_LIMIT))
+        )));
     }
     let mut parts = Vec::new();
     if summary.errors > 0 {
@@ -285,5 +321,5 @@ fn at_stop(checked: &Checked, allow_incomplete: bool, stop_hook_active: bool) ->
     } else {
         format!("Lighthouse: {} introduced this session.", parts.join(", "))
     };
-    (!message.is_empty()).then(|| json!({ "systemMessage": message }))
+    (!message.is_empty()).then(|| notice(message))
 }

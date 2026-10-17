@@ -8,25 +8,32 @@ use lighthouse_ml::attach::{attachable, evidence};
 use lighthouse_model::{Attribution, now};
 use lighthouse_spec::Decision;
 use lighthouse_store::{Change, Records, RevisionSpec, append_revision};
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::{EvalReport, EvalRequest, eval};
 use crate::{Result, Session};
 
-/// What came of asking to attach a model.
+/// What came of asking to attach a model: the `ModelAttach` kind.
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Attachment {
     pub decision: String,
     pub model: String,
     /// The revision that attached it; none when it was refused.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub revision: Option<String>,
-    /// Why the evaluation does not allow it.
+    /// Why the evaluation does not allow it; none when it was attached.
+    #[serde(rename = "refused", skip_serializing_if = "Vec::is_empty")]
     pub reasons: Vec<String>,
     /// The numbers the gate looked at, as a revision records them.
     pub evaluation: Value,
+    #[serde(skip)]
     pub report: EvalReport,
 }
 
-/// The revision that detached a model.
+/// The revision that detached a model: the `ModelDetach` kind.
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Detachment {
     pub revision: String,
     pub decision: String,

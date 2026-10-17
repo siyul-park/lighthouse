@@ -21,6 +21,7 @@ lighthouse-resource.workspace = true
 lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
 lighthouse-store.workspace = true
+schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_norway.workspace = true

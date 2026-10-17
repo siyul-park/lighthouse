@@ -97,7 +97,7 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
         .find(|f| f["decision"] == "design/errors")
         .unwrap();
     assert_eq!(helper["symbol"], "demo::run#function");
-    assert_eq!(helper["location"]["line"], 2);
+    assert_eq!(helper["locator"]["span"]["start"]["line"], 2);
     let record = shown(&dir, helper["fingerprint"].as_str().unwrap());
     assert_eq!(record["facts"]["language"], "rust");
     assert_eq!(record["locator"]["span"]["start"]["line"], 2);
@@ -295,7 +295,7 @@ fn a_run_resolves_only_findings_inside_its_report_scope() {
         .success();
     let open = listing(&dir, "open");
     assert_eq!(open.len(), 1);
-    assert_eq!(open[0]["location"]["path"], "src/b.rs");
+    assert_eq!(open[0]["path"], "src/b.rs");
 
     lighthouse(dir.path())
         .args(["check", "--decision", "design/errors", "src/b.rs"])

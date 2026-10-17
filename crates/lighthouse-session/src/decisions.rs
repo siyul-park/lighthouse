@@ -6,6 +6,7 @@ use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_report::docs::{Density, decision_markdown};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
+use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -21,7 +22,7 @@ const ENTRY: Density<'static> = Density::Entry {
 const NEUTRAL: &str = "text";
 
 /// One line of a decision listing.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct DecisionRow {
     pub id: String,
     pub status: Implementation,
@@ -30,7 +31,7 @@ pub struct DecisionRow {
 }
 
 /// How far a decision is carried out.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Implementation {
     /// Its status is not accepted: written down, tested, not enforced.
@@ -54,6 +55,7 @@ lighthouse_model::vocabulary!(Implementation, "implementation" {
 });
 
 /// The outcome of running examples.
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DecisionTest {
     pub decisions: usize,
     pub languages: usize,

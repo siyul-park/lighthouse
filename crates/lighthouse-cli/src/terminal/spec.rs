@@ -7,16 +7,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_cli::surface::kinds;
+use lighthouse_cli::surface::tools;
 use lighthouse_session::{Session, config_file, local_dir, schema_file, schemas, validate_paths};
 use serde_json::Value;
 
-use crate::cli::Result;
+use crate::terminal::Result;
 
 /// Validates the documents under `paths`; the project's configuration and
 /// local decisions when there are none. Returns 1 when anything is wrong.
 pub fn validate(config: Option<&Path>, paths: &[PathBuf], examples: bool) -> Result<u8> {
-    let root = lighthouse_session::project_root()?;
+    let root = lighthouse_session::project_root(config)?;
     // The documents under check may be the very ones that do not load.
     let session = match Session::load_or_default(config) {
         Ok(session) => session,
@@ -79,11 +79,11 @@ pub fn schema(kind: Option<&str>, write: Option<&Path>) -> Result<u8> {
 
 /// Every schema the tool serves, by kind: the spec documents and log records,
 /// then what the commands print.
-pub fn all_schemas() -> BTreeMap<String, Value> {
+fn all_schemas() -> BTreeMap<String, Value> {
     let documents = schemas()
         .into_values()
         .map(|descriptor| (descriptor.kind.to_owned(), descriptor.schema));
-    let outputs = kinds::kinds()
+    let outputs = tools::kinds()
         .into_iter()
         .map(|(kind, schema)| (kind.to_owned(), schema));
     documents.chain(outputs).collect()

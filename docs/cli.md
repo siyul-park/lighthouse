@@ -316,11 +316,11 @@ Arguments:
           The decision, such as `design/prefer-method`
 
 Options:
-      --repo <NAME=DIR>
-          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+      --labels <FILE>
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
 
-      --baseline <FILE>
-          A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists
+      --repo <NAME=DIR>
+          A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
 
       --check <FILE>
           A decision file whose check is evaluated beside the current one
@@ -481,7 +481,7 @@ Options:
           Why, written for the next reader
 
       --attributed-to <WHO>
-          Who the judgment is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          Who this is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
           
           [env: LIGHTHOUSE_ATTRIBUTED_TO=]
 
@@ -602,7 +602,7 @@ Options:
 ```text
 Fit a model on the labels of a decision.
 
-The labels are the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model; the decision's examples ride in the question. Writes the dataset under `.lighthouse/datasets/` and the model under `.lighthouse/models/`, named by its digest; it binds nothing (bind `local/learned@sha256:<hex>`).
+The labels are the rows of the labels table, the judgments recorded under its current meaning version, and optionally the answers of another model; the decision's examples ride in the question. Writes the dataset under `.lighthouse/datasets/` and the model under `.lighthouse/models/`, named by its digest; it binds nothing (bind `local/learned@sha256:<hex>`).
 
 Usage: lighthouse model train [OPTIONS] <ID>
 
@@ -617,11 +617,11 @@ Options:
       --from-model <REF>
           Also label the subjects nobody labelled with this model's answers (weight 0.5): a fail where it is sure of one, a pass where it is sure of the other. `<provider>/<model>`
 
-      --baseline <FILE>
-          A table of reviewed findings (`fingerprint repo location verdict`)
+      --labels <FILE>
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
 
       --repo <NAME=DIR>
-          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+          A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
 
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
@@ -658,14 +658,14 @@ Options:
       --model <REF>
           The model to attach, `<provider>/<model>@sha256:<hex>` for a learned one: graded as the first layer of the decision before anything is written
 
-      --baseline <FILE>
-          A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists
+      --labels <FILE>
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
 
       --repo <NAME=DIR>
-          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+          A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
 
       --attributed-to <WHO>
-          Who approves the revision: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          Who this is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
           
           [env: LIGHTHOUSE_ATTRIBUTED_TO=]
 
@@ -702,7 +702,7 @@ Arguments:
 
 Options:
       --attributed-to <WHO>
-          Who approves the revision: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          Who this is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
           
           [env: LIGHTHOUSE_ATTRIBUTED_TO=]
 
@@ -733,11 +733,11 @@ Arguments:
           Decisions or globs such as `design/*`; default: every decision with an attached model
 
 Options:
-      --baseline <FILE>
-          A table of reviewed findings, for the labels when the dataset the model was attached with is gone
+      --labels <FILE>
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
 
       --repo <NAME=DIR>
-          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+          A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
 
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
@@ -976,27 +976,16 @@ Options:
 ## `lighthouse hook`
 
 ```text
-Entry points for agent hooks. Reads the hook payload on stdin
+Entry points for agent hooks. Reads the hook payload on stdin.
 
-Usage: lighthouse hook <COMMAND>
+For Claude Code, see docs/agents.md.
 
-Commands:
-  claude-code  Claude Code hooks (see docs/agents.md)
-  help         Print this message or the help of the given subcommand(s)
-
-Options:
-  -h, --help
-          Print help
-```
-
-## `lighthouse hook claude-code`
-
-```text
-Claude Code hooks (see docs/agents.md)
-
-Usage: lighthouse hook claude-code [OPTIONS] <EVENT>
+Usage: lighthouse hook [OPTIONS] <AGENT> <EVENT>
 
 Arguments:
+  <AGENT>
+          [possible values: claude-code]
+
   <EVENT>
           Possible values:
           - pre-tool-use:  Before Edit, Write or MultiEdit: record the file's findings as the session's baseline, once per file; prints nothing

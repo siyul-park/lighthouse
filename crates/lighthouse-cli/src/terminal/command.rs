@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use lighthouse_cli::surface::Action;
 
-use crate::cli::hook;
+use crate::terminal::hook;
 use clap::{ColorChoice, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 
@@ -110,12 +110,20 @@ pub enum Command {
     /// name).
     Mcp,
     /// Entry points for agent hooks. Reads the hook payload on stdin.
+    ///
+    /// For Claude Code, see docs/agents.md.
     Hook {
-        #[command(subcommand)]
-        agent: HookAgent,
+        #[arg(value_enum)]
+        agent: Agent,
+        #[arg(value_enum)]
+        event: hook::Event,
+        /// Say that the analysis was incomplete but do not block on it.
+        #[arg(long)]
+        allow_incomplete: bool,
     },
 }
 
+/// The coding agents Lighthouse sets up and answers the hooks of.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum Agent {
     ClaudeCode,
@@ -139,18 +147,6 @@ impl From<CompletionShell> for Shell {
             CompletionShell::Powershell => Self::PowerShell,
         }
     }
-}
-
-#[derive(Debug, Subcommand)]
-pub enum HookAgent {
-    /// Claude Code hooks (see docs/agents.md).
-    ClaudeCode {
-        #[arg(value_enum)]
-        event: hook::Event,
-        /// Say that the analysis was incomplete but do not block on it.
-        #[arg(long)]
-        allow_incomplete: bool,
-    },
 }
 
 #[derive(Debug, Subcommand)]

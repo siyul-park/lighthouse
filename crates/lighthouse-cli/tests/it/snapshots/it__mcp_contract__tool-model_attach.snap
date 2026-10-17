@@ -16,15 +16,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "properties": {
       "attributedTo": {
         "default": null,
-        "description": "Who approves the revision: `person` or `agent`, with an id after a\ncolon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
-        "type": [
-          "string",
-          "null"
-        ]
-      },
-      "baseline": {
-        "default": null,
-        "description": "A table of reviewed findings. Default: `baseline/precision/<id>.tsv`\nwhen it exists.",
+        "description": "Who this is attributed to: `person` or `agent`, with an id after a\ncolon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
         "type": [
           "string",
           "null"
@@ -34,13 +26,21 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "description": "The decision the model judges, such as `design/prefer-method`.",
         "type": "string"
       },
+      "labels": {
+        "default": null,
+        "description": "A table of reviewed findings (`fingerprint repo location verdict`).\nDefault: `labels/<id>.tsv` when it exists.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
       "model": {
         "description": "The model to attach, `<provider>/<model>@sha256:<hex>` for a learned\none: graded as the first layer of the decision before anything is\nwritten.",
         "type": "string"
       },
       "repo": {
         "default": [],
-        "description": "A repository the labels are about, `name=dir`, where `name` is the\nbaseline's `repo` column. Repeatable; default: this project.",
+        "description": "A repository the labels are about, `name=dir`, where `name` is the\n`repo` column of the table. Repeatable; default: this project.",
         "items": {
           "type": "string"
         },
@@ -55,26 +55,32 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
   },
   "name": "model_attach",
   "outputSchema": {
-    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/attach-report.schema.json",
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-attach.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What came of asking to attach a model: the `ModelAttach` kind.",
     "properties": {
       "decision": {
         "type": "string"
       },
       "evaluation": {
-        "type": "object"
+        "description": "The numbers the gate looked at, as a revision records them."
       },
       "model": {
         "type": "string"
       },
       "refused": {
+        "description": "Why the evaluation does not allow it; none when it was attached.",
         "items": {
           "type": "string"
         },
         "type": "array"
       },
       "revision": {
-        "type": "string"
+        "description": "The revision that attached it; none when it was refused.",
+        "type": [
+          "string",
+          "null"
+        ]
       }
     },
     "required": [
@@ -82,7 +88,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "model",
       "evaluation"
     ],
-    "title": "AttachReport",
+    "title": "ModelAttach",
     "type": "object"
   },
   "title": "Make a model the first layer of a decision, by a revision"

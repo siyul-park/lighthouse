@@ -1,0 +1,64 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-rebuild.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "items": {
+    "description": "How the model attached to a decision came out: a row of the `ModelRebuild`\nkind.",
+    "properties": {
+      "decision": {
+        "type": "string"
+      },
+      "detail": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "model": {
+        "type": "string"
+      },
+      "status": {
+        "description": "How a rebuild went for one attached model.",
+        "oneOf": [
+          {
+            "const": "present",
+            "description": "The artifact is here and is what its name says.",
+            "type": "string"
+          },
+          {
+            "const": "rebuilt",
+            "description": "The artifact was missing and training made it again, bit for bit.",
+            "type": "string"
+          },
+          {
+            "const": "differs",
+            "description": "A file is here, or training made one, that is not what the name says.",
+            "type": "string"
+          },
+          {
+            "const": "labels-changed",
+            "description": "The labels are not the ones the model was attached with.",
+            "type": "string"
+          },
+          {
+            "const": "not-rebuildable",
+            "description": "The artifact is missing and cannot be made again here.",
+            "type": "string"
+          },
+          {
+            "const": "not-local",
+            "description": "The model has no digest: a service, not a file.",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "required": [
+      "decision",
+      "model",
+      "status"
+    ],
+    "type": "object"
+  },
+  "title": "ModelRebuild",
+  "type": "array"
+}

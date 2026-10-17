@@ -13,7 +13,7 @@ use tempfile::TempDir;
 use crate::{
     cache_fixtures::write,
     models::project,
-    models_plugin::{RPC, baseline, json, lighthouse, with_plugin},
+    models_plugin::{RPC, json, label_table, lighthouse, with_plugin},
 };
 
 const DECISION: &str = "local/naming-ban";
@@ -24,7 +24,7 @@ fn attached() -> (TempDir, String) {
     let dir = project(&RPC.replace("classification = \"fake/m1\"\n", ""));
     with_plugin(dir.path());
     spread(dir.path());
-    baseline(dir.path());
+    label_table(dir.path());
     let trained = lighthouse(
         dir.path(),
         &[
@@ -33,7 +33,7 @@ fn attached() -> (TempDir, String) {
             DECISION,
             "--model",
             "fake/m1",
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--format",
             "json",
@@ -50,7 +50,7 @@ fn attached() -> (TempDir, String) {
             "model",
             "attach",
             DECISION,
-            "--baseline",
+            "--labels",
             "labels.tsv",
             "--model",
             &model,
@@ -131,7 +131,7 @@ fn a_missing_file_and_dataset_are_made_again_from_the_same_labels() {
         fs::remove_file(dataset).unwrap();
     }
 
-    let (code, rows) = rebuild(dir.path(), &["--baseline", "labels.tsv"]);
+    let (code, rows) = rebuild(dir.path(), &["--labels", "labels.tsv"]);
 
     assert_eq!(code, Some(0), "{rows}");
     assert_eq!(rows[0]["status"], "rebuilt", "{rows}");
@@ -154,7 +154,7 @@ fn labels_that_changed_since_attach_train_nothing() {
         &format!("{}\n", changed.join("\n")),
     );
 
-    let (code, rows) = rebuild(dir.path(), &["--baseline", "labels.tsv"]);
+    let (code, rows) = rebuild(dir.path(), &["--labels", "labels.tsv"]);
 
     assert_eq!(code, Some(1), "{rows}");
     assert_eq!(rows[0]["status"], "labels-changed", "{rows}");

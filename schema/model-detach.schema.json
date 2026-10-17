@@ -1,6 +1,7 @@
 {
-  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/detach-report.schema.json",
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-detach.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The revision that detached a model: the `ModelDetach` kind.",
   "properties": {
     "decision": {
       "type": "string"
@@ -17,6 +18,6 @@
     "decision",
     "model"
   ],
-  "title": "DetachReport",
+  "title": "ModelDetach",
   "type": "object"
 }

@@ -1,5 +1,5 @@
-mod cli;
+mod terminal;
 
 fn main() -> std::process::ExitCode {
-    cli::main()
+    terminal::main()
 }

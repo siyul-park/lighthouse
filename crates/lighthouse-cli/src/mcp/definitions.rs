@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use crate::surface::{kinds, tools};
+use crate::surface::tools;
 use lighthouse_session::Session;
 use rmcp::model::{JsonObject, Tool, ToolAnnotations};
 use serde_json::Value;
@@ -15,7 +15,6 @@ use serde_json::Value;
 /// project cannot be loaded it says so as the table does.
 pub fn all() -> Vec<Tool> {
     let session = Session::load_or_default(None).ok();
-    let kinds = kinds::kinds();
     tools::tools()
         .iter()
         .map(|tool| {
@@ -30,7 +29,7 @@ pub fn all() -> Vec<Tool> {
                 .open_world(open_world);
             Tool::new(tool.name, description, object(tool.input_schema()))
                 .with_title(title)
-                .with_raw_output_schema(Arc::new(object(kinds[tool.kind].clone())))
+                .with_raw_output_schema(Arc::new(object(tool.output_schema())))
                 .annotate(annotations)
         })
         .collect()

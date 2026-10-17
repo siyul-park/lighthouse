@@ -5,7 +5,13 @@
 use std::path::PathBuf;
 
 use clap::FromArgMatches;
-use lighthouse_cli::surface::{Action, Context, args::CheckArgs, cli::command, tools::tools};
+use lighthouse_cli::surface::{
+    Action, Context,
+    args::CheckArgs,
+    commands::command,
+    reply::Body,
+    tools::{input, tools},
+};
 use lighthouse_session::Session;
 use serde_json::{Value, json};
 
@@ -25,16 +31,13 @@ fn core_project() -> (tempfile::TempDir, Context) {
 fn run() {
     let (_dir, ctx) = core_project();
     let matches = command()
+        .clone()
         .try_get_matches_from(["decision", "list", "--format", "json"])
         .unwrap();
     let action = Action::from_arg_matches(&matches).unwrap();
     let reply = lighthouse_cli::surface::run(&ctx, &action).unwrap();
     assert_eq!(reply.code, 0);
-    assert!(reply.stdout.starts_with('{') && reply.stdout.ends_with("}\n"));
-    assert_eq!(
-        serde_json::from_str::<Value>(&reply.stdout).unwrap(),
-        reply.value
-    );
+    assert!(matches!(&reply.body, Body::Json(value) if value["decisions"].is_array()));
 }
 
 #[test]
@@ -47,7 +50,10 @@ fn call() {
     let reply = lighthouse_cli::surface::tools::call(&ctx, "decision_list", Value::Null)
         .unwrap()
         .unwrap();
-    assert!(reply.value.is_object(), "{reply:?}");
+    assert!(
+        matches!(reply.body, Body::Json(Value::Object(_))),
+        "{reply:?}"
+    );
     let error = lighthouse_cli::surface::tools::call(&ctx, "decision_list", json!({"nope": 1}))
         .unwrap()
         .unwrap_err();
@@ -59,9 +65,8 @@ fn call() {
 
 #[test]
 fn schema() {
-    let schema = lighthouse_cli::surface::tools::schema::<CheckArgs>();
+    let schema = input::<CheckArgs>();
     assert_eq!(schema["type"], "object");
-    assert_eq!(schema["additionalProperties"], false);
     assert!(schema.get("$schema").is_none() && schema.get("title").is_none());
     assert!(schema["properties"]["paths"].is_object());
 }

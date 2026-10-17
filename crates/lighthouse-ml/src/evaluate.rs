@@ -10,6 +10,7 @@
 use std::{iter::Sum, path::PathBuf};
 
 use lighthouse_spec::Evaluation;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::metrics::{Metrics, Rate};
@@ -23,7 +24,7 @@ pub use grade::{RepoResult, grade};
 pub use layer::{Overlaid, Overlay};
 
 /// How a layer was graded, for the report.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Layer {
     pub model: String,
@@ -38,7 +39,7 @@ pub struct Layer {
 }
 
 /// What a check asked of models.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Usage {
     /// Subjects a model decided.
@@ -62,7 +63,7 @@ impl Sum for Usage {
 }
 
 /// One check's numbers.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Side {
     pub check: String,
@@ -82,7 +83,7 @@ pub struct Side {
 }
 
 /// What a model gave a labelled subject.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct Score {
     /// The label's fingerprint.
     pub fingerprint: String,
@@ -96,7 +97,7 @@ pub struct Score {
 }
 
 /// The result of an evaluation.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalReport {
     pub decision: String,
@@ -124,7 +125,7 @@ pub struct EvalReport {
 
 /// The monitor proposes to detach a model; nothing is written until it is
 /// done.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Proposal {
     pub model: String,
     pub reason: String,

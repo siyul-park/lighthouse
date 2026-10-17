@@ -5,9 +5,8 @@ use std::collections::BTreeSet;
 
 use clap::Command;
 use lighthouse_cli::surface::{
-    cli::{command, command_at},
-    kinds::kinds,
-    tools::{camel_case, tools},
+    commands::{command, command_at},
+    tools::{kinds, tools},
 };
 use serde_json::Value;
 
@@ -45,8 +44,19 @@ fn leaves(command: &Command, path: &mut Vec<String>, found: &mut Vec<Vec<String>
 
 fn leaf_paths() -> Vec<Vec<String>> {
     let mut found = Vec::new();
-    leaves(&command(), &mut Vec::new(), &mut found);
+    leaves(command(), &mut Vec::new(), &mut found);
     found
+}
+
+/// The long flag `--attributed-to` as the argument `attributedTo`.
+fn camel_case(flag: &str) -> String {
+    let mut words = flag.split('-');
+    let first = words.next().unwrap_or_default().to_owned();
+    words.fold(first, |name, word| {
+        let mut letters = word.chars();
+        let initial = letters.next().map(|c| c.to_ascii_uppercase());
+        name + &initial.map(String::from).unwrap_or_default() + letters.as_str()
+    })
 }
 
 /// The names a command's arguments have as tool properties: long flags and

@@ -1,19 +1,23 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Write,
+    path::PathBuf,
 };
 
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Preview, Severity, Suppressed, squash,
 };
 use lighthouse_spec::{Catalog, authored_severity};
+use schemars::JsonSchema;
 use serde::Serialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
 use crate::{
     expected::{ExampleKey, Expected, expected},
     fix::Shown,
-    group::{Entry, GroupOptions, Grouped, judgments, judgments_line, resolve_command},
+    group::{
+        Entry, GroupOptions, Grouped, Groups, Judgments, judgments, judgments_line, resolve_command,
+    },
     text::{evidence, evidence_line},
 };
 
@@ -97,16 +101,79 @@ impl Briefing<'_> {
     }
 }
 
-/// The report as typed data, the fields of the JSON object a frontend prints
-/// or wraps.
-///
-/// Compact: `status`, `counts`, `groups`, then when they apply `incomplete`
-/// (`[path, reason]` pairs), `omitted`, and the `resolve` hint and `judgments`
-/// table once for all shown findings that ask for review. Full: `findings`,
-/// `incomplete` and `judgments` as records, `omitted` as a count.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Report {
-    pub fields: Map<String, Value>,
+/// The JSON report of a check as typed data, which a frontend prints or
+/// wraps: the findings grouped by decision, or one self-contained record per
+/// finding.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Report {
+    Compact(Compact),
+    Full(Full),
+}
+
+/// How a compact report stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    Clean,
+    /// Some finding is a decision's verdict.
+    Findings,
+    /// Every finding is a subject nothing decided, left to review.
+    Review,
+    /// Part of the project was not checked.
+    Incomplete,
+}
+
+/// The counts of a compact report: findings by severity (a subject left to
+/// review is no finding) and those that ask for review, always; the rest when
+/// they are not zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct Counts {
+    pub error: usize,
+    pub warn: usize,
+    pub review: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub info: Option<usize>,
+    /// Findings judgments kept out of the report.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suppressed: Option<usize>,
+    /// Findings source directives suppress.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed: Option<usize>,
+}
+
+/// The report with the findings grouped by decision.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct Compact {
+    pub status: Status,
+    pub counts: Counts,
+    #[serde(flatten)]
+    pub groups: Groups,
+    /// What was not checked: `[path, reason]` pairs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub incomplete: Vec<(Option<PathBuf>, String)>,
+}
+
+/// The report with one record per finding.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct Full {
+    pub findings: Vec<Value>,
+    pub incomplete: Vec<Gap>,
+    /// Findings the limit left out.
+    pub omitted: usize,
+    /// What each judgment says; present when a shown finding asks for review.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub judgments: Option<Judgments>,
+}
+
+/// A part of the project that was not checked, and why.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct Gap {
+    /// `incomplete`.
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    pub path: Option<PathBuf>,
+    pub reason: String,
 }
 
 #[derive(Serialize)]
@@ -184,11 +251,10 @@ pub fn report(
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> Report {
-    let fields = match briefing.detail {
-        Detail::Compact => compact_fields(diagnostics, incomplete, briefing),
-        Detail::Full => full_fields(diagnostics, incomplete, briefing),
-    };
-    Report { fields }
+    match briefing.detail {
+        Detail::Compact => Report::Compact(compact(diagnostics, incomplete, briefing)),
+        Detail::Full => Report::Full(full(diagnostics, incomplete, briefing)),
+    }
 }
 
 /// The findings to print: all of them, or the first `limit` by severity
@@ -302,89 +368,71 @@ fn full_text(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &B
     out
 }
 
-/// The compact fields: the grouped findings with the status and counts of the
+/// The compact report: the grouped findings with the status and counts of the
 /// whole run, and the gaps.
-fn compact_fields(
-    diagnostics: &[Diagnostic],
-    incomplete: &[Incomplete],
-    briefing: &Briefing,
-) -> Map<String, Value> {
+fn compact(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &Briefing) -> Compact {
     let grouped = Grouped::of(entries(diagnostics, briefing), &briefing.group_options());
-    let mut fields = grouped.fields();
     let status = if !incomplete.is_empty() {
-        "incomplete"
+        Status::Incomplete
     } else if diagnostics.is_empty() {
-        "clean"
+        Status::Clean
     } else if diagnostics.iter().all(|d| d.review.is_some()) {
-        "review"
+        Status::Review
     } else {
-        "findings"
+        Status::Findings
     };
-    fields.insert("status".to_owned(), json!(status));
-    fields.insert("counts".to_owned(), counts(diagnostics, briefing));
-    if !incomplete.is_empty() {
-        let gaps: Vec<Value> = incomplete
-            .iter()
-            .map(|item| json!([item.path, item.reason]))
-            .collect();
-        fields.insert("incomplete".to_owned(), Value::Array(gaps));
-    }
-    fields
-}
-
-/// Errors, warnings and findings asking for review always; the other
-/// counts when they are not zero.
-fn counts(diagnostics: &[Diagnostic], briefing: &Briefing) -> Value {
     let count = |s: Severity| severity_count(diagnostics, s);
-    let reviews = diagnostics
-        .iter()
-        .filter(|d| briefing.needs_review(d))
-        .count();
-    let mut counts = Map::new();
-    counts.insert("error".to_owned(), json!(count(Severity::Error)));
-    counts.insert("warn".to_owned(), json!(count(Severity::Warn)));
-    counts.insert("review".to_owned(), json!(reviews));
-    for (key, n) in [
-        ("info", count(Severity::Info)),
-        ("suppressed", briefing.suppressed),
-        ("allowed", briefing.allowed),
-    ] {
-        if n > 0 {
-            counts.insert(key.to_owned(), json!(n));
-        }
+    let some = |n: usize| (n > 0).then_some(n);
+    Compact {
+        status,
+        counts: Counts {
+            error: count(Severity::Error),
+            warn: count(Severity::Warn),
+            review: diagnostics
+                .iter()
+                .filter(|d| briefing.needs_review(d))
+                .count(),
+            info: some(count(Severity::Info)),
+            suppressed: some(briefing.suppressed),
+            allowed: some(briefing.allowed),
+        },
+        groups: grouped.data(),
+        incomplete: incomplete
+            .iter()
+            .map(|item| (item.path.clone(), item.reason.clone()))
+            .collect(),
     }
-    Value::Object(counts)
 }
 
-/// The full fields: the findings that fit `briefing.limit`, the gaps, how many
+/// The full report: the findings that fit `briefing.limit`, the gaps, how many
 /// findings were left out, and the judgments table when a shown finding asks
 /// for review.
-fn full_fields(
-    diagnostics: &[Diagnostic],
-    incomplete: &[Incomplete],
-    briefing: &Briefing,
-) -> Map<String, Value> {
+fn full(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &Briefing) -> Full {
     let (shown, omitted) = select(diagnostics, briefing.limit);
     let widths = widths(diagnostics);
-    let findings: Vec<Value> = shown
+    let findings = shown
         .iter()
         .map(|d| {
             let record = finding(d, briefing, widths[d.fingerprint.as_str()]);
             serde_json::to_value(record).expect("finding serializes")
         })
         .collect();
-    let gaps: Vec<Value> = incomplete
-        .iter()
-        .map(|item| json!({ "type": "incomplete", "path": item.path, "reason": item.reason }))
-        .collect();
-    let mut fields = Map::new();
-    fields.insert("findings".to_owned(), Value::Array(findings));
-    fields.insert("incomplete".to_owned(), Value::Array(gaps));
-    fields.insert("omitted".to_owned(), json!(omitted));
-    if shown.iter().any(|d| briefing.needs_review(d)) {
-        fields.insert("judgments".to_owned(), judgments());
+    Full {
+        findings,
+        incomplete: incomplete
+            .iter()
+            .map(|item| Gap {
+                kind: "incomplete",
+                path: item.path.clone(),
+                reason: item.reason.clone(),
+            })
+            .collect(),
+        omitted,
+        judgments: shown
+            .iter()
+            .any(|d| briefing.needs_review(d))
+            .then(judgments),
     }
-    fields
 }
 
 /// How many characters of each fingerprint tell it apart from the others of

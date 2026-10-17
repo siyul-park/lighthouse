@@ -9,21 +9,12 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": false
   },
-  "description": "Fit a model on the labels of a decision.\n\nThe labels are the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model; the decision's examples ride in the question. Writes the dataset under `.lighthouse/datasets/` and the model under `.lighthouse/models/`, named by its digest; it binds nothing (bind `local/learned@sha256:<hex>`).\n\nExamples:\n  lighthouse model train design/prefer-method\n  lighthouse model train design/prefer-method --model local/learned --repo cel=../cel\n  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json",
+  "description": "Fit a model on the labels of a decision.\n\nThe labels are the rows of the labels table, the judgments recorded under its current meaning version, and optionally the answers of another model; the decision's examples ride in the question. Writes the dataset under `.lighthouse/datasets/` and the model under `.lighthouse/models/`, named by its digest; it binds nothing (bind `local/learned@sha256:<hex>`).\n\nExamples:\n  lighthouse model train design/prefer-method\n  lighthouse model train design/prefer-method --model local/learned --repo cel=../cel\n  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`model train`.",
     "properties": {
-      "baseline": {
-        "default": null,
-        "description": "A table of reviewed findings (`fingerprint repo location verdict`).",
-        "type": [
-          "string",
-          "null"
-        ]
-      },
       "fromModel": {
-        "default": null,
         "description": "Also label the subjects nobody labelled with this model's answers\n(weight 0.5): a fail where it is sure of one, a pass where it is sure\nof the other. `<provider>/<model>`.",
         "type": [
           "string",
@@ -34,8 +25,15 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "description": "The decision whose labels the model learns, such as\n`design/prefer-method`.",
         "type": "string"
       },
-      "model": {
+      "labels": {
         "default": null,
+        "description": "A table of reviewed findings (`fingerprint repo location verdict`).\nDefault: `labels/<id>.tsv` when it exists.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "model": {
         "description": "The model to train, `<provider>/<model>`. Default: the one bound to\nthe decision.",
         "type": [
           "string",
@@ -44,7 +42,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       },
       "repo": {
         "default": [],
-        "description": "A repository the labels are about, `name=dir`, where `name` is the\nbaseline's `repo` column. Repeatable; default: this project.",
+        "description": "A repository the labels are about, `name=dir`, where `name` is the\n`repo` column of the table. Repeatable; default: this project.",
         "items": {
           "type": "string"
         },
@@ -58,25 +56,20 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
   },
   "name": "model_train",
   "outputSchema": {
-    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/train-report.schema.json",
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-train.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What a training run did.",
     "properties": {
       "bySource": {
         "additionalProperties": {
+          "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "type": "object"
       },
       "card": {
-        "anyOf": [
-          {
-            "type": "object"
-          },
-          {
-            "type": "null"
-          }
-        ]
+        "description": "The card of the artifact the job made, when it is in the store."
       },
       "decision": {
         "type": "string"
@@ -85,23 +78,216 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "type": "string"
       },
       "result": {
-        "anyOf": [
-          {
-            "type": "object"
+        "description": "The job the trainer gave; `None` when no model that learns is bound.",
+        "properties": {
+          "created_at": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
-          {
-            "type": "null"
+          "error": {
+            "default": null,
+            "description": "Why a job failed, in OpenAI's words.",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "param": {
+                "default": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "param"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "estimated_finish": {
+            "default": null,
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "fine_tuned_model": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "default": null,
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "hyperparameters": {
+            "default": null
+          },
+          "id": {
+            "type": "string"
+          },
+          "integrations": {
+            "default": null,
+            "items": true,
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": null,
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "method": {
+            "default": null,
+            "description": "The method of a fine-tuning job.",
+            "properties": {
+              "supervised": {
+                "description": "OpenAI's supervised fine-tuning method, with optional OpenAI parameters.",
+                "properties": {
+                  "hyperparameters": {
+                    "additionalProperties": true,
+                    "default": {},
+                    "description": "Provider-specific supervised fine-tuning parameters.",
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "hyperparameters"
+                ],
+                "type": "object"
+              },
+              "type": {
+                "description": "`supervised`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "supervised"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "object": {
+            "description": "`fine_tuning.job`.",
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string"
+          },
+          "result_files": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "seed": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "description": "How far a fine-tuning job is.",
+            "enum": [
+              "validating_files",
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "trained_tokens": {
+            "default": null,
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "training_file": {
+            "type": "string"
+          },
+          "validation_file": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
           }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "finished_at",
+          "object",
+          "model",
+          "status",
+          "hyperparameters",
+          "organization_id",
+          "trained_tokens",
+          "training_file",
+          "validation_file",
+          "integrations",
+          "seed",
+          "estimated_finish",
+          "method",
+          "metadata",
+          "fine_tuned_model",
+          "result_files",
+          "error"
+        ],
+        "type": [
+          "object",
+          "null"
         ]
       },
       "subjects": {
+        "description": "Labelled subjects handed over, by source.",
+        "format": "uint",
         "minimum": 0,
         "type": "integer"
       },
       "trainingFile": {
+        "description": "The training file, by content: `sha256:<hex>`.",
         "type": "string"
       },
       "unresolved": {
+        "description": "Labels whose subject no longer exists or is not selected.",
+        "format": "uint",
         "minimum": 0,
         "type": "integer"
       }
@@ -110,10 +296,13 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "decision",
       "model",
       "subjects",
+      "bySource",
       "unresolved",
-      "trainingFile"
+      "trainingFile",
+      "result",
+      "card"
     ],
-    "title": "TrainReport",
+    "title": "ModelTrain",
     "type": "object"
   },
   "title": "Fit a model on the labels of a decision"

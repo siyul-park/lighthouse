@@ -22,7 +22,7 @@ pub mod model;
 pub mod review;
 
 pub use authoring::{Authored, create_decision, replace_decision};
-pub use check::{CheckRequest, Checked, RunStatus, Summary, check};
+pub use check::{CheckReport, CheckRequest, Checked, RunStatus, Summary, check};
 pub use decisions::{
     DecisionRow, DecisionTest, active_decisions, catalog_index, config_summary, decision_rows,
     decision_text, explain, test_decisions,
@@ -38,7 +38,6 @@ pub use lighthouse_spec::{FILE_NAME, local_dir};
 pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};
 pub use scope::{changed, since};
 pub(crate) use selector::Selector;
-pub use selector::long_enough;
 pub use trust::{Basis, revoke, trust};
 pub use validate::{Problem, Validated, validate_paths};
 
