@@ -46,63 +46,80 @@ languages and editors are added.
 | Fewer concepts | `spec::project` replaces config (projects replace presets and overrides); fields cut to requirement/scope/severity/options + context/consequences/status/supersedes + check/fix/examples/provenance; generated and test code handled by each decision's scope; camelCase options; UUID identity; decision ids in the ESLint convention, checked by `core/decision-naming`; ESLint-style `lighthouse-disable` directives; judgments (`pass`/`fail`/`notApplicable`) and SARIF suppressions replace verdicts; `decisions.jsonl` is the only source of truth |
 | Self-check and placement | `layers` (import-linter contracts), `feature-envy` and `misplaced-symbol` (Lanza & Marinescu thresholds), `no-hidden-target`; the low-precision heuristics `private-helper-callers`, `unique-type-names`, `tiny-modules` and `owner-file` are the candidate selectors of model checks; enum variants as a symbol kind; option shapes validated |
 | Rules aligned with established tools | independent standard limits (cyclomatic, cognitive, statements, depth, params, results, function length) with one limit shape per role and `-1` for none; params and results count the fields of single-use structs; model checks made deterministic where a linter proves it (context-first, stored context, error identity, panics, private types in APIs); `command` checks read SARIF 2.1.0 (`output: sarif`, `select`, `columns`) so common linters are [wrapped](wrapping-linters.md); the [baseline](baseline.md): precision per decision, timings and findings on the reference repositories |
+| Info signals | every deterministic info signal below 20% precision was refined at its false-positive cause or retired to a model check's candidate selector |
+| One cohesive catalog | similar decisions merged: 117 decisions became 27, variants are options or kinds and every finding carries its kind so precision stays measurable; Clean Code's *Smells and Heuristics* and chapter rules are covered by a decision, recorded as not applicable (14) or pending a named fact (40) |
+| Model checks | classification runtime with binding layers (a revision's model, the decision's, the project's, then a review task), abstention falling through, answers cached and budgeted; `decision eval` with precision, recall, coverage, Brier score, calibration and AUROC over the labels, a refit for labels the model learned from, and a promotion gate; `model train`, `attach`, `detach` and `rebuild` for a local classifier trained on judgments (it ties the per-decision constant today, so attach is refused where it does not beat the check) |
+| One CLI and MCP surface | noun-verb commands, one meaning per flag, each MCP tool the twin of a command with annotations, an `outputSchema` and structured content; every JSON result has a schema derived from its type (`schema/`); `check --fix` always prints a `CheckReport` and the `fix` tool prints the `FixReport`; the labels of a decision are `labels/<pack>/<decision>.tsv` (`--labels`) |
+| Crate boundaries | 15 crates in layers, each one role, the edges enforced by `design/layers`; one name per concept across crates, protocol, schemas and docs (`Run`, `fingerprints`, `decision`) |
+| Hooks report the session's own changes | the first edit of a file records its findings; later hooks report only the findings the session introduced, and a turn with no edit is silent |
+| Stability signals | module stability, reach of functions and a stability probe on the reference repositories |
 
 ## Next
 
 Rule accuracy and checking cost are measured; the [baseline](baseline.md) is the yardstick.
-Rules first, then models where rules fall short, then reach.
+What is checked by hand is automated first where the result can be verified, then models
+where rules fall short, then reach. Each step below comes before the ones that build on it.
 
-### Signals that earn their place
-- **Measured info signals:** a deterministic check below 20% precision after cheap fixes
-  stops deciding. Its heuristic becomes the recall-oriented candidate selector of a model
-  check, merged into the decision that already states the requirement. The rest are
-  refined at their measured false-positive causes.
-- **One cohesive catalog:** similar decisions merge. Variants become options or kinds,
-  every finding carries its kind so precision stays measurable, and other linters'
-  granularity is consulted. 117 decisions become 29.
-- **Clean Code, fully covered:** every item of Martin's *Smells and Heuristics* and every
-  chapter rule is covered by a decision, recorded as not applicable, or pending a named
-  fact. A coverage test enforces it.
-  - A new deterministic kind ships only if its sampled precision passes; otherwise it is
-    judged.
-  - A project can replace a bundled decision's check (`rules."<id>".check`) to wrap a
-    linter it already runs.
-  - New facts are general shapes: flow attributes, event kinds, external calls, parameter
-    attributes, type origin. Effects, locals and clone fingerprints follow.
+### One concept model
+Renames and removals only, so that what follows builds on one vocabulary:
+- A check abstains (the CEL field `review` becomes `abstain`), a provider names the
+  `protocol` it speaks, and derived strength replaces `mining`.
+- Protocol 0.3: `lighthouse/index`, `initialize` in LSP and MCP vocabulary, LSP error
+  codes, one method table with its HTTP twin, and recorded conformance transcripts for
+  the Rust and Go providers.
+- The core stays free of the code model: fingerprint disambiguation comes from the
+  engine, symbol fix operations move to the code domain, and layer contracts keep the
+  code model out of core, store, ml, report and session.
 
-### Models where rules fall short
-A decision says what to ask; the project binds who answers. Bindings resolve in layers,
-and an abstention falls through: a classifier trained for this decision, then a model
-bound per decision, then the project's model, then the agent.
-- **Runtime:**
-  - a check is decided by its rule, which abstains where it is unsure;
-  - candidates go through the layers;
-  - undecided cases are reported as `review`;
-  - answers are cached, `cost > 0` calls are budgeted and limited to the report scope,
-    and remote use is opt-in.
-- **Local first, at no cost:** an embedding model run in process (EmbeddingGemma) and a
-  per-decision classifier (LightGBM against kNN and logistic-regression baselines,
-  calibrated, abstaining). It is trained on strength-weighted judgments and never on its
-  own outputs.
-- **Remote decision models:** System One models answer yes/no questions with a probability.
-  They are reached through TypeSafe's API spec (TypeSafe jev, or any provider that
-  speaks it). `:free` chat models label candidates on request, and the
-  local classifier distils those labels.
-- **Evaluation is the promotion gate (CLI and MCP):** precision, false-positive rate,
-  recall, false-negative rate, selector precision, coverage and agreement, with
-  intervals, over examples, hand-reviewed samples and judgments. A trained model is
-  attached to a decision only by an approved revision that beats the current check.
-  Sampled re-judging gives recall and drift.
-- **LLM fixers are ordinary fix providers** (`command` for any CLI, `rpc` for a plugin).
+### Fixes by models, verified
+The biggest direct cut in agent work, and it needs no labels: the verifier already exists.
+- **LLM fixers are ordinary fix providers** (`command` for any CLI, `rpc` for a plugin),
+  chosen with `rules."<id>".fix`, and a `type: model` fix is an extent replacement or an
+  agent edit of a scratch workspace.
   - Lighthouse ships a ready-made plugin with clients for standard APIs: OpenAI-compatible endpoints (OpenRouter, Ollama, vLLM, LM Studio) now, Anthropic later.
-  - CLIs are documented as recipes (command providers).
-  - A project attaches a fixer to a bundled decision with `rules."<id>".fix`.
+  - Headless agent CLIs are documented as recipes (command providers); a measured
+    comparison of API, local-server and agent-CLI arms decides the default.
   - The fixer's output is always verified (apply, format, re-check, roll back) and is always `suggested`.
+  - An `[approval]` policy says which changes may be applied without a person.
+
+### Local models
+Free, local and calibrated, run in process; evaluation is the promotion gate.
+- A Core ML embedding model on the Apple Neural Engine through the standard Apple path;
+  adopted only if it is at least twice as fast with no drop in evaluation.
+- A 1B-4B local model as a classifier, measured first on the hand-labelled subjects
+  against the per-decision constant, zero- and few-shot; implemented only if an arm
+  earns it. No arm tried so far (hosted logprobs models, free chat models, the local
+  learner) beats that constant.
+- Remote decision models stay behind the published APIs: System One models answer yes/no
+  questions with a probability through TypeSafe's API spec, and `:free` chat models label
+  candidates on request.
+
+### Checks that author themselves
+A check author turns `model` checks and noisy selectors into deterministic revisions that
+pass the evaluation gate, which removes review tasks at the source. A revision still needs
+approval, and a major change always needs a person.
+
+### Learning from history
+Labels are the measured bottleneck of every classifier, so they come next.
+- **Repository mining:** change direction, prevalence and kept fixes become weak labels
+  (strength `derived`) and `proposed` decisions. Changes are grouped by structural change
+  first, then by embeddings; generation drafts the wording. A design comes first.
+- **Stability:** a system table and a risk ordering of the signals. Risk orders and
+  samples findings; it never removes one.
+
+### More Clean Code coverage
+General provider facts for the 40 pending items: flow attributes, event kinds, external
+calls, parameter attributes, type origin; effects, locals and clone fingerprints follow.
+This adds findings, so it waits until automation exists to absorb them.
+- A new deterministic kind ships only if its sampled precision passes; otherwise it is
+  judged.
+- A project can replace a bundled decision's check (`rules."<id>".check`) to wrap a
+  linter it already runs.
 
 ### Fast on large repositories
 - **Done:** per-unit provider caches with early cutoff and a host result cache keyed by
   each rule's declared reach. Warm runs are byte-identical to cold runs
-  (`scripts/fastgate.sh`).
+  (`scripts/fastgate.sh`); a warm run on this repository takes 0.7 s.
 - **Next:**
   - type-check edited packages from source over dependency export data;
   - cache failed units;
@@ -111,12 +128,6 @@ bound per decision, then the project's model, then the agent.
 - **Target:** a one-file edit costs under 40% of a cold run, reported per repository.
 - **Protocol 0.2, the rest:** LSP lifecycle, text sync, UTF-8 positions, and
   `lighthouse/check` for `rpc` checks.
-
-### Packaging
-- Prebuilt binaries that bundle the Go and Rust providers and the local model plugin
-  (model weights download on first use), plus a one-command install. Verified on clean
-  machines.
-- Not yet a public release.
 
 ### The decision loop, completed
 - **Graph queries:** decision, finding, judgment (reason, actor), evidence and revision.
@@ -138,22 +149,19 @@ bound per decision, then the project's model, then the agent.
   - Results are reported per check type, decision and language.
   - FTS5 BM25 alone is the baseline; embeddings are adopted only if they improve it.
 
-### Adoption
+### Packaging and adoption
 Public adoption waits until the loop has been shown working.
-- Public release.
+- Prebuilt binaries that bundle the Go and Rust providers and the local model plugin
+  (model weights download on first use), plus a one-command install. Verified on clean
+  machines. Not yet a public release.
 - `lighthouse init` detects languages and proposes a starter set, including mined
   decisions.
-- A docs pass: each document holds only what its reader needs.
-
-### Learning from history
-- **Repository mining:** refactor-like commits and dominant conventions become weak
-  labels and `proposed` decisions. Changes are grouped by structural change first, then
-  by embeddings; generation drafts the wording.
+- Public release, and a docs pass: each document holds only what its reader needs.
 
 ### Later
 | Step | Scope |
 | --- | --- |
-| Artifact graph | domain-neutral nodes and edges; a markdown provider as the first non-code domain |
+| Artifact graph | domain-neutral nodes and edges; a markdown provider as the first non-code domain, then the shared artifact and relation graph extracted from what the second domain shows is common |
 | Breadth | `lsp-bridge` (any off-the-shelf language server, at lower capability), then native TypeScript and Python providers |
 | Ecosystem | `lighthouse lsp` for editors (diagnostics, fixes, judgments); external rule plugins over RPC that ship their decision specs; `plugin add` with a lockfile |
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
@@ -173,3 +181,6 @@ Public adoption waits until the loop has been shown working.
 - Rename fixes are off: no provider declares complete reference sites yet.
 - External binaries in `command` providers are trusted by their command line, not by
   content.
+- Shallow helpers are not extended: the deterministic check reached 12% precision on two
+  samples and no model arm beats the per-decision constant, so the opt-in `helpers`
+  review route stays as it is.

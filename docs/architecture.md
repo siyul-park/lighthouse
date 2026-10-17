@@ -217,7 +217,7 @@ concurrently); files are checked in parallel, each by every rule that applies to
 it, and project-scope rules in parallel with them. What each step returns is
 gathered in a fixed order (files in path order, rules in id order), so findings,
 fingerprints and exit codes are the same on every run whatever the schedule;
-identity and fingerprint assignment run after the findings are collected and
+fingerprint assignment runs after the findings are collected and
 ordered. What several rules would compute alike is computed once per run and
 shared through `Context::memo`: the base facts of a symbol that CEL checks read, and
 the versions of a decision that the store records with each finding. Set
@@ -239,7 +239,7 @@ a package without function bodies, so a body edit re-indexes one unit.
 `lighthouse check --timings` prints where a run's time went to stderr, one
 `timings:` line per phase: setup, read, each provider's index, merge, each
 analyzer, the rules (wall clock, then the five slowest rules summed over the
-files they ran on), identity, store, report and the total.
+files they ran on), fingerprints, store, report and the total.
 
 ### Result cache
 
@@ -264,7 +264,7 @@ applicability, then by reach the file path and its slice digest (local), plus it
 neighbor digest (neighbors), or the digest of the whole merged project (global).
 The digests are computed once per run, in parallel per file, after the merge. A
 hit returns the stored findings and notices; failed or incomplete rule runs are
-never stored. Identity, suppression and reporting run afterwards on the full set,
+never stored. Fingerprints, suppression and reporting run afterwards on the full set,
 so a warm run prints what a cold one does, byte for byte.
 
 ## Memory: findings, judgments and the feedback loop
@@ -524,7 +524,7 @@ demand, when `check --fix` or the MCP `fix` tool asks.
 
 **One canonical fix per rule.** The catalog is the single source that says how a rule is
 fixed: the optional `fix:` block of its decision (see [Fixer spec](fixer-spec.md)). The
-resolution is deterministic, `finding.rule` to `decision.fix` to the fixer registered
+resolution is deterministic, `finding.decision` to `decision.fix` to the fixer registered
 under the decision's id; there is no list of competing fixers and no fallback chain.
 `--fixer <id>` is an explicit override that must name a registered fixer; it replaces the
 decision's fixer for the selected findings, whose proposals count as `suggested`, and it
