@@ -93,18 +93,22 @@ fix = "ask"                                        # default; "allow" writes a v
   these after you; follow them when placing code"). The preview and the written text are the result
   after them.
 - **What keeps it.** The orchestrator applies the files in memory, formats, re-checks, and keeps the
-  edit only if at least one targeted finding is gone, nothing new of `warn` or `error` appeared in the
-  changed and referencing files ("introduced <decision> at <line>"), and they are fully analyzed.
+  edit only if at least one targeted finding is gone, no decision has more findings of `warn` or `error` in
+  the changed and referencing files than before (counted by decision and file, so a renamed symbol's
+  old findings are not new; "introduced <decision> at <line>"), and they are fully analyzed.
   Targeted findings still there are declined `unresolved`; the rest count as `verified`. Otherwise the
   files are rolled back and the findings declined with the reason.
-- **Runs in sequence.** One run per file (every model-fixable finding of the file in the report
-  scope, up to 20, by line), one after another by path: a chain. Each run's scratch copy holds the
-  project plus every edit already accepted in the pass, so whole-file results never overwrite each
-  other. An edit is accepted only if each file it changed still has the digest it found (compare and
-  swap); otherwise it is declined `conflict` and never merged. The cache key includes those digests.
-  Runs that changed a file in common are verified as one. After the chain the combined files are
-  re-checked, then `[fix] verify` runs; on failure the newest run is rolled back, then the next, until
-  it passes, and their findings are declined with the reason.
+- **Runs in sequence.** One run for each file and scope of the findings (every model-fixable finding
+  of the file with that scope in the report scope, up to 20, by line), one after another by path,
+  the narrower scope first: a chain. A `symbol` decision and a `files` decision in one file are two
+  runs. Each run's scratch copy holds the project plus every edit already accepted in the pass, so
+  whole-file results never overwrite each other. An edit is accepted only if each file it changed
+  still has the digest it found (compare and swap); otherwise it is declined `conflict` and never
+  merged. The cache key includes those digests. Each run is applied, re-checked and judged by
+  itself, over what the runs before it left; one made over a text an earlier run did not keep is
+  declined `conflict`. Then `[fix] verify` runs; on failure the newest run is undone (its files go
+  back to the text it started from), then the one before it, until the commands pass, and the
+  findings of those undone are declined `rolled-back` with the reason.
 - **`[fix] verify`.** Commands (argument lists, no shell) run once per run, after the fixes, over a
   scratch copy of the project (what version control keeps, with the fixed texts in place), when the
   fixes would be written. They need a trusted project and are part of what `lighthouse trust` lists.

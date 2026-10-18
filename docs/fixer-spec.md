@@ -38,7 +38,7 @@ fix:
   through `Plugin::order_keys()`) live in the operation, not in per-rule code.
 - **`model`** is a fix by an agent that edits, not a derivation. A decision has one when it is
   listed in `[fix] decisions` and `[models] edit` is bound, whether it says `fix: {type: model}`
-  (optionally with `prompt` and `scope: symbol | files`, default `symbol`) or has a check and no
+  (optionally with `prompt` and `scope: symbol | files`; undeclared, the decision limits nothing and `[fix] scope` decides) or has a check and no
   fix of its own. Without an `edit` binding the finding stays a review task carrying the brief.
   The agent runs in a scratch copy of the project, once per file; each changed file is a
   whole-file `Replace`, `suggested` and never `safe` (`safety: safe` is refused). The orchestrator
