@@ -3,7 +3,8 @@
 use std::{fs, path::PathBuf};
 
 use lighthouse_process::{
-    Bridge, DENIED, Denied, Plan, Policy, Profile, Sandbox, bwrap_argv, seatbelt_profile, secrets,
+    Bridge, DENIED, Denied, Plan, Policy, Profile, Sandbox, bwrap_argv, is_project_secret,
+    seatbelt_profile, secrets,
 };
 
 fn path(text: &str) -> PathBuf {
@@ -162,6 +163,21 @@ fn the_secrets_are_the_fixed_list_below_home_and_the_files_of_the_project() {
     assert!(found.contains(&project(".lighthouse/local.toml")));
     assert!(!found.contains(&project(".envrc")));
     assert!(!found.contains(&project("main.rs")));
+}
+
+#[test]
+fn a_project_secret_is_an_environment_file_at_the_root_or_the_local_settings() {
+    for secret in [".env", ".env.local", ".lighthouse/local.toml"] {
+        assert!(is_project_secret(&path(secret)), "{secret}");
+    }
+    for plain in [
+        ".envrc",
+        "src/.env",
+        ".lighthouse/decisions/a.yaml",
+        "main.rs",
+    ] {
+        assert!(!is_project_secret(&path(plain)), "{plain}");
+    }
 }
 
 #[test]

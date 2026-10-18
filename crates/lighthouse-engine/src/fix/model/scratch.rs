@@ -11,7 +11,7 @@ use std::{
 };
 
 use ignore::WalkBuilder;
-use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT, Policy, Profile};
+use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT, Policy, Profile, is_project_secret};
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 
@@ -165,7 +165,8 @@ fn tail(bytes: &[u8]) -> String {
     lines[lines.len().saturating_sub(TAIL_LINES)..].join("\n")
 }
 
-/// Copies the files of the project that version control would keep, and
+/// Copies the files of the project that version control would keep, except
+/// its secrets (the copy is writable and its programs may read it), and
 /// writes `texts` over them. The paths of the files placed.
 fn copy_project(root: &Path, into: &Path, texts: &Overlays) -> io::Result<BTreeSet<PathBuf>> {
     let mut placed = BTreeSet::new();
@@ -182,6 +183,9 @@ fn copy_project(root: &Path, into: &Path, texts: &Overlays) -> io::Result<BTreeS
         let Ok(relative) = entry.path().strip_prefix(root) else {
             continue;
         };
+        if is_project_secret(relative) {
+            continue;
+        }
         place(&into.join(relative), |target| {
             fs::copy(entry.path(), target).map(drop)
         })?;

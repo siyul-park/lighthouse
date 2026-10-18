@@ -205,16 +205,21 @@ pub fn secrets(home: Option<&Path>, root: &Path) -> Vec<PathBuf> {
         .into_iter()
         .flatten()
         .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name == ".env" || name.starts_with(".env."))
-        });
+        .filter(|entry| is_project_secret(Path::new(&entry.file_name())))
+        .map(|entry| entry.path());
     personal
         .chain(files)
         .chain([root.join(".lighthouse/local.toml")])
         .collect()
+}
+
+/// Whether the project-relative `path` is a secret of the project: an
+/// environment file at its root, or the personal settings of its user.
+pub fn is_project_secret(path: &Path) -> bool {
+    path == Path::new(".lighthouse/local.toml")
+        || path
+            .to_str()
+            .is_some_and(|name| name == ".env" || name.starts_with(".env."))
 }
 
 /// Whether `program` names something to run from `dir`: a file at a path, or a

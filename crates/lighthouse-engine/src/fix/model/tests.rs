@@ -305,6 +305,19 @@ fn the_verify_commands_run_over_a_copy_that_holds_the_fixed_texts() {
     assert!(failed.contains("exited 3"), "{failed}");
     assert!(failed.ends_with("one\ntwo"), "{failed}");
 
+    fs::write(root.path().join(".env"), "KEY=fake\n").unwrap();
+    let read = run_verify(
+        root.path(),
+        &texts,
+        &[sh(&format!(
+            "test ! -e .env && ! cat '{}/.env' 2>/dev/null",
+            root.path().display()
+        ))],
+        limit,
+        &Policy::default(),
+    );
+    assert_eq!(read, Ok(()), "a command read the .env of the project");
+
     let escaping = crate::Overlays::from([(PathBuf::from("../x"), String::new())]);
     assert!(run_verify(root.path(), &escaping, &[], limit, &Policy::default()).is_err());
 }

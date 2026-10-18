@@ -267,6 +267,10 @@ fn the_scratch_copy_holds_the_files_and_texts_of_the_run_and_tells_what_was_chan
     fs::write(root.path().join("src/c.txt"), "c\n").unwrap();
     fs::write(root.path().join(".gitignore"), "ignored.txt\n").unwrap();
     fs::write(root.path().join("ignored.txt"), "ignored\n").unwrap();
+    fs::write(root.path().join(".env"), "KEY=fake\n").unwrap();
+    fs::write(root.path().join(".env.local"), "KEY=fake\n").unwrap();
+    fs::create_dir_all(root.path().join(".lighthouse")).unwrap();
+    fs::write(root.path().join(".lighthouse/local.toml"), "x = 1\n").unwrap();
     let texts = Overlays::from([("src/a.txt".into(), "overlay\n".to_owned())]);
 
     let scratch = Scratch::new(root.path(), &texts).unwrap();
@@ -277,6 +281,9 @@ fn the_scratch_copy_holds_the_files_and_texts_of_the_run_and_tells_what_was_chan
         "overlay\n"
     );
     assert!(!at.join("ignored.txt").exists());
+    for secret in [".env", ".env.local", ".lighthouse/local.toml"] {
+        assert!(!at.join(secret).exists(), "{secret} was copied");
+    }
     assert!(scratch.changes(root.path(), &texts).unwrap().is_empty());
 
     fs::write(at.join("src/b.txt"), "changed\n").unwrap();

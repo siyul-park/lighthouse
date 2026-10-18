@@ -89,13 +89,21 @@ fn an_agent_edits_in_its_scratch_copy_with_a_home_of_its_own_and_writes_nowhere_
         "{RENAME}echo \"// home=$HOME\" >> src/lib.rs\ntouch {:?} 2>/dev/null || true\n",
         outside.path().join("escaped")
     );
-    let (dir, _agent) = edited(&agent, "", ALLOWED);
+    let (dir, scripts) = edited(&agent, "", ALLOWED);
+    write(dir.path(), ".env", "FAKE-ENV-SECRET\n");
+    let reads = format!(
+        "{{ cat .env; cat {:?}; }} 2>/dev/null >> src/lib.rs\ntrue\n",
+        dir.path().join(".env")
+    );
+    let script = scripts.path().join("agent.sh");
+    fs::write(&script, format!("{agent}{reads}")).unwrap();
 
     let fixed = fix(dir.path(), json!({}));
 
     assert_eq!(fixed["applied"].as_array().unwrap().len(), 1, "{fixed}");
     let text = lib(&dir);
     assert!(text.contains("fixed_one"), "{text}");
+    assert!(!text.contains("FAKE-ENV-SECRET"), "the agent read .env");
     let home = text.split("// home=").nth(1).unwrap().trim();
     assert_ne!(home, std::env::var("HOME").unwrap(), "the real home");
     assert!(
