@@ -1,7 +1,7 @@
 {
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/finding.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "A finding as stored: its latest sighting, its history and its standing.",
+  "description": "A finding as `review show` gives it: the record, and when the project lets\na model fix its decision, the brief for whoever fixes it by hand or with an\nagent of their own (the `Finding` kind).",
   "properties": {
     "authoredSeverity": {
       "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
@@ -21,6 +21,13 @@
           "description": "Reported, never fails the run.",
           "type": "string"
         }
+      ]
+    },
+    "brief": {
+      "description": "What the fix of this finding is told, written as the prompt of an\n`edit` run is: the decision, the finding, its scope and how the result\nis checked. Present for the decisions `[fix] decisions` lists.",
+      "type": [
+        "string",
+        "null"
       ]
     },
     "catalogVersion": {

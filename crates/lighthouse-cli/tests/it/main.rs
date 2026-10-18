@@ -11,7 +11,7 @@ mod environment;
 mod explore;
 mod fix;
 mod fix_edit;
-mod fix_model;
+mod fix_scope;
 mod fix_trust;
 mod help;
 mod hook_session;

@@ -36,17 +36,17 @@ fix:
   generated into [decisions/fix-operations.md](decisions/fix-operations.md). Semantics that
   need Rust (`reorder` sorting by a key such as `design/group`, registered by a plugin
   through `Plugin::order_keys()`) live in the operation, not in per-rule code.
-- **`model`** asks the project's `chat` model (`[models] chat`) for the new text of the symbol
-  around the finding, or of a small file. The proposal is one `Replace`, `suggested` and never
-  `safe` (`safety: safe` is refused), and a decision without a fix has this one while a `chat`
-  model is bound. Unlike the others it is not a derivation, so the orchestrator keeps it only if
-  the finding is gone, nothing of `warn` or `error` is new in the file and the file is fully
-  analyzed, then writes it or reports a preview by `[approval] fix`, and `--unsafe-fixes` writes it
-  whatever the approval; `[fix] verify` commands must pass over the fixed texts first. Examples
-  need no `fixed` for it. With `[models] edit` bound the model is an agent run in a scratch copy
-  of the project, once per file, whose changed file is the proposal. See
-  [models.md](models.md#chat-and-fixes) and
-  [models.md](models.md#edit-and-fixes-by-an-agent).
+- **`model`** is a fix by an agent that edits, not a derivation. A decision has one when it is
+  listed in `[fix] decisions` and `[models] edit` is bound, whether it says `fix: {type: model}`
+  (optionally with `prompt` and `scope: symbol | files`, default `symbol`) or has a check and no
+  fix of its own. Without an `edit` binding the finding stays a review task carrying the brief.
+  The agent runs in a scratch copy of the project, once per file; each changed file is a
+  whole-file `Replace`, `suggested` and never `safe` (`safety: safe` is refused). The orchestrator
+  keeps it only if the scope holds, the finding is gone, nothing of `warn` or `error` is new in the
+  changed and referencing files and they are fully analyzed, then writes it (`[approval] fix =
+  "allow"`) or reports a preview (`"ask"`); `--unsafe-fixes` writes it whatever the approval, and
+  `[fix] verify` commands must pass over the fixed texts first. Examples need no `fixed` for it.
+  See [models.md](models.md#fixes-by-a-model) and [models.md](models.md#the-agent-that-edits).
 - **`command`** is the simple text contract; structured data goes through `rpc`. It runs a
   program without a shell in a scratch directory that holds a copy of the finding's file.
   *Exit codes:* `0` succeeds with the result per `output` (an empty result changes nothing),

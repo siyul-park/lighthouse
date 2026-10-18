@@ -18,7 +18,9 @@ const PAIR: &str = "mod a {\n    pub fn bad_one() {}\n}\nmod b {\n    pub fn bad
 
 const OTHER: &str = "pub fn other_one() {}\n";
 
-const VERIFIED: &str = "[approval]\nfix = \"verified\"\n";
+const LISTED: &str = "[fix]\ndecisions = [\"local/naming-ban\"]\n";
+
+const ALLOWED: &str = "[approval]\nfix = \"allow\"\n[fix]\ndecisions = [\"local/naming-ban\"]\n";
 
 /// The agent that renames the banned function in `src/lib.rs`.
 const RENAME: &str =
@@ -56,7 +58,7 @@ fn counts(fixed: &Value) -> &Value {
 
 #[test]
 fn an_edit_that_fixes_the_finding_is_applied_when_the_project_approves() {
-    let (dir, _agent) = edited(RENAME, "", VERIFIED);
+    let (dir, _agent) = edited(RENAME, "", ALLOWED);
 
     let fixed = fix(dir.path(), json!({}));
 
@@ -77,7 +79,7 @@ fn an_edit_that_fixes_the_finding_is_applied_when_the_project_approves() {
 
 #[test]
 fn without_approval_a_verified_edit_is_a_preview_and_the_files_are_left_alone() {
-    let (dir, _agent) = edited(RENAME, "", "");
+    let (dir, _agent) = edited(RENAME, "", LISTED);
 
     let fixed = fix(dir.path(), json!({}));
 
@@ -97,7 +99,7 @@ fn without_approval_a_verified_edit_is_a_preview_and_the_files_are_left_alone() 
 #[test]
 fn an_edit_outside_the_files_being_fixed_is_rejected_whole() {
     let agent = format!("{RENAME}echo 'pub fn extra() {{}}' >> src/other.rs\n");
-    let (dir, _agent) = edited(&agent, "", VERIFIED);
+    let (dir, _agent) = edited(&agent, "", ALLOWED);
 
     let fixed = fix(dir.path(), json!({"paths": ["src/lib.rs"]}));
 
@@ -117,7 +119,7 @@ fn an_edit_outside_the_files_being_fixed_is_rejected_whole() {
 #[test]
 fn a_file_the_agent_created_is_rejected_and_named() {
     let outside = format!("{RENAME}echo x > src/new.rs\n");
-    let (dir, _agent) = edited(&outside, "", VERIFIED);
+    let (dir, _agent) = edited(&outside, "", ALLOWED);
 
     let fixed = fix(dir.path(), json!({"paths": ["src/lib.rs"]}));
 
@@ -127,7 +129,7 @@ fn a_file_the_agent_created_is_rejected_and_named() {
     assert!(!dir.path().join("src/new.rs").exists());
 
     let inside = format!("{RENAME}echo x > notes.txt\n");
-    let (dir, _agent) = edited(&inside, "", VERIFIED);
+    let (dir, _agent) = edited(&inside, "", ALLOWED);
 
     let fixed = fix(dir.path(), json!({}));
 
@@ -141,7 +143,7 @@ fn an_agent_that_times_out_is_declined_and_its_scratch_copy_is_removed() {
     let marks = tempfile::tempdir().unwrap();
     let cwd = marks.path().join("cwd");
     let agent = format!("pwd > {:?}\nsleep 30\n", cwd.to_str().unwrap());
-    let (dir, _agent) = edited(&agent, "timeout = \"1s\"\n", VERIFIED);
+    let (dir, _agent) = edited(&agent, "timeout = \"1s\"\n", ALLOWED);
 
     let fixed = fix(dir.path(), json!({}));
 
@@ -164,7 +166,7 @@ fn a_failing_agent_leaves_no_scratch_copy_either() {
     let marks = tempfile::tempdir().unwrap();
     let cwd = marks.path().join("cwd");
     let agent = format!("pwd > {:?}\nexit 3\n", cwd.to_str().unwrap());
-    let (dir, _agent) = edited(&agent, "", VERIFIED);
+    let (dir, _agent) = edited(&agent, "", ALLOWED);
 
     let fixed = fix(dir.path(), json!({}));
 
@@ -177,7 +179,7 @@ fn a_failing_agent_leaves_no_scratch_copy_either() {
 #[test]
 fn a_partial_fix_keeps_what_was_fixed_and_declines_what_is_left() {
     let agent = "awk '!done && /bad_one/ { sub(/bad_one/, \"fixed_one\"); done = 1 } { print }' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n";
-    let (dir, _agent) = edited(agent, "", VERIFIED);
+    let (dir, _agent) = edited(agent, "", ALLOWED);
     write(dir.path(), "src/lib.rs", &format!("mod other;\n{PAIR}"));
 
     let fixed = fix(dir.path(), json!({}));
@@ -203,7 +205,7 @@ fn a_second_run_takes_the_edit_from_the_cache_and_runs_no_agent() {
     let marks = tempfile::tempdir().unwrap();
     let calls = marks.path().join("calls");
     let agent = format!("{RENAME}echo x >> {:?}\n", calls.to_str().unwrap());
-    let (dir, _agent) = edited(&agent, "", "");
+    let (dir, _agent) = edited(&agent, "", LISTED);
 
     let first = fix(dir.path(), json!({}));
     assert_eq!(first["usage"]["calls"], 1, "{first}");
@@ -223,7 +225,7 @@ fn a_second_run_takes_the_edit_from_the_cache_and_runs_no_agent() {
 
 #[test]
 fn an_untrusted_project_declines_with_the_trust_message() {
-    let (dir, _agent) = edited(RENAME, "", VERIFIED);
+    let (dir, _agent) = edited(RENAME, "", ALLOWED);
 
     let fixed = Client::start(dir.path())
         .tool("fix", json!({"decision": ["local/naming-ban"]}))
@@ -236,10 +238,19 @@ fn an_untrusted_project_declines_with_the_trust_message() {
 
 #[test]
 fn only_a_command_without_a_protocol_can_be_bound_to_edit() {
-    for provider in [
-        "protocol = \"openai\"\nbaseUrl = \"http://127.0.0.1:9\"\n",
-        "protocol = \"openai\"\ncommand = [\"cat\"]\n",
-        "protocol = \"typesafe\"\ncommand = [\"cat\"]\n",
+    for (provider, wanted) in [
+        (
+            "protocol = \"openai\"\nbaseUrl = \"http://127.0.0.1:9\"\n",
+            "provider `fake` does not serve `edit`: only a command without a protocol does",
+        ),
+        (
+            "protocol = \"typesafe\"\ncommand = [\"cat\"]\n",
+            "provider `fake` does not serve `edit`: only a command without a protocol does",
+        ),
+        (
+            "protocol = \"openai\"\ncommand = [\"cat\"]\n",
+            "a `command` speaks `typesafe` (classification) or plain text (edit)",
+        ),
     ] {
         let dir = project(&format!(
             "[models]\nedit = \"fake/any\"\n[models.providers.fake]\n{provider}"
@@ -260,35 +271,8 @@ fn only_a_command_without_a_protocol_can_be_bound_to_edit() {
 
         assert!(!out.status.success(), "{provider}");
         let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(
-            stderr.contains(
-                "provider `fake` does not serve `edit`: only a command without a protocol does"
-            ),
-            "{stderr}"
-        );
+        assert!(stderr.contains(wanted), "{stderr}");
     }
-}
-
-#[test]
-fn without_an_edit_binding_fixes_ask_the_chat_model_as_they_did() {
-    let dir = project(&format!(
-        "[models]\nchat = \"writer/any\"\n[models.providers.writer]\ncommand = [\"cat\", \"answer.txt\"]\n{VERIFIED}"
-    ));
-    write(dir.path(), "src/lib.rs", LIB);
-    write(
-        dir.path(),
-        "answer.txt",
-        "{\"replacement\": \"pub fn fixed_one() {}\"}\n",
-    );
-
-    let fixed = fix(dir.path(), json!({}));
-
-    assert_eq!(lib(&dir), FIXED);
-    assert_eq!(
-        fixed["applied"][0]["description"],
-        "model fix by `writer/any`"
-    );
-    assert!(fixed["usage"].get("edit").is_none(), "{fixed}");
 }
 
 #[test]

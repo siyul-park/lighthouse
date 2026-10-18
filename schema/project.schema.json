@@ -4,13 +4,13 @@
       "description": "Whether a fix a model proposed and the checks accepted is written.",
       "oneOf": [
         {
-          "const": "preview",
-          "description": "Reported with its diff and left for a hand to apply.",
+          "const": "ask",
+          "description": "Reported with its diff (previewed) and left for a hand to apply.",
           "type": "string"
         },
         {
-          "const": "verified",
-          "description": "Written like any other applied fix, without `--unsafe-fixes`.",
+          "const": "allow",
+          "description": "Written (applied) like any other applied fix, without `--unsafe-fixes`.",
           "type": "string"
         }
       ]
@@ -28,7 +28,7 @@
               "type": "null"
             }
           ],
-          "description": "What becomes of a verified fix by a model. Default: `preview`."
+          "description": "What becomes of a verified fix by a model. Default: `ask`."
         }
       },
       "type": "object"
@@ -54,10 +54,43 @@
       },
       "type": "object"
     },
+    "FixScope": {
+      "description": "How far the change of a fix by a model may go, which the verifier checks.\nOrdered from the narrowest.",
+      "oneOf": [
+        {
+          "const": "symbol",
+          "description": "Only inside the symbol of the finding (its extent): the symbol it is\nabout, else the innermost one around it, else a short file as a whole.",
+          "type": "string"
+        },
+        {
+          "const": "files",
+          "description": "Any file the analysis indexes in the run's scope.",
+          "type": "string"
+        }
+      ]
+    },
     "FixSpec": {
       "additionalProperties": false,
       "description": "The `fix` table of a project.",
       "properties": {
+        "decisions": {
+          "description": "The decisions a model may fix, as ids or globs over them (`*` within\none segment of an id): `[\"design/exported-doc\", \"testing/*\"]`. Only a\ndecision with a check and no fix of its own (`ops`, `command`) is\nfixed, and only by the agent `[models] edit` binds; binding a model\nenables nothing by itself. Default: none.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FixScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The widest change a model's fix may make, for every decision: it\nnarrows the `scope` of a decision's fix and never widens it. Default:\n`files`."
+        },
         "timeout": {
           "description": "How long each of those commands may run. Default: `10m`.",
           "type": [
@@ -214,17 +247,6 @@
             "null"
           ]
         },
-        "chat": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Names"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The model (`<provider>/<model>`), or the route of several, that writes\nthe fixes no rule makes by itself: one binding for the project, not\nper decision. A request moves to the next model of a route when one\nfails."
-        },
         "classification": {
           "anyOf": [
             {
@@ -245,7 +267,7 @@
               "type": "null"
             }
           ],
-          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. When bound, fixes by a\nmodel use it instead of `chat`. One binding for the project; a request\nmoves to the next model of a route when one fails."
+          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. It makes the fixes of\nthe decisions `[fix] decisions` lists. One binding for the project; a\nrequest moves to the next model of a route when one fails."
         },
         "explore": {
           "description": "The share, from 0 to 1, of the subjects an attached model fails that are\nsent on to the next layer as if it had abstained, so that labels keep\ncoming from where the model is surest. The same subjects every run.\nDefault: 0.05.",
@@ -466,7 +488,7 @@
           ]
         },
         "command": {
-          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer. Without a\n`protocol` the conversation is plain text on stdin and the answer is\nall of stdout; the same program serves `edit` when it runs in a\nscratch copy of the project and changes the files there.",
+          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer. Without a\n`protocol` the prompt is plain text on stdin and the program serves\n`edit`: it runs in a scratch copy of the project and changes the files\nthere.",
           "items": {
             "type": "string"
           },
@@ -518,7 +540,7 @@
           ]
         },
         "pointer": {
-          "description": "`command` only: RFC 6901 JSON Pointer to the response inside the\nprinted JSON (stdout is one JSON value), when the program wraps it in\nan envelope; for plain text, to the string that is the answer.",
+          "description": "`command` with `protocol = \"typesafe\"` only: RFC 6901 JSON Pointer to\nthe response inside the printed JSON (stdout is one JSON value), when\nthe program wraps it in an envelope.",
           "type": [
             "string",
             "null"
@@ -533,7 +555,7 @@
               "type": "null"
             }
           ],
-          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification)\nor `openai` (it serves `chat`), or plain text without a `protocol`\n(it serves `chat` and `edit`); a `plugin` must not name one: its\nhandshake says what it serves."
+          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification),\nor plain text without a `protocol` (it serves `edit`); a `plugin` must\nnot name one: its handshake says what it serves."
         },
         "timeout": {
           "description": "How long one request may take, such as `90s`: a run of a `command`\n(default 120s, 10m for `edit`) or an HTTP request of a `baseUrl`\nprovider (default 120s; reasoning models may need `10m`). A `plugin`\nprovider has none: a plugin is not told one.",
@@ -564,6 +586,17 @@
       "additionalProperties": false,
       "description": "A level with options.",
       "properties": {
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model, or the route of several, that judges this decision, before\nthe project's `models.classification`. When it abstains, the subject is\nleft to agent review."
+        },
         "evaluation": {
           "anyOf": [
             {
@@ -584,17 +617,6 @@
         },
         "level": {
           "$ref": "#/$defs/Level"
-        },
-        "model": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Names"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The model, or the route of several, that judges this decision, before\nthe project's `models.classification`. When it abstains, the subject is\nleft to agent review."
         },
         "options": {
           "additionalProperties": true,

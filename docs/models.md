@@ -15,7 +15,7 @@ declared as a provider later.
 ## Run time
 
 A rule evaluates its `abstain` route only when the run asks its models (`Models::asks`): a model is
-bound to its decision through a Revision, `rules."<id>".model` or `[models] classification`, or
+bound to its decision through a Revision, `rules."<id>".classification` or `[models] classification`, or
 the run passes `--all-models` or collects subjects. Otherwise the route is skipped, nothing is
 reported for it, and the rule's findings stay cacheable (a rule that asks is never stored). The
 `where` part is unaffected. A rule hands the subjects it suspects (`abstain`) to `Context::models`. The rule only queues the
@@ -37,93 +37,102 @@ The probability that a subject fails comes from the model's own distribution: th
 answer token of a chat model, the score of a classifier, or System One's `noul`. A number a model
 writes in its reply (a verbalized probability) is never one, and neither is the verdict of an
 agent CLI such as `claude -p` or `codex exec`: it has no distribution to read. Agent CLIs are
-`chat` providers, a `command` without a protocol (below).
+`edit` providers, a `command` without a protocol (below).
 
-## Chat and fixes
+## Fixes by a model
 
-`[models] chat` binds the model that writes the fixes no rule derives: one reference, or a route
-list that fails over on error like a classification route (layers are for classification only).
-It serves the task `chat` (`lighthouse/chat`, whose body is OpenAI's Chat Completions; HTTP twin
-`POST /v1/chat/completions`). A provider serves a task by its handshake (plugin) or its protocol:
-`openai` (HTTP or `command`) and a `command` without a protocol serve `chat`; `typesafe` serves
-classification only; `model-local` serves neither. Binding a provider to a task it does not serve is
-a configuration error naming both.
-
-A decision with a check and no fix of its own then has a fix of type `model`; a decision may also
-say `fix: {type: model, prompt: "..."}` to add an instruction. A decision whose fix is `ops` or
-`command` never uses the model. Without a `chat` binding nothing changes.
+Lighthouse is the System 1 harness: deterministic checks, classifiers, the verifier and briefs.
+Generating or changing files is System 2, an external agent's work, so there is no chat task and no
+prompt-and-parse fixer. Chat Completions serve classification only (see `model-http` below). A model
+fixes a finding in one way: `[models] edit` binds an agent that changes files in a scratch copy of
+the project, and the project permits it decision by decision. Nothing else enables a model fix;
+binding an agent enables nothing by itself.
 
 ```toml
 [models]
-chat = "openrouter/qwen/qwen3-coder:free"
-[approval]
-fix = "preview"            # default; "verified" writes a verified model fix
+edit = "claude/sonnet"                             # the agent, below
 [fix]
-verify = [["cargo", "test", "-q"]]   # must pass over the model fixes of a run
-timeout = "10m"            # for each of them
+decisions = ["design/exported-doc", "testing/*"]   # ids or globs; default none
+scope = "files"                                    # widest change: symbol | files; default files
+verify = [["cargo", "test", "-q"]]                 # must pass over the fixes of a run
+timeout = "10m"                                    # for each of them
+[approval]
+fix = "ask"                                        # default; "allow" writes a verified model fix
 ```
 
-- **What the model sees.** One extent per finding: the symbol the finding is about, else the
-  innermost symbol around it, else the whole file when it has fewer than 400 lines (otherwise the
-  finding is declined, "too large for a model fix without a symbol"). The prompt is fixed text plus
-  the decision (requirement, context, `prompt`), the finding (message, evidence, place in the
-  extent), the extent verbatim and up to three of the decision's invalid examples that have
-  `fixed`. The request is `temperature: 0` with a strict `json_schema` response format
-  `{replacement}` (omitted for plain-text commands, whose answer is searched for the first JSON
-  object). The answer is one `Replace` of the extent, `suggested` and never `safe`.
-- **What keeps it.** The orchestrator applies the replacement in memory, formats, re-checks, and
-  keeps it only if the finding's fingerprint is gone (a new finding of the same rule in the file
-  also counts as "did not resolve the finding"), no new `warn` or `error` appeared in the file
-  ("introduced <decision> at <line>"), and the file is still fully analyzed. Otherwise the file is
-  rolled back and the finding declined with the reason. Deterministic fixes keep their own rule.
+- **Who gets a model fix.** A finding does if its decision matches `[fix] decisions`, has a check
+  and no fix of its own (`ops`, `command`), and `[models] edit` is bound. An entry is an id or a glob
+  (`*` within one segment of an id, matched against the whole id); one that matches no active
+  decision is a warning naming it. A listed decision without a `fix` block has `fix: {type: model}`;
+  a decision may say `fix: {type: model, prompt: "...", scope: symbol | files}` to add an
+  instruction and a scope (default `symbol`). The effective scope is the narrower of the decision's
+  and `[fix] scope`.
+- **Edit or review, no router.** Where a finding gets a model fix it is `edit`; with no `edit` bound
+  it stays a review task that carries the brief (MCP `review_show` returns it as `brief`, `review
+  show` prints it under `brief:`) for whoever drives the session, and Lighthouse re-checks when they
+  are done. There are no retries inside Lighthouse. The brief is attached to the review task of every
+  listed decision.
+- **The brief.** One builder writes it, for the `edit` prompt and for the review task: the system part
+  (change only what the findings need, within the scope of each: `symbol` is the symbol of the
+  finding, `files` any file the fix needs), for each finding the decision (requirement, context,
+  `prompt`), message, evidence, `path:line:col` and scope, up to two before and after examples per
+  decision, how the result is checked, and a closing line asking for `fixed` or `left` per finding.
+  The reply is a note, never a verdict.
+- **Scope, checked by the verifier.** `symbol`: only the extent of each finding of the batch in its
+  file (the symbol the finding is about, else the innermost around it, else the whole file when it has
+  fewer than 400 lines, otherwise the finding is declined `no-extent`); a change outside the union of
+  the extents is declined `out-of-scope`, naming the first line. `files`: any indexed text file in
+  the run's scope; each changed file is one whole-file `Replace`, and the files are verified together
+  with every file that calls or refers to a symbol whose signature changed (a symbol with no signature
+  fact counts as changed); the change passes or is rolled back whole.
+- **Safe fixes first.** Before an edit is judged, the safe fixes of the rules (`safety: safe`, the
+  rounds of `check --fix`, whatever the run selected) are applied to the files it changed, to a
+  fixpoint, so an order or layout rule such as `design/declaration-groups` does not condemn code an
+  agent placed well enough. The scope is checked on the agent's own diff, not on these edits, and the
+  brief lists the decisions with a safe fix for the language of the file ("the project's tools fix
+  these after you; follow them when placing code"). The preview and the written text are the result
+  after them.
+- **What keeps it.** The orchestrator applies the files in memory, formats, re-checks, and keeps the
+  edit only if at least one targeted finding is gone, nothing new of `warn` or `error` appeared in the
+  changed and referencing files ("introduced <decision> at <line>"), and they are fully analyzed.
+  Targeted findings still there are declined `unresolved`; the rest count as `verified`. Otherwise the
+  files are rolled back and the findings declined with the reason.
+- **Runs in sequence.** One run per file (every model-fixable finding of the file in the report
+  scope, up to 20, by line), one after another by path: a chain. Each run's scratch copy holds the
+  project plus every edit already accepted in the pass, so whole-file results never overwrite each
+  other. An edit is accepted only if each file it changed still has the digest it found (compare and
+  swap); otherwise it is declined `conflict` and never merged. The cache key includes those digests.
+  Runs that changed a file in common are verified as one. After the chain the combined files are
+  re-checked, then `[fix] verify` runs; on failure the newest run is rolled back, then the next, until
+  it passes, and their findings are declined with the reason.
 - **`[fix] verify`.** Commands (argument lists, no shell) run once per run, after the fixes, over a
   scratch copy of the project (what version control keeps, with the fixed texts in place), when the
-  model fixes would be written. A failure withdraws every model fix of the run to a preview and
-  puts the command and the tail of its output in the messages. They need a trusted project and are
-  part of what `lighthouse trust` lists.
-- **Approval.** With `approval.fix = "preview"` a verified fix is not written: the report carries it
-  as a preview with its diff (`previews` in the `fix` JSON, `preview ...` lines in `check --fix`),
-  awaiting a hand. With `"verified"` it is written like any applied fix. `--unsafe-fixes` also
-  writes verified model fixes whatever the approval: the approval is the project's standing
-  permission for model fixes only, the flag is the person's permission for all suggested fixes in one
-  run. `--dry-run` writes nothing either way.
+  fixes would be written. They need a trusted project and are part of what `lighthouse trust` lists.
+- **Approval.** With `approval.fix = "ask"` a verified fix is not written: the report carries it as a
+  preview with its diff (`previews` in the `fix` JSON, `preview ...` lines in `check --fix`), awaiting
+  a hand. With `"allow"` it is written like any applied fix. `--unsafe-fixes` also writes verified
+  model fixes whatever the approval: the approval is the project's standing permission for model
+  fixes only, the flag is the person's permission for all suggested fixes in one run. `--dry-run`
+  writes nothing either way.
 - **Accounting.** Per decision: `asked`, `answered`, `verified`, `applied`, `previewed` and `declined`
-  by class (`no-extent`, `unanswered`, `out-of-scope`, `unparsed`, `unchanged`, `unresolved`,
-  `introduced`, `incomplete`, `rolled-back`), in `check --fix` and in the `fix` JSON (`models`),
-  with `usage` (requests and cost; for `edit` also `runs` and `seconds`).
+  by class (`no-extent`, `unanswered`, `out-of-scope`, `conflict`, `unchanged`, `unresolved`,
+  `introduced`, `incomplete`, `rolled-back`), in `check --fix` and in the `fix` JSON (`models`), with
+  `usage` (requests and cost, and `runs` and `seconds`).
 - **Cost, trust, cache.** Requests count against `[models] budget` at the provider's `cost`; remote
   providers need the opt-in classification does; `command` providers need `lighthouse trust`; the
-  answers are kept in the result cache under the model, its version and the digest of the request
-  (`--no-cache` skips it, `--no-models` asks no model).
+  edits are kept in the result cache under the model, its version, the digest of the brief and the
+  digests of the files in the report scope as they stand (`--no-cache` skips it, `--no-models` asks
+  no model).
 
-Recipes (the keys are the provider axes of [rule-pipeline.md](rule-pipeline.md#models)):
+## The agent that edits
 
-```toml
-[models.providers.openrouter]     # a free model, key from the environment
-protocol = "openai"
-baseUrl = "https://openrouter.ai/api/v1"
-keyEnv = "OPENROUTER_API_KEY"
-cost = 1
-# timeout = "10m"                 # per request, default 120s; reasoning models may need it
-
-[models.providers.ollama]         # Ollama, LM Studio (:1234) and llama-server (:8080) alike
-protocol = "openai"
-baseUrl = "http://localhost:11434/v1"
-cost = 0
-
-[models.providers.claude]         # a plain-text command: stdin is the conversation, stdout the answer
-command = ["claude", "-p", "--tools", "", "--no-session-persistence"]
-# reference: claude/any; `--tools ""` leaves it no tools, and no flag skips permissions
-```
-
-## Edit and fixes by an agent
-
-`[models] edit` binds an agent that fixes by changing files: one reference, or a route list that
-fails over on error. Only a `command` without a `protocol` serves it, in addition to `chat`:
-running the same program in a scratch copy of the project is what makes it an edit. HTTP and
-plugin providers do not serve `edit`, and binding one is a configuration error ("provider `x` does
-not serve `edit`: only a command without a protocol does"). When `edit` is bound, fixes by a model
-use it instead of `chat`; one binding is used per run. Without it nothing changes.
+Only a `command` without a `protocol` serves `edit`: running the program in a scratch copy of the
+project, with the brief as plain text on stdin, is what makes it an edit. HTTP and plugin providers do
+not, and binding one is a configuration error ("provider `x` does not serve `edit`: only a command
+without a protocol does"); a `command` with `protocol = "openai"` is no provider at all ("a `command`
+speaks `typesafe` (classification) or plain text (edit)"). `[models] edit` is one reference or a
+route list that fails over on error. The agent CLIs `claude -p`, `codex exec` and opencode are `edit`
+providers; none of them classifies, since they have no distribution to read.
 
 ```toml
 [models]
@@ -132,8 +141,6 @@ edit = "claude/sonnet"
 command = ["claude", "-p", "--output-format", "text", "--permission-mode", "acceptEdits",
            "--allowedTools", "Read,Edit,Write,Glob,Grep", "--model", "{model}"]
 timeout = "10m"            # the default for edit
-[approval]
-fix = "preview"
 ```
 
 ```toml
@@ -155,34 +162,20 @@ against the Claude Code headless docs (<https://code.claude.com/docs/en/headless
 formerly `developers.openai.com/codex/noninteractive`); `codex exec --help` could not be run on the
 machine that wrote this, so `--skip-git-repo-check` and `-` rest on those docs alone.
 
-- **Workspace.** A scratch copy of the project (what version control keeps, with the run's
-  fixed texts in place; the same copy `[fix] verify` uses). The command runs with it as its working
-  directory and the prompt as plain text on stdin, under the process contract (no shell, own process
-  group, `timeout`, output cap, environment of `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`
-  plus `env` and `keyEnv`, project trust). The copy is deleted when the run ends, on every path.
-  stdout is kept for the notes only (2 KB).
-- **One run per file.** Every model-fixable finding of the file in the report scope, up to 20, by
-  line; files run one after another. The prompt names, per finding, the decision (requirement,
-  context, `prompt`), the message, the evidence and `path:line:col`, with up to two before and after
-  examples per decision, and asks for one line per finding in reply; the reply is a note, never a
-  verdict.
-- **What it may change.** The text of that file, nothing else. A change to another file, to a file
-  outside the report scope or one Lighthouse does not index, a file created or deleted, or a
-  non-text file rejects the whole attempt (class `out-of-scope`, the reason names the first
-  path). A non-zero exit, a timeout or a signal is a model error: the route fails over, else the
-  findings are declined `unanswered`.
-- **What keeps it.** The file becomes one `Replace` of the whole file per finding (`suggested`,
-  "model edit by `<provider>/<model>`"), verified as every fix by a model, per file: kept only if
-  at least one targeted finding is gone, nothing new of `warn` or `error` is in the file, and the
-  file is fully analyzed. Targeted findings still there are declined `unresolved`; the rest count
-  as `verified`. Then `[fix] verify` and `[approval]` apply as for `chat`.
-- **Cache.** The key is the model and its version, the digest of the prompt and the digests of the
-  files in the report scope (all an agent may read); the value is the changed texts. A hit runs no
-  process and spends no budget.
-- **Safety.** Trusted projects only. With a `keyEnv` the provider is remote; otherwise it is a
-  local process, and the agent's own configuration decides where code is sent. Lighthouse writes
-  nothing outside the scratch copy; the files are written by the fix run after verification, as for
-  any fix.
+- **Workspace.** A scratch copy of the project (what version control keeps, with the run's accepted
+  texts in place; the same copy `[fix] verify` uses). The command runs with it as its working
+  directory under the process contract (no shell, own process group, `timeout`, output cap,
+  environment of `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR` plus `env` and `keyEnv`, project
+  trust). The copy is deleted when the run ends, on every path. stdout is kept for the notes only
+  (2 KB).
+- **What it may change.** Under the scope, the indexed text files of the report scope. A change to a
+  file outside the report scope or one Lighthouse does not index, a file created or deleted, or a
+  non-text file rejects the whole attempt (class `out-of-scope`, the reason names the first path). A
+  non-zero exit, a timeout or a signal is a model error: the route fails over, else the findings are
+  declined `unanswered`.
+- **Safety.** Trusted projects only. With a `keyEnv` the provider is remote; otherwise it is a local
+  process, and the agent's own configuration decides where code is sent. Lighthouse writes nothing
+  outside the scratch copy; the files are written by the fix run after verification, as for any fix.
 
 ## Providers
 
@@ -190,6 +183,23 @@ A provider has two axes: the `protocol` it speaks and its reach, exactly one of 
 served by `model-http`), `command` (a stdio process speaking `typesafe`) and `plugin` (an rpc
 plugin, whose handshake says what it serves). `protocol = "openai"` or `"typesafe"` alone is HTTP
 at that protocol's own service. Recipes are in [rule-pipeline.md](rule-pipeline.md#models).
+
+```toml
+[models.providers.openrouter]     # a hosted model with logprobs, key from the environment
+protocol = "openai"
+baseUrl = "https://openrouter.ai/api/v1"
+keyEnv = "OPENROUTER_API_KEY"
+cost = 1
+# timeout = "10m"                 # per request, default 120s; reasoning models may need it
+
+[models.providers.ollama]         # Ollama, LM Studio (:1234) and llama-server (:8080) alike
+protocol = "openai"
+baseUrl = "http://localhost:11434/v1"
+cost = 0
+```
+
+An `openai` HTTP provider serves classification only (Chat Completions with logprobs, never fixes).
+
 
 ## `model-http`
 

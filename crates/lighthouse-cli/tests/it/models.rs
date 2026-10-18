@@ -272,7 +272,7 @@ fn an_abstention_falls_through_the_layers_and_a_command_answers_through_a_pointe
         dir.path().join("lighthouse.toml"),
         text.replace(
             "\"local/naming-ban\" = \"warn\"",
-            "\"local/naming-ban\" = { level = \"warn\", model = \"weak/m\" }",
+            "\"local/naming-ban\" = { level = \"warn\", classification = \"weak/m\" }",
         ),
     )
     .unwrap();

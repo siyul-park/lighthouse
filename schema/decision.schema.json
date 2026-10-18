@@ -835,10 +835,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "A model rewrites the code of the finding, and the checks accept the\nresult or not. A decision without a fix of its own has this one\nwhenever the project binds a `chat` model.",
+          "description": "An agent that edits fixes the finding, and the checks accept the\nresult or not. The project lists the decisions this applies to\n(`[fix] decisions`); a listed decision without a fix of its own has\nthis one with the defaults.",
           "properties": {
             "prompt": {
-              "description": "What the model is told besides the decision's requirement, such\nas how this decision is usually fixed.",
+              "description": "What the agent is told besides the decision's requirement, such\nas how this decision is usually fixed.",
               "type": [
                 "string",
                 "null"
@@ -854,6 +854,17 @@
             "safety": {
               "$ref": "#/$defs/Safety",
               "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
+            },
+            "scope": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FixScope"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "How far the agent's change may go. Default: `symbol`. The\nproject's `[fix] scope` narrows it and never widens it."
             },
             "type": {
               "const": "model",
@@ -914,6 +925,21 @@
         "safety"
       ],
       "type": "object"
+    },
+    "FixScope": {
+      "description": "How far the change of a fix by a model may go, which the verifier checks.\nOrdered from the narrowest.",
+      "oneOf": [
+        {
+          "const": "symbol",
+          "description": "Only inside the symbol of the finding (its extent): the symbol it is\nabout, else the innermost one around it, else a short file as a whole.",
+          "type": "string"
+        },
+        {
+          "const": "files",
+          "description": "Any file the analysis indexes in the run's scope.",
+          "type": "string"
+        }
+      ]
     },
     "Identity": {
       "additionalProperties": false,

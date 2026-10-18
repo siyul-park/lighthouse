@@ -683,12 +683,13 @@ The core never knows the code model (UCM): the modules of `model` other than `uc
 
 A model is the provider of a task, named `<provider>/<model>`, and a plugin kind beside language
 providers. A task has one standard body: `classification` (TypeSafe System One), `embedding`
-(OpenAI Embeddings), `chat` (OpenAI Chat Completions) and `edit` (an agent session). Only
-`classification` is built; `chat` and `edit` arrive with fixes by models. The probability of a
+(OpenAI Embeddings) and `edit` (an agent session in a scratch copy). Chat Completions are not a task:
+they are the logprobs adapter behind `classification`. Lighthouse generates nothing itself; a
+model fix is an agent's `edit`. The probability of a
 classification comes from the model's own distribution, never from a number the model writes.
 
 A project binds `classification` in layers chosen per decision, where an abstention falls through
-to the next (the attached Revision, `rules."<id>".model`, `[models] classification`, then a review
+to the next (the attached Revision, `rules."<id>".classification`, `[models] classification`, then a review
 task); a layer may be a route of equivalent models that fails over on error or rotates. The
 runtime, the wire, `model-http`, labels, datasets, `decision eval` and `model train` are in
 [models.md](models.md).

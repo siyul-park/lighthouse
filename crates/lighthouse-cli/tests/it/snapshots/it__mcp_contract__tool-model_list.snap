@@ -54,11 +54,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                   "type": "string"
                 },
                 {
-                  "const": "chat",
-                  "description": "`models.chat`: the model that writes the fixes no rule derives.",
-                  "type": "string"
-                },
-                {
                   "const": "edit",
                   "description": "`models.edit`: the agent that fixes by changing files.",
                   "type": "string"
@@ -76,7 +71,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               ]
             },
             "decision": {
-              "description": "The decision it judges; none for the classification, chat and edit\nmodels.",
+              "description": "The decision it judges; none for the classification and edit\nmodels.",
               "type": [
                 "string",
                 "null"

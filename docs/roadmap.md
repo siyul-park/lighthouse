@@ -63,14 +63,14 @@ where rules fall short, then reach. Each step below comes before the ones that b
 
 ### Fixes by models, verified
 The biggest direct cut in agent work, and it needs no labels: the verifier already exists.
-- **A `type: model` fix** for every decision without a fix of its own, once `[models] edit`
-  or `chat` is bound: an extent replacement (`chat`) or an agent edit of a scratch
-  workspace (`edit`: a headless agent CLI, later an ACP agent).
-  - Lighthouse ships a ready-made plugin with clients for standard APIs: OpenAI-compatible endpoints (OpenRouter, Ollama, vLLM, LM Studio) now, Anthropic later.
-  - Headless agent CLIs are `chat` and `edit` providers (a `command` without a protocol);
-    a measured comparison of API, local-server and agent-CLI arms decides the default.
+- **A `type: model` fix** for the decisions `[fix] decisions` lists, once `[models] edit`
+  is bound: an agent edit of a scratch workspace (`edit`: a headless agent CLI, later an ACP
+  agent), within the scope `symbol` or `files`. Without an agent the finding stays a review task
+  carrying the brief.
+  - Headless agent CLIs are `edit` providers (a `command` without a protocol); chat models serve
+    classification only.
   - The fixer's output is always verified (apply, format, re-check, roll back) and is always `suggested`.
-  - An `[approval]` policy says which changes may be applied without a person.
+  - `[approval] fix` (`ask`, the default, or `allow`) says whether a verified change is applied without a person.
 
 ### Local models
 Free, local and calibrated, run in process; evaluation is the promotion gate.
