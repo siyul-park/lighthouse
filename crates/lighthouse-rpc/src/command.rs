@@ -1,11 +1,9 @@
 //! A model that is any program, declared as a `command` provider. With
 //! `protocol = "typesafe"` it reads TypeSafe's System One request on stdin and
-//! prints the response (classification); with `protocol = "openai"` it reads
-//! a chat completion request and prints the response; without a protocol it
-//! reads the conversation as text and prints the answer (`chat`), and the same
-//! program serves `edit` when it is run in a directory it may change. The
-//! program runs under the process contract, so a trusted project is the only
-//! one that builds it.
+//! prints the response (classification); without a protocol it serves `edit`:
+//! it reads the prompt as text on stdin and changes the files of the directory
+//! it is run in. The program runs under the process contract, so a trusted
+//! project is the only one that builds it.
 
 use std::{
     collections::BTreeMap,
@@ -14,8 +12,8 @@ use std::{
 };
 
 use lighthouse_plugin::{
-    Answer, Capabilities, ChatRequest, CreateChatCompletionRequest, CreateChatCompletionResponse,
-    EditRequest, Error, Model, ModelClient, Supports, SystemOneRequest, SystemOneResponse,
+    Answer, Capabilities, EditRequest, Error, Model, ModelClient, SystemOneRequest,
+    SystemOneResponse,
 };
 use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
 use lighthouse_protocol::{
@@ -71,10 +69,7 @@ impl CommandModel {
                 owned_by: name.to_owned(),
                 capabilities: match protocol {
                     CommandProtocol::TypeSafe => Capabilities::classifier(false),
-                    CommandProtocol::OpenAi | CommandProtocol::PlainText => Capabilities {
-                        chat: Some(Supports { supported: true }),
-                        ..Capabilities::default()
-                    },
+                    CommandProtocol::PlainText => Capabilities::default(),
                 },
                 version: hash::short(
                     &canonical(&json!({
@@ -125,49 +120,6 @@ impl CommandModel {
         }
         Ok(output.stdout)
     }
-
-    /// The completion a program that speaks Chat Completions printed.
-    fn completion(&self, stdout: &[u8]) -> Result<CreateChatCompletionResponse, Error> {
-        let failed = |reason: String| Error::model(&self.manifest.id, reason);
-        let printed = serde_json::from_slice::<Value>(stdout)
-            .ok()
-            .and_then(|printed| match self.pointer.as_deref() {
-                Some(pointer) => printed.pointer(pointer).cloned(),
-                None => Some(printed),
-            })
-            .ok_or_else(|| failed("its output is not a chat completion".to_owned()))?;
-        serde_json::from_value(printed)
-            .map_err(|e| failed(format!("its output is not a chat completion: {e}")))
-    }
-
-    /// The completion of a program that printed its answer as text: all of
-    /// stdout, or the string a pointer leads to in a JSON envelope.
-    fn text_completion(&self, stdout: &[u8]) -> Result<CreateChatCompletionResponse, Error> {
-        let failed = |reason: String| Error::model(&self.manifest.id, reason);
-        let text = String::from_utf8_lossy(stdout);
-        let answer = match self.pointer.as_deref() {
-            Some(pointer) => serde_json::from_str::<Value>(&text)
-                .ok()
-                .and_then(|printed| printed.pointer(pointer)?.as_str().map(str::to_owned))
-                .ok_or_else(|| failed(format!("its output has no text at `{pointer}`")))?,
-            None => text.trim_end().to_owned(),
-        };
-        if answer.trim().is_empty() {
-            return Err(failed("it printed no answer".to_owned()));
-        }
-        serde_json::from_value(json!({
-            "id": "command",
-            "object": "chat.completion",
-            "created": 0,
-            "model": self.model,
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": answer},
-                "finish_reason": "stop",
-            }],
-        }))
-        .map_err(|e| failed(e.to_string()))
-    }
 }
 
 impl ModelClient for CommandModel {
@@ -208,25 +160,6 @@ impl ModelClient for CommandModel {
         })
     }
 
-    /// The reply of the program: the completion it printed, or its text
-    /// answer as the one choice of a completion.
-    fn chat(&self, request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
-        let failed = |reason: String| Error::model(&self.manifest.id, reason);
-        let mut asked = request.body.clone();
-        asked.model.clone_from(&self.model);
-        match self.protocol {
-            CommandProtocol::TypeSafe => Err(failed("it does not chat".to_owned())),
-            CommandProtocol::OpenAi => {
-                let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
-                self.completion(&self.run(&self.dir, self.timeout, &input)?)
-            }
-            CommandProtocol::PlainText => {
-                let input = conversation(&asked);
-                self.text_completion(&self.run(&self.dir, self.timeout, input.as_bytes())?)
-            }
-        }
-    }
-
     /// The program run in the directory of the request with the prompt on
     /// stdin; what it printed is kept for the notes, cut to a few kilobytes.
     fn edit(&self, request: &EditRequest<'_>) -> Result<String, Error> {
@@ -245,30 +178,6 @@ fn capped(text: &str, max: usize) -> String {
         .find(|&at| text.is_char_boundary(at))
         .unwrap_or_default();
     text[..end].to_owned()
-}
-
-/// The conversation as plain text: the text of each message in turn, a blank
-/// line between them.
-fn conversation(request: &CreateChatCompletionRequest) -> String {
-    let messages = serde_json::to_value(&request.messages).unwrap_or_default();
-    let text = |message: &Value| match message.get("content")? {
-        Value::String(text) => Some(text.clone()),
-        Value::Array(parts) => Some(
-            parts
-                .iter()
-                .filter_map(|part| part.get("text")?.as_str())
-                .collect::<Vec<_>>()
-                .join("\n"),
-        ),
-        _ => None,
-    };
-    let texts: Vec<String> = messages
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(text)
-        .collect();
-    texts.join("\n\n")
 }
 
 /// The content hash of the program a command runs, so that a changed program

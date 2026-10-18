@@ -9,7 +9,6 @@ test = false
 doctest = false
 
 [dependencies]
-async-openai.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

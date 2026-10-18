@@ -8,7 +8,7 @@ Providers that run as processes: discovers and starts plugin processes, adapts t
 - `register`: starts every plugin `lighthouse.toml` lists and puts it in the `Registry`.
 - `search_dirs`, `discover`, `load`, `parse`: finding and reading `lighthouse-plugin.toml`.
 - `RpcPlugin`: `connect` runs the handshake; `languages()` and the models it offers.
-- `Command`: a `ModelClient` over a program that reads System One or Chat Completions on stdin, or a conversation as text.
+- `Command`: a `ModelClient` over a program that reads System One on stdin (classification), or a brief as plain text (edit).
 - `Provides`, `Runtime`, `PluginSpec`: the manifest kind; `descriptors()` gives its schema.
 
 ## Invariants

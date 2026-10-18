@@ -4,12 +4,11 @@
 //! on what it is later asked about.
 
 pub use lighthouse_protocol::{
-    Answer, Capabilities, ChatRequest, CreateChatCompletionRequest, CreateChatCompletionResponse,
-    CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, Example, FineTuneJobError,
-    FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
-    FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, Neighbor, Question, State,
-    Subject, Supports, SystemOneRequest, SystemOneResponse, TrainingLine, artifact_path,
-    dataset_path,
+    Answer, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, Example,
+    FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod,
+    FineTuningJob, FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, Neighbor,
+    Question, State, Subject, Supports, SystemOneRequest, SystemOneResponse, TrainingLine,
+    artifact_path, dataset_path,
 };
 
 use std::path::Path;
@@ -41,17 +40,12 @@ pub trait ModelClient: Send + Sync {
     fn classify(&self, _params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
         Err(Error::model(&self.manifest().id, "does not classify"))
     }
-    /// Replies to a conversation; only a model whose manifest supports `chat`
-    /// does.
-    fn chat(&self, _request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
-        Err(Error::model(&self.manifest().id, "does not chat"))
-    }
     /// Changes the files of a directory as the prompt says, and returns what
     /// the agent said about it; only a program run by the host there does.
     fn edit(&self, _request: &EditRequest<'_>) -> Result<String, Error> {
         Err(Error::model(&self.manifest().id, "does not edit"))
     }
-    /// Runs a fine-tuning job; only a model whose manifest supports `fine_tuning` does.
+    /// Runs a fine-tuning job; only a model whose manifest supports `training` does.
     /// The job is final: `succeeded` or `failed`.
     fn train(&self, _request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
         Err(Error::model(&self.manifest().id, "does not train"))

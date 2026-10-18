@@ -6,7 +6,7 @@ The model provider over the standard HTTP APIs: TypeSafe System One and the Open
 
 ## Entry points
 - `openai`, `typesafe`: one module per published protocol, one free function per operation used.
-- `chat`: adapts a System One request to Chat Completions (a prompt asking for `true` or `false`, P(fail) read from the logprobs of the answer token).
+- `chat`: adapts a System One request to Chat Completions (a prompt asking for `true` or `false`, P(fail) read from the logprobs of the answer token). It is the only use of Chat Completions: the logprobs adapter behind `classification`, never a generator.
 - `endpoint`: the provider `options`: `protocol`, `baseUrl`, `keyEnv`, `extraBody`.
 - `http`: the one I/O seam, `Client`, over one shared agent; `serve`: the handshake and handler, which picks the protocol a provider declares for `classify` (`typesafe` before `openai`).
 

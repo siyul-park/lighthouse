@@ -19,7 +19,6 @@ pub use language::{
     },
 };
 pub use model::{
-    chat::{ChatCall, ChatRequest, CreateChatCompletionRequest, CreateChatCompletionResponse},
     jobs::{
         Capabilities, ChatMessage, CreateFineTuningJobRequest, FineTuneJobError, FineTuneMethod,
         FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
@@ -32,7 +31,7 @@ pub use model::{
     prompt,
     store::{DATASETS_DIR, MODELS_DIR, artifact_path, content_dir, dataset_path},
 };
-pub use route::{CHAT_COMPLETIONS, FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
+pub use route::{FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
 pub const VERSION: &str = "0.3";
@@ -43,8 +42,6 @@ pub const INITIALIZE: &str = "initialize";
 pub const INDEX: &str = "lighthouse/index";
 /// Request: put the subjects of a decision to a model.
 pub const CLASSIFY: &str = "lighthouse/classify";
-/// Request: have a model generate a reply to a conversation.
-pub const CHAT: &str = "lighthouse/chat";
 /// Request: fit a model on labelled subjects.
 pub const TRAIN: &str = "lighthouse/train";
 /// Request: stop accepting work; answered, then followed by [`EXIT`].

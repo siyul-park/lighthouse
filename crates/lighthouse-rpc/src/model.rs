@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use lighthouse_plugin::{
-    ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest, Error, FineTuningJob,
-    Model as ModelInfo, ModelClient, SystemOneRequest, SystemOneResponse,
+    CreateFineTuningJobRequest, Error, FineTuningJob, Model as ModelInfo, ModelClient,
+    SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_protocol::{self as wire, FineTuningJobStatus};
 
@@ -14,15 +14,6 @@ use crate::client::Client;
 pub(crate) struct Remote {
     pub(crate) manifest: ModelInfo,
     pub(crate) client: Arc<Client>,
-}
-
-impl Remote {
-    fn serves_chat(&self) -> bool {
-        self.manifest
-            .capabilities
-            .chat
-            .is_some_and(|capability| capability.supported)
-    }
 }
 
 impl ModelClient for Remote {
@@ -47,16 +38,6 @@ impl ModelClient for Remote {
             ));
         }
         Ok(result)
-    }
-
-    /// The reply of the model, as OpenAI's chat completion.
-    fn chat(&self, request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
-        if !self.serves_chat() {
-            return Err(Error::model(&self.manifest.id, "it does not chat"));
-        }
-        self.client
-            .call(wire::CHAT, request)
-            .map_err(|reason| Error::model(&self.manifest.id, reason))
     }
 
     /// Asks for the fine-tuning job; the answer is final, `succeeded` or

@@ -56,7 +56,6 @@ and analyzers.
 | `initialize` | request | none |
 | `lighthouse/index` | request | none |
 | `lighthouse/classify` | request | `POST /v1/systemone` |
-| `lighthouse/chat` | request | `POST /v1/chat/completions` |
 | `lighthouse/train` | request | `POST /v1/fine_tuning/jobs` |
 | `shutdown` | request | none |
 | `exit` | notification | none |
@@ -186,7 +185,7 @@ verbatim, with that API's own field names.
 A plugin may offer models instead of, or besides, languages. `initialize` lists them in
 `capabilities.models`, a `ListModelResponse` with the OpenAI list shape `{object: "list", data: [Model]}`.
 Each `Model` has OpenAI's `{id, object, created, owned_by}`, capabilities
-`{classification | chat | embedding | fine_tuning: {supported}}`, and Lighthouse's `version` (changes
+`{classification | embedding | training: {supported}}`, and Lighthouse's `version` (changes
 whenever answers for the same input may), `cost` (0 for a model that runs locally for free),
 `deterministic` and `abstains`. The manifest lists the same ids in `provides.models`. The host
 keys behaviour off these capabilities, never off names.
@@ -211,14 +210,6 @@ probability that the subject fails. There is no reason. The host maps it, the sa
 model: at or above the band's `upper` the subject fails (0.9 until `eval` calibrates one);
 otherwise it is left to review. A model that has not been calibrated never clears a subject. The confidence is
 max(p, 1 - p).
-
-`lighthouse/chat` takes the body of OpenAI's Chat Completions (`createChatCompletion`, `POST
-/v1/chat/completions`), https://platform.openai.com/docs/api-reference/chat/create, and answers
-the chat completion object. `model` is the part of the reference after the provider. Beside the
-body Lighthouse sends `options` as it does for `lighthouse/classify`, omitted when empty and
-stripped by HTTP providers. A model that supports `chat` generates text: the host asks it for
-fixes (`{"replacement": ...}` under a JSON-schema `response_format`) and verifies every one before
-it counts; the model gives no probability, so it never classifies.
 
 `lighthouse/train` takes OpenAI's fine-tuning job body (`POST /v1/fine_tuning/jobs`):
 `{model, training_file, validation_file?, method: {type: "supervised", supervised:
@@ -659,8 +650,8 @@ Rust with a notice.
 Models behind the standard HTTP protocols, as a provider in `lighthouse.toml`
 (`protocol = "openai"` or a list such as `["openai", "typesafe"]`, `baseUrl`, `keyEnv`, `extraBody`; see
 [rule-pipeline.md](rule-pipeline.md#models)). Each operation uses the protocol that covers it:
-classification uses `typesafe` when listed, else `openai`; `lighthouse/chat` is served for `openai`
-only, and a provider that does not list it is refused for `chat` when the project is loaded.
+classification uses `typesafe` when listed, else `openai`. There is no chat method: Chat Completions
+are only the logprobs adapter behind classification.
 
 For `typesafe`, the System One body is forwarded as it is to `POST {baseUrl}/v1/systemone` with `Authorization: Bearer <key>` (https://docs.typesafe.ai/api), and its answer is read as it comes.
 
@@ -671,7 +662,3 @@ two words at the answer token. A response without logprobs is an error ("the mod
 logprobs; it cannot serve classification"), never read as a verbalized number. The API shapes are
 those of OpenAI's Chat Completions as documented by OpenRouter
 (https://openrouter.ai/docs/quickstart).
-
-For `lighthouse/chat`, the request body is posted to `{baseUrl}/chat/completions` as it is (with
-the provider's `extraBody` merged over it, and without `options`), and the service's completion is
-returned as it came.

@@ -2,16 +2,14 @@
 //! to the protocol that serves it.
 
 use lighthouse_protocol::{
-    Capabilities, ChatRequest, CreateChatCompletionResponse, ErrorObject, Handler,
-    InitializeParams, InitializeResult, Model, Supports, SystemOneRequest, SystemOneResponse,
+    Capabilities, ErrorObject, Handler, InitializeParams, InitializeResult, Model,
+    SystemOneRequest, SystemOneResponse,
 };
-use serde_json::Map;
 
 use crate::{
     chat::{self, PROMPT_VERSION},
     endpoint::Endpoint,
     http::Client,
-    openai::create_chat_completion,
     typesafe,
 };
 
@@ -33,14 +31,7 @@ impl Handler for Plugin {
         let model = Model {
             abstains: true,
             cost: 1.0,
-            ..Model::new(
-                ID,
-                PROMPT_VERSION,
-                Capabilities {
-                    chat: Some(Supports { supported: true }),
-                    ..Capabilities::classifier(false)
-                },
-            )
+            ..Model::new(ID, PROMPT_VERSION, Capabilities::classifier(false))
         };
         Ok(InitializeResult::new(
             ID,
@@ -68,23 +59,6 @@ impl Handler for Plugin {
             )
             .into())
         }
-    }
-
-    /// The request goes to Chat Completions as it is; the reply comes back as
-    /// the service gave it.
-    fn chat(&mut self, request: ChatRequest) -> Result<CreateChatCompletionResponse, ErrorObject> {
-        if request.body.model.is_empty() {
-            return Err("the request names no model".into());
-        }
-        let endpoint = Endpoint::of(&request.options)?;
-        if !endpoint.speaks("openai") {
-            return Err(format!(
-                "no protocol of {:?} serves chat (served: [\"openai\"])",
-                endpoint.protocols
-            )
-            .into());
-        }
-        create_chat_completion(self.client.as_ref(), &endpoint, &request.body, Map::new())
     }
 }
 
@@ -221,55 +195,6 @@ mod tests {
         );
         assert_eq!(result.answers["d/x"].noul, 0.81);
         assert_eq!(result.model, "jev-latest");
-    }
-
-    fn chat_request(protocol: Value, url: &str) -> ChatRequest {
-        ChatRequest {
-            body: serde_json::from_value(json!({
-                "model": "qwen/qwen3-coder:free",
-                "messages": [{"role": "user", "content": "fix it"}],
-                "temperature": 0.0,
-                "response_format": {"type": "json_object"},
-            }))
-            .unwrap(),
-            options: json!({ "protocol": protocol, "baseUrl": url })
-                .as_object()
-                .unwrap()
-                .clone(),
-        }
-    }
-
-    #[test]
-    fn a_chat_is_posted_to_chat_completions_without_the_options_and_answered_as_it_came() {
-        let (url, request) = serve_once(
-            "200 OK",
-            r#"{"id":"c","object":"chat.completion","created":1,"model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"{\"replacement\":\"x\"}"},"finish_reason":"stop"}]}"#,
-        );
-        let reply = Plugin::new(Box::new(Http::new()))
-            .chat(chat_request(json!(["typesafe", "openai"]), &url))
-            .unwrap();
-        let request = request.join().unwrap();
-
-        assert!(
-            request.starts_with("POST /chat/completions HTTP/1.1"),
-            "{request}"
-        );
-        let body: Value = serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
-        assert_eq!(body["model"], "qwen/qwen3-coder:free");
-        assert_eq!(body["response_format"]["type"], "json_object");
-        assert!(body.get("options").is_none() && body.get("baseUrl").is_none());
-        assert_eq!(
-            reply.choices[0].message.content.as_deref(),
-            Some("{\"replacement\":\"x\"}")
-        );
-    }
-
-    #[test]
-    fn a_provider_that_does_not_speak_openai_does_not_chat() {
-        let error = Plugin::new(Box::new(Http::new()))
-            .chat(chat_request(json!("typesafe"), "http://x"))
-            .unwrap_err();
-        assert!(error.message.contains("serves chat"), "{}", error.message);
     }
 
     #[test]

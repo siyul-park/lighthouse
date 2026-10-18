@@ -96,7 +96,7 @@ fn a_trainer_must_learn_and_make_the_same_model_to_make_it_again() {
     assert!(reason.contains("not deterministic"), "{reason}");
 
     model.deterministic = true;
-    model.capabilities.fine_tuning = None;
+    model.capabilities.training = None;
     let reason = unrebuildable(&Memorizer(model)).unwrap();
     assert!(reason.contains("does not learn"), "{reason}");
 }

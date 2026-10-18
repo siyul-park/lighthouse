@@ -116,7 +116,7 @@ fn a_model_list_is_an_openai_list_object_with_lighthouse_capabilities() {
     assert_eq!(wire["object"], "list");
     assert_eq!(wire["data"][0]["object"], "model");
     assert_eq!(
-        wire["data"][0]["capabilities"]["fine_tuning"]["supported"],
+        wire["data"][0]["capabilities"]["training"]["supported"],
         true
     );
     assert!(wire["data"][0]["capabilities"].get("embedding").is_none());

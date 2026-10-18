@@ -11,10 +11,9 @@ use super::frame::{
     INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, PARSE_ERROR, SERVER_NOT_INITIALIZED,
 };
 use crate::{
-    CHAT, CLASSIFY, ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest, EXIT,
-    ErrorObject, FineTuningJob, FrameError, INDEX, INITIALIZE, IndexParams, IndexResult,
-    InitializeParams, InitializeResult, Message, SHUTDOWN, SystemOneRequest, SystemOneResponse,
-    TRAIN, VERSION, read_message, write_message,
+    CLASSIFY, CreateFineTuningJobRequest, EXIT, ErrorObject, FineTuningJob, FrameError, INDEX,
+    INITIALIZE, IndexParams, IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN,
+    SystemOneRequest, SystemOneResponse, TRAIN, VERSION, read_message, write_message,
 };
 
 /// The methods of a plugin. An `Err` becomes a failed-request response; the
@@ -35,11 +34,6 @@ pub trait Handler {
     /// Puts subjects to a model; a language plugin offers no model.
     fn classify(&mut self, _params: SystemOneRequest) -> Result<SystemOneResponse, ErrorObject> {
         Err("this plugin offers no model".into())
-    }
-    /// Has a model reply to a conversation; only a model that generates text
-    /// offers it.
-    fn chat(&mut self, _params: ChatRequest) -> Result<CreateChatCompletionResponse, ErrorObject> {
-        Err("this plugin does not chat".into())
     }
     /// Fits a model; only a model that learns from labels offers it.
     fn train(&mut self, _params: CreateFineTuningJobRequest) -> Result<FineTuningJob, ErrorObject> {
@@ -130,7 +124,6 @@ fn dispatch(
         )),
         INDEX => call(message, |p| handler.index(p)),
         CLASSIFY => call(message, |p| handler.classify(p)),
-        CHAT => call(message, |p| handler.chat(p)),
         TRAIN => call(message, |p| handler.train(p)),
         SHUTDOWN => {
             session.shutdown = true;

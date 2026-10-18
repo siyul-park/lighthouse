@@ -42,7 +42,7 @@ pub fn manifest(deterministic: bool) -> Model {
         owned_by: "fake".to_owned(),
         capabilities: Capabilities {
             classification: Some(Supports { supported: true }),
-            fine_tuning: Some(Supports { supported: true }),
+            training: Some(Supports { supported: true }),
             ..Capabilities::default()
         },
         version: "1".to_owned(),

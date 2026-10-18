@@ -67,16 +67,6 @@
     "Capabilities": {
       "description": "The capabilities of a model.",
       "properties": {
-        "chat": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Supports"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "classification": {
           "anyOf": [
             {
@@ -97,7 +87,7 @@
             }
           ]
         },
-        "fine_tuning": {
+        "training": {
           "anyOf": [
             {
               "$ref": "#/$defs/Supports"
@@ -108,51 +98,6 @@
           ]
         }
       },
-      "type": "object"
-    },
-    "ChatCall": {
-      "description": "The chat method with its params and result. Exists to anchor the schema:\nOpenAI's types are not described here, its API reference is.",
-      "properties": {
-        "params": {
-          "description": "The body of OpenAI's createChatCompletion (POST /v1/chat/completions, https://platform.openai.com/docs/api-reference/chat/create), and `options`.",
-          "properties": {
-            "messages": {
-              "type": "array"
-            },
-            "model": {
-              "type": "string"
-            },
-            "options": {
-              "type": "object"
-            }
-          },
-          "required": [
-            "model",
-            "messages"
-          ],
-          "type": "object"
-        },
-        "result": {
-          "description": "OpenAI's chat completion object (https://platform.openai.com/docs/api-reference/chat/object).",
-          "properties": {
-            "choices": {
-              "type": "array"
-            }
-          },
-          "required": [
-            "id",
-            "object",
-            "created",
-            "model",
-            "choices"
-          ],
-          "type": "object"
-        }
-      },
-      "required": [
-        "params",
-        "result"
-      ],
       "type": "object"
     },
     "Comment": {
@@ -1676,9 +1621,6 @@
   "properties": {
     "initialize": {
       "$ref": "#/$defs/Call"
-    },
-    "lighthouse/chat": {
-      "$ref": "#/$defs/ChatCall"
     },
     "lighthouse/classify": {
       "$ref": "#/$defs/Call"

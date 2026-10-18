@@ -1,5 +1,8 @@
 //! The one adaptation: a System One request answered through Chat
-//! Completions. Each question is rendered as a prompt asking for `true` or
+//! Completions. This is the only use of Chat Completions here, and it is
+//! System One's: the logprobs of a chat model are the wire of `classification`.
+//! A chat model never generates text for Lighthouse (no fix, no check, no
+//! decision); that is an external agent's work (`edit`). Each question is rendered as a prompt asking for `true` or
 //! `false`, the names of its criteria, and P(fail) is read from the
 //! probabilities of those two tokens at the answer position, renormalized over
 //! the two labels (OpenAI Cookbook, "Using logprobs for classification"; Zhao
