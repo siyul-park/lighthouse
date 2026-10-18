@@ -202,7 +202,7 @@ System One body to the API.
   passes, with the valid ones.
 - `model` is the part of the reference after the provider (`openrouter/qwen/qwen3-coder:free`
   sends `qwen/qwen3-coder:free`). Beside System One's body (`SystemOneRequest`) Lighthouse sends
-  `options`, the provider's `options`, for a plugin that needs them (`protocol`, `baseUrl`, `keyEnv`, `extraBody`);
+  `options`, the provider's `options`, for a plugin that needs them (`protocol`, `url`, `headers`, `body`);
   they are never part of the body a remote server gets.
 
 It answers `{model, answers: {<decision id>: {type: "noul", noul}}, usage}`: `noul` is the
@@ -648,15 +648,15 @@ Rust with a notice.
 ## `model-http`
 
 Models behind the standard HTTP protocols, as a provider in `lighthouse.toml`
-(`protocol = "openai"` or a list such as `["openai", "typesafe"]`, `baseUrl`, `keyEnv`, `extraBody`; see
+(`protocol = "openai"` or a list such as `["openai", "typesafe"]`, `url`, `headers`, `body`; see
 [rule-pipeline.md](rule-pipeline.md#models)). Each operation uses the protocol that covers it:
 classification uses `typesafe` when listed, else `openai`. There is no chat method: Chat Completions
 are only the logprobs adapter behind classification.
 
-For `typesafe`, the System One body is forwarded as it is to `POST {baseUrl}/v1/systemone` with `Authorization: Bearer <key>` (https://docs.typesafe.ai/api), and its answer is read as it comes.
+For `typesafe`, the System One body is forwarded as it is to `POST {url}/v1/systemone` with the provider's `headers` (`Authorization: Bearer <key>` at the service of the protocol) (https://docs.typesafe.ai/api), and its answer is read as it comes.
 
 For `openai`, each question is rendered as a prompt that asks for one word, `true` or `false`, and
-sent to `{baseUrl}/chat/completions` with `Authorization: Bearer <key>`, `temperature` 0,
+sent to `{url}/chat/completions` with the provider's `headers`, `temperature` 0,
 `logprobs`, `top_logprobs` 20 and `max_tokens` 1. P(fail) is read from the probabilities of the
 two words at the answer token. A response without logprobs is an error ("the model returned no
 logprobs; it cannot serve classification"), never read as a verbalized number. The API shapes are

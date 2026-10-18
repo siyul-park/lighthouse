@@ -37,7 +37,7 @@ judged is remembered with its reason and is not raised again.
    3. For the others, `review_show` the finding, edit with its brief, `check` again.
    4. An `unsafe` fix that runs (every fix by a model is) is previewed first: `fix` the group, read the diffs, then run the `apply` of a preview to write exactly that fix. Passing `noModels` asks no model.
    A check shows no diff; `fix` does. Only `safe` fixes are written, whoever
-   makes them; an `unsafe` fix is shown as a preview with its diff, unless the project's `[approval] fix = "allow"`
+   makes them; an `unsafe` fix is shown as a preview with its diff, unless the project's `[fix] unsafe = true`
    or `unsafeFixes` says otherwise. Every fix is verified and rolled back if it
    makes the file worse. Review the diff like any other change. A run that
    reports `incomplete` did not check everything: it is not a pass.
@@ -78,14 +78,13 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (23)
+## Active decisions (24)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|unsafe` marks a decision with a fixer and the safety of its fix.
 
 ### core
 
 - `core/file-size` (warn) Files stay small and cohesive
-- `core/formatted` (warn) A file is as its formatter writes it
 - `core/allow` (error) Allow a finding in source, with a reason
 - `core/no-unused-allow` (warn, fixable: unsafe) Allow annotations suppress something
 - `core/decision-naming` (warn) Decision names follow the ESLint convention
@@ -106,6 +105,14 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
 - `design/exported-doc` (warn) Exported symbols are documented
 - `design/comments` (warn, fixable: unsafe) A comment states a fact the code cannot
+
+### go
+
+- `go/formatted` (error, fixable: safe) A Go file is as gofmt writes it
+
+### rust
+
+- `rust/formatted` (error, fixable: safe) A Rust file is as rustfmt writes it
 
 ### testing
 

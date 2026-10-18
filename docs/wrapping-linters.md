@@ -3,7 +3,8 @@
 A linter that writes SARIF 2.1.0 is wrapped, not rewritten: a `command` check names the program with
 `output: sarif`, and Lighthouse turns each result into a finding. No bundled decision wraps a tool, because the
 tools are installed by the user; the decision lives in the project (`.lighthouse/decisions`), and the project
-must trust commands (`lighthouse trust`; see [architecture](architecture.md#rules)).
+must trust commands (`lighthouse trust`; see [architecture](architecture.md#rules)). The command is a program like
+every other ([programs](programs.md)): this page is only what is particular to SARIF.
 
 ```yaml
 spec:
@@ -11,27 +12,26 @@ spec:
   severity: error
   check:
     type: command
-    argv: [golangci-lint, run, --output.sarif.path=stdout, --show-stats=false, ./...]
-    batch: all
+    command: [golangci-lint, run, --output.sarif.path=stdout, --show-stats=false, ./...]
     output: sarif
-    columns: bytes                    # golangci-lint counts bytes and omits columnKind
-    env: { HOME: /home/dev }          # the caches; a command gets no HOME of its own
-    exitCodes: { clean: [0], findings: [1] }
-    select: { ruleIds: [errcheck, staticcheck], levels: [error, warning] }
+    sarif:
+      rules: [errcheck, staticcheck]
+      levels: [error, warning]
+      columns: bytes                  # golangci-lint counts bytes and omits columnKind
 ```
 
 ## Reading
 
-- **Exit codes** are the declared ones. The log is read after a clean code as well as a findings code, for tools
-  that always exit 0 (a `sh -c 'cargo clippy --message-format=json | clippy-sarif'` pipeline exits with its last
-  command).
+- **Exit codes** are `success`, `[0, 1]` unless the program says otherwise. The log is read after a clean code as
+  well as a findings code, for tools that always exit 0 (a `sh -c 'cargo clippy --message-format=json |
+  clippy-sarif'` pipeline exits with its last command). Another code is an error.
 - **Incomplete, never clean.** No output at all, output that is not a SARIF log, a log of another version than
   2.1.0, and a findings code over a log with no result each leave the analysis incomplete (exit 3), with the start
   of stderr in the message. Only a log that was read and holds no result is clean.
-- **`select`** is a field of the command check, not the CEL `select`. It keeps the results whose `ruleId` matches
-  one of `ruleIds` and whose `level` is one of `levels` (a result without a level is a `warning`); both default to
-  everything. Globs are those of module paths: `*` is a run of characters inside one segment, `/` and `::`
-  separate segments, `**` spans segments. `select` and `columns` are refused without `output: sarif`.
+- **`sarif`** keeps the results whose `ruleId` matches one of `rules` and whose `level` is one of `levels` (a
+  result without a level is a `warning`); both default to everything. Globs are those of module paths: `*` is a run
+  of characters inside one segment, `/` and `::` separate segments, `**` spans segments. `sarif` is refused
+  without `output: sarif`.
 - **Location.** The first location is used. `uri` is resolved against `uriBaseId` and `originalUriBaseIds`
   (following up to four bases), or read as a `file:` URI (`file:///a`, `file://localhost/a`, `file:/a`), or taken
   relative to the project root, which is what a tool that writes plain relative paths means. A `#` or `?` suffix
@@ -39,7 +39,7 @@ spec:
   the project.
 - **Dropped results.** A result in a file the project does not have is dropped, and the run says so in a notice
   with the count and the first path.
-- **Columns** are one-based and converted to byte columns. The unit is, in order: `columns`
+- **Columns** are one-based and converted to byte columns. The unit is, in order: `sarif.columns`
   (`utf16CodeUnits | unicodeCodePoints | bytes`), the run's `columnKind`, then UTF-16 code units. SARIF names the
   two kinds in §3.14.27 and requires `columnKind` from a producer that processes text and reports results, but
   gives no default for a log that omits it, so the last step is Lighthouse's choice, and golangci-lint, which
@@ -65,9 +65,9 @@ spec:
   `1` when it found issues (`--issues-exit-code`, default 1; a timeout is 4;
   <https://github.com/golangci/golangci-lint/blob/main/pkg/commands/run.go>). Run with v2.12.2, a result has
   `ruleId` (the linter), `level`, `message.text`, a relative `uri` without `uriBaseId` and `startLine` /
-  `startColumn` in bytes, with no `columnKind`; stdout holds only the log. It needs `HOME` or
-  `GOLANGCI_LINT_CACHE` and Go's caches, which the cleared environment of a command lacks. A check may write to the user's cache directory
-  and nowhere else outside the temporary directory of its run, so `GOLANGCI_LINT_CACHE` must point into it.
+  `startColumn` in bytes, with no `columnKind`; stdout holds only the log. It keeps
+  its cache in the user's cache directory, where a check may write, and nowhere else outside the temporary
+  directory of its run.
 - Clippy has no SARIF output of its own: `cargo clippy --message-format=json | clippy-sarif`
   (<https://github.com/psastras/sarif-rs>). It builds in `target` and reads the registry, so a
   project that wraps it says `[sandbox] write = ["target", "~/.cargo/registry", "~/.cargo/git"]`.

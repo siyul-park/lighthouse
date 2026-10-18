@@ -124,9 +124,9 @@ runs them). Readers accept the current format only.
 Meaning is shared; the environment is personal. The keys that decide findings, or what may change
 the shared repository, are the project's alone (`lighthouse.toml`, committed): `plugins`,
 `extends`, `languages`, `overrides`, `generated`, `[fix]`, and per decision `level`, `options`,
-`generated` and `evaluation`. The keys that say how this machine computes and applies are the
+`generated`, `evaluation` and `safety`. The keys that say how this machine computes and applies are the
 environment: `[models]` (bindings, `providers`, `routing`, `budget`, `explore`),
-`rules."<id>".classification` and `rules."<id>".edit`, `[approval]` and `[sandbox]`. They are read from four
+`rules."<id>".classification` and `rules."<id>".agent`, `[fix] unsafe` and `[sandbox]`. They are read from four
 layers, the later winning key by key:
 
 | Layer | File |
@@ -139,10 +139,10 @@ layers, the later winning key by key:
 With `--config FILE` the project root is the current directory, so the local file is
 `.lighthouse/local.toml` under it, not beside `FILE`. Git must not track the local file: when it does,
 loading fails until it is untracked (`git rm --cached`). `config show` hides what may carry a secret
-(the values of a provider's `env`, `options` and `extraBody`, and the userinfo and query of its
-`baseUrl`; the `command` is shown as written), and errors in a personal file give its line and key but
+(the values of a provider's `env`, `headers`, `body` and `options`, and the userinfo and query of its
+`url`; the `command` is shown as written), and errors in a personal file give its line and key but
 never the text of the line. Trust covers the part of the personal files that can run a program or
-write without asking (a provider with a `command`, its `env` and `network`, `[approval]` and `[sandbox]`),
+write without asking (a provider with a `command`, its `env` and `sandbox`, `[fix] unsafe` and `[sandbox]`),
 not their budgets or bindings.
 
 The user and the local file are bare TOML with the environment keys only
@@ -175,6 +175,9 @@ judgment that can take effect.
 
 ## Rules
 
+Every external program (a command check or fix, a `[fix] verify` program, a model provider's command) is a
+[program](programs.md) with one shape and one contract; this page keeps what is the rule's.
+
 Every implemented rule belongs to a catalog decision whose `check` is
 one provider of the union `builtin | cel | command | model`, with the common fields `requires` and `timeout`:
 
@@ -182,7 +185,7 @@ one provider of the union `builtin | cel | command | model`, with the common fie
 - `cel` is an expression over the code model (UCM), written in the decision, with the standard function library `metrics callers owner tests rank exposed limit counted`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. `limit(node, max)` gives the value for the node's role, and `counted(node, n, what)` says it (`NewServer needs 9 parameters`, `parse has 9 parameters`).
-- `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command runs in the project root, [sandboxed](#sandbox), with an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR` (a directory of its own) and the declared `env` plus `LIGHTHOUSE_*`. Trust and the sandbox protect together; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
+- `command` runs a [program](programs.md) whose result is findings: `output: lines` (the default; one finding per stdout line, with an optional `path:line[:col]: ` prefix, and a line that is only a project path is a finding at line 1 of that file), `sarif` or `status`. `{file}` runs it once per file, `{files}` over batches of files, neither once; exit `0` and `1` ran (`success`), anything else is an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script; the programs of the bundled catalog need none. A command runs in the project root, [sandboxed](#sandbox), under the one environment of every program (see [programs](programs.md#the-environment)). Trust and the sandbox protect together; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
 - `model` asks the `classification` task of the model the project binds to the decision (`select` and `prompt` optional); a subject nothing decides stays a review task. It is not deterministic and caps the severity at `warn`.
 
 A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and judgments without ever expiring one.
@@ -617,10 +620,13 @@ reached through no symlink; anything else is declined before any text is read.
 **Safety.** A fix is `safe` or `unsafe`, whatever provider makes it (ops, command, rpc or
 a model), and one function, `DecisionSpec::fix_safety`, says which: `safe` only for a
 deterministic fix of a decision that authors `error`; a model's fix, and any fix of a
-`warn` or `info` decision, is `unsafe`. A fixer may claim less than that, never more. One
+`warn` or `info` decision, is `unsafe`. A fixer may claim less than that, never more. The project
+has the last word per decision: `[rules."<id>"] safety = "safe" | "unsafe"` replaces the result
+(`unsafe` wins when two layers disagree). One
 permission writes a fix of any provider: a `safe` fix is written; an `unsafe` one is written
-under `[approval] fix = "allow"` or `--unsafe-fixes` (MCP `unsafeFixes`), and otherwise it is
-verified in memory and reported as `previewed` with its diff, never written. Applying a
+under `[fix] unsafe = true` or `--unsafe-fixes` (MCP `unsafeFixes: true`), and otherwise it is
+verified in memory and reported as `previewed` with its diff, never written; `--no-unsafe-fixes`
+(`unsafeFixes: false`) previews for one run what the project would write. Applying a
 preview is `check --fix --unsafe-fixes --fingerprint <fp>` (the `fingerprints` of the `fix`
 tool), naming all the findings the fix was made for: whoever made it, a preview is kept in
 the result cache with the digests of the files it changes, and applying it writes exactly
@@ -629,10 +635,10 @@ was is a `conflict` and nothing is written; a preview that is not kept (`--no-ca
 never made) is declined as `unanswered`. A check shows the same previews, because it takes
 the same verified path in a dry run. `--no-models` (MCP `noModels`) asks no model.
 Every decision carries one descriptor, built in one place (`lighthouse_session::Fixing`),
-that says who checks and who fixes, the safety, whether the fix runs and if not why (no edit
+that says who checks and who fixes, the safety, whether the fix runs and if not why (no agent
 binding, untrusted project, sandbox unavailable, no budget, provider unavailable: one
 `Availability` of the engine decides it, for the descriptor and for the fix run that declines
-what cannot run), the approval, and the command line and tool call of the step that writes a
+what cannot run), whether it is written or previewed, and the command line and tool call of the step that writes a
 `safe` fix and previews an `unsafe` one; `decision list`, `decision show`,
 the check groups, `review_show` and the hooks print it. `--fixer <id>`
 (the `fixer` argument of the `fix` tool) names a registered fixer for the selected findings and
@@ -645,31 +651,22 @@ at most five:
    analysis is incomplete, because a fix that rests on a partial analysis is a guess;
 2. select the findings (paths, rules, fingerprints; never those a judgment hides),
    ask each one's fixer for a proposal, lower it, and keep the proposals that do not
-   collide (safe ones first, then report order; a proposal with exactly the edits of a
-   kept one is covered by it);
+   collide (safe ones first, then the higher `fix.priority`, then report order; a proposal
+   with exactly the edits of a kept one is covered by it; one that lost an overlap is
+   proposed again in the next round);
 3. apply the edits to the texts **in memory** (a proposal whose own edits overlap is
    declined; an out-of-range or overlapping edit is an error, never a panic);
-4. run the language's formatter, `[languages.<id>] formatter`, which follows the command
-   contract of fixes: exit `0` succeeds, stdout carries only the result, stderr is for
-   people, the environment is cleared to an allowlist plus the declared `env`, and a
-   timeout takes the process group down. Short form: `["gofmt", "-w"]` formats a scratch
-   copy of the file (its path appended, or filling a `{file}` argument), `inPlace`. Table
-   form: `{ argv = [...], stdin = "none|file", output = "inPlace|text", env = {...} }`;
-   with `stdin = "file"` and `output = "text"` the formatter filters the text and no scratch
-   file or module tree is needed (this repository uses `{ argv = ["rustfmt", "--edition",
-   "2024", "--emit", "stdout"], stdin = "file", output = "text" }` and `gofmt` the same way).
-   `{path}` is the file's real project-relative path, for tools like `--stdin-filepath`;
-   `inPlace` formatters get the settings files found between the file and the root
-   (`rustfmt.toml`, `.rustfmt.toml`, `.editorconfig`, `rust-toolchain.toml`) copied next to
-   their scratch copy, and stdin formatters find them from the project root, their working
-   directory. It runs only in a trusted project; otherwise it is skipped with a
-   note and verification still runs. The key is the host's and never reaches the provider;
-5. re-index and re-check **over overlays**: the engine reads the project with the
+4. re-index and re-check **over overlays**: the engine reads the project with the
    candidate texts standing in for the files (protocol `context.overlays`; nothing is
-   read from or written to those files). A changed file is dropped, back to its text
+   read from or written to those files), for the rules and analyzers as well as the language
+   providers; a program that reads files is run in a copy of the project that holds the texts.
+5. take the **safe follow-ups**: the safe fixes of the findings the change introduced in its files
+   (the formatter's among them, `go/formatted` and `rust/formatted`), in priority order, at most
+   two passes, and check again. They become part of the fix, and so of its preview.
+   A changed file is dropped, back to its text
    before the round, when its check got worse: more findings of error or warn severity for
-   some rule in the file (counted per file and decision, as a model fix's verdict is), a new
-   gap in the analysis, or a failed formatter; so is every file of a fix that spans files.
+   some rule in the file (counted per file and decision, as a model fix's verdict is), or a new
+   gap in the analysis; so is every file of a fix that spans files.
    Dropped fixes are reported as declined.
 
 It stops when a round applies nothing, after five rounds, or when a round reaches a state
@@ -712,11 +709,11 @@ sandbox-runtime:
   `~/.m2/settings.xml`, `~/.gem/credentials`, and in the project the `.env` files at its root and
   `.lighthouse/local.toml` (a scratch copy of the project leaves them out). Without `HOME` a
   sandboxed program is not run: the secrets cannot be located.
-- **Writes** are allowed where the caller says: the scratch copy of a fix, formatter or verify run
+- **Writes** are allowed where the caller says: the scratch copy of a fix or verify run
   and a `TMPDIR` of the run's own, deleted with it; the user's cache directory for checks and
   verification, since linters keep their caches there. An agent also has a `HOME` and
   `XDG_*` of its own, empty, unless its provider sets them, so it never sees the credentials or
-  settings of the user. `[sandbox] write` adds places for checks and verification: paths below the
+  settings of the user. `[sandbox] write` adds places for every program: paths below the
   project or, with `~/`, the home directory (`target`, `~/.cargo/registry`), never a secret.
 - **Isolation.** On Linux the program sees empty `/run`, `/var/run` and, when the run needs nothing
   in it, `/tmp`, and the directory of `SSH_AUTH_SOCK`, so the Unix sockets of the user's other
@@ -725,7 +722,7 @@ sandbox-runtime:
   validation): not the keychain, Launch Services or the network daemons. It leads a session of its
   own and has no terminal.
 - **Network** is off. A host-side HTTP proxy on the loopback lets through the hosts the project lists
-  in `[sandbox] network` (a command check or verify run) or a provider lists in its `network` (an
+  in `[sandbox] network` or a program lists in its own `sandbox.network` (a provider's, for an
   agent): `host`, `*.suffix` (below the suffix, not the suffix itself), each with an optional
   `:port` (a name alone is let through on 80 and 443 only; `*`, `*.com` and the like are refused at
   load). The proxy takes host names of plain characters, answers a plain request only when its
@@ -735,7 +732,7 @@ sandbox-runtime:
   no network at all: `lighthouse internal bridge` (hidden) runs inside it, listens on the loopback
   and relays to a Unix socket the host serves.
 - **Fail closed.** When the backend is missing or does not work (no `bwrap`, user namespaces
-  forbidden), the program is not run: a check leaves the analysis incomplete, a formatter or an agent
+  forbidden), the program is not run: a check leaves the analysis incomplete, a fix or an agent
   fails with "sandbox unavailable: <reason>; install bubblewrap, or set `[sandbox] enabled = false` in
   a trusted project". It never falls back to an unsandboxed run.
 
@@ -793,9 +790,9 @@ The core never knows the code model (UCM): the modules of `model` other than `uc
 
 A model is the provider of a task, named `<provider>/<model>`, and a plugin kind beside language
 providers. A task has one standard body: `classification` (TypeSafe System One), `embedding`
-(OpenAI Embeddings) and `edit` (an agent session in a scratch copy). Chat Completions are not a task:
+(OpenAI Embeddings) and `agent` (an agent session in a scratch copy). Chat Completions are not a task:
 they are the logprobs adapter behind `classification`. Lighthouse generates nothing itself; a
-model fix is an agent's `edit`. The probability of a
+model fix is an `agent`'s. The probability of a
 classification comes from the model's own distribution, never from a number the model writes.
 
 A project binds `classification` in layers chosen per decision, where an abstention falls through

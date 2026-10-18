@@ -53,7 +53,7 @@ languages and editors are added.
 | Crate boundaries | 15 crates in layers, each one role, the edges enforced by `design/layers`; one name per concept across crates, protocol, schemas and docs (`Run`, `fingerprints`, `decision`) |
 | Hooks report the session's own changes | the first edit of a file records its findings; later hooks report only the findings the session introduced, and a turn with no edit is silent |
 | Stability signals | module stability, reach of functions and a stability probe on the reference repositories |
-| One concept model | a check abstains (the CEL field `abstain`); a provider names the `protocol` it speaks and its reach (`baseUrl`, `command` or `plugin`); chat classification always reads logprobs; the core is free of the code model, with `design/layers` keeping `lighthouse_model::ucm` out of core, store, ml, report and session; plugin protocol 0.3: `lighthouse/index`, `initialize` in MCP and LSP vocabulary (`workspaceFolders`, `serverInfo`, `capabilities`), LSP error codes, one method table with its HTTP twins, conformance transcripts replayed by every plugin and the Go sdk |
+| One concept model | a check abstains (the CEL field `abstain`); a provider names the `protocol` it speaks and its reach (`url`, `command` or `plugin`); chat classification always reads logprobs; the core is free of the code model, with `design/layers` keeping `lighthouse_model::ucm` out of core, store, ml, report and session; plugin protocol 0.3: `lighthouse/index`, `initialize` in MCP and LSP vocabulary (`workspaceFolders`, `serverInfo`, `capabilities`), LSP error codes, one method table with its HTTP twins, conformance transcripts replayed by every plugin and the Go sdk |
 
 ## Next
 
@@ -63,14 +63,14 @@ where rules fall short, then reach. Each step below comes before the ones that b
 
 ### Fixes by models, verified
 The biggest direct cut in agent work, and it needs no labels: the verifier already exists.
-- **A `type: model` fix** for the decisions `[fix] decisions` lists, once `[models] edit`
-  is bound: an agent edit of a scratch workspace (`edit`: a headless agent CLI, later an ACP
+- **A `type: model` fix** for the decisions `[fix] decisions` lists, once `[models] agent`
+  is bound: an agent edit of a scratch workspace (`agent`: a headless agent CLI, later an ACP
   agent), within the scope `symbol` or `files`. Without an agent the finding stays a review task
   carrying the brief.
-  - Headless agent CLIs are `edit` providers (a `command` without a protocol); chat models serve
+  - Headless agent CLIs are `agent` providers (a `command` without a protocol); chat models serve
     classification only.
   - The fixer's output is always verified (apply, format, re-check, roll back) and is always `unsafe`.
-  - `[approval] fix` (`ask`, the default, or `allow`) says whether a verified change is applied without a person.
+  - `[fix] unsafe` (false by default) says whether a verified change is applied without a person; `[rules."<id>"] safety` says it per decision.
 
 ### Local models
 Free, local and calibrated, run in process; evaluation is the promotion gate.

@@ -125,7 +125,7 @@ Options:
           Print where the time went to stderr, phase by phase: reading, each language provider, merging, analyzers, the slowest rules, identity, the store and the report. Findings and exit code do not change
 
       --fix
-          Fix what the catalog's fixers can fix, then report what is left. Only safe fixes are written, whatever makes them (a rule, a command, a plugin); unsafe ones, which every fix by a model is, are shown as previews with how to apply them. Each fix is verified (formatted, re-checked) and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed
+          Fix what the catalog's fixers can fix, then report what is left. Only safe fixes are written, whatever makes them (a rule, a command, a plugin); unsafe ones, which every fix by a model is, are shown as previews with how to apply them. Each fix is verified (re-checked, with the safe fixes of what it introduced) and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed
 
       --fingerprint <FINGERPRINT>
           With --fix: fix only the findings with these fingerprints (repeatable; prefixes of at least 7 characters allowed). With --unsafe-fixes it applies the preview of each as it was shown, kept by the run that made it: a fix is never made again, a preview that is not kept is declined, and a file that changed since gives a conflict
@@ -134,7 +134,10 @@ Options:
           Print the unified diff and leave every file as it was
 
       --unsafe-fixes
-          Also write `unsafe` fixes, which are judgment calls, whatever makes them; without it, or `[approval] fix = "allow"`, they are shown as previews, and a preview is applied by naming its finding
+          Write `unsafe` fixes, as `unsafeFixes: true` does
+
+      --no-unsafe-fixes
+          Only preview `unsafe` fixes, whatever `[fix] unsafe` says
 
       --fixer <ID>
           Use this registered fixer for the selected findings instead of the one their decision names. Its fixes are `unsafe`
@@ -769,7 +772,7 @@ Show the configuration of this machine
 Usage: lighthouse config <COMMAND>
 
 Commands:
-  show  Show the effective environment: models, providers, bindings, approval, sandbox
+  show  Show the effective environment: models, providers, bindings, fix, sandbox
   help  Print this message or the help of the given subcommand(s)
 
 Options:
@@ -780,7 +783,7 @@ Options:
 ## `lighthouse config show`
 
 ```text
-Show the effective environment: models, providers, bindings, approval, sandbox.
+Show the effective environment: models, providers, bindings, fix, sandbox.
 
 Meaning is the project's alone (`lighthouse.toml`); how this machine computes and applies is read from, in order, the bundled defaults, the project, your file (`$XDG_CONFIG_HOME/lighthouse/config.toml`, default `~/.config/lighthouse/config.toml`) and the repository-local `.lighthouse/local.toml`. A later layer wins key by key; a provider is replaced whole. Shows each key that has a value, sorted; --origin names the layer each value comes from, as `git config --show-origin` does. The values a provider passes to its program (`env`) are hidden.
 

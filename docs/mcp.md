@@ -63,7 +63,7 @@ Result: [CheckReport](../schema/check-report.schema.json).
 
 Fix findings with the fixers their decisions name.
 
-Fix findings with the fixers the decisions name (`fix` in `decision_list`: who makes it, `safe` or `unsafe`, whether it runs). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only `safe` fixes are written, whatever makes them; an `unsafe` one is returned as a preview with its diff and the call that applies exactly it (`fingerprints` of every finding of its run, with `unsafeFixes`), unless `unsafeFixes` is set or the project's `[approval] fix` is `allow`. Applying a preview writes exactly the edit that was shown, kept by the run that made it: a file that changed since gives a conflict and writes nothing, and a preview that is not kept is declined. `noModels` asks no model. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes, the `previews` and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.
+Fix findings with the fixers the decisions name (`fix` in `decision_list`: who makes it, `safe` or `unsafe`, whether it runs). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed, applied, re-checked (the safe fixes of what it introduced follow it) and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only `safe` fixes are written, whatever makes them; an `unsafe` one is returned as a preview with its diff and the call that applies exactly it (`fingerprints` of every finding of its run, with `unsafeFixes`), unless `unsafeFixes` is true or, when it is not set, the project's `[fix] unsafe` is true; `unsafeFixes: false` only previews. Applying a preview writes exactly the edit that was shown, kept by the run that made it: a file that changed since gives a conflict and writes nothing, and a preview that is not kept is declined. `noModels` asks no model. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes, the `previews` and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.
 
 Result: [FixReport](../schema/fix-report.schema.json).
 
@@ -75,7 +75,7 @@ Result: [FixReport](../schema/fix-report.schema.json).
 | `fixer` | string \| null | `null` | Use this registered fixer for the selected findings instead of the one their decision names. Its fixes are `unsafe`. |
 | `noModels` | boolean | `false` | Ask no model: what they would fix is left to review. |
 | `paths` | string[] | `[]` | Fix findings under these paths. |
-| `unsafeFixes` | boolean | `false` | Also write `unsafe` fixes, which are judgment calls, whatever makes them; without it, or `[approval] fix = "allow"`, they are shown as previews, and a preview is applied by naming its finding. |
+| `unsafeFixes` | boolean \| null | `null` | Write `unsafe` fixes, which are judgment calls, whatever makes them (`true`), or only preview them (`false`); unset, `[fix] unsafe` decides. A preview is applied by naming its finding. |
 
 ## decision_list
 
@@ -287,7 +287,7 @@ Result: [ModelDetach](../schema/model-detach.schema.json).
 
 ## config_show
 
-Show the effective environment: models, providers, bindings, approval, sandbox.
+Show the effective environment: models, providers, bindings, fix, sandbox.
 
 Meaning is the project's alone (`lighthouse.toml`); how this machine computes and applies is read from, in order, the bundled defaults, the project, your file (`$XDG_CONFIG_HOME/lighthouse/config.toml`, default `~/.config/lighthouse/config.toml`) and the repository-local `.lighthouse/local.toml`. A later layer wins key by key; a provider is replaced whole. Shows each key that has a value, sorted; --origin names the layer each value comes from, as `git config --show-origin` does. The values a provider passes to its program (`env`) are hidden.
 

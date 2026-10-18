@@ -124,10 +124,10 @@ or declined has none.
 
 - A group of a fixable decision has `fix`, which says who fixes (`ops`,
   `command`, `rpc`, `model`), the safety, whether it runs (and `why` when it
-  does not), the `approval` of an `unsafe` fix and `apply`:
+  does not), whether an `unsafe` fix is `written` or only previewed, and `apply`:
   `lighthouse check --fix --decision <id>` or the `fix` tool call
   `fix {"decision":["<id>"]}`. That step writes a `safe` fix and previews an
-  `unsafe` one, under `ask`; each preview then carries its diff and its own
+  `unsafe` one, unless `[fix] unsafe` is set; each preview then carries its diff and its own
   `apply`, with `--unsafe-fixes` and the fingerprints of every finding the same
   run of the fix was made for. A decision with no fix, an `unsafe` one or one that does not run
   has `brief: true`: `review_show` has the brief to fix the finding by hand.
@@ -148,15 +148,14 @@ unsafe ones: a preview is applied by its fingerprint (`check --fix
 `check`; prefixes are accepted), `paths` (under the project root) or `decision`: a
 fix never defaults to the whole project. Use `dryRun` first: it returns the
 `diff` and leaves every file as it was. Only safe fixes are applied unless
-`unsafeFixes` is set or the project allows it (`[approval] fix = "allow"`); unsafe ones
+`unsafeFixes` is true or the project allows it (`[fix] unsafe = true`; `unsafeFixes: false` overrides it for one call); unsafe ones
 are then judgment calls to review in the diff, and without it they come back in
-`previews` with their diff, whatever program makes them. `noModels` asks no model. Every applied fix has been formatted (the `[languages.<id>] formatter`
-of `lighthouse.toml`), re-checked and, for a file that gained an error or stopped
+`previews` with their diff, whatever program makes them. `noModels` asks no model. Every applied fix has been re-checked together with the safe fixes of
+what it introduced (the formatter's among them) and, for a file that gained an error or stopped
 being analyzable, rolled back, so `declined` also says what was undone and why.
 Findings that a judgment hides are never fixed, and a run refuses to start
 while the analysis is incomplete. Commands run only in a project the user trusted with
-`lighthouse trust`, and without trust a command fix is declined and formatting is
-skipped. Trust is the user's, given at a terminal: `lighthouse trust` lists the
+`lighthouse trust`, and without trust a command fix is declined. Trust is the user's, given at a terminal: `lighthouse trust` lists the
 commands and asks (`--yes` only after reading the list), and `init --agent claude-code`
 adds `Bash(lighthouse trust:*)` to the project's permission deny list so the agent cannot
 trust a project for you. Nothing is written until the whole run verified in memory, and

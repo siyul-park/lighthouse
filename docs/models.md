@@ -12,6 +12,9 @@ uses one `Model` type. Errors are JSON-RPC errors whose `data` is the
 reused API's own error body. No HTTP server is built: a server that speaks these bodies could be
 declared as a provider later.
 
+Providers that run a program (`command`) are [programs](programs.md): their environment, credentials and
+network are described there.
+
 ## Run time
 
 A rule evaluates its `abstain` route only when the run asks its models (`Models::asks`): a model is
@@ -37,42 +40,42 @@ The probability that a subject fails comes from the model's own distribution: th
 answer token of a chat model, the score of a classifier, or System One's `noul`. A number a model
 writes in its reply (a verbalized probability) is never one, and neither is the verdict of an
 agent CLI such as `claude -p` or `codex exec`: it has no distribution to read. Agent CLIs are
-`edit` providers, a `command` without a protocol (below).
+`agent` providers, a `command` without a protocol (below).
 
 ## Fixes by a model
 
 Lighthouse is the System 1 harness: deterministic checks, classifiers, the verifier and briefs.
 Generating or changing files is System 2, an external agent's work, so there is no chat task and no
 prompt-and-parse fixer. Chat Completions serve classification only (see `model-http` below). A model
-fixes a finding in one way: `[models] edit` binds an agent that changes files in a scratch copy of
+fixes a finding in one way: `[models] agent` binds an agent that changes files in a scratch copy of
 the project, and the project permits it decision by decision. Nothing else enables a model fix;
 binding an agent enables nothing by itself.
 
 ```toml
 [models]
-edit = "claude/sonnet"                             # the agent, below
+agent = "claude/sonnet"                            # the agent, below
 [fix]
 decisions = ["design/exported-doc", "testing/*"]   # ids or globs; default none
 scope = "files"                                    # widest change: symbol | files; default files
-verify = [["cargo", "test", "-q"]]                 # must pass over the fixes of a run
-timeout = "10m"                                    # for each of them
-[approval]
-fix = "ask"                                        # default; "allow" writes a verified model fix
+verify = [["cargo", "test", "-q"]]                 # programs that must pass over the fixes of a run
+unsafe = false                                     # default; true writes a verified model fix
+[rules."design/exported-doc"]
+safety = "safe"                                    # trust the agent on this decision: written without --unsafe-fixes
 ```
 
 - **Who gets a model fix.** A finding does if its decision matches `[fix] decisions`, has a check
-  and no fix of its own (`ops`, `command`), and `[models] edit` is bound. An entry is an id or a glob
+  and no fix of its own (`ops`, `command`), and `[models] agent` is bound. An entry is an id or a glob
   (`*` within one segment of an id, matched against the whole id); one that matches no active
   decision is a warning naming it. A listed decision without a `fix` block has `fix: {type: model}`;
   a decision may say `fix: {type: model, prompt: "...", scope: symbol | files}` to add an
   instruction and a scope. A decision that declares none imposes no limit of its own, so its scope is
   `[fix] scope`; one that declares a scope is narrowed to `[fix] scope`, never widened by it.
-- **Edit or review, no router.** Where a finding gets a model fix it is `edit`; with no `edit` bound
+- **Agent or review, no router.** Where a finding gets a model fix it is made by the `agent`; with none bound
   it stays a review task that carries the brief (MCP `review_show` returns it as `brief`, `review
   show` prints it under `brief:`) for whoever drives the session, and Lighthouse re-checks when they
   are done. There are no retries inside Lighthouse. The brief is attached to the review task of every
   listed decision.
-- **The brief.** One builder writes it, for the `edit` prompt and for the review task: the system part
+- **The brief.** One builder writes it, for the `agent` prompt and for the review task: the system part
   (change only what the findings need, within the scope of each: `symbol` is the symbol of the
   finding, `files` any file the fix needs), for each finding the decision (requirement, context,
   `prompt`), message, evidence, `path:line:col` and scope, up to two before and after examples per
@@ -109,19 +112,22 @@ fix = "ask"                                        # default; "allow" writes a v
   declined `conflict`. Then `[fix] verify` runs; on failure the newest run is undone (its files go
   back to the text it started from), then the one before it, until the commands pass, and the
   findings of those undone are declined `rolled-back` with the reason.
-- **`[fix] verify`.** Commands (argument lists, no shell) run once per run, after the fixes, over a
-  scratch copy of the project (what version control keeps, with the fixed texts in place), when the
-  fixes would be written. They need a trusted project and are part of what `lighthouse trust` lists.
-- **Approval.** With `approval.fix = "ask"` a verified fix is not written: the report carries it as a
+- **`[fix] verify`.** Programs ([programs.md](programs.md): a bare argument list, or a table with its own
+  `timeout`, default 10 minutes) run once per run, after the fixes, over a scratch copy of the project (what
+  version control keeps, with the fixed texts in place), when the fixes would be written. Their `output` is
+  `status` (default: a code outside `success` is the one finding) or `lines`. They need a trusted project and
+  are part of what `lighthouse trust` lists.
+- **Permission.** Without `[fix] unsafe = true` a verified fix is not written: the report carries it as a
   preview with its diff (`previews` in the `fix` JSON, `preview ...` lines in `check --fix`), awaiting
   a hand. The run keeps each preview in the result cache with the digests of the files it changes;
   applying it, `check --fix --unsafe-fixes --fingerprint <fp>` with the fingerprints of all the findings
   of its run, writes exactly that edit after re-verifying it, without asking the model again. A file that
   changed since is a `conflict`, and a preview that is not kept (`--no-cache`, or never made) is declined
   as `unanswered`. With
-  `"allow"` it is written like any applied fix. `--unsafe-fixes` also writes verified model fixes
-  whatever the approval: the same permission every unsafe fix of every provider has. `--dry-run`
-  writes nothing either way.
+  `unsafe = true` it is written like any applied fix. `--unsafe-fixes` also writes verified model fixes,
+  `--no-unsafe-fixes` previews them for one run: the same permission every unsafe fix of every provider
+  has. `--dry-run` writes nothing either way. A decision the project calls `safety = "safe"` is written
+  without either.
 - **Accounting.** Per decision: `asked`, `answered`, `verified`, `applied`, `previewed` and `declined`
   by class (`no-extent`, `unanswered`, `out-of-scope`, `conflict`, `unchanged`, `unresolved`,
   `introduced`, `incomplete`, `rolled-back`), in `check --fix` and in the `fix` JSON (`models`), with
@@ -134,49 +140,49 @@ fix = "ask"                                        # default; "allow" writes a v
 
 ## The agent that edits
 
-Only a `command` without a `protocol` serves `edit`: running the program in a scratch copy of the
-project, with the brief as plain text on stdin, is what makes it an edit. HTTP and plugin providers do
-not, and binding one is a configuration error ("provider `x` does not serve `edit`: only a command
+Only a `command` without a `protocol` serves `agent`: running the program in a scratch copy of the
+project, with the brief as plain text on stdin, is what makes it an agent. HTTP and plugin providers do
+not, and binding one is a configuration error ("provider `x` does not serve `agent`: only a command
 without a protocol does"); a `command` with `protocol = "openai"` is no provider at all ("a `command`
-speaks `typesafe` (classification) or plain text (edit)"). `[models] edit` is one reference or a
-route list that fails over on error; `rules."<id>".edit` binds another one for that decision, in the
+speaks `typesafe` (classification) or plain text (agent)"). `[models] agent` is one reference or a
+route list that fails over on error; `rules."<id>".agent` binds another one for that decision, in the
 project file or in a user or local file ([architecture.md](architecture.md#configuration-layers)).
 The findings of a file are fixed by one run for each scope and agent, one run after another, each
-over the texts the runs before it were accepted with. The agent CLIs `claude -p`, `codex exec` and opencode are `edit`
+over the texts the runs before it were accepted with. The agent CLIs `claude -p`, `codex exec` and opencode are `agent`
 providers; none of them classifies, since they have no distribution to read.
 
 ```toml
 [models]
-edit = "claude/sonnet"
+agent = "claude/sonnet"
 [models.providers.claude]
 command = ["claude", "-p", "--output-format", "text", "--permission-mode", "acceptEdits",
            "--allowedTools", "Read,Edit,Write,Glob,Grep", "--model", "{model}"]
-timeout = "10m"            # the default for edit
-keyEnv = "ANTHROPIC_API_KEY"      # its login is not in the home of its own
-network = ["api.anthropic.com"]   # the hosts the agent may reach; none by default
+timeout = "10m"                                      # the default for an agent
+env = { ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY}" } # its login is not in the home of its own
+sandbox = { network = ["api.anthropic.com"] }        # the hosts the agent may reach; none by default
 ```
 
 ```toml
 [models]
-edit = "codex/any"
+agent = "codex/any"
 [models.providers.codex]   # the model is codex's own configuration
-command = ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "-"]
+command = ["codex", "exec", "--sandbox", "workspace-write", "-"]
 timeout = "10m"
-keyEnv = "OPENAI_API_KEY"
-network = ["api.openai.com"]
+env = { OPENAI_API_KEY = "${OPENAI_API_KEY}" }
+sandbox = { network = ["api.openai.com"] }
 ```
 
 The sandbox of `codex` runs inside Lighthouse's; whether the two nest on every OS is not verified.
 
 ```toml
 [models]
-edit = "oc/nim/z-ai/glm-5.3"        # provider oc; opencode's own model is nim/z-ai/glm-5.3
+agent = "oc/nim/z-ai/glm-5.3"        # provider oc; opencode's own model is nim/z-ai/glm-5.3
 [models.providers.oc]
 command = ["opencode", "run", "--pure", "--model", "{model}"]   # the prompt arrives on stdin
-keyEnv = "NVIDIA_API_KEY"           # passed through; opencode reads it as {env:NVIDIA_API_KEY}
-network = ["integrate.api.nvidia.com"]
+sandbox = { network = ["integrate.api.nvidia.com"] }
 timeout = "10m"
 [models.providers.oc.env]
+NVIDIA_API_KEY = "${NVIDIA_API_KEY}"    # passed through; opencode reads it as {env:NVIDIA_API_KEY}
 OPENCODE_DISABLE_PROJECT_CONFIG = "1"   # only the configuration below applies
 OPENCODE_CONFIG_CONTENT = '''
 {"permission": {"*": "deny", "read": "allow", "list": "allow", "glob": "allow", "grep": "allow", "edit": "allow"},
@@ -194,36 +200,37 @@ approves every permission request.
 The `claude` and `codex` recipes use the narrowest permission the tool offers for editing files in its working
 directory: `claude -p` (prompt on stdin) with `--permission-mode acceptEdits` and only the file
 tools in `--allowedTools`; `codex exec` (prompt on stdin through `-`) with `--sandbox
-workspace-write`, and `--skip-git-repo-check` because the scratch copy has no repository. Never use
+workspace-write`; the scratch copy is a repository of one commit, which both agents want. Never use
 a flag that skips permissions or the sandbox (`--dangerously-skip-permissions`, `--yolo`,
 `--full-auto`, `danger-full-access`); a test checks that no recipe here does. The flags were checked
 against the Claude Code headless docs (<https://code.claude.com/docs/en/headless> and `claude
 --help`) and the Codex non-interactive docs (<https://learn.chatgpt.com/docs/non-interactive-mode>,
 formerly `developers.openai.com/codex/noninteractive`); `codex exec --help` could not be run on the
-machine that wrote this, so `--skip-git-repo-check` and `-` rest on those docs alone.
+machine that wrote this, so `-` rests on those docs alone.
 
 - **Workspace.** A scratch copy of the project (what version control keeps, with the run's accepted
-  texts in place; the same copy `[fix] verify` uses). The command runs with it as its working
-  directory under the process contract (no shell, own process group, `timeout`, output cap,
-  environment of `PATH`, `USER`, `LOGNAME`, `LANG` plus `env` and `keyEnv`, project trust) and in
+  texts in place; the same copy `[fix] verify` uses), itself a repository of one commit, so the agent
+  finds its root and `git diff` works. The command runs with it as its working
+  directory as a [program](programs.md) (no shell, own process group, `timeout`, output cap,
+  the one environment plus `env`, project trust) and in
   the [sandbox](architecture.md#sandbox): it writes only in the copy and in a `TMPDIR` and a `HOME`
   (with `XDG_*`) of its own, which `env` may override, it reads everything but the sandbox's list of
   secrets (the user's credential files and the project's `.env` files, which the copy leaves out),
-  and it reaches only the hosts the provider lists in `network`. The copy is deleted when the run ends, on every path. stdout is kept for the notes only
+  and it reaches only the hosts the project's `[sandbox] network` and the provider's `sandbox.network` list. The copy is deleted when the run ends, on every path. stdout is kept for the notes only
   (2 KB).
 - **What it may change.** Under the scope, the indexed text files of the report scope. A change to a
   file outside the report scope or one Lighthouse does not index, a file created or deleted, or a
   non-text file rejects the whole attempt (class `out-of-scope`, the reason names the first path). A
   non-zero exit, a timeout or a signal is a model error: the route fails over, else the findings are
   declined `unanswered`.
-- **Safety.** Trusted projects only. With a `keyEnv` the provider is remote; otherwise it is a local
+- **Safety.** Trusted projects only. A provider whose `sandbox.network` lists a host is remote; otherwise it is a local
   process, and the agent's own configuration decides where code is sent. Lighthouse writes nothing
   outside the scratch copy; the files are written by the fix run after verification, as for any fix.
-  An agent that logs in through a file in the home of the user does not find it in the home of its own: give it a `keyEnv`.
+  An agent that logs in through a file in the home of the user does not find it in the home of its own: give it the key in `env`.
 
 ## Providers
 
-A provider has two axes: the `protocol` it speaks and its reach, exactly one of `baseUrl` (HTTP,
+A provider has two axes: the `protocol` it speaks and its reach, exactly one of `url` (HTTP,
 served by `model-http`), `command` (a stdio process speaking `typesafe`) and `plugin` (an rpc
 plugin, whose handshake says what it serves). `protocol = "openai"` or `"typesafe"` alone is HTTP
 at that protocol's own service. Recipes are in [rule-pipeline.md](rule-pipeline.md#models).
@@ -231,14 +238,14 @@ at that protocol's own service. Recipes are in [rule-pipeline.md](rule-pipeline.
 ```toml
 [models.providers.openrouter]     # a hosted model with logprobs, key from the environment
 protocol = "openai"
-baseUrl = "https://openrouter.ai/api/v1"
-keyEnv = "OPENROUTER_API_KEY"
+url = "https://openrouter.ai/api/v1"
+headers = { Authorization = "Bearer ${OPENROUTER_API_KEY}" }   # any scheme; the default at a protocol's own service
 cost = 1
 # timeout = "10m"                 # per request, default 120s; reasoning models may need it
 
 [models.providers.ollama]         # Ollama, LM Studio (:1234) and llama-server (:8080) alike
 protocol = "openai"
-baseUrl = "http://localhost:11434/v1"
+url = "http://localhost:11434/v1"
 cost = 0
 ```
 
