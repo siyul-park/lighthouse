@@ -37,6 +37,20 @@ pub(crate) fn read(dir: &TempDir, name: &str) -> String {
 /// A Go project with the design and testing rules; `None` after a skip
 /// message when there is no Go toolchain.
 pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
+    go_project_in(files, extra, "")
+}
+
+/// The same, with the pack `go` and its recommended decisions: `go/formatted`.
+fn go_formatted_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
+    go_project_in(files, extra, "go")
+}
+
+fn go_project_in(files: &[(&str, &str)], extra: &str, pack: &str) -> Option<TempDir> {
+    let (plugin_of, extends_of) = if pack.is_empty() {
+        (String::new(), String::new())
+    } else {
+        (format!("\"{pack}\", "), format!(", \"{pack}/recommended\""))
+    };
     let plugin = lighthouse_test_support::lang_go()?;
     let dir = tempfile::tempdir().unwrap();
     let local = if files
@@ -51,7 +65,7 @@ pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir>
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"design\", \"testing\", {local}{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n{extra}",
+            "plugins = [\"core\", \"design\", \"testing\", {plugin_of}{local}{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"{extends_of}]\n{extra}",
             plugin.to_str().unwrap()
         )),
     );
@@ -63,6 +77,21 @@ pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir>
 }
 
 pub(crate) fn rust_project(source: &str, extra: &str) -> TempDir {
+    rust_project_in(source, extra, "")
+}
+
+/// The same, with the pack `rust` and its recommended decisions:
+/// `rust/formatted`.
+fn rust_formatted_project(source: &str, extra: &str) -> TempDir {
+    rust_project_in(source, extra, "rust")
+}
+
+fn rust_project_in(source: &str, extra: &str, pack: &str) -> TempDir {
+    let (plugin_of, extends_of) = if pack.is_empty() {
+        (String::new(), String::new())
+    } else {
+        (format!("\"{pack}\", "), format!(", \"{pack}/recommended\""))
+    };
     let dir = tempfile::tempdir().unwrap();
     let plugin = lighthouse_test_support::lang_rust();
     let local = if extra.contains("local/") {
@@ -74,7 +103,7 @@ pub(crate) fn rust_project(source: &str, extra: &str) -> TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"design\", {local}{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"]\n{extra}",
+            "plugins = [\"core\", \"design\", {plugin_of}{local}{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"{extends_of}]\n{extra}",
             plugin.to_str().unwrap()
         )),
     );
@@ -193,25 +222,64 @@ fn paths_and_rules_select_what_is_fixed() {
 }
 
 #[test]
-fn a_configured_formatter_runs_on_the_files_a_fix_changed() {
+fn an_unformatted_go_file_is_a_finding_and_its_fix_makes_gofmt_clean() {
+    let squashed = "package demo\n\nfunc  helper() int {return 1}\n";
+    let Some(dir) = go_formatted_project(&[("a.go", squashed)], "") else {
+        return;
+    };
+
+    let found = lighthouse(dir.path())
+        .args([
+            "check",
+            "--format",
+            "json",
+            "--detail",
+            "full",
+            "--decision",
+            "go/formatted",
+        ])
+        .output()
+        .unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&found.stdout).unwrap();
+    assert_eq!(
+        report["findings"][0]["decision"], "go/formatted",
+        "{report}"
+    );
+    assert_eq!(report["findings"][0]["severity"], "error", "{report}");
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "--decision", "go/formatted"])
+        .assert()
+        .success();
+
+    let fixed = std::process::Command::new("gofmt")
+        .args(["-l", "a.go"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&fixed.stdout),
+        "",
+        "gofmt -l is clean"
+    );
+    assert_eq!(
+        read(&dir, "a.go"),
+        "package demo\n\nfunc helper() int { return 1 }\n"
+    );
+}
+
+#[test]
+fn a_reorder_whose_output_is_unformatted_is_applied_with_the_formatting_follow_up() {
     let squashed = "package demo\n\nfunc helper() int { return 1 }\n\ntype Service struct{}\n\nfunc (s *Service) Run() int {\n        return helper()\n}\n";
-    let Some(dir) = go_project(
-        &[("a.go", squashed)],
-        "[languages.go]\nformatter = [\"gofmt\", \"-w\"]\n",
-    ) else {
+    let Some(dir) = go_formatted_project(&[("a.go", squashed)], "") else {
         return;
     };
 
     lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("not formatted"));
-    trust(dir.path());
-    lighthouse(dir.path())
         .args(["check", "--fix"])
         .assert()
-        .success();
+        .success()
+        .stderr(predicate::str::contains("rolled back").not());
 
     let fixed = read(&dir, "a.go");
     assert!(
@@ -367,8 +435,8 @@ spec:
   fix:
     safety: safe
     type: command
-    argv: [sh, "-c", "tr a-z A-Z < \"$1\"", sh, "{file}"]
-    output: text
+    command: [sh, "-c", "tr a-z A-Z < \"$1\"", sh, "{file}"]
+    output: stdout
   examples:
     - name: quiet
       language: text
@@ -493,9 +561,10 @@ fn an_unknown_fixer_is_a_usage_error() {
 fn a_command_that_fails_is_declined_and_leaves_the_file() {
     let failing = UPPERCASE
         .replace(
-            "argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]",
-            "argv: [sh, \"-c\", \"exit 3\"]",
+            "command: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]",
+            "command: [sh, \"-c\", \"exit 3\"]",
         )
+        .replace("    output: stdout\n", "")
         .replace(
             "fixed:\n      - path: a.txt\n        body: HELLO\n",
             "fixed:\n      - path: a.txt\n        body: hello\n",
@@ -510,7 +579,7 @@ fn a_command_that_fails_is_declined_and_leaves_the_file() {
 
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("not fixed a.txt"), "{stderr}");
-    assert!(stderr.contains("failed"), "{stderr}");
+    assert!(stderr.contains("exited 3"), "{stderr}");
     assert_eq!(read(&dir, "a.txt"), "hello\n");
 }
 
@@ -680,13 +749,11 @@ fn a_run_without_the_store_still_honors_the_committed_decisions() {
 }
 
 #[test]
-fn a_rust_file_that_declares_a_module_file_is_formatted_through_stdin() {
+fn a_rust_file_that_declares_a_module_file_is_fixed_without_touching_the_module() {
     let source =
-        "pub fn run() -> u8 {\n    1\n}\n\npub  struct Store;\n\n#[cfg(test)]\nmod tests;\n";
-    let formatter = "[languages.rust]\nformatter = { argv = [\"rustfmt\", \"--edition\", \"2024\", \"--emit\", \"stdout\"], stdin = \"file\", output = \"text\" }\n";
-    let dir = rust_project(source, formatter);
+        "pub fn run() -> u8 {\n    1\n}\n\npub struct Store;\n\n#[cfg(test)]\nmod tests;\n";
+    let dir = rust_formatted_project(source, "");
     write(dir.path(), "src/tests.rs", "use super::*;\n");
-    trust(dir.path());
 
     lighthouse(dir.path())
         .args(["check", "--fix", "--decision", "design/declaration-groups"])
@@ -698,26 +765,6 @@ fn a_rust_file_that_declares_a_module_file_is_formatted_through_stdin() {
     assert_eq!(
         read(&dir, "src/lib.rs"),
         "pub struct Store;\n\npub fn run() -> u8 {\n    1\n}\n\n#[cfg(test)]\nmod tests;\n",
-        "reordered and formatted, with its module file untouched"
-    );
-}
-
-#[test]
-fn a_formatter_that_cannot_use_stdin_still_works_on_a_scratch_copy() {
-    let source = "pub fn run() -> u8 {\n    1\n}\n\npub  struct Store;\n";
-    let dir = rust_project(
-        source,
-        "[languages.rust]\nformatter = [\"rustfmt\", \"--edition\", \"2024\"]\n",
-    );
-    trust(dir.path());
-
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--decision", "design/declaration-groups"])
-        .assert()
-        .success();
-
-    assert_eq!(
-        read(&dir, "src/lib.rs"),
-        "pub struct Store;\n\npub fn run() -> u8 {\n    1\n}\n"
+        "reordered, with its module file untouched"
     );
 }

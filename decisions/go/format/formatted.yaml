@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: go/formatted
+  uid: 5c354926-60c3-4d35-ab8d-bbe2a955a03a
+spec:
+  title: A Go file is as gofmt writes it
+  context: >-
+    Vertical and horizontal openness, indentation and the placement of braces
+    are team rules, and a team keeps them by letting one tool decide, not by
+    reviewing them (Martin, Clean Code ch. 5 Team rules). The check is the
+    tool's own list mode: one finding per file it would change, at line 1,
+    that names the file. The fix is the tool as a filter, which writes the
+    file as it formats it; it has the lowest priority, so the fix of any other
+    decision wins an overlap and the formatting follows it as a safe follow-up
+    of the change. The programs are the bundled catalog's own, so they run in a
+    project nobody trusted.
+  scope:
+    subject: file
+    generated: false
+    tests: include
+  requirement: >-
+    A Go file MUST equal the output of gofmt.
+  severity: error
+  check:
+    type: command
+    command: [gofmt, -l, "{files}"]
+    output: lines
+    files: ["**/*.go"]
+  fix:
+    type: command
+    safety: safe
+    priority: -100
+    command: [gofmt]
+    stdin: file
+    output: stdout
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), G24 Follow Standard Conventions
+    - Martin, Clean Code (2008), ch. 5 Vertical openness and density
+    - Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation
+    - Martin, Clean Code (2008), ch. 5 Team rules
+    - 'gofmt: https://pkg.go.dev/cmd/gofmt'
+  examples:
+  - name: unformatted
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |
+        package sample
+
+        func  Run( ) int {return 1}
+    expect:
+    - line: 1
+    fixed:
+    - path: example.go
+      body: |
+        package sample
+
+        func Run() int { return 1 }
+  - name: formatted
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: example.go
+      body: |
+        package sample
+
+        func Run() int { return 1 }

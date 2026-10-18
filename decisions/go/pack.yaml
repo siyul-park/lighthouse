@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../../schema/pack.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Pack
+metadata:
+  name: go
+spec:
+  title: Go Decisions
+  intro: What gofmt decides, so a reviewer does not.
+  sections:
+    - name: format
+      title: Format
+      intro: One tool decides the layout of a file, so a reviewer does not.
+      decisions: [formatted]

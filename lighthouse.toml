@@ -9,17 +9,12 @@ plugins = [
   "core",
   "design",
   "testing",
+  "go",
+  "rust",
   { id = "lang-go", path = "target/plugins/lang-go" },
   { id = "lang-rust", path = "target/plugins/lang-rust" },
 ]
-extends = ["core/recommended", "design/recommended", "testing/recommended"]
-
-# What `lighthouse check --fix` runs on a file it changed.
-[spec.languages.go]
-formatter = { argv = ["gofmt"], stdin = "file", output = "text" }
-
-[spec.languages.rust]
-formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin = "file", output = "text" }
+extends = ["core/recommended", "design/recommended", "testing/recommended", "go/recommended", "rust/recommended"]
 
 [spec.rules]
 "core/file-size" = { level = "warn", options = { max = 1000 } }

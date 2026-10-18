@@ -15,8 +15,6 @@ use crate::{
     models::UNSANDBOXED,
 };
 
-const RUST_FORMATTER: &str = "[languages.rust]\nformatter = { argv = [\"rustfmt\", \"--edition\", \"2024\", \"--emit\", \"stdout\"], stdin = \"file\", output = \"text\" }\n";
-
 /// Two modules with a banned function each, and a shared file.
 fn chain_project(agent: &str, rest: &str) -> (TempDir, TempDir) {
     let (dir, scripts) = with_agent(agent, rest);
@@ -91,7 +89,7 @@ fn scoped_project(rest: &str) -> (TempDir, TempDir) {
 
 /// The `[fix]` table that lists both decisions, with `rest` in it.
 fn scoped_models(rest: &str) -> String {
-    format!("{ALLOW}[fix]\ndecisions = [\"local/naming-*\"]\n{rest}")
+    format!("[fix]\n{ALLOW}decisions = [\"local/naming-*\"]\n{rest}")
 }
 
 fn fix_both(dir: &TempDir) -> Value {
@@ -144,11 +142,12 @@ fn two_runs_over_one_file_are_undone_newest_first_and_the_first_stays() {
 
 #[test]
 fn a_fix_that_leaves_one_of_its_files_as_it_was_is_still_previewed_under_ask() {
-    // The formatter writes the second file back as it was.
+    // The agent unformats the second file, and `rust/formatted` writes it back
+    // as it was.
     let agent = format!(
         "{FIX_OWN_FILE}sed 's/other()/other( )/' src/other.rs > src/other.rs.new && mv src/other.rs.new src/other.rs\n"
     );
-    let (dir, _agent) = with_agent(&agent, &format!("{}{RUST_FORMATTER}", listed("", "")));
+    let (dir, _agent) = agent_project("\"rust/formatted\" = \"error\"\n", &agent, &listed("", ""));
     write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
     write(
         dir.path(),
@@ -173,7 +172,7 @@ fn a_fix_that_leaves_one_of_its_files_as_it_was_is_still_previewed_under_ask() {
 /// A project whose agent fixes the banned function and adds a type after it,
 /// which `design/declaration-groups` puts before the functions; and the file
 /// the agent keeps its brief in.
-fn reorder_project(approval: &str) -> (TempDir, TempDir, PathBuf) {
+fn reorder_project(approval: &str, rules: &str) -> (TempDir, TempDir, PathBuf) {
     let scripts = tempfile::tempdir().unwrap();
     let told = scripts.path().join("told");
     let keep = format!(
@@ -192,7 +191,7 @@ fn reorder_project(approval: &str) -> (TempDir, TempDir, PathBuf) {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"design\", \"local\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n\"design/declaration-groups\" = \"error\"\n[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}{}",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"design\", \"local\", \"rust\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n\"design/declaration-groups\" = \"error\"\n{rules}[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}{}",
             plugin.to_str().unwrap(),
             script.to_str().unwrap(),
             listed("", approval),
@@ -217,7 +216,7 @@ fn at(text: &str, needle: &str) -> usize {
 
 #[test]
 fn the_safe_fixes_of_the_project_reorder_an_edit_before_it_is_judged() {
-    let (dir, _agent, told) = reorder_project(ALLOW);
+    let (dir, _agent, told) = reorder_project(ALLOW, "");
 
     let fixed = fix(&dir, json!({}));
 
@@ -238,7 +237,7 @@ fn the_safe_fixes_of_the_project_reorder_an_edit_before_it_is_judged() {
 
 #[test]
 fn the_preview_of_an_edit_shows_the_text_the_safe_fixes_left() {
-    let (dir, _agent, _told) = reorder_project("");
+    let (dir, _agent, _told) = reorder_project("", "");
 
     let fixed = fix(&dir, json!({}));
 
@@ -249,4 +248,27 @@ fn the_preview_of_an_edit_shows_the_text_the_safe_fixes_left() {
         at(&preview, "pub fn fixed_one"),
     );
     assert!(struct_at < fn_at, "{preview}");
+}
+
+#[test]
+fn an_edit_with_unformatted_output_is_judged_with_its_formatting_follow_up() {
+    let (dir, scripts, _told) = reorder_project(ALLOW, "\"rust/formatted\" = \"error\"\n");
+    let agent = scripts.path().join("agent.sh");
+    let script = fs::read_to_string(&agent).unwrap();
+    fs::write(
+        &agent,
+        format!("{script}printf 'pub fn   spaced( )  {{  }}\\n' >> src/lib.rs\n"),
+    )
+    .unwrap();
+
+    let fixed = fix(&dir, json!({}));
+
+    let text = read(&dir, "src/lib.rs");
+    assert!(text.contains("pub fn spaced() {}\n"), "formatted:\n{text}");
+    assert!(
+        at(&text, "pub struct Helper") < at(&text, "pub fn fixed_one"),
+        "reordered:\n{text}"
+    );
+    assert_eq!(fixed["models"][BAN]["applied"], 1, "{fixed}");
+    assert_eq!(fixed["models"][BAN]["declined"], json!({}), "{fixed}");
 }

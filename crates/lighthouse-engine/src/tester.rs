@@ -3,7 +3,7 @@ use std::{fmt::Write as _, fs, path::Path};
 use tempfile::TempDir;
 
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, FORMATTED, Fix};
+use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, Fix};
 use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
@@ -58,7 +58,9 @@ impl<'a> RuleTester<'a> {
     /// Failures of one decision's examples, each prefixed `<id> <example>:`.
     /// With a language filter, a decision that has no example for that language
     /// (and no language-neutral `text` example) is itself a failure: a checked
-    /// rule must show what it does in every language under test.
+    /// rule must show what it does in every language under test. A command
+    /// check that names the `files` it is run for is the exception: it has
+    /// examples for the languages of those files only.
     pub fn check(&self, decision: &Decision) -> Vec<String> {
         let selected: Vec<&Example> = decision
             .examples
@@ -66,6 +68,9 @@ impl<'a> RuleTester<'a> {
             .filter(|example| self.selects(example))
             .collect();
         if selected.is_empty() && self.language.is_some() {
+            if names_files(decision) {
+                return Vec::new();
+            }
             return vec![format!(
                 "{}: no example for language `{}`",
                 decision.id(),
@@ -93,7 +98,7 @@ impl<'a> RuleTester<'a> {
         let config = config(&registry, decision, example)?;
         let engine = Engine::new(registry, config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
-            .with_trust(self.trusted || formats(decision));
+            .with_trust(self.trusted);
         let outcome = engine
             .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;
@@ -126,7 +131,7 @@ impl<'a> RuleTester<'a> {
         let plan = FixPlan::from_catalog(self.catalog);
         let run = FixRun {
             rules: vec![decision.id().to_owned()],
-            unsafe_fixes: true,
+            unsafe_fixes: Some(true),
             ..FixRun::default()
         };
         let report = engine.fix(&plan, &run).map_err(|e| format!("fix: {e}"))?;
@@ -240,39 +245,7 @@ fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result
     let mut root = toml::Table::new();
     root.insert("plugins".to_owned(), plugins.into());
     root.insert("rules".to_owned(), rules.into());
-    if formats(decision) {
-        let mut language = toml::Table::new();
-        language.insert("formatter".to_owned(), formatter(&example.language)?);
-        let mut languages = toml::Table::new();
-        languages.insert(example.language.clone(), language.into());
-        root.insert("languages".to_owned(), languages.into());
-    }
     Config::parse_inline(&root.to_string()).map_err(|e| e.to_string())
-}
-
-/// Whether the decision's check runs the formatter of the example's language.
-/// Its examples run it as the tester configures it, and trusted: nothing the
-/// project says is run.
-fn formats(decision: &Decision) -> bool {
-    decision
-        .check
-        .as_ref()
-        .is_some_and(|c| matches!(&c.kind, CheckKind::Builtin(b) if b.named() == Some(FORMATTED)))
-}
-
-/// The standard formatter of a language, as `lighthouse.toml` of the project
-/// writes it.
-fn formatter(language: &str) -> Result<toml::Value, String> {
-    let argv: &[&str] = match language {
-        "go" => &["gofmt"],
-        "rust" => &["rustfmt", "--edition", "2024", "--emit", "stdout"],
-        other => return Err(format!("no standard formatter for `{other}`")),
-    };
-    let mut table = toml::Table::new();
-    table.insert("argv".to_owned(), argv.to_vec().into());
-    table.insert("stdin".to_owned(), "file".into());
-    table.insert("output".to_owned(), "text".into());
-    Ok(table.into())
 }
 
 fn toml_value(value: &Value) -> Result<toml::Value, String> {
@@ -307,4 +280,13 @@ fn describe(found: &[(u32, &str)]) -> String {
         let _ = write!(out, "[{line}: {message}] ");
     }
     out.trim_end().to_owned()
+}
+
+/// Whether the check of `decision` is a command that is run for the files it
+/// names.
+fn names_files(decision: &Decision) -> bool {
+    matches!(
+        decision.check.as_ref().map(|check| &check.kind),
+        Some(CheckKind::Command(command)) if !command.files.is_empty()
+    )
 }

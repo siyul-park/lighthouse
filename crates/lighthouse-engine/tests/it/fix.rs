@@ -131,7 +131,7 @@ fn an_unsafe_fix_is_previewed_until_the_run_may_write_it() {
     assert!(shown.preview.files[0].hunks.contains("+DONE"));
 
     let run = FixRun {
-        unsafe_fixes: true,
+        unsafe_fixes: Some(true),
         ..FixRun::default()
     };
     let written = engine.fix(&unsafe_fix, &run).unwrap();
@@ -140,9 +140,9 @@ fn an_unsafe_fix_is_previewed_until_the_run_may_write_it() {
 }
 
 #[test]
-fn the_approval_of_the_project_writes_an_unsafe_fix_of_any_provider() {
+fn unsafe_in_the_project_writes_an_unsafe_fix_of_any_provider() {
     let dir = project("TODO\n");
-    let engine = engine(&dir, "[approval]\nfix = \"allow\"\n");
+    let engine = engine(&dir, "[fix]\nunsafe = true\n");
 
     let report = engine
         .fix(&plan("fake/to-done", Safety::Unsafe), &FixRun::default())
@@ -151,6 +151,48 @@ fn the_approval_of_the_project_writes_an_unsafe_fix_of_any_provider() {
     assert_eq!(text(&dir), "DONE\n");
     assert_eq!(report.applied[0].safety, Safety::Unsafe);
     assert!(report.previews.is_empty());
+}
+
+#[test]
+fn no_unsafe_fixes_keeps_a_fix_a_project_would_write_as_a_preview() {
+    let dir = project("TODO\n");
+    let engine = engine(&dir, "[fix]\nunsafe = true\n");
+    let run = FixRun {
+        unsafe_fixes: Some(false),
+        ..FixRun::default()
+    };
+
+    let report = engine
+        .fix(&plan("fake/to-done", Safety::Unsafe), &run)
+        .unwrap();
+
+    assert_eq!(text(&dir), "TODO\n");
+    assert!(report.applied.is_empty());
+    assert_eq!(report.previews.len(), 1);
+}
+
+#[test]
+fn the_project_has_the_last_word_on_the_safety_of_a_fix() {
+    let dir = project("TODO\n");
+    let engine = engine(&dir, "");
+    let hardened =
+        plan("fake/to-done", Safety::Safe).with_safety([("fake/todo".to_owned(), Safety::Unsafe)]);
+
+    let held = engine.fix(&hardened, &FixRun::default()).unwrap();
+
+    assert_eq!(text(&dir), "TODO\n", "a fix the project calls unsafe waits");
+    assert_eq!(held.previews[0].preview.safety, Safety::Unsafe);
+
+    let trusted =
+        plan("fake/to-done", Safety::Unsafe).with_safety([("fake/todo".to_owned(), Safety::Safe)]);
+    let written = engine.fix(&trusted, &FixRun::default()).unwrap();
+
+    assert_eq!(
+        text(&dir),
+        "DONE\n",
+        "a fix the project calls safe is written"
+    );
+    assert_eq!(written.applied[0].safety, Safety::Safe);
 }
 
 #[test]
@@ -245,7 +287,7 @@ fn a_fixer_override_applies_to_a_rule_without_a_fix_as_an_unsafe_fix() {
     assert_eq!(held.previews[0].preview.safety, Safety::Unsafe);
 
     let run = FixRun {
-        unsafe_fixes: true,
+        unsafe_fixes: Some(true),
         ..run
     };
     engine.fix(&FixPlan::default(), &run).unwrap();
@@ -272,35 +314,6 @@ fn findings_a_run_skips_are_left_alone() {
 
     assert_eq!(text(&dir), "TODO\n");
     assert!(report.applied.is_empty() && report.declined.is_empty());
-}
-
-#[test]
-fn the_formatter_runs_on_a_changed_file() {
-    let dir = project("TODO   here\n");
-    let formatter = r#"
-[languages.toy]
-formatter = ["sh", "-c", "tr -s ' ' < \"$0\" > \"$0.tmp\" && mv \"$0.tmp\" \"$0\""]
-"#;
-    let engine = engine(&dir, formatter).with_trust(true);
-
-    engine
-        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
-        .unwrap();
-
-    assert_eq!(text(&dir), "DONE here\n");
-}
-
-#[test]
-fn a_formatter_that_fails_rolls_the_file_back() {
-    let dir = project("TODO\n");
-    let engine = engine(&dir, "[languages.toy]\nformatter = [\"false\"]\n").with_trust(true);
-
-    let report = engine
-        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
-        .unwrap();
-
-    assert_eq!(text(&dir), "TODO\n");
-    assert!(report.declined[0].reason.contains("formatter"));
 }
 
 #[test]
@@ -426,7 +439,7 @@ fn model_fixes_are_given_only_to_the_listed_rules_that_have_a_check_and_no_fix_o
         documented.needs,
         Needs::Model {
             decision: "design/exported-doc".to_owned(),
-            task: Task::Edit
+            task: Task::Agent
         }
     );
     assert_eq!(documented.decision.id, "design/exported-doc");

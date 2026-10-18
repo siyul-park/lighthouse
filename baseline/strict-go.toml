@@ -5,6 +5,6 @@ kind = "Project"
 [metadata]
 name = "go-strict"
 [spec]
-plugins = ["core","design","testing",
+plugins = ["core","design","testing","go",
   { id = "lang-go", path = "@PLUGINS@/lang-go" }]
-extends = ["core/recommended","design/strict","testing/recommended"]
+extends = ["core/recommended","design/strict","testing/recommended","go/recommended"]
