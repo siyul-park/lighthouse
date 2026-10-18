@@ -62,7 +62,7 @@ pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir>
     Some(dir)
 }
 
-fn rust_project(source: &str, extra: &str) -> TempDir {
+pub(crate) fn rust_project(source: &str, extra: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let plugin = lighthouse_test_support::lang_rust();
     let local = if extra.contains("local/") {

@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Diagnostic, Fingerprint, Severity};
+use lighthouse_model::{Diagnostic, Fingerprint};
 
 use super::{Class, reach::reach};
 use crate::{
@@ -232,9 +232,5 @@ fn introduced<'a>(
 
 /// The findings of error or warn severity of the check `run` in `files`.
 fn loud_in<'r>(files: &[PathBuf], run: &'r Run) -> Vec<&'r Diagnostic> {
-    run.diagnostics
-        .iter()
-        .filter(|d| files.contains(&d.file))
-        .filter(|d| matches!(d.severity, Severity::Error | Severity::Warn))
-        .collect()
+    run.loud().filter(|d| files.contains(&d.file)).collect()
 }

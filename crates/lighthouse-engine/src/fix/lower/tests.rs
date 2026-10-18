@@ -280,19 +280,66 @@ fn reorder_moves_a_parenthesized_declaration_whole_with_its_comment() {
     );
 }
 
-#[test]
-fn reorder_declines_a_parenthesized_declaration_whose_specs_are_ordered_apart() {
-    let case = case(GROUPED, GROUPED_SYMBOLS, vec![]);
-    let op = EditOp::Reorder {
+fn reorder_grouped(order: &[&str]) -> EditOp {
+    EditOp::Reorder {
         owner: Owner::File(FILE.into()),
-        order: vec![id("b"), id("c"), id("a"), id("d")],
-    };
+        order: order.iter().map(|name| id(name)).collect(),
+    }
+}
 
-    let why = case.run(&[op]).unwrap_err();
+#[test]
+fn reorder_moves_a_parenthesized_declaration_with_its_block_comment() {
+    let text =
+        "/* modes\n   of it */\nconst (\n    a = 1\n    b = 2\n)\n\nfn c() {}\n\nfn d() {}\n";
+    let case = case(
+        text,
+        &[("a", 4, 4), ("b", 5, 5), ("c", 8, 8), ("d", 10, 10)],
+        vec![],
+    );
+
+    assert_eq!(
+        case.run(&[reorder_grouped(&["c", "a", "b", "d"])]).unwrap(),
+        "fn c() {}\n\n/* modes\n   of it */\nconst (\n    a = 1\n    b = 2\n)\n\nfn d() {}\n"
+    );
+}
+
+#[test]
+fn reorder_declines_specs_of_a_group_ordered_apart() {
+    let case = case(GROUPED, GROUPED_SYMBOLS, vec![]);
+
+    let why = case
+        .run(&[reorder_grouped(&["b", "c", "a", "d"])])
+        .unwrap_err();
 
     assert!(
-        why.contains("`b`: a grouped declaration mixes groups, `a` is ordered apart"),
+        why.contains("`a` is ordered apart from `b`, the first of its grouped declaration"),
         "{why}"
+    );
+}
+
+#[test]
+fn reorder_declines_specs_of_a_group_ordered_against_the_file() {
+    let case = case(GROUPED, GROUPED_SYMBOLS, vec![]);
+
+    let why = case
+        .run(&[reorder_grouped(&["c", "b", "a", "d"])])
+        .unwrap_err();
+
+    assert!(
+        why.contains("`a` and `b` of one grouped declaration are ordered against their file order"),
+        "{why}"
+    );
+}
+
+#[test]
+fn reorder_declines_a_group_with_a_spec_the_order_does_not_list() {
+    let case = case(GROUPED, GROUPED_SYMBOLS, vec![]);
+
+    let why = case.run(&[reorder_grouped(&["c", "a", "d"])]).unwrap_err();
+
+    assert_eq!(
+        why,
+        "`b` of a grouped declaration is not ordered; it stays in place"
     );
 }
 

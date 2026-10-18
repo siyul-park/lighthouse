@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     ops::Range,
     path::{Component, Path, PathBuf},
@@ -239,20 +239,16 @@ impl<'a> Lowerer<'a> {
             .range(extent)
             .filter(|r| !r.is_empty())
             .ok_or_else(|| format!("the extent of `{}` is outside its file", symbol.name))?;
-        let start = text[..range.start].rfind('\n').map_or(0, |n| n + 1);
-        let end = line_end_after(&text, range.end);
-        let shares_line =
-            !text[start..range.start].trim().is_empty() || code_follows(&text[range.end..end]);
-        if shares_line {
-            return Err(format!(
+        let lines = lines_of(&text, &range).ok_or_else(|| {
+            format!(
                 "`{}` shares its lines with other code, so it cannot be moved on its own",
                 symbol.name
-            ));
-        }
+            )
+        })?;
         let container = self.sources.containers(&symbol.file)?.at(range.start);
         Ok(Block {
             symbol: symbol.clone(),
-            lines: start..end,
+            lines,
             container: container.open,
             group: container.group,
         })
@@ -357,62 +353,84 @@ impl<'a> Lowerer<'a> {
         Ok(edits)
     }
 
-    /// `blocks` as the reorder moves them: the specs of a parenthesized
-    /// declaration are one block, the declaration from its keyword line, with
-    /// the comment lines that lead it, to its closing paren, put where its first
-    /// spec is listed. Its specs must be listed together and in file order, or
-    /// the order asks to split it, and the reorder is declined.
+    /// `blocks` as the reorder moves them. A declaration directly inside a `(`
+    /// container is one of a grouped declaration, as Go's `const ( ... )`
+    /// (providers of other languages report no symbol there). The specs of
+    /// one are a single block, the declaration from its first line, with the
+    /// comments that lead it, to its closing paren, put where its first spec
+    /// is listed. The reorder is declined when the order would split it: its
+    /// specs are not listed together and in file order, or one is not listed.
     fn units(&self, blocks: Vec<Block>) -> Result<Vec<Block>, String> {
+        let listed: BTreeSet<SymbolId> = blocks.iter().map(|b| b.symbol.id.clone()).collect();
         let mut units = Vec::new();
         let mut first: BTreeMap<usize, String> = BTreeMap::new();
-        let mut previous: Option<(usize, usize)> = None;
+        let mut previous: Option<(usize, usize, String)> = None;
         for block in blocks {
-            let (Some(open), Some(close)) = (block.container, block.group) else {
+            let Some(open) = block.group.and(block.container) else {
                 units.push(block);
                 previous = None;
                 continue;
             };
-            let follows = previous.is_some_and(|(p, start)| p == open && start < block.lines.start);
-            previous = Some((open, block.lines.start));
-            if let Some(name) = first.get(&open) {
-                if follows {
-                    continue;
+            let last = previous.replace((open, block.lines.start, block.symbol.name.clone()));
+            let Some(head) = first.get(&open) else {
+                first.insert(open, block.symbol.name.clone());
+                units.push(self.unit(block, &listed)?);
+                continue;
+            };
+            match last {
+                Some((p, start, _)) if p == open && start < block.lines.start => {}
+                Some((p, _, before)) if p == open => {
+                    return Err(format!(
+                        "`{}` and `{before}` of one grouped declaration are ordered against their file order; split it",
+                        block.symbol.name
+                    ));
                 }
-                return Err(format!(
-                    "`{name}`: a grouped declaration mixes groups, `{}` is ordered apart from it; split it",
-                    block.symbol.name
-                ));
+                _ => {
+                    return Err(format!(
+                        "`{}` is ordered apart from `{head}`, the first of its grouped declaration; split it",
+                        block.symbol.name
+                    ));
+                }
             }
-            first.insert(open, block.symbol.name.clone());
-            units.push(self.unit(block, open, close)?);
         }
         Ok(units)
     }
 
-    /// The parenthesized declaration with the paren `open`..`close`, in place
-    /// of its spec `spec`.
-    fn unit(&self, spec: Block, open: usize, close: usize) -> Result<Block, String> {
+    /// The grouped declaration `spec` is one of, in place of the spec, if it
+    /// is one. Every symbol it holds must be `listed`: one the order does not
+    /// mention would move with the unit unasked.
+    fn unit(&self, spec: Block, listed: &BTreeSet<SymbolId>) -> Result<Block, String> {
+        let (Some(open), Some(close)) = (spec.container, spec.group) else {
+            return Ok(spec);
+        };
         let file = &spec.symbol.file;
         let text = self.sources.text(file)?;
-        let mut start = text[..open].rfind('\n').map_or(0, |n| n + 1);
-        let end = line_end_after(&text, close + 1);
-        if text[start..open].split_whitespace().count() != 1 || code_follows(&text[close + 1..end])
-        {
+        let index = LineIndex::new(&text);
+        let loose = self.project.symbols_in(file).find(|s| {
+            s.owner.is_none()
+                && !listed.contains(&s.id)
+                && index
+                    .range(s.span)
+                    .is_some_and(|r| open < r.start && r.start < close)
+        });
+        if let Some(loose) = loose {
             return Err(format!(
-                "`{}` is one of a parenthesized group that shares its lines with other code",
-                spec.symbol.name
+                "`{}` of a grouped declaration is not ordered; it stays in place",
+                loose.name
             ));
         }
-        while start > 0 {
-            let above = text[..start - 1].rfind('\n').map_or(0, |n| n + 1);
-            if !text[above..start].trim_start().starts_with("//") {
-                break;
-            }
-            start = above;
-        }
+        let line = text[..open].rfind('\n').map_or(0, |n| n + 1);
+        let keyword = line + text[line..].len() - text[line..].trim_start().len();
+        let lines = lines_of(&text, &(with_leading_comments(&text, keyword)..close + 1))
+            .ok_or_else(|| {
+                format!(
+                    "`{}` is one of a grouped declaration that shares its lines with other code",
+                    spec.symbol.name
+                )
+            })?;
         let container = self.sources.containers(file)?.at(open).open;
         Ok(Block {
-            lines: start..end,
+            lines,
             container,
             group: None,
             ..spec
@@ -546,6 +564,36 @@ pub(crate) struct Lowerer<'a> {
     sources: &'a Sources<'a>,
     /// Whether the provider of a language declares `complete-references`.
     complete: &'a dyn Fn(&str) -> bool,
+}
+
+/// The whole lines `range` fills, or `None` when other code shares them.
+fn lines_of(text: &str, range: &Range<usize>) -> Option<Range<usize>> {
+    let start = text[..range.start].rfind('\n').map_or(0, |n| n + 1);
+    let end = line_end_after(text, range.end);
+    let shares = !text[start..range.start].trim().is_empty() || code_follows(&text[range.end..end]);
+    (!shares).then_some(start..end)
+}
+
+/// `start`, moved up over the comments that lead its line: `//` lines and
+/// `/* */` blocks that begin their lines.
+fn with_leading_comments(text: &str, mut start: usize) -> usize {
+    while start > 0 {
+        let above = text[..start - 1].rfind('\n').map_or(0, |n| n + 1);
+        let line = text[above..start].trim();
+        let opens = if line.starts_with("//") {
+            Some(above)
+        } else if line.ends_with("*/") {
+            text[..start]
+                .rfind("/*")
+                .map(|at| text[..at].rfind('\n').map_or(0, |n| n + 1))
+                .filter(|&l| text[l..].trim_start().starts_with("/*"))
+        } else {
+            None
+        };
+        let Some(opens) = opens else { break };
+        start = opens;
+    }
+    start
 }
 
 /// The end of the line that holds the end of a range: just past the newline

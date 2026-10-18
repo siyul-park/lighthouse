@@ -136,6 +136,12 @@ pub struct Run {
 }
 
 impl Run {
+    /// The findings of error or warn severity.
+    pub(crate) fn loud(&self) -> impl Iterator<Item = &Diagnostic> {
+        let loud = |d: &&Diagnostic| matches!(d.severity, Severity::Error | Severity::Warn);
+        self.diagnostics.iter().filter(loud)
+    }
+
     /// Process exit code: 3 if the analysis is incomplete, unless
     /// `allow_incomplete`; else 1 if any error diagnostic, or when the
     /// warnings fail the run as `fail_on` says; otherwise 0. `info` never

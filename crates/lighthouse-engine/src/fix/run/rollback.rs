@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Fingerprint, Preview, Safety, Severity};
+use lighthouse_model::{Fingerprint, Preview, Safety};
 
 use lighthouse_protocol::hash;
 
@@ -302,11 +302,7 @@ pub(super) fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<
     type Key<'a> = (&'a Path, &'a str);
     fn count(run: &Run) -> BTreeMap<Key<'_>, usize> {
         let mut counts = BTreeMap::new();
-        let loud = run
-            .diagnostics
-            .iter()
-            .filter(|d| matches!(d.severity, Severity::Error | Severity::Warn));
-        for d in loud {
+        for d in run.loud() {
             *counts
                 .entry((d.file.as_path(), d.rule_id.as_str()))
                 .or_insert(0) += 1;

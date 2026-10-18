@@ -593,11 +593,11 @@ strings and characters skipped) tells which container a declaration sits in: a m
 needs both ends in the same one (the same file level, the same `impl` or class body), a
 `reorder` sorts each container on its own. A member of a parenthesized group (Go's
 `const ( ... )`, whose order can carry meaning) is never moved alone: a `reorder` moves
-the group whole, from its keyword line, with the comments that lead it, to its closing
-paren, and declines the file when the order asks to split it (its members are not
-listed together and in file order). A declaration that shares
-its lines with other code is not moved alone (a block comment that opens after the closing
-brace counts as code). The scan reads comments and strings the way the file's language does
+the group whole, from its first line, with the comments that lead it, to its closing
+paren, and declines the file when the order would split it (its members are not listed
+together and in file order, or one is not listed). A declaration that shares its lines
+with other code is not moved alone (a block comment that opens after the closing brace
+counts as code). The scan reads comments and strings the way the file's language does
 (nested block comments and raw strings are Rust's; a backtick quotes in Go; an unknown
 language is read like C), which is a heuristic that the re-check backs up. Line endings
 follow the file: the dominant one (LF or CRLF) is used where an edit inserts a line.
@@ -654,9 +654,9 @@ at most five:
    candidate texts standing in for the files (protocol `context.overlays`; nothing is
    read from or written to those files). A changed file is dropped, back to its text
    before the round, when its check got worse: more findings of error or warn severity for
-   some rule in the file (wherever in it, as a model fix's verdict counts), a new gap in the
-   analysis, or a failed formatter; so is every file of a fix that spans files. Dropped fixes are
-   reported as declined.
+   some rule in the file (counted per file and decision, as a model fix's verdict is), a new
+   gap in the analysis, or a failed formatter; so is every file of a fix that spans files.
+   Dropped fixes are reported as declined.
 
 It stops when a round applies nothing, after five rounds, or when a round reaches a state
 an earlier one had (fixes that undo each other; the note names their rules).

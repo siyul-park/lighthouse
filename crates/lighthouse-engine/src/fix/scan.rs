@@ -11,7 +11,9 @@ pub(crate) struct Container {
     /// Offset of the opening bracket; `None` at file level.
     pub open: Option<usize>,
     /// The closing paren of a `(` group, such as Go's `const ( ... )` block:
-    /// its members depend on their place and are never moved one by one.
+    /// its members depend on their place and are never moved one by one. The
+    /// declarations directly inside one are the specs of a grouped
+    /// declaration; a language without such groups has none there.
     pub group: Option<usize>,
 }
 
