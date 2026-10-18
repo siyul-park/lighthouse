@@ -148,6 +148,7 @@ edit = "claude/sonnet"
 command = ["claude", "-p", "--output-format", "text", "--permission-mode", "acceptEdits",
            "--allowedTools", "Read,Edit,Write,Glob,Grep", "--model", "{model}"]
 timeout = "10m"            # the default for edit
+network = ["api.anthropic.com"]   # the hosts the agent may reach; none by default
 ```
 
 ```toml
@@ -156,6 +157,7 @@ edit = "codex/any"
 [models.providers.codex]   # the model is codex's own configuration
 command = ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "-"]
 timeout = "10m"
+network = ["api.openai.com"]
 ```
 
 ```toml
@@ -164,6 +166,7 @@ edit = "oc/nim/z-ai/glm-5.3"        # provider oc; opencode's own model is nim/z
 [models.providers.oc]
 command = ["opencode", "run", "--pure", "--model", "{model}"]   # the prompt arrives on stdin
 keyEnv = "NVIDIA_API_KEY"           # passed through; opencode reads it as {env:NVIDIA_API_KEY}
+network = ["integrate.api.nvidia.com"]
 timeout = "10m"
 [models.providers.oc.env]
 OPENCODE_DISABLE_PROJECT_CONFIG = "1"   # only the configuration below applies
@@ -194,8 +197,10 @@ machine that wrote this, so `--skip-git-repo-check` and `-` rest on those docs a
 - **Workspace.** A scratch copy of the project (what version control keeps, with the run's accepted
   texts in place; the same copy `[fix] verify` uses). The command runs with it as its working
   directory under the process contract (no shell, own process group, `timeout`, output cap,
-  environment of `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR` plus `env` and `keyEnv`, project
-  trust). The copy is deleted when the run ends, on every path. stdout is kept for the notes only
+  environment of `PATH`, `USER`, `LOGNAME`, `LANG` plus `env` and `keyEnv`, project trust) and in
+  the [sandbox](architecture.md#sandbox): it writes only in the copy and in a `TMPDIR` and a `HOME`
+  (with `XDG_*`) of its own, which `env` may override, it cannot read the user's credentials, and it
+  reaches only the hosts the provider lists in `network`. The copy is deleted when the run ends, on every path. stdout is kept for the notes only
   (2 KB).
 - **What it may change.** Under the scope, the indexed text files of the report scope. A change to a
   file outside the report scope or one Lighthouse does not index, a file created or deleted, or a
@@ -205,6 +210,7 @@ machine that wrote this, so `--skip-git-repo-check` and `-` rest on those docs a
 - **Safety.** Trusted projects only. With a `keyEnv` the provider is remote; otherwise it is a local
   process, and the agent's own configuration decides where code is sent. Lighthouse writes nothing
   outside the scratch copy; the files are written by the fix run after verification, as for any fix.
+  An agent that logs in through a file in the home of the user does not find it in the home of its own: give it a `keyEnv`.
 
 ## Providers
 

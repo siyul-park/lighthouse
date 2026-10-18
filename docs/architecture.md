@@ -126,7 +126,7 @@ the shared repository, are the project's alone (`lighthouse.toml`, committed): `
 `extends`, `languages`, `overrides`, `generated`, `[fix]`, and per decision `level`, `options`,
 `generated` and `evaluation`. The keys that say how this machine computes and applies are the
 environment: `[models]` (bindings, `providers`, `routing`, `budget`, `explore`),
-`rules."<id>".classification` and `rules."<id>".edit`, and `[approval]`. They are read from four
+`rules."<id>".classification` and `rules."<id>".edit`, `[approval]` and `[sandbox]`. They are read from four
 layers, the later winning key by key:
 
 | Layer | File |
@@ -142,8 +142,8 @@ loading fails until it is untracked (`git rm --cached`). `config show` hides wha
 (the values of a provider's `env`, `options` and `extraBody`, and the userinfo and query of its
 `baseUrl`; the `command` is shown as written), and errors in a personal file give its line and key but
 never the text of the line. Trust covers the part of the personal files that can run a program or
-write without asking (a provider with a `command` and its `env`, and `[approval]`), not their budgets
-or bindings.
+write without asking (a provider with a `command`, its `env` and `network`, `[approval]` and `[sandbox]`),
+not their budgets or bindings.
 
 The user and the local file are bare TOML with the environment keys only
 ([environment.schema.json](../schema/environment.schema.json)); a meaning key in either is a load
@@ -182,7 +182,7 @@ one provider of the union `builtin | cel | command | model`, with the common fie
 - `cel` is an expression over the code model (UCM), written in the decision, with the standard function library `metrics callers owner tests rank exposed limit counted`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. `limit(node, max)` gives the value for the node's role, and `counted(node, n, what)` says it (`NewServer needs 9 parameters`, `parse has 9 parameters`).
-- `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR` and the declared `env` plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
+- `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command runs in the project root, [sandboxed](#sandbox), with an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR` (a directory of its own) and the declared `env` plus `LIGHTHOUSE_*`. Trust and the sandbox protect together; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
 - `model` asks the `classification` task of the model the project binds to the decision (`select` and `prompt` optional); a subject nothing decides stays a review task. It is not deterministic and caps the severity at `warn`.
 
 A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and judgments without ever expiring one.
@@ -682,6 +682,40 @@ annotation line) are suggested. An `impl` block is not a symbol, so
 reordering a Rust file cannot move one: such findings are declined and fixed by hand.
 `lighthouse check .` on this repository is clean, and `check --fix` brought it there.
 
+## Sandbox
+
+Every external program Lighthouse runs through `lighthouse_process::run` runs in an OS sandbox
+that no configuration of the program can loosen: Seatbelt (`sandbox-exec`) on macOS, bubblewrap
+on Linux. Plugin processes (`rpc`), the version-control calls of `session` and test support are
+outside it. The policy has the shape of Anthropic's sandbox-runtime:
+
+- **Reads** are allowed everywhere except a fixed list of secrets: `~/.ssh`, `~/.gnupg`, `~/.aws`,
+  `~/.azure`, `~/.config/gcloud`, `~/.kube`, `~/.docker/config.json`, `~/.config/gh`, `~/.netrc`,
+  `~/.git-credentials`, `~/.npmrc`, `~/.pypirc`, `~/Library/Keychains`, `~/.config/lighthouse`,
+  and in the project the `.env` files at its root and `.lighthouse/local.toml`.
+- **Writes** are allowed where the caller says: the scratch copy of a fix, formatter or verify run
+  and a `TMPDIR` of the run's own, deleted with it; the user's cache directory for checks and
+  verification, since linters keep their caches there. An agent also has a `HOME` and
+  `XDG_*` of its own, empty, unless its provider sets them, so it never sees the credentials or
+  settings of the user.
+- **Network** is off. A host-side HTTP proxy on the loopback lets through the hosts the project lists
+  in `[sandbox] network` (a command check or verify run) or a provider lists in its `network` (an
+  agent): `host`, `*.suffix` (below the suffix, not the suffix itself), each with an optional
+  `:port`. The program finds the proxy in `HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY`; a request to
+  another host is refused and the refusal added to the program's stderr. On Linux the namespace has
+  no network at all: `lighthouse internal bridge` (hidden) runs inside it, listens on the loopback
+  and relays to a Unix socket the host serves.
+- **Fail closed.** When the backend is missing or does not work (no `bwrap`, user namespaces
+  forbidden), the program is not run: a check leaves the analysis incomplete, a formatter or an agent
+  fails with "sandbox unavailable: <reason>; install bubblewrap, or set `[sandbox] enabled = false` in
+  a trusted project". It never falls back to an unsandboxed run.
+
+`[sandbox] enabled = false` is the one way out. It is an environment key, so it can come from any
+layer, and it needs a trusted project: in an untrusted one loading fails ("`[sandbox] enabled =
+false` needs a trusted project"), and every run of a project that has turned it off says "sandbox
+off: programs run with your full access". The trust covers `[sandbox]`, so a change to it in a
+personal file withdraws the trust like a new provider.
+
 ## Fixer spec
 
 The `fix:` block of a decision selects one fixer kind that compiles into a provider of the
@@ -712,7 +746,7 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 - [plugin](../crates/lighthouse-plugin/README.md): SPI and Registry.
 - [spec](../crates/lighthouse-spec/README.md): decision kinds, Catalog, local layer.
 - [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), [protocol](../crates/lighthouse-protocol/README.md): L0 vocabulary, resources and the wire; protocol also owns the hashes and folds that host and plugin must compute alike.
-- `process`: child-process helper (no README). `test-support`: dev-only helper of the test suites (no README).
+- `process`: child-process helper and the [sandbox](#sandbox) (no README). `test-support`: dev-only helper of the test suites (no README).
 - Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
 
 Each crate has one integration-test binary, `tests/it/main.rs` with a module per area.

@@ -66,7 +66,8 @@ spec:
   <https://github.com/golangci/golangci-lint/blob/main/pkg/commands/run.go>). Run with v2.12.2, a result has
   `ruleId` (the linter), `level`, `message.text`, a relative `uri` without `uriBaseId` and `startLine` /
   `startColumn` in bytes, with no `columnKind`; stdout holds only the log. It needs `HOME` or
-  `GOLANGCI_LINT_CACHE` and Go's caches, which the cleared environment of a command lacks.
+  `GOLANGCI_LINT_CACHE` and Go's caches, which the cleared environment of a command lacks. A check may write to the user's cache directory
+  and nowhere else outside the temporary directory of its run, so `GOLANGCI_LINT_CACHE` must point into it.
 - Clippy has no SARIF output of its own: `cargo clippy --message-format=json | clippy-sarif`
   (<https://github.com/psastras/sarif-rs>).
 - SARIF 2.1.0

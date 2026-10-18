@@ -58,7 +58,7 @@ fix:
   *Argv:* `{file}`, `{line}`, `{symbol}` and `{rule}` fill a whole argument each (no
   embedding, no `{root}`; a value starting with `-` is refused); the working directory is the
   scratch directory, and a symlink in the output is refused. *Environment:* cleared to
-  `PATH`, `HOME`, `LANG`, `TMPDIR`, plus the declared `env`, plus `LIGHTHOUSE_DECISION` (the
+  `PATH`, `HOME`, `LANG`, `TMPDIR` (a directory of the run's own), plus the declared `env`, plus `LIGHTHOUSE_DECISION` (the
   finding as JSON), `LIGHTHOUSE_OPTIONS` (the rule's options as JSON) and
   `LIGHTHOUSE_API_VERSION`. *Limits:* a timeout sends SIGTERM to the process group, then
   SIGKILL after a grace period, through the runner shared with the plugin host
