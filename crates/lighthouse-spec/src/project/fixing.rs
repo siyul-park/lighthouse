@@ -49,9 +49,9 @@ pub struct FixSpec {
     /// enables nothing by itself. Default: none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub decisions: Vec<String>,
-    /// The widest change a model's fix may make, for every decision: it
-    /// narrows the `scope` of a decision's fix and never widens it. Default:
-    /// `files`.
+    /// The widest change a model's fix may make, for every decision. A
+    /// decision that declares no `scope` has this one; one that declares a
+    /// `scope` is narrowed to it, never widened. Default: `files`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope: Option<FixScope>,
     /// Commands (argument lists, no shell) that must pass over the project

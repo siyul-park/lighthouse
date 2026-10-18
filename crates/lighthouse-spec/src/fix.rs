@@ -132,22 +132,25 @@ impl Fix {
 pub enum FixScope {
     /// Only inside the symbol of the finding (its extent): the symbol it is
     /// about, else the innermost one around it, else a short file as a whole.
-    #[default]
     Symbol,
-    /// Any file the analysis indexes in the run's scope.
+    /// Any file the analysis indexes in the run's scope. No limit of its own:
+    /// what a decision that declares no scope has.
+    #[default]
     Files,
 }
 
 impl FixScope {
-    /// The scope of the fix by a model of a decision whose `fix` is `fix`
-    /// (`symbol` unless it says more), narrowed to `cap`, the widest the
-    /// project allows.
+    /// The scope of the fix by a model of a decision whose `fix` is `fix`:
+    /// the `cap` of the project when the decision declares none (it imposes no
+    /// limit of its own), else the narrower of the two. Nobody widens.
     pub fn of_fix(fix: Option<&Fix>, cap: Self) -> Self {
-        let own = match fix.map(|f| &f.kind) {
-            Some(FixKind::Model { scope, .. }) => scope.unwrap_or_default(),
-            _ => Self::default(),
-        };
-        own.min(cap)
+        match fix.map(|f| &f.kind) {
+            Some(FixKind::Model {
+                scope: Some(declared),
+                ..
+            }) => (*declared).min(cap),
+            _ => cap,
+        }
     }
 }
 
@@ -177,8 +180,9 @@ pub enum FixKind {
         /// as how this decision is usually fixed.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         prompt: Option<String>,
-        /// How far the agent's change may go. Default: `symbol`. The
-        /// project's `[fix] scope` narrows it and never widens it.
+        /// How far the agent's change may go. Undeclared, the decision limits
+        /// nothing and the project's `[fix] scope` decides; declared, it
+        /// narrows that scope and the project never widens it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         scope: Option<FixScope>,
     },

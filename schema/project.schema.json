@@ -64,7 +64,7 @@
         },
         {
           "const": "files",
-          "description": "Any file the analysis indexes in the run's scope.",
+          "description": "Any file the analysis indexes in the run's scope. No limit of its own:\nwhat a decision that declares no scope has.",
           "type": "string"
         }
       ]
@@ -89,7 +89,7 @@
               "type": "null"
             }
           ],
-          "description": "The widest change a model's fix may make, for every decision: it\nnarrows the `scope` of a decision's fix and never widens it. Default:\n`files`."
+          "description": "The widest change a model's fix may make, for every decision. A\ndecision that declares no `scope` has this one; one that declares a\n`scope` is narrowed to it, never widened. Default: `files`."
         },
         "timeout": {
           "description": "How long each of those commands may run. Default: `10m`.",

@@ -504,7 +504,7 @@ fn a_share_to_explore_outside_zero_and_one_is_a_configuration_error() {
 }
 
 #[test]
-fn fix_scope_of_fix_is_the_decisions_own_scope_narrowed_to_the_projects() {
+fn fix_scope_of_fix_is_the_projects_cap_unless_the_decision_declares_a_narrower_scope() {
     let model = |scope| Fix {
         safety: Safety::Suggested,
         requires: Vec::new(),
@@ -514,7 +514,8 @@ fn fix_scope_of_fix_is_the_decisions_own_scope_narrowed_to_the_projects() {
         },
     };
 
-    assert_eq!(FixScope::of_fix(None, FixScope::Files), FixScope::Symbol);
+    assert_eq!(FixScope::of_fix(None, FixScope::Files), FixScope::Files);
+    assert_eq!(FixScope::of_fix(None, FixScope::Symbol), FixScope::Symbol);
     assert_eq!(
         FixScope::of_fix(Some(&model(Some(FixScope::Files))), FixScope::Files),
         FixScope::Files
@@ -525,6 +526,10 @@ fn fix_scope_of_fix_is_the_decisions_own_scope_narrowed_to_the_projects() {
     );
     assert_eq!(
         FixScope::of_fix(Some(&model(None)), FixScope::Files),
+        FixScope::Files
+    );
+    assert_eq!(
+        FixScope::of_fix(Some(&model(Some(FixScope::Symbol))), FixScope::Files),
         FixScope::Symbol
     );
 }

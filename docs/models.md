@@ -65,8 +65,8 @@ fix = "ask"                                        # default; "allow" writes a v
   (`*` within one segment of an id, matched against the whole id); one that matches no active
   decision is a warning naming it. A listed decision without a `fix` block has `fix: {type: model}`;
   a decision may say `fix: {type: model, prompt: "...", scope: symbol | files}` to add an
-  instruction and a scope (default `symbol`). The effective scope is the narrower of the decision's
-  and `[fix] scope`.
+  instruction and a scope. A decision that declares none imposes no limit of its own, so its scope is
+  `[fix] scope`; one that declares a scope is narrowed to `[fix] scope`, never widened by it.
 - **Edit or review, no router.** Where a finding gets a model fix it is `edit`; with no `edit` bound
   it stays a review task that carries the brief (MCP `review_show` returns it as `brief`, `review
   show` prints it under `brief:`) for whoever drives the session, and Lighthouse re-checks when they

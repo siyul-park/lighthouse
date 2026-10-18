@@ -130,7 +130,7 @@ fn a_change_outside_the_symbol_of_the_finding_is_out_of_scope() {
     let agent = format!(
         "{FIX_OWN_FILE}sed 's/fine/fine2/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n"
     );
-    let (dir, _agent) = with_agent(&agent, &listed("", ALLOW));
+    let (dir, _agent) = with_agent(&agent, &listed("scope = \"symbol\"\n", ALLOW));
     write(
         dir.path(),
         "src/lib.rs",
@@ -495,4 +495,20 @@ fn the_preview_of_an_edit_shows_the_text_the_safe_fixes_left() {
     let preview = fixed["previews"][0].to_string();
     assert!(preview.contains("aaa_helper"), "{preview}");
     assert!(!preview.contains("zzz_helper"), "{preview}");
+}
+
+#[test]
+fn a_decision_without_a_scope_leaves_the_cap_so_a_helper_may_be_added_beside_the_target() {
+    let agent = format!("{FIX_OWN_FILE}printf 'pub fn helper() {{}}\\n' >> src/lib.rs\n");
+    let (dir, _agent) = with_agent(&agent, &listed("", ALLOW));
+    write(dir.path(), "src/lib.rs", "pub fn bad_one() {}\n");
+
+    let fixed = fix(&dir, json!({}));
+
+    assert_eq!(
+        read(&dir, "src/lib.rs"),
+        "pub fn fixed_one() {}\npub fn helper() {}\n",
+        "{fixed}"
+    );
+    assert_eq!(fixed["models"][BAN]["applied"], 1, "{fixed}");
 }
