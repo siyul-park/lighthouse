@@ -64,9 +64,9 @@ pub struct ModelsSpec {
     /// by changing files: a headless agent run as a `command` without a
     /// `protocol`, in a scratch copy of the project. It makes the fixes of
     /// the decisions `[fix] decisions` lists, unless a rule binds its own
-    /// `edit`. A request moves to the next model of a route when one fails.
+    /// `agent`. A request moves to the next model of a route when one fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edit: Option<Names>,
+    pub agent: Option<Names>,
     /// Which model of a route a request starts at. Default: `ordered`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub routing: Option<Routing>,
@@ -122,7 +122,7 @@ pub struct Models {
     /// The project's route for decisions no rule binds.
     pub classification: Vec<String>,
     /// The project's route for the agent that fixes by editing files.
-    pub edit: Vec<String>,
+    pub agent: Vec<String>,
     /// Which model of a route a request starts at.
     pub routing: Routing,
     /// The providers the project defines, by name.
@@ -153,8 +153,8 @@ impl Models {
                 .as_ref()
                 .map(|names| names.iter().map(str::to_owned).collect())
                 .unwrap_or_default(),
-            edit: models
-                .edit
+            agent: models
+                .agent
                 .as_ref()
                 .map(|names| names.iter().map(str::to_owned).collect())
                 .unwrap_or_default(),
@@ -189,17 +189,17 @@ impl Models {
     }
 
     /// The route of the agent that fixes `rule` by editing files: what the
-    /// rule names, else the project's `edit`. Empty when no agent is bound.
-    pub fn edit_for(&self, rule: &str) -> &[String] {
+    /// rule names, else the project's `agent`. Empty when no agent is bound.
+    pub fn agent_for(&self, rule: &str) -> &[String] {
         self.rules
             .get(rule)
-            .and_then(|r| r.edit.as_deref())
-            .unwrap_or(&self.edit)
+            .and_then(|r| r.agent.as_deref())
+            .unwrap_or(&self.agent)
     }
 
     /// Whether any agent that edits is bound, to the project or to a rule.
-    pub fn binds_edit(&self) -> bool {
-        self.bindings().any(|(task, _)| task == Task::Edit)
+    pub fn binds_agent(&self) -> bool {
+        self.bindings().any(|(task, _)| task == Task::Agent)
     }
 
     /// The routes rules name, by decision id.
@@ -210,10 +210,10 @@ impl Models {
     }
 
     /// The routes of the agents rules name, by decision id.
-    pub fn edit_routes(&self) -> impl Iterator<Item = (&str, &[String])> {
+    pub fn agent_routes(&self) -> impl Iterator<Item = (&str, &[String])> {
         self.rules
             .iter()
-            .filter_map(|(id, rule)| Some((id.as_str(), rule.edit.as_deref()?)))
+            .filter_map(|(id, rule)| Some((id.as_str(), rule.agent.as_deref()?)))
     }
 
     /// Every model reference the project binds, with the task it binds it to.
@@ -224,15 +224,15 @@ impl Models {
                 .filter_map(|r| r.classification.as_ref())
                 .flatten(),
         );
-        let edit = self.edit.iter().chain(
+        let agent = self.agent.iter().chain(
             self.rules
                 .values()
-                .filter_map(|r| r.edit.as_ref())
+                .filter_map(|r| r.agent.as_ref())
                 .flatten(),
         );
         classification
             .map(|id| (Task::Classification, id.as_str()))
-            .chain(edit.map(|id| (Task::Edit, id.as_str())))
+            .chain(agent.map(|id| (Task::Agent, id.as_str())))
     }
 
     /// The evaluation policy of a rule: what the project sets, else the default.

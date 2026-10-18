@@ -3,9 +3,7 @@
 //! environment keys are the later layer's, key by key.
 
 use lighthouse_resource::Format;
-use lighthouse_spec::{
-    Approval, BUNDLED, Config, EnvironmentSpec, Layer, Layers, Models, Projects, Routing,
-};
+use lighthouse_spec::{BUNDLED, Config, EnvironmentSpec, Layer, Layers, Models, Projects, Routing};
 use serde_json::json;
 
 const PROJECT: &str = r#"
@@ -13,7 +11,7 @@ plugins = ["core"]
 
 [models]
 classification = "team/small"
-edit = "team/agent"
+agent = "team/agent"
 budget = 50
 
 [models.providers.team]
@@ -22,31 +20,31 @@ env = { TOKEN = "secret-token" }
 
 [models.providers.shared]
 protocol = "openai"
-baseUrl = "https://example.test/v1"
+url = "https://example.test/v1"
 
 [rules."design/complexity"]
 level = "warn"
-edit = "team/agent"
+agent = "team/agent"
 "#;
 
 const USER: &str = r#"
 [models]
-edit = "mine/agent"
+agent = "mine/agent"
 routing = "round-robin"
 
 [models.providers.team]
 command = ["my-agent"]
 
-[approval]
-fix = "allow"
+[fix]
+unsafe = true
 "#;
 
 const LOCAL: &str = r#"
 [models]
-edit = "local/agent"
+agent = "local/agent"
 
 [rules."design/complexity"]
-edit = "local/agent"
+agent = "local/agent"
 classification = ["a/one", "b/two"]
 "#;
 
@@ -91,14 +89,14 @@ fn a_meaning_key_in_a_personal_file_is_refused_naming_the_key_and_the_file() {
     }
     let message = refused(LOCAL_FILE, "[fix]\ndecisions = [\"design/*\"]\n");
     assert!(
-        message.contains("`fix`") && message.contains(LOCAL_FILE),
+        message.contains("`fix.decisions`") && message.contains(LOCAL_FILE),
         "{message}"
     );
 }
 
 #[test]
 fn a_meaning_key_of_a_rule_in_a_personal_file_is_refused_naming_the_key_and_the_file() {
-    for key in ["level", "options", "generated", "evaluation"] {
+    for key in ["level", "options", "generated", "safety", "evaluation"] {
         let text = format!("[rules.\"design/complexity\"]\n{key} = \"warn\"\n");
         let message = refused(USER_FILE, &text);
         assert!(
@@ -122,7 +120,7 @@ fn a_key_that_is_nobodys_is_refused_with_the_file() {
 fn the_later_layer_wins_key_by_key() {
     let bound = models(&[(USER_FILE, USER), (LOCAL_FILE, LOCAL)]);
 
-    assert_eq!(bound.edit, ["local/agent"], "local over user over project");
+    assert_eq!(bound.agent, ["local/agent"], "local over user over project");
     assert_eq!(bound.classification, ["team/small"], "nobody else set it");
     assert_eq!(bound.budget, 50, "the project's, kept");
     assert_eq!(bound.routing, Routing::RoundRobin, "the user's, kept");
@@ -130,10 +128,10 @@ fn the_later_layer_wins_key_by_key() {
 
 #[test]
 fn a_user_value_wins_over_the_project_and_loses_to_the_local_one() {
-    assert_eq!(models(&[(USER_FILE, USER)]).edit, ["mine/agent"]);
-    assert_eq!(models(&[(LOCAL_FILE, LOCAL)]).edit, ["local/agent"]);
+    assert_eq!(models(&[(USER_FILE, USER)]).agent, ["mine/agent"]);
+    assert_eq!(models(&[(LOCAL_FILE, LOCAL)]).agent, ["local/agent"]);
     assert_eq!(
-        models(&[(LOCAL_FILE, LOCAL), (USER_FILE, USER)]).edit,
+        models(&[(LOCAL_FILE, LOCAL), (USER_FILE, USER)]).agent,
         ["mine/agent"],
         "the order of the layers is what decides, not the kind of file"
     );
@@ -144,20 +142,27 @@ fn a_provider_is_replaced_whole_by_the_later_layer_and_the_others_stay() {
     let bound = models(&[(USER_FILE, USER)]);
 
     let team = bound.provider("team").unwrap();
-    let lighthouse_spec::ModelProvider::Command { argv, env, .. } = team else {
+    let lighthouse_spec::ModelProvider::Command { program, .. } = team else {
         panic!("a command provider");
     };
-    assert_eq!(argv, ["my-agent"]);
-    assert!(env.is_empty(), "the project's env went with its provider");
+    assert_eq!(program.command, ["my-agent"]);
+    assert!(
+        program.env.is_empty(),
+        "the project's env went with its provider"
+    );
     assert!(bound.provider("shared").is_some());
 }
 
 #[test]
-fn the_approval_is_the_later_layers() {
-    assert_eq!(layers(&[]).0.fix().approval, Approval::Ask);
-    assert_eq!(
-        layers(&[(USER_FILE, USER)]).0.fix().approval,
-        Approval::Allow
+fn unsafe_fixes_are_the_later_layers() {
+    assert!(!layers(&[]).0.fix().unsafe_fixes);
+    assert!(layers(&[(USER_FILE, USER)]).0.fix().unsafe_fixes);
+    let off = "[fix]\nunsafe = false\n";
+    assert!(
+        !layers(&[(USER_FILE, USER), (LOCAL_FILE, off)])
+            .0
+            .fix()
+            .unsafe_fixes
     );
 }
 
@@ -286,24 +291,24 @@ fn a_host_or_a_place_that_cannot_mean_what_it_says_is_refused_naming_the_file_an
 fn a_decision_binds_its_own_agent_over_the_projects_and_over_the_models_one() {
     let bound = models(&[(LOCAL_FILE, LOCAL)]);
 
-    assert_eq!(bound.edit_for("design/complexity"), ["local/agent"]);
+    assert_eq!(bound.agent_for("design/complexity"), ["local/agent"]);
     assert_eq!(
-        bound.edit_for("design/other"),
+        bound.agent_for("design/other"),
         ["local/agent"],
-        "the models edit"
+        "the models agent"
     );
     assert_eq!(
         bound.route("design/complexity").unwrap(),
         ["a/one", "b/two"]
     );
     let project_only = models(&[]);
-    assert_eq!(project_only.edit_for("design/complexity"), ["team/agent"]);
-    assert_eq!(project_only.edit_for("design/other"), ["team/agent"]);
+    assert_eq!(project_only.agent_for("design/complexity"), ["team/agent"]);
+    assert_eq!(project_only.agent_for("design/other"), ["team/agent"]);
 }
 
 #[test]
 fn a_personal_binding_of_a_decision_the_project_does_not_list_enables_nothing() {
-    let local = "[rules.\"design/other\"]\nedit = \"local/agent\"\n";
+    let local = "[rules.\"design/other\"]\nagent = \"local/agent\"\n";
     let (config, _) = layers(&[(LOCAL_FILE, local)]);
     let projects = Projects::default();
 
@@ -312,7 +317,7 @@ fn a_personal_binding_of_a_decision_the_project_does_not_list_enables_nothing() 
         .resolve(std::path::Path::new(""), "", &projects)
         .unwrap();
 
-    assert_eq!(bound.edit_for("design/other"), ["local/agent"]);
+    assert_eq!(bound.agent_for("design/other"), ["local/agent"]);
     assert!(
         active
             .get("design/other")
@@ -326,11 +331,11 @@ fn every_agent_a_decision_binds_is_a_binding_to_check() {
 
     let edits: Vec<_> = bound
         .bindings()
-        .filter(|(task, _)| *task == lighthouse_spec::Task::Edit)
+        .filter(|(task, _)| *task == lighthouse_spec::Task::Agent)
         .map(|(_, reference)| reference)
         .collect();
 
-    assert!(bound.binds_edit());
+    assert!(bound.binds_agent());
     assert_eq!(edits, ["local/agent", "local/agent"]);
 }
 
@@ -344,7 +349,7 @@ fn without_personal_files_the_configuration_is_the_projects() {
         config.models(&projects).unwrap(),
         plain.models(&projects).unwrap()
     );
-    assert_eq!(config.fix().approval, plain.fix().approval);
+    assert_eq!(config.fix().unsafe_fixes, plain.fix().unsafe_fixes);
     assert!(
         stack
             .entries()
@@ -368,13 +373,13 @@ fn each_entry_names_the_layer_its_value_comes_from() {
     assert_eq!(origin("models.explore"), (BUNDLED, json!(0.05)));
     assert_eq!(origin("models.budget"), ("lighthouse.toml", json!(50)));
     assert_eq!(origin("models.classification").0, "lighthouse.toml");
-    assert_eq!(origin("models.edit"), (LOCAL_FILE, json!("local/agent")));
+    assert_eq!(origin("models.agent"), (LOCAL_FILE, json!("local/agent")));
     assert_eq!(origin("models.routing"), (USER_FILE, json!("round-robin")));
-    assert_eq!(origin("approval.fix"), (USER_FILE, json!("allow")));
+    assert_eq!(origin("fix.unsafe"), (USER_FILE, json!(true)));
     assert_eq!(origin("models.providers.shared").0, "lighthouse.toml");
     assert_eq!(origin("models.providers.team").0, USER_FILE);
     assert_eq!(
-        origin("rules.\"design/complexity\".edit"),
+        origin("rules.\"design/complexity\".agent"),
         (LOCAL_FILE, json!("local/agent"))
     );
     assert_eq!(
@@ -415,7 +420,7 @@ fn the_defaults_are_the_bundled_layer() {
     assert_eq!(
         bundled,
         [
-            "approval.fix",
+            "fix.unsafe",
             "models.budget",
             "models.explore",
             "models.routing",
@@ -430,13 +435,13 @@ fn the_defaults_are_the_bundled_layer() {
 fn the_environment_file_is_the_spec_without_an_envelope() {
     let spec = EnvironmentSpec::parse(USER_FILE, USER).unwrap();
 
-    assert_eq!(spec.approval.fix, Some(Approval::Allow));
+    assert_eq!(spec.fix.unsafe_fixes, Some(true));
     assert!(spec.models.providers.contains_key("team"));
 }
 
 #[test]
 fn a_model_binding_inside_an_override_is_a_load_error_naming_the_override_and_the_key() {
-    for task in ["edit", "classification"] {
+    for task in ["agent", "classification"] {
         let text = document(&format!(
             "plugins = [\"core\"]\n[[overrides]]\nfiles = [\"src/**\"]\n[overrides.rules.\"design/complexity\"]\nlevel = \"warn\"\n{task} = \"a/one\"\n"
         ));
@@ -466,8 +471,9 @@ fn an_override_without_a_binding_is_what_it_was() {
 const PROVIDERS: &str = r#"
 [models.providers.http]
 protocol = "openai"
-baseUrl = "https://user:pass@api.example.test:8443/v1/chat?key=sk-secret#frag"
-extraBody = { api_key = "sk-body", n = 2 }
+url = "https://user:pass@api.example.test:8443/v1/chat?key=sk-secret#frag"
+headers = { Authorization = "Bearer sk-header" }
+body = { api_key = "sk-body", n = 2 }
 
 [models.providers.rpc]
 plugin = "fake-model"
@@ -491,8 +497,9 @@ fn shown(key: &str) -> serde_json::Value {
 #[test]
 fn what_may_carry_a_secret_is_not_shown() {
     let http = shown("models.providers.http");
-    assert_eq!(http["baseUrl"], "https://api.example.test:8443/v1/chat");
-    assert_eq!(http["extraBody"], json!({"api_key": "***", "n": "***"}));
+    assert_eq!(http["url"], "https://api.example.test:8443/v1/chat");
+    assert_eq!(http["headers"], json!({"Authorization": "***"}));
+    assert_eq!(http["body"], json!({"api_key": "***", "n": "***"}));
 
     let rpc = shown("models.providers.rpc");
     assert_eq!(rpc["options"], json!({"token": "***"}));
@@ -507,7 +514,14 @@ fn what_may_carry_a_secret_is_not_shown() {
         .iter()
         .map(ToString::to_string)
         .collect::<String>();
-    for secret in ["sk-secret", "sk-body", "sk-option", "sk-env", "user:pass"] {
+    for secret in [
+        "sk-secret",
+        "sk-body",
+        "sk-header",
+        "sk-option",
+        "sk-env",
+        "user:pass",
+    ] {
         assert!(!all.contains(secret), "{secret} in {all}");
     }
 }
@@ -533,7 +547,7 @@ fn an_error_in_a_personal_file_names_the_line_and_the_key_and_not_the_value() {
             "",
             "duplicate",
         ),
-        ("[models]\nedit = \"sk-secret-4\n", ":2", "edit", ""),
+        ("[models]\nagent = \"sk-secret-4\n", ":2", "agent", ""),
     ];
     for (text, line, key, what) in cases {
         let message = refused(USER_FILE, text);
@@ -555,7 +569,7 @@ fn a_value_that_cannot_work_is_refused_with_the_file_the_line_and_the_key() {
 
     let provider = refused(
         USER_FILE,
-        "# mine\n[models.providers.both]\ncommand = [\"x\"]\nbaseUrl = \"https://u:pw-secret@h\"\n",
+        "# mine\n[models.providers.both]\ncommand = [\"x\"]\nurl = \"https://u:pw-secret@h\"\n",
     );
     assert!(
         provider.contains(&format!("{USER_FILE}:2"))

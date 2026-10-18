@@ -1,38 +1,5 @@
 {
   "$defs": {
-    "Approval": {
-      "description": "Whether a fix a model proposed and the checks accepted is written.",
-      "oneOf": [
-        {
-          "const": "ask",
-          "description": "Reported with its diff (previewed) and left for a hand to apply.",
-          "type": "string"
-        },
-        {
-          "const": "allow",
-          "description": "Written (applied) like any other applied fix, without `--unsafe-fixes`.",
-          "type": "string"
-        }
-      ]
-    },
-    "ApprovalSpec": {
-      "additionalProperties": false,
-      "description": "The `approval` table of a project: what happens without a person's hand.",
-      "properties": {
-        "fix": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Approval"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "What becomes of a verified fix by a model. Default: `ask`."
-        }
-      },
-      "type": "object"
-    },
     "Evaluation": {
       "additionalProperties": false,
       "description": "How a rule's check is judged by `lighthouse eval`. A policy, not a\nmeaning: changing it moves no meaning version.",
@@ -55,7 +22,7 @@
       "type": "object"
     },
     "FixScope": {
-      "description": "How far the change of a fix by a model may go, which the verifier checks.\nOrdered from the narrowest.",
+      "description": "How far the change of a fix may go, which the verifier checks. Ordered\nfrom the narrowest.",
       "oneOf": [
         {
           "const": "symbol",
@@ -63,8 +30,13 @@
           "type": "string"
         },
         {
+          "const": "file",
+          "description": "Only the file of the finding. What a fix by a command has when it\ndeclares no scope.",
+          "type": "string"
+        },
+        {
           "const": "files",
-          "description": "Any file the analysis indexes in the run's scope. No limit of its own:\nwhat a decision that declares no scope has.",
+          "description": "Any file the analysis indexes in the run's scope. No limit of its own:\nwhat a fix by a model that declares no scope has.",
           "type": "string"
         }
       ]
@@ -74,7 +46,7 @@
       "description": "The `fix` table of a project.",
       "properties": {
         "decisions": {
-          "description": "The decisions a model may fix, as ids or globs over them (`*` within\none segment of an id): `[\"design/exported-doc\", \"testing/*\"]`. Only a\ndecision with a check and no fix of its own (`ops`, `command`) is\nfixed, and only by the agent `[models] edit` binds; binding a model\nenables nothing by itself. Default: none.",
+          "description": "The decisions a model may fix, as ids or globs over them (`*` within\none segment of an id): `[\"design/exported-doc\", \"testing/*\"]`. Only a\ndecision with a check and no fix of its own (`ops`, `command`) is\nfixed, and only by the agent `[models] agent` binds; binding a model\nenables nothing by itself. Default: none.",
           "items": {
             "type": "string"
           },
@@ -89,72 +61,24 @@
               "type": "null"
             }
           ],
-          "description": "The widest change a model's fix may make, for every decision. A\ndecision that declares no `scope` has this one; one that declares a\n`scope` is narrowed to it, never widened. Default: `files`."
+          "description": "The widest change a fix by a model may make, for every decision. A\ndecision that declares no `scope` has this one; one that declares a\n`scope` is narrowed to it, never widened. Default: `files`."
         },
-        "timeout": {
-          "description": "How long each of those commands may run. Default: `10m`.",
+        "unsafe": {
+          "description": "Whether a fix that is not safe (one by a model among them) is written\nwhen its result is verified, as `--unsafe-fixes` does for one run;\notherwise it is reported with its diff and left for a hand to apply.\nA user's file may set it. `--no-unsafe-fixes` turns it off for a run.\nDefault: `false`.",
           "type": [
-            "string",
+            "boolean",
             "null"
           ]
         },
         "verify": {
-          "description": "Commands (argument lists, no shell) that must pass over the project\nwith the fixes by models in place, such as its tests. They run once\nper fix run, after its rounds, on a scratch copy of the project, and\nonly in a trusted project. If one fails, every fix by a model of the\nrun is withdrawn to a preview.",
+          "description": "Programs that must pass over the project with the fixes by models in\nplace, such as its tests: a command line, or a table with a `command`,\na `timeout` (default `10m`) and the rest of a program. They run once\nper fix run, after its rounds, on a scratch copy of the project, and\nonly in a trusted project. A program that fails (its `output` is\n`status` unless it says `lines`) withdraws every fix by a model of the\nrun to a preview.",
           "items": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
+            "$ref": "#/$defs/ProgramSpec"
           },
           "type": "array"
         }
       },
       "type": "object"
-    },
-    "Formatter": {
-      "additionalProperties": false,
-      "description": "The command that formats a file of a language, by the command contract of\nfixes: exit `0` succeeds, stdout carries only the result, stderr is for\npeople.",
-      "properties": {
-        "argv": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "env": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Extra environment variables; the rest is cleared to an allowlist.",
-          "type": "object"
-        },
-        "output": {
-          "$ref": "#/$defs/Output",
-          "default": "in-place"
-        },
-        "stdin": {
-          "$ref": "#/$defs/Stdin",
-          "default": "none"
-        }
-      },
-      "required": [
-        "argv"
-      ],
-      "type": "object"
-    },
-    "FormatterSpec": {
-      "anyOf": [
-        {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        {
-          "$ref": "#/$defs/Formatter"
-        }
-      ],
-      "description": "How a formatter is written: `[gofmt, -w]` is the short form (scratch copy,\npath appended)."
     },
     "GeneratedCheck": {
       "description": "Whether decisions check generated code.",
@@ -238,6 +162,17 @@
       "additionalProperties": false,
       "description": "The `models` table of a project: its bindings and limits, and its own\nproviders.",
       "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. It makes the fixes of\nthe decisions `[fix] decisions` lists, unless a rule binds its own\n`agent`. A request moves to the next model of a route when one fails."
+        },
         "budget": {
           "description": "Requests a run may send to models that cost something; the subjects\nof the rest are left to review. Default: 200.",
           "format": "uint",
@@ -257,17 +192,6 @@
             }
           ],
           "description": "The model (`<provider>/<model>`), or the route of several, that judges\na decision no rule binds and no trained model is attached to. A request\nmoves to the next model of a route when one fails. When the route\nabstains, the subject is left to agent review."
-        },
-        "edit": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Names"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. It makes the fixes of\nthe decisions `[fix] decisions` lists, unless a rule binds its own\n`edit`. A request moves to the next model of a route when one fails."
         },
         "explore": {
           "description": "The share, from 0 to 1, of the subjects an attached model fails that are\nsent on to the next layer as if it had abstained, so that labels keep\ncoming from where the model is surest. The same subjects every run.\nDefault: 0.05.",
@@ -313,16 +237,31 @@
       "description": "One name or several, in the order written: the protocols a provider speaks\n(each operation uses the one that covers it: classification `typesafe`,\nelse `openai`), or the models of a route."
     },
     "Output": {
-      "description": "Where a command that fixes or formats a file leaves the new text.",
+      "description": "What a program prints, which decides what its result is. A program has one\nof two results: findings (`lines`, `sarif`, `status`) or changes (`files`,\n`stdout`).",
       "oneOf": [
         {
-          "const": "in-place",
-          "description": "In the scratch copy of the file, which is appended to `argv` (or fills\nan `{file}` argument).",
+          "const": "lines",
+          "description": "One finding per line of stdout; a leading `path:line[:col]: ` places it,\nand a line that is only a path of the project places it at line 1 of\nthat file, with the decision's title as the message.",
           "type": "string"
         },
         {
-          "const": "text",
-          "description": "On stdout, which carries only the text.",
+          "const": "sarif",
+          "description": "A SARIF 2.1.0 log: one finding per result.",
+          "type": "string"
+        },
+        {
+          "const": "status",
+          "description": "One finding when the exit code is not in `success`, with the tail of\nstderr or stdout as its message.",
+          "type": "string"
+        },
+        {
+          "const": "files",
+          "description": "The files the program changed in its scratch copy of the project.",
+          "type": "string"
+        },
+        {
+          "const": "stdout",
+          "description": "The new text of `{file}`, on stdout.",
           "type": "string"
         }
       ]
@@ -390,6 +329,20 @@
       ],
       "type": "object"
     },
+    "ProgramSpec": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "$ref": "#/$defs/program"
+        }
+      ],
+      "description": "A program as a list of arguments (a program with only a `command`) or as\na table: the form where either is accepted, such as the programs of\n`[fix] verify`."
+    },
     "ProjectLanguage": {
       "additionalProperties": true,
       "description": "The options of one language.",
@@ -403,17 +356,6 @@
             "array",
             "null"
           ]
-        },
-        "formatter": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FormatterSpec"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The command that formats a file of the language after a fix."
         }
       },
       "type": "object"
@@ -422,10 +364,6 @@
       "additionalProperties": false,
       "description": "A project's configuration, and the shape of a shareable one: `extends`\nnames any project, the way an ESLint config extends a shareable config.\nAn extended project contributes its `extends`, `rules` and `overrides`.\nIts `plugins` and `languages` belong to the project that is run.",
       "properties": {
-        "approval": {
-          "$ref": "#/$defs/ApprovalSpec",
-          "description": "What happens to a fix by a model without a person's hand."
-        },
         "extends": {
           "description": "Projects whose rules apply first, in order: the `recommended` and\n`strict` projects of each pack (`core/recommended`), or any `Project`\ndocument of the catalog.",
           "items": {
@@ -435,7 +373,7 @@
         },
         "fix": {
           "$ref": "#/$defs/FixSpec",
-          "description": "How fixes by models are checked beyond the rules."
+          "description": "What fixes may do, and how fixes by models are checked beyond the rules."
         },
         "generated": {
           "$ref": "#/$defs/GeneratedSpec",
@@ -445,7 +383,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/ProjectLanguage"
           },
-          "description": "Options per language id; `formatter` is the host's, the rest goes to\nthe language's provider.",
+          "description": "Options per language id; `constructorPrefixes` is the host's, the rest\ngoes to the language's provider.",
           "type": "object"
         },
         "models": {
@@ -482,17 +420,18 @@
     },
     "ProviderSpec": {
       "additionalProperties": false,
-      "description": "A provider of models as the project writes it, under\n`[models.providers.<name>]`. A model is named `<provider>/<model>`.\n\nA provider is reached by exactly one of `baseUrl` (HTTP), `command` (a\nstdio process) and `plugin` (an rpc plugin); the only exception is a\n`protocol` of `openai` or `typesafe` alone, which is HTTP at that\nprotocol's own service. Fields that belong to one reach are refused on the\nothers.",
+      "description": "A provider of models as the project writes it, under\n`[models.providers.<name>]`. A model is named `<provider>/<model>`.\n\nA provider is reached by exactly one of `url` (HTTP), `command` (a stdio\nprocess) and `plugin` (an rpc plugin); the only exception is a `protocol`\nof `openai` or `typesafe` alone, which is HTTP at that protocol's own\nservice. Fields that belong to one reach are refused on the others.",
       "properties": {
-        "baseUrl": {
-          "description": "The reach over HTTP: where requests go.",
+        "body": {
+          "additionalProperties": true,
+          "description": "HTTP only: a JSON object merged shallowly into every request body, its\nkeys overriding the body's own (the OpenAI SDK's `extra_body`).",
           "type": [
-            "string",
+            "object",
             "null"
           ]
         },
         "command": {
-          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer. Without a\n`protocol` the prompt is plain text on stdin and the program serves\n`edit`: it runs in a scratch copy of the project and changes the files\nthere.",
+          "description": "The reach as a stdio process under the process contract of a program\n(see `docs/programs.md`): no shell, its own process group, a time\nlimit, a cap on output, the one environment plus the declared `env`,\nand the project's trust. `{model}` stands for the model part of the\nreference. An answer that does not fit the protocol's shape is no\nanswer. Without a `protocol` the prompt is plain text on stdin and the\nprogram serves `agent`: it runs in a scratch copy of the project and\nchanges the files there.",
           "items": {
             "type": "string"
           },
@@ -513,30 +452,15 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "`command` only: variables the program is given besides the allowlist.",
+          "description": "`command` only: variables the program is given besides the allowlist;\na value may hold `${NAME}` (see `headers`), which is how a key reaches\nthe program.",
           "type": "object"
         },
-        "extraBody": {
-          "additionalProperties": true,
-          "description": "HTTP only: a JSON object merged shallowly into every request body, its\nkeys overriding the body's own (the OpenAI SDK's `extra_body`).",
-          "type": [
-            "object",
-            "null"
-          ]
-        },
-        "keyEnv": {
-          "description": "The environment variable that holds the key: sent as the bearer of an\nHTTP request, or passed through to a `command`; none for a service that\nneeds no key. Default at a protocol's own service: that protocol's.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "network": {
-          "description": "`command` only: the hosts the program may reach, through the proxy of\nthe run: a name, or `*.suffix` for every host below it, either with\n`:port`. The program runs in the OS sandbox, which reaches nothing\nelse. Default: none.",
-          "items": {
+        "headers": {
+          "additionalProperties": {
             "type": "string"
           },
-          "type": "array"
+          "description": "HTTP only: headers sent with every request. A value may hold\n`${NAME}`, the user's variable `NAME`, which is never written into a\nnote, a log or a cache key; a variable that is not set fails the\nrequest, naming it. Default at a protocol's own service:\n`Authorization: Bearer ${OPENAI_API_KEY}` (`${TYPESAFE_API_KEY}`).",
+          "type": "object"
         },
         "options": {
           "additionalProperties": true,
@@ -566,10 +490,28 @@
               "type": "null"
             }
           ],
-          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification),\nor plain text without a `protocol` (it serves `edit`); a `plugin` must\nnot name one: its handshake says what it serves."
+          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `url`. A `command` speaks `typesafe` (it serves classification),\nor plain text without a `protocol` (it serves `agent`); a `plugin` must\nnot name one: its handshake says what it serves."
+        },
+        "sandbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sandbox"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`command` only: what the program may reach besides the project's\n`[sandbox]`. A provider whose `sandbox.network` lists a host is remote."
         },
         "timeout": {
-          "description": "How long one request may take, such as `90s`: a run of a `command`\n(default 120s, 10m for `edit`) or an HTTP request of a `baseUrl`\nprovider (default 120s; reasoning models may need `10m`). A `plugin`\nprovider has none: a plugin is not told one.",
+          "description": "How long one request may take, such as `90s`: a run of a `command`\n(default 2m, 10m for `agent`) or an HTTP request of a `url` provider\n(default 2m; reasoning models may need `10m`). A `plugin` provider has\nnone: a plugin is not told one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "description": "The reach over HTTP: where requests go.",
           "type": [
             "string",
             "null"
@@ -597,6 +539,17 @@
       "additionalProperties": false,
       "description": "A level with options.",
       "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The agent, or the route of several, that fixes this decision by\nediting files, before the project's `models.agent`. Findings bound to\ndifferent agents in one file are fixed by one run each."
+        },
         "classification": {
           "anyOf": [
             {
@@ -607,17 +560,6 @@
             }
           ],
           "description": "The model, or the route of several, that judges this decision, before\nthe project's `models.classification`. When it abstains, the subject is\nleft to agent review."
-        },
-        "edit": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Names"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The agent, or the route of several, that fixes this decision by\nediting files, before the project's `models.edit`. Findings bound to\ndifferent agents in one file are fixed by one run each."
         },
         "evaluation": {
           "anyOf": [
@@ -644,6 +586,17 @@
           "additionalProperties": true,
           "description": "The decision's options, as its own schema declares them.",
           "type": "object"
+        },
+        "safety": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Safety"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The safety of every fix of this decision, applied last: `safe` writes\nthem with `--fix` (trust the agent here), `unsafe` previews them\nuntil `--unsafe-fixes`. Where layers disagree, `unsafe` wins."
         }
       },
       "required": [
@@ -661,6 +614,42 @@
         }
       ],
       "description": "How a rule is written in a spec: `warn`, `off`, or\n`{ level: warn, options: { max: 10 } }`."
+    },
+    "Safety": {
+      "description": "How much a proposed fix may be trusted to keep the program's meaning.",
+      "oneOf": [
+        {
+          "const": "safe",
+          "description": "Mechanical and meaning-preserving: written by `--fix`.",
+          "type": "string"
+        },
+        {
+          "const": "unsafe",
+          "description": "Probably right but a judgment call: written only when the project allows\nit or the run asks for unsafe fixes, else previewed.",
+          "type": "string"
+        }
+      ]
+    },
+    "Sandbox": {
+      "additionalProperties": false,
+      "description": "What a program may reach besides what the project's `[sandbox]` lets every\nprogram reach: its lists are added to the project's.",
+      "properties": {
+        "network": {
+          "description": "Hosts the program may reach, through the proxy of the run: a name, or\n`*.suffix` for every host below it, either with `:port`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "write": {
+          "description": "Places besides its own that it may write: paths below the project, or\nbelow the home directory with `~/` in front. Never a secret.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
     },
     "SandboxSpec": {
       "additionalProperties": false,
@@ -696,8 +685,60 @@
       },
       "type": "object"
     },
+    "Sarif": {
+      "additionalProperties": false,
+      "description": "How a SARIF log is read, under SARIF's own names. A result must pass both\nlists.",
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SarifColumns"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The unit the program counts columns in, when its log does not say or\nsays wrongly. Default: the log's `columnKind`, else `utf16CodeUnits`."
+        },
+        "levels": {
+          "description": "SARIF `level`s to keep: `error`, `warning`, `note` or `none`; a result\nwithout a level is a `warning`. Default: every level.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rules": {
+          "description": "Globs over the result's `ruleId`, such as `errcheck` or `govet:*`: `*`\nis any run of characters inside one segment, segments being separated\nby `/` or `::`, and `**` is any number of segments, as in module path\nglobs. Default: every rule.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "SarifColumns": {
+      "description": "The unit a SARIF log counts columns in (`columnKind`, plus the bytes that\ntools such as golangci-lint count without saying so).",
+      "oneOf": [
+        {
+          "const": "utf16CodeUnits",
+          "description": "UTF-16 code units.",
+          "type": "string"
+        },
+        {
+          "const": "unicodeCodePoints",
+          "description": "Unicode code points.",
+          "type": "string"
+        },
+        {
+          "const": "bytes",
+          "description": "Bytes.",
+          "type": "string"
+        }
+      ]
+    },
     "Stdin": {
-      "description": "What a command that checks, fixes or formats a file is given on stdin.",
+      "description": "What a program is given on stdin.",
       "oneOf": [
         {
           "enum": [
@@ -707,10 +748,88 @@
         },
         {
           "const": "file",
-          "description": "The text of the file.",
+          "description": "The text of `{file}`.",
           "type": "string"
         }
       ]
+    },
+    "program": {
+      "description": "A program as the files write it. Where a program is a table of its own\n(a `check` or a `fix`), its fields stand beside the others.",
+      "properties": {
+        "command": {
+          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables the program is given besides the one allowlist. A value may\nhold `${NAME}`, the user's variable `NAME`, which is never written\ninto a command line, a note, a log or a cache key; a variable that is\nnot set fails the run, naming it.",
+          "type": "object"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Output"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What it prints, which decides the result. Default: `lines` for a\ncheck, `files` for a fix, `status` for a `[fix] verify` program."
+        },
+        "sandbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sandbox"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What it may reach besides the project's `[sandbox]`."
+        },
+        "sarif": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sarif"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How a SARIF log is read; only with `output: sarif`."
+        },
+        "stdin": {
+          "$ref": "#/$defs/Stdin",
+          "description": "What it reads on stdin: nothing, or the text of `{file}`."
+        },
+        "success": {
+          "description": "The exit codes that mean the program ran; any other code, a signal or\na timeout is an error. Default: `[0, 1]` for `lines` and `sarif`\n(linters exit 1 with findings), `[0]` otherwise.",
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "timeout": {
+          "description": "How long it may run, such as `30s` or `2m`. Default: `2m`; `10m` for\nan agent and for a `[fix] verify` program.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/project.schema.json",

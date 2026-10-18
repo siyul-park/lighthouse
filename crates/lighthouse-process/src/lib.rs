@@ -7,10 +7,12 @@
 //! processes of `lighthouse-rpc` (Lighthouse's own binaries), the version
 //! control calls of `lighthouse-session`, and test support.
 
-mod format;
+mod copy;
+mod program;
 mod sandbox;
 
-pub use format::Formatter;
+pub use copy::{clone_file, copy_project};
+pub use program::{Environment, Home, Job, context, expand, expand_value, referenced, variables};
 /// Whether sandboxed programs can run on this machine, and if not, why.
 pub use sandbox::available as sandbox_available;
 pub use sandbox::{
@@ -20,8 +22,6 @@ pub use sandbox::{
 };
 
 use sandbox::{Started, ended, runnable, wrap};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::{
     io::{self, Read, Write},
     path::Path,
@@ -39,33 +39,11 @@ const POLL: Duration = Duration::from_millis(10);
 /// How long the output of a program that has exited is waited for.
 const DRAIN: Duration = Duration::from_millis(500);
 
-/// What a fixer or formatter may print on each of stdout and stderr.
+/// What a program may print on each of stdout and stderr.
 pub const MAX_OUTPUT: usize = 1 << 20;
 /// How long a program that was asked to stop may take to do so before it is
 /// killed, unless the caller says otherwise.
 pub const GRACE: Duration = Duration::from_secs(2);
-
-/// What a command that checks, fixes or formats a file is given on stdin.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Stdin {
-    #[default]
-    None,
-    /// The text of the file.
-    File,
-}
-
-/// Where a command that fixes or formats a file leaves the new text.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Output {
-    /// In the scratch copy of the file, which is appended to `argv` (or fills
-    /// an `{file}` argument).
-    #[default]
-    InPlace,
-    /// On stdout, which carries only the text.
-    Text,
-}
 
 /// What a finished program left behind.
 #[derive(Debug)]

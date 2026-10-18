@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use lighthouse_model::{ColumnUnit, Diagnostic, Position, Span, Suppression, byte_position};
 use lighthouse_plugin::{Context, RuleManifest};
-use lighthouse_spec::{SarifColumns, SarifSelect};
+use lighthouse_spec::{Sarif, SarifColumns};
 
 use crate::glob::slashed;
 use serde_json::{Map, Value, json};
@@ -30,10 +30,12 @@ const DEFAULT_LEVEL: &str = "warning";
 /// A SARIF log being read for one rule.
 pub(super) struct Reading<'a> {
     pub ctx: &'a Context<'a>,
+    /// Where the program ran: the project, or its copy with overlays.
+    pub root: &'a Path,
     pub meta: &'a RuleManifest,
-    pub select: Option<&'a SarifSelect>,
-    /// The decision's column unit, which wins over the log's `columnKind`.
-    pub columns: Option<SarifColumns>,
+    /// How the program's log is read; its column unit wins over the log's
+    /// `columnKind`.
+    pub sarif: Option<&'a Sarif>,
     /// The exit code said the program found something.
     pub found: bool,
 }
@@ -81,16 +83,15 @@ impl Reading<'_> {
         Ok(found)
     }
 
-    /// Whether the decision's `select` lets the result through.
+    /// Whether the program's `sarif` options let the result through.
     fn selected(&self, run: &Run, result: &SarifResult) -> bool {
-        let Some(select) = self.select else {
+        let Some(sarif) = self.sarif else {
             return true;
         };
         let id = rule_id(run, result);
         let level = result.level.as_deref().unwrap_or(DEFAULT_LEVEL);
-        let by_rule =
-            select.rule_ids.is_empty() || select.rule_ids.iter().any(|g| glob::matches(&id, g));
-        let by_level = select.levels.is_empty() || select.levels.iter().any(|l| l == level);
+        let by_rule = sarif.rules.is_empty() || sarif.rules.iter().any(|g| glob::matches(&id, g));
+        let by_level = sarif.levels.is_empty() || sarif.levels.iter().any(|l| l == level);
         by_rule && by_level
     }
 
@@ -130,7 +131,7 @@ impl Reading<'_> {
         let Some(path) = place::path_of(location, &run.original_uri_base_ids) else {
             return Location::Project;
         };
-        let path = place::relative(&path, &self.ctx.workspace.root);
+        let path = place::relative(&path, self.root);
         if self.ctx.project.file(&path).is_none() {
             tally.left_out(&path);
             return Location::Outside;
@@ -163,7 +164,10 @@ impl Reading<'_> {
     /// The unit columns are counted in: the decision's, else the log's, else
     /// UTF-16 code units, which SARIF's own `columnKind` names first.
     fn unit(&self, run: &Run) -> ColumnUnit {
-        match (self.columns, run.column_kind.as_deref()) {
+        match (
+            self.sarif.and_then(|sarif| sarif.columns),
+            run.column_kind.as_deref(),
+        ) {
             (Some(SarifColumns::Bytes), _) => ColumnUnit::Bytes,
             (Some(SarifColumns::UnicodeCodePoints), _) | (None, Some("unicodeCodePoints")) => {
                 ColumnUnit::CodePoints

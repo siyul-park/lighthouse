@@ -56,7 +56,7 @@ fn local(dir: &TempDir, text: &str) {
 fn surveyed(port: u16) -> (TempDir, TempDir) {
     let script = SURVEY.replace("$PORT", &port.to_string());
     let dir = project(&decision(&format!(
-        "  check:\n    type: command\n    argv: [sh, -c, {script:?}, sh, \"{{file}}\"]\n"
+        "  check:\n    type: command\n    command: [sh, -c, {script:?}, sh, \"{{file}}\"]\n"
     )));
     write(
         dir.path(),
@@ -160,7 +160,7 @@ fn without_a_home_a_sandboxed_program_is_not_run_for_the_secrets_cannot_be_locat
 fn a_check_writes_a_place_outside_its_own_only_when_the_project_lists_it() {
     let script = r#"mkdir -p out && touch out/x && echo "$1:1: wr"ote; exit 1"#;
     let dir = project(&decision(&format!(
-        "  check:\n    type: command\n    argv: [sh, -c, {script:?}, sh, \"{{file}}\"]\n"
+        "  check:\n    type: command\n    command: [sh, -c, {script:?}, sh, \"{{file}}\"]\n"
     )));
     trust(dir.path());
     let ran = |dir: &TempDir| {

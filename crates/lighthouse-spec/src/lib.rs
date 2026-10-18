@@ -10,6 +10,7 @@ mod model;
 mod model_check;
 mod options;
 mod pack;
+mod program;
 mod project;
 mod sources;
 mod union;
@@ -21,10 +22,10 @@ pub use attributes::Attributes;
 pub use catalog::Catalog;
 pub use catalog::load::{load_local, local_dir, local_files};
 pub use check::{
-    BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, DEFAULT_TIMEOUT, FORMATTED,
-    NamedRule, OrderReport, OrderScope, Select,
+    BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, NamedRule, OrderReport,
+    OrderScope, Select,
 };
-pub use command::{Batch, CheckOutput, CommandCheck, ExitCodes, SarifColumns, SarifSelect};
+pub use command::CommandCheck;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
 pub use error::Error;
 pub use expression::{TemplatePart, parse_template};
@@ -34,11 +35,15 @@ pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};
 pub use pack::{Pack, Section};
 pub(crate) use pack::{PackSpec, SectionSpec};
+pub use program::{
+    Batching, DEFAULT_TIMEOUT, LONG_TIMEOUT, Output, Point, Program, ProgramSpec, Sandbox, Sarif,
+    SarifColumns, Stdin,
+};
 pub use project::{
-    Approval, ApprovalSpec, BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule,
-    EnvironmentSpec, Evaluation, FILE_NAME, FixPolicy, FixSpec, Formatter, GeneratedCheck, GlobSet,
-    Layer, Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
-    RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, Task, glob_set,
+    BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule, EnvironmentSpec, Evaluation,
+    FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GeneratedCheck, GlobSet, Layer, Layers, Level,
+    ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects, RESERVED_PROVIDERS,
+    Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, Task, glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 

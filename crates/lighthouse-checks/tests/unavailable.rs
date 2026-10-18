@@ -22,7 +22,7 @@ spec:
   severity: error
   check:
     type: command
-    argv: [sh, -c, "touch ran; exit 1", sh, "{file}"]
+    command: [sh, -c, "touch ran; exit 1", sh, "{file}"]
   examples:
     - name: bad
       language: text
@@ -35,8 +35,8 @@ spec:
       files: [{ path: good.txt, body: bye }]
 "#;
 
-/// Checks a project with the command check `local/probe`, and `core/formatted`
-/// with the formatter `tr`, both trusted.
+/// Checks a project with the command check `local/probe` and the bundled
+/// `go/formatted`, whose program is `gofmt`.
 fn check(dir: &std::path::Path) -> Run {
     let layer = Catalog::from_local(BTreeMap::from([(
         "probe.yaml".to_owned(),
@@ -47,8 +47,7 @@ fn check(dir: &std::path::Path) -> Run {
     let mut registry = lighthouse_checks::registry();
     registry.register(&plugin).unwrap();
     let config = Config::parse_inline(
-        "plugins = [\"core\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n\"core/formatted\" = \"warn\"\n\
-         [languages.text]\nformatter = { argv = [\"tr\", \"a-z\", \"A-Z\"], stdin = \"file\", output = \"text\" }\n",
+        "plugins = [\"core\", \"go\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n\"go/formatted\" = \"error\"\n",
     )
     .unwrap();
     let catalog = Catalog::overlay(Catalog::bundled(), &layer).unwrap();
@@ -60,9 +59,11 @@ fn check(dir: &std::path::Path) -> Run {
 }
 
 #[test]
-fn a_command_check_and_a_formatter_leave_the_analysis_incomplete_when_the_sandbox_is_unavailable() {
+fn a_command_check_and_a_bundled_one_leave_the_analysis_incomplete_when_the_sandbox_is_unavailable()
+{
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("a.txt"), "hello\n").unwrap();
+    fs::write(dir.path().join("a.go"), "package a\nfunc  F( ) {}\n").unwrap();
     let _gone: Simulation = simulate_unavailable("no backend here");
 
     let run = check(dir.path());
@@ -77,7 +78,7 @@ fn a_command_check_and_a_formatter_leave_the_analysis_incomplete_when_the_sandbo
     );
     assert!(
         run.incomplete.len() >= 2,
-        "the check and the formatter both: {reasons:?}"
+        "the check and the bundled one both: {reasons:?}"
     );
     assert!(!dir.path().join("ran").exists(), "the program ran");
 }

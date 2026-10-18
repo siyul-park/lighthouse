@@ -150,7 +150,7 @@ fn columns_count_in_the_unit_the_decision_the_log_or_the_default_names() {
         (
             "bytes, as golangci-lint counts",
             None,
-            "    columns: bytes\n",
+            "    sarif: { columns: bytes }\n",
             7,
         ),
         ("the log says code points", Some("unicodeCodePoints"), "", 3),
@@ -159,7 +159,7 @@ fn columns_count_in_the_unit_the_decision_the_log_or_the_default_names() {
         (
             "the decision wins over the log",
             Some("utf16CodeUnits"),
-            "    columns: unicodeCodePoints\n",
+            "    sarif: { columns: unicodeCodePoints }\n",
             3,
         ),
     ];

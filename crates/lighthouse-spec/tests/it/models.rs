@@ -3,8 +3,8 @@
 
 use lighthouse_model::{Safety, Severity};
 use lighthouse_spec::{
-    Approval, CommandProtocol, Config, Evaluation, Fix, FixKind, FixPolicy, FixScope, ModelCheck,
-    ModelProvider, Models, Projects, Routing, Select, Subject, Task,
+    CommandProtocol, Config, Evaluation, Fix, FixKind, FixPolicy, FixScope, ModelCheck,
+    ModelProvider, Models, Output, Point, Projects, Routing, Select, Subject, Task,
 };
 
 const PROJECT: &str = r#"
@@ -16,8 +16,8 @@ budget = 50
 
 [models.providers.openrouter]
 protocol = "openai"
-baseUrl = "https://openrouter.ai/api/v1"
-keyEnv = "OPENROUTER_API_KEY"
+url = "https://openrouter.ai/api/v1"
+headers = { Authorization = "Bearer ${OPENROUTER_API_KEY}" }
 
 [models.providers.script]
 protocol = "typesafe"
@@ -91,11 +91,15 @@ fn a_provider_is_reached_by_url_command_or_plugin_and_openai_is_built_in() {
         plugin, options, ..
     } = binding.provider("openrouter").unwrap()
     else {
-        panic!("a baseUrl provider is a model-http provider");
+        panic!("a url provider is a model-http provider");
     };
     assert_eq!(plugin, "model-http");
     assert_eq!(options["protocol"], "openai");
-    assert_eq!(options["baseUrl"], "https://openrouter.ai/api/v1");
+    assert_eq!(options["url"], "https://openrouter.ai/api/v1");
+    assert_eq!(
+        options["headers"]["Authorization"],
+        "Bearer ${OPENROUTER_API_KEY}"
+    );
     assert!(matches!(
         binding.provider("script"),
         Some(ModelProvider::Command { .. })
@@ -103,21 +107,24 @@ fn a_provider_is_reached_by_url_command_or_plugin_and_openai_is_built_in() {
     let ModelProvider::Rpc { options, .. } = binding.provider("openai").unwrap() else {
         panic!("openai is built in");
     };
-    assert_eq!(options["baseUrl"], "https://api.openai.com/v1");
-    assert_eq!(options["keyEnv"], "OPENAI_API_KEY");
+    assert_eq!(options["url"], "https://api.openai.com/v1");
+    assert_eq!(
+        options["headers"]["Authorization"], "Bearer ${OPENAI_API_KEY}",
+        "a protocol's own service has its key by default"
+    );
     assert!(binding.provider("ollama").is_none());
 }
 
 #[test]
 fn a_timeout_reaches_model_http_as_a_duration_and_is_absent_without_one() {
     let ModelProvider::Rpc { options, .. } =
-        provider("protocol = \"openai\"\nbaseUrl = \"https://x/v1\"\ntimeout = \"10m\"\n")
+        provider("protocol = \"openai\"\nurl = \"https://x/v1\"\ntimeout = \"10m\"\n")
     else {
-        panic!("a baseUrl provider is a model-http provider");
+        panic!("a url provider is a model-http provider");
     };
     assert_eq!(options["timeout"], "10m");
     let ModelProvider::Rpc { options, .. } = binding().provider("openrouter").unwrap() else {
-        panic!("a baseUrl provider is a model-http provider");
+        panic!("a url provider is a model-http provider");
     };
     assert!(!options.contains_key("timeout"));
 }
@@ -172,19 +179,19 @@ fn invalid(text: &str) -> String {
 }
 
 #[test]
-fn extra_body_travels_in_the_options_and_unknown_fields_are_rejected() {
+fn body_travels_in_the_options_and_unknown_fields_are_rejected() {
     let ModelProvider::Rpc { options, .. } = provider(
         "protocol = \"openai\"\n\
-         extraBody = { provider = { require_parameters = true }, max_tokens = 1024 }\n",
+         body = { provider = { require_parameters = true }, max_tokens = 1024 }\n",
     ) else {
         panic!("a protocol provider is a model-http provider");
     };
-    assert_eq!(options["extraBody"]["provider"]["require_parameters"], true);
-    assert_eq!(options["extraBody"]["max_tokens"], 1024);
+    assert_eq!(options["body"]["provider"]["require_parameters"], true);
+    assert_eq!(options["body"]["max_tokens"], 1024);
     let ModelProvider::Rpc { options, .. } = binding().provider("openrouter").unwrap() else {
-        panic!("a baseUrl provider is a model-http provider");
+        panic!("a url provider is a model-http provider");
     };
-    assert!(!options.contains_key("extraBody"));
+    assert!(!options.contains_key("body"));
 
     for removed in [
         "logprobs = true",
@@ -192,6 +199,9 @@ fn extra_body_travels_in_the_options_and_unknown_fields_are_rejected() {
         "type = \"rpc\"",
         "tasks = []",
         "stdin = \"prompt\"",
+        "keyEnv = \"K\"",
+        "baseUrl = \"http://x\"",
+        "extraBody = { a = 1 }",
     ] {
         let text = format!("[models.providers.x]\nprotocol = \"openai\"\n{removed}\n");
         assert!(Config::parse_inline(&text).is_err(), "{removed}");
@@ -203,17 +213,26 @@ fn a_protocol_alone_is_http_at_its_own_service_and_a_key_is_only_defaulted_there
     let ModelProvider::Rpc { options, .. } = provider("protocol = \"typesafe\"\n") else {
         panic!("a protocol provider is a model-http provider");
     };
-    assert_eq!(options["baseUrl"], "https://api.typesafe.ai");
-    assert_eq!(options["keyEnv"], "TYPESAFE_API_KEY");
+    assert_eq!(options["url"], "https://api.typesafe.ai");
+    assert_eq!(
+        options["headers"]["Authorization"],
+        "Bearer ${TYPESAFE_API_KEY}"
+    );
     let ModelProvider::Rpc { options, .. } =
-        provider("protocol = \"openai\"\nbaseUrl = \"http://localhost:11434/v1\"\n")
+        provider("protocol = \"openai\"\nurl = \"http://localhost:11434/v1\"\n")
     else {
-        panic!("a baseUrl provider is a model-http provider");
+        panic!("a url provider is a model-http provider");
     };
     assert!(
-        !options.contains_key("keyEnv"),
+        !options.contains_key("headers"),
         "a local service needs no key"
     );
+    let ModelProvider::Rpc { options, .. } =
+        provider("protocol = \"openai\"\nheaders = { Authorization = \"Token ${MINE}\" }\n")
+    else {
+        panic!("a protocol provider is a model-http provider");
+    };
+    assert_eq!(options["headers"]["Authorization"], "Token ${MINE}");
 }
 
 #[test]
@@ -229,38 +248,35 @@ fn a_plugin_provider_takes_options_and_a_command_provider_its_own_fields() {
         ("model-local", Some(1))
     );
     let ModelProvider::Command {
-        argv,
+        program,
         cost,
         pointer,
-        key_env,
         ..
     } = provider(
-        "protocol = \"typesafe\"\ncommand = [\"run\", \"{model}\"]\npointer = \"/result\"\nkeyEnv = \"K\"\n",
+        "protocol = \"typesafe\"\ncommand = [\"run\", \"{model}\"]\npointer = \"/result\"\nenv = { K = \"${K}\" }\n",
     )
     else {
         panic!("a command provider is a command");
     };
-    assert_eq!(argv, ["run", "{model}"]);
-    assert_eq!(
-        (cost, pointer.as_deref(), key_env.as_deref()),
-        (1.0, Some("/result"), Some("K"))
-    );
+    assert_eq!(program.command, ["run", "{model}"]);
+    assert_eq!(program.env["K"], "${K}");
+    assert_eq!((cost, pointer.as_deref()), (1.0, Some("/result")));
 }
 
 #[test]
 fn a_provider_with_two_reaches_or_none_is_invalid_naming_the_fields() {
-    let both = invalid("protocol = \"openai\"\nbaseUrl = \"http://x\"\ncommand = [\"run\"]\n");
-    assert!(both.contains("`baseUrl` and `command`"), "{both}");
+    let both = invalid("protocol = \"openai\"\nurl = \"http://x\"\ncommand = [\"run\"]\n");
+    assert!(both.contains("`url` and `command`"), "{both}");
     let none = invalid("protocol = \"anthropic\"\n");
     assert!(none.contains("none of the protocols"), "{none}");
     let nothing = invalid("cost = 1\n");
     assert!(
-        nothing.contains("`baseUrl`, `command` or `plugin`"),
+        nothing.contains("`url`, `command` or `plugin`"),
         "{nothing}"
     );
     let several = invalid("protocol = [\"openai\", \"typesafe\"]\n");
-    assert!(several.contains("add a `baseUrl`"), "{several}");
-    let unprotocolled = invalid("baseUrl = \"http://x\"\n");
+    assert!(several.contains("add a `url`"), "{several}");
+    let unprotocolled = invalid("url = \"http://x\"\n");
     assert!(
         unprotocolled.contains("needs a `protocol`"),
         "{unprotocolled}"
@@ -288,14 +304,14 @@ fn a_command_speaks_typesafe_or_plain_text_and_nothing_else() {
     ] {
         let refused = invalid(text);
         assert!(
-            refused.contains("`typesafe` (classification) or plain text (edit)"),
+            refused.contains("`typesafe` (classification) or plain text (agent)"),
             "{refused}"
         );
     }
     let pointer = invalid("command = [\"run\"]\npointer = \"/result\"\n");
     assert!(pointer.contains("has no `pointer`"), "{pointer}");
     let empty = invalid("protocol = \"typesafe\"\ncommand = []\n");
-    assert!(empty.contains("`command` is empty"), "{empty}");
+    assert!(empty.contains("`command` needs a program"), "{empty}");
 }
 
 #[test]
@@ -304,7 +320,7 @@ fn a_provider_serves_the_tasks_its_protocol_covers() {
         let provider = provider(text);
         (
             provider.serves(Task::Classification),
-            provider.serves(Task::Edit),
+            provider.serves(Task::Agent),
         )
     };
     let command = |protocol: &str| format!("{protocol}command = [\"run\"]\n");
@@ -316,41 +332,41 @@ fn a_provider_serves_the_tasks_its_protocol_covers() {
     assert_eq!(
         serves("protocol = \"openai\"\n"),
         (Some(true), Some(false)),
-        "chat completions classify by their logprobs and edit nothing"
+        "chat completions classify by their logprobs and run no agent"
     );
     assert_eq!(
         serves("protocol = \"typesafe\"\n"),
         (Some(true), Some(false))
     );
     assert_eq!(
-        serves("protocol = [\"typesafe\", \"openai\"]\nbaseUrl = \"http://x\"\n"),
+        serves("protocol = [\"typesafe\", \"openai\"]\nurl = \"http://x\"\n"),
         (Some(true), Some(false))
     );
     assert_eq!(
         serves("plugin = \"model-local\"\n"),
         (None, Some(false)),
-        "only the handshake of a plugin says what it classifies, and it never edits"
+        "only the handshake of a plugin says what it classifies, and it never serves an agent"
     );
 }
 
 #[test]
-fn edit_is_one_binding_of_the_project_and_fixes_are_asked_for_and_previewed_by_default() {
+fn agent_is_one_binding_of_the_project_and_unsafe_fixes_are_previewed_by_default() {
     let config = Config::parse_inline(
-        "plugins = []\n[models]\nedit = [\"a/one\", \"b/two\"]\nclassification = \"a/one\"\n",
+        "plugins = []\n[models]\nagent = [\"a/one\", \"b/two\"]\nclassification = \"a/one\"\n",
     )
     .unwrap();
     let binding = config.models(&Projects::default()).unwrap();
-    assert_eq!(binding.edit, ["a/one", "b/two"]);
+    assert_eq!(binding.agent, ["a/one", "b/two"]);
     let bound: Vec<_> = binding.bindings().collect();
     assert_eq!(
         bound,
         [
             (Task::Classification, "a/one"),
-            (Task::Edit, "a/one"),
-            (Task::Edit, "b/two")
+            (Task::Agent, "a/one"),
+            (Task::Agent, "b/two")
         ]
     );
-    assert_eq!(config.fix().approval, Approval::Ask);
+    assert!(!config.fix().unsafe_fixes);
     assert!(config.fix().verify.is_empty());
     assert!(config.fix().decisions.is_empty(), "no decision is listed");
     assert_eq!(config.fix().scope, FixScope::Files);
@@ -379,29 +395,41 @@ fn chat_is_no_binding_and_a_rule_binds_classification_not_model() {
 }
 
 #[test]
-fn approval_the_decisions_a_model_may_fix_and_the_commands_that_verify_them_are_read_and_checked() {
+fn the_decisions_a_model_may_fix_and_the_programs_that_verify_them_are_read_and_checked() {
     let config = Config::parse_inline(
-        "plugins = []\n[approval]\nfix = \"allow\"\n[fix]\ndecisions = [\"design/exported-doc\", \"testing/*\"]\nscope = \"symbol\"\nverify = [[\"cargo\", \"test\", \"-q\"]]\n",
+        "plugins = []\n[fix]\nunsafe = true\ndecisions = [\"design/exported-doc\", \"testing/*\"]\nscope = \"symbol\"\nverify = [[\"cargo\", \"test\", \"-q\"], { command = [\"make\", \"lint\"], timeout = \"3m\", output = \"lines\" }]\n",
     )
     .unwrap();
-    assert_eq!(config.fix().approval, Approval::Allow);
+    assert!(config.fix().unsafe_fixes);
     assert_eq!(config.fix().decisions, ["design/exported-doc", "testing/*"]);
     assert_eq!(config.fix().scope, FixScope::Symbol);
-    assert_eq!(config.fix().verify, [["cargo", "test", "-q"]]);
-    assert_eq!(config.fix().timeout, std::time::Duration::from_secs(600));
-    let slow = Config::parse_inline("plugins = []\n[fix]\ntimeout = \"20m\"\n").unwrap();
-    assert_eq!(slow.fix().timeout, std::time::Duration::from_secs(1200));
+    let verify = &config.fix().verify;
+    assert_eq!(verify[0].command, ["cargo", "test", "-q"]);
+    assert_eq!(verify[0].output(Point::Verify), Output::Status);
+    assert_eq!(verify[0].timeout(Point::Verify).as_secs(), 600);
+    assert_eq!(verify[1].output(Point::Verify), Output::Lines);
+    assert_eq!(verify[1].timeout(Point::Verify).as_secs(), 180);
 
     for (text, wanted) in [
-        ("[approval]\nfix = \"always\"\n", "always"),
-        ("[approval]\nfix = \"verified\"\n", "verified"),
-        ("[approval]\nfix = \"preview\"\n", "preview"),
+        ("[approval]\nfix = \"allow\"\n", "approval"),
+        ("[fix]\nunsafe = \"allow\"\n", "allow"),
+        ("[fix]\ntimeout = \"20m\"\n", "timeout"),
         ("[fix]\nscope = \"extent\"\n", "extent"),
-        ("[approval]\nminor = \"gate\"\n", "minor"),
-        ("[fix]\nverify = [[]]\n", "`fix.verify[0]` needs a program"),
+        (
+            "[fix]\nverify = [[]]\n",
+            "`fix.verify[0]`: `command` needs a program",
+        ),
         (
             "[fix]\nverify = [[\" \"]]\n",
-            "`fix.verify[0]` needs a program",
+            "`fix.verify[0]`: `command` needs a program",
+        ),
+        (
+            "[fix]\nverify = [[\"make\", \"{file}\"]]\n",
+            "`{file}` is not a placeholder of a `[fix] verify` program",
+        ),
+        (
+            "[fix]\nverify = [{ command = [\"make\"], output = \"sarif\" }]\n",
+            "`output`",
         ),
         ("[fix]\ncommands = []\n", "commands"),
     ] {
@@ -429,8 +457,15 @@ fn a_field_of_another_reach_is_refused() {
         protocol.contains("`plugin` provider has no `protocol`"),
         "{protocol}"
     );
-    let extra = invalid("plugin = \"model-local\"\nextraBody = { a = 1 }\n");
-    assert!(extra.contains("`extraBody`"), "{extra}");
+    let extra = invalid("plugin = \"model-local\"\nbody = { a = 1 }\n");
+    assert!(extra.contains("`body`"), "{extra}");
+    let headers = invalid("command = [\"run\"]\nheaders = { A = \"b\" }\n");
+    assert!(
+        headers.contains("`command` provider has no `headers`"),
+        "{headers}"
+    );
+    let env = invalid("protocol = \"openai\"\nenv = { A = \"b\" }\n");
+    assert!(env.contains("`url` provider has no `env`"), "{env}");
 }
 
 #[test]
@@ -470,7 +505,7 @@ fn a_model_check_is_a_cel_check_that_never_fails_and_reviews_what_it_selects() {
 }
 
 #[test]
-fn model_provider_remote() {
+fn a_provider_is_remote_when_it_reaches_a_host_outside_the_machine() {
     let binding = binding();
     assert!(
         binding.provider("openrouter").unwrap().remote(),
@@ -478,7 +513,19 @@ fn model_provider_remote() {
     );
     assert!(
         !binding.provider("script").unwrap().remote(),
-        "a program that is given no key stays on the machine"
+        "a program that reaches no host stays on the machine"
+    );
+    assert!(
+        !provider("protocol = \"openai\"\nurl = \"http://localhost:11434/v1\"\n").remote(),
+        "a loopback url stays on the machine"
+    );
+    assert!(
+        provider("command = [\"agent\"]\nsandbox = { network = [\"api.test\"] }\n").remote(),
+        "a program whose sandbox lists a host leaves it"
+    );
+    assert!(
+        !provider("command = [\"agent\"]\nenv = { KEY = \"${KEY}\" }\n").remote(),
+        "a key does not make a program remote"
     );
 }
 
@@ -508,6 +555,7 @@ fn fix_scope_of_fix_is_the_projects_cap_unless_the_decision_declares_a_narrower_
     let model = |scope| Fix {
         safety: Safety::Unsafe,
         requires: Vec::new(),
+        priority: 0,
         kind: FixKind::Model {
             prompt: None,
             scope,
@@ -542,19 +590,19 @@ fn fix_policy_is_the_fix_table_with_its_defaults() {
 
     assert!(policy.decisions.is_empty() && policy.verify.is_empty());
     assert_eq!(policy.scope, FixScope::Files);
-    assert_eq!(policy.timeout, std::time::Duration::from_secs(600));
+    assert!(!policy.unsafe_fixes);
 }
 
 #[test]
-fn edit_routes_list_the_agents_rules_name() {
+fn agent_routes_list_the_agents_rules_name() {
     let models = Config::parse_inline(
-        "[rules.\"d/x\"]\nlevel = \"warn\"\nedit = [\"a/one\", \"b/two\"]\n[rules.\"d/y\"]\nlevel = \"warn\"\n",
+        "[rules.\"d/x\"]\nlevel = \"warn\"\nagent = [\"a/one\", \"b/two\"]\n[rules.\"d/y\"]\nlevel = \"warn\"\n",
     )
     .unwrap()
     .models(&Projects::default())
     .unwrap();
 
-    let routes: Vec<_> = models.edit_routes().collect();
+    let routes: Vec<_> = models.agent_routes().collect();
 
     assert_eq!(
         routes,
@@ -563,45 +611,33 @@ fn edit_routes_list_the_agents_rules_name() {
 }
 
 #[test]
-fn a_command_provider_lists_the_hosts_it_may_reach_and_no_other_reach_has_the_key() {
-    let config = Config::parse_inline(
-        "plugins = []\n[models.providers.p]\ncommand = [\"agent\"]\nnetwork = [\"api.test\", \"*.cdn.test\"]\n",
-    )
-    .unwrap();
-    let provider = config
-        .models(&lighthouse_spec::Projects::default())
-        .unwrap()
-        .provider("p")
-        .unwrap();
-    let ModelProvider::Command { network, .. } = provider else {
+fn a_command_provider_lists_the_hosts_it_may_reach_and_no_other_reach_has_the_sandbox() {
+    let ModelProvider::Command { program, .. } = provider(
+        "command = [\"agent\"]\nsandbox = { network = [\"api.test\", \"*.cdn.test\"], write = [\"~/.cache/agent\"] }\n",
+    ) else {
         panic!("a command provider");
     };
-    assert_eq!(network, ["api.test", "*.cdn.test"]);
+    let sandbox = program.sandbox.unwrap();
+    assert_eq!(sandbox.network, ["api.test", "*.cdn.test"]);
+    assert_eq!(sandbox.write, ["~/.cache/agent"]);
 
     for (reach, wanted) in [
         (
-            "protocol = \"openai\"\nbaseUrl = \"http://127.0.0.1:9\"\n",
-            "a `baseUrl` provider has no `network`",
+            "protocol = \"openai\"\nurl = \"http://127.0.0.1:9\"\n",
+            "a `url` provider has no `sandbox`",
         ),
-        ("plugin = \"x\"\n", "a `plugin` provider has no `network`"),
+        ("plugin = \"x\"\n", "a `plugin` provider has no `sandbox`"),
     ] {
-        let error = Config::parse_inline(&format!(
-            "plugins = []\n[models.providers.p]\n{reach}network = [\"a.test\"]\n"
-        ))
-        .unwrap()
-        .models(&lighthouse_spec::Projects::default())
-        .unwrap()
-        .invalid["p"]
-            .clone();
+        let error = invalid(&format!("{reach}sandbox = {{ network = [\"a.test\"] }}\n"));
         assert!(error.contains(wanted), "{error}");
     }
 }
 
 #[test]
-fn a_host_a_provider_lists_that_cannot_mean_what_it_says_makes_the_provider_invalid() {
+fn a_host_or_place_a_provider_lists_that_cannot_mean_what_it_says_makes_it_invalid() {
     let invalid = |network: &str| {
         Config::parse_inline(&format!(
-            "plugins = []\n[models.providers.p]\ncommand = [\"agent\"]\nnetwork = {network}\n"
+            "plugins = []\n[models.providers.p]\ncommand = [\"agent\"]\nsandbox = {{ network = {network} }}\n"
         ))
         .unwrap()
         .models(&lighthouse_spec::Projects::default())
@@ -614,9 +650,21 @@ fn a_host_a_provider_lists_that_cannot_mean_what_it_says_makes_the_provider_inva
     for bad in ["\"*\"", "\"*.com\"", "\"a.test:99999\"", "\"\""] {
         let error = invalid(&format!("[{bad}]")).expect(bad);
         assert!(
-            error.contains("`network`") && error.contains(bad.trim_matches('"')),
+            error.contains("`sandbox.network`") && error.contains(bad.trim_matches('"')),
             "{error}"
         );
     }
     assert_eq!(invalid("[\"api.test\", \"*.cdn.test:8443\"]"), None);
+}
+
+#[test]
+fn a_variable_in_a_header_or_an_environment_must_be_a_name() {
+    let headers =
+        invalid("protocol = \"openai\"\nurl = \"http://x\"\nheaders = { A = \"${NAME\" }\n");
+    assert!(headers.contains("`headers.A`"), "{headers}");
+    let env = invalid("command = [\"run\"]\nenv = { A = \"${1BAD}\" }\n");
+    assert!(env.contains("`env.A`"), "{env}");
+    let name =
+        invalid("protocol = \"openai\"\nurl = \"http://x\"\nheaders = { \"A b\" = \"c\" }\n");
+    assert!(name.contains("not a header"), "{name}");
 }

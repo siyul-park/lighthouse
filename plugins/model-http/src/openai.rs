@@ -11,7 +11,7 @@ use crate::{endpoint::Endpoint, http::Client};
 
 /// `createChatCompletion`: `POST /chat/completions`. `fixed` holds fields the
 /// request type cannot carry; the body is the request, then `fixed`, then the
-/// endpoint's `extraBody`, each overriding the one before. A refusal comes
+/// endpoint's `body`, each overriding the one before. A refusal comes
 /// back as the error body the service answered; an error body in a 200
 /// response is carried the same way.
 pub fn create_chat_completion(
@@ -23,11 +23,11 @@ pub fn create_chat_completion(
     let mut body = serde_json::to_value(request).map_err(|e| e.to_string())?;
     if let Some(fields) = body.as_object_mut() {
         fields.extend(fixed);
-        fields.extend(endpoint.extra_body.clone());
+        fields.extend(endpoint.body.clone());
     }
     let response = client.post(
         &endpoint.url("chat/completions"),
-        endpoint.key()?.as_deref(),
+        &endpoint.headers()?,
         &body,
         endpoint.timeout,
     )?;
@@ -80,10 +80,10 @@ mod tests {
     }
 
     #[test]
-    fn extra_body_overrides_the_body_and_the_fixed_fields() {
+    fn body_overrides_the_request_and_the_fixed_fields() {
         let client = Recording::replying(vec![serde_json::from_str(COMPLETION).unwrap()]);
         let mut endpoint = Endpoint::at("openai", "https://x");
-        endpoint.extra_body = json!({"max_tokens": 1024, "provider": {"a": 1}, "model": "other"})
+        endpoint.body = json!({"max_tokens": 1024, "provider": {"a": 1}, "model": "other"})
             .as_object()
             .unwrap()
             .clone();

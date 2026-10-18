@@ -15,7 +15,6 @@ mod design_rules;
 mod directives;
 mod edge_anchor;
 mod fixes;
-mod formatted;
 mod func_facts;
 mod go;
 mod layout;

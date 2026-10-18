@@ -195,7 +195,7 @@ mod tests {
     fn endpoint(extra: Option<Value>) -> Endpoint {
         let mut endpoint = Endpoint::at("openai", "https://x");
         if let Some(Value::Object(extra)) = extra {
-            endpoint.extra_body = extra;
+            endpoint.body = extra;
         }
         endpoint
     }
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn extra_body_overrides_the_logprobs_request_including_max_tokens() {
+    fn body_overrides_the_logprobs_request_including_max_tokens() {
         let reply = logprobs_reply(&[("true", &[("true", -0.1)])]);
         let client = Recording::replying(vec![reply]);
         let endpoint = endpoint(Some(json!({"max_tokens": 1024, "temperature": 0.5})));

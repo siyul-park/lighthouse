@@ -117,6 +117,34 @@ impl Policy {
             .collect()
     }
 
+    /// This policy with the hosts and places of a program added to the
+    /// project's: a program's own lists never replace them.
+    #[must_use]
+    pub fn with(&self, network: &[String], write: &[String]) -> Self {
+        let joined = |base: &[String], extra: &[String]| {
+            let mut all = base.to_vec();
+            all.extend(extra.iter().filter(|e| !base.contains(e)).cloned());
+            all
+        };
+        Self {
+            enabled: self.enabled,
+            network: joined(&self.network, network),
+            write: joined(&self.write, write),
+        }
+    }
+
+    /// The profile of a program that runs in `dir` for the project at
+    /// `root`: it may reach the hosts of this policy and write its places,
+    /// below `dir`, and reads no secret of the project.
+    pub fn profile(&self, root: &Path, dir: &Path) -> Profile {
+        let mut profile = Profile {
+            network: self.network.clone(),
+            ..Profile::new(root)
+        };
+        profile.writes.extend(self.writes(dir));
+        profile
+    }
+
     /// `profile` when the project sandboxes its programs, else none.
     pub fn sandbox<'a>(&self, profile: &'a Profile) -> Sandbox<'a> {
         if self.enabled {

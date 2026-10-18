@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 async-openai.workspace = true
+lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
 lighthouse-resource.workspace = true
 serde.workspace = true

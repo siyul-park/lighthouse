@@ -61,7 +61,8 @@ pub(crate) fn project(rule: &str) -> TempDir {
 
 const LINT: &str = "if grep -q hello \"$1\"; then echo \"$1:1: says hello\"; exit 1; fi\n";
 
-const BY_SCRIPT: &str = "  check:\n    type: command\n    argv: [sh, tools/lint.sh, \"{file}\"]\n";
+const BY_SCRIPT: &str =
+    "  check:\n    type: command\n    command: [sh, tools/lint.sh, \"{file}\"]\n";
 
 fn scripted() -> TempDir {
     let dir = project(&decision(BY_SCRIPT));
@@ -114,34 +115,119 @@ fn command_check_trust_covers_the_script_an_argument_names() {
         .stdout(predicate::str::contains("changed"));
 }
 
-#[test]
-fn command_check_exit_codes_and_empty_findings_are_execution_errors() {
-    let dir = project(&decision(
-        "  check:\n    type: command\n    argv: [sh, -c, \"exit 2\", sh, \"{file}\"]\n",
-    ));
-    trust(dir.path());
-    lighthouse(dir.path())
-        .arg("check")
-        .assert()
-        .code(3)
-        .stdout(predicate::str::contains("exited 2"));
+/// The outcome of `lighthouse check` over a project whose command check is
+/// `check` (lines under the `check:` key), as the exit code and the report.
+fn checked(check: &str) -> (i32, String) {
+    checked_at("file", check)
+}
 
-    // Exit 1 says it found something; printing nothing contradicts that.
-    let silent = project(&decision(
-        "  check:\n    type: command\n    argv: [sh, -c, \"exit 1\", sh, \"{file}\"]\n",
-    ));
-    trust(silent.path());
-    lighthouse(silent.path())
-        .arg("check")
-        .assert()
-        .code(3)
-        .stdout(predicate::str::contains("printed no finding"));
+fn checked_at(subject: &str, check: &str) -> (i32, String) {
+    let rule = decision(&format!("  check:\n    type: command\n{check}"));
+    let dir = project(&rule.replace("subject: file", &format!("subject: {subject}")));
+    trust(dir.path());
+    let out = lighthouse(dir.path()).arg("check").output().unwrap();
+    (
+        out.status.code().unwrap(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+    )
+}
+
+#[test]
+fn a_program_ends_as_its_exit_code_and_its_output_say_for_every_exit_class() {
+    let table: [(&str, &str, i32, &str); 7] = [
+        // Findings by lines: exit 0 and 1 ran, whatever the code says.
+        (
+            "command: [sh, -c, \"exit 0\", sh, \"{file}\"]\n",
+            "no codes",
+            0,
+            "",
+        ),
+        (
+            "command: [sh, -c, \"exit 1\", sh, \"{file}\"]\n",
+            "1 prints nothing",
+            0,
+            "",
+        ),
+        (
+            "command: [sh, -c, \"echo \\\"$1:1: found\\\"; exit 1\", sh, \"{file}\"]\n",
+            "1 prints",
+            1,
+            "found",
+        ),
+        // Another code is an error: the analysis is incomplete.
+        (
+            "command: [sh, -c, \"exit 2\", sh, \"{file}\"]\n",
+            "2 is an error",
+            3,
+            "exited 2",
+        ),
+        // The codes can be remapped.
+        (
+            "command: [sh, -c, \"echo \\\"$1:1: found\\\"; exit 2\", sh, \"{file}\"]\n    success: [0, 2]\n",
+            "2 remapped",
+            1,
+            "found",
+        ),
+        (
+            "command: [sh, -c, \"exit 1\", sh, \"{file}\"]\n    success: [0]\n",
+            "1 not ran",
+            3,
+            "exited 1",
+        ),
+        // A program that outlives its timeout is an error too.
+        (
+            "command: [sleep, \"5\"]\n    timeout: 1s\n",
+            "timeout",
+            3,
+            "timed out",
+        ),
+    ];
+
+    for (check, what, code, shown) in table {
+        let (got, report) = checked(&format!("    {check}"));
+
+        assert_eq!(got, code, "{what}: {report}");
+        assert!(report.contains(shown), "{what}: {report}");
+    }
+}
+
+#[test]
+fn a_status_program_has_exactly_one_finding_when_it_fails_and_none_when_it_passes() {
+    let failing = "    command: [sh, -c, \"echo broken >&2; exit 4\"]\n    output: status\n";
+    let passing = "    command: [sh, -c, \"exit 0\"]\n    output: status\n";
+
+    let (code, report) = checked_at("project", failing);
+    let (clean, nothing) = checked_at("project", passing);
+
+    assert_eq!(code, 1, "{report}");
+    assert_eq!(report.matches("local/probe").count(), 1, "{report}");
+    assert!(report.contains("broken"), "{report}");
+    assert!(report.contains("1 error"), "{report}");
+    assert_eq!(clean, 0, "{nothing}");
+}
+
+#[test]
+fn a_line_that_is_only_a_path_places_the_finding_at_line_one_once_however_it_is_named() {
+    // A tool that follows module declarations names a file once for each way
+    // it reached it, and may name it by the path the file system resolves.
+    let script = "printf '%s/a.txt\\n%s/a.txt\\n' \"$(pwd -P)\" \"$(pwd -P)\"; echo a.txt; exit 1";
+    let (code, report) = checked_at(
+        "project",
+        &format!("    command: [sh, -c, {script:?}]\n    files: [\"a.txt\"]\n"),
+    );
+
+    assert_eq!(code, 1, "{report}");
+    assert_eq!(report.matches("a.txt:1:1").count(), 1, "{report}");
+    assert!(
+        report.contains("Probe"),
+        "the title is the message: {report}"
+    );
 }
 
 #[test]
 fn command_check_gets_the_same_environment_as_a_fix_command() {
     let dir = project(&decision(
-        "  check:\n    type: command\n    argv: [sh, -c, \"test -n \\\"$HOME\\\" && test -n \\\"$LIGHTHOUSE_API_VERSION\\\" && test -z \\\"$LIGHTHOUSE_TEST_SECRET\\\" && echo \\\"$1:1: has the contract\\\"; exit 1\", sh, \"{file}\"]\n",
+        "  check:\n    type: command\n    command: [sh, -c, \"test -n \\\"$HOME\\\" && test -n \\\"$LIGHTHOUSE_API_VERSION\\\" && test -z \\\"$LIGHTHOUSE_TEST_SECRET\\\" && echo \\\"$1:1: has the contract\\\"; exit 1\", sh, \"{file}\"]\n",
     ));
     trust(dir.path());
     lighthouse(dir.path())
@@ -155,7 +241,7 @@ fn command_check_gets_the_same_environment_as_a_fix_command() {
 #[test]
 fn command_check_output_past_the_cap_is_incomplete_not_clean() {
     let dir = project(&decision(
-        "  check:\n    type: command\n    argv: [sh, -c, \"yes finding | head -c 2000000; exit 1\", sh, \"{file}\"]\n",
+        "  check:\n    type: command\n    command: [sh, -c, \"yes finding | head -c 2000000; exit 1\", sh, \"{file}\"]\n",
     ));
     trust(dir.path());
     lighthouse(dir.path())

@@ -9,8 +9,7 @@ test = false
 doctest = false
 
 [dependencies]
-schemars.workspace = true
-serde.workspace = true
+ignore.workspace = true
 tempfile.workspace = true
 
 [target.'cfg(unix)'.dependencies]

@@ -9,13 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;
 
-use super::{
-    fixing::{ApprovalSpec, FixSpec},
-    formatter::FormatterSpec,
-    models::ModelsSpec,
-    rules::RuleSetting,
-    sandbox::SandboxSpec,
-};
+use super::{fixing::FixSpec, models::ModelsSpec, rules::RuleSetting, sandbox::SandboxSpec};
 
 /// A project's configuration, and the shape of a shareable one: `extends`
 /// names any project, the way an ESLint config extends a shareable config.
@@ -33,8 +27,8 @@ pub struct ProjectSpec {
     /// document of the catalog.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extends: Vec<String>,
-    /// Options per language id; `formatter` is the host's, the rest goes to
-    /// the language's provider.
+    /// Options per language id; `constructorPrefixes` is the host's, the rest
+    /// goes to the language's provider.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub languages: BTreeMap<String, ProjectLanguage>,
     /// Level and options per decision id.
@@ -46,13 +40,10 @@ pub struct ProjectSpec {
     /// The models that judge the decisions rules cannot prove.
     #[serde(default, skip_serializing_if = "ModelsSpec::is_empty")]
     pub models: ModelsSpec,
-    /// What happens to a fix by a model without a person's hand.
-    #[serde(default, skip_serializing_if = "ApprovalSpec::is_empty")]
-    pub approval: ApprovalSpec,
     /// The sandbox the programs of the project run in.
     #[serde(default, skip_serializing_if = "SandboxSpec::is_empty")]
     pub sandbox: SandboxSpec,
-    /// How fixes by models are checked beyond the rules.
+    /// What fixes may do, and how fixes by models are checked beyond the rules.
     #[serde(default, skip_serializing_if = "FixSpec::is_empty")]
     pub fix: FixSpec,
     /// Which files are generated code, beyond what the providers and
@@ -133,9 +124,6 @@ pub struct PluginRefSpec {
 /// The options of one language.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ProjectLanguage {
-    /// The command that formats a file of the language after a fix.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub formatter: Option<FormatterSpec>,
     /// The name prefixes that make a function a constructor in this
     /// language, replacing what its provider declares. Every decision that
     /// tells a constructor apart shares them.

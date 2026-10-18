@@ -8,21 +8,15 @@ use lighthouse_model::{
     RunScope,
     ucm::{Capability, EdgeKind},
 };
-use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    Batch, CommandCheck, ModelCheck, Subject,
+    CommandCheck, ModelCheck, Subject, command,
     expression::{compile_problem, template_problem},
     union::{refuse_strays, stray_field},
 };
-
-/// How long a command may run when its check or fix names no `timeout`.
-pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
-/// The id of the builtin check that compares a file with its formatter's output.
-pub const FORMATTED: &str = "core/formatted";
 
 /// How a decision is checked, mirroring [`crate::Fix`]: one provider selected by
 /// `type`, with the fields every provider shares. Which other fields a check
@@ -34,9 +28,6 @@ pub struct Check {
     /// is not run for that language.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<Capability>,
-    /// How long one run of the provider may take, such as `30s` or `2m`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timeout: Option<Duration>,
     #[serde(flatten)]
     pub kind: CheckKind,
 }
@@ -47,8 +38,6 @@ pub struct Check {
 struct Written {
     #[serde(default)]
     requires: Vec<Capability>,
-    #[serde(default)]
-    timeout: Option<Duration>,
     #[serde(flatten)]
     kind: CheckKind,
 }
@@ -58,7 +47,6 @@ impl Check {
     pub fn new(kind: CheckKind) -> Self {
         Self {
             requires: Vec::new(),
-            timeout: None,
             kind,
         }
     }
@@ -67,11 +55,12 @@ impl Check {
 impl<'de> Deserialize<'de> for Check {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use serde::de::Error as _;
-        const COMMON: [&str; 3] = ["requires", "timeout", "type"];
+        const COMMON: [&str; 2] = ["requires", "type"];
         let value = Value::deserialize(deserializer)?;
         let table = value
             .as_object()
             .ok_or_else(|| D::Error::custom("a check is a table"))?;
+        let command = command::fields();
         let own: &[&str] = match table.get("type").and_then(Value::as_str) {
             Some("builtin") => match table.get("op").and_then(Value::as_str) {
                 None if table.contains_key("op") => {
@@ -90,16 +79,7 @@ impl<'de> Deserialize<'de> for Check {
                 "select", "with", "where", "message", "evidence", "at", "identity", "abstain",
                 "prompt",
             ],
-            Some("command") => &[
-                "argv",
-                "batch",
-                "stdin",
-                "env",
-                "exitCodes",
-                "output",
-                "columns",
-                "select",
-            ],
+            Some("command") => &command,
             Some("model") => &["over", "with", "select", "prompt", "identity"],
             other => {
                 return Err(D::Error::custom(match other {
@@ -115,16 +95,8 @@ impl<'de> Deserialize<'de> for Check {
         if let Some(problem) = stray_field(table, "check", &COMMON, own) {
             return Err(D::Error::custom(problem));
         }
-        let Written {
-            requires,
-            timeout,
-            kind,
-        } = serde_json::from_value(value).map_err(D::Error::custom)?;
-        Ok(Self {
-            requires,
-            timeout,
-            kind,
-        })
+        let Written { requires, kind } = serde_json::from_value(value).map_err(D::Error::custom)?;
+        Ok(Self { requires, kind })
     }
 }
 
@@ -188,12 +160,7 @@ impl CheckKind {
                         )
                     })
             }),
-            Self::Command(command) => command.problem().or_else(|| {
-                (command.batch == Batch::All && subject.run_scope() == RunScope::File).then(|| {
-                    "check `batch: all` needs a module or project decision: a file-scope decision is checked one file at a time"
-                        .to_owned()
-                })
-            }),
+            Self::Command(command) => command.problem(),
             Self::Model(model) => model.problem(subject),
         }
     }

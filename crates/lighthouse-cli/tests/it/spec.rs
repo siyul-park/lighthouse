@@ -125,7 +125,12 @@ fn the_fix_schema_allows_only_the_fields_of_its_type() {
     let branches = schema["$defs"]["Fix"]["oneOf"].as_array().unwrap();
     assert_eq!(branches.len(), 4);
     for branch in branches {
-        assert_eq!(branch["additionalProperties"], false, "{branch}");
+        // A branch that takes the fields of a program by reference closes
+        // what that reference leaves open.
+        let closed = branch
+            .get("additionalProperties")
+            .or_else(|| branch.get("unevaluatedProperties"));
+        assert_eq!(closed, Some(&serde_json::json!(false)), "{branch}");
         for field in ["safety", "requires"] {
             assert!(branch["properties"][field].is_object(), "{field}: {branch}");
         }

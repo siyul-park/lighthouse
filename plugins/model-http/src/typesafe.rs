@@ -18,7 +18,7 @@ pub fn systemone(
     let body = serde_json::to_value(api_request).map_err(|e| e.to_string())?;
     let response = client.post(
         &endpoint.url(SYSTEM_ONE.path),
-        endpoint.key()?.as_deref(),
+        &endpoint.headers()?,
         &body,
         endpoint.timeout,
     )?;

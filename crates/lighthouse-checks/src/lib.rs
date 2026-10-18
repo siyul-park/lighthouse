@@ -18,7 +18,6 @@ pub mod command;
 mod eval;
 mod facts;
 mod fix;
-mod formatted;
 mod glob;
 pub mod layout;
 mod library;

@@ -10,9 +10,9 @@ fn bundled(id: &str) -> &'static Decision {
 }
 
 #[test]
-fn bundled_catalog_has_core_design_and_testing_packs() {
+fn bundled_catalog_has_the_core_design_language_and_testing_packs() {
     let ids: Vec<_> = Catalog::bundled().packs().iter().map(|p| &*p.id).collect();
-    assert_eq!(ids, ["core", "design", "testing"]);
+    assert_eq!(ids, ["core", "design", "go", "rust", "testing"]);
 }
 
 #[test]

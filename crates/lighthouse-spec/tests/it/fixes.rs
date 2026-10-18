@@ -1,7 +1,9 @@
 //! The `fix:` block of a decision: what a catalog accepts and what it refuses.
 
 use lighthouse_model::{Safety, Severity, ucm::Capability};
-use lighthouse_spec::{Catalog, CommandSpec, DecisionSpec, Fix, FixKind, OpSpec, OrderScope};
+use lighthouse_spec::{
+    Catalog, CommandSpec, DecisionSpec, Fix, FixKind, FixScope, OpSpec, OrderScope, Point,
+};
 use lighthouse_test_support::catalog::*;
 
 fn rejected(files: Files, needle: &str) {
@@ -205,28 +207,96 @@ fn fixed_examples_must_name_files_of_an_invalid_example() {
 fn a_command_needs_a_program_and_a_usable_timeout() {
     let command =
         |fields: &str| format!("  fix:\n    safety: unsafe\n    type: command\n    {fields}\n");
-    rejected(fixable(&command("argv: []")), "needs a program");
+    rejected(fixable(&command("command: []")), "needs a program");
     rejected(
-        fixable(&command("argv: [gofmt]\n    timeout: soon")),
+        fixable(&command("command: [gofmt]\n    timeout: soon")),
         "`soon` is not a duration",
     );
     rejected(
-        fixable(&command("argv: [gofmt]\n    timeout: '30'")),
+        fixable(&command("command: [gofmt]\n    timeout: '30'")),
         "`30` is not a duration",
     );
     rejected(
-        fixable(&command("argv: [gofmt]\n    output: inPlace")),
-        "inPlace",
+        fixable(&command("command: [gofmt]\n    output: text")),
+        "text",
     );
-    let ok = command("argv: [gofmt, -w, '{file}']\n    output: text\n    timeout: 2m");
+    rejected(
+        fixable(&command("command: [gofmt]\n    output: lines")),
+        "`output`",
+    );
+    rejected(fixable(&command("argv: [gofmt]")), "argv");
+    let ok = command("command: [gofmt, -w, '{file}']\n    output: files\n    timeout: 2m");
     let catalog = Catalog::from_files(fixable(&ok)).unwrap();
     let fix: &Fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
     let FixKind::Command(command) = &fix.kind else {
         panic!("command expected");
     };
     let command: &CommandSpec = command;
-    assert_eq!(command.argv.len(), 3);
-    assert_eq!(command.timeout.get(), std::time::Duration::from_secs(120));
+    assert_eq!(command.program.command.len(), 3);
+    assert_eq!(
+        command.program.timeout(Point::Fix),
+        std::time::Duration::from_secs(120)
+    );
+}
+
+#[test]
+fn a_command_fix_has_the_placeholders_of_a_fix_and_a_scope_of_its_output() {
+    let command =
+        |fields: &str| format!("  fix:\n    safety: unsafe\n    type: command\n    {fields}\n");
+    for fine in ["file", "line", "symbol", "decision"] {
+        let fix = command(&format!("command: [fixer, '{{{fine}}}']"));
+        assert!(Catalog::from_files(fixable(&fix)).is_ok(), "{fine}");
+    }
+    for bad in ["files", "model", "rule", "path"] {
+        let fix = command(&format!("command: [fixer, '{{{bad}}}']"));
+        rejected(fixable(&fix), &format!("`{{{bad}}}` is not a placeholder"));
+    }
+    let filter = command("command: [gofmt]\n    stdin: file\n    output: stdout");
+    assert!(Catalog::from_files(fixable(&filter)).is_ok());
+    rejected(
+        fixable(&command("command: [gofmt]\n    output: stdout")),
+        "needs `{file}` or `stdin: file`",
+    );
+    rejected(
+        fixable(&command(
+            "command: [gofmt]\n    stdin: file\n    output: stdout\n    scope: files",
+        )),
+        "scope",
+    );
+    let scoped = command("command: [fixer]\n    scope: files");
+    let catalog = Catalog::from_files(fixable(&scoped)).unwrap();
+    let FixKind::Command(spec) = &catalog.decision("p/a").unwrap().fix.as_ref().unwrap().kind
+    else {
+        panic!("command expected");
+    };
+    assert_eq!(spec.scope, Some(FixScope::Files));
+}
+
+#[test]
+fn a_fix_has_a_priority_that_defaults_to_zero() {
+    let plain = Catalog::from_files(fixable(MOVE)).unwrap();
+    assert_eq!(
+        plain
+            .decision("p/a")
+            .unwrap()
+            .fix
+            .as_ref()
+            .unwrap()
+            .priority,
+        0
+    );
+    let low = MOVE.replace("safety: safe", "safety: safe\n    priority: -100");
+    let catalog = Catalog::from_files(fixable(&low)).unwrap();
+    assert_eq!(
+        catalog
+            .decision("p/a")
+            .unwrap()
+            .fix
+            .as_ref()
+            .unwrap()
+            .priority,
+        -100
+    );
 }
 
 #[test]
@@ -279,15 +349,15 @@ fn the_effective_safety_of_a_fix_is_decided_in_one_place() {
     .unwrap()
     .clone();
 
-    assert_eq!(ops_safe.fix_safety(), Safety::Safe);
-    assert_eq!(ops_unsafe.fix_safety(), Safety::Unsafe);
+    assert_eq!(ops_safe.fix_safety(None), Safety::Safe);
+    assert_eq!(ops_unsafe.fix_safety(None), Safety::Unsafe);
     assert_eq!(
-        model.fix_safety(),
+        model.fix_safety(None),
         Safety::Unsafe,
         "a model's is never safe"
     );
     assert_eq!(
-        unfixed.fix_safety(),
+        unfixed.fix_safety(None),
         Safety::Unsafe,
         "a model would make it"
     );
@@ -296,8 +366,27 @@ fn the_effective_safety_of_a_fix_is_decided_in_one_place() {
         ..spec
     });
     assert_eq!(
-        warned.fix_safety(),
+        warned.fix_safety(None),
         Safety::Unsafe,
         "a safe fix of a decision that does not author `error` is unsafe"
     );
+}
+
+#[test]
+fn the_safety_a_project_gives_a_rule_replaces_every_other_in_the_last_place() {
+    let catalog = Catalog::from_files(fixable(MOVE)).unwrap();
+    let ops = catalog.decision("p/a").unwrap().clone();
+    let warned = ops.clone().map_spec(|spec| DecisionSpec {
+        severity: Some(Severity::Warn),
+        ..spec
+    });
+    let model = Catalog::from_files(fixable("  fix:\n    safety: unsafe\n    type: model\n"))
+        .unwrap()
+        .decision("p/a")
+        .unwrap()
+        .clone();
+
+    assert_eq!(ops.fix_safety(Some(Safety::Unsafe)), Safety::Unsafe);
+    assert_eq!(warned.fix_safety(Some(Safety::Safe)), Safety::Safe);
+    assert_eq!(model.fix_safety(Some(Safety::Safe)), Safety::Safe);
 }

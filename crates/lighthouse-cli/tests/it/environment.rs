@@ -50,7 +50,7 @@ fn no_color_wins_over_a_forced_color_and_the_flag_wins_over_both() {
 #[test]
 fn trust_is_kept_below_xdg_config_home_and_nothing_below_home() {
     let dir = project(&crate::checks::decision(
-        "  check:\n    type: command\n    argv: [sh, tools/lint.sh]\n",
+        "  check:\n    type: command\n    command: [sh, tools/lint.sh]\n",
     ));
     let (config, home) = (dir.path().join("config"), dir.path().join("home"));
     fs::create_dir_all(&home).unwrap();
@@ -74,7 +74,7 @@ fn trust_is_kept_below_xdg_config_home_and_nothing_below_home() {
 #[test]
 fn a_relative_xdg_directory_is_ignored() {
     let dir = project(&crate::checks::decision(
-        "  check:\n    type: command\n    argv: [sh, tools/lint.sh]\n",
+        "  check:\n    type: command\n    command: [sh, tools/lint.sh]\n",
     ));
     let home = dir.path().join("home");
     fs::create_dir_all(&home).unwrap();

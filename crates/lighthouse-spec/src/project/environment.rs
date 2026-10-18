@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     RuleConfig, Rules,
-    fixing::ApprovalSpec,
+    fixing::FixEnvironment,
     models::{ModelsSpec, Names},
     rules::RuleSetting,
     sandbox::SandboxSpec,
@@ -22,23 +22,16 @@ use crate::Error;
 
 /// The tables of the project file that decide findings or what may change the
 /// shared repository.
-const MEANING: [&str; 6] = [
-    "plugins",
-    "extends",
-    "languages",
-    "overrides",
-    "generated",
-    "fix",
-];
+const MEANING: [&str; 5] = ["plugins", "extends", "languages", "overrides", "generated"];
 
 /// The keys of a rule that are meaning; its model bindings are environment.
 const MEANING_RULE: [&str; 6] = [
     "level",
     "options",
     "generated",
-    "check",
-    "fix",
+    "safety",
     "evaluation",
+    "fix",
 ];
 
 /// What a user's file and a repository-local file hold: the keys of the
@@ -55,9 +48,10 @@ pub struct EnvironmentSpec {
     /// the `models` binding of the same task for that decision.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub rules: BTreeMap<String, EnvironmentRule>,
-    /// What happens to a fix by a model without a person's hand.
-    #[serde(default, skip_serializing_if = "ApprovalSpec::is_empty")]
-    pub approval: ApprovalSpec,
+    /// Whether a fix that is not safe is written once verified, without a
+    /// person's hand; the rest of the project's `fix` table is the project's.
+    #[serde(default, skip_serializing_if = "FixEnvironment::is_empty")]
+    pub fix: FixEnvironment,
     /// The sandbox the programs run in, and the hosts checks may reach.
     #[serde(default, skip_serializing_if = "SandboxSpec::is_empty")]
     pub sandbox: SandboxSpec,
@@ -73,9 +67,9 @@ pub struct EnvironmentRule {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<Names>,
     /// The agent, or the route of several, that fixes this decision by
-    /// editing files, before `models.edit`.
+    /// editing files, before `models.agent`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edit: Option<Names>,
+    pub agent: Option<Names>,
 }
 
 impl Spec for EnvironmentSpec {
@@ -92,6 +86,14 @@ impl EnvironmentSpec {
         let fail = |message: String| Error::Config(format!("{origin}: {message}"));
         if let Some(key) = table.keys().find(|key| MEANING.contains(&key.as_str())) {
             return Err(fail(project_only(key)));
+        }
+        let fix = table.get("fix").and_then(toml::Value::as_table);
+        if let Some(key) = fix
+            .into_iter()
+            .flat_map(toml::Table::keys)
+            .find(|k| *k != "unsafe")
+        {
+            return Err(fail(project_only(&format!("fix.{key}"))));
         }
         let rules = table.get("rules").and_then(toml::Value::as_table);
         for (id, rule) in rules.into_iter().flatten() {
@@ -136,13 +138,13 @@ impl EnvironmentSpec {
             .iter()
             .filter_map(|(id, setting)| match setting {
                 RuleSetting::Detailed(detail)
-                    if detail.classification.is_some() || detail.edit.is_some() =>
+                    if detail.classification.is_some() || detail.agent.is_some() =>
                 {
                     Some((
                         id.clone(),
                         EnvironmentRule {
                             classification: detail.classification.clone(),
-                            edit: detail.edit.clone(),
+                            agent: detail.agent.clone(),
                         },
                     ))
                 }
@@ -152,7 +154,9 @@ impl EnvironmentSpec {
         Self {
             models: project.models.clone(),
             rules,
-            approval: project.approval,
+            fix: FixEnvironment {
+                unsafe_fixes: project.fix.unsafe_fixes,
+            },
             sandbox: project.sandbox.clone(),
         }
     }
@@ -161,7 +165,7 @@ impl EnvironmentSpec {
     pub(super) fn over(&mut self, later: &Self) {
         let (models, from) = (&mut self.models, &later.models);
         models.classification = from.classification.clone().or(models.classification.take());
-        models.edit = from.edit.clone().or(models.edit.take());
+        models.agent = from.agent.clone().or(models.agent.take());
         models.routing = from.routing.or(models.routing);
         models.budget = from.budget.or(models.budget);
         models.explore = from.explore.or(models.explore);
@@ -169,9 +173,9 @@ impl EnvironmentSpec {
         for (id, next) in &later.rules {
             let rule = self.rules.entry(id.clone()).or_default();
             rule.classification = next.classification.clone().or(rule.classification.take());
-            rule.edit = next.edit.clone().or(rule.edit.take());
+            rule.agent = next.agent.clone().or(rule.agent.take());
         }
-        self.approval.fix = later.approval.fix.or(self.approval.fix);
+        self.fix.unsafe_fixes = later.fix.unsafe_fixes.or(self.fix.unsafe_fixes);
         self.sandbox.over(&later.sandbox);
     }
 }
@@ -187,8 +191,8 @@ pub(super) fn bind(into: &mut Rules, env: &BTreeMap<String, EnvironmentRule>) {
         if let Some(names) = &next.classification {
             rule.classification = Some(names.iter().map(str::to_owned).collect());
         }
-        if let Some(names) = &next.edit {
-            rule.edit = Some(names.iter().map(str::to_owned).collect());
+        if let Some(names) = &next.agent {
+            rule.agent = Some(names.iter().map(str::to_owned).collect());
         }
     }
 }
@@ -199,9 +203,9 @@ pub(super) fn binding_in(rules: &BTreeMap<String, RuleSetting>) -> Option<String
         let RuleSetting::Detailed(detail) = setting else {
             return None;
         };
-        let task = match (&detail.classification, &detail.edit) {
+        let task = match (&detail.classification, &detail.agent) {
             (Some(_), _) => "classification",
-            (_, Some(_)) => "edit",
+            (_, Some(_)) => "agent",
             _ => return None,
         };
         Some(format!("\"{id}\".{task}"))

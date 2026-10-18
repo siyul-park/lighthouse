@@ -1,5 +1,5 @@
 //! The HTTP all protocols share. [`Client`] is the one seam for I/O: a JSON POST
-//! with a bearer key (RFC 6750), answered with the JSON body or the error. A
+//! with the headers the provider declares, answered with the JSON body or the error. A
 //! protocol takes a `&dyn Client`; tests swap the client, never a protocol. [`Http`] is
 //! the client: it pauses before asking again when the service is busy (429,
 //! 503) or overloaded (529), for the `Retry-After` the service sent, in
@@ -17,13 +17,13 @@ const MAX_PAUSE: Duration = Duration::from_secs(60);
 
 /// Something that posts a JSON body and gives the JSON that answers.
 pub trait Client: Sync {
-    /// Posts `body` to `url`, with `key` as the bearer when there is one, giving
-    /// up after `timeout`. An error status fails with the error body the
-    /// service answered, which travels as the `data` of the JSON-RPC error.
+    /// Posts `body` to `url` with `headers`, giving up after `timeout`. An
+    /// error status fails with the error body the service answered, which
+    /// travels as the `data` of the JSON-RPC error.
     fn post(
         &self,
         url: &str,
-        key: Option<&str>,
+        headers: &[(String, String)],
         body: &Value,
         timeout: Duration,
     ) -> Result<Value, ErrorObject>;
@@ -48,13 +48,13 @@ impl Client for Http {
     fn post(
         &self,
         url: &str,
-        key: Option<&str>,
+        headers: &[(String, String)],
         body: &Value,
         timeout: Duration,
     ) -> Result<Value, ErrorObject> {
         let mut pause = Duration::from_secs(1);
         for _ in 0..RETRIES {
-            match post(&self.agent, url, key, body, timeout) {
+            match post(&self.agent, url, headers, body, timeout) {
                 Err(refused) if matches!(refused.status, Some(429 | 503 | 529)) => {
                     let wait = refused
                         .retry_after
@@ -66,7 +66,7 @@ impl Client for Http {
                 other => return other.map_err(|refused| refused.error),
             }
         }
-        post(&self.agent, url, key, body, timeout).map_err(|refused| refused.error)
+        post(&self.agent, url, headers, body, timeout).map_err(|refused| refused.error)
     }
 }
 
@@ -90,7 +90,7 @@ fn unreached(e: ureq::Error) -> Refused {
 fn post(
     agent: &ureq::Agent,
     url: &str,
-    key: Option<&str>,
+    headers: &[(String, String)],
     body: &Value,
     timeout: Duration,
 ) -> Result<Value, Refused> {
@@ -99,8 +99,8 @@ fn post(
         .config()
         .timeout_global(Some(timeout))
         .build();
-    if let Some(key) = key {
-        call = call.header("Authorization", &format!("Bearer {key}"));
+    for (name, value) in headers {
+        call = call.header(name, value);
     }
     let mut response = call.send_json(body).map_err(unreached)?;
     let status = response.status().as_u16();

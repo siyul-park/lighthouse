@@ -157,7 +157,7 @@ fn registered_rules_are_exactly_the_automated_catalog_decisions() {
             Some(CheckKind::Builtin(rule)) => {
                 assert!(rule.named().is_none_or(|rule| rule == id), "{id}");
             }
-            Some(CheckKind::Cel(_) | CheckKind::Model(_)) => {}
+            Some(CheckKind::Cel(_) | CheckKind::Command(_) | CheckKind::Model(_)) => {}
             other => panic!("{id} is registered but its decision's check is {other:?}"),
         }
     }
@@ -188,6 +188,10 @@ fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
     let mut fixable = std::collections::BTreeSet::new();
     for decision in catalog.decisions() {
         let Some(fix) = &decision.fix else { continue };
+        // A command fix is run by the fix run itself, which registers no fixer.
+        if !matches!(fix.kind, FixKind::Ops { .. }) {
+            continue;
+        }
         let id = &decision.id().to_owned();
         fixable.insert(id.clone());
         assert!(registry.rule(id).is_some(), "{id} has a fix but no rule");
@@ -261,7 +265,10 @@ fn default_limit_comes_from_the_catalog() {
 fn bundled_plugins_provide_only_the_fallback_text_language() {
     let registry = lighthouse_checks::registry();
     let plugins: Vec<_> = registry.manifests().iter().map(|p| p.id.as_str()).collect();
-    assert_eq!(plugins, ["core", "metrics", "design", "testing"]);
+    assert_eq!(
+        plugins,
+        ["core", "metrics", "design", "go", "rust", "testing"]
+    );
     let languages: Vec<_> = registry
         .languages()
         .iter()

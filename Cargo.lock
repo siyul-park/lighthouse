@@ -1772,9 +1772,8 @@ dependencies = [
 name = "lighthouse-process"
 version = "0.1.0"
 dependencies = [
+ "ignore",
  "libc",
- "schemars",
- "serde",
  "tempfile",
 ]
 
@@ -2022,6 +2021,7 @@ name = "model-http"
 version = "0.1.0"
 dependencies = [
  "async-openai",
+ "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-resource",
  "serde",

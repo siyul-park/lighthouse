@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lighthouse_model::{Options, Severity};
+use lighthouse_model::{Options, Safety, Severity};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::Value;
@@ -23,8 +23,11 @@ pub struct RuleConfig {
     /// `models.classification`.
     pub classification: Option<Vec<String>>,
     /// The agent that fixes this decision by editing files, before the
-    /// project's `models.edit`.
-    pub edit: Option<Vec<String>>,
+    /// project's `models.agent`.
+    pub agent: Option<Vec<String>>,
+    /// The safety every fix of this decision has, whoever makes it, whatever
+    /// the decision and the provider claim.
+    pub safety: Option<Safety>,
     /// How `lighthouse eval` judges this rule's check.
     pub evaluation: Option<Evaluation>,
 }
@@ -37,7 +40,8 @@ impl RuleConfig {
             options: Options::new(),
             generated: None,
             classification: None,
-            edit: None,
+            agent: None,
+            safety: None,
             evaluation: None,
         }
     }
@@ -53,9 +57,10 @@ impl From<RuleSetting> for RuleConfig {
                 classification: detail
                     .classification
                     .map(|names| names.iter().map(str::to_owned).collect()),
-                edit: detail
-                    .edit
+                agent: detail
+                    .agent
                     .map(|names| names.iter().map(str::to_owned).collect()),
+                safety: detail.safety,
                 evaluation: detail.evaluation,
                 ..Self::new(detail.level.into())
             },
@@ -116,10 +121,15 @@ pub struct RuleDetail {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<Names>,
     /// The agent, or the route of several, that fixes this decision by
-    /// editing files, before the project's `models.edit`. Findings bound to
+    /// editing files, before the project's `models.agent`. Findings bound to
     /// different agents in one file are fixed by one run each.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edit: Option<Names>,
+    pub agent: Option<Names>,
+    /// The safety of every fix of this decision, applied last: `safe` writes
+    /// them with `--fix` (trust the agent here), `unsafe` previews them
+    /// until `--unsafe-fixes`. Where layers disagree, `unsafe` wins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub safety: Option<Safety>,
     /// How `lighthouse eval` judges this rule's check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evaluation: Option<Evaluation>,
@@ -149,8 +159,8 @@ impl From<Option<Severity>> for Level {
 
 /// Later level replaces the earlier one; options merge per key, later wins,
 /// and an object-valued option (a limit per role) merges per key too; a
-/// model route, an edit route and an evaluation policy the later sets replace
-/// the earlier.
+/// model route, an agent route and an evaluation policy the later sets replace
+/// the earlier; a safety does too, unless either is `unsafe`.
 pub(crate) fn merge(into: &mut Rules, from: &Rules) {
     for (id, next) in from {
         match into.get_mut(id) {
@@ -168,9 +178,13 @@ pub(crate) fn merge(into: &mut Rules, from: &Rules) {
                 if next.classification.is_some() {
                     prev.classification.clone_from(&next.classification);
                 }
-                if next.edit.is_some() {
-                    prev.edit.clone_from(&next.edit);
+                if next.agent.is_some() {
+                    prev.agent.clone_from(&next.agent);
                 }
+                prev.safety = match (prev.safety, next.safety) {
+                    (Some(Safety::Unsafe), _) | (_, Some(Safety::Unsafe)) => Some(Safety::Unsafe),
+                    (before, after) => after.or(before),
+                };
             }
             None => {
                 into.insert(id.clone(), next.clone());

@@ -77,7 +77,7 @@ fn a_meaning_key_in_the_user_file_is_a_load_error_in_every_repository() {
 #[test]
 fn a_decision_the_local_file_binds_must_exist() {
     let (dir, _agent) = agent_dir();
-    local(&dir, "[rules.\"local/typo\"]\nedit = \"agent/m\"\n");
+    local(&dir, "[rules.\"local/typo\"]\nagent = \"agent/m\"\n");
 
     lighthouse(dir.path())
         .arg("check")
@@ -91,10 +91,10 @@ fn a_decision_the_local_file_binds_must_exist() {
 #[test]
 fn config_show_origin_names_the_layer_of_each_value() {
     let (dir, _agent) = agent_dir();
-    user(&dir, "[models]\nbudget = 7\n[approval]\nfix = \"allow\"\n");
+    user(&dir, "[models]\nbudget = 7\n[fix]\nunsafe = true\n");
     local(
         &dir,
-        "[models]\nedit = \"second/m\"\n[models.providers.second]\ncommand = [\"sh\", \"x.sh\"]\n[rules.\"local/naming-ban\"]\nedit = \"second/m\"\n",
+        "[models]\nagent = \"second/m\"\n[models.providers.second]\ncommand = [\"sh\", \"x.sh\"]\n[rules.\"local/naming-ban\"]\nagent = \"second/m\"\n",
     );
 
     let text = shown(&dir, &["--origin"]);
@@ -111,8 +111,8 @@ fn config_show_origin_names_the_layer_of_each_value() {
         "{text}"
     );
     assert!(line(USER_FILE, "models.budget = 7"), "{text}");
-    assert!(line(USER_FILE, "approval.fix = \"allow\""), "{text}");
-    assert!(line(LOCAL_FILE, "models.edit = \"second/m\""), "{text}");
+    assert!(line(USER_FILE, "fix.unsafe = true"), "{text}");
+    assert!(line(LOCAL_FILE, "models.agent = \"second/m\""), "{text}");
     assert!(
         line(
             LOCAL_FILE,
@@ -121,7 +121,10 @@ fn config_show_origin_names_the_layer_of_each_value() {
         "{text}"
     );
     assert!(
-        line(LOCAL_FILE, "rules.\"local/naming-ban\".edit = \"second/m\""),
+        line(
+            LOCAL_FILE,
+            "rules.\"local/naming-ban\".agent = \"second/m\""
+        ),
         "{text}"
     );
 }
@@ -185,7 +188,7 @@ fn a_personal_file_withdraws_the_trust_given_to_the_project_without_it() {
         .assert()
         .stderr(predicate::str::contains("would fix local/shout"));
 
-    local(&dir, "[approval]\nfix = \"allow\"\n");
+    local(&dir, "[fix]\nunsafe = true\n");
     lighthouse(dir.path())
         .args(["check", "--fix", "--dry-run"])
         .assert()
@@ -204,7 +207,7 @@ fn a_personal_file_withdraws_the_trust_given_to_the_project_without_it() {
 fn two_agents() -> (TempDir, TempDir) {
     let agent =
         "sed 's/bad_one/fixed_one/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n";
-    let rest = format!("{ALLOW}[fix]\ndecisions = [\"local/naming-*\"]\n");
+    let rest = format!("[fix]\n{ALLOW}decisions = [\"local/naming-*\"]\n");
     let (dir, scripts) = agent_project(&format!("\"{BAN2}\" = \"warn\"\n"), agent, &rest);
     let second = WIDE
         .replace(BAN, BAN2)
@@ -221,7 +224,7 @@ fn two_agents() -> (TempDir, TempDir) {
     local(
         &dir,
         &format!(
-            "[models.providers.second]\ncommand = [\"sh\", {:?}]\n[rules.\"{BAN2}\"]\nedit = \"second/m\"\n",
+            "[models.providers.second]\ncommand = [\"sh\", {:?}]\n[rules.\"{BAN2}\"]\nagent = \"second/m\"\n",
             script.to_str().unwrap()
         ),
     );
@@ -331,7 +334,7 @@ fn config_show_hides_what_may_carry_a_secret_in_the_command_and_the_tool() {
     let (dir, _agent) = agent_dir();
     local(
         &dir,
-        "[models.providers.http]\nprotocol = \"openai\"\nbaseUrl = \"https://u:pw-secret@h.test/v1?k=sk-query\"\nextraBody = { key = \"sk-body\" }\n[models.providers.run]\ncommand = [\"agent\", \"--model\", \"{model}\"]\nenv = { TOKEN = \"sk-env\" }\n",
+        "[models.providers.http]\nprotocol = \"openai\"\nurl = \"https://u:pw-secret@h.test/v1?k=sk-query\"\nbody = { key = \"sk-body\" }\n[models.providers.run]\ncommand = [\"agent\", \"--model\", \"{model}\"]\nenv = { TOKEN = \"sk-env\" }\n",
     );
 
     let text = shown(&dir, &["--origin"]);
@@ -401,7 +404,7 @@ fn unbound() -> (TempDir, TempDir) {
     local(
         &dir,
         &format!(
-            "[models]\nedit = \"mine/m\"\n[models.providers.mine]\ncommand = [\"sh\", {:?}]\n",
+            "[models]\nagent = \"mine/m\"\n[models.providers.mine]\ncommand = [\"sh\", {:?}]\n",
             scripts.path().join("agent.sh").to_str().unwrap()
         ),
     );

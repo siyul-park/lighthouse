@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    Check, CheckKind, DecisionStatus, Error, Example, ExampleKind, Fix, OptionsSchema, Scope,
+    Catalog, Check, CheckKind, DecisionStatus, Error, Example, ExampleKind, Fix, OptionsSchema,
+    Scope,
 };
 use lighthouse_protocol::{DecisionRef, hash};
 
@@ -136,6 +137,15 @@ impl Decision {
         }
     }
 
+    /// Whether this is a decision of the bundled catalog as it ships: the
+    /// programs it names are Lighthouse's own, and run without the trust a
+    /// program of the project or of a plugin needs.
+    pub fn bundled(&self) -> bool {
+        Catalog::bundled()
+            .decision(self.id())
+            .is_some_and(|shipped| shipped == self)
+    }
+
     /// The `<pack>/<name>` id.
     pub fn id(&self) -> &str {
         &self.0.metadata.name
@@ -254,14 +264,17 @@ impl DecisionSpec {
     /// fix: the one place that says. A fix is `safe` only when a program makes
     /// it and the decision authors `error`, and then as far as its `safety`
     /// allows; every other fix, a model's among them, is `unsafe`. A
-    /// provider's claim can make it `unsafe`, never `safe` again.
-    pub fn fix_safety(&self) -> Safety {
-        match &self.fix {
+    /// provider's claim can make it `unsafe`, never `safe` again. The
+    /// `configured` safety of the project (`[rules."<id>"] safety`) is
+    /// applied last and replaces all of that, as ruff's `extend-safe-fixes`
+    /// does.
+    pub fn fix_safety(&self, configured: Option<Safety>) -> Safety {
+        configured.unwrap_or_else(|| match &self.fix {
             Some(fix) if fix.deterministic() && self.severity == Some(Severity::Error) => {
                 fix.safety
             }
             _ => Safety::Unsafe,
-        }
+        })
     }
 
     /// Whether a program decides the decision's findings, as opposed to agent

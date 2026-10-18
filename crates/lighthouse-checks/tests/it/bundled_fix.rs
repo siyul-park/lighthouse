@@ -24,8 +24,7 @@ spec:
   fix:
     safety: safe
     type: command
-    argv: ["sh", "-c", ": > \"$1\"", "sh", "{file}"]
-    output: in-place
+    command: ["sh", "-c", ": > \"$1\"", "sh", "{file}"]
   examples:
     - name: quiet
       language: text

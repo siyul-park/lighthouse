@@ -31,7 +31,7 @@ impl Client for Recording {
     fn post(
         &self,
         url: &str,
-        _: Option<&str>,
+        _: &[(String, String)],
         body: &Value,
         _: Duration,
     ) -> Result<Value, ErrorObject> {

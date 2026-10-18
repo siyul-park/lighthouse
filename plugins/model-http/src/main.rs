@@ -1,6 +1,6 @@
 //! `model-http`: models behind the standard HTTP APIs. A provider declares
-//! which protocols it speaks (`protocol`), where (`baseUrl`) and how it is
-//! authenticated (`keyEnv`); every request names the model. Each published
+//! which protocols it speaks (`protocol`), where (`url`) and how it is
+//! authenticated (`headers`); every request names the model. Each published
 //! protocol is one module of free functions, one per operation used: `openai`
 //! (Chat Completions, which OpenRouter, Ollama, vLLM and LM Studio also
 //! speak) and `typesafe` (System One). `chat` adapts one to the other.

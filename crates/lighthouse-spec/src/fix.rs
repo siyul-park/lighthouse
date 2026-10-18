@@ -4,18 +4,15 @@
 //! model) and every type compiles into a provider of the one `Fixer`
 //! interface.
 
-use std::{collections::BTreeMap, collections::BTreeSet};
+use std::collections::BTreeSet;
 
 use lighthouse_model::{Safety, Severity, ucm::Capability};
-use lighthouse_process::{Output, Stdin};
-use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
-    DEFAULT_TIMEOUT, DecisionSpec, OrderScope,
-    command::mixed_placeholder,
+    DecisionSpec, OrderScope, Point, Program,
     expression::{compile_problem, template_problem},
     union::{refuse_strays, stray_field},
 };
@@ -31,6 +28,12 @@ pub struct Fix {
     /// Provider capabilities the fix needs; without them it is declined.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<Capability>,
+    /// Which fix wins when several of one round overlap: higher first.
+    /// Ties go by the order of the findings. Default: `0`. A fix that only
+    /// restates what others decided, such as a formatter's, is negative, so
+    /// that fixes of content win and formatting follows them.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub priority: i32,
     #[serde(flatten)]
     pub kind: FixKind,
 }
@@ -42,6 +45,8 @@ struct Written {
     safety: Safety,
     #[serde(default)]
     requires: Vec<Capability>,
+    #[serde(default)]
+    priority: i32,
     #[serde(flatten)]
     kind: FixKind,
 }
@@ -49,14 +54,15 @@ struct Written {
 impl<'de> Deserialize<'de> for Fix {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use serde::de::Error as _;
-        const COMMON: [&str; 3] = ["safety", "requires", "type"];
+        const COMMON: [&str; 4] = ["safety", "requires", "priority", "type"];
         let value = Value::deserialize(deserializer)?;
         let table = value
             .as_object()
             .ok_or_else(|| D::Error::custom("a fix is a table"))?;
+        let command = command_fields();
         let own: &[&str] = match table.get("type").and_then(Value::as_str) {
             Some("ops") => &["ops"],
-            Some("command") => &["argv", "output", "stdin", "env", "timeout"],
+            Some("command") => &command,
             Some("model") => &["prompt", "scope"],
             Some("rpc") => &["params"],
             other => {
@@ -74,11 +80,13 @@ impl<'de> Deserialize<'de> for Fix {
         let Written {
             safety,
             requires,
+            priority,
             kind,
         } = serde_json::from_value(value).map_err(D::Error::custom)?;
         Ok(Self {
             safety,
             requires,
+            priority,
             kind,
         })
     }
@@ -123,8 +131,8 @@ impl Fix {
     }
 }
 
-/// How far the change of a fix by a model may go, which the verifier checks.
-/// Ordered from the narrowest.
+/// How far the change of a fix may go, which the verifier checks. Ordered
+/// from the narrowest.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
@@ -133,22 +141,28 @@ pub enum FixScope {
     /// Only inside the symbol of the finding (its extent): the symbol it is
     /// about, else the innermost one around it, else a short file as a whole.
     Symbol,
+    /// Only the file of the finding. What a fix by a command has when it
+    /// declares no scope.
+    File,
     /// Any file the analysis indexes in the run's scope. No limit of its own:
-    /// what a decision that declares no scope has.
+    /// what a fix by a model that declares no scope has.
     #[default]
     Files,
 }
 
 impl FixScope {
-    /// The scope of the fix by a model of a decision whose `fix` is `fix`:
-    /// the `cap` of the project when the decision declares none (it imposes no
-    /// limit of its own), else the narrower of the two. Nobody widens.
+    /// The scope of the fix of a decision whose `fix` is `fix`: the narrower
+    /// of the `cap` of the project and what the decision declares, which for
+    /// a command is its `scope`, else `file`, and for a model its `scope`,
+    /// else no limit of its own. Nobody widens. The project's cap is for
+    /// fixes by a model: callers ask for a command with the widest cap.
     pub fn of_fix(fix: Option<&Fix>, cap: Self) -> Self {
         match fix.map(|f| &f.kind) {
             Some(FixKind::Model {
                 scope: Some(declared),
                 ..
             }) => (*declared).min(cap),
+            Some(FixKind::Command(command)) => command.scope.unwrap_or(Self::File).min(cap),
             _ => cap,
         }
     }
@@ -158,6 +172,7 @@ impl std::fmt::Display for FixScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Symbol => "symbol",
+            Self::File => "file",
             Self::Files => "files",
         })
     }
@@ -314,48 +329,43 @@ impl OpSpec {
     }
 }
 
-/// An external program that fixes a finding, by the process contract: exit `0`
-/// is success and the result is per `output` (an empty result changes nothing),
-/// `1` declines with the reason on stderr, anything else (`>= 2`, a signal, a
-/// timeout) is an error that applies nothing. stdout carries only the result;
-/// stderr is for people. It runs without a shell, in a scratch directory over
-/// the finding's file, with an environment cleared to `PATH`, `HOME`, `LANG`,
-/// `TMPDIR`, the declared `env` and `LIGHTHOUSE_DECISION`, `LIGHTHOUSE_OPTIONS`,
-/// `LIGHTHOUSE_API_VERSION`.
+/// An external program that fixes a finding, by the process contract. Its
+/// `output` says what the result is: `files`, the files it changed in a
+/// scratch copy of the project (a repository of one commit, so tools that need
+/// one find their root), or `stdout`, the new text of `{file}`, which needs no
+/// copy. A result with no change declines the finding, with stderr as the
+/// reason; a code outside `success`, a signal or a timeout is an error that
+/// applies nothing. stdout carries only the result; stderr is for people.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct CommandSpec {
-    /// Program and arguments; `{file}`, `{line}`, `{symbol}` and `{rule}` fill
-    /// whole arguments.
-    pub argv: Vec<String>,
-    #[serde(default)]
-    pub output: Output,
-    #[serde(default)]
-    pub stdin: Stdin,
-    /// Extra environment variables.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub env: BTreeMap<String, String>,
-    /// How long it may run, such as `30s` or `2m`.
-    #[serde(default = "default_timeout")]
-    pub timeout: Duration,
+    #[serde(flatten)]
+    pub program: Program,
+    /// How far the program's change may go. Default: `file`, the file of the
+    /// finding; `symbol` and `files` are what a fix by a model also has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<FixScope>,
 }
 
 impl CommandSpec {
     /// Why the command cannot run as written.
     fn problem(&self) -> Option<String> {
-        const KNOWN: [&str; 4] = ["{file}", "{line}", "{symbol}", "{rule}"];
-        if let Some(problem) = mixed_placeholder(&self.argv, &KNOWN, |arg| {
-            arg.contains("{root}") || KNOWN.iter().any(|p| arg.contains(p))
-        }) {
-            return Some(problem);
-        }
-        self.argv
-            .first()
-            .is_none_or(|program| program.trim().is_empty())
-            .then(|| "`argv` needs a program".to_owned())
+        self.program.problem(Point::Fix).or_else(|| {
+            let filter = self.program.output(Point::Fix) == crate::Output::Stdout;
+            let wide = self.scope.is_some_and(|scope| scope != FixScope::File);
+            (filter && wide).then(|| {
+                "`output: stdout` is the new text of one file: its `scope` is `file`".to_owned()
+            })
+        })
     }
 }
 
-fn default_timeout() -> Duration {
-    DEFAULT_TIMEOUT
+/// The keys a `command` fix may have besides the common ones.
+fn command_fields() -> Vec<&'static str> {
+    let mut own = crate::program::FIELDS.to_vec();
+    own.push("scope");
+    own
+}
+
+fn is_zero(priority: &i32) -> bool {
+    *priority == 0
 }

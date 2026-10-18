@@ -11,7 +11,7 @@ use lighthouse_model::{
 use serde_json::Value;
 
 use super::{Level, Metadata, ProjectSpec, Resource, RuleSetting, rules::RuleDetail};
-use crate::{BuiltinCheck, Catalog, CheckKind, Decision, FORMATTED, Pack, options::KINDS};
+use crate::{BuiltinCheck, Catalog, CheckKind, Decision, Pack, options::KINDS};
 
 /// The standard projects of every pack of `catalog`, pack by pack.
 pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
@@ -42,7 +42,8 @@ fn project(pack: &Pack, rules: &[&Decision], strict: bool) -> Resource<ProjectSp
                     options: Options::from_iter([(KINDS.to_owned(), Value::Array(kinds))]),
                     generated: None,
                     classification: None,
-                    edit: None,
+                    agent: None,
+                    safety: None,
                     evaluation: None,
                 }),
                 None => RuleSetting::Level(level),
@@ -81,7 +82,7 @@ fn runs_as_rule(decision: &Decision) -> bool {
     match &check.kind {
         CheckKind::Cel(_) | CheckKind::Command(_) | CheckKind::Builtin(BuiltinCheck::Op(_)) => true,
         CheckKind::Builtin(BuiltinCheck::Named(named)) => {
-            [ANNOTATION_REASON, UNUSED_ALLOW, FORMATTED].contains(&named.id.as_str())
+            [ANNOTATION_REASON, UNUSED_ALLOW].contains(&named.id.as_str())
         }
         CheckKind::Model(_) => false,
     }

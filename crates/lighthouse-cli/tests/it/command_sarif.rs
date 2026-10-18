@@ -11,7 +11,7 @@ use super::checks::{lighthouse, project, trust, write};
 /// The decision that wraps the tool, once over the project.
 pub(crate) fn wrapping(select: &str) -> String {
     format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: project }}\n  requirement: The tool MUST find nothing.\n  severity: error\n  check:\n    type: command\n    argv: [sh, tools/lint.sh]\n    batch: all\n    output: sarif\n{select}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: bad.txt, body: hello }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: good.txt, body: bye }}]\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: project }}\n  requirement: The tool MUST find nothing.\n  severity: error\n  check:\n    type: command\n    command: [sh, tools/lint.sh]\n    output: sarif\n{select}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: bad.txt, body: hello }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: good.txt, body: bye }}]\n"
     )
 }
 
@@ -105,7 +105,7 @@ pub(crate) fn check(dir: &Path) -> Vec<Value> {
 #[test]
 fn a_sarif_log_becomes_findings_with_the_decisions_severity_and_the_tools_evidence() {
     let select =
-        "    select: { ruleIds: [errcheck, \"govet:*\", \"style:*\"], levels: [error, warning] }\n";
+        "    sarif: { rules: [errcheck, \"govet:*\", \"style:*\"], levels: [error, warning] }\n";
     let dir = wrapped(select, &log(2, 3));
     let all = check(dir.path());
 
@@ -165,7 +165,7 @@ fn a_result_the_tool_suppressed_in_the_code_is_an_in_source_suppression() {
 
 #[test]
 fn a_finding_keeps_its_identity_when_its_line_and_the_numbers_in_its_message_move() {
-    let select = "    select: { ruleIds: [errcheck, \"style:*\"] }\n";
+    let select = "    sarif: { rules: [errcheck, \"style:*\"] }\n";
     let fingerprints = |line: u32, count: u32| {
         let dir = wrapped(select, &log(line, count));
         let mut found: Vec<(String, Value)> = check(dir.path())

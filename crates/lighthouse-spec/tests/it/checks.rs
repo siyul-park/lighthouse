@@ -1,8 +1,9 @@
 //! The providers a `check:` block can name, and what the types around them say.
 
+use lighthouse_process::Policy;
 use lighthouse_spec::{
-    Batch, BuiltinCheck, BuiltinOp, Catalog, Check, CheckKind, CheckOutput, CommandCheck, Decision,
-    DecisionStatus, ExitCodes, ModelCheck, NamedRule,
+    Batching, BuiltinCheck, BuiltinOp, Catalog, Check, CheckKind, CommandCheck, Decision,
+    DecisionStatus, ModelCheck, NamedRule, Output, Point, Program, ProgramSpec, Sandbox, Stdin,
 };
 use lighthouse_test_support::catalog::*;
 use serde_json::json;
@@ -62,68 +63,122 @@ fn builtin_check_named_is_the_id_of_a_registered_rule_only() {
     assert_eq!(op.named(), None);
 }
 
-#[test]
-fn exit_codes_default_to_zero_clean_and_one_findings() {
-    let codes = ExitCodes::default();
-    assert_eq!(codes.clean, [0]);
-    assert_eq!(codes.findings, [1]);
+fn command(value: serde_json::Value) -> CommandCheck {
+    match check(value).unwrap().kind {
+        CheckKind::Command(command) => command,
+        other => panic!("command expected, got {}", other.label()),
+    }
 }
 
 #[test]
-fn command_check_reads_argv_batch_and_exit_codes_and_refuses_strays() {
-    let ok = check(json!({
-        "type": "command", "argv": ["lint", "{files}"], "batch": "all",
-        "exitCodes": {"clean": [0], "findings": [2]}, "timeout": "5s"
-    }))
-    .unwrap();
-    let CheckKind::Command(CommandCheck {
-        batch, exit_codes, ..
-    }) = &ok.kind
-    else {
-        panic!("command expected");
-    };
-    assert_eq!(*batch, Batch::All);
-    assert_eq!(exit_codes.findings, [2]);
-    assert!(check(json!({"type":"command","argv":["x"],"where":"true"})).is_err());
-    assert!(check(json!({"type":"command","argv":["x"],"scope":"file"})).is_err());
+fn a_program_defaults_follow_its_output_and_its_binding_point() {
+    let lines = Program::of(vec!["lint".into()]);
+    assert_eq!(lines.output(Point::Check), Output::Lines);
+    assert_eq!(lines.success(Point::Check), [0, 1]);
+    assert_eq!(lines.output(Point::Fix), Output::Files);
+    assert_eq!(lines.success(Point::Fix), [0]);
+    assert_eq!(lines.output(Point::Verify), Output::Status);
+    assert_eq!(lines.success(Point::Verify), [0]);
+    assert_eq!(lines.timeout(Point::Check).as_secs(), 120);
+    assert_eq!(lines.timeout(Point::Verify).as_secs(), 600);
+    assert_eq!(lines.timeout(Point::Agent).as_secs(), 600);
 }
 
 #[test]
-fn command_check_select_belongs_to_sarif_output_and_names_sarif_levels() {
-    let load = |fields: &str| {
+fn batching_follows_the_placeholders_of_the_command() {
+    let batching =
+        |args: &[&str]| Program::of(args.iter().map(|a| (*a).to_owned()).collect()).batching();
+    assert_eq!(batching(&["lint", "{files}"]), Batching::Files);
+    assert_eq!(batching(&["lint", "{file}"]), Batching::File);
+    assert_eq!(batching(&["lint"]), Batching::Once);
+}
+
+#[test]
+fn command_check_reads_the_program_fields_and_refuses_strays() {
+    let ok = command(json!({
+        "type": "command", "command": ["lint", "{files}"], "success": [0, 2],
+        "timeout": "5s", "output": "status", "files": ["**/*.go"],
+        "env": {"TOKEN": "${TOKEN}"}, "sandbox": {"network": ["api.example.com"]}
+    }));
+    assert_eq!(ok.program.success, Some(vec![0, 2]));
+    assert_eq!(ok.program.output, Some(Output::Status));
+    assert_eq!(ok.files, ["**/*.go"]);
+    assert_eq!(ok.program.env["TOKEN"], "${TOKEN}");
+    assert!(check(json!({"type":"command","command":["x"],"where":"true"})).is_err());
+    assert!(check(json!({"type":"command","command":["x"],"scope":"file"})).is_err());
+    for gone in ["argv", "batch", "exitCodes", "select", "columns"] {
+        let stray = check(json!({"type": "command", "command": ["x"], gone: []}));
+        assert!(stray.is_err(), "`{gone}` is gone");
+    }
+}
+
+fn load_check(fields: &str) -> Result<Catalog, String> {
+    let spec = format!(
+        "  severity: error\n  check:\n    type: command\n    command: [lint]\n{fields}  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
+    );
+    Catalog::from_files(decision_with(&spec)).map_err(|e| e.to_string())
+}
+
+#[test]
+fn sarif_options_belong_to_sarif_output_and_name_sarif_levels() {
+    let sarif = "    sarif: { rules: [\"govet:*\"], levels: [error, note] }\n";
+    assert!(load_check(&format!("    output: sarif\n{sarif}")).is_ok());
+    assert!(
+        load_check(sarif)
+            .unwrap_err()
+            .contains("needs `output: sarif`")
+    );
+    let level = "    output: sarif\n    sarif: { levels: [fatal] }\n";
+    assert!(load_check(level).unwrap_err().contains("SARIF levels"));
+    let stray = "    output: sarif\n    sarif: { select: [x] }\n";
+    assert!(load_check(stray).is_err());
+    for unit in ["utf16CodeUnits", "unicodeCodePoints", "bytes"] {
+        let columns = format!("    output: sarif\n    sarif: {{ columns: {unit} }}\n");
+        assert!(load_check(&columns).is_ok(), "{unit}");
+    }
+    assert!(load_check("    output: sarif\n    sarif: { columns: chars }\n").is_err());
+}
+
+#[test]
+fn a_check_prints_lines_sarif_or_a_status_and_nothing_else() {
+    for output in ["lines", "sarif", "status"] {
+        assert!(
+            load_check(&format!("    output: {output}\n")).is_ok(),
+            "{output}"
+        );
+    }
+    for output in ["files", "stdout"] {
+        let refused = load_check(&format!("    output: {output}\n")).unwrap_err();
+        assert!(refused.contains("`output`"), "{refused}");
+    }
+}
+
+#[test]
+fn a_placeholder_the_binding_point_does_not_accept_is_refused_at_load() {
+    let refused = |args: &str| {
+        load_check("").map(drop).unwrap();
         let spec = format!(
-            "  severity: error\n  check:\n    type: command\n    argv: [lint]\n{fields}  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
+            "  severity: error\n  check:\n    type: command\n    command: {args}\n  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
         );
         Catalog::from_files(decision_with(&spec)).map_err(|e| e.to_string())
     };
-    let select = "    select: { ruleIds: [\"govet:*\"], levels: [error, note] }\n";
-    assert!(load(&format!("    output: sarif\n{select}")).is_ok());
-    assert!(load(select).unwrap_err().contains("needs `output: sarif`"));
-    let level = "    output: sarif\n    select: { levels: [fatal] }\n";
-    assert!(load(level).unwrap_err().contains("SARIF levels"));
-    let stray = "    output: sarif\n    select: { rules: [x] }\n";
-    assert!(load(stray).is_err());
-    for unit in ["utf16CodeUnits", "unicodeCodePoints", "bytes"] {
-        let columns = format!("    output: sarif\n    columns: {unit}\n");
-        assert!(load(&columns).is_ok(), "{unit}");
+    for fine in ["file", "files", "decision"] {
+        assert!(
+            refused(&format!("[lint, \"{{{fine}}}\"]")).is_ok(),
+            "{fine}"
+        );
     }
-    let lines = load("    columns: bytes\n").unwrap_err();
-    assert!(lines.contains("`columns` needs `output: sarif`"), "{lines}");
-    assert!(load("    output: sarif\n    columns: chars\n").is_err());
-}
-
-#[test]
-fn check_output_is_lines_unless_the_check_says_sarif() {
-    let command = |value| match check(value).unwrap().kind {
-        CheckKind::Command(command) => command,
-        other => panic!("command expected, got {}", other.label()),
-    };
-    assert_eq!(
-        command(json!({"type": "command", "argv": ["x"]})).output,
-        CheckOutput::Lines
-    );
-    let sarif = command(json!({"type": "command", "argv": ["x"], "output": "sarif"}));
-    assert_eq!(sarif.output, CheckOutput::Sarif);
+    for (bad, hint) in [
+        ("model", "not a placeholder"),
+        ("line", "not a placeholder"),
+        ("rule", "it is gone"),
+        ("path", "it is gone"),
+    ] {
+        let why = refused(&format!("[lint, \"{{{bad}}}\"]")).unwrap_err();
+        assert!(why.contains(hint) && why.contains(bad), "{bad}: {why}");
+    }
+    let mixed = refused("[lint, \"--file={file}\"]").unwrap_err();
+    assert!(mixed.contains("fills a whole argument"), "{mixed}");
 }
 
 #[test]
@@ -210,7 +265,7 @@ fn a_builtin_names_one_operation_and_only_its_own_fields() {
 fn a_command_cannot_be_a_placeholder() {
     let catalog = |argv: &str| {
         let spec = format!(
-            "  severity: error\n  check:\n    type: command\n    argv: {argv}\n  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
+            "  severity: error\n  check:\n    type: command\n    command: {argv}\n  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
         );
         Catalog::from_files(decision_with(&spec))
     };
@@ -283,4 +338,103 @@ fn parse_template_splits_text_from_holes_and_refuses_an_open_hole() {
     );
     assert!(parse_template("a {{ x").is_err());
     assert_eq!(parse_template("").unwrap(), []);
+}
+
+#[test]
+fn a_program_shows_its_command_line_and_names_what_is_wrong_with_it() {
+    let program = |args: &[&str]| Program::of(args.iter().map(|a| (*a).to_owned()).collect());
+
+    assert_eq!(
+        program(&["gofmt", "-l", "{files}"]).shown(),
+        "gofmt -l {files}"
+    );
+    assert_eq!(program(&["gofmt", "{files}"]).problem(Point::Check), None);
+    assert!(
+        program(&["lint", "{line}"])
+            .problem(Point::Check)
+            .unwrap()
+            .contains("{line}")
+    );
+    assert!(program(&["{file}"]).problem(Point::Fix).is_some());
+
+    let filter = Program {
+        stdin: Stdin::File,
+        output: Some(Output::Stdout),
+        ..program(&["gofmt"])
+    };
+    assert_eq!(filter.problem(Point::Fix), None);
+    let unread = Program {
+        stdin: Stdin::None,
+        ..filter
+    };
+    assert!(unread.problem(Point::Fix).is_some());
+}
+
+#[test]
+fn a_binding_point_accepts_its_placeholders_and_an_output_finds_or_changes() {
+    assert_eq!(Point::Check.accepts(), ["file", "files", "decision"]);
+    assert_eq!(Point::Fix.accepts(), ["file", "line", "symbol", "decision"]);
+    assert!(Point::Verify.accepts().is_empty());
+    assert_eq!(Point::Agent.accepts(), ["model"]);
+    for finds in [Output::Lines, Output::Sarif, Output::Status] {
+        assert!(finds.finds(), "{finds:?}");
+    }
+    for changes in [Output::Files, Output::Stdout] {
+        assert!(!changes.finds(), "{changes:?}");
+    }
+}
+
+#[test]
+fn a_program_adds_its_own_hosts_to_the_sandbox_of_the_project() {
+    let project = Policy {
+        enabled: true,
+        network: vec!["api.project.test".to_owned()],
+        write: Vec::new(),
+    };
+    let own = Program {
+        sandbox: Some(Sandbox {
+            network: vec!["api.own.test".to_owned()],
+            write: Vec::new(),
+        }),
+        ..Program::of(vec!["lint".into()])
+    };
+
+    assert_eq!(
+        own.policy(&project).network,
+        ["api.project.test", "api.own.test"]
+    );
+    assert_eq!(
+        Program::of(vec!["lint".into()]).policy(&project).network,
+        ["api.project.test"]
+    );
+}
+
+#[test]
+fn a_program_is_a_list_or_a_table() {
+    let list: ProgramSpec = serde_json::from_value(json!(["cargo", "test"])).unwrap();
+    assert_eq!(
+        list,
+        ProgramSpec::Command(vec!["cargo".into(), "test".into()])
+    );
+
+    let table: ProgramSpec =
+        serde_json::from_value(json!({"command": ["cargo", "test"], "stdin": "file"})).unwrap();
+    let ProgramSpec::Program(table) = table else {
+        panic!("a table is a program");
+    };
+    assert_eq!(table.stdin, Stdin::File);
+
+    let wrong = serde_json::from_value::<ProgramSpec>(json!({"argv": ["cargo"]}));
+    assert!(wrong.is_err());
+}
+
+#[test]
+fn a_decision_of_the_catalog_as_it_ships_is_bundled_and_an_edited_one_is_not() {
+    let shipped = bundled("go/formatted");
+    assert!(shipped.bundled());
+
+    let mut value = serde_json::to_value(shipped).unwrap();
+    value["spec"]["severity"] = json!("info");
+    let edited: Decision = serde_json::from_value(value).unwrap();
+    assert!(!edited.bundled());
 }

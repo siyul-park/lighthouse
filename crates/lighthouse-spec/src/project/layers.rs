@@ -11,8 +11,9 @@ use serde::Serialize;
 use serde_json::Value;
 
 use super::{
-    Approval, ApprovalSpec, Config, ProviderSpec, Routing,
+    Config, ProviderSpec, Routing,
     environment::EnvironmentSpec,
+    fixing::FixEnvironment,
     models::{DEFAULT_BUDGET, DEFAULT_EXPLORE, ModelsSpec},
     parse_project,
     sandbox::SandboxSpec,
@@ -48,8 +49,8 @@ impl Layer {
 /// An environment key with its effective value, and the layer it came from.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct Entry {
-    /// The key, as a TOML dotted key: `models.edit`,
-    /// `rules."design/complexity".edit`.
+    /// The key, as a TOML dotted key: `models.agent`,
+    /// `rules."design/complexity".agent`.
     pub key: String,
     /// The value as the configuration writes it; what may carry a secret in
     /// a provider is hidden.
@@ -86,7 +87,7 @@ impl Layers {
         merged.over(&personal);
         let mut spec = project.spec;
         spec.models = merged.models;
-        spec.approval = merged.approval;
+        spec.fix.unsafe_fixes = merged.fix.unsafe_fixes;
         spec.sandbox = merged.sandbox;
         let mut config = Config::from_resource(Resource::new(project.metadata, spec))?;
         config.environment = personal.rules;
@@ -123,8 +124,8 @@ fn defaults() -> Layer {
                 explore: Some(DEFAULT_EXPLORE),
                 ..ModelsSpec::default()
             },
-            approval: ApprovalSpec {
-                fix: Some(Approval::default()),
+            fix: FixEnvironment {
+                unsafe_fixes: Some(false),
             },
             sandbox: SandboxSpec {
                 enabled: Some(true),
@@ -141,8 +142,8 @@ fn flatten(env: &EnvironmentSpec) -> Vec<(String, Value)> {
     let models = &env.models;
     let mut out: Vec<(String, Option<Value>)> = vec![
         (
-            "approval.fix".to_owned(),
-            env.approval.fix.and_then(to_value),
+            "fix.unsafe".to_owned(),
+            env.fix.unsafe_fixes.and_then(to_value),
         ),
         ("models.budget".to_owned(), models.budget.and_then(to_value)),
         (
@@ -150,8 +151,8 @@ fn flatten(env: &EnvironmentSpec) -> Vec<(String, Value)> {
             models.classification.as_ref().and_then(to_value),
         ),
         (
-            "models.edit".to_owned(),
-            models.edit.as_ref().and_then(to_value),
+            "models.agent".to_owned(),
+            models.agent.as_ref().and_then(to_value),
         ),
         (
             "models.explore".to_owned(),
@@ -186,8 +187,8 @@ fn flatten(env: &EnvironmentSpec) -> Vec<(String, Value)> {
             rule.classification.as_ref().and_then(to_value),
         ));
         out.push((
-            format!("rules.\"{id}\".edit"),
-            rule.edit.as_ref().and_then(to_value),
+            format!("rules.\"{id}\".agent"),
+            rule.agent.as_ref().and_then(to_value),
         ));
     }
     out.into_iter()
@@ -200,16 +201,17 @@ fn to_value<T: Serialize>(value: T) -> Option<Value> {
 }
 
 /// A provider as it is shown. What may carry a secret is not: the values of
-/// `env`, of the plugin `options` and of `extraBody` (their keys stay), and the
-/// userinfo, query and fragment of `baseUrl`. The `command` is shown as it is.
+/// `env`, `headers`, `body` and the plugin `options` (their keys stay), and the
+/// userinfo, query and fragment of `url`. The `command` is shown as it is.
 fn shown(provider: &ProviderSpec) -> Option<Value> {
     let mut provider = provider.clone();
     provider.env.values_mut().for_each(hide);
+    provider.headers.values_mut().for_each(hide);
     provider.options.values_mut().for_each(|v| *v = hidden());
-    if let Some(body) = provider.extra_body.as_mut() {
+    if let Some(body) = provider.body.as_mut() {
         body.values_mut().for_each(|v| *v = hidden());
     }
-    provider.base_url = provider.base_url.as_deref().map(plain_url);
+    provider.url = provider.url.as_deref().map(plain_url);
     to_value(provider)
 }
 

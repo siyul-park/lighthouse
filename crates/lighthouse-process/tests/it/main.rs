@@ -2,8 +2,9 @@
 
 #[cfg(unix)]
 mod bridge;
-mod format;
+mod copy;
 mod profile;
+mod program;
 mod proxy;
 mod run;
 mod sandbox;

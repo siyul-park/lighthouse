@@ -25,8 +25,7 @@ pub(crate) const OTHER: &str = "pub fn other_one() {}\n";
 
 pub(crate) const LISTED: &str = "[fix]\ndecisions = [\"local/naming-ban\"]\n";
 
-pub(crate) const ALLOWED: &str =
-    "[approval]\nfix = \"allow\"\n[fix]\ndecisions = [\"local/naming-ban\"]\n";
+pub(crate) const ALLOWED: &str = "[fix]\nunsafe = true\ndecisions = [\"local/naming-ban\"]\n";
 
 /// The agent that renames the banned function in `src/lib.rs`.
 pub(crate) const RENAME: &str =
@@ -40,7 +39,7 @@ pub(crate) fn edited(agent: &str, provider: &str, extra: &str) -> (TempDir, Temp
     write(scripts.path(), "agent.sh", agent);
     let script = scripts.path().join("agent.sh");
     let dir = project(&format!(
-        "[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{provider}{extra}",
+        "[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{provider}{extra}",
         script.to_str().unwrap()
     ));
     write(dir.path(), "src/lib.rs", &format!("mod other;\n{LIB}"));
@@ -212,7 +211,7 @@ fn a_failing_agent_leaves_no_scratch_copy_either() {
     let fixed = fix(dir.path(), json!({}));
 
     let reason = fixed["declined"][0]["reason"].as_str().unwrap();
-    assert!(reason.contains("exited with Some(3)"), "{reason}");
+    assert!(reason.contains("exited 3"), "{reason}");
     let scratch = fs::read_to_string(&cwd).unwrap();
     assert!(!Path::new(scratch.trim()).exists());
 }
@@ -281,20 +280,20 @@ fn an_untrusted_project_declines_with_the_trust_message() {
 fn only_a_command_without_a_protocol_can_be_bound_to_edit() {
     for (provider, wanted) in [
         (
-            "protocol = \"openai\"\nbaseUrl = \"http://127.0.0.1:9\"\n",
-            "provider `fake` does not serve `edit`: only a command without a protocol does",
+            "protocol = \"openai\"\nurl = \"http://127.0.0.1:9\"\n",
+            "provider `fake` does not serve `agent`: only a command without a protocol does",
         ),
         (
             "protocol = \"typesafe\"\ncommand = [\"cat\"]\n",
-            "provider `fake` does not serve `edit`: only a command without a protocol does",
+            "provider `fake` does not serve `agent`: only a command without a protocol does",
         ),
         (
             "protocol = \"openai\"\ncommand = [\"cat\"]\n",
-            "a `command` speaks `typesafe` (classification) or plain text (edit)",
+            "a `command` speaks `typesafe` (classification) or plain text (agent)",
         ),
     ] {
         let dir = project(&format!(
-            "[models]\nedit = \"fake/any\"\n[models.providers.fake]\n{provider}"
+            "[models]\nagent = \"fake/any\"\n[models.providers.fake]\n{provider}"
         ));
         let config = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
         let plugin = lighthouse_test_support::model_http();

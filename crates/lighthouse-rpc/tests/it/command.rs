@@ -129,7 +129,7 @@ fn a_command_speaking_openai_is_no_provider_at_all() {
         .clone();
 
     assert!(
-        error.contains("`typesafe` (classification) or plain text (edit)"),
+        error.contains("`typesafe` (classification) or plain text (agent)"),
         "{error}"
     );
 }
@@ -178,7 +178,7 @@ fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
         .unwrap_err();
 
     assert!(said.len() <= 2048, "{}", said.len());
-    assert!(error.to_string().contains("exited with Some(2)"), "{error}");
+    assert!(error.to_string().contains("exited 2"), "{error}");
 }
 
 #[test]
@@ -224,4 +224,90 @@ fn an_agent_runs_with_a_home_of_its_own_and_writes_only_in_its_directory() {
     assert!(xdg.trim().starts_with(home.trim()), "{xdg} under {home}");
     assert!(!std::path::Path::new(home.trim()).exists(), "home removed");
     assert!(!outside.path().join("escaped").exists(), "wrote outside");
+}
+
+/// An agent that writes its key variable and its arguments into its directory
+/// and says the key on stdout, configured with `env = { KEY = "${NAME}" }`.
+fn keyed(name: &str) -> lighthouse_spec::ModelProvider {
+    let script =
+        "printf %s \"$KEY\" > key.txt; printf '%s' \"$*\" > argv.txt; echo \"the key is $KEY\"";
+    provider_of(
+        &format!("env = {{ KEY = \"${{{name}}}\" }}\n"),
+        &serde_json::json!(["sh", "-c", script, "sh", "--model", "{model}"]).to_string(),
+    )
+}
+
+#[test]
+fn a_key_reaches_the_program_by_its_environment_and_nowhere_else() {
+    // SAFETY: this variable belongs to this test.
+    unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_KEY", "sk-agent-secret") };
+    let work = tempfile::tempdir().unwrap();
+    let provider = keyed("LIGHTHOUSE_RPC_TEST_KEY");
+    let command =
+        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+
+    let said = command
+        .edit(&EditRequest {
+            prompt: "go",
+            dir: work.path(),
+        })
+        .unwrap();
+
+    let read = |name: &str| std::fs::read_to_string(work.path().join(name)).unwrap();
+    assert_eq!(
+        read("key.txt"),
+        "sk-agent-secret",
+        "the program has its key"
+    );
+    assert_eq!(read("argv.txt"), "--model m", "the command line has no key");
+    assert_eq!(
+        said, "the key is ${LIGHTHOUSE_RPC_TEST_KEY}",
+        "the notes have its name"
+    );
+    assert!(!format!("{:?}", command.manifest()).contains("sk-agent-secret"));
+}
+
+#[test]
+fn the_version_of_a_model_holds_the_name_of_a_key_and_a_hash_of_its_value() {
+    let work = tempfile::tempdir().unwrap();
+    let version = |value: &str| {
+        // SAFETY: this variable belongs to this test.
+        unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_ROTATED", value) };
+        let provider = keyed("LIGHTHOUSE_RPC_TEST_ROTATED");
+        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default())
+            .unwrap()
+            .manifest()
+            .version
+            .clone()
+    };
+
+    let first = version("sk-one");
+    let again = version("sk-one");
+    let rotated = version("sk-two");
+
+    assert_eq!(first, again);
+    assert_ne!(
+        first, rotated,
+        "another key is another version, so a cache cannot cross"
+    );
+}
+
+#[test]
+fn a_key_that_is_not_set_fails_the_run_naming_the_variable() {
+    let work = tempfile::tempdir().unwrap();
+    let provider = keyed("LIGHTHOUSE_RPC_TEST_NEVER_SET");
+    let command =
+        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+
+    let error = command
+        .edit(&EditRequest {
+            prompt: "go",
+            dir: work.path(),
+        })
+        .unwrap_err();
+
+    assert!(
+        error.to_string().contains("LIGHTHOUSE_RPC_TEST_NEVER_SET"),
+        "{error}"
+    );
 }

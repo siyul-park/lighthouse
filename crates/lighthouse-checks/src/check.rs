@@ -13,14 +13,13 @@ use lighthouse_model::{
 
 use lighthouse_plugin::{Caching, Context, Error as PluginError, Rule, RuleManifest};
 use lighthouse_protocol::hash;
-use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, FORMATTED, Select};
+use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, Select};
 use serde_json::{Map, Value};
 
 use crate::{
     Error,
     cel_rule::CelRule,
     command::CommandRule,
-    formatted,
     manifest::{rule_manifest, rule_options},
     ops,
 };
@@ -41,8 +40,6 @@ enum Kind {
     Order(ops::OrderRule),
     Cycle(ops::CycleRule),
     Command(CommandRule),
-    /// The file equals what the formatter of its language makes of it.
-    Formatted,
     /// The rules about allow annotations: the engine reads the annotations of
     /// the whole project and reports these findings itself, because whether
     /// an annotation is used depends on every other rule's findings. The rule
@@ -65,10 +62,11 @@ impl Check {
                 BuiltinOp::Order { .. } => Kind::Order(ops::OrderRule::new(id, op)?),
                 BuiltinOp::Cycle { .. } => Kind::Cycle(ops::CycleRule::new(id, op)?),
             },
-            CheckKind::Command(command) => Kind::Command(CommandRule::new(check, command)),
-            CheckKind::Builtin(BuiltinCheck::Named(named)) if named.id == FORMATTED => {
-                Kind::Formatted
-            }
+            CheckKind::Command(command) => Kind::Command(CommandRule::new(
+                command,
+                &decision.title,
+                decision.bundled(),
+            )?),
             CheckKind::Builtin(BuiltinCheck::Named(named))
                 if ANNOTATION_RULES.contains(&named.id.as_str()) =>
             {
@@ -110,13 +108,18 @@ impl Check {
             Kind::Cel(rule) => rule.reach(meta.scope),
             Kind::Order(rule) => rule.reach(),
             Kind::Cycle(_) => (Reach::Global, false),
-            Kind::Formatted => (Reach::Local, false),
             Kind::Command(_) | Kind::Annotation => (Reach::Global, false),
         };
         // The findings of a program that reads the code model are stored;
         // those of a command, which reads whatever the program reads, and the
-        // annotation rules, which the engine reports itself, are not.
-        meta.caching = match kind {
+        // annotation rules, which the engine reports itself, are not. A
+        // bundled command that judges a file by its text alone is.
+        meta.caching = match &kind {
+            Kind::Command(rule) if rule.local(meta.scope) => Some(Caching {
+                reach: Reach::Local,
+                positions: false,
+                revision,
+            }),
             Kind::Command(_) | Kind::Annotation => None,
             _ => Some(Caching {
                 reach,
@@ -167,7 +170,6 @@ impl Rule for Check {
             Kind::Order(rule) => rule.check(meta, ctx, &resolved),
             Kind::Cycle(rule) => rule.check(meta, ctx),
             Kind::Command(rule) => rule.check(meta, ctx, &resolved),
-            Kind::Formatted => formatted::check(meta, ctx),
             Kind::Annotation => Ok(Vec::new()),
         }
     }

@@ -1,7 +1,6 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
-use lighthouse_model::Severity;
-use lighthouse_process::{Output, Stdin};
+use lighthouse_model::{Safety, Severity};
 use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_spec::{
     Config, Error, Level, PluginRef, ProjectSpec, Projects, RuleConfig, RuleSetting, Rules,
@@ -304,70 +303,36 @@ fn config_extends() {
 }
 
 #[test]
-fn a_language_formatter_is_the_hosts_and_never_reaches_the_provider() {
-    let config = Config::parse_inline(
-        "[languages.go]\nformatter = [\"gofmt\", \"-w\"]\ntags = [\"x\"]\n[languages.rust]\ntags = []\n",
-    )
-    .unwrap();
-
-    let go = config.formatter("go").unwrap();
-    assert_eq!(go.argv, ["gofmt", "-w"]);
-    assert_eq!(go.stdin, Stdin::None);
-    assert_eq!(go.output, Output::InPlace);
-    assert_eq!(config.formatter("rust"), None);
-    assert!(!options(&config, "go").contains_key("formatter"));
-    assert!(options(&config, "go").contains_key("tags"));
-}
-
-#[test]
-fn a_formatter_must_be_a_non_empty_argv_with_known_keys() {
-    for bad in [
-        "\"gofmt\"",
-        "[]",
-        "[1]",
-        "[\"gofmt\", 2]",
-        "{ stdin = \"file\" }",
-        "{ argv = [\"x\"], stdin = \"pipe\" }",
-        "{ argv = [\"x\"], output = \"json\" }",
-        "{ argv = [\"x\"], output = \"inPlace\" }",
-        "{ argv = [\"x\"], colour = \"red\" }",
-    ] {
-        let result = Config::parse_inline(&format!("[languages.go]\nformatter = {bad}\n"));
-        assert!(result.is_err(), "{bad} was accepted");
-    }
-}
-
-#[test]
 fn a_fix_table_in_the_repository_is_refused_because_trust_is_the_users() {
     assert!(Config::parse_inline("[fix]\ncommands = \"allow\"\n").is_err());
 }
 
 #[test]
-fn formatter() {
-    let config = Config::parse_inline(
-        "[languages.rust]\nformatter = { argv = [\"rustfmt\", \"--emit\", \"stdout\"], stdin = \"file\", output = \"text\", env = { A = \"b\" } }\n[languages.go]\nformatter = { argv = [\"gofmt\"], output = \"in-place\" }\n",
-    )
-    .unwrap();
+fn a_rule_gives_its_fixes_a_safety_that_the_unsafe_of_a_later_layer_beats() {
+    let safety = |text: &str| {
+        let config = Config::parse_inline(text).unwrap();
+        let rules = config
+            .resolve(Path::new("a.go"), "go", &Projects::default())
+            .unwrap();
+        rules.get("d/x").and_then(|rule| rule.safety)
+    };
+    let rule = |safety: &str| format!("[rules.\"d/x\"]\nlevel = \"warn\"\nsafety = \"{safety}\"\n");
 
-    let rust = config.formatter("rust").unwrap();
-
-    assert_eq!(rust.argv, ["rustfmt", "--emit", "stdout"]);
-    assert_eq!(rust.stdin, Stdin::File);
-    assert_eq!(rust.output, Output::Text);
-    assert_eq!(rust.env["A"], "b");
-    assert_eq!(config.formatter("go").unwrap().output, Output::InPlace);
-}
-
-#[test]
-fn config_formatters() {
-    let config = Config::parse_inline(
-        "[languages.go]\nformatter = [\"gofmt\"]\n[languages.rust]\nformatter = { argv = [\"rustfmt\"], stdin = \"file\", output = \"text\" }\n",
-    )
-    .unwrap();
-
-    let ids: Vec<&str> = config.formatters().map(|(id, _)| id).collect();
-
-    assert_eq!(ids, ["go", "rust"]);
+    assert_eq!(safety(&rule("safe")), Some(Safety::Safe));
+    assert_eq!(safety(&rule("unsafe")), Some(Safety::Unsafe));
+    assert_eq!(safety("[rules.\"d/x\"]\nlevel = \"warn\"\n"), None);
+    let later = |first: &str, second: &str| {
+        safety(&format!(
+            "{}[[overrides]]\nfiles = [\"**/*.go\"]\n[overrides.rules.\"d/x\"]\nlevel = \"warn\"\nsafety = \"{second}\"\n",
+            rule(first)
+        ))
+    };
+    assert_eq!(later("unsafe", "safe"), Some(Safety::Unsafe), "unsafe wins");
+    assert_eq!(later("safe", "unsafe"), Some(Safety::Unsafe));
+    assert_eq!(later("safe", "safe"), Some(Safety::Safe));
+    assert!(
+        Config::parse_inline("[rules.\"d/x\"]\nlevel = \"warn\"\nsafety = \"maybe\"\n").is_err()
+    );
 }
 
 #[test]

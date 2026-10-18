@@ -17,7 +17,7 @@
               },
               {
                 "const": "edit",
-                "description": "`models.edit`: the agent that fixes by changing files.",
+                "description": "`models.agent`: the agent that fixes by changing files.",
                 "type": "string"
               },
               {

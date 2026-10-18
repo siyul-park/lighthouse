@@ -5,7 +5,6 @@
 
 mod environment;
 mod fixing;
-mod formatter;
 mod layers;
 mod models;
 mod provider;
@@ -29,11 +28,11 @@ use std::{
 pub use globset::GlobSet;
 
 pub use environment::{EnvironmentRule, EnvironmentSpec};
-pub use fixing::{Approval, ApprovalSpec, FixPolicy, FixSpec};
+pub use fixing::{FixEnvironment, FixPolicy, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
 pub use layers::{BUNDLED, Entry, Layer, Layers};
 use lighthouse_model::{Options, Severity};
-pub use lighthouse_process::{Formatter, Policy};
+pub use lighthouse_process::Policy;
 use lighthouse_resource::{Duration, documents, resource};
 pub use lighthouse_resource::{Format, Metadata, Resource};
 pub use models::{Evaluation, Models, Routing};
@@ -84,7 +83,6 @@ struct LanguageConfig {
     /// Handed to the language's provider.
     options: Options,
     constructors: Option<Vec<String>>,
-    formatter: Option<Formatter>,
 }
 
 impl PluginRef {
@@ -218,13 +216,8 @@ impl Config {
                 "`models.explore` is {share}, not a share from 0 to 1"
             )));
         }
-        if let Some(at) = spec
-            .fix
-            .verify
-            .iter()
-            .position(|argv| argv.first().is_none_or(|program| program.trim().is_empty()))
-        {
-            return Err(Error::Config(format!("`fix.verify[{at}]` needs a program")));
+        if let Some(problem) = spec.fix.problem() {
+            return Err(Error::Config(problem));
         }
         let rules = |settings: BTreeMap<String, RuleSetting>| -> Rules {
             settings
@@ -252,18 +245,11 @@ impl Config {
             .collect::<Result<_, Error>>()?;
         let mut languages = BTreeMap::new();
         for (id, language) in spec.languages {
-            let formatter = language.formatter.map(Formatter::from);
-            if formatter.as_ref().is_some_and(|f| f.argv.is_empty()) {
-                return Err(Error::Config(format!(
-                    "`languages.{id}.formatter` must have a non-empty `argv`"
-                )));
-            }
             languages.insert(
                 id,
                 LanguageConfig {
                     options: language.options,
                     constructors: language.constructor_prefixes,
-                    formatter,
                 },
             );
         }
@@ -279,7 +265,7 @@ impl Config {
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
             sandbox: spec.sandbox.into(),
-            fix: FixPolicy::new(spec.fix, spec.approval),
+            fix: FixPolicy::new(spec.fix),
             extends: spec.extends,
             rules: rules(spec.rules),
             environment: BTreeMap::new(),
@@ -329,20 +315,8 @@ impl Config {
         self.plugins.iter().any(|p| p.id == id)
     }
 
-    /// Every language's formatter, by language id.
-    pub fn formatters(&self) -> impl Iterator<Item = (&str, &Formatter)> {
-        self.languages
-            .iter()
-            .filter_map(|(id, l)| Some((id.as_str(), l.formatter.as_ref()?)))
-    }
-
-    /// The formatter of a language, if its configuration names one.
-    pub fn formatter(&self, language: &str) -> Option<&Formatter> {
-        self.languages.get(language)?.formatter.as_ref()
-    }
-
     /// `languages.<id>` options handed to the language's provider; the
-    /// `formatter` key is the host's and is not among them.
+    /// `constructorPrefixes` key is the host's and is not among them.
     pub fn languages(&self) -> impl Iterator<Item = (&str, &Options)> {
         self.languages
             .iter()
@@ -390,15 +364,15 @@ impl Config {
     }
 
     /// How the programs of the project run: in the OS sandbox or, in a trusted
-    /// project that says so, with the user's full access; and the hosts its
-    /// checks and verification commands may reach.
+    /// project that says so, with the user's full access; and the hosts and
+    /// places they may reach, besides what each program lists.
     pub fn sandbox(&self) -> &Policy {
         &self.sandbox
     }
 
-    /// What the project allows of fixes by models: whether a verified one is
-    /// written, the decisions, the widest change, and the commands that must
-    /// pass after them.
+    /// What the project allows of fixes: whether a verified one that is not
+    /// safe is written, the decisions a model may fix, the widest change, and
+    /// the programs that must pass after them.
     pub fn fix(&self) -> &FixPolicy {
         &self.fix
     }

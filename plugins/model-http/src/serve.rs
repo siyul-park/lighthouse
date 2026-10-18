@@ -107,7 +107,7 @@ mod tests {
                 },
             )]
             .into(),
-            options: json!({ "protocol": protocol, "baseUrl": url })
+            options: json!({ "protocol": protocol, "url": url })
                 .as_object()
                 .unwrap()
                 .clone(),
