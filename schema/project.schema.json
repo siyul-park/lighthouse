@@ -267,7 +267,7 @@
               "type": "null"
             }
           ],
-          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. It makes the fixes of\nthe decisions `[fix] decisions` lists. One binding for the project; a\nrequest moves to the next model of a route when one fails."
+          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. It makes the fixes of\nthe decisions `[fix] decisions` lists, unless a rule binds its own\n`edit`. A request moves to the next model of a route when one fails."
         },
         "explore": {
           "description": "The share, from 0 to 1, of the subjects an attached model fails that are\nsent on to the next layer as if it had abstained, so that labels keep\ncoming from where the model is surest. The same subjects every run.\nDefault: 0.05.",
@@ -596,6 +596,17 @@
             }
           ],
           "description": "The model, or the route of several, that judges this decision, before\nthe project's `models.classification`. When it abstains, the subject is\nleft to agent review."
+        },
+        "edit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The agent, or the route of several, that fixes this decision by\nediting files, before the project's `models.edit`. Findings bound to\ndifferent agents in one file are fixed by one run each."
         },
         "evaluation": {
           "anyOf": [

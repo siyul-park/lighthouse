@@ -217,12 +217,18 @@ fn init_keeps_the_store_out_of_version_control() {
     let fresh = tempfile::tempdir().unwrap();
     lighthouse(fresh.path()).arg("init").assert().success();
     let ignore = |dir: &TempDir| fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-    assert_eq!(ignore(&fresh), ".lighthouse/*.db*\n");
+    assert_eq!(
+        ignore(&fresh),
+        ".lighthouse/*.db*\n.lighthouse/local.toml\n"
+    );
 
     let existing = tempfile::tempdir().unwrap();
     fs::write(existing.path().join(".gitignore"), "target").unwrap();
     lighthouse(existing.path()).arg("init").assert().success();
-    assert_eq!(ignore(&existing), "target\n.lighthouse/*.db*\n");
+    assert_eq!(
+        ignore(&existing),
+        "target\n.lighthouse/*.db*\n.lighthouse/local.toml\n"
+    );
 
     let attributes = fs::read_to_string(fresh.path().join(".gitattributes")).unwrap();
     assert_eq!(attributes, ".lighthouse/decisions.jsonl merge=union\n");
@@ -230,7 +236,10 @@ fn init_keeps_the_store_out_of_version_control() {
     let ignoring = tempfile::tempdir().unwrap();
     fs::write(ignoring.path().join(".gitignore"), ".lighthouse/*.db*\n").unwrap();
     lighthouse(ignoring.path()).arg("init").assert().success();
-    assert_eq!(ignore(&ignoring), ".lighthouse/*.db*\n");
+    assert_eq!(
+        ignore(&ignoring),
+        ".lighthouse/*.db*\n.lighthouse/local.toml\n"
+    );
 }
 
 #[test]

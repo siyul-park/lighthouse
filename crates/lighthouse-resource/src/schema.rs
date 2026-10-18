@@ -22,20 +22,23 @@ impl Descriptor {
             schema: schema::<S>(),
         }
     }
+
+    /// The descriptor of the kind whose spec is `S`, for a file that is the
+    /// spec alone, without the envelope.
+    pub fn bare<S: Spec + JsonSchema>() -> Self {
+        let root = serde_json::to_value(schemars::schema_for!(S)).expect("a schema serializes");
+        Self {
+            kind: S::KIND,
+            schema: identified::<S>(root),
+        }
+    }
 }
 
 /// The JSON Schema (draft 2020-12) of a whole document of spec `S`.
 pub fn schema<S: Spec + JsonSchema>() -> Value {
-    let mut root =
+    let root =
         serde_json::to_value(schemars::schema_for!(Resource<S>)).expect("a schema serializes");
-    if let Value::Object(map) = &mut root {
-        map.insert(
-            "$id".to_owned(),
-            Value::String(format!("{SCHEMA_URL_BASE}/{}", schema_file(S::KIND))),
-        );
-        map.insert("title".to_owned(), Value::String(S::KIND.to_owned()));
-    }
-    root
+    identified::<S>(root)
 }
 
 /// The file name of a kind's schema: `DecisionOverride` is
@@ -63,4 +66,16 @@ pub fn header(kind: &str, base: &str) -> String {
         base.trim_end_matches('/'),
         schema_file(kind)
     )
+}
+
+/// `root` with the `$id` and the title of the kind of `S`.
+fn identified<S: Spec>(mut root: Value) -> Value {
+    if let Value::Object(map) = &mut root {
+        map.insert(
+            "$id".to_owned(),
+            Value::String(format!("{SCHEMA_URL_BASE}/{}", schema_file(S::KIND))),
+        );
+        map.insert("title".to_owned(), Value::String(S::KIND.to_owned()));
+    }
+    root
 }

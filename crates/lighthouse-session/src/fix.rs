@@ -307,7 +307,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     let bound = session.config.models(catalog.projects())?;
     let (engine, notices) = session.engine()?;
     let permit = permitted(&session.config, catalog, &|id| engine.active(id))?;
-    let asks_model = !bound.edit.is_empty() && !permit.ids.is_empty();
+    let asks_model = bound.binds_edit() && !permit.ids.is_empty();
     let plan = FixPlan::from_catalog(catalog);
     let plan = if permit.ids.is_empty() {
         plan

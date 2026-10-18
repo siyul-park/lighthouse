@@ -1,0 +1,67 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "Show the effective environment: models, providers, bindings, approval.\n\nMeaning is the project's alone (`lighthouse.toml`); how this machine computes and applies is read from, in order, the bundled defaults, the project, your file (`$XDG_CONFIG_HOME/lighthouse/config.toml`, default `~/.config/lighthouse/config.toml`) and the repository-local `.lighthouse/local.toml`. A later layer wins key by key; a provider is replaced whole. Shows each key that has a value, sorted; --origin names the layer each value comes from, as `git config --show-origin` does. The values a provider passes to its program (`env`) are hidden.\n\nExamples:\n  lighthouse config show\n  lighthouse config show --origin\n  lighthouse config show --origin --format json",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`config show`.",
+    "properties": {
+      "origin": {
+        "default": false,
+        "description": "Name, for each key, the layer its value comes from: `bundled`, or the\nfile.",
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "name": "config_show",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/config-show.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The `ConfigShow` kind.",
+    "properties": {
+      "settings": {
+        "description": "The environment keys that have a value, sorted by key.",
+        "items": {
+          "description": "An environment key as `config show` prints it.",
+          "properties": {
+            "key": {
+              "description": "The key, as a TOML dotted key.",
+              "type": "string"
+            },
+            "origin": {
+              "description": "With `--origin`: `bundled`, or the file that set the value, relative\nto the project when it lies in it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": {
+              "description": "The effective value; the values of a provider's `env` are hidden."
+            }
+          },
+          "required": [
+            "key",
+            "value"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "settings"
+    ],
+    "title": "ConfigShow",
+    "type": "object"
+  },
+  "title": "Show the effective environment: models, providers, bindings, approval"
+}

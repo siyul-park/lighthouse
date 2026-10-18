@@ -1,0 +1,273 @@
+{
+  "$defs": {
+    "Approval": {
+      "description": "Whether a fix a model proposed and the checks accepted is written.",
+      "oneOf": [
+        {
+          "const": "ask",
+          "description": "Reported with its diff (previewed) and left for a hand to apply.",
+          "type": "string"
+        },
+        {
+          "const": "allow",
+          "description": "Written (applied) like any other applied fix, without `--unsafe-fixes`.",
+          "type": "string"
+        }
+      ]
+    },
+    "ApprovalSpec": {
+      "additionalProperties": false,
+      "description": "The `approval` table of a project: what happens without a person's hand.",
+      "properties": {
+        "fix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Approval"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What becomes of a verified fix by a model. Default: `ask`."
+        }
+      },
+      "type": "object"
+    },
+    "EnvironmentRule": {
+      "additionalProperties": false,
+      "description": "The bindings one decision has of its own. Its level, options and every\nother key are the project's.",
+      "properties": {
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model, or the route of several, that judges this decision, before\n`models.classification`."
+        },
+        "edit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The agent, or the route of several, that fixes this decision by\nediting files, before `models.edit`."
+        }
+      },
+      "type": "object"
+    },
+    "ModelsSpec": {
+      "additionalProperties": false,
+      "description": "The `models` table of a project: its bindings and limits, and its own\nproviders.",
+      "properties": {
+        "budget": {
+          "description": "Requests a run may send to models that cost something; the subjects\nof the rest are left to review. Default: 200.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model (`<provider>/<model>`), or the route of several, that judges\na decision no rule binds and no trained model is attached to. A request\nmoves to the next model of a route when one fails. When the route\nabstains, the subject is left to agent review."
+        },
+        "edit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. It makes the fixes of\nthe decisions `[fix] decisions` lists, unless a rule binds its own\n`edit`. A request moves to the next model of a route when one fails."
+        },
+        "explore": {
+          "description": "The share, from 0 to 1, of the subjects an attached model fails that are\nsent on to the next layer as if it had abstained, so that labels keep\ncoming from where the model is surest. The same subjects every run.\nDefault: 0.05.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "providers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ProviderSpec"
+          },
+          "description": "The providers the project defines, by name; a name that is built in\noverrides it.",
+          "type": "object"
+        },
+        "routing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Routing"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which model of a route a request starts at. Default: `ordered`."
+        }
+      },
+      "type": "object"
+    },
+    "Names": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "One name or several, in the order written: the protocols a provider speaks\n(each operation uses the one that covers it: classification `typesafe`,\nelse `openai`), or the models of a route."
+    },
+    "ProviderSpec": {
+      "additionalProperties": false,
+      "description": "A provider of models as the project writes it, under\n`[models.providers.<name>]`. A model is named `<provider>/<model>`.\n\nA provider is reached by exactly one of `baseUrl` (HTTP), `command` (a\nstdio process) and `plugin` (an rpc plugin); the only exception is a\n`protocol` of `openai` or `typesafe` alone, which is HTTP at that\nprotocol's own service. Fields that belong to one reach are refused on the\nothers.",
+      "properties": {
+        "baseUrl": {
+          "description": "The reach over HTTP: where requests go.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "command": {
+          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer. Without a\n`protocol` the prompt is plain text on stdin and the program serves\n`edit`: it runs in a scratch copy of the project and changes the files\nthere.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "cost": {
+          "description": "What one answer costs. Default: 1.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "`command` only: variables the program is given besides the allowlist.",
+          "type": "object"
+        },
+        "extraBody": {
+          "additionalProperties": true,
+          "description": "HTTP only: a JSON object merged shallowly into every request body, its\nkeys overriding the body's own (the OpenAI SDK's `extra_body`).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "keyEnv": {
+          "description": "The environment variable that holds the key: sent as the bearer of an\nHTTP request, or passed through to a `command`; none for a service that\nneeds no key. Default at a protocol's own service: that protocol's.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "`plugin` only: what the plugin is told besides the model.",
+          "type": "object"
+        },
+        "plugin": {
+          "description": "The reach as a listed plugin that offers models.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pointer": {
+          "description": "`command` with `protocol = \"typesafe\"` only: RFC 6901 JSON Pointer to\nthe response inside the printed JSON (stdout is one JSON value), when\nthe program wraps it in an envelope.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification),\nor plain text without a `protocol` (it serves `edit`); a `plugin` must\nnot name one: its handshake says what it serves."
+        },
+        "timeout": {
+          "description": "How long one request may take, such as `90s`: a run of a `command`\n(default 120s, 10m for `edit`) or an HTTP request of a `baseUrl`\nprovider (default 120s; reasoning models may need `10m`). A `plugin`\nprovider has none: a plugin is not told one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Routing": {
+      "description": "Which model of a route a request goes to first.",
+      "oneOf": [
+        {
+          "const": "ordered",
+          "description": "The first model, then the others in the order written.",
+          "type": "string"
+        },
+        {
+          "const": "round-robin",
+          "description": "Each request starts at the next model, so load is spread; the others\nfollow in the order written, wrapping.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/environment.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "What a user's file and a repository-local file hold: the keys of the\nproject that are about this machine. Later layers win key by key; a\nprovider is replaced whole by name, a binding is replaced, never joined.",
+  "properties": {
+    "approval": {
+      "$ref": "#/$defs/ApprovalSpec",
+      "description": "What happens to a fix by a model without a person's hand."
+    },
+    "models": {
+      "$ref": "#/$defs/ModelsSpec",
+      "description": "The bindings, limits and providers of this machine; the same table as\nthe project's `models`."
+    },
+    "rules": {
+      "additionalProperties": {
+        "$ref": "#/$defs/EnvironmentRule"
+      },
+      "description": "The model bindings of single decisions, by decision id; they override\nthe `models` binding of the same task for that decision.",
+      "type": "object"
+    }
+  },
+  "title": "Environment",
+  "type": "object"
+}

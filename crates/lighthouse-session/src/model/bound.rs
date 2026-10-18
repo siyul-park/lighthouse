@@ -17,8 +17,11 @@ pub enum Binding {
     Classification,
     /// `models.edit`: the agent that fixes by changing files.
     Edit,
-    /// A rule of the configuration names it.
+    /// A rule of the configuration names it for classification.
     Rule,
+    /// A rule of the configuration names it for the agent that edits.
+    #[serde(rename = "rule-edit")]
+    RuleEdit,
     /// A trained model attached by an approved revision.
     Attached,
 }
@@ -70,6 +73,13 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
         if selector.matches(decision) {
             for model in models {
                 bind(model, Some(decision), Binding::Rule);
+            }
+        }
+    }
+    for (decision, models) in bound.edit_routes() {
+        if selector.matches(decision) {
+            for model in models {
+                bind(model, Some(decision), Binding::RuleEdit);
             }
         }
     }

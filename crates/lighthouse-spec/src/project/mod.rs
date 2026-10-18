@@ -3,8 +3,10 @@
 //! `strict` projects of a pack derive from its decisions, and a catalog may
 //! hold more.
 
+mod environment;
 mod fixing;
 mod formatter;
+mod layers;
 mod models;
 mod provider;
 mod resolved;
@@ -25,8 +27,10 @@ use std::{
 
 pub use globset::GlobSet;
 
+pub use environment::{EnvironmentRule, EnvironmentSpec};
 pub use fixing::{Approval, ApprovalSpec, FixPolicy, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
+pub use layers::{BUNDLED, Entry, Layer, Layers};
 use lighthouse_model::{Options, Severity};
 pub use lighthouse_process::Formatter;
 use lighthouse_resource::{Duration, documents, resource};
@@ -171,6 +175,9 @@ pub struct Config {
     fix: FixPolicy,
     extends: Vec<String>,
     rules: Rules,
+    /// The model bindings of single decisions the personal layers set: they
+    /// win over every rule of the project.
+    environment: BTreeMap<String, EnvironmentRule>,
     overrides: Vec<Override>,
     resolved: Resolved,
 }
@@ -184,15 +191,7 @@ impl Config {
 
     /// Parses `text` in `format`; `path` only names it in errors.
     pub fn parse_as(format: Format, path: &str, text: &str) -> Result<Self, Error> {
-        let mut docs = documents(format, path, text)?;
-        if docs.len() != 1 {
-            return Err(Error::Documents {
-                path: path.to_owned(),
-                found: docs.len(),
-            });
-        }
-        let project = resource::<ProjectSpec>(path, &docs.remove(0))?;
-        Self::from_resource(project)
+        Self::from_resource(parse_project(format, path, text)?)
     }
 
     /// Parses a bare spec written in TOML, without the envelope: for
@@ -274,6 +273,7 @@ impl Config {
             fix: spec.fix.into(),
             extends: spec.extends,
             rules: rules(spec.rules),
+            environment: BTreeMap::new(),
             overrides,
             resolved: Resolved::default(),
         })
@@ -443,6 +443,7 @@ impl Config {
                     }
                 }
             }
+            environment::bind(&mut out, &self.environment);
             out
         }))
     }
@@ -508,4 +509,17 @@ fn globs(patterns: &[String]) -> Result<Option<GlobSet>, Error> {
         return Ok(None);
     }
     glob_set(patterns).map(Some)
+}
+
+/// The `Project` document `text` is, read in `format`; `path` only names it in
+/// errors.
+fn parse_project(format: Format, path: &str, text: &str) -> Result<Resource<ProjectSpec>, Error> {
+    let mut docs = documents(format, path, text)?;
+    if docs.len() != 1 {
+        return Err(Error::Documents {
+            path: path.to_owned(),
+            found: docs.len(),
+        });
+    }
+    Ok(resource::<ProjectSpec>(path, &docs.remove(0))?)
 }

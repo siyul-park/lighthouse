@@ -1,7 +1,8 @@
 //! Proposing the fixes of an agent that edits. The findings given to a model
-//! are grouped by file and by the scope of their fix, and the agent is run
-//! once for each group, one run after another in the order of the paths, the
-//! narrower scope first: they form a chain. Each run starts from the project
+//! are grouped by file, the scope of their fix and the agent their decisions
+//! are bound to, and the agent is run once for each group, one run after
+//! another in the order of the paths, the narrower scope first, then of the
+//! agents: they form a chain. Each run starts from the project
 //! with every edit the runs before it were accepted with, so that whole-file
 //! results never overwrite each other, and its edit is accepted only over
 //! the texts it found (see `conflict`). Each run is a link of the chain with
@@ -34,6 +35,10 @@ type Asked<'o> = (&'o Diagnostic, FixBinding);
 /// The findings a run declines, and why.
 type Failed<'o> = (Vec<&'o Diagnostic>, String);
 
+/// The run each finding goes to: its file, the scope of its fix and the agent
+/// its decision is bound to.
+type RunKey = (PathBuf, FixScope, Vec<String>);
+
 /// A run of the chain that was accepted: the findings it was for, who made
 /// the edit, and each file it changed with the text it started from and the
 /// one it left.
@@ -61,7 +66,7 @@ impl Proposer<'_> {
         let mut standing = texts.clone();
         let mut proposals = Vec::new();
         let mut accepted = 0;
-        for ((file, _), mut group) in by_run(found, models) {
+        for ((file, ..), mut group) in by_run(found, models) {
             let rest = group.split_off(group.len().min(MAX_FINDINGS));
             for (finding, _) in &rest {
                 decline(
@@ -225,16 +230,17 @@ fn language_of(world: &World<'_>, file: &Path) -> String {
         .map_or_else(String::new, |f| f.lang.clone())
 }
 
-/// The findings by the run they go to: their file and the scope of their fix,
-/// in the order of the paths, the narrower scope first, and then of their
-/// lines.
-fn by_run<'o>(
-    found: Vec<Asked<'o>>,
-    models: &ModelFixer<'_>,
-) -> BTreeMap<(PathBuf, FixScope), Vec<Asked<'o>>> {
-    let mut runs: BTreeMap<(PathBuf, FixScope), Vec<Asked<'o>>> = BTreeMap::new();
+/// The findings by the run they go to, in the order of the paths, the
+/// narrower scope first, then of the agents, and then of their lines.
+fn by_run<'o>(found: Vec<Asked<'o>>, models: &ModelFixer<'_>) -> BTreeMap<RunKey, Vec<Asked<'o>>> {
+    let mut runs: BTreeMap<RunKey, Vec<Asked<'o>>> = BTreeMap::new();
     for asked in found {
-        let key = (asked.0.file.clone(), models.scope_of(&asked.0.rule_id));
+        let rule = &asked.0.rule_id;
+        let key = (
+            asked.0.file.clone(),
+            models.scope_of(rule),
+            models.edit_for(rule).to_vec(),
+        );
         runs.entry(key).or_default().push(asked);
     }
     for group in runs.values_mut() {

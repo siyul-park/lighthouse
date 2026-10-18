@@ -19,7 +19,7 @@ use super::{
 use crate::{Engine, Error, Overlays, Run, engine::Scopes};
 
 /// Why a fix by a model is left to review.
-const NO_EDIT: &str = "left for review: `[models] edit` is not bound, or models are off (`--no-models`); `review show` gives the brief";
+const NO_EDIT: &str = "left for review: `[models] edit` is not bound (and the rule binds no `edit`), or models are off (`--no-models`); `review show` gives the brief";
 
 /// A finding's fix, lowered and ready to apply.
 pub(super) struct Proposal {
@@ -144,7 +144,12 @@ impl<'e> Proposer<'e> {
                 decline(finding, why.clone());
                 continue;
             }
-            if model && self.models.is_none() {
+            if model
+                && self
+                    .models
+                    .as_ref()
+                    .is_none_or(|models| models.edit_for(&finding.rule_id).is_empty())
+            {
                 decline(finding, NO_EDIT.to_owned());
                 continue;
             }

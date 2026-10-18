@@ -409,6 +409,16 @@ pub struct ModelListArgs {
     pub limit: Option<usize>,
 }
 
+/// `config show`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ConfigShowArgs {
+    /// Name, for each key, the layer its value comes from: `bundled`, or the
+    /// file.
+    #[arg(long)]
+    pub origin: bool,
+}
+
 /// `model train`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

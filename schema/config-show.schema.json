@@ -1,0 +1,40 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/config-show.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The `ConfigShow` kind.",
+  "properties": {
+    "settings": {
+      "description": "The environment keys that have a value, sorted by key.",
+      "items": {
+        "description": "An environment key as `config show` prints it.",
+        "properties": {
+          "key": {
+            "description": "The key, as a TOML dotted key.",
+            "type": "string"
+          },
+          "origin": {
+            "description": "With `--origin`: `bundled`, or the file that set the value, relative\nto the project when it lies in it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "description": "The effective value; the values of a provider's `env` are hidden."
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "settings"
+  ],
+  "title": "ConfigShow",
+  "type": "object"
+}

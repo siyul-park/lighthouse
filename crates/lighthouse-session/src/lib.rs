@@ -18,6 +18,7 @@ mod trust;
 mod validate;
 
 pub mod baseline;
+pub mod environment;
 pub mod fix;
 pub mod model;
 pub mod review;

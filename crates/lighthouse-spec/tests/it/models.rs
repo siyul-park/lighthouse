@@ -544,3 +544,20 @@ fn fix_policy_is_the_fix_table_with_its_defaults() {
     assert_eq!(policy.scope, FixScope::Files);
     assert_eq!(policy.timeout, std::time::Duration::from_secs(600));
 }
+
+#[test]
+fn edit_routes_list_the_agents_rules_name() {
+    let models = Config::parse_inline(
+        "[rules.\"d/x\"]\nlevel = \"warn\"\nedit = [\"a/one\", \"b/two\"]\n[rules.\"d/y\"]\nlevel = \"warn\"\n",
+    )
+    .unwrap()
+    .models(&Projects::default())
+    .unwrap();
+
+    let routes: Vec<_> = models.edit_routes().collect();
+
+    assert_eq!(
+        routes,
+        [("d/x", &["a/one".to_owned(), "b/two".to_owned()][..])]
+    );
+}

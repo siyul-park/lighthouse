@@ -14,10 +14,10 @@ use lighthouse_plugin::{ModelClient, Registry};
 use lighthouse_resource::Format;
 use lighthouse_rpc::{CommandModel, Registered};
 use lighthouse_spec::{Catalog, CheckKind, FixKind, load_local, local_files};
-use lighthouse_spec::{Config, FILE_NAME};
+use lighthouse_spec::{Config, FILE_NAME, Layers};
 
 use crate::{
-    Result,
+    Result, environment,
     permit::permitted,
     trust::{Basis, Program},
 };
@@ -42,6 +42,8 @@ pub struct Session {
     /// What the project asks to be trusted for, computed from the same bytes
     /// the configuration and the decisions were loaded from.
     pub basis: Basis,
+    /// The environment of the configuration, layer by layer.
+    pub(crate) layers: Layers,
 }
 
 impl Session {
@@ -109,12 +111,19 @@ impl Session {
     /// judged on.
     fn assemble(path: &Path, text: &str, root: PathBuf) -> Result<Self> {
         let format = Format::of_path(path).unwrap_or(Format::Toml);
-        let config = Config::parse_as(format, &path.display().to_string(), text)?;
+        let personal = environment::read(&root)?;
+        let texts: Vec<(&str, &str)> = personal
+            .iter()
+            .map(|p| (p.layer.origin.as_str(), p.text.as_str()))
+            .collect();
+        let layers = personal.iter().map(|p| p.layer.clone()).collect();
+        let (config, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;
         let files = local_files(&root)?;
         let local = files.clone().map(Catalog::from_local).transpose()?;
         let catalog = layered(local.as_ref())?;
+        environment::check_local(&root, &personal, &catalog)?;
         let commands = commands(&config, &catalog)?;
-        let basis = Basis::of(&root, text, &files.unwrap_or_default(), &commands);
+        let basis = Basis::of(&root, text, &texts, &files.unwrap_or_default(), &commands);
         Ok(Self {
             config,
             store: root.clone(),
@@ -122,6 +131,7 @@ impl Session {
             local,
             catalog: Arc::new(catalog),
             basis,
+            layers,
         })
     }
 
@@ -136,6 +146,7 @@ impl Session {
             local: None,
             catalog: Arc::new(layered(None)?),
             basis: Basis::default(),
+            layers: Layers::default(),
         })
     }
 

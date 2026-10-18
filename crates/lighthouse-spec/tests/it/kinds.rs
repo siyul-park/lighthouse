@@ -14,8 +14,16 @@ use serde_json::json;
 fn every_kind_of_the_catalog_has_a_schema() {
     let kinds: Vec<&str> = descriptors().iter().map(|d| d.kind).collect();
 
-    assert_eq!(kinds, ["Decision", "Pack", "Project", "SourceMap"]);
+    assert_eq!(
+        kinds,
+        ["Decision", "Environment", "Pack", "Project", "SourceMap"]
+    );
     for descriptor in descriptors() {
+        if descriptor.kind == "Environment" {
+            // Written without an envelope: the schema is of the spec itself.
+            assert!(descriptor.schema["properties"]["models"].is_object());
+            continue;
+        }
         assert_eq!(
             descriptor.schema["properties"]["kind"]["const"],
             descriptor.kind
@@ -206,4 +214,20 @@ fn shape_describe() {
         lighthouse_spec::Shape::of(OptionType::Array).describe(),
         "a list"
     );
+}
+
+#[test]
+fn a_bare_kind_is_described_without_the_envelope() {
+    let bare = lighthouse_resource::Descriptor::bare::<lighthouse_spec::EnvironmentSpec>();
+
+    assert_eq!(bare.kind, "Environment");
+    assert_eq!(
+        bare.schema["$id"],
+        format!(
+            "{}/environment.schema.json",
+            lighthouse_resource::SCHEMA_URL_BASE
+        )
+    );
+    assert!(bare.schema["properties"].get("apiVersion").is_none());
+    assert!(descriptors().contains(&bare));
 }

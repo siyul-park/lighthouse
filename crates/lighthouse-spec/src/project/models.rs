@@ -9,12 +9,12 @@ use serde::{Deserialize, Serialize};
 use super::{ModelProvider, ProviderSpec, Rules, Task};
 
 /// Requests a run may send to models that cost, unless the project says.
-const DEFAULT_BUDGET: usize = 200;
+pub(super) const DEFAULT_BUDGET: usize = 200;
 /// The precision a check must reach unless the project says.
 const DEFAULT_PRECISION: f64 = 0.9;
 /// The share of the answers of an attached model that are sent on, unless the
 /// project says.
-const DEFAULT_EXPLORE: f64 = 0.05;
+pub(super) const DEFAULT_EXPLORE: f64 = 0.05;
 
 /// One name or several, in the order written: the protocols a provider speaks
 /// (each operation uses the one that covers it: classification `typesafe`,
@@ -63,8 +63,8 @@ pub struct ModelsSpec {
     /// The model (`<provider>/<model>`), or the route of several, that fixes
     /// by changing files: a headless agent run as a `command` without a
     /// `protocol`, in a scratch copy of the project. It makes the fixes of
-    /// the decisions `[fix] decisions` lists. One binding for the project; a
-    /// request moves to the next model of a route when one fails.
+    /// the decisions `[fix] decisions` lists, unless a rule binds its own
+    /// `edit`. A request moves to the next model of a route when one fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edit: Option<Names>,
     /// Which model of a route a request starts at. Default: `ordered`.
@@ -188,11 +188,32 @@ impl Models {
         self.rules.get(rule)?.classification.as_deref()
     }
 
+    /// The route of the agent that fixes `rule` by editing files: what the
+    /// rule names, else the project's `edit`. Empty when no agent is bound.
+    pub fn edit_for(&self, rule: &str) -> &[String] {
+        self.rules
+            .get(rule)
+            .and_then(|r| r.edit.as_deref())
+            .unwrap_or(&self.edit)
+    }
+
+    /// Whether any agent that edits is bound, to the project or to a rule.
+    pub fn binds_edit(&self) -> bool {
+        self.bindings().any(|(task, _)| task == Task::Edit)
+    }
+
     /// The routes rules name, by decision id.
     pub fn routes(&self) -> impl Iterator<Item = (&str, &[String])> {
         self.rules
             .iter()
             .filter_map(|(id, rule)| Some((id.as_str(), rule.classification.as_deref()?)))
+    }
+
+    /// The routes of the agents rules name, by decision id.
+    pub fn edit_routes(&self) -> impl Iterator<Item = (&str, &[String])> {
+        self.rules
+            .iter()
+            .filter_map(|(id, rule)| Some((id.as_str(), rule.edit.as_deref()?)))
     }
 
     /// Every model reference the project binds, with the task it binds it to.
@@ -203,9 +224,15 @@ impl Models {
                 .filter_map(|r| r.classification.as_ref())
                 .flatten(),
         );
+        let edit = self.edit.iter().chain(
+            self.rules
+                .values()
+                .filter_map(|r| r.edit.as_ref())
+                .flatten(),
+        );
         classification
             .map(|id| (Task::Classification, id.as_str()))
-            .chain(self.edit.iter().map(|id| (Task::Edit, id.as_str())))
+            .chain(edit.map(|id| (Task::Edit, id.as_str())))
     }
 
     /// The evaluation policy of a rule: what the project sets, else the default.

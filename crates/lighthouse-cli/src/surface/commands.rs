@@ -9,11 +9,12 @@ use clap::{Args, Subcommand};
 use crate::surface::{
     Result,
     args::{
-        CheckArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs,
-        DocumentArgs, FingerprintArgs, FixOptions, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
-        ModelRebuildArgs, ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
+        CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
+        DecisionTestArgs, DocumentArgs, FingerprintArgs, FixOptions, ModelAttachArgs,
+        ModelDetachArgs, ModelListArgs, ModelRebuildArgs, ModelTrainArgs, ReviewListArgs,
+        ReviewResolveArgs,
     },
-    check, decision, model,
+    check, config, decision, model,
     reply::{CheckFormat, Context, FormatArg, Reply},
     review,
 };
@@ -54,6 +55,12 @@ Examples:
   lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e
   lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --repo cel=../cel
   lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --attributed-to agent:claude --format json";
+
+const SHOW_EXAMPLES: &str = "\
+Examples:
+  lighthouse config show
+  lighthouse config show --origin
+  lighthouse config show --origin --format json";
 
 /// A command of the agent loop, with its arguments.
 #[derive(Debug, Subcommand)]
@@ -96,6 +103,11 @@ pub enum Action {
     Model {
         #[command(subcommand)]
         command: ModelCommand,
+    },
+    /// Show the configuration of this machine.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
     },
 }
 
@@ -327,6 +339,28 @@ pub enum ModelCommand {
     },
 }
 
+/// `config <verb>`.
+#[derive(Debug, Subcommand)]
+pub enum ConfigCommand {
+    /// Show the effective environment: models, providers, bindings, approval.
+    ///
+    /// Meaning is the project's alone (`lighthouse.toml`); how this machine
+    /// computes and applies is read from, in order, the bundled defaults, the
+    /// project, your file (`$XDG_CONFIG_HOME/lighthouse/config.toml`, default
+    /// `~/.config/lighthouse/config.toml`) and the repository-local
+    /// `.lighthouse/local.toml`. A later layer wins key by key; a provider is
+    /// replaced whole. Shows each key that has a value, sorted; --origin names
+    /// the layer each value comes from, as `git config --show-origin` does.
+    /// The values a provider passes to its program (`env`) are hidden.
+    #[command(after_long_help = SHOW_EXAMPLES)]
+    Show {
+        #[command(flatten)]
+        args: ConfigShowArgs,
+        #[command(flatten)]
+        output: FormatArg,
+    },
+}
+
 #[derive(Debug, clap::Parser)]
 #[command(no_binary_name = true)]
 struct Tree {
@@ -367,6 +401,9 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
             ModelCommand::Attach { args, output } => model::attach(ctx, args, output.format),
             ModelCommand::Detach { args, output } => model::detach(ctx, args, output.format),
             ModelCommand::Rebuild { args, output } => model::rebuild(ctx, args, output.format),
+        },
+        Action::Config { command } => match command {
+            ConfigCommand::Show { args, output } => config::show(ctx, args, output.format),
         },
     }
 }

@@ -1,7 +1,7 @@
 //! Trust in a project, decided by the user and not by the repository: running
 //! the commands a project names (command fixers, formatters) needs the user to
-//! have said so, for exactly the configuration, rules and in-project programs
-//! they were shown. A file the repository carries cannot grant it, and a change
+//! have said so, for exactly the configuration (the personal files over it
+//! too), rules and in-project programs they were shown. A file the repository carries cannot grant it, and a change
 //! to any of them withdraws it.
 //!
 //! The digest is computed from the very bytes the session loaded the
@@ -45,16 +45,22 @@ pub(crate) struct Program {
 }
 
 impl Basis {
-    /// The basis of the project at `root` as loaded from `config` and the rule
-    /// files `rules`, running `programs`.
+    /// The basis of the project at `root` as loaded from `config`, the
+    /// personal files `layers` (origin and text) over it and the rule files
+    /// `rules`, running `programs`.
     pub(crate) fn of(
         root: &Path,
         config: &str,
+        layers: &[(&str, &str)],
         rules: &BTreeMap<String, String>,
         programs: &[Program],
     ) -> Self {
         let mut hash = Hasher::new();
         field(&mut hash, "config", config.as_bytes());
+        for (origin, text) in layers {
+            field(&mut hash, "layer-name", origin.as_bytes());
+            field(&mut hash, "layer", text.as_bytes());
+        }
         for (name, text) in rules {
             field(&mut hash, "rule-name", name.as_bytes());
             field(&mut hash, "rule", text.as_bytes());

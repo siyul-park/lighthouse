@@ -11,6 +11,7 @@ Commands:
   decision     Inspect, author, test and evaluate decisions
   review       Review the findings `check` remembers and record judgments on them
   model        List, train, attach and detach the models that judge decisions
+  config       Show the configuration of this machine
   cache        Manage the result cache in `.lighthouse/cache`
   spec         Validate spec documents
   schema       Print the JSON Schema of a kind of document or output

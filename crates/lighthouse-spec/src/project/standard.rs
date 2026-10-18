@@ -42,6 +42,7 @@ fn project(pack: &Pack, rules: &[&Decision], strict: bool) -> Resource<ProjectSp
                     options: Options::from_iter([(KINDS.to_owned(), Value::Array(kinds))]),
                     generated: None,
                     classification: None,
+                    edit: None,
                     evaluation: None,
                 }),
                 None => RuleSetting::Level(level),

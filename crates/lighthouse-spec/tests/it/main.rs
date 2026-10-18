@@ -6,6 +6,7 @@ mod clean_code;
 mod fixes;
 mod kinds;
 mod kinds_option;
+mod layers;
 mod local;
 mod models;
 mod project;

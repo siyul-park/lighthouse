@@ -35,10 +35,10 @@ pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, l
 pub use pack::{Pack, Section};
 pub(crate) use pack::{PackSpec, SectionSpec};
 pub use project::{
-    Approval, ApprovalSpec, CommandProtocol, Config, Evaluation, FILE_NAME, FixPolicy, FixSpec,
-    Formatter, GeneratedCheck, GlobSet, Level, ModelProvider, Models, OverrideSpec, PluginRef,
-    ProjectSpec, Projects, RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, Task,
-    glob_set,
+    Approval, ApprovalSpec, BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule,
+    EnvironmentSpec, Evaluation, FILE_NAME, FixPolicy, FixSpec, Formatter, GeneratedCheck, GlobSet,
+    Layer, Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
+    RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, Task, glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 
@@ -58,6 +58,7 @@ pub fn descriptors() -> Vec<Descriptor> {
     }
     vec![
         decision,
+        Descriptor::bare::<EnvironmentSpec>(),
         Descriptor::new::<PackSpec>(),
         Descriptor::new::<ProjectSpec>(),
         Descriptor::new::<SourceMapSpec>(),

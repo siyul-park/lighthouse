@@ -22,6 +22,9 @@ pub struct RuleConfig {
     /// The models that judge this decision, before the project's
     /// `models.classification`.
     pub classification: Option<Vec<String>>,
+    /// The agent that fixes this decision by editing files, before the
+    /// project's `models.edit`.
+    pub edit: Option<Vec<String>>,
     /// How `lighthouse eval` judges this rule's check.
     pub evaluation: Option<Evaluation>,
 }
@@ -34,6 +37,7 @@ impl RuleConfig {
             options: Options::new(),
             generated: None,
             classification: None,
+            edit: None,
             evaluation: None,
         }
     }
@@ -48,6 +52,9 @@ impl From<RuleSetting> for RuleConfig {
                 generated: detail.generated,
                 classification: detail
                     .classification
+                    .map(|names| names.iter().map(str::to_owned).collect()),
+                edit: detail
+                    .edit
                     .map(|names| names.iter().map(str::to_owned).collect()),
                 evaluation: detail.evaluation,
                 ..Self::new(detail.level.into())
@@ -108,6 +115,11 @@ pub struct RuleDetail {
     /// left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<Names>,
+    /// The agent, or the route of several, that fixes this decision by
+    /// editing files, before the project's `models.edit`. Findings bound to
+    /// different agents in one file are fixed by one run each.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edit: Option<Names>,
     /// How `lighthouse eval` judges this rule's check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evaluation: Option<Evaluation>,
@@ -137,7 +149,8 @@ impl From<Option<Severity>> for Level {
 
 /// Later level replaces the earlier one; options merge per key, later wins,
 /// and an object-valued option (a limit per role) merges per key too; a
-/// model route and an evaluation policy the later sets replace the earlier.
+/// model route, an edit route and an evaluation policy the later sets replace
+/// the earlier.
 pub(crate) fn merge(into: &mut Rules, from: &Rules) {
     for (id, next) in from {
         match into.get_mut(id) {
@@ -154,6 +167,9 @@ pub(crate) fn merge(into: &mut Rules, from: &Rules) {
                 prev.evaluation = next.evaluation.or(prev.evaluation);
                 if next.classification.is_some() {
                     prev.classification.clone_from(&next.classification);
+                }
+                if next.edit.is_some() {
+                    prev.edit.clone_from(&next.edit);
                 }
             }
             None => {

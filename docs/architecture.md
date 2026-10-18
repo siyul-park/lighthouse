@@ -119,6 +119,34 @@ against the others (extended projects and rules name things that exist, fix oper
 registered order keys, CEL compiles, examples are well formed; `--examples` also
 runs them). Readers accept the current format only.
 
+### Configuration layers
+
+Meaning is shared; the environment is personal. The keys that decide findings, or what may change
+the shared repository, are the project's alone (`lighthouse.toml`, committed): `plugins`,
+`extends`, `languages`, `overrides`, `generated`, `[fix]`, and per decision `level`, `options`,
+`generated` and `evaluation`. The keys that say how this machine computes and applies are the
+environment: `[models]` (bindings, `providers`, `routing`, `budget`, `explore`),
+`rules."<id>".classification` and `rules."<id>".edit`, and `[approval]`. They are read from four
+layers, the later winning key by key:
+
+| Layer | File |
+| --- | --- |
+| bundled | the defaults |
+| project | `lighthouse.toml` |
+| user | `$XDG_CONFIG_HOME/lighthouse/config.toml` (default `~/.config/lighthouse/config.toml`), every repository |
+| local | `.lighthouse/local.toml`, this repository; `lighthouse init` adds it to `.gitignore` |
+
+The user and the local file are bare TOML with the environment keys only
+([environment.schema.json](../schema/environment.schema.json)); a meaning key in either is a load
+error that names the key and the file. A binding (a reference or a route list) is replaced, never
+joined; a provider is replaced whole by a later layer that defines the same name. A decision a local
+file binds must exist. Trust stays the user's (`trust.toml`) and covers the personal files too: a
+change to one withdraws it, and a command provider they declare runs only in a trusted project.
+Findings of deterministic checks are the same for everyone; only a model's answers can differ, and
+they are cached by model. `lighthouse config show [--origin]` (MCP `config_show`) prints each
+environment key with its effective value and, with `--origin`, the layer it came from, the way
+`git config --show-origin` does; CI sees the project layer alone unless it writes the other files.
+
 ## Severity
 
 A finding is `error`, `warn` or `info` (and a rule may be `off` in

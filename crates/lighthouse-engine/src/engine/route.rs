@@ -1,9 +1,10 @@
-//! The route of a task: the models `[models]` binds to `edit`, asked to
-//! generate (the fix of a finding). A request goes to the models in
-//! turn until one answers: a failure or a spent budget moves it on, a kept
-//! answer is reused without a call. Answers are kept under a key the task
-//! builds from the model at its version and what it is asked, in the result
-//! cache of the engine.
+//! The route of a task: the models `[models]` and the rules bind to `edit`,
+//! asked to generate (the fix of a finding). A request names the binding it
+//! is for, and goes to the models of it in turn until one answers: a failure
+//! or a spent budget moves it on, a kept answer is reused without a call. The
+//! budget, the failures and the answers are shared by every binding of the
+//! run. Answers are kept under a key the task builds from the model at its
+//! version and what it is asked, in the result cache of the engine.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -16,7 +17,7 @@ use std::{
 
 use lighthouse_model::ModelRef;
 use lighthouse_plugin::ModelClient;
-use lighthouse_spec::Routing;
+use lighthouse_spec::{Models as BoundModels, Routing, Task};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
@@ -28,6 +29,8 @@ const MAX_FAILURES: usize = 3;
 
 /// One model of the route, as the route asks it.
 pub(crate) struct Member<'a> {
+    /// `<provider>/<model>`, as a binding names it.
+    pub(crate) reference: String,
     pub(crate) client: Box<dyn ModelClient + 'a>,
 }
 
@@ -58,9 +61,11 @@ pub(crate) struct Usage {
     pub(crate) time: Duration,
 }
 
-/// The models of a route and what a run has spent on them.
+/// The models of every binding of a task and what a run has spent on them.
 pub(crate) struct Route<'a> {
     members: Vec<Member<'a>>,
+    /// Which models a decision is bound to.
+    bound: &'a BoundModels,
     routing: Routing,
     /// Requests that went through the route, to rotate its models.
     turn: AtomicUsize,
@@ -74,13 +79,19 @@ pub(crate) struct Route<'a> {
 }
 
 impl Engine {
-    /// The route of the models `[models] edit` names; `None` when no model is
+    /// The models `[models] edit` and the rules name; `None` when no model is
     /// bound or the run asks no model.
     pub(crate) fn edit_route(&self) -> Option<Route<'_>> {
-        self.route(&self.binding.edit)
+        let bound: BTreeSet<&str> = self
+            .binding
+            .bindings()
+            .filter(|(task, _)| *task == Task::Edit)
+            .map(|(_, reference)| reference)
+            .collect();
+        self.route(&bound)
     }
 
-    fn route(&self, bound: &[String]) -> Option<Route<'_>> {
+    fn route(&self, bound: &BTreeSet<&str>) -> Option<Route<'_>> {
         if bound.is_empty() || self.models.off {
             return None;
         }
@@ -88,11 +99,14 @@ impl Engine {
         let mut notes = BTreeSet::new();
         let members: Vec<Member<'_>> = bound
             .iter()
-            .filter_map(|reference| {
+            .filter_map(|&reference| {
                 let model = ModelRef::parse(reference)?;
                 let provider = self.binding.provider(model.provider)?;
                 let client = clients.build(reference, model.model, &provider);
-                Some(Member { client })
+                Some(Member {
+                    reference: reference.to_owned(),
+                    client,
+                })
             })
             .collect();
         if members.is_empty() {
@@ -107,6 +121,7 @@ impl Engine {
         });
         Some(Route {
             members,
+            bound: &self.binding,
             routing: self.binding.routing,
             turn: AtomicUsize::new(0),
             budget: AtomicUsize::new(self.binding.budget),
@@ -122,9 +137,10 @@ impl Engine {
 #[cfg(test)]
 impl<'a> Route<'a> {
     /// A route over `members`, in order, with no budget and no cache.
-    pub(crate) fn of(members: Vec<Member<'a>>) -> Self {
+    pub(crate) fn of(members: Vec<Member<'a>>, bound: &'a BoundModels) -> Self {
         Self {
             members,
+            bound,
             routing: Routing::Ordered,
             turn: AtomicUsize::new(0),
             budget: AtomicUsize::new(usize::MAX),
@@ -138,17 +154,18 @@ impl<'a> Route<'a> {
 }
 
 impl Route<'_> {
-    /// The answer of the first model of the order that gives one, and that
-    /// model, `<provider>/<model>`. `key` is what a model's answer is kept
-    /// under, given the model and its name at its version; `call` asks the
-    /// model, and its failure moves on to the next.
+    /// The answer of the first model of the binding `bound` that gives one,
+    /// and that model, `<provider>/<model>`. `key` is what a model's answer is
+    /// kept under, given the model and its name at its version; `call` asks
+    /// the model, and its failure moves on to the next.
     pub(crate) fn through<T: Serialize + DeserializeOwned>(
         &self,
+        bound: &[String],
         key: &dyn Fn(&Member<'_>, &str) -> Digest,
         call: &dyn Fn(&Member<'_>) -> Result<T, String>,
     ) -> Result<(T, String), Refusal> {
         let mut refusal = Refusal::Budget;
-        for member in self.order() {
+        for member in self.order(bound) {
             let manifest = member.client.manifest();
             let key = key(member, &named(manifest));
             if let Some(kept) = self.kept(&key) {
@@ -175,6 +192,11 @@ impl Route<'_> {
         Err(refusal)
     }
 
+    /// The models that fix `decision`: the ones it binds, else the project's.
+    pub(crate) fn edit_for(&self, decision: &str) -> &[String] {
+        self.bound.edit_for(decision)
+    }
+
     /// What the requests that went to a model this run took.
     pub(crate) fn usage(&self) -> Usage {
         let spent = self.spent.lock().unwrap_or_else(PoisonError::into_inner);
@@ -198,18 +220,26 @@ impl Route<'_> {
         notes.into_iter().collect()
     }
 
-    /// The models in the order a request tries them: as written, or rotated by
-    /// one more than the request before.
-    fn order(&self) -> impl Iterator<Item = &Member<'_>> {
+    /// The models of `bound` in the order a request tries them: as written,
+    /// or rotated by one more than the request before.
+    fn order(&self, bound: &[String]) -> Vec<&Member<'_>> {
+        let named: Vec<&Member<'_>> = bound
+            .iter()
+            .filter_map(|reference| self.members.iter().find(|m| m.reference == *reference))
+            .collect();
         let start = match self.routing {
-            Routing::Ordered => 0,
-            Routing::RoundRobin => self.turn.fetch_add(1, Ordering::SeqCst) % self.members.len(),
+            Routing::RoundRobin if !named.is_empty() => {
+                self.turn.fetch_add(1, Ordering::SeqCst) % named.len()
+            }
+            _ => 0,
         };
-        self.members
+        named
             .iter()
             .cycle()
             .skip(start)
-            .take(self.members.len())
+            .take(named.len())
+            .copied()
+            .collect()
     }
 
     /// Takes one unit of the budget for a request to a model that costs.

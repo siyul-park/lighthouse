@@ -89,9 +89,15 @@ pub fn init(config: Option<&Path>, agent: Option<Agent>) -> Result<u8> {
         fs::write(&path, DEFAULT_CONFIG)?;
         println!("wrote {}", path.display());
         // The store is a local cache of one machine's checks and reviews.
-        let ignore = format!("{STATE_DIR}/*.db*");
-        if ensure_line(&path.with_file_name(".gitignore"), &ignore)? {
-            println!("added {ignore} to .gitignore");
+        // So is the repository-local configuration: one person's models and
+        // approvals, not the project's.
+        for ignore in [
+            format!("{STATE_DIR}/*.db*"),
+            lighthouse_session::environment::LOCAL_PATH.to_owned(),
+        ] {
+            if ensure_line(&path.with_file_name(".gitignore"), &ignore)? {
+                println!("added {ignore} to .gitignore");
+            }
         }
         // The decision log is committed; branches that both appended merge by
         // keeping the lines of both.

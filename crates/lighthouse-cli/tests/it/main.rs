@@ -18,6 +18,7 @@ mod help;
 mod hook_session;
 mod internal;
 mod judgments;
+mod layers;
 mod mcp;
 mod mcp_contract;
 mod models;

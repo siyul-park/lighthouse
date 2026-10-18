@@ -34,6 +34,9 @@ use crate::{
 pub(in crate::fix) struct Batch<'a> {
     pub(in crate::fix) file: &'a Path,
     targets: Vec<Target<'a>>,
+    /// The agent the run asks, in the order it is tried: the binding the
+    /// findings share.
+    binding: Vec<String>,
     /// The decisions whose safe fixes the project applies to the result.
     tools: Vec<String>,
     /// The widest change allowed: the narrowest scope of the findings.
@@ -144,8 +147,13 @@ impl ModelFixer<'_> {
                 }
             })
             .collect();
+        let binding = findings
+            .first()
+            .map(|(_, decision, _)| self.edit_for(&decision.id).to_vec())
+            .unwrap_or_default();
         Batch {
             file,
+            binding,
             scope,
             extents: findings.iter().filter_map(|&(_, _, span)| span).collect(),
             targets,
@@ -172,7 +180,7 @@ impl ModelFixer<'_> {
         };
         let key = |_: &Member<'_>, model: &str| key(model, &prompt_digest, &world.digest);
         let call = |member: &Member<'_>| run(member, &prompt, world);
-        let (attempt, model) = match self.route.through(&key, &call) {
+        let (attempt, model) = match self.route.through(&batch.binding, &key, &call) {
             Ok(found) => found,
             Err(Refusal::Budget) => {
                 let reason = "the budget for models is spent".to_owned();

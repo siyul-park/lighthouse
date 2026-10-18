@@ -37,6 +37,7 @@ impl Client {
         command
             .arg("mcp")
             .current_dir(dir)
+            .env("XDG_CONFIG_HOME", dir.join(".home"))
             .env_remove("LIGHTHOUSE_ATTRIBUTED_TO")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -208,6 +209,7 @@ fn the_server_lists_its_tools_and_resources() {
         names,
         [
             "check",
+            "config_show",
             "decision_create",
             "decision_eval",
             "decision_list",

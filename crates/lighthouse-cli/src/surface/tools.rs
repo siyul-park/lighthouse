@@ -20,12 +20,13 @@ use serde_json::{Value, json};
 use crate::surface::{
     Result,
     args::{
-        CheckArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs,
-        DocumentArgs, FingerprintArgs, FixArgs, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
-        ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
+        CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
+        DecisionTestArgs, DocumentArgs, FingerprintArgs, FixArgs, ModelAttachArgs, ModelDetachArgs,
+        ModelListArgs, ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
     },
     check,
     commands::{self, CheckCommand},
+    config::{self, ConfigShow},
     decision::{self, DecisionList, DecisionShow, DecisionTested},
     model::{self, ModelList},
     reply::{CheckFormat, Context, Format, Reply},
@@ -41,7 +42,7 @@ const FIX_DESCRIPTION: &str = "Fix findings with the fixers the decisions name (
 const REBUILD_KIND: &str = "ModelRebuild";
 
 /// The tools, in the order they are listed.
-pub const TOOLS: [Tool; 16] = [
+pub const TOOLS: [Tool; 17] = [
     Tool::new::<CheckArgs, CheckReport>(
         "check",
         &["check"],
@@ -160,6 +161,13 @@ pub const TOOLS: [Tool; 16] = [
         "ModelDetach",
         Hints::WRITE,
         |ctx, args| model::detach(ctx, &parse(args)?, Format::Json),
+    ),
+    Tool::new::<ConfigShowArgs, ConfigShow>(
+        "config_show",
+        &["config", "show"],
+        "ConfigShow",
+        Hints::READ,
+        |ctx, args| config::show(ctx, &parse(args)?, Format::Json),
     ),
 ];
 

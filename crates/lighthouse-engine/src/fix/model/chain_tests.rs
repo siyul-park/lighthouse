@@ -13,7 +13,7 @@ use lighthouse_model::{
 };
 use lighthouse_plugin::{Capabilities, EditRequest, Error, FixDecision, Model, ModelClient};
 use lighthouse_protocol::hash;
-use lighthouse_spec::FixScope;
+use lighthouse_spec::{FixScope, Models};
 
 use super::{
     Account, ModelFixer,
@@ -192,10 +192,16 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
     let texts = Overlays::new();
     let (scope, _) = Scopes::new(&[], root.path()).unwrap();
     let fixes = BTreeMap::new();
+    let mut bound = Models::default();
+    bound.edit.push("agent/m".to_owned());
     let fixer = ModelFixer {
-        route: Route::of(vec![Member {
-            client: Box::new(agent()),
-        }]),
+        route: Route::of(
+            vec![Member {
+                reference: "agent/m".to_owned(),
+                client: Box::new(agent()),
+            }],
+            &bound,
+        ),
         fixes: &fixes,
         account: Account::default(),
         said: Mutex::default(),

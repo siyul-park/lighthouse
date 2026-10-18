@@ -22,7 +22,12 @@
               },
               {
                 "const": "rule",
-                "description": "A rule of the configuration names it.",
+                "description": "A rule of the configuration names it for classification.",
+                "type": "string"
+              },
+              {
+                "const": "rule-edit",
+                "description": "A rule of the configuration names it for the agent that edits.",
                 "type": "string"
               },
               {

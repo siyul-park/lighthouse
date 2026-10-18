@@ -16,6 +16,7 @@ Commands:
   decision     Inspect, author, test and evaluate decisions
   review       Review the findings `check` remembers and record judgments on them
   model        List, train, attach and detach the models that judge decisions
+  config       Show the configuration of this machine
   cache        Manage the result cache in `.lighthouse/cache`
   spec         Validate spec documents
   schema       Print the JSON Schema of a kind of document or output
@@ -757,6 +758,53 @@ Examples:
   lighthouse model rebuild design/prefer-method --format json
 ```
 
+## `lighthouse config`
+
+```text
+Show the configuration of this machine
+
+Usage: lighthouse config <COMMAND>
+
+Commands:
+  show  Show the effective environment: models, providers, bindings, approval
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help
+```
+
+## `lighthouse config show`
+
+```text
+Show the effective environment: models, providers, bindings, approval.
+
+Meaning is the project's alone (`lighthouse.toml`); how this machine computes and applies is read from, in order, the bundled defaults, the project, your file (`$XDG_CONFIG_HOME/lighthouse/config.toml`, default `~/.config/lighthouse/config.toml`) and the repository-local `.lighthouse/local.toml`. A later layer wins key by key; a provider is replaced whole. Shows each key that has a value, sorted; --origin names the layer each value comes from, as `git config --show-origin` does. The values a provider passes to its program (`env`) are hidden.
+
+Usage: lighthouse config show [OPTIONS]
+
+Options:
+      --origin
+          Name, for each key, the layer its value comes from: `bundled`, or the file
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse config show
+  lighthouse config show --origin
+  lighthouse config show --origin --format json
+```
+
 ## `lighthouse cache`
 
 ```text
@@ -942,7 +990,7 @@ Options:
 ```text
 Trust this project to run the commands it names.
 
-Command fixers and the formatters of `lighthouse.toml`. Trust is yours, kept in `$XDG_CONFIG_HOME/lighthouse/trust.toml` (default `~/.config/lighthouse/trust.toml`) for this root and the exact `lighthouse.toml` and `.lighthouse/decisions` you have read; a change to either withdraws it. `LIGHTHOUSE_TRUST=1` trusts every project, for CI. Without trust a command fix is declined and formatting is skipped; checks and the verification of fixes still run.
+Command fixers and the formatters of `lighthouse.toml`. Trust is yours, kept in `$XDG_CONFIG_HOME/lighthouse/trust.toml` (default `~/.config/lighthouse/trust.toml`) for this root and the exact `lighthouse.toml`, `.lighthouse/decisions` and personal config files (`config.toml`, `.lighthouse/local.toml`) you have read; a change to any of them withdraws it. `LIGHTHOUSE_TRUST=1` trusts every project, for CI. Without trust a command fix is declined and formatting is skipped; checks and the verification of fixes still run.
 
 It lists the formatters and fixer commands it would trust and asks for confirmation on the terminal; without a terminal it refuses unless `--yes` says you have read the list.
 

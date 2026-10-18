@@ -9,6 +9,7 @@
 pub mod args;
 mod check;
 pub mod commands;
+mod config;
 mod decision;
 mod list;
 mod model;

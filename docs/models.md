@@ -135,7 +135,10 @@ project, with the brief as plain text on stdin, is what makes it an edit. HTTP a
 not, and binding one is a configuration error ("provider `x` does not serve `edit`: only a command
 without a protocol does"); a `command` with `protocol = "openai"` is no provider at all ("a `command`
 speaks `typesafe` (classification) or plain text (edit)"). `[models] edit` is one reference or a
-route list that fails over on error. The agent CLIs `claude -p`, `codex exec` and opencode are `edit`
+route list that fails over on error; `rules."<id>".edit` binds another one for that decision, in the
+project file or in a user or local file ([architecture.md](architecture.md#configuration-layers)).
+The findings of a file are fixed by one run for each scope and agent, one run after another, each
+over the texts the runs before it were accepted with. The agent CLIs `claude -p`, `codex exec` and opencode are `edit`
 providers; none of them classifies, since they have no distribution to read.
 
 ```toml

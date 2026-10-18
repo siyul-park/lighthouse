@@ -1,0 +1,42 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Show the effective environment: models, providers, bindings, approval.
+
+Meaning is the project's alone (`lighthouse.toml`); how this machine computes and applies is read from, in order, the bundled defaults, the project, your file (`$XDG_CONFIG_HOME/lighthouse/config.toml`, default `~/.config/lighthouse/config.toml`) and the repository-local `.lighthouse/local.toml`. A later layer wins key by key; a provider is replaced whole. Shows each key that has a value, sorted; --origin names the layer each value comes from, as `git config --show-origin` does. The values a provider passes to its program (`env`) are hidden.
+
+Usage: lighthouse config show [OPTIONS]
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --origin
+          Name, for each key, the layer its value comes from: `bundled`, or the file
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse config show
+  lighthouse config show --origin
+  lighthouse config show --origin --format json

@@ -64,8 +64,8 @@ impl ModelFix {
     }
 }
 
-/// The fixer of the findings given to a model: asks the route of `[models]
-/// edit` and counts what happens.
+/// The fixer of the findings given to a model: asks the agent each decision
+/// is bound to (`[models] edit`, or its own `edit`) and counts what happens.
 pub(super) struct ModelFixer<'e> {
     route: Route<'e>,
     fixes: &'e BTreeMap<String, ModelFix>,
@@ -87,6 +87,12 @@ impl<'e> ModelFixer<'e> {
             account: Account::default(),
             said: Mutex::default(),
         })
+    }
+
+    /// The agents that fix `decision`, in the order they are asked: the ones
+    /// it binds, else the project's. Empty when none is bound to it.
+    pub(super) fn edit_for(&self, decision: &str) -> &[String] {
+        self.route.edit_for(decision)
     }
 
     /// How far the fix of `decision` may go.
