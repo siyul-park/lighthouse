@@ -69,7 +69,8 @@ spec:
   `GOLANGCI_LINT_CACHE` and Go's caches, which the cleared environment of a command lacks. A check may write to the user's cache directory
   and nowhere else outside the temporary directory of its run, so `GOLANGCI_LINT_CACHE` must point into it.
 - Clippy has no SARIF output of its own: `cargo clippy --message-format=json | clippy-sarif`
-  (<https://github.com/psastras/sarif-rs>).
+  (<https://github.com/psastras/sarif-rs>). It builds in `target` and reads the registry, so a
+  project that wraps it says `[sandbox] write = ["target", "~/.cargo/registry", "~/.cargo/git"]`.
 - SARIF 2.1.0
   (<https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/sarif-v2.1.0-errata01-os-complete.html>):
   `columnKind` §3.14.27, `originalUriBaseIds` §3.14.14, `uriBaseId` resolution §3.4.4, `suppression` §3.35.

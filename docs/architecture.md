@@ -687,21 +687,36 @@ reordering a Rust file cannot move one: such findings are declined and fixed by 
 Every external program Lighthouse runs through `lighthouse_process::run` runs in an OS sandbox
 that no configuration of the program can loosen: Seatbelt (`sandbox-exec`) on macOS, bubblewrap
 on Linux. Plugin processes (`rpc`), the version-control calls of `session` and test support are
-outside it. The policy has the shape of Anthropic's sandbox-runtime:
+outside it; a plugin the project brings (`.lighthouse/plugins`, or a `path` inside it) starts only in a
+trusted project, and its program is part of the trust. The policy has the shape of Anthropic's
+sandbox-runtime:
 
 - **Reads** are allowed everywhere except a fixed list of secrets: `~/.ssh`, `~/.gnupg`, `~/.aws`,
   `~/.azure`, `~/.config/gcloud`, `~/.kube`, `~/.docker/config.json`, `~/.config/gh`, `~/.netrc`,
   `~/.git-credentials`, `~/.npmrc`, `~/.pypirc`, `~/Library/Keychains`, `~/.config/lighthouse`,
-  and in the project the `.env` files at its root and `.lighthouse/local.toml`.
+  `~/.cargo/credentials(.toml)`, `~/.local/share/keyrings`, `~/.password-store`, `~/.config/op`,
+  `~/.m2/settings.xml`, `~/.gem/credentials`, and in the project the `.env` files at its root and
+  `.lighthouse/local.toml` (a scratch copy of the project leaves them out). Without `HOME` a
+  sandboxed program is not run: the secrets cannot be located.
 - **Writes** are allowed where the caller says: the scratch copy of a fix, formatter or verify run
   and a `TMPDIR` of the run's own, deleted with it; the user's cache directory for checks and
   verification, since linters keep their caches there. An agent also has a `HOME` and
   `XDG_*` of its own, empty, unless its provider sets them, so it never sees the credentials or
-  settings of the user.
+  settings of the user. `[sandbox] write` adds places for checks and verification: paths below the
+  project or, with `~/`, the home directory (`target`, `~/.cargo/registry`), never a secret.
+- **Isolation.** On Linux the program sees empty `/run`, `/var/run` and, when the run needs nothing
+  in it, `/tmp`, and the directory of `SSH_AUTH_SOCK`, so the Unix sockets of the user's other
+  programs cannot be connected to. On macOS a program may look up only a short list of Mach
+  services (users and groups, logging, notifications, per-user directories, certificate
+  validation): not the keychain, Launch Services or the network daemons. It leads a session of its
+  own and has no terminal.
 - **Network** is off. A host-side HTTP proxy on the loopback lets through the hosts the project lists
   in `[sandbox] network` (a command check or verify run) or a provider lists in its `network` (an
   agent): `host`, `*.suffix` (below the suffix, not the suffix itself), each with an optional
-  `:port`. The program finds the proxy in `HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY`; a request to
+  `:port` (a name alone is let through on 80 and 443 only; `*`, `*.com` and the like are refused at
+  load). The proxy takes host names of plain characters, answers a plain request only when its
+  `Host` agrees with the target, serves 64 clients at once and gives a connection 10 s to be made.
+  The program finds the proxy in `HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY`; a request to
   another host is refused and the refusal added to the program's stderr. On Linux the namespace has
   no network at all: `lighthouse internal bridge` (hidden) runs inside it, listens on the loopback
   and relays to a Unix socket the host serves.
@@ -715,6 +730,13 @@ layer, and it needs a trusted project: in an untrusted one loading fails ("`[san
 false` needs a trusted project"), and every run of a project that has turned it off says "sandbox
 off: programs run with your full access". The trust covers `[sandbox]`, so a change to it in a
 personal file withdraws the trust like a new provider.
+
+Known limits. The proxy lets a `CONNECT` through by the host it names and does not look at the TLS
+that follows, so a listed host on a shared CDN can be fronted for another, as in sandbox-runtime.
+Only the `.env` files at the root of the project are secrets; nested ones are not. The built-in
+providers (`lang-go` runs `go env` and the Go toolchain) and the plugins of the user run
+unsandboxed. Under bubblewrap an exit code from 129 to 192 reads as a signal. Certificate
+validation on macOS goes through `trustd`, which fetches revocation data by itself.
 
 ## Fixer spec
 

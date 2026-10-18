@@ -148,6 +148,7 @@ edit = "claude/sonnet"
 command = ["claude", "-p", "--output-format", "text", "--permission-mode", "acceptEdits",
            "--allowedTools", "Read,Edit,Write,Glob,Grep", "--model", "{model}"]
 timeout = "10m"            # the default for edit
+keyEnv = "ANTHROPIC_API_KEY"      # its login is not in the home of its own
 network = ["api.anthropic.com"]   # the hosts the agent may reach; none by default
 ```
 
@@ -157,8 +158,11 @@ edit = "codex/any"
 [models.providers.codex]   # the model is codex's own configuration
 command = ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "-"]
 timeout = "10m"
+keyEnv = "OPENAI_API_KEY"
 network = ["api.openai.com"]
 ```
+
+The sandbox of `codex` runs inside Lighthouse's; whether the two nest on every OS is not verified.
 
 ```toml
 [models]
@@ -199,8 +203,9 @@ machine that wrote this, so `--skip-git-repo-check` and `-` rest on those docs a
   directory under the process contract (no shell, own process group, `timeout`, output cap,
   environment of `PATH`, `USER`, `LOGNAME`, `LANG` plus `env` and `keyEnv`, project trust) and in
   the [sandbox](architecture.md#sandbox): it writes only in the copy and in a `TMPDIR` and a `HOME`
-  (with `XDG_*`) of its own, which `env` may override, it cannot read the user's credentials, and it
-  reaches only the hosts the provider lists in `network`. The copy is deleted when the run ends, on every path. stdout is kept for the notes only
+  (with `XDG_*`) of its own, which `env` may override, it reads everything but the sandbox's list of
+  secrets (the user's credential files and the project's `.env` files, which the copy leaves out),
+  and it reaches only the hosts the provider lists in `network`. The copy is deleted when the run ends, on every path. stdout is kept for the notes only
   (2 KB).
 - **What it may change.** Under the scope, the indexed text files of the report scope. A change to a
   file outside the report scope or one Lighthouse does not index, a file created or deleted, or a
