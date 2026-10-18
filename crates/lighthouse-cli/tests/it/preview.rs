@@ -7,6 +7,8 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
+use crate::checks::home;
+
 const MISORDERED: &str = "pub fn run() -> u8 {\n    1\n}\n\npub struct Store;\n";
 const BANNER: &str = "// ===== Types =====\n\npub struct Store;\n";
 const DOC: &str = "pub fn undocumented() {}\n";
@@ -38,6 +40,7 @@ fn check(dir: &TempDir, args: &[&str]) -> String {
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir.path())
+        .envs(home(dir.path()))
         .args(["check", "--no-store"])
         .args(args)
         .output()

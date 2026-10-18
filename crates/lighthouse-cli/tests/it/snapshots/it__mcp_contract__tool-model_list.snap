@@ -59,7 +59,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                   "type": "string"
                 },
                 {
-                  "const": "rule",
+                  "const": "rule-classification",
                   "description": "A rule of the configuration names it for classification.",
                   "type": "string"
                 },

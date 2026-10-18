@@ -230,6 +230,13 @@ impl Config {
                 .map(|(id, setting)| (id, setting.into()))
                 .collect()
         };
+        for (at, o) in spec.overrides.iter().enumerate() {
+            if let Some(key) = environment::binding_in(&o.rules) {
+                return Err(Error::Config(format!(
+                    "`overrides[{at}].rules.{key}` is a model binding: bindings apply to a decision, not to some paths; set it in `rules`"
+                )));
+            }
+        }
         let overrides = spec
             .overrides
             .into_iter()

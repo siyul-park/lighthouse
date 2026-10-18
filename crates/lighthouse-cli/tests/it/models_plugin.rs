@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     cache_fixtures::write,
+    checks::home,
     models::{bound, count, project, provider, results},
 };
 
@@ -34,6 +35,7 @@ pub(crate) fn lighthouse(dir: &Path, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir)
+        .envs(home(dir))
         .env("LIGHTHOUSE_TRUST", "1")
         .args(args)
         .output()

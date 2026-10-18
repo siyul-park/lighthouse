@@ -6,7 +6,10 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 
-use crate::cache_fixtures::{Fixture, go, project, rust, write};
+use crate::{
+    cache_fixtures::{Fixture, go, project, rust, write},
+    checks::home,
+};
 
 const CACHE: &str = ".lighthouse/cache";
 
@@ -26,7 +29,7 @@ struct Timed {
 
 fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
-    cmd.current_dir(dir);
+    cmd.current_dir(dir).envs(home(dir));
     cmd
 }
 

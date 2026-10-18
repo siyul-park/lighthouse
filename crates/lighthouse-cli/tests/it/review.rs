@@ -7,13 +7,15 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
+use crate::checks::home;
+
 pub(crate) const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
 const LONG_NAME: &str = "/// Runs.\npub fn run_the_whole_thing_now() {}\n";
 const DOCUMENTED: &str = "/// Runs.\npub fn run(x: u8) -> u8 {\n    x + 1\n}\n";
 
 pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
-    cmd.current_dir(dir);
+    cmd.current_dir(dir).envs(home(dir));
     cmd
 }
 

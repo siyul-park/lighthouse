@@ -48,8 +48,8 @@ pub struct Entry {
     /// The key, as a TOML dotted key: `models.edit`,
     /// `rules."design/complexity".edit`.
     pub key: String,
-    /// The value as the configuration writes it; the values of a provider's
-    /// `env` are hidden.
+    /// The value as the configuration writes it; what may carry a secret in
+    /// a provider is hidden.
     pub value: Value,
     /// `bundled`, or the file that set it.
     pub origin: String,
@@ -177,11 +177,40 @@ fn to_value<T: Serialize>(value: T) -> Option<Value> {
     serde_json::to_value(value).ok()
 }
 
-/// A provider as it is shown: without the values of the variables it passes.
+/// A provider as it is shown. What may carry a secret is not: the values of
+/// `env`, of the plugin `options` and of `extraBody` (their keys stay), and the
+/// userinfo, query and fragment of `baseUrl`. The `command` is shown as it is.
 fn shown(provider: &ProviderSpec) -> Option<Value> {
     let mut provider = provider.clone();
-    for value in provider.env.values_mut() {
-        HIDDEN.clone_into(value);
+    provider.env.values_mut().for_each(hide);
+    provider.options.values_mut().for_each(|v| *v = hidden());
+    if let Some(body) = provider.extra_body.as_mut() {
+        body.values_mut().for_each(|v| *v = hidden());
     }
+    provider.base_url = provider.base_url.as_deref().map(plain_url);
     to_value(provider)
+}
+
+fn hide(value: &mut String) {
+    HIDDEN.clone_into(value);
+}
+
+fn hidden() -> Value {
+    Value::from(HIDDEN)
+}
+
+/// `url` as `scheme://host[:port]/path`: without userinfo, query and fragment.
+fn plain_url(url: &str) -> String {
+    let (scheme, rest) = url.split_once("://").map_or(("", url), |(s, r)| (s, r));
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, tail) = rest.split_at(end);
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let path = tail.split(['?', '#']).next().unwrap_or_default();
+    if scheme.is_empty() {
+        format!("{host}{path}")
+    } else {
+        format!("{scheme}://{host}{path}")
+    }
 }

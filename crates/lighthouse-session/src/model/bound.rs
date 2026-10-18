@@ -18,7 +18,8 @@ pub enum Binding {
     /// `models.edit`: the agent that fixes by changing files.
     Edit,
     /// A rule of the configuration names it for classification.
-    Rule,
+    #[serde(rename = "rule-classification")]
+    RuleClassification,
     /// A rule of the configuration names it for the agent that edits.
     #[serde(rename = "rule-edit")]
     RuleEdit,
@@ -72,7 +73,7 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
     for (decision, models) in bound.routes() {
         if selector.matches(decision) {
             for model in models {
-                bind(model, Some(decision), Binding::Rule);
+                bind(model, Some(decision), Binding::RuleClassification);
             }
         }
     }

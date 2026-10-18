@@ -88,22 +88,22 @@ pub fn init(config: Option<&Path>, agent: Option<Agent>) -> Result<u8> {
     } else {
         fs::write(&path, DEFAULT_CONFIG)?;
         println!("wrote {}", path.display());
-        // The store is a local cache of one machine's checks and reviews.
-        // So is the repository-local configuration: one person's models and
-        // approvals, not the project's.
-        for ignore in [
-            format!("{STATE_DIR}/*.db*"),
-            lighthouse_session::environment::LOCAL_PATH.to_owned(),
-        ] {
-            if ensure_line(&path.with_file_name(".gitignore"), &ignore)? {
-                println!("added {ignore} to .gitignore");
-            }
-        }
         // The decision log is committed; branches that both appended merge by
         // keeping the lines of both.
         let attributes = format!("{STATE_DIR}/decisions.jsonl merge=union");
         if ensure_line(&path.with_file_name(".gitattributes"), &attributes)? {
             println!("added the decision log to .gitattributes (merge=union)");
+        }
+    }
+    // The store is a local cache of one machine's checks and reviews.
+    // So is the repository-local configuration: one person's models and
+    // approvals, not the project's.
+    for ignore in [
+        format!("{STATE_DIR}/*.db*"),
+        lighthouse_session::environment::LOCAL_PATH.to_owned(),
+    ] {
+        if ensure_line(&path.with_file_name(".gitignore"), &ignore)? {
+            println!("added {ignore} to .gitignore");
         }
     }
     if let Some(Agent::ClaudeCode) = agent {

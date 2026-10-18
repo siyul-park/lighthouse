@@ -81,10 +81,11 @@ impl Spec for EnvironmentSpec {
 impl EnvironmentSpec {
     /// Parses a user's or a repository-local file; `origin` names it in
     /// errors. A key that is the project's to set is an error that names the
-    /// key and the file.
+    /// key and the file. An error names the file, the line and the key, and
+    /// never repeats the text of the line: it may hold a secret.
     pub fn parse(origin: &str, text: &str) -> Result<Self, Error> {
+        let table: toml::Table = toml::from_str(text).map_err(|e| located(origin, text, &e))?;
         let fail = |message: String| Error::Config(format!("{origin}: {message}"));
-        let table: toml::Table = toml::from_str(text).map_err(|e| fail(e.to_string()))?;
         if let Some(key) = table.keys().find(|key| MEANING.contains(&key.as_str())) {
             return Err(fail(project_only(key)));
         }
@@ -98,7 +99,30 @@ impl EnvironmentSpec {
                 return Err(fail(project_only(&format!("rules.\"{id}\".{key}"))));
             }
         }
-        table.try_into().map_err(|e| fail(e.to_string()))
+        let spec: Self = toml::from_str(text).map_err(|e| located(origin, text, &e))?;
+        spec.validate(origin, text)?;
+        Ok(spec)
+    }
+
+    /// What the values of a personal file must satisfy for the configuration
+    /// to be built, named by file, line and key.
+    fn validate(&self, origin: &str, text: &str) -> Result<(), Error> {
+        let at = |needle: &str, key: &str, why: &str| {
+            let line = line_of(text, needle).map_or_else(String::new, |n| format!(":{n}"));
+            Error::Config(format!("{origin}{line}: `{key}`: {why}"))
+        };
+        if let Some(share) = self.models.explore
+            && !(0.0..=1.0).contains(&share)
+        {
+            return Err(at("explore", "models.explore", "not a share from 0 to 1"));
+        }
+        for (name, provider) in &self.models.providers {
+            if let Err(why) = provider.resolve() {
+                let key = format!("models.providers.{name}");
+                return Err(at(&format!("providers.{name}"), &key, &why));
+            }
+        }
+        Ok(())
     }
 
     /// The environment keys the project file itself sets.
@@ -161,6 +185,71 @@ pub(super) fn bind(into: &mut Rules, env: &BTreeMap<String, EnvironmentRule>) {
             rule.edit = Some(names.iter().map(str::to_owned).collect());
         }
     }
+}
+
+/// The first model binding among `rules`, as the key `"<id>".<task>`.
+pub(super) fn binding_in(rules: &BTreeMap<String, RuleSetting>) -> Option<String> {
+    rules.iter().find_map(|(id, setting)| {
+        let RuleSetting::Detailed(detail) = setting else {
+            return None;
+        };
+        let task = match (&detail.classification, &detail.edit) {
+            (Some(_), _) => "classification",
+            (_, Some(_)) => "edit",
+            _ => return None,
+        };
+        Some(format!("\"{id}\".{task}"))
+    })
+}
+
+/// A TOML error as `origin:line: `key`: message`, with the values the message
+/// quotes left out: they may be secrets.
+fn located(origin: &str, text: &str, error: &toml::de::Error) -> Error {
+    let line = error
+        .span()
+        .map(|span| text[..span.start.min(text.len())].matches('\n').count());
+    let key = line
+        .and_then(|n| text.lines().nth(n))
+        .and_then(|line| line.split('=').next())
+        .map(|key| key.trim().trim_matches(['[', ']']).to_owned())
+        .filter(|key| !key.is_empty());
+    let mut place = origin.to_owned();
+    if let Some(n) = line {
+        place = format!("{place}:{}", n + 1);
+    }
+    if let Some(key) = key {
+        place = format!("{place}: `{key}`");
+    }
+    Error::Config(format!("{place}: {}", unquoted(error.message())))
+}
+
+/// `message` without the value serde quotes in it: `invalid type: string
+/// "x", expected usize` is `invalid type, expected usize`.
+fn unquoted(message: &str) -> String {
+    let kind = ["invalid type", "invalid value", "invalid length"]
+        .into_iter()
+        .find(|kind| message.starts_with(kind));
+    if let Some(kind) = kind {
+        return match message.find(", expected") {
+            Some(at) => format!("{kind}{}", &message[at..]),
+            None => kind.to_owned(),
+        };
+    }
+    match message.strip_prefix("unknown variant `") {
+        Some(rest) => rest
+            .split_once('`')
+            .map_or(message.to_owned(), |(_, rest)| {
+                format!("unknown variant{rest}")
+            }),
+        None => message.to_owned(),
+    }
+}
+
+/// The 1-based number of the first line that has `needle`.
+fn line_of(text: &str, needle: &str) -> Option<usize> {
+    text.lines()
+        .position(|line| line.contains(needle))
+        .map(|n| n + 1)
 }
 
 fn project_only(key: &str) -> String {

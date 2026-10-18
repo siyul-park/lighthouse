@@ -1,16 +1,20 @@
 //! The personal layers of the configuration: the user's file, which holds for
-//! every repository, and the repository-local file. Their text is read here
-//! once, so that what is parsed is what trust is judged on.
+//! every repository, and the repository-local file. What they say that can run
+//! a program or write without asking is part of what trust covers (see
+//! [`Personal::trusted`]).
 
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use lighthouse_resource::{Base, read_optional, xdg_dir};
 use lighthouse_spec::{Catalog, Layer};
 use schemars::JsonSchema;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 
-use crate::{Result, Session};
+use crate::{Result, Session, git::git};
 
 /// The user's file below the config directory of Lighthouse.
 const USER_FILE: &str = "config.toml";
@@ -18,10 +22,33 @@ const USER_FILE: &str = "config.toml";
 /// lists.
 pub const LOCAL_PATH: &str = ".lighthouse/local.toml";
 
-/// A personal file that exists: where it is, what it says, and what it means.
+/// A personal file that exists: where it is, and what it says.
 pub(crate) struct Personal {
     pub(crate) layer: Layer,
-    pub(crate) text: String,
+}
+
+impl Personal {
+    /// What of the file trust covers, canonically: the providers that run a
+    /// program, with the variables they are given, and the approval. A budget
+    /// or a binding to a provider that is not a program is not. `None` when
+    /// the file holds nothing of the kind.
+    pub(crate) fn trusted(&self) -> Option<String> {
+        let spec = &self.layer.spec;
+        let programs: BTreeMap<&String, Value> = spec
+            .models
+            .providers
+            .iter()
+            .filter(|(_, provider)| provider.command.is_some())
+            .map(|(name, p)| {
+                let ran = json!({ "command": p.command, "env": p.env, "keyEnv": p.key_env });
+                (name, ran)
+            })
+            .collect();
+        if programs.is_empty() && spec.approval.fix.is_none() {
+            return None;
+        }
+        Some(json!({ "providers": programs, "approval": spec.approval.fix }).to_string())
+    }
 }
 
 /// An environment key as `config show` prints it.
@@ -55,8 +82,14 @@ pub(crate) fn read(root: &Path) -> Result<Vec<Personal>> {
         .filter_map(|path| read_optional(&path).transpose().map(|text| (path, text)))
         .map(|(path, text)| {
             let (origin, text) = (path.display().to_string(), text?);
+            if path == local_file(root) && tracked(root, &path) {
+                return Err(format!(
+                    "{origin}: personal settings are committed: untrack it (git rm --cached) and keep it ignored"
+                )
+                .into());
+            }
             let layer = Layer::parse(&origin, &text)?;
-            Ok(Personal { layer, text })
+            Ok(Personal { layer })
         })
         .collect()
 }
@@ -83,13 +116,7 @@ pub(crate) fn check_local(root: &Path, personal: &[Personal], catalog: &Catalog)
 /// The effective environment of the session's project, key by key; with
 /// `origin`, each with the layer it came from.
 pub fn show(session: &Session, origin: bool) -> Vec<Setting> {
-    let shown = |origin: String| {
-        let root = session.root.display().to_string();
-        let inside = origin.strip_prefix(&root);
-        inside.map_or(origin.clone(), |rest| {
-            rest.trim_start_matches('/').to_owned()
-        })
-    };
+    let shown = |origin: String| relative(&session.root, origin);
     session
         .layers
         .entries()
@@ -100,4 +127,20 @@ pub fn show(session: &Session, origin: bool) -> Vec<Setting> {
             origin: origin.then(|| shown(entry.origin)),
         })
         .collect()
+}
+
+/// `origin` relative to the project at `root` when the file lies inside it.
+fn relative(root: &Path, origin: String) -> String {
+    Path::new(&origin)
+        .strip_prefix(root)
+        .map_or(origin.clone(), |rest| rest.display().to_string())
+}
+
+/// Whether git tracks `path`, in a project that is in a git work tree. Without
+/// git, or outside a work tree, nothing is tracked.
+fn tracked(root: &Path, path: &Path) -> bool {
+    let Some(name) = path.to_str() else {
+        return false;
+    };
+    git(root, &["ls-files", "--error-unmatch", "--", name]).is_ok()
 }

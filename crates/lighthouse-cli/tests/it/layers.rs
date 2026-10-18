@@ -12,8 +12,9 @@ use tempfile::TempDir;
 use crate::{
     checks::{lighthouse, write},
     fix::{UPPERCASE, text_project, trust},
-    fix_scope::{ALLOW, BAN, WIDE, agent_project, read},
+    fix_scope::{ALLOW, BAN, WIDE, agent_project, listed, read},
     mcp::Client,
+    models::project,
 };
 
 const BAN2: &str = "local/naming-ban2";
@@ -272,4 +273,227 @@ fn a_decision_is_fixed_by_the_project_agent_without_a_binding_of_its_own() {
         read(&dir, "src/lib.rs"),
         "pub fn fixed_one() {}\npub fn bad_two() {}\n"
     );
+}
+
+/// Runs `git` in `dir`, and panics when it fails.
+fn run_git(dir: &TempDir, args: &[&str]) {
+    let status = std::process::Command::new("git")
+        .current_dir(dir.path())
+        .args(args)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?}");
+}
+
+#[test]
+fn a_committed_local_file_is_a_load_error_until_it_is_untracked() {
+    let (dir, _agent) = agent_dir();
+    run_git(&dir, &["init", "-q"]);
+    local(&dir, "[models]\nbudget = 3\n");
+    lighthouse(dir.path()).arg("check").assert().success();
+
+    run_git(&dir, &["add", LOCAL_FILE]);
+    lighthouse(dir.path())
+        .arg("check")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("personal settings are committed"))
+        .stderr(predicate::str::contains("git rm --cached"))
+        .stderr(predicate::str::contains(LOCAL_FILE));
+
+    run_git(&dir, &["rm", "-q", "--cached", LOCAL_FILE]);
+    lighthouse(dir.path()).arg("check").assert().success();
+}
+
+#[test]
+fn without_git_the_local_file_is_read_as_it_was() {
+    let (dir, _agent) = agent_dir();
+    local(&dir, "[models]\nbudget = 3\n");
+
+    assert!(shown(&dir, &[]).contains("models.budget = 3"));
+}
+
+#[test]
+fn init_ignores_the_local_file_in_a_project_that_has_its_config_and_adds_it_once() {
+    let (dir, _agent) = agent_dir();
+    write(dir.path(), ".gitignore", "target\n");
+    for _ in 0..2 {
+        lighthouse(dir.path())
+            .args(["init", "--agent", "claude-code"])
+            .assert()
+            .success();
+    }
+
+    let ignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert_eq!(
+        ignore.lines().filter(|line| *line == LOCAL_FILE).count(),
+        1,
+        "{ignore}"
+    );
+    assert!(ignore.starts_with("target\n"), "{ignore}");
+}
+
+#[test]
+fn config_show_hides_what_may_carry_a_secret_in_the_command_and_the_tool() {
+    let (dir, _agent) = agent_dir();
+    local(
+        &dir,
+        "[models.providers.http]\nprotocol = \"openai\"\nbaseUrl = \"https://u:pw-secret@h.test/v1?k=sk-query\"\nextraBody = { key = \"sk-body\" }\n[models.providers.run]\ncommand = [\"agent\", \"--model\", \"{model}\"]\nenv = { TOKEN = \"sk-env\" }\n",
+    );
+
+    let text = shown(&dir, &["--origin"]);
+    let tool = Client::start(dir.path())
+        .tool("config_show", json!({"origin": true}))
+        .unwrap()
+        .to_string();
+
+    for shown in [&text, &tool] {
+        for secret in ["pw-secret", "sk-query", "sk-body", "sk-env"] {
+            assert!(!shown.contains(secret), "{secret} in {shown}");
+        }
+        assert!(shown.contains("https://h.test/v1"), "{shown}");
+        assert!(shown.contains("***"), "{shown}");
+    }
+}
+
+#[test]
+fn a_parse_error_in_a_personal_file_never_repeats_the_line() {
+    let (dir, _agent) = agent_dir();
+    local(&dir, "[models]\nbudget = \"sk-secret-9\"\n");
+
+    lighthouse(dir.path())
+        .arg("check")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains(format!("{LOCAL_FILE}:2")))
+        .stderr(predicate::str::contains("`budget`"))
+        .stderr(predicate::str::contains("sk-secret").not());
+}
+
+#[test]
+fn a_file_beside_the_project_directory_is_not_taken_for_a_file_inside_it() {
+    let (dir, _agent) = agent_dir();
+    let root = dir.path().canonicalize().unwrap();
+    let mut name = root.file_name().unwrap().to_owned();
+    name.push("-cfg");
+    let config = root.with_file_name(name);
+    write(&config, "lighthouse/config.toml", "[models]\nbudget = 7\n");
+
+    let out = lighthouse(&root)
+        .env("XDG_CONFIG_HOME", &config)
+        .args(["config", "show", "--origin"])
+        .output()
+        .unwrap();
+    fs::remove_dir_all(&config).unwrap();
+
+    let text = String::from_utf8(out.stdout).unwrap();
+    let wanted = format!(
+        "{}\tmodels.budget = 7",
+        config.join("lighthouse/config.toml").display()
+    );
+    assert!(text.lines().any(|line| line == wanted), "{text}");
+}
+
+/// A project that lists the banned-function decision and binds nothing, and
+/// the script of an agent that leaves a mark when it runs.
+fn unbound() -> (TempDir, TempDir) {
+    let scripts = tempfile::tempdir().unwrap();
+    write(
+        scripts.path(),
+        "agent.sh",
+        &format!(
+            "touch {:?}\nsed 's/bad_one/fixed_one/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n",
+            scripts.path().join("ran").to_str().unwrap()
+        ),
+    );
+    let dir = project(&listed("", ALLOW));
+    write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
+    local(
+        &dir,
+        &format!(
+            "[models]\nedit = \"mine/m\"\n[models.providers.mine]\ncommand = [\"sh\", {:?}]\n",
+            scripts.path().join("agent.sh").to_str().unwrap()
+        ),
+    );
+    (dir, scripts)
+}
+
+#[test]
+fn a_command_provider_declared_only_in_a_personal_file_runs_only_in_a_trusted_project() {
+    let (dir, scripts) = unbound();
+    let ran = scripts.path().join("ran");
+
+    let refused = Client::start(dir.path())
+        .tool("fix", json!({"decision": [BAN]}))
+        .unwrap();
+
+    assert!(!ran.exists(), "the agent ran");
+    let reason = refused["declined"][0]["reason"].as_str().unwrap();
+    assert!(reason.contains("lighthouse trust"), "{reason}");
+
+    let fixed = Client::trusting(dir.path())
+        .tool("fix", json!({"decision": [BAN]}))
+        .unwrap();
+    assert!(ran.exists(), "{fixed}");
+    assert!(read(&dir, "src/lib.rs").starts_with("pub fn fixed_one() {}\n"));
+}
+
+/// What `args` print, stdout and stderr, in the project.
+fn printed(dir: &TempDir, args: &[&str]) -> (Vec<u8>, Vec<u8>) {
+    let out = lighthouse(dir.path()).args(args).output().unwrap();
+    (out.stdout, out.stderr)
+}
+
+#[test]
+fn personal_files_that_say_nothing_leave_a_check_and_a_dry_run_byte_identical() {
+    let (dir, _agent) = agent_dir();
+    let check = ["check", "--no-store", "--no-cache", "--format", "json"];
+    let dry = ["check", "--fix", "--dry-run", "--no-store", "--no-cache"];
+    let before = (printed(&dir, &check), printed(&dir, &dry));
+    assert!(!before.0.0.is_empty(), "the check printed nothing");
+
+    user(&dir, "# mine\n");
+    local(&dir, "");
+    let after = (printed(&dir, &check), printed(&dir, &dry));
+
+    assert_eq!(before, after);
+}
+
+#[test]
+fn a_limit_in_a_personal_file_keeps_the_trust_and_a_program_withdraws_it() {
+    let dir = text_project(UPPERCASE);
+    trust(dir.path());
+    let trusted = |dir: &TempDir| {
+        let out = lighthouse(dir.path())
+            .args(["check", "--fix", "--dry-run"])
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8(out.stderr).unwrap();
+        assert!(
+            stderr.contains("would fix local/shout") || stderr.contains("not trusted"),
+            "{stderr}"
+        );
+        !stderr.contains("not trusted")
+    };
+    assert!(trusted(&dir));
+
+    local(
+        &dir,
+        "[models]\nbudget = 3\nexplore = 0.5\nrouting = \"round-robin\"\n",
+    );
+    assert!(trusted(&dir), "limits change no trust");
+
+    local(
+        &dir,
+        "[models.providers.run]\ncommand = [\"agent\"]\nenv = { A = \"1\" }\n",
+    );
+    assert!(!trusted(&dir), "a program is new");
+
+    trust(dir.path());
+    assert!(trusted(&dir));
+    local(
+        &dir,
+        "[models.providers.run]\ncommand = [\"agent\"]\nenv = { A = \"2\" }\n",
+    );
+    assert!(!trusted(&dir), "its variables changed");
 }

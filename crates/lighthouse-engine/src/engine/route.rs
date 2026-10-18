@@ -164,8 +164,12 @@ impl Route<'_> {
         key: &dyn Fn(&Member<'_>, &str) -> Digest,
         call: &dyn Fn(&Member<'_>) -> Result<T, String>,
     ) -> Result<(T, String), Refusal> {
+        let order = self.order(bound);
+        if order.is_empty() {
+            return Err(Refusal::Failed("no model is bound".to_owned()));
+        }
         let mut refusal = Refusal::Budget;
-        for member in self.order(bound) {
+        for member in order {
             let manifest = member.client.manifest();
             let key = key(member, &named(manifest));
             if let Some(kept) = self.kept(&key) {

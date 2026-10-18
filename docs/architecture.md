@@ -136,6 +136,15 @@ layers, the later winning key by key:
 | user | `$XDG_CONFIG_HOME/lighthouse/config.toml` (default `~/.config/lighthouse/config.toml`), every repository |
 | local | `.lighthouse/local.toml`, this repository; `lighthouse init` adds it to `.gitignore` |
 
+With `--config FILE` the project root is the current directory, so the local file is
+`.lighthouse/local.toml` under it, not beside `FILE`. Git must not track the local file: when it does,
+loading fails until it is untracked (`git rm --cached`). `config show` hides what may carry a secret
+(the values of a provider's `env`, `options` and `extraBody`, and the userinfo and query of its
+`baseUrl`; the `command` is shown as written), and errors in a personal file give its line and key but
+never the text of the line. Trust covers the part of the personal files that can run a program or
+write without asking (a provider with a `command` and its `env`, and `[approval]`), not their budgets
+or bindings.
+
 The user and the local file are bare TOML with the environment keys only
 ([environment.schema.json](../schema/environment.schema.json)); a meaning key in either is a load
 error that names the key and the file. A binding (a reference or a route list) is replaced, never

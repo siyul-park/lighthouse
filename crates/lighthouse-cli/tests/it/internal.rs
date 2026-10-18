@@ -8,6 +8,8 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
+use crate::checks::home;
+
 const DOC: &str = "design/exported-doc";
 const OWNER: &str = "testing/owner";
 const SINGLE: &str = "testing/owner";
@@ -26,6 +28,7 @@ fn findings(dir: &Path) -> Vec<(String, String)> {
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir)
+        .envs(home(dir))
         .args(["check", "--no-store", "--format", "json"])
         .output()
         .unwrap();

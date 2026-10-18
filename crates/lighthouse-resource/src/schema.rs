@@ -26,7 +26,7 @@ impl Descriptor {
     /// The descriptor of the kind whose spec is `S`, for a file that is the
     /// spec alone, without the envelope.
     pub fn bare<S: Spec + JsonSchema>() -> Self {
-        let root = serde_json::to_value(schemars::schema_for!(S)).expect("a schema serializes");
+        let root = Value::from(schemars::schema_for!(S));
         Self {
             kind: S::KIND,
             schema: identified::<S>(root),

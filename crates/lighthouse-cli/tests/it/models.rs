@@ -7,7 +7,7 @@ use std::{fs, path::Path};
 use assert_cmd::Command;
 use serde_json::Value;
 
-use crate::cache_fixtures::write;
+use crate::{cache_fixtures::write, checks::home};
 
 const DECISION: &str = r#"apiVersion: lighthouse/v1alpha1
 kind: Decision
@@ -82,6 +82,7 @@ fn check(dir: &Path, args: &[&str]) -> (i32, Value) {
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir)
+        .envs(home(dir))
         .env("LIGHTHOUSE_TRUST", "1")
         .args(["check", "--no-store", "--format", "sarif"])
         .args(args)
@@ -221,6 +222,7 @@ fn a_command_model_is_not_run_until_the_project_is_trusted() {
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir.path())
+        .envs(home(dir.path()))
         .env_remove("LIGHTHOUSE_TRUST")
         .env("HOME", dir.path())
         .args(["check", "--no-store", "--no-cache", "--format", "sarif"])
@@ -237,6 +239,7 @@ fn recorded_model_labels_are_judgments_attributed_to_the_model() {
     Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir.path())
+        .envs(home(dir.path()))
         .env("LIGHTHOUSE_TRUST", "1")
         .args([
             "check",
@@ -323,6 +326,7 @@ fn routed_check(dir: &Path) -> Value {
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir)
+        .envs(home(dir))
         .env("LIGHTHOUSE_TRUST", "1")
         .env("RAYON_NUM_THREADS", "1")
         .args([

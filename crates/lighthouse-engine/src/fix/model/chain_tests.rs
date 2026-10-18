@@ -24,7 +24,8 @@ use super::{
 };
 use crate::{
     Overlays, Run,
-    engine::{Member, Route, Scopes},
+    cache::KeyBuilder,
+    engine::{Member, Refusal, Route, Scopes},
 };
 
 fn function(name: &str, file: &str, result: &str) -> (Symbol, FunctionSummary) {
@@ -232,4 +233,26 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
     let counts = &fixer.account.counts()["r"];
     assert_eq!(counts.declined["conflict"], 1, "{counts:?}");
     assert_eq!(counts.asked, 2);
+}
+
+#[test]
+fn a_binding_that_names_no_model_of_the_route_is_not_a_spent_budget() {
+    let mut bound = Models::default();
+    bound.edit.push("agent/m".to_owned());
+    let route = Route::of(
+        vec![Member {
+            reference: "agent/m".to_owned(),
+            client: Box::new(agent()),
+        }],
+        &bound,
+    );
+
+    let refused = route
+        .through::<String>(&[], &|_, _| KeyBuilder::new().finish(), &|_| {
+            Ok("never asked".to_owned())
+        })
+        .unwrap_err();
+
+    assert_eq!(refused, Refusal::Failed("no model is bound".to_owned()));
+    assert_eq!(route.usage().calls, 0);
 }

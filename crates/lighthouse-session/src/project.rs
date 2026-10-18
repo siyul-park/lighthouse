@@ -112,9 +112,13 @@ impl Session {
     fn assemble(path: &Path, text: &str, root: PathBuf) -> Result<Self> {
         let format = Format::of_path(path).unwrap_or(Format::Toml);
         let personal = environment::read(&root)?;
-        let texts: Vec<(&str, &str)> = personal
+        let covered: Vec<(&str, String)> = personal
             .iter()
-            .map(|p| (p.layer.origin.as_str(), p.text.as_str()))
+            .filter_map(|p| Some((p.layer.origin.as_str(), p.trusted()?)))
+            .collect();
+        let texts: Vec<(&str, &str)> = covered
+            .iter()
+            .map(|(origin, trusted)| (*origin, trusted.as_str()))
             .collect();
         let layers = personal.iter().map(|p| p.layer.clone()).collect();
         let (config, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;

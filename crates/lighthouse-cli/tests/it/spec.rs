@@ -6,9 +6,11 @@ use std::{fs, path::Path};
 use assert_cmd::Command;
 use predicates::prelude::*;
 
+use crate::checks::home;
+
 fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
-    cmd.current_dir(dir);
+    cmd.current_dir(dir).envs(home(dir));
     cmd
 }
 

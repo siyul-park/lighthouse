@@ -1,18 +1,28 @@
 //! `command` checks and decisions that are not in force, through the binary,
 //! over a text project with project-local decisions.
 
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
+/// The user-level directories of a process run in `dir`: kept inside the
+/// project's own scratch space, so that a test never reads or writes the real
+/// home (the user's trust and `config.toml`, plugins and caches).
+pub(crate) fn home(dir: &Path) -> [(&'static str, PathBuf); 3] {
+    ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"].map(|name| (name, dir.join(".home")))
+}
+
+/// The binary in `dir`, with the user-level directories inside it and no CI
+/// override: nothing leaks between tests.
 pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir)
-        .env("XDG_CONFIG_HOME", dir.join(".home"))
-        .env("XDG_DATA_HOME", dir.join(".home"))
-        .env("XDG_CACHE_HOME", dir.join(".home"))
+        .envs(home(dir))
         .env_remove("LIGHTHOUSE_TRUST");
     cmd
 }

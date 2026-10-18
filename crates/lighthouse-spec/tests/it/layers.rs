@@ -306,3 +306,134 @@ fn the_environment_file_is_the_spec_without_an_envelope() {
     assert_eq!(spec.approval.fix, Some(Approval::Allow));
     assert!(spec.models.providers.contains_key("team"));
 }
+
+#[test]
+fn a_model_binding_inside_an_override_is_a_load_error_naming_the_override_and_the_key() {
+    for task in ["edit", "classification"] {
+        let text = document(&format!(
+            "plugins = [\"core\"]\n[[overrides]]\nfiles = [\"src/**\"]\n[overrides.rules.\"design/complexity\"]\nlevel = \"warn\"\n{task} = \"a/one\"\n"
+        ));
+
+        let message = Config::parse_as(Format::Toml, "lighthouse.toml", &text)
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            message.contains(&format!(
+                "`overrides[0].rules.\"design/complexity\".{task}`"
+            )),
+            "{message}"
+        );
+    }
+}
+
+#[test]
+fn an_override_without_a_binding_is_what_it_was() {
+    let text = document(
+        "plugins = [\"core\"]\n[[overrides]]\nfiles = [\"src/**\"]\n[overrides.rules.\"design/complexity\"]\nlevel = \"info\"\n",
+    );
+
+    assert!(Config::parse_as(Format::Toml, "lighthouse.toml", &text).is_ok());
+}
+
+const PROVIDERS: &str = r#"
+[models.providers.http]
+protocol = "openai"
+baseUrl = "https://user:pass@api.example.test:8443/v1/chat?key=sk-secret#frag"
+extraBody = { api_key = "sk-body", n = 2 }
+
+[models.providers.rpc]
+plugin = "fake-model"
+options = { token = "sk-option" }
+
+[models.providers.run]
+command = ["agent", "--model", "{model}", "--flag=visible"]
+env = { TOKEN = "sk-env" }
+"#;
+
+fn shown(key: &str) -> serde_json::Value {
+    let (_, stack) = layers(&[(USER_FILE, PROVIDERS)]);
+    stack
+        .entries()
+        .into_iter()
+        .find(|entry| entry.key == key)
+        .unwrap()
+        .value
+}
+
+#[test]
+fn what_may_carry_a_secret_is_not_shown() {
+    let http = shown("models.providers.http");
+    assert_eq!(http["baseUrl"], "https://api.example.test:8443/v1/chat");
+    assert_eq!(http["extraBody"], json!({"api_key": "***", "n": "***"}));
+
+    let rpc = shown("models.providers.rpc");
+    assert_eq!(rpc["options"], json!({"token": "***"}));
+
+    let run = shown("models.providers.run");
+    assert_eq!(run["env"], json!({"TOKEN": "***"}));
+    assert_eq!(
+        run["command"],
+        json!(["agent", "--model", "{model}", "--flag=visible"])
+    );
+    let all = [http, rpc, run]
+        .iter()
+        .map(ToString::to_string)
+        .collect::<String>();
+    for secret in ["sk-secret", "sk-body", "sk-option", "sk-env", "user:pass"] {
+        assert!(!all.contains(secret), "{secret} in {all}");
+    }
+}
+
+#[test]
+fn an_error_in_a_personal_file_names_the_line_and_the_key_and_not_the_value() {
+    let cases = [
+        (
+            "[models]\nbudget = \"sk-secret-1\"\n",
+            ":2",
+            "budget",
+            "invalid type",
+        ),
+        (
+            "[models]\nrouting = \"sk-secret-2\"\n",
+            ":2",
+            "routing",
+            "unknown variant",
+        ),
+        (
+            "[models]\nbudget = 1\nbudget = 2 # sk-secret-3\n",
+            ":3",
+            "",
+            "duplicate",
+        ),
+        ("[models]\nedit = \"sk-secret-4\n", ":2", "edit", ""),
+    ];
+    for (text, line, key, what) in cases {
+        let message = refused(USER_FILE, text);
+
+        assert!(message.contains(&format!("{USER_FILE}{line}")), "{message}");
+        assert!(message.contains(key), "{message}");
+        assert!(message.contains(what), "{message}");
+        assert!(!message.contains("sk-secret"), "{message}");
+    }
+}
+
+#[test]
+fn a_value_that_cannot_work_is_refused_with_the_file_the_line_and_the_key() {
+    let explore = refused(USER_FILE, "[models]\nexplore = 7\n");
+    assert!(
+        explore.contains(&format!("{USER_FILE}:2")) && explore.contains("`models.explore`"),
+        "{explore}"
+    );
+
+    let provider = refused(
+        USER_FILE,
+        "# mine\n[models.providers.both]\ncommand = [\"x\"]\nbaseUrl = \"https://u:pw-secret@h\"\n",
+    );
+    assert!(
+        provider.contains(&format!("{USER_FILE}:2"))
+            && provider.contains("`models.providers.both`")
+            && !provider.contains("pw-secret"),
+        "{provider}"
+    );
+}
