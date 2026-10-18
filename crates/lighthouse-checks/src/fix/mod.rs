@@ -1,23 +1,18 @@
 //! Fixes as data: a decision's `fix:` block compiled into a provider of the
 //! single `Fixer` interface, the way a declarative check compiles into a
-//! `Rule`. `ops` evaluates generic operations with CEL; `command` runs an
-//! external program on a scratch copy.
+//! `Rule`. `ops` evaluates generic operations with CEL. A `command` fix is
+//! run by the fix run itself, through the one rewrite path it shares with an
+//! agent.
 
-mod command;
 mod ops;
 
 use std::sync::Arc;
 
 use lighthouse_model::{Safety, ucm::FixOutcome};
 use lighthouse_plugin::{Error as PluginError, FixRequest, FixerManifest};
-use lighthouse_spec::{CommandSpec, Decision, FixKind};
+use lighthouse_spec::{Decision, FixKind};
 
 use crate::Error;
-
-enum Compiled {
-    Ops(ops::Steps),
-    Command(CommandSpec),
-}
 
 /// A fixer built from a decision's `fix:` block.
 #[derive(Clone)]
@@ -25,7 +20,7 @@ pub(crate) struct Fixer {
     meta: FixerManifest,
     description: String,
     safety: Safety,
-    compiled: Arc<Compiled>,
+    steps: Arc<ops::Steps>,
 }
 
 impl Fixer {
@@ -35,11 +30,10 @@ impl Fixer {
         let Some(fix) = &decision.fix else {
             return Ok(None);
         };
-        let compiled = match &fix.kind {
-            FixKind::Ops { ops: list } => Compiled::Ops(ops::Steps::compile(decision.id(), list)?),
-            FixKind::Command(command) => Compiled::Command(command.clone()),
-            // The engine's own fixer, built when a model is bound, serves it.
-            FixKind::Model { .. } => return Ok(None),
+        let steps = match &fix.kind {
+            FixKind::Ops { ops: list } => ops::Steps::compile(decision.id(), list)?,
+            // The fix run itself serves a command and a model.
+            FixKind::Command(_) | FixKind::Model { .. } => return Ok(None),
             // Not supported yet: the decision keeps its fix, no fixer is built, and
             // the plan declines its findings with that reason. The rest of the
             // pack is unaffected.
@@ -52,7 +46,7 @@ impl Fixer {
             },
             description: decision.title.clone(),
             safety: fix.safety,
-            compiled: Arc::new(compiled),
+            steps: Arc::new(steps),
         }))
     }
 }
@@ -63,19 +57,7 @@ impl lighthouse_plugin::Fixer for Fixer {
     }
 
     fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
-        let evaluated = match self.compiled.as_ref() {
-            Compiled::Ops(steps) => steps.evaluate(&self.meta.id, request)?,
-            Compiled::Command(spec) => {
-                if !request.trusted {
-                    return Ok(FixOutcome::declined(format!(
-                        "`{}` fixes by running `{}`; this project is not trusted to run commands (run `lighthouse trust`, or set LIGHTHOUSE_TRUST=1 in CI)",
-                        self.meta.id,
-                        spec.argv.join(" ")
-                    )));
-                }
-                command::run(&self.meta.id, spec, request)?
-            }
-        };
+        let evaluated = self.steps.evaluate(&self.meta.id, request)?;
         Ok(match evaluated {
             Ok(ops) => FixOutcome::Proposed {
                 description: self.description.clone(),

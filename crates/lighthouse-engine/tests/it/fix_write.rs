@@ -35,6 +35,14 @@ impl Fixer for Both {
             lighthouse_model::Span { start: at, end: at }
         };
         let b = fs::read_to_string(request.workspace.root.join("b.toy")).unwrap();
+        // As an editor saving would, while the fix is made.
+        if request.workspace.root.join(".meddle").exists() && !b.contains("saved elsewhere") {
+            fs::write(
+                request.workspace.root.join("b.toy"),
+                format!("{b}// saved elsewhere\n"),
+            )
+            .unwrap();
+        }
         Ok(FixOutcome::Proposed {
             description: "both".to_owned(),
             ops: vec![
@@ -74,7 +82,7 @@ impl Plugin for Pair {
     }
 }
 
-fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
+fn pair(dir: &tempfile::TempDir, extra: &str) -> (Engine, FixPlan) {
     let mut registry = Registry::default();
     registry
         .register(&Pair(PluginManifest {
@@ -83,7 +91,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
         }))
         .unwrap();
     let config = Config::parse_inline(&format!(
-        "plugins = [\"pair\"]\n[rules]\n\"pair/todo\" = \"error\"\n{formatter}"
+        "plugins = [\"pair\"]\n[rules]\n\"pair/todo\" = \"error\"\n{extra}"
     ))
     .unwrap();
     let mut plan = FixPlan::default();
@@ -136,14 +144,8 @@ fn a_fix_over_two_files_is_written_whole() {
 fn when_one_file_of_a_fix_changed_concurrently_neither_is_written() {
     let dir = two_files();
     let b = dir.path().join("b.toy");
-    // The formatter of a trusted project saves `b.toy` elsewhere while the run
-    // is verifying, only when it formats that file.
-    let formatter = format!(
-        "[languages.toy]\nformatter = [\"sh\", \"-c\", \"case \\\"$0\\\" in *b.toy) echo '// saved elsewhere' >> '{}';; esac\"]\n[sandbox]\nenabled = false\n",
-        b.display()
-    );
-    let (engine, plan) = pair(&dir, &formatter);
-    let engine = engine.with_trust(true);
+    fs::write(dir.path().join(".meddle"), "").unwrap();
+    let (engine, plan) = pair(&dir, "");
 
     let report = engine.fix(&plan, &FixRun::default()).unwrap();
 
@@ -333,32 +335,5 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
             .contains("does not analyze overlays"),
         "{:?}",
         report.declined
-    );
-}
-
-#[test]
-fn a_formatter_is_told_the_real_path_and_finds_the_settings_next_to_its_copy() {
-    let dir = project("TODO\n");
-    fs::write(dir.path().join(".editorconfig"), "root = true\n").unwrap();
-    let by_path = "[languages.toy]\nformatter = { argv = [\"sh\", \"-c\", \"cat; echo \\\"// $0\\\"\", \"{path}\"], stdin = \"file\", output = \"text\" }\n";
-    engine(&dir, by_path)
-        .with_trust(true)
-        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
-        .unwrap();
-
-    assert_eq!(text(&dir), "DONE\n// a.toy\n");
-
-    fs::write(dir.path().join("a.toy"), "TODO\n").unwrap();
-    let by_copy = "[languages.toy]\nformatter = [\"sh\", \"-c\", \"cat \\\"$(dirname \\\"$0\\\")/.editorconfig\\\" > \\\"$0\\\"\"]\n";
-
-    engine(&dir, by_copy)
-        .with_trust(true)
-        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
-        .unwrap();
-
-    assert_eq!(
-        text(&dir),
-        "root = true\n",
-        "the settings were in the scratch tree"
     );
 }

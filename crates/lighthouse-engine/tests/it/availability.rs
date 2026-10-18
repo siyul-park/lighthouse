@@ -11,7 +11,7 @@ use crate::support::*;
 /// plugin that serves `local`, and `extra` besides.
 fn models(extra: &str) -> Models {
     let config = Config::parse_inline(&format!(
-        "[models]\nedit = \"agent/m\"\nclassification = \"local/m\"\n{extra}[models.providers.agent]\ncommand = [\"sh\", \"agent.sh\"]\n"
+        "[models]\nagent = \"agent/m\"\nclassification = \"local/m\"\n{extra}[models.providers.agent]\ncommand = [\"sh\", \"agent.sh\"]\n"
     ))
     .unwrap();
     config.models(Catalog::bundled().projects()).unwrap()
@@ -20,7 +20,7 @@ fn models(extra: &str) -> Models {
 fn edit(decision: &str) -> Needs {
     Needs::Model {
         decision: decision.to_owned(),
-        task: Task::Edit,
+        task: Task::Agent,
     }
 }
 
@@ -68,7 +68,7 @@ fn an_agent_that_edits_is_a_program_and_needs_a_binding() {
     );
     assert_eq!(
         Availability::new(true, false, &unbound).of(&edit("a/b")),
-        Err(Unavailable::NoEditBinding)
+        Err(Unavailable::NoAgentBinding)
     );
 }
 

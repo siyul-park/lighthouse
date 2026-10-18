@@ -3,14 +3,13 @@
 //! prompt (see [`edit`]); what it changed is a proposal, which the
 //! orchestrator applies in memory and keeps only if the checks accept it (see
 //! [`verify`]). A model's word is never taken for the result, and what it may
-//! change is limited by the scope of the fix (see [`scope`]).
+//! change is limited by the scope of the fix (see [`super::rewrite`], the path
+//! it shares with a command fix).
 
 mod account;
 mod edit;
 mod extent;
 mod reach;
-mod scope;
-mod scratch;
 mod verify;
 
 use std::{
@@ -27,9 +26,7 @@ use crate::{
 };
 pub use account::ModelCounts;
 pub(super) use account::{Account, Class, Event};
-pub(super) use edit::World;
 pub(super) use extent::choose as choose_extent;
-pub(super) use scratch::run_verify;
 pub(super) use verify::{Verdict, judge};
 
 /// How many findings of one file an agent is given at most.
@@ -65,7 +62,7 @@ impl ModelFix {
 }
 
 /// The fixer of the findings given to a model: asks the agent each decision
-/// is bound to (`[models] edit`, or its own `edit`) and counts what happens.
+/// is bound to (`[models] agent`, or its own `edit`) and counts what happens.
 pub(super) struct ModelFixer<'e> {
     route: Route<'e>,
     fixes: &'e BTreeMap<String, ModelFix>,
@@ -82,7 +79,7 @@ impl<'e> ModelFixer<'e> {
             return None;
         }
         Some(Self {
-            route: engine.edit_route()?,
+            route: engine.agent_route()?,
             fixes,
             account: Account::default(),
             said: Mutex::default(),
@@ -91,8 +88,8 @@ impl<'e> ModelFixer<'e> {
 
     /// The agents that fix `decision`, in the order they are asked: the ones
     /// it binds, else the project's. Empty when none is bound to it.
-    pub(super) fn edit_for(&self, decision: &str) -> &[String] {
-        self.route.edit_for(decision)
+    pub(super) fn agent_for(&self, decision: &str) -> &[String] {
+        self.route.agent_for(decision)
     }
 
     /// How far the fix of `decision` may go.

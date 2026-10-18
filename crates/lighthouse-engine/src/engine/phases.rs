@@ -225,9 +225,8 @@ impl Engine {
     /// an analyzer reads the facts of those it requires, never its own.
     pub(super) fn analyze(
         &self,
-        rules: &[&dyn Rule],
-        inputs: &[Input],
-        project: &Project,
+        ws: &Workspace,
+        (rules, inputs, project): (&[&dyn Rule], &[Input], &Project),
         memo: &Memo,
         timings: &mut Timings,
     ) -> Result<Facts, Error> {
@@ -240,7 +239,7 @@ impl Engine {
             let id = &analyzer.manifest().id;
             let run = |input: Option<&Input>, facts: &Facts| {
                 analyzer.run(&Context {
-                    workspace: &self.ws,
+                    workspace: ws,
                     project,
                     file: input.map(|i| (&i.file, i.text.as_str())),
                     facts,
@@ -416,7 +415,7 @@ impl Engine {
         let meta = rule.manifest();
         let notices = Notices::default();
         let ctx = Context {
-            workspace: &self.ws,
+            workspace: scene.workspace,
             project: scene.project,
             file,
             facts: scene.facts,

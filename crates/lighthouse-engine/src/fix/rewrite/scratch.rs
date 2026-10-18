@@ -1,17 +1,21 @@
-//! The scratch copy of the project, which the commands of `[fix] verify` and
-//! an agent that edits run in, so that the files themselves stay as they were
-//! until the fixes are accepted. The copy holds the fixed texts of the run in
-//! place of the files they name, and is deleted when it is dropped.
+//! The scratch copy of the project, which the programs of `[fix] verify`, a
+//! command fix and an agent that edits run in, so that the files themselves
+//! stay as they were until the fixes are accepted. The copy holds the fixed
+//! texts of the run in place of the files they name and is a repository with
+//! one commit of that state, so that a tool finds its root, `git diff` works
+//! and an agent that refuses to run outside a repository runs. It is deleted
+//! when it is dropped.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs, io,
-    path::{Component, Path, PathBuf},
-    time::Duration,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 use ignore::WalkBuilder;
-use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT, Policy, Profile, is_project_secret};
+use lighthouse_process::{Environment, Home, Job, Policy, Ran, copy_project};
+use lighthouse_spec::{Output, Point, Program};
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 
@@ -23,6 +27,9 @@ const TAIL_LINES: usize = 20;
 /// Changes to files that are not edits of a text that an agent made, after
 /// which looking for more is pointless: any of them rejects its work.
 const MAX_OPAQUE: usize = 32;
+
+/// The directory of the repository, which is no part of the project.
+const REPOSITORY: &str = ".git";
 
 /// A copy of the project in a directory of its own.
 pub(in crate::fix) struct Scratch {
@@ -49,10 +56,13 @@ pub(in crate::fix) type Changes = BTreeMap<PathBuf, Change>;
 
 impl Scratch {
     /// A copy of the files of the project at `root` that version control
-    /// would keep, with `texts` written over the files they name.
+    /// would keep, with `texts` written over the files they name, as a
+    /// repository of one commit. The files are cloned where the file system
+    /// can, so the copy costs the directory entries and not the bytes.
     pub(in crate::fix) fn new(root: &Path, texts: &Overlays) -> io::Result<Self> {
         let dir = tempfile::tempdir()?;
         let copied = copy_project(root, dir.path(), texts)?;
+        commit(dir.path())?;
         Ok(Self { dir, copied })
     }
 
@@ -68,6 +78,7 @@ impl Scratch {
         let mut present = BTreeSet::new();
         let walk = WalkBuilder::new(self.path())
             .standard_filters(false)
+            .filter_entry(|entry| entry.file_name() != REPOSITORY)
             .sort_by_file_path(Ord::cmp)
             .build();
         for entry in walk {
@@ -100,47 +111,67 @@ impl Scratch {
     }
 }
 
-/// Runs `commands` in turn over a copy of the project at `root` with `texts`
+/// Runs `programs` in turn over a copy of the project at `root` with `texts`
 /// in place of the files they name. The first that fails ends the run: its
 /// text and the tail of its output are the error.
 pub(in crate::fix) fn run_verify(
     root: &Path,
     texts: &Overlays,
-    commands: &[Vec<String>],
-    limit: Duration,
+    programs: &[Program],
     policy: &Policy,
 ) -> Result<(), String> {
     let scratch = Scratch::new(root, texts)
         .map_err(|e| format!("the scratch copy of the project failed: {e}"))?;
-    let mut profile = Profile {
-        writes: vec![scratch.path().to_owned()],
-        network: policy.network.clone(),
-        ..Profile::new(root).caching()
-    };
-    profile.writes.extend(policy.writes(scratch.path()));
-    for argv in commands {
-        let shown = argv.join(" ");
-        let ran = lighthouse_process::run(&Invocation {
-            argv,
+    for program in programs {
+        let shown = program.shown();
+        let own = program.policy(policy);
+        let mut profile = own.profile(root, scratch.path()).caching();
+        profile.writes.push(scratch.path().to_owned());
+        let environment = Environment::new(&program.env, Vec::new(), Home::User)
+            .map_err(|reason| format!("`{shown}`: {reason}"))?;
+        let ran = Job {
+            command: &program.command,
             dir: scratch.path(),
             stdin: &[],
-            env: None,
-            limit,
-            grace: GRACE,
-            max_output: MAX_OUTPUT,
-            sandbox: policy.sandbox(&profile),
-        })
+            environment: &environment,
+            timeout: program.timeout(Point::Verify),
+            policy: &own,
+            profile: &profile,
+        }
+        .run()
         .map_err(|reason| format!("`{shown}`: {reason}"))?;
-        if !ran.success {
-            let how = ran.code.map_or("was ended by a signal".to_owned(), |c| {
-                format!("exited {c}")
-            });
-            let (stderr, stdout) = (tail(&ran.stderr), tail(&ran.stdout));
-            let output = if stderr.is_empty() { stdout } else { stderr };
-            return Err(format!("`{shown}` {how}:\n{output}"));
+        let success = program.success(Point::Verify);
+        let ended = ended(&ran, &success);
+        let failure = match program.output(Point::Verify) {
+            Output::Lines => ended.or_else(|| said(&ran)),
+            _ => ended,
+        };
+        if let Some(why) = failure {
+            return Err(format!("`{shown}` {why}"));
         }
     }
     Ok(())
+}
+
+/// How a program that did not exit with a code of `success` ended, with the
+/// tail of what it said.
+fn ended(ran: &Ran, success: &[i32]) -> Option<String> {
+    if ran.code.is_some_and(|code| success.contains(&code)) {
+        return None;
+    }
+    let how = ran.code.map_or("was ended by a signal".to_owned(), |c| {
+        format!("exited {c}")
+    });
+    let (stderr, stdout) = (tail(&ran.stderr), tail(&ran.stdout));
+    let output = if stderr.is_empty() { stdout } else { stderr };
+    Some(format!("{how}:\n{output}"))
+}
+
+/// The findings a program of `output: lines` printed, as the reason it
+/// fails.
+fn said(ran: &Ran) -> Option<String> {
+    let text = tail(&ran.stdout);
+    (!text.trim().is_empty()).then(|| format!("found:\n{text}"))
 }
 
 fn opaque(changes: &Changes) -> usize {
@@ -166,52 +197,46 @@ fn tail(bytes: &[u8]) -> String {
     lines[lines.len().saturating_sub(TAIL_LINES)..].join("\n")
 }
 
-/// Copies the files of the project that version control would keep, except
-/// its secrets (the copy is writable and its programs may read it), and
-/// writes `texts` over them. The paths of the files placed.
-fn copy_project(root: &Path, into: &Path, texts: &Overlays) -> io::Result<BTreeSet<PathBuf>> {
-    let mut placed = BTreeSet::new();
-    let walk = WalkBuilder::new(root)
-        .hidden(false)
-        .require_git(false)
-        .filter_entry(|entry| entry.file_name() != ".git")
-        .build();
-    for entry in walk {
-        let entry = entry.map_err(io::Error::other)?;
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
+/// Makes the directory a repository with one commit of everything in it. The
+/// settings of the user and of the machine are not read, so what the commit
+/// holds does not depend on them.
+fn commit(dir: &Path) -> io::Result<()> {
+    let git = |args: &[&str]| -> io::Result<()> {
+        let ran = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .stdin(Stdio::null())
+            .output()
+            .map_err(|e| io::Error::other(format!("git cannot be run: {e}")))?;
+        if ran.status.success() {
+            return Ok(());
         }
-        let Ok(relative) = entry.path().strip_prefix(root) else {
-            continue;
-        };
-        if is_project_secret(relative) {
-            continue;
-        }
-        place(&into.join(relative), |target| {
-            fs::copy(entry.path(), target).map(drop)
-        })?;
-        placed.insert(relative.to_owned());
-    }
-    for (path, text) in texts {
-        if path
-            .components()
-            .any(|c| !matches!(c, Component::Normal(_)))
-        {
-            return Err(io::Error::other(format!(
-                "`{}` is not a relative, normalized path",
-                path.display()
-            )));
-        }
-        place(&into.join(path), |target| fs::write(target, text))?;
-        placed.insert(path.clone());
-    }
-    Ok(placed)
-}
-
-/// Creates the directory of `target` and fills the file by `write`.
-fn place(target: &Path, write: impl FnOnce(&Path) -> io::Result<()>) -> io::Result<()> {
-    if let Some(dir) = target.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    write(target)
+        let said = String::from_utf8_lossy(&ran.stderr);
+        Err(io::Error::other(format!(
+            "git {} failed: {}",
+            args.first().copied().unwrap_or_default(),
+            said.trim()
+        )))
+    };
+    git(&["init", "--quiet"])?;
+    git(&["add", "--all", "--force"])?;
+    git(&[
+        "-c",
+        "user.name=lighthouse",
+        "-c",
+        "user.email=lighthouse@localhost",
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--quiet",
+        "--allow-empty",
+        "--no-verify",
+        "--message",
+        "base",
+    ])
 }

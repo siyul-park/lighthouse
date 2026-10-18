@@ -1,7 +1,7 @@
 //! The fix by an agent that edits: its brief, the scope, the verdict on the edit of a
 //! file, and the scratch copy it works in.
 
-use std::{fs, path::Path};
+use std::path::Path;
 
 use lighthouse_model::{Diagnostic, Fingerprint, Severity};
 use lighthouse_plugin::FixDecision;
@@ -9,13 +9,11 @@ use lighthouse_spec::{Example, ExampleFile, ExampleKind, FixScope};
 
 use super::{
     Class,
-    scope::first_outside,
-    scratch::{Change, Scratch},
-    tests::{FILE, finding, proposal, run, span},
+    tests::{FILE, finding, proposal, run},
     verify::{Verdict, judge},
 };
 use crate::{
-    Overlays, Run,
+    Run,
     fix::{
         brief::{Target, brief},
         propose::{Aim, Proposal},
@@ -140,22 +138,6 @@ When done, reply with one line per finding: its number and `fixed` or `left` wit
     assert_eq!(text, brief(&targets, &[]));
 }
 
-#[test]
-fn a_change_is_inside_the_scope_symbol_when_every_changed_line_is_in_an_extent() {
-    let old = "a\nb\nc\nd\ne\n";
-    let extents = [span((2, 1), (3, 2)), span((5, 1), (5, 2))];
-    let outside = |new: &str| first_outside(old, new, &extents);
-
-    assert_eq!(outside("a\nB\nC\nd\ne\n"), None);
-    assert_eq!(outside("a\nb\nc\nd\nE\n"), None);
-    assert_eq!(outside("a\nb\nc\nD\ne\n"), Some(4));
-    assert_eq!(outside("A\nb\nc\nd\ne\n"), Some(1));
-    assert_eq!(outside("a\nb\nc\nx\nd\ne\n"), None, "next to an extent");
-    assert_eq!(outside("a\nb\nx\nc\nd\ne\n"), None, "inside an extent");
-    assert_eq!(outside("x\na\nb\nc\nd\ne\n"), Some(1));
-    assert_eq!(outside(old), None);
-}
-
 fn shared(finding: &Diagnostic) -> Proposal {
     Proposal {
         aim: Aim::File,
@@ -256,54 +238,4 @@ fn a_new_finding_of_the_rule_stands_for_one_of_the_old_whose_fingerprint_changed
 
     assert!(verdict.files.is_empty(), "{verdict:?}");
     assert_eq!(verdict.own.len(), 1, "one of the two is explained by it");
-}
-
-#[test]
-fn the_scratch_copy_holds_the_files_and_texts_of_the_run_and_tells_what_was_changed() {
-    let root = tempfile::tempdir().unwrap();
-    fs::create_dir_all(root.path().join("src")).unwrap();
-    fs::write(root.path().join("src/a.txt"), "on disk\n").unwrap();
-    fs::write(root.path().join("src/b.txt"), "b\n").unwrap();
-    fs::write(root.path().join("src/c.txt"), "c\n").unwrap();
-    fs::write(root.path().join(".gitignore"), "ignored.txt\n").unwrap();
-    fs::write(root.path().join("ignored.txt"), "ignored\n").unwrap();
-    fs::write(root.path().join(".env"), "KEY=fake\n").unwrap();
-    fs::write(root.path().join(".env.local"), "KEY=fake\n").unwrap();
-    fs::create_dir_all(root.path().join(".lighthouse")).unwrap();
-    fs::write(root.path().join(".lighthouse/local.toml"), "x = 1\n").unwrap();
-    let texts = Overlays::from([("src/a.txt".into(), "overlay\n".to_owned())]);
-
-    let scratch = Scratch::new(root.path(), &texts).unwrap();
-    let at = scratch.path().to_owned();
-
-    assert_eq!(
-        fs::read_to_string(at.join("src/a.txt")).unwrap(),
-        "overlay\n"
-    );
-    assert!(!at.join("ignored.txt").exists());
-    for secret in [".env", ".env.local", ".lighthouse/local.toml"] {
-        assert!(!at.join(secret).exists(), "{secret} was copied");
-    }
-    assert!(scratch.changes(root.path(), &texts).unwrap().is_empty());
-
-    fs::write(at.join("src/b.txt"), "changed\n").unwrap();
-    fs::write(at.join("src/a.txt"), "on disk\n").unwrap();
-    fs::remove_file(at.join("src/c.txt")).unwrap();
-    fs::write(at.join("new.txt"), "new\n").unwrap();
-    let changes = scratch.changes(root.path(), &texts).unwrap();
-
-    assert_eq!(
-        changes[Path::new("src/b.txt")],
-        Change::Text("changed\n".to_owned())
-    );
-    assert_eq!(
-        changes[Path::new("src/a.txt")],
-        Change::Text("on disk\n".to_owned())
-    );
-    assert_eq!(changes[Path::new("src/c.txt")], Change::Deleted);
-    assert_eq!(changes[Path::new("new.txt")], Change::Created);
-    assert_eq!(changes.len(), 4);
-
-    drop(scratch);
-    assert!(!at.exists(), "the copy is deleted when it is dropped");
 }

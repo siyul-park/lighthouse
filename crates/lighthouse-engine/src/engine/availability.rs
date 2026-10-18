@@ -16,6 +16,9 @@ pub enum Needs {
     Nothing,
     /// A program the project names: a command check or fix.
     Program,
+    /// A program of the bundled catalog, which is Lighthouse's own: it needs
+    /// no trust.
+    Bundled,
     /// The models bound to a decision for a task.
     Model { decision: String, task: Task },
     /// Nothing serves it yet: a fix of kind `rpc`.
@@ -54,6 +57,7 @@ impl<'a> Availability<'a> {
         match needs {
             Needs::Nothing => Ok(()),
             Needs::Program => self.program(),
+            Needs::Bundled => self.sandbox(),
             Needs::Model { decision, task } => self.route(decision, *task),
             Needs::Unserved => Err(Unavailable::ProviderUnavailable),
         }
@@ -65,6 +69,11 @@ impl<'a> Availability<'a> {
         if !self.trusted {
             return Err(Unavailable::UntrustedProject);
         }
+        self.sandbox()
+    }
+
+    /// A sandbox that works, when the project asks for one.
+    fn sandbox(&self) -> Result<(), Unavailable> {
         if self.sandboxed && sandbox_available().is_err() {
             return Err(Unavailable::SandboxUnavailable);
         }
@@ -73,7 +82,7 @@ impl<'a> Availability<'a> {
 
     fn route(&self, decision: &str, task: Task) -> Result<(), Unavailable> {
         let (route, none) = match task {
-            Task::Edit => (self.models.edit_for(decision), Unavailable::NoEditBinding),
+            Task::Agent => (self.models.agent_for(decision), Unavailable::NoAgentBinding),
             Task::Classification => (
                 self.models
                     .route(decision)

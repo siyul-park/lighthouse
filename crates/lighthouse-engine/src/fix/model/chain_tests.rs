@@ -17,15 +17,15 @@ use lighthouse_spec::{FixScope, Models};
 
 use super::{
     Account, ModelFixer,
-    edit::{World, conflict},
+    edit::conflict,
     reach::reach,
-    scratch::Scratch,
     tests::{FILE, finding, run, symbol},
 };
 use crate::{
     Overlays, Run,
     cache::KeyBuilder,
     engine::{Member, Refusal, Route, Scopes},
+    fix::rewrite::{Scratch, World},
 };
 
 fn function(name: &str, file: &str, result: &str) -> (Symbol, FunctionSummary) {
@@ -130,7 +130,7 @@ fn a_run_sees_the_edits_accepted_before_it_and_a_stale_result_is_a_conflict() {
         "the copy of the second run holds what the first was accepted with"
     );
 
-    let world = World::new(root.path(), &outcome, &first, &scope).unwrap();
+    let world = World::new(root.path(), &outcome, &first, &scope);
     let found = |text: &str| BTreeMap::from([(PathBuf::from(FILE), hash::sha256(text))]);
     assert_eq!(conflict(&found("first run\n"), &world), None);
     let stale = conflict(&found("disk\n"), &world).unwrap();
@@ -194,7 +194,7 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
     let (scope, _) = Scopes::new(&[], root.path()).unwrap();
     let fixes = BTreeMap::new();
     let mut bound = Models::default();
-    bound.edit.push("agent/m".to_owned());
+    bound.agent.push("agent/m".to_owned());
     let fixer = ModelFixer {
         route: Route::of(
             vec![Member {
@@ -218,7 +218,7 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
         &[(&finding, &decision, None)],
         Vec::new(),
     );
-    let world = || World::new(root.path(), &outcome, &texts, &scope).unwrap();
+    let world = || World::new(root.path(), &outcome, &texts, &scope);
 
     let first = fixer.edit(&batch, &world()).unwrap();
     assert_eq!(first.texts[std::path::Path::new(FILE)], "agent\n");
@@ -238,7 +238,7 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
 #[test]
 fn a_binding_that_names_no_model_of_the_route_is_not_a_spent_budget() {
     let mut bound = Models::default();
-    bound.edit.push("agent/m".to_owned());
+    bound.agent.push("agent/m".to_owned());
     let route = Route::of(
         vec![Member {
             reference: "agent/m".to_owned(),

@@ -84,7 +84,7 @@ fn a_kept_preview_is_applied_as_it_was_shown() {
             &stuck(),
             &FixRun {
                 fingerprints: vec![fingerprint],
-                unsafe_fixes: true,
+                unsafe_fixes: Some(true),
                 ..FixRun::default()
             },
         )
@@ -108,7 +108,7 @@ fn a_changed_base_is_a_conflict_for_a_deterministic_fix_too() {
             &stuck(),
             &FixRun {
                 fingerprints: vec![fingerprint],
-                unsafe_fixes: true,
+                unsafe_fixes: Some(true),
                 ..FixRun::default()
             },
         )
@@ -137,7 +137,7 @@ fn a_preview_that_is_not_kept_is_declined_not_made_again() {
             &stuck(),
             &FixRun {
                 fingerprints: vec![fingerprint],
-                unsafe_fixes: true,
+                unsafe_fixes: Some(true),
                 ..FixRun::default()
             },
         )

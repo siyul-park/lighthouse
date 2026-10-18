@@ -20,12 +20,13 @@ use lighthouse_protocol::hash;
 use lighthouse_spec::FixScope;
 
 use super::{
-    FixBinding, FixedBy,
+    FixBinding, FixPlan, FixedBy,
     brief::safe_fixes,
     edits::TextEdit,
     lower::Sources,
-    model::{Class, Event, MAX_FINDINGS, ModelFixer, World, choose_extent},
+    model::{Class, Event, MAX_FINDINGS, ModelFixer, choose_extent},
     propose::{Aim, Proposal, Proposer},
+    rewrite::World,
 };
 use crate::{Error, Overlays, Run, engine::Scopes};
 
@@ -76,9 +77,8 @@ impl Proposer<'_> {
                     ),
                 );
             }
-            let ran = World::new(root, outcome, &standing, scope)
-                .map_err(|reason| (group.iter().map(|(f, _)| *f).collect(), reason))
-                .and_then(|world| self.run_on(models, &world, &file, &group, sources, decline));
+            let world = World::new(root, outcome, &standing, scope);
+            let ran = self.run_on(models, &world, &file, &group, sources, decline);
             match ran {
                 Ok(Some(run)) => {
                     standing.extend(
@@ -86,7 +86,7 @@ impl Proposer<'_> {
                             .iter()
                             .map(|(path, (_, after))| (path.clone(), after.clone())),
                     );
-                    proposals.extend(run_proposals(accepted, &run));
+                    proposals.extend(run_proposals(self.plan, accepted, &run));
                     accepted += 1;
                 }
                 Ok(None) => {}
@@ -186,7 +186,7 @@ impl Proposer<'_> {
 /// The proposals of run number `number` of the chain: one for each of its
 /// findings, all with the one edit that replaces each file the run changed,
 /// over the text the run started from.
-fn run_proposals(number: usize, run: &Accepted<'_>) -> Vec<Proposal> {
+fn run_proposals(plan: &FixPlan, number: usize, run: &Accepted<'_>) -> Vec<Proposal> {
     let edits: Vec<TextEdit> = run
         .files
         .iter()
@@ -216,7 +216,8 @@ fn run_proposals(number: usize, run: &Accepted<'_>) -> Vec<Proposal> {
             line: finding.span.start.line,
             fixer: FixedBy::Model,
             description: format!("model edit by `{}`", run.model),
-            safety: Safety::Unsafe,
+            safety: plan.safety(&finding.rule_id, Safety::Unsafe, Safety::Unsafe),
+            priority: plan.priority(&finding.rule_id),
             edits: edits.clone(),
             files: files.clone(),
             aim: Aim::File,
@@ -245,7 +246,7 @@ fn by_run<'o>(found: Vec<Asked<'o>>, models: &ModelFixer<'_>) -> BTreeMap<RunKey
         let key = (
             asked.0.file.clone(),
             models.scope_of(rule),
-            models.edit_for(rule).to_vec(),
+            models.agent_for(rule).to_vec(),
         );
         runs.entry(key).or_default().push(asked);
     }

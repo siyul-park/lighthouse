@@ -49,6 +49,37 @@ pub fn unified_diff(path: &Path, before: &str, after: &str) -> String {
         .to_string()
 }
 
+/// The smallest edit of whole lines that turns `old` into `new`; `None` when
+/// they are the same.
+pub(crate) fn replace_changed(file: &Path, old: &str, new: &str) -> Option<TextEdit> {
+    if old == new {
+        return None;
+    }
+    let old_lines: Vec<&str> = old.split_inclusive('\n').collect();
+    let new_lines: Vec<&str> = new.split_inclusive('\n').collect();
+    let prefix = old_lines
+        .iter()
+        .zip(&new_lines)
+        .take_while(|(a, b)| a == b)
+        .count();
+    let suffix = old_lines[prefix..]
+        .iter()
+        .rev()
+        .zip(new_lines[prefix..].iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let size = |lines: &[&str]| lines.iter().map(|l| l.len()).sum::<usize>();
+    let start = size(&old_lines[..prefix]);
+    let end = old.len() - size(&old_lines[old_lines.len() - suffix..]);
+    let from = size(&new_lines[..prefix]);
+    let to = new.len() - size(&new_lines[new_lines.len() - suffix..]);
+    Some(TextEdit {
+        file: file.to_owned(),
+        range: start..end,
+        text: new[from..to].to_owned(),
+    })
+}
+
 /// Whether two edits of one file collide. Two inserts at one point do not; an
 /// insert strictly inside a replaced range does.
 pub(crate) fn overlap(a: &Range<usize>, b: &Range<usize>) -> bool {
@@ -166,6 +197,15 @@ mod tests {
         assert!(overlap(&(4..4), &(3..5)));
         assert!(overlap(&(1..4), &(3..5)));
         assert!(!overlap(&(1..3), &(3..5)));
+    }
+
+    #[test]
+    fn replace_changed_takes_the_lines_between_the_common_ends() {
+        let edit = replace_changed(Path::new("f"), "a\nb\nc\nd\n", "a\nB\nX\nd\n").unwrap();
+        assert_eq!((edit.range, edit.text.as_str()), (2..6, "B\nX\n"));
+        assert!(replace_changed(Path::new("f"), "a\n", "a\n").is_none());
+        let grown = replace_changed(Path::new("f"), "a\na\n", "a\na\na\n").unwrap();
+        assert_eq!(apply("a\na\n", &[&grown]).unwrap(), "a\na\na\n");
     }
 
     #[test]

@@ -144,7 +144,6 @@ impl Engine {
         let maps = [
             serde_json::to_string(&self.ws.languages),
             serde_json::to_string(&self.ws.constructors),
-            serde_json::to_string(&self.ws.formatters),
         ];
         for map in maps {
             key.part(map.unwrap_or_default());

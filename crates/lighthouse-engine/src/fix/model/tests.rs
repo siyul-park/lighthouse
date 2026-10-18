@@ -3,7 +3,6 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
     path::PathBuf,
 };
 
@@ -11,10 +10,9 @@ use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Position, Safety, Severity, Span,
     ucm::{File, Fragment, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
-use lighthouse_process::Policy;
 use serde_json::json;
 
-use super::{Account, Class, Event, extent, scratch::run_verify, verify::judge};
+use super::{Account, Class, Event, extent, verify::judge};
 use crate::{
     Run,
     fix::{
@@ -139,6 +137,7 @@ pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
         fixer: FixedBy::Model,
         description: "model fix".to_owned(),
         safety: Safety::Unsafe,
+        priority: 0,
         edits: Vec::new(),
         files: vec![finding.file.clone()],
         aim: Aim::Finding,
@@ -269,56 +268,4 @@ fn the_classes_of_declines_are_named() {
     .map(Class::name)
     .into();
     assert_eq!(names.len(), 9);
-}
-
-#[test]
-fn the_verify_commands_run_over_a_copy_that_holds_the_fixed_texts() {
-    let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("a.txt"), "old\n").unwrap();
-    fs::write(root.path().join(".gitignore"), "skipped/\n").unwrap();
-    fs::create_dir(root.path().join("skipped")).unwrap();
-    fs::write(root.path().join("skipped/b.txt"), "x\n").unwrap();
-    let texts = crate::Overlays::from([(PathBuf::from("a.txt"), "new\n".to_owned())]);
-    let sh = |script: &str| vec!["sh".to_owned(), "-c".to_owned(), script.to_owned()];
-    let limit = std::time::Duration::from_secs(20);
-
-    let passed = run_verify(
-        root.path(),
-        &texts,
-        &[sh("grep -q new a.txt"), sh("test ! -e skipped/b.txt")],
-        limit,
-        &Policy::default(),
-    );
-    assert_eq!(passed, Ok(()));
-    assert_eq!(
-        fs::read_to_string(root.path().join("a.txt")).unwrap(),
-        "old\n"
-    );
-
-    let failed = run_verify(
-        root.path(),
-        &texts,
-        &[sh("echo one >&2; echo two >&2; exit 3"), sh("exit 0")],
-        limit,
-        &Policy::default(),
-    )
-    .unwrap_err();
-    assert!(failed.contains("exited 3"), "{failed}");
-    assert!(failed.ends_with("one\ntwo"), "{failed}");
-
-    fs::write(root.path().join(".env"), "KEY=fake\n").unwrap();
-    let read = run_verify(
-        root.path(),
-        &texts,
-        &[sh(&format!(
-            "test ! -e .env && ! cat '{}/.env' 2>/dev/null",
-            root.path().display()
-        ))],
-        limit,
-        &Policy::default(),
-    );
-    assert_eq!(read, Ok(()), "a command read the .env of the project");
-
-    let escaping = crate::Overlays::from([(PathBuf::from("../x"), String::new())]);
-    assert!(run_verify(root.path(), &escaping, &[], limit, &Policy::default()).is_err());
 }

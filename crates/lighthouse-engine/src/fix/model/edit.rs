@@ -6,27 +6,24 @@
 
 use std::{
     collections::BTreeMap,
-    fs,
     path::{Path, PathBuf},
     sync::PoisonError,
 };
 
-use lighthouse_model::{Diagnostic, Span, Unavailable, ucm::File};
+use lighthouse_model::{Diagnostic, Span, Unavailable};
 use lighthouse_plugin::{EditRequest, FixDecision};
 use lighthouse_protocol::hash;
 use lighthouse_spec::FixScope;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    Class, Event, ModelFixer,
-    scope::first_outside,
-    scratch::{Change, Changes, Scratch},
-};
+use super::{Class, Event, ModelFixer};
 use crate::{
-    Overlays, Run,
     cache::{Digest, KeyBuilder, digest_of},
-    engine::{Member, Refusal, Scopes},
-    fix::brief::{Target, brief},
+    engine::{Member, Refusal},
+    fix::{
+        brief::{Target, brief},
+        rewrite::{Bounds, Changes, Scratch, World, accept, collect},
+    },
 };
 
 /// The findings of one file an agent is asked to fix, by the order of their
@@ -44,56 +41,6 @@ pub(in crate::fix) struct Batch<'a> {
     /// Where the agent may change `file` under the scope `symbol`: the extent
     /// of each finding.
     extents: Vec<Span>,
-}
-
-/// What the agent works over, which is also all it may read.
-pub(in crate::fix) struct World<'a> {
-    pub(in crate::fix) root: &'a Path,
-    /// The check the findings come from.
-    pub(in crate::fix) outcome: &'a Run,
-    /// The texts that stand in for the files of the project: those of the
-    /// rounds before, and every edit already accepted in this pass.
-    pub(in crate::fix) texts: &'a Overlays,
-    /// Where the run fixes: the files it may change.
-    pub(in crate::fix) scope: &'a Scopes,
-    /// The files of the scope as they stand now, which an answer is kept
-    /// under: an edit made over other texts is another answer.
-    digest: Digest,
-}
-
-impl<'a> World<'a> {
-    pub(in crate::fix) fn new(
-        root: &'a Path,
-        outcome: &'a Run,
-        texts: &'a Overlays,
-        scope: &'a Scopes,
-    ) -> Result<Self, String> {
-        let mut files: Vec<(&Path, String)> = outcome
-            .project
-            .files
-            .iter()
-            .filter(|file| scope.contains(&file.path))
-            .map(|file| (file.path.as_path(), stand(texts, file)))
-            .collect();
-        files.sort_unstable();
-        let digest = digest_of(&files)
-            .map_err(|e| format!("the files of the project could not be digested: {e}"))?;
-        Ok(Self {
-            root,
-            outcome,
-            texts,
-            scope,
-            digest,
-        })
-    }
-
-    /// The text `path` has before the agent runs.
-    pub(in crate::fix) fn text(&self, path: &Path) -> Option<String> {
-        match self.texts.get(path) {
-            Some(text) => Some(text.clone()),
-            None => fs::read_to_string(self.root.join(path)).ok(),
-        }
-    }
 }
 
 /// The new texts of the files an agent changed, by path, and who made them.
@@ -149,7 +96,7 @@ impl ModelFixer<'_> {
             .collect();
         let binding = findings
             .first()
-            .map(|(_, decision, _)| self.edit_for(&decision.id).to_vec())
+            .map(|(_, decision, _)| self.agent_for(&decision.id).to_vec())
             .unwrap_or_default();
         Batch {
             file,
@@ -178,7 +125,11 @@ impl ModelFixer<'_> {
                 return Err(self.decline_all(batch, Class::Unanswered, reason));
             }
         };
-        let key = |_: &Member<'_>, model: &str| key(model, &prompt_digest, &world.digest);
+        let files = match world.digest() {
+            Ok(digest) => digest,
+            Err(reason) => return Err(self.decline_all(batch, Class::Unanswered, reason)),
+        };
+        let key = |_: &Member<'_>, model: &str| key(model, &prompt_digest, files);
         let call = |member: &Member<'_>| run(member, &prompt, world);
         let (attempt, model) = match self.route.through(&batch.binding, &key, &call) {
             Ok(found) => found,
@@ -202,7 +153,13 @@ impl ModelFixer<'_> {
         if let Some(reason) = conflict(&attempt.bases, world) {
             return Err(self.decline_all(batch, Class::Conflict, reason));
         }
-        match accept(attempt.changes, batch, world) {
+        let bounds = Bounds {
+            who: "the agent",
+            scope: batch.scope,
+            file: batch.file,
+            extents: &batch.extents,
+        };
+        match accept(attempt.changes, &bounds, world) {
             Ok(texts) => Ok(Edit { model, texts }),
             Err((class, reason)) => Err(self.decline_all(batch, class, reason)),
         }
@@ -239,14 +196,6 @@ pub(in crate::fix) fn conflict(
     })
 }
 
-/// The digest of the file as it stands: the text that stands in for it, else
-/// the hash of the file on disk.
-fn stand(texts: &Overlays, file: &File) -> String {
-    texts
-        .get(&file.path)
-        .map_or_else(|| file.hash.clone(), hash::sha256)
-}
-
 /// What `member` leaves of the scratch copy of the project once it has been
 /// asked `prompt` in it. The copy is deleted on the way out, whatever happens.
 fn run(member: &Member<'_>, prompt: &str, world: &World<'_>) -> Result<Attempt, String> {
@@ -259,22 +208,7 @@ fn run(member: &Member<'_>, prompt: &str, world: &World<'_>) -> Result<Attempt, 
             dir: scratch.path(),
         })
         .map_err(|e| e.to_string())?;
-    let changes = scratch
-        .changes(world.root, world.texts)
-        .map_err(|e| format!("the scratch copy of the project could not be read: {e}"))?;
-    let mut bases = BTreeMap::new();
-    for (path, change) in &changes {
-        if *change == Change::Created {
-            continue;
-        }
-        let found = world.text(path).ok_or_else(|| {
-            format!(
-                "`{}`, which the agent changed, cannot be read",
-                path.display()
-            )
-        })?;
-        bases.insert(path.clone(), hash::sha256(&found));
-    }
+    let (changes, bases) = collect(&scratch, world)?;
     Ok(Attempt {
         changes,
         bases,
@@ -288,69 +222,4 @@ fn key(model: &str, prompt: &Digest, files: &Digest) -> Digest {
     let mut key = KeyBuilder::new();
     key.part("edit-answer").part(model).part(prompt).part(files);
     key.finish()
-}
-
-/// The new texts of the files the agent changed when all of it is within the
-/// scope of `batch`, else why the work is rejected whole.
-fn accept(
-    changes: Changes,
-    batch: &Batch<'_>,
-    world: &World<'_>,
-) -> Result<BTreeMap<PathBuf, String>, (Class, String)> {
-    if let Some(offence) = changes
-        .iter()
-        .find_map(|(path, change)| offence(path, change, batch, world))
-    {
-        return Err((Class::OutOfScope, offence));
-    }
-    let texts: BTreeMap<PathBuf, String> = changes
-        .into_iter()
-        .filter_map(|(path, change)| match change {
-            Change::Text(text) => Some((path, text)),
-            _ => None,
-        })
-        .collect();
-    if texts.is_empty() {
-        return Err((Class::Unchanged, "the agent changed no file".to_owned()));
-    }
-    Ok(texts)
-}
-
-/// What is wrong with the agent having done `change` to `path`, if anything:
-/// it may change the indexed text files of the report scope, and under the
-/// scope `symbol` only the extents of the findings in their file.
-fn offence(path: &Path, change: &Change, batch: &Batch<'_>, world: &World<'_>) -> Option<String> {
-    let shown = path.display();
-    if !world.scope.contains(path) {
-        return Some(format!(
-            "the agent changed `{shown}`, which is outside the files being fixed"
-        ));
-    }
-    let Change::Text(text) = change else {
-        return Some(match change {
-            Change::Created => format!("the agent created `{shown}`"),
-            Change::Deleted => format!("the agent deleted `{shown}`"),
-            _ => format!("the agent changed `{shown}`, which is not text"),
-        });
-    };
-    if world.outcome.project.file(path).is_none() {
-        return Some(format!(
-            "the agent changed `{shown}`, which Lighthouse does not index"
-        ));
-    }
-    if batch.scope == FixScope::Files {
-        return None;
-    }
-    if path != batch.file {
-        return Some(format!(
-            "the agent changed `{shown}`, which none of the findings is in (scope `symbol`)"
-        ));
-    }
-    let Some(old) = world.text(path) else {
-        return Some(format!("`{shown}` cannot be read"));
-    };
-    let line = first_outside(&old, text, &batch.extents)?;
-    Some(format!(
-        "the agent changed line {line} of `{shown}`, outside the symbol of the findings (scope `symbol`)"
-    ))
 }

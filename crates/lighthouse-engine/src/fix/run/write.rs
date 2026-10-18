@@ -4,7 +4,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use lighthouse_model::Fingerprint;
@@ -42,8 +42,6 @@ pub(super) struct Round {
     pub(super) unchanged: BTreeSet<PathBuf>,
     /// Files whose edits could not be applied.
     pub(super) failed: BTreeMap<PathBuf, String>,
-    /// What the user should know about how the round went.
-    pub(super) notes: Vec<String>,
 }
 
 impl Orchestrator<'_> {
@@ -225,8 +223,8 @@ impl Orchestrator<'_> {
         None
     }
 
-    /// The new text of every file the kept proposals edit, formatted. Files
-    /// whose edits cannot be applied, or whose formatter fails, are `failed`.
+    /// The new text of every file the kept proposals edit. Files whose edits
+    /// cannot be applied are `failed`.
     pub(super) fn round(&self, kept: &[Proposal], before: &Run) -> Round {
         let sources = Sources::new(&self.proposer.engine.ws.root, &before.project, &self.texts);
         let mut by_file: BTreeMap<PathBuf, Vec<&TextEdit>> = BTreeMap::new();
@@ -234,7 +232,6 @@ impl Orchestrator<'_> {
             by_file.entry(edit.file.clone()).or_default().push(edit);
         }
         let mut out = Round::default();
-        let mut unformatted = false;
         for (file, edits) in &by_file {
             let base = match sources.text(file) {
                 Ok(base) => base,
@@ -260,54 +257,9 @@ impl Orchestrator<'_> {
                     continue;
                 }
             };
-            let language = before.project.file(file).map_or("", |f| f.lang.as_str());
-            let next = match self.format(file, language, next, &mut unformatted, &mut out.notes) {
-                Ok(next) => next,
-                Err(why) => {
-                    out.failed.insert(file.clone(), why);
-                    continue;
-                }
-            };
             out.bases.insert(file.clone(), (*base).clone());
             out.texts.insert(file.clone(), next);
         }
         out
-    }
-
-    /// Runs the language's formatter and takes the result. It runs with the
-    /// project root as its working directory, so version managers resolve and a
-    /// stdin formatter finds the project's settings from there; `{path}` is the
-    /// file's real project-relative path, for tools that take one. A formatter
-    /// that works on a file gets a scratch copy of it, `{file}`, next to copies
-    /// of the settings files found between it and the root. Formatting needs a
-    /// trusted project; without trust it is skipped with a note, and
-    /// verification still runs on the unformatted text.
-    fn format(
-        &self,
-        file: &Path,
-        language: &str,
-        text: String,
-        skipped: &mut bool,
-        notes: &mut Vec<String>,
-    ) -> Result<String, String> {
-        let Some(formatter) = self.proposer.engine.config.formatter(language) else {
-            return Ok(text);
-        };
-        let shown = formatter.argv.join(" ");
-        if !self.proposer.engine.trusted {
-            if !*skipped {
-                *skipped = true;
-                notes.push(format!(
-                    "not formatted: the formatter `{shown}` runs only in a trusted project (`lighthouse trust`)"
-                ));
-            }
-            return Ok(text);
-        }
-        formatter.format(
-            &self.proposer.engine.ws.root,
-            file,
-            &text,
-            &self.proposer.engine.ws.sandbox,
-        )
     }
 }

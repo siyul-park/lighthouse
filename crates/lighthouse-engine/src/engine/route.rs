@@ -79,13 +79,13 @@ pub(crate) struct Route<'a> {
 }
 
 impl Engine {
-    /// The models `[models] edit` and the rules name; `None` when no model is
+    /// The models `[models] agent` and the rules name; `None` when no model is
     /// bound or the run asks no model.
-    pub(crate) fn edit_route(&self) -> Option<Route<'_>> {
+    pub(crate) fn agent_route(&self) -> Option<Route<'_>> {
         let bound: BTreeSet<&str> = self
             .binding
             .bindings()
-            .filter(|(task, _)| *task == Task::Edit)
+            .filter(|(task, _)| *task == Task::Agent)
             .map(|(_, reference)| reference)
             .collect();
         self.route(&bound)
@@ -197,8 +197,8 @@ impl Route<'_> {
     }
 
     /// The models that fix `decision`: the ones it binds, else the project's.
-    pub(crate) fn edit_for(&self, decision: &str) -> &[String] {
-        self.bound.edit_for(decision)
+    pub(crate) fn agent_for(&self, decision: &str) -> &[String] {
+        self.bound.agent_for(decision)
     }
 
     /// What the requests that went to a model this run took.

@@ -1,7 +1,10 @@
 //! Proposing fixes: which findings a fix run takes up, the fixer each is
 //! given to, and what the fixer proposes, lowered to text edits.
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+};
 
 use lighthouse_model::{
     Diagnostic, Fingerprint, Safety, Unavailable,
@@ -36,6 +39,8 @@ pub(super) struct Proposal {
     pub(super) fixer: FixedBy,
     pub(super) description: String,
     pub(super) safety: Safety,
+    /// Which proposal wins when those of a round overlap: the higher.
+    pub(super) priority: i32,
     pub(super) edits: Vec<TextEdit>,
     /// The files the edits are in, sorted.
     pub(super) files: Vec<PathBuf>,
@@ -68,6 +73,19 @@ pub(super) enum Aim {
 pub(super) enum Phase {
     Rules,
     Models,
+}
+
+/// Which findings a call of [`Proposer::propose`] takes up.
+#[derive(Clone, Copy)]
+pub(super) enum Taking<'a> {
+    /// Those the run selected, in the files it fixes.
+    Selected,
+    /// Whatever the run selected, those of `findings` in `files`: the
+    /// findings that a change introduced, for the safe fixes that follow it.
+    Introduced {
+        files: &'a [PathBuf],
+        findings: &'a BTreeSet<Fingerprint>,
+    },
 }
 
 /// What a fix run asks of fixers: the findings it takes up and the proposals
@@ -116,14 +134,14 @@ impl<'e> Proposer<'e> {
     }
 
     /// The proposals this round can try over the files as `texts` stand in for
-    /// the disk, with the findings that cannot be fixed declined. `within`
-    /// limits the findings to those of these files, when it names any.
+    /// the disk, with the findings that cannot be fixed declined. `taking`
+    /// says which findings are taken up.
     pub(super) fn propose(
         &self,
         outcome: &Run,
         texts: &Overlays,
         phase: Phase,
-        within: &[PathBuf],
+        taking: Taking<'_>,
     ) -> Result<(Vec<Proposal>, BTreeMap<Fingerprint, DeclinedFix>), Error> {
         let sources = Sources::new(&self.engine.ws.root, &outcome.project, texts);
         let engine = self.engine;
@@ -144,7 +162,7 @@ impl<'e> Proposer<'e> {
             );
         };
         let (scopes, _) = Scopes::new(&self.run.paths, &self.engine.ws.root)?;
-        for finding in self.select(outcome, &scopes, within) {
+        for finding in self.select(outcome, &scopes, taking) {
             let binding = self.binding(&finding.rule_id);
             let model = binding.as_ref().is_some_and(|b| b.fixer == FixedBy::Model);
             if model != (phase == Phase::Models) {
@@ -189,7 +207,21 @@ impl<'e> Proposer<'e> {
                 asked_to_edit.push((finding, binding));
                 continue;
             }
-            match self.propose_one(outcome, finding, &binding, &lowerer, &sources) {
+            let made = match self
+                .plan
+                .command(self.run.fixer.as_deref().unwrap_or(&finding.rule_id))
+            {
+                Some(command) => self
+                    .propose_command(
+                        outcome,
+                        finding,
+                        (&binding, command),
+                        (&sources, texts, &scopes),
+                    )
+                    .map_err(|(_, reason)| reason),
+                None => self.propose_one(outcome, finding, &binding, &lowerer, &sources),
+            };
+            match made {
                 Ok(proposal) => proposals.push(proposal),
                 Err(reason) => decline(finding, reason),
             }
@@ -205,28 +237,32 @@ impl<'e> Proposer<'e> {
     }
 
     /// The findings the run was asked to fix. A finding of a rule without a
-    /// fix is left out unless the selection names it. Within files, which is
-    /// the settling of an agent's edit, every finding of those files is taken
-    /// up whatever rules the run selected.
+    /// fix is left out unless the selection names it. The findings that a
+    /// change introduced are taken up whatever rules the run selected.
     fn select<'o>(
         &self,
         outcome: &'o Run,
         scopes: &Scopes,
-        within: &[PathBuf],
+        taking: Taking<'_>,
     ) -> Vec<&'o Diagnostic> {
-        let settling = !within.is_empty();
+        let introduced = matches!(taking, Taking::Introduced { .. });
         let explicit =
-            !settling && (!self.run.rules.is_empty() || !self.run.fingerprints.is_empty());
+            !introduced && (!self.run.rules.is_empty() || !self.run.fingerprints.is_empty());
         outcome
             .diagnostics
             .iter()
             .filter(|d| scopes.contains(&d.file))
-            .filter(|d| within.is_empty() || within.contains(&d.file))
-            .filter(|d| {
-                settling || self.run.rules.is_empty() || self.run.rules.contains(&d.rule_id)
+            .filter(|d| match taking {
+                Taking::Selected => true,
+                Taking::Introduced { files, findings } => {
+                    files.contains(&d.file) && findings.contains(&d.fingerprint)
+                }
             })
             .filter(|d| {
-                settling
+                introduced || self.run.rules.is_empty() || self.run.rules.contains(&d.rule_id)
+            })
+            .filter(|d| {
+                introduced
                     || self.run.fingerprints.is_empty()
                     || self
                         .run
@@ -245,7 +281,11 @@ impl<'e> Proposer<'e> {
                 fixer: FixedBy::Fixer(fixer.clone()),
                 cap: Safety::Unsafe,
                 languages: Vec::new(),
-                needs: Needs::Nothing,
+                // A named command fixer runs under the trust it needs.
+                needs: self
+                    .plan
+                    .get(fixer)
+                    .map_or(Needs::Nothing, |named| named.needs.clone()),
                 decision: FixDecision {
                     id: rule.to_owned(),
                     requirement: String::new(),
@@ -331,7 +371,7 @@ impl<'e> Proposer<'e> {
                 ops,
                 safety,
             } => {
-                let safety = safety.max(binding.cap);
+                let safety = self.plan.safety(&finding.rule_id, safety, binding.cap);
                 if safety == Safety::Unsafe && self.applies_previews() {
                     return Err(NOT_KEPT.to_owned());
                 }
@@ -344,6 +384,7 @@ impl<'e> Proposer<'e> {
                     fixer: binding.fixer.clone(),
                     description,
                     safety,
+                    priority: self.plan.priority(&finding.rule_id),
                     edits,
                     files: bases.keys().cloned().collect(),
                     aim: Aim::Finding,

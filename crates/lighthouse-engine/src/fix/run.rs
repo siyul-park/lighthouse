@@ -10,12 +10,11 @@ use std::{
 
 use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_protocol::hash::Hasher;
-use lighthouse_spec::Approval;
 
 use super::{
     AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, FixedBy, MAX_ROUNDS, PreviewedFix,
-    model::run_verify,
-    propose::{Phase, Proposal, Proposer},
+    propose::{Phase, Proposal, Proposer, Taking},
+    rewrite::run_verify,
 };
 use chain::{Links, Mark};
 
@@ -56,7 +55,7 @@ impl Engine {
     /// analysis is a guess.
     pub fn fix(&self, plan: &FixPlan, run: &FixRun) -> Result<FixReport, Error> {
         if let Some(id) = &run.fixer {
-            if self.registry.fixer(id).is_none() {
+            if self.registry.fixer(id).is_none() && plan.command(id).is_none() {
                 return Err(Error::Fix(format!("unknown fixer `{id}`")));
             }
             if run.rules.is_empty() && run.fingerprints.is_empty() {
@@ -130,7 +129,7 @@ impl Orchestrator<'_> {
             }
             let (proposals, declined) =
                 self.proposer
-                    .propose(&outcome, &self.texts, Phase::Rules, &[])?;
+                    .propose(&outcome, &self.texts, Phase::Rules, Taking::Selected)?;
             self.declined.extend(declined);
             let (proposals, withheld): (Vec<_>, Vec<_>) =
                 proposals.into_iter().partition(|p| self.permits(p.safety));
@@ -174,7 +173,7 @@ impl Orchestrator<'_> {
     fn withheld(&mut self, outcome: &Run) -> Result<Vec<Proposal>, Error> {
         let (proposals, declined) =
             self.proposer
-                .propose(outcome, &self.texts, Phase::Rules, &[])?;
+                .propose(outcome, &self.texts, Phase::Rules, Taking::Selected)?;
         self.declined.extend(declined);
         Ok(proposals
             .into_iter()
@@ -197,15 +196,15 @@ impl Orchestrator<'_> {
 
     /// The round that gives the findings the rules left to a model: its
     /// edits are kept only if the checks accept them, and then written only if
-    /// the run may (`--unsafe-fixes`, or `approval.fix = "allow"`) and the
-    /// commands of `[fix] verify` pass over them. Otherwise they are
+    /// the run may (`--unsafe-fixes`, or `[fix] unsafe`) and the programs of
+    /// `[fix] verify` pass over them. Otherwise they are
     /// withdrawn to previews; when a command fails, the runs of the chain are
     /// rolled back newest first until they pass, and their findings are
     /// declined. The run of the last check.
     fn model_round(&mut self, outcome: Run) -> Result<Run, Error> {
         let (proposals, declined) =
             self.proposer
-                .propose(&outcome, &self.texts, Phase::Models, &[])?;
+                .propose(&outcome, &self.texts, Phase::Models, Taking::Selected)?;
         self.declined.extend(declined);
         if proposals.is_empty() {
             return Ok(outcome);
@@ -277,20 +276,23 @@ impl Orchestrator<'_> {
     }
 
     /// Whether the run may write a fix of this safety, whoever makes it: a
-    /// `safe` fix always, an `unsafe` one with `--unsafe-fixes` or the
-    /// project's `[approval] fix = "allow"`.
+    /// `safe` fix always, an `unsafe` one as the run asks (`--unsafe-fixes`,
+    /// `--no-unsafe-fixes`) or else as the project's `[fix] unsafe` says.
     fn permits(&self, safety: Safety) -> bool {
         safety == Safety::Safe
-            || self.proposer.run.unsafe_fixes
-            || self.proposer.engine.config.fix().approval == Approval::Allow
+            || self
+                .proposer
+                .run
+                .unsafe_fixes
+                .unwrap_or(self.proposer.engine.config.fix().unsafe_fixes)
     }
 
-    /// Why the commands of `[fix] verify` do not pass over the texts of the
+    /// Why the programs of `[fix] verify` do not pass over the texts of the
     /// run, if they do not.
     fn failing_verify(&self) -> Option<String> {
         let engine = self.proposer.engine;
-        let commands = &engine.config.fix().verify;
-        if commands.is_empty() {
+        let programs = &engine.config.fix().verify;
+        if programs.is_empty() {
             return None;
         }
         if !engine.trusted {
@@ -298,14 +300,7 @@ impl Orchestrator<'_> {
                 "`[fix] verify` runs only in a trusted project (`lighthouse trust`)".to_owned(),
             );
         }
-        run_verify(
-            &engine.ws.root,
-            &self.texts,
-            commands,
-            engine.config.fix().timeout,
-            &engine.ws.sandbox,
-        )
-        .err()
+        run_verify(&engine.ws.root, &self.texts, programs, &engine.ws.sandbox).err()
     }
 
     /// A hash of every text the run holds, which two rounds share only when

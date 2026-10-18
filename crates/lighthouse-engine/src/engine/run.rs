@@ -36,8 +36,20 @@ impl Engine {
         });
         run.timings.hashing = started.elapsed();
         let memo = Memo::default();
-        let facts = self.analyze(&selected, &inputs, &project, &memo, &mut run.timings)?;
+        // The rules read what the run stands in place of files, as the
+        // providers do.
+        let workspace = Workspace {
+            overlays: overlays.clone(),
+            ..self.ws.clone()
+        };
+        let facts = self.analyze(
+            &workspace,
+            (&selected, &inputs, &project),
+            &memo,
+            &mut run.timings,
+        )?;
         let scene = Scene {
+            workspace: &workspace,
             rules: &selected,
             inputs: &inputs,
             project: &project,

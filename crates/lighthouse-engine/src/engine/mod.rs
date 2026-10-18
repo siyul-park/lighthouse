@@ -207,6 +207,8 @@ pub(crate) struct Input {
 /// What the rules of a run read: the selected rules and everything they may
 /// look at.
 struct Scene<'a> {
+    /// The project's, with the texts the run stands in place of files.
+    workspace: &'a Workspace,
     rules: &'a [&'a dyn Rule],
     inputs: &'a [Input],
     project: &'a Project,
@@ -275,8 +277,8 @@ pub struct Engine {
     active: BTreeSet<String>,
     /// Gaps known before the run, such as a plugin that failed to start.
     startup: Vec<Incomplete>,
-    /// The user trusts the project to run the commands its checks, fixers
-    /// and formatters name.
+    /// The user trusts the project to run the commands its checks and fixers
+    /// name.
     pub(crate) trusted: bool,
     /// How a `command` model provider is run, when the host knows.
     commands: Option<CommandModels>,
@@ -330,10 +332,6 @@ impl Engine {
                 .map(|(id, options)| (id.to_owned(), options.clone()))
                 .collect(),
             constructors: constructors(&registry, &config),
-            formatters: config
-                .formatters()
-                .map(|(id, formatter)| (id.to_owned(), formatter.clone()))
-                .collect(),
             overlays: BTreeMap::new(),
             cache_dir: None,
             sandbox: config.sandbox().clone(),

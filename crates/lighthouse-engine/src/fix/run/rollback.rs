@@ -2,6 +2,7 @@
 //! and are rolled back whole, and what became of each.
 
 use std::{
+    cmp::Reverse,
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
@@ -18,14 +19,15 @@ use super::{
     super::propose::Proposal,
     super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator, Standing,
-    settle::{has_model, restate},
+    settle::fold,
 };
 use crate::{Error, Run};
 
 impl Orchestrator<'_> {
-    /// Applies what does not collide to the texts in memory, formats, verifies
-    /// them with a check over overlays and drops what got worse. The check of
-    /// the resulting state, when nothing was dropped.
+    /// Applies what does not collide to the texts in memory, verifies them
+    /// with a check over overlays, applies the safe fixes of what they
+    /// introduced and drops what got worse. The check of the resulting state,
+    /// when nothing was dropped.
     pub(super) fn apply_round(
         &mut self,
         before: &Run,
@@ -33,13 +35,13 @@ impl Orchestrator<'_> {
         round: usize,
     ) -> Result<Option<Run>, Error> {
         // Safe fixes win a collision, so the ones that apply unasked are not
-        // shut out by an unsafe one.
-        proposals.sort_by_key(|p| p.safety);
+        // shut out by an unsafe one; of one safety the higher priority wins,
+        // and the order of the findings breaks a tie.
+        proposals.sort_by_key(|p| (p.safety, Reverse(p.priority)));
         let (mut kept, mut merged, dropped) = kept_proposals(proposals);
         self.decline_dropped(&dropped);
         let mut candidates = self.round(&kept, before);
         let mut failed = std::mem::take(&mut candidates.failed);
-        self.notes.append(&mut candidates.notes);
         let changed: Vec<PathBuf> = candidates.texts.keys().cloned().collect();
         // The candidates stand in for the disk while they are checked; the
         // texts they replace are kept to put back what is rolled back.
@@ -53,12 +55,12 @@ impl Orchestrator<'_> {
             Some(self.proposer.engine.check_overlaid(&[], &[], &self.texts)?)
         };
         let after = match after {
-            Some(run) if has_model(&kept) => {
-                let settled = self.settle(run, &changed)?;
-                restate(&mut kept, &mut merged, &self.texts);
+            Some(run) => {
+                let settled = self.settle(before, run, &changed)?;
+                fold(&mut kept, &mut merged, &self.texts, &candidates.bases);
                 Some(settled)
             }
-            other => other,
+            None => None,
         };
         let mut verdict = Verdict::default();
         if let Some(after) = &after {

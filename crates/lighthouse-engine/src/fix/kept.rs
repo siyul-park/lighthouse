@@ -6,7 +6,6 @@
 
 use lighthouse_model::{Diagnostic, Fingerprint, Safety};
 use lighthouse_protocol::hash;
-use lighthouse_spec::Approval;
 
 use super::{
     FixBinding, FixedBy,
@@ -21,12 +20,13 @@ pub(super) const NOT_KEPT: &str = "the preview is not kept (run without --no-cac
 
 impl Proposer<'_> {
     /// Whether the run applies previews: it names findings and asks for
-    /// `unsafe` fixes under `ask`, where an `unsafe` fix is written only as
-    /// it was shown. Under `allow` the same words write a fix as it is made.
+    /// `unsafe` fixes while the project does not write them unasked, where an
+    /// `unsafe` fix is written only as it was shown. With `[fix] unsafe` the
+    /// same words write a fix as it is made.
     pub(super) fn applies_previews(&self) -> bool {
         !self.run.fingerprints.is_empty()
-            && self.run.unsafe_fixes
-            && self.engine.config.fix().approval != Approval::Allow
+            && self.run.unsafe_fixes == Some(true)
+            && !self.engine.config.fix().unsafe_fixes
     }
 
     /// What applying previews makes of `finding`, if the run does: its kept
