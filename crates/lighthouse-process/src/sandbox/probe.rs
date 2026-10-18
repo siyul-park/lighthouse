@@ -2,11 +2,12 @@
 //! it once, the first time a sandbox is needed.
 
 use std::{
+    fs,
     process::{Command, Stdio},
     sync::{Mutex, OnceLock},
 };
 
-use super::{Plan, backend};
+use super::{Denied, Plan, backend};
 
 /// What the first trial found, for the life of the process.
 static TRIAL: OnceLock<Result<(), String>> = OnceLock::new();
@@ -48,8 +49,31 @@ pub(super) fn available() -> Result<(), String> {
     }
 }
 
+/// The backend works when a program runs under it and a file it is told to
+/// hide cannot be read.
 fn trial() -> Result<(), String> {
-    let wrapped = backend::wrap(&Plan::default(), &["true".to_owned()]);
+    let dir = tempfile::tempdir().map_err(|e| format!("no temporary directory: {e}"))?;
+    let secret = dir.path().join("secret");
+    fs::write(&secret, "x").map_err(|e| e.to_string())?;
+    let plan = Plan {
+        deny: vec![Denied {
+            path: secret.canonicalize().map_err(|e| e.to_string())?,
+            dir: false,
+        }],
+        ..Plan::default()
+    };
+    under(&plan, &["true"])?;
+    let shown = secret.to_string_lossy();
+    match under(&plan, &["cat", &shown]) {
+        Ok(()) => Err("it does not hide the files it is told to".to_owned()),
+        Err(_) => Ok(()),
+    }
+}
+
+/// Runs `argv` under the backend with `plan`.
+fn under(plan: &Plan, argv: &[&str]) -> Result<(), String> {
+    let argv: Vec<String> = argv.iter().map(|word| (*word).to_owned()).collect();
+    let wrapped = backend::wrap(plan, &argv);
     let Some((program, args)) = wrapped.split_first() else {
         return Err("this OS has no sandbox backend".to_owned());
     };

@@ -36,23 +36,42 @@ pub struct Plan {
     pub port: Option<u16>,
     /// Set where the program lives in a namespace of its own.
     pub bridge: Option<Bridge>,
+    /// Directories the program sees empty: where other programs of the user
+    /// leave their sockets (`/run`, and `/tmp` when the run needs nothing in it).
+    pub mask: Vec<PathBuf>,
 }
 
 impl Plan {
-    /// The plan of `profile` for a run whose temporary directory is `tmp`.
-    /// A path to write that cannot be made is left out: the program gets less
-    /// access, never more.
-    pub(super) fn of(profile: &Profile, tmp: &Path, port: Option<u16>) -> Result<Self, String> {
-        let writes = [tmp]
+    /// The plan of `profile` for a run in `dir` whose temporary directory is
+    /// `tmp`. A path to write that cannot be made is left out: the program
+    /// gets less access, never more.
+    pub(super) fn of(
+        profile: &Profile,
+        tmp: &Path,
+        dir: &Path,
+        port: Option<u16>,
+    ) -> Result<Self, String> {
+        let writes: Vec<PathBuf> = profile.writes.iter().filter_map(|w| prepared(w)).collect();
+        let needs_tmp = [dir.canonicalize().unwrap_or_else(|_| dir.to_owned())]
+            .iter()
+            .chain(&writes)
+            .any(|path| path.starts_with("/tmp"));
+        let mask = ["/run", "/var/run", "/tmp"]
             .into_iter()
-            .chain(profile.writes.iter().map(PathBuf::as_path))
-            .filter_map(prepared)
+            .filter(|place| *place != "/tmp" || !needs_tmp)
+            .map(PathBuf::from)
+            .filter(|place| place.is_dir() && !place.is_symlink())
             .collect();
+        let agent = env::var_os("SSH_AUTH_SOCK")
+            .map(PathBuf::from)
+            .and_then(|socket| socket.parent().map(Path::to_owned));
         let deny = profile
             .deny
             .iter()
+            .chain(&agent)
             .filter_map(|path| hidden(path))
             .collect();
+        let writes = prepared(tmp).into_iter().chain(writes).collect();
         let bridge = if cfg!(target_os = "linux") && port.is_some() {
             let exe = env::current_exe().map_err(|e| format!("no bridge executable: {e}"))?;
             Some(Bridge {
@@ -67,6 +86,7 @@ impl Plan {
             deny,
             port,
             bridge,
+            mask,
         })
     }
 }

@@ -33,6 +33,7 @@ fn command_check() -> Plan {
         deny: vec![dir("/home/u/.ssh"), file("/proj/.env")],
         port: Some(40000),
         bridge: None,
+        mask: Vec::new(),
     }
 }
 
@@ -43,6 +44,7 @@ fn scratch_only() -> Plan {
         deny: vec![dir("/home/u/.ssh")],
         port: None,
         bridge: None,
+        mask: vec![path("/run"), path("/var/run"), path("/tmp")],
     }
 }
 
@@ -57,6 +59,7 @@ fn edit_agent() -> Plan {
             exe: path("/usr/bin/lighthouse"),
             socket: path("/tmp/run-3/proxy.sock"),
         }),
+        mask: vec![path("/run"), path("/var/run")],
     }
 }
 
@@ -78,7 +81,7 @@ fn seatbelt_reads_all_but_the_secrets_and_writes_the_list() {
 (allow file-read*)
 (deny file-read* (subpath "/home/u/.ssh"))
 (deny file-read* (subpath "/proj/.env"))
-(allow file-write* (literal "/dev/null") (literal "/dev/tty") (literal "/dev/stdout") (literal "/dev/stderr") (subpath "/tmp/run-1") (subpath "/home/u/.cache"))
+(allow file-write* (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr") (subpath "/tmp/run-1") (subpath "/home/u/.cache"))
 (allow network-outbound (remote ip "localhost:40000"))
 "#
     );
@@ -110,8 +113,8 @@ fn bubblewrap_binds_the_host_read_only_and_covers_the_secrets() {
 
     assert_eq!(
         argv.join(" "),
-        "bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /home/u/.ssh \
-         --bind /tmp/run-2 /tmp/run-2 --bind /tmp/scratch /tmp/scratch \
+        "bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /run --tmpfs /var/run --tmpfs /tmp \
+         --tmpfs /home/u/.ssh --bind /tmp/run-2 /tmp/run-2 --bind /tmp/scratch /tmp/scratch \
          --unshare-all --die-with-parent --new-session -- fmt -x"
     );
 }
@@ -137,8 +140,8 @@ fn bubblewrap_starts_the_program_under_the_bridge_when_it_reaches_hosts() {
 
     assert_eq!(
         argv.join(" "),
-        "bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /home/u/.ssh \
-         --ro-bind /dev/null /home/u/.netrc \
+        "bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /run --tmpfs /var/run \
+         --tmpfs /home/u/.ssh --ro-bind /dev/null /home/u/.netrc \
          --bind /tmp/run-3 /tmp/run-3 --bind /tmp/copy /tmp/copy --bind /tmp/home /tmp/home \
          --unshare-all --die-with-parent --new-session -- \
          /usr/bin/lighthouse internal bridge /tmp/run-3/proxy.sock 40001 -- agent run"

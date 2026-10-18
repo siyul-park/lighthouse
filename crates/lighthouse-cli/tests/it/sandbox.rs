@@ -133,3 +133,25 @@ fn what_the_sandbox_allows_is_part_of_the_trust_a_personal_file_cannot_change_al
     fs::remove_file(dir.path().join(LOCAL_FILE)).unwrap();
     assert!(!trusted(&dir), "the hosts are gone");
 }
+
+#[test]
+fn without_a_home_a_sandboxed_program_is_not_run_for_the_secrets_cannot_be_located() {
+    let (dir, _home) = surveyed(serve());
+
+    let out = lighthouse(dir.path())
+        .env_remove("HOME")
+        .arg("check")
+        .output()
+        .unwrap();
+
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        said.contains("cannot locate the user's secrets: HOME is not set"),
+        "{said}"
+    );
+    assert!(!said.contains("plain=[visible]"), "{said}");
+}

@@ -1,7 +1,12 @@
 //! A fake agent under the sandbox: a shell script with a home directory that
 //! holds fake secrets, run through `run` the way the callers do.
 
-use std::{fs, path::Path, time::Duration};
+use std::{
+    fs,
+    os::unix::net::{UnixListener, UnixStream},
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use lighthouse_process::{Invocation, Profile, Ran, Sandbox, run, secrets};
 use tempfile::TempDir;
@@ -42,6 +47,11 @@ impl World {
 
     /// Runs `script` as the fake agent in the work directory.
     fn run(&self, script: &str, profile: &Profile) -> Ran {
+        self.run_in(self.work.path(), script, profile)
+    }
+
+    /// Runs `script` as the fake agent in `dir`.
+    fn run_in(&self, dir: &Path, script: &str, profile: &Profile) -> Ran {
         let path = std::env::var("PATH").unwrap();
         let env = [
             ("PATH".to_owned(), path),
@@ -55,7 +65,7 @@ impl World {
         let argv = ["bash".to_owned(), "-c".to_owned(), script.to_owned()];
         run(&Invocation {
             argv: &argv,
-            dir: self.work.path(),
+            dir,
             stdin: b"",
             env: Some(&env),
             limit: Duration::from_secs(30),
@@ -213,4 +223,78 @@ fn an_agent_reaches_a_listed_host_through_the_proxy_and_nothing_else() {
         said.contains("refused network access to localhost"),
         "{said}"
     );
+}
+
+/// A Unix socket of the host that something listens on, removed when dropped.
+struct Socket {
+    path: PathBuf,
+    _listener: UnixListener,
+}
+
+impl Socket {
+    fn bind(place: &Path) -> Option<Self> {
+        let path = place.join(format!("lighthouse-test-{}.sock", std::process::id()));
+        let _ = fs::remove_file(&path);
+        let listener = UnixListener::bind(&path).ok()?;
+        Some(Self {
+            path,
+            _listener: listener,
+        })
+    }
+
+    /// The script that succeeds when the socket can be connected to.
+    fn connect(&self) -> String {
+        format!(
+            r#"perl -MSocket -e 'socket(S, PF_UNIX, SOCK_STREAM, 0); connect(S, sockaddr_un($ARGV[0])) or exit 1' {:?} && echo connected"#,
+            self.path
+        )
+    }
+}
+
+impl Drop for Socket {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[test]
+fn a_program_cannot_connect_to_a_socket_the_host_listens_on_under_run() {
+    let world = World::new();
+    let place = if cfg!(target_os = "linux") {
+        PathBuf::from("/run")
+    } else {
+        world.outside.path().to_owned()
+    };
+    let Some(socket) = Socket::bind(&place) else {
+        return;
+    };
+    assert!(UnixStream::connect(&socket.path).is_ok(), "the control");
+
+    let ran = world.run(&socket.connect(), &world.profile(&[]));
+
+    assert_eq!(lines(&ran), Vec::<String>::new(), "{ran:?}");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_program_that_needs_nothing_in_tmp_cannot_connect_to_the_sockets_there() {
+    let world = World::new();
+    let socket = Socket::bind(world.outside.path()).unwrap();
+    assert!(UnixStream::connect(&socket.path).is_ok(), "the control");
+    let profile = Profile::default();
+
+    let ran = world.run_in(Path::new("/"), &socket.connect(), &profile);
+
+    assert_eq!(lines(&ran), Vec::<String>::new(), "{ran:?}");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn a_program_leads_its_group_in_a_session_of_its_own_and_has_no_terminal() {
+    let world = World::new();
+    let script = r#"exec perl -e 'print getpgrp(0) == $$ ? "leader" : "member", "\n"; print open(T, ">/dev/tty") ? "terminal" : "no terminal", "\n"'"#;
+
+    let ran = world.run(script, &world.profile(&[]));
+
+    assert_eq!(lines(&ran), ["leader", "no terminal"], "{ran:?}");
 }

@@ -16,11 +16,11 @@ pub use sandbox::{
     bwrap_argv, is_project_secret, seatbelt_profile, secrets, simulate_unavailable,
 };
 
-use sandbox::{Started, runnable};
+use sandbox::{Started, ended, runnable, wrap};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
-    io::{Read, Write},
+    io::{self, Read, Write},
     path::Path,
     process::{Child, Command, Stdio},
     sync::{
@@ -126,7 +126,7 @@ impl Captured {
 pub fn run(invocation: &Invocation) -> Result<Ran, String> {
     let program = invocation.argv.first().ok_or("no program")?;
     let sandboxed = match invocation.sandbox {
-        Sandbox::On(profile) => Some(Started::new(profile)?),
+        Sandbox::On(profile) => Some(Started::new(profile, invocation.dir)?),
         Sandbox::Off => None,
     };
     if sandboxed.is_some() && !runnable(program, invocation.dir, invocation.env) {
@@ -134,9 +134,10 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
             "cannot start `{program}`: No such file or directory (os error 2)"
         ));
     }
-    let argv = sandboxed
-        .as_ref()
-        .map_or_else(|| invocation.argv.to_vec(), |s| s.wrap(invocation.argv));
+    let argv = sandboxed.as_ref().map_or_else(
+        || invocation.argv.to_vec(),
+        |s| wrap(&s.plan, invocation.argv),
+    );
     let (launcher, args) = argv.split_first().ok_or("no program")?;
     let mut command = Command::new(launcher);
     command
@@ -151,8 +152,10 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
     if let Some(sandboxed) = &sandboxed {
         command.envs(sandboxed.env());
     }
-    #[cfg(unix)]
-    std::os::unix::process::CommandExt::process_group(&mut command, 0);
+    detach(
+        &mut command,
+        sandboxed.is_some() && cfg!(target_os = "macos"),
+    );
     let mut child = command
         .spawn()
         .map_err(|e| format!("cannot start `{program}`: {e}"))?;
@@ -195,7 +198,7 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
         stderr.extend(refusals(&sandboxed.blocked()));
     }
     let code = if sandboxed.is_some() {
-        Started::ended(status.code())
+        ended(status.code())
     } else {
         status.code()
     };
@@ -233,6 +236,32 @@ fn refusals(hosts: &[String]) -> Vec<u8> {
     )
     .into_bytes()
 }
+
+/// Puts the program in a process group of its own, which is how its whole tree
+/// is stopped; with `session`, in a session of its own as well, so that it has
+/// no terminal to write to. A session leader leads its group, so both are
+/// stopped the same way. (Bubblewrap makes the session itself.)
+#[cfg(unix)]
+fn detach(command: &mut Command, session: bool) {
+    use std::os::unix::process::CommandExt;
+    if session {
+        // SAFETY: `setsid` only changes the session of the child, between fork
+        // and exec, and is safe to call there.
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    } else {
+        command.process_group(0);
+    }
+}
+
+#[cfg(not(unix))]
+fn detach(_command: &mut Command, _session: bool) {}
 
 /// Asks the program's process group to stop, then kills the whole group after
 /// `grace` whether or not the leader obeyed, and collects the leader.

@@ -23,6 +23,7 @@ use std::{
 
 use tempfile::TempDir;
 
+pub(crate) use backend::{ended, wrap};
 use bridge::Uplink;
 pub use bridge::bridge;
 pub use bubblewrap::argv as bwrap_argv;
@@ -32,7 +33,7 @@ pub use proxy::{Proxy, allows};
 pub use seatbelt::profile as seatbelt_profile;
 
 /// The paths below the home directory that a sandboxed program may not read.
-pub const DENIED: [&str; 14] = [
+pub const DENIED: [&str; 21] = [
     ".ssh",
     ".gnupg",
     ".aws",
@@ -47,6 +48,13 @@ pub const DENIED: [&str; 14] = [
     ".pypirc",
     "Library/Keychains",
     ".config/lighthouse",
+    ".cargo/credentials.toml",
+    ".cargo/credentials",
+    ".local/share/keyrings",
+    ".password-store",
+    ".config/op",
+    ".m2/settings.xml",
+    ".gem/credentials",
 ];
 
 /// How a program runs: under the OS sandbox with a profile, or, only in a
@@ -122,14 +130,17 @@ impl Profile {
 pub(crate) struct Started {
     _dir: TempDir,
     tmp: PathBuf,
-    plan: Plan,
+    pub(crate) plan: Plan,
     proxy: Option<Proxy>,
     _uplink: Option<Uplink>,
 }
 
 impl Started {
     /// Gets everything a run under `profile` needs, or says why it cannot be.
-    pub(crate) fn new(profile: &Profile) -> Result<Self, String> {
+    pub(crate) fn new(profile: &Profile, cwd: &Path) -> Result<Self, String> {
+        if env::var_os("HOME").is_none_or(|home| home.is_empty()) {
+            return Err("cannot locate the user's secrets: HOME is not set".to_owned());
+        }
         probe::available().map_err(|reason| {
             format!(
                 "sandbox unavailable: {reason}; {}, or set [sandbox] enabled = false in a trusted project",
@@ -145,7 +156,7 @@ impl Started {
             .then(|| Proxy::start(&profile.network))
             .transpose()
             .map_err(|e| format!("no network proxy: {e}"))?;
-        let plan = Plan::of(profile, &tmp, proxy.as_ref().map(Proxy::port))?;
+        let plan = Plan::of(profile, &tmp, cwd, proxy.as_ref().map(Proxy::port))?;
         let uplink = plan
             .bridge
             .as_ref()
@@ -160,17 +171,6 @@ impl Started {
             proxy,
             _uplink: uplink,
         })
-    }
-
-    /// `argv` run under the backend.
-    pub(crate) fn wrap(&self, argv: &[String]) -> Vec<String> {
-        backend::wrap(&self.plan, argv)
-    }
-
-    /// The exit code of the program, which the backend may have turned into
-    /// the code of a signal.
-    pub(crate) fn ended(code: Option<i32>) -> Option<i32> {
-        backend::ended(code)
     }
 
     /// The variables the program is given on top of its own: where it may put

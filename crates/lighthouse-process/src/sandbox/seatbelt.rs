@@ -8,7 +8,7 @@ use std::path::Path;
 use super::Plan;
 
 /// The devices every program may write.
-const DEVICES: [&str; 4] = ["/dev/null", "/dev/tty", "/dev/stdout", "/dev/stderr"];
+const DEVICES: [&str; 3] = ["/dev/null", "/dev/stdout", "/dev/stderr"];
 
 /// The profile that lets a program read everything but what `plan` denies,
 /// write only what it lists, and reach only the proxy's loopback port.
