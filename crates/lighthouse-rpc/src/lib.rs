@@ -139,6 +139,43 @@ pub fn register(
     Ok(registered)
 }
 
+/// A listed plugin that is part of the project, and the program it runs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalPlugin {
+    pub id: String,
+    /// The executable and its arguments, as they are started.
+    pub argv: Vec<String>,
+}
+
+/// The listed plugins that live inside the project at `root`
+/// (`.lighthouse/plugins`, or a `path` below it): code the repository brought,
+/// which runs only in a project the user trusts. Those installed for the user
+/// or next to the executable are not among them.
+pub fn local_plugins(config: &Config, root: &Path, search: &[PathBuf]) -> Vec<LocalPlugin> {
+    let found = discover(search).map(|d| d.found).unwrap_or_default();
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_owned());
+    config
+        .plugins()
+        .iter()
+        .filter_map(|listed| {
+            let one = choose(listed, false, &found, &root)
+                .ok()?
+                .into_iter()
+                .next()?;
+            one.dir
+                .canonicalize()
+                .ok()?
+                .starts_with(&root)
+                .then(|| LocalPlugin {
+                    id: one.id().to_owned(),
+                    argv: std::iter::once(one.command_path().to_string_lossy().into_owned())
+                        .chain(one.resource.spec.runtime.args.iter().cloned())
+                        .collect(),
+                })
+        })
+        .collect()
+}
+
 /// A broken manifest of a listed plugin is an error; any other is a notice.
 fn note_broken(
     broken: Vec<Error>,

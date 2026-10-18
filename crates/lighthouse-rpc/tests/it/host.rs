@@ -6,7 +6,7 @@ use std::{
 };
 
 use lighthouse_plugin::{Plugin, Registry};
-use lighthouse_rpc::{Error, discover, register, search_dirs};
+use lighthouse_rpc::{Error, discover, local_plugins, register, search_dirs};
 use lighthouse_spec::Config;
 
 #[cfg(unix)]
@@ -168,6 +168,60 @@ fn lighthouse_builtin_stub() -> Registry {
         }))
         .unwrap();
     registry
+}
+
+#[test]
+fn a_listed_plugin_that_lives_in_the_project_is_local_with_the_program_it_runs() {
+    let root = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    manifest(
+        &root.path().join(".lighthouse/plugins/found"),
+        "found",
+        "./run.sh",
+    );
+    manifest(&root.path().join("tools/named"), "named", "bin");
+    manifest(&elsewhere.path().join("installed"), "installed", "x");
+    manifest(
+        &root.path().join(".lighthouse/plugins/unlisted"),
+        "unlisted",
+        "x",
+    );
+    let toml = format!(
+        "[\"found\", {{ id = \"named\", path = \"tools/named\" }}, \"installed\", \"missing\", {{ id = \"outside\", path = {:?} }}]",
+        elsewhere.path().join("installed").to_str().unwrap()
+    );
+    fs::write(
+        elsewhere.path().join("installed/lighthouse-plugin.toml"),
+        plugin_document("outside", "x", "args = [\"--flag\"]\n"),
+    )
+    .unwrap();
+    let search = search_dirs(root.path())
+        .into_iter()
+        .take(1)
+        .chain([elsewhere.path().to_owned()])
+        .collect::<Vec<_>>();
+
+    let local = local_plugins(&config(&toml), root.path(), &search);
+
+    let shown: Vec<(&str, Vec<String>)> = local
+        .iter()
+        .map(|l| (l.id.as_str(), l.argv.clone()))
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            (
+                "found",
+                vec![
+                    root.path()
+                        .join(".lighthouse/plugins/found/./run.sh")
+                        .display()
+                        .to_string()
+                ]
+            ),
+            ("named", vec!["bin".to_owned()]),
+        ]
+    );
 }
 
 #[test]

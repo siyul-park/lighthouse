@@ -129,7 +129,7 @@ impl Session {
         let local = files.clone().map(Catalog::from_local).transpose()?;
         let catalog = layered(local.as_ref())?;
         environment::check_local(&root, &personal, &catalog)?;
-        let commands = commands(&config, &catalog)?;
+        let commands = commands(&config, &catalog, &root)?;
         let basis = Basis::of(&root, text, &texts, &files.unwrap_or_default(), &commands);
         Ok(Self {
             config,
@@ -162,12 +162,23 @@ impl Session {
     /// in the store.
     pub fn registry(&self) -> Result<(Registry, Registered)> {
         let mut registry = self.in_process_registry()?;
+        let search = lighthouse_rpc::search_dirs(&self.root);
+        if !self.trusted()
+            && let Some(local) =
+                lighthouse_rpc::local_plugins(&self.config, &self.root, &search).first()
+        {
+            return Err(format!(
+                "plugin `{}` comes with the project and would run a program: this project is not trusted (run `lighthouse trust`, or set LIGHTHOUSE_TRUST=1 in CI)",
+                local.id
+            )
+            .into());
+        }
         let registered = lighthouse_rpc::register(
             &mut registry,
             &self.config,
             &self.root,
             &self.store,
-            &lighthouse_rpc::search_dirs(&self.root),
+            &search,
         )?;
         Ok((registry, registered))
     }
@@ -258,8 +269,9 @@ pub fn catalog_at(root: &Path) -> Result<Catalog> {
 
 /// Every command the project would run: the formatters and the fix
 /// verification of its configuration, its command model providers, and the
-/// command fixers and command checks of its catalog.
-fn commands(config: &Config, catalog: &Catalog) -> Result<Vec<Program>> {
+/// command fixers and command checks of its catalog, and the plugins that come
+/// with the project.
+fn commands(config: &Config, catalog: &Catalog, root: &Path) -> Result<Vec<Program>> {
     let mut found: Vec<Program> = config
         .formatters()
         .map(|(language, f)| Program {
@@ -271,6 +283,12 @@ fn commands(config: &Config, catalog: &Catalog) -> Result<Vec<Program>> {
         found.push(Program {
             what: format!("fix verification: {}", argv.join(" ")),
             argv: argv.clone(),
+        });
+    }
+    for local in lighthouse_rpc::local_plugins(config, root, &lighthouse_rpc::search_dirs(root)) {
+        found.push(Program {
+            what: format!("plugin {}: {}", local.id, local.argv.join(" ")),
+            argv: local.argv,
         });
     }
     for (name, provider) in &config.models(catalog.projects())?.providers {

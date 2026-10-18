@@ -24,6 +24,7 @@ mod mcp;
 mod mcp_contract;
 mod models;
 mod models_plugin;
+mod plugin_trust;
 mod preview;
 mod rebuild;
 mod reply;
