@@ -41,7 +41,7 @@ pub use spec::{GeneratedCheck, OverrideSpec, ProjectSpec};
 
 pub(crate) use standard::standard;
 
-use crate::Error;
+use crate::{Error, FixScope};
 
 /// Name of the configuration file discovered in a project directory.
 pub const FILE_NAME: &str = "lighthouse.toml";
@@ -169,6 +169,8 @@ pub struct Config {
     generated_check: Option<GeneratedCheck>,
     models: Models,
     approval: Approval,
+    fix_decisions: Vec<String>,
+    fix_scope: FixScope,
     verify: Vec<Vec<String>>,
     verify_timeout: Duration,
     extends: Vec<String>,
@@ -273,6 +275,8 @@ impl Config {
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
             approval: spec.approval.fix.unwrap_or_default(),
+            fix_decisions: spec.fix.decisions,
+            fix_scope: spec.fix.scope.unwrap_or(FixScope::Files),
             verify: spec.fix.verify,
             verify_timeout: spec.fix.timeout.unwrap_or(DEFAULT_VERIFY_TIMEOUT),
             extends: spec.extends,
@@ -386,6 +390,17 @@ impl Config {
     /// Whether a verified fix by a model is written or left as a preview.
     pub fn approval(&self) -> Approval {
         self.approval
+    }
+
+    /// The decisions a model may fix: ids or globs over them; none when the
+    /// project lists none.
+    pub fn fix_decisions(&self) -> &[String] {
+        &self.fix_decisions
+    }
+
+    /// The widest change any fix by a model may make.
+    pub fn fix_scope(&self) -> FixScope {
+        self.fix_scope
     }
 
     /// The commands that must pass with the fixes by models in place.

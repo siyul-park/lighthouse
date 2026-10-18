@@ -28,7 +28,7 @@ pub use command::{Batch, CheckOutput, CommandCheck, ExitCodes, SarifColumns, Sar
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
 pub use error::Error;
 pub use expression::{TemplatePart, parse_template};
-pub use fix::{CommandSpec, Fix, FixKind, OpSpec};
+pub use fix::{CommandSpec, Fix, FixKind, FixScope, OpSpec};
 pub use model::{DecisionStatus, Example, ExampleFile, ExampleKind, Expect, Scope, Subject};
 pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};

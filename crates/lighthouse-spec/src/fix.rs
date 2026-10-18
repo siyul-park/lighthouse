@@ -57,7 +57,7 @@ impl<'de> Deserialize<'de> for Fix {
         let own: &[&str] = match table.get("type").and_then(Value::as_str) {
             Some("ops") => &["ops"],
             Some("command") => &["argv", "output", "stdin", "env", "timeout"],
-            Some("model") => &["prompt"],
+            Some("model") => &["prompt", "scope"],
             Some("rpc") => &["params"],
             other => {
                 return Err(D::Error::custom(match other {
@@ -123,6 +123,43 @@ impl Fix {
     }
 }
 
+/// How far the change of a fix by a model may go, which the verifier checks.
+/// Ordered from the narrowest.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum FixScope {
+    /// Only inside the symbol of the finding (its extent): the symbol it is
+    /// about, else the innermost one around it, else a short file as a whole.
+    #[default]
+    Symbol,
+    /// Any file the analysis indexes in the run's scope.
+    Files,
+}
+
+impl FixScope {
+    /// The scope of the fix by a model of a decision whose `fix` is `fix`
+    /// (`symbol` unless it says more), narrowed to `cap`, the widest the
+    /// project allows.
+    pub fn of_fix(fix: Option<&Fix>, cap: Self) -> Self {
+        let own = match fix.map(|f| &f.kind) {
+            Some(FixKind::Model { scope, .. }) => scope.unwrap_or_default(),
+            _ => Self::default(),
+        };
+        own.min(cap)
+    }
+}
+
+impl std::fmt::Display for FixScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Symbol => "symbol",
+            Self::Files => "files",
+        })
+    }
+}
+
 /// The type of a fix; a `fix:` block holds exactly one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
@@ -131,14 +168,19 @@ pub enum FixKind {
     Ops { ops: Vec<OpSpec> },
     /// An external program on a scratch copy of the files.
     Command(CommandSpec),
-    /// A model rewrites the code of the finding, and the checks accept the
-    /// result or not. A decision without a fix of its own has this one
-    /// whenever the project binds a `chat` model.
+    /// An agent that edits fixes the finding, and the checks accept the
+    /// result or not. The project lists the decisions this applies to
+    /// (`[fix] decisions`); a listed decision without a fix of its own has
+    /// this one with the defaults.
     Model {
-        /// What the model is told besides the decision's requirement, such
+        /// What the agent is told besides the decision's requirement, such
         /// as how this decision is usually fixed.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         prompt: Option<String>,
+        /// How far the agent's change may go. Default: `symbol`. The
+        /// project's `[fix] scope` narrows it and never widens it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        scope: Option<FixScope>,
     },
     /// A language plugin's fix method. Reserved: not yet supported.
     Rpc {

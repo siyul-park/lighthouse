@@ -18,8 +18,8 @@ use super::{
 };
 use crate::{Engine, Error, Overlays, Run, engine::Scopes};
 
-/// Why a fix by a model is not asked for.
-const NO_MODEL: &str = "no chat model is available: `[models] chat` is not bound, or model checks are off (`--no-models`)";
+/// Why a fix by a model is left to review.
+const NO_EDIT: &str = "left for review: `[models] edit` is not bound, or models are off (`--no-models`); `review show` gives the brief";
 
 /// A finding's fix, lowered and ready to apply.
 pub(super) struct Proposal {
@@ -35,6 +35,9 @@ pub(super) struct Proposal {
     /// The files the edits are in, sorted.
     pub(super) files: Vec<PathBuf>,
     pub(super) aim: Aim,
+    /// For a fix by a model, the place of its group in the chain of the
+    /// pass: the later the group, the later it ran.
+    pub(super) chain: usize,
 }
 
 /// What a fix by a model must have achieved for the checks to keep it.
@@ -77,7 +80,7 @@ impl<'e> Proposer<'e> {
         }
     }
 
-    /// The same, asking the models the project binds for chat.
+    /// The same, asking the agents the project binds for `edit`.
     #[must_use]
     pub(super) fn asking_models(mut self) -> Self {
         self.models = ModelFixer::new(self.engine, &self.plan.models);
@@ -92,12 +95,14 @@ impl<'e> Proposer<'e> {
     }
 
     /// The proposals this round can try over the files as `texts` stand in for
-    /// the disk, with the findings that cannot be fixed declined.
+    /// the disk, with the findings that cannot be fixed declined. `within`
+    /// limits the findings to those of these files, when it names any.
     pub(super) fn propose(
         &self,
         outcome: &Run,
         texts: &Overlays,
         phase: Phase,
+        within: &[PathBuf],
     ) -> Result<(Vec<Proposal>, BTreeMap<Fingerprint, DeclinedFix>), Error> {
         let sources = Sources::new(&self.engine.ws.root, &outcome.project, texts);
         let engine = self.engine;
@@ -118,7 +123,7 @@ impl<'e> Proposer<'e> {
             );
         };
         let (scopes, _) = Scopes::new(&self.run.paths, &self.engine.ws.root)?;
-        for finding in self.select(outcome, &scopes) {
+        for finding in self.select(outcome, &scopes, within) {
             let binding = self.binding(&finding.rule_id);
             let model = binding.as_ref().is_some_and(|b| b.fixer == FixedBy::Model);
             if model != (phase == Phase::Models) {
@@ -131,34 +136,25 @@ impl<'e> Proposer<'e> {
             // Eligibility comes first: a fix that would not be applied is never
             // even asked for, so a command never runs for nothing. A fix by a
             // model is asked for whatever the run may apply: what it may do
-            // with the answer is settled after the checks.
+            // with the edit is settled after the checks.
             if let Some(why) = &binding.unsupported {
                 decline(finding, why.clone());
                 continue;
             }
             if model && self.models.is_none() {
-                if !self
-                    .plan
-                    .models
-                    .get(&finding.rule_id)
-                    .is_some_and(|m| m.implicit())
-                {
-                    decline(finding, NO_MODEL.to_owned());
-                }
+                decline(finding, NO_EDIT.to_owned());
                 continue;
             }
-            if model && self.models.as_ref().is_some_and(ModelFixer::edits) {
+            if model {
                 asked_to_edit.push((finding, binding));
                 continue;
             }
-            if let Some(why) = self.ineligible(&binding).filter(|_| !model) {
+            if let Some(why) = self.ineligible(&binding) {
                 decline(finding, why);
                 continue;
             }
             match self.propose_one(outcome, finding, &binding, &lowerer, &sources) {
-                Ok(proposal)
-                    if model || self.run.unsafe_fixes || proposal.safety == Safety::Safe =>
-                {
+                Ok(proposal) if self.run.unsafe_fixes || proposal.safety == Safety::Safe => {
                     proposals.push(proposal);
                 }
                 Ok(proposal) => {
@@ -200,16 +196,29 @@ impl<'e> Proposer<'e> {
     }
 
     /// The findings the run was asked to fix. A finding of a rule without a
-    /// fix is left out unless the selection names it.
-    fn select<'o>(&self, outcome: &'o Run, scopes: &Scopes) -> Vec<&'o Diagnostic> {
-        let explicit = !self.run.rules.is_empty() || !self.run.fingerprints.is_empty();
+    /// fix is left out unless the selection names it. Within files, which is
+    /// the settling of an agent's edit, every finding of those files is taken
+    /// up whatever rules the run selected.
+    fn select<'o>(
+        &self,
+        outcome: &'o Run,
+        scopes: &Scopes,
+        within: &[PathBuf],
+    ) -> Vec<&'o Diagnostic> {
+        let settling = !within.is_empty();
+        let explicit =
+            !settling && (!self.run.rules.is_empty() || !self.run.fingerprints.is_empty());
         outcome
             .diagnostics
             .iter()
             .filter(|d| scopes.contains(&d.file))
-            .filter(|d| self.run.rules.is_empty() || self.run.rules.contains(&d.rule_id))
+            .filter(|d| within.is_empty() || within.contains(&d.file))
             .filter(|d| {
-                self.run.fingerprints.is_empty()
+                settling || self.run.rules.is_empty() || self.run.rules.contains(&d.rule_id)
+            })
+            .filter(|d| {
+                settling
+                    || self.run.fingerprints.is_empty()
                     || self
                         .run
                         .fingerprints
@@ -258,14 +267,13 @@ impl<'e> Proposer<'e> {
         sources: &Sources,
     ) -> Result<Proposal, String> {
         let engine = self.engine;
-        let fixer: &dyn Fixer = match (&binding.fixer, &self.models) {
-            (FixedBy::Model, Some(models)) => models,
-            (FixedBy::Model, None) => return Err(NO_MODEL.to_owned()),
-            (FixedBy::Fixer(id), _) => engine
-                .registry
-                .fixer(id)
-                .ok_or_else(|| format!("fixer `{id}` is not registered"))?,
+        let FixedBy::Fixer(id) = &binding.fixer else {
+            return Err("a fix by a model is made by an agent that edits".to_owned());
         };
+        let fixer: &dyn Fixer = engine
+            .registry
+            .fixer(id)
+            .ok_or_else(|| format!("fixer `{id}` is not registered"))?;
         let file = outcome.project.file(&finding.file);
         let language = file.map_or("", |f| f.lang.as_str());
         let provided = engine
@@ -343,6 +351,7 @@ impl<'e> Proposer<'e> {
                     edits,
                     files,
                     aim: Aim::Finding,
+                    chain: 0,
                 })
             }
         }

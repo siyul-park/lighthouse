@@ -1,10 +1,10 @@
 //! What a project says about models: references, providers, bindings and the
 //! evaluation policy; and the `model` check as the `cel` check it is.
 
-use lighthouse_model::Severity;
+use lighthouse_model::{Safety, Severity};
 use lighthouse_spec::{
-    Approval, CommandProtocol, Config, Evaluation, ModelCheck, ModelProvider, Models, Projects,
-    Routing, Select, Subject, Task,
+    Approval, CommandProtocol, Config, Evaluation, Fix, FixKind, FixScope, ModelCheck,
+    ModelProvider, Models, Projects, Routing, Select, Subject, Task,
 };
 
 const PROJECT: &str = r#"
@@ -25,7 +25,7 @@ command = ["./scripts/classify", "{model}"]
 
 [rules."design/prefer-method"]
 level = "warn"
-model = "script/sonnet"
+classification = "script/sonnet"
 evaluation = { precision = 0.95, recall = 0.8 }
 "#;
 
@@ -57,7 +57,7 @@ routing = "round-robin"
 
 [rules."design/naming"]
 level = "warn"
-model = ["c/three", "a/one"]
+classification = ["c/three", "a/one"]
 "#;
 
 #[test]
@@ -268,7 +268,7 @@ fn a_provider_with_two_reaches_or_none_is_invalid_naming_the_fields() {
 }
 
 #[test]
-fn a_command_speaks_typesafe_or_openai_or_plain_text_and_nothing_else() {
+fn a_command_speaks_typesafe_or_plain_text_and_nothing_else() {
     let protocol = |text: &str| match provider(text) {
         ModelProvider::Command { protocol, .. } => protocol,
         other => panic!("{other:?}"),
@@ -278,17 +278,22 @@ fn a_command_speaks_typesafe_or_openai_or_plain_text_and_nothing_else() {
         CommandProtocol::PlainText
     );
     assert_eq!(
-        protocol("protocol = \"openai\"\ncommand = [\"run\"]\n"),
-        CommandProtocol::OpenAi
-    );
-    assert_eq!(
         protocol("protocol = \"typesafe\"\ncommand = [\"run\"]\n"),
         CommandProtocol::TypeSafe
     );
-    let other = invalid("protocol = \"anthropic\"\ncommand = [\"run\"]\n");
-    assert!(other.contains("plain text without a `protocol`"), "{other}");
-    let several = invalid("protocol = [\"openai\", \"typesafe\"]\ncommand = [\"run\"]\n");
-    assert!(several.contains("plain text"), "{several}");
+    for text in [
+        "protocol = \"anthropic\"\ncommand = [\"run\"]\n",
+        "protocol = \"openai\"\ncommand = [\"run\"]\n",
+        "protocol = [\"openai\", \"typesafe\"]\ncommand = [\"run\"]\n",
+    ] {
+        let refused = invalid(text);
+        assert!(
+            refused.contains("`typesafe` (classification) or plain text (edit)"),
+            "{refused}"
+        );
+    }
+    let pointer = invalid("command = [\"run\"]\npointer = \"/result\"\n");
+    assert!(pointer.contains("has no `pointer`"), "{pointer}");
     let empty = invalid("protocol = \"typesafe\"\ncommand = []\n");
     assert!(empty.contains("`command` is empty"), "{empty}");
 }
@@ -299,7 +304,7 @@ fn a_provider_serves_the_tasks_its_protocol_covers() {
         let provider = provider(text);
         (
             provider.serves(Task::Classification),
-            provider.serves(Task::Chat),
+            provider.serves(Task::Edit),
         )
     };
     let command = |protocol: &str| format!("{protocol}command = [\"run\"]\n");
@@ -307,15 +312,11 @@ fn a_provider_serves_the_tasks_its_protocol_covers() {
         serves(&command("protocol = \"typesafe\"\n")),
         (Some(true), Some(false))
     );
-    assert_eq!(
-        serves(&command("protocol = \"openai\"\n")),
-        (Some(false), Some(true))
-    );
     assert_eq!(serves(&command("")), (Some(false), Some(true)));
     assert_eq!(
         serves("protocol = \"openai\"\n"),
-        (Some(true), Some(true)),
-        "chat completions answer chat, and classification by their logprobs"
+        (Some(true), Some(false)),
+        "chat completions classify by their logprobs and edit nothing"
     );
     assert_eq!(
         serves("protocol = \"typesafe\"\n"),
@@ -323,43 +324,69 @@ fn a_provider_serves_the_tasks_its_protocol_covers() {
     );
     assert_eq!(
         serves("protocol = [\"typesafe\", \"openai\"]\nbaseUrl = \"http://x\"\n"),
-        (Some(true), Some(true))
+        (Some(true), Some(false))
     );
     assert_eq!(
         serves("plugin = \"model-local\"\n"),
-        (None, None),
-        "only the handshake of a plugin says what it serves"
+        (None, Some(false)),
+        "only the handshake of a plugin says what it classifies, and it never edits"
     );
 }
 
 #[test]
-fn chat_is_one_binding_of_the_project_and_the_approval_of_a_fix_defaults_to_a_preview() {
+fn edit_is_one_binding_of_the_project_and_fixes_are_asked_for_and_previewed_by_default() {
     let config = Config::parse_inline(
-        "plugins = []\n[models]\nchat = [\"a/one\", \"b/two\"]\nclassification = \"a/one\"\n",
+        "plugins = []\n[models]\nedit = [\"a/one\", \"b/two\"]\nclassification = \"a/one\"\n",
     )
     .unwrap();
     let binding = config.models(&Projects::default()).unwrap();
-    assert_eq!(binding.chat, ["a/one", "b/two"]);
+    assert_eq!(binding.edit, ["a/one", "b/two"]);
     let bound: Vec<_> = binding.bindings().collect();
     assert_eq!(
         bound,
         [
             (Task::Classification, "a/one"),
-            (Task::Chat, "a/one"),
-            (Task::Chat, "b/two")
+            (Task::Edit, "a/one"),
+            (Task::Edit, "b/two")
         ]
     );
-    assert_eq!(config.approval(), Approval::Preview);
+    assert_eq!(config.approval(), Approval::Ask);
     assert!(config.verify().is_empty());
+    assert!(config.fix_decisions().is_empty(), "no decision is listed");
+    assert_eq!(config.fix_scope(), FixScope::Files);
 }
 
 #[test]
-fn approval_and_the_commands_that_verify_fixes_are_read_and_checked() {
-    let config = Config::parse_inline(
-        "plugins = []\n[approval]\nfix = \"verified\"\n[fix]\nverify = [[\"cargo\", \"test\", \"-q\"]]\n",
+fn chat_is_no_binding_and_a_rule_binds_classification_not_model() {
+    let chat = Config::parse_inline("plugins = []\n[models]\nchat = \"a/one\"\n")
+        .unwrap_err()
+        .to_string();
+    assert!(chat.contains("chat"), "{chat}");
+
+    let bound = Config::parse_inline(
+        "plugins = []\n[rules]\n\"d/x\" = { level = \"warn\", classification = \"a/one\" }\n",
     )
     .unwrap();
-    assert_eq!(config.approval(), Approval::Verified);
+    let models = bound.models(&Projects::default()).unwrap();
+    assert_eq!(models.route("d/x"), Some(&["a/one".to_owned()][..]));
+
+    let old = Config::parse_inline(
+        "plugins = []\n[rules]\n\"d/x\" = { level = \"warn\", model = \"a/one\" }\n",
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(old.contains("model"), "{old}");
+}
+
+#[test]
+fn approval_the_decisions_a_model_may_fix_and_the_commands_that_verify_them_are_read_and_checked() {
+    let config = Config::parse_inline(
+        "plugins = []\n[approval]\nfix = \"allow\"\n[fix]\ndecisions = [\"design/exported-doc\", \"testing/*\"]\nscope = \"symbol\"\nverify = [[\"cargo\", \"test\", \"-q\"]]\n",
+    )
+    .unwrap();
+    assert_eq!(config.approval(), Approval::Allow);
+    assert_eq!(config.fix_decisions(), ["design/exported-doc", "testing/*"]);
+    assert_eq!(config.fix_scope(), FixScope::Symbol);
     assert_eq!(config.verify(), [["cargo", "test", "-q"]]);
     assert_eq!(config.verify_timeout(), std::time::Duration::from_secs(600));
     let slow = Config::parse_inline("plugins = []\n[fix]\ntimeout = \"20m\"\n").unwrap();
@@ -367,6 +394,9 @@ fn approval_and_the_commands_that_verify_fixes_are_read_and_checked() {
 
     for (text, wanted) in [
         ("[approval]\nfix = \"always\"\n", "always"),
+        ("[approval]\nfix = \"verified\"\n", "verified"),
+        ("[approval]\nfix = \"preview\"\n", "preview"),
+        ("[fix]\nscope = \"extent\"\n", "extent"),
         ("[approval]\nminor = \"gate\"\n", "minor"),
         ("[fix]\nverify = [[]]\n", "`fix.verify[0]` needs a program"),
         (
@@ -471,4 +501,30 @@ fn a_share_to_explore_outside_zero_and_one_is_a_configuration_error() {
         assert!(error.contains("`models.explore` is"), "{error}");
         assert!(error.contains("not a share from 0 to 1"), "{error}");
     }
+}
+
+#[test]
+fn fix_scope_of_fix_is_the_decisions_own_scope_narrowed_to_the_projects() {
+    let model = |scope| Fix {
+        safety: Safety::Suggested,
+        requires: Vec::new(),
+        kind: FixKind::Model {
+            prompt: None,
+            scope,
+        },
+    };
+
+    assert_eq!(FixScope::of_fix(None, FixScope::Files), FixScope::Symbol);
+    assert_eq!(
+        FixScope::of_fix(Some(&model(Some(FixScope::Files))), FixScope::Files),
+        FixScope::Files
+    );
+    assert_eq!(
+        FixScope::of_fix(Some(&model(Some(FixScope::Files))), FixScope::Symbol),
+        FixScope::Symbol
+    );
+    assert_eq!(
+        FixScope::of_fix(Some(&model(None)), FixScope::Files),
+        FixScope::Symbol
+    );
 }

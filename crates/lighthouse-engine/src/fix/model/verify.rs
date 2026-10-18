@@ -2,8 +2,10 @@
 //! rule; a model's rewrite is a guess, so it is kept only if the analysis of
 //! the rewritten file agrees: the finding is gone, nothing of error or warn
 //! severity is new in the file, and the file is still fully analyzed. An edit
-//! of a whole file by an agent is kept when at least one of the findings it
-//! was asked about is gone; those still there are declined, one by one.
+//! of files by an agent is kept when at least one of the findings it was asked
+//! about is gone; those still there are declined, one by one. Its files are
+//! judged together, with the files that use a symbol whose signature it
+//! changed: the edit stands or falls whole.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -12,7 +14,7 @@ use std::{
 
 use lighthouse_model::{Diagnostic, Fingerprint, Severity};
 
-use super::Class;
+use super::{Class, reach::reach};
 use crate::{
     Run,
     fix::{
@@ -57,7 +59,7 @@ pub(in crate::fix) fn judge(
                     .filter(|(_, into)| *into == proposal.fingerprint)
                     .map(|(p, _)| p);
                 let group: Vec<&Proposal> = std::iter::once(proposal).chain(sharing).collect();
-                judge_file(&mut verdict, &group, after, &known);
+                judge_file(&mut verdict, &group, (before, after), &known);
             }
         }
     }
@@ -80,14 +82,15 @@ fn reject(verdict: &mut Verdict, group: &[&Proposal], class: Class, reason: Stri
     }
 }
 
-/// The verdict on the edit of a file that is for every finding of `group`.
+/// The verdict on the edit of files that is for every finding of `group`.
 fn judge_file(
     verdict: &mut Verdict,
     group: &[&Proposal],
-    after: &Run,
+    (before, after): (&Run, &Run),
     known: &BTreeSet<&Fingerprint>,
 ) {
-    if let Some((class, reason)) = regression(&group[0].files, after, known) {
+    let reached = reach(&group[0].files, before, after);
+    if let Some((class, reason)) = regression(&reached, after, known) {
         return reject(verdict, group, class, reason);
     }
     let left = unresolved(group, after, known);

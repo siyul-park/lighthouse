@@ -1,4 +1,5 @@
-//! The fix by a model: what it is asked, how its answer is read and judged.
+//! The fix by a model: the extent an agent may change, and how its result is
+//! judged.
 
 use std::{collections::BTreeSet, fs, path::PathBuf};
 
@@ -6,19 +7,9 @@ use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Position, Safety, Severity, Span,
     ucm::{File, Fragment, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
-use lighthouse_plugin::FixDecision;
-use lighthouse_spec::{Example, ExampleFile, ExampleKind};
 use serde_json::json;
 
-use super::{
-    Account, Class, Event, ModelFix, extent,
-    extent::Extent,
-    json_objects,
-    prompt::{Ask, MAX_EXAMPLES, examples_for},
-    replacement,
-    scratch::run_verify,
-    verify::judge,
-};
+use super::{Account, Class, Event, extent, scratch::run_verify, verify::judge};
 use crate::{
     Run,
     fix::{
@@ -33,14 +24,14 @@ fn at(line: u32, col: u32) -> Position {
     Position { line, col }
 }
 
-fn span(from: (u32, u32), to: (u32, u32)) -> Span {
+pub(super) fn span(from: (u32, u32), to: (u32, u32)) -> Span {
     Span {
         start: at(from.0, from.1),
         end: at(to.0, to.1),
     }
 }
 
-fn symbol(name: &str, lines: (u32, u32), end_col: u32) -> Symbol {
+pub(super) fn symbol(name: &str, lines: (u32, u32), end_col: u32) -> Symbol {
     let span = span((lines.0, 1), (lines.1, end_col));
     Symbol {
         id: SymbolId::new("m", &[], name, SymbolKind::Function),
@@ -97,16 +88,19 @@ fn the_extent_is_the_symbol_of_the_finding_else_the_one_around_it_else_a_small_f
     let choose = |finding: &Diagnostic| extent::choose(&project, finding, text);
 
     let around = choose(&finding("r", 4, Severity::Warn, "a")).unwrap();
-    assert_eq!(around.text, "\tfunc inner() {\n\t}");
+    assert_eq!(around, span((4, 1), (5, 3)));
 
     let mut named = finding("r", 8, Severity::Warn, "b");
     named.symbol = Some(symbol("outer", (3, 6), 2).id.as_str().to_owned());
-    let named = choose(&named).unwrap();
-    assert!(named.text.starts_with("func outer()"), "{}", named.text);
+    assert_eq!(choose(&named).unwrap(), span((3, 1), (6, 2)));
 
     let whole = choose(&finding("r", 8, Severity::Warn, "c")).unwrap();
-    assert_eq!(whole.text, text, "no symbol holds line 8: the small file");
-    assert_eq!(whole.span.start, at(1, 1));
+    assert_eq!(
+        whole.start,
+        at(1, 1),
+        "no symbol holds line 8: the small file"
+    );
+    assert_eq!(whole.end, at(9, 1));
 }
 
 #[test]
@@ -131,194 +125,6 @@ fn a_large_file_is_rewritten_only_around_a_symbol() {
     );
 }
 
-#[test]
-fn positions_are_counted_from_the_start_of_the_extent() {
-    let extent = Extent {
-        span: span((4, 5), (6, 2)),
-        text: String::new(),
-    };
-    assert_eq!(extent.relative(at(4, 7)), Some(at(1, 3)));
-    assert_eq!(extent.relative(at(5, 7)), Some(at(2, 7)));
-    assert_eq!(extent.relative(at(3, 1)), None);
-    assert_eq!(extent.relative(at(4, 2)), None);
-}
-
-fn decision() -> FixDecision {
-    FixDecision {
-        id: "design/short-names".to_owned(),
-        requirement: "Names are at most four words.".to_owned(),
-        context: "Long names hide the point.".to_owned(),
-    }
-}
-
-fn example(language: &str, name: &str) -> Example {
-    Example {
-        name: name.to_owned(),
-        language: language.to_owned(),
-        kind: ExampleKind::Invalid,
-        files: vec![ExampleFile::inline("x.src", "bad\n")],
-        canonical: false,
-        expect: Vec::new(),
-        options: serde_json::Map::new(),
-        fixed: vec![ExampleFile::inline("x.src", "good\n")],
-    }
-}
-
-#[test]
-fn the_request_asks_for_the_replacement_of_the_extent_and_nothing_else() {
-    let extent = Extent {
-        span: span((10, 1), (12, 2)),
-        text: "func LongNameOfAFunction() {\n}\n".to_owned(),
-    };
-    let mut hit = finding("design/short-names", 10, Severity::Warn, "a");
-    hit.span = span((10, 6), (10, 26));
-    let examples = [example("go", "short")];
-    let ask = Ask {
-        decision: &decision(),
-        instruction: Some("Rename, do not delete."),
-        finding: &hit,
-        language: "go",
-        extent: &extent,
-        examples: &examples,
-    };
-
-    let request = serde_json::to_value(ask.request(true).unwrap()).unwrap();
-
-    let want = json!({
-        "model": "",
-        "temperature": 0.0,
-        "max_completion_tokens": 273,
-        "messages": [
-            {
-                "role": "system",
-                "content": "You fix one finding of a design rule in one piece of code. Reply with JSON {\"replacement\": \"<new text of the extent>\"} and nothing else. Keep behaviour. Change only what the requirement needs. Keep the code's style."
-            },
-            {
-                "role": "user",
-                "content": "Decision: design/short-names\nRequirement: Names are at most four words.\nContext: Long names hide the point.\nInstruction: Rename, do not delete.\n\nFinding: the name is too long\nEvidence: {\"words\":6}\nWhere, as line:column in the code below: 1:6-1:26\n\nFile: a.go (go)\n\nCode to fix:\n```go\nfunc LongNameOfAFunction() {\n}\n```\n\nExample 1 (x.src), before:\n```go\nbad\n```\n\nExample 1 (x.src), after:\n```go\ngood\n```\n"
-            }
-        ],
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "replacement",
-                "strict": true,
-                "schema": {
-                    "type": "object",
-                    "properties": {"replacement": {"type": "string"}},
-                    "required": ["replacement"],
-                    "additionalProperties": false
-                }
-            }
-        }
-    });
-    assert_eq!(request, want);
-    assert_eq!(
-        request,
-        serde_json::to_value(ask.request(true).unwrap()).unwrap()
-    );
-
-    let plain = serde_json::to_value(ask.request(false).unwrap()).unwrap();
-    assert!(plain.get("response_format").is_none(), "{plain}");
-}
-
-#[test]
-fn the_fence_of_the_code_is_longer_than_any_run_of_backticks_in_it() {
-    let extent = Extent {
-        span: span((1, 1), (2, 1)),
-        text: "s := ```x```\n".to_owned(),
-    };
-    let hit = finding("r", 1, Severity::Warn, "a");
-    let ask = Ask {
-        decision: &decision(),
-        instruction: None,
-        finding: &hit,
-        language: "go",
-        extent: &extent,
-        examples: &[],
-    };
-    let request = serde_json::to_value(ask.request(true).unwrap()).unwrap();
-    let user = request["messages"][1]["content"].as_str().unwrap();
-    assert!(user.contains("````go\ns := ```x```\n````\n"), "{user}");
-    assert!(!user.contains("Instruction:"));
-}
-
-#[test]
-fn the_examples_shown_are_three_at_most_those_in_the_language_of_the_finding_first() {
-    let all = [
-        example("rust", "a"),
-        example("go", "b"),
-        example("rust", "c"),
-        example("go", "d"),
-    ];
-    let names: Vec<_> = examples_for(&all, "go", MAX_EXAMPLES)
-        .into_iter()
-        .map(|e| e.name)
-        .collect();
-    assert_eq!(names, ["b", "d", "a"]);
-}
-
-#[test]
-fn a_decision_gives_the_model_its_prompt_and_the_examples_that_show_a_fix() {
-    let mut valid = example("go", "ok");
-    valid.kind = ExampleKind::Valid;
-    let mut unfixed = example("go", "unfixed");
-    unfixed.fixed.clear();
-    let kept = example("go", "kept");
-    let fix = ModelFix::of(None, &[valid, unfixed, kept], true).unwrap();
-    assert!(fix.implicit());
-    let names: Vec<_> = fix.examples.iter().map(|e| e.name.as_str()).collect();
-    assert_eq!(names, ["kept"]);
-    assert_eq!(fix.instruction, None);
-}
-
-#[test]
-fn an_answer_is_a_json_object_with_a_replacement() {
-    let extent = "old\n";
-    for answer in [
-        r#"{"replacement": "new\n"}"#,
-        "```json\n{\"replacement\": \"new\\n\"}\n```",
-        "Here you go: {\"replacement\": \"new\\n\"} Hope it helps.",
-        "{\"note\": 1} then {\"replacement\": \"new\\n\"}",
-    ] {
-        assert_eq!(
-            replacement(answer, extent).as_deref(),
-            Ok("new\n"),
-            "{answer}"
-        );
-    }
-}
-
-#[test]
-fn an_answer_that_is_no_replacement_is_declined_with_its_class() {
-    let extent = "old\n";
-    for answer in ["", "no idea", r#"{"replacement": 3}"#, r#"["replacement"]"#] {
-        let (class, reason) = replacement(answer, extent).unwrap_err();
-        assert_eq!(class, Class::Unparsed, "{answer}");
-        assert!(reason.contains("did not parse"), "{reason}");
-    }
-    let (class, reason) = replacement(r#"{"replacement": "old\n"}"#, extent).unwrap_err();
-    assert_eq!(class, Class::Unchanged);
-    assert!(reason.contains("unchanged"), "{reason}");
-}
-
-#[test]
-fn the_newline_that_ends_the_extent_is_kept_as_it_was() {
-    assert_eq!(
-        replacement(r#"{"replacement": "new"}"#, "old\n").as_deref(),
-        Ok("new\n")
-    );
-    assert_eq!(
-        replacement(r#"{"replacement": "new\n"}"#, "old").as_deref(),
-        Ok("new")
-    );
-    assert_eq!(
-        replacement(r#"{"replacement": ""}"#, "old\n").as_deref(),
-        Ok("")
-    );
-    assert_eq!(json_objects("x { y").count(), 0);
-}
-
 pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
     Proposal {
         fingerprint: finding.fingerprint.clone(),
@@ -331,6 +137,7 @@ pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
         edits: Vec::new(),
         files: vec![finding.file.clone()],
         aim: Aim::Finding,
+        chain: 0,
     }
 }
 
@@ -420,7 +227,7 @@ fn counts_are_kept_per_decision_and_declines_by_class() {
         Event::Applied,
         Event::Declined(Class::Unresolved),
         Event::Declined(Class::Unresolved),
-        Event::Declined(Class::Unparsed),
+        Event::Declined(Class::Unchanged),
     ] {
         account.add("a", event);
     }
@@ -435,7 +242,7 @@ fn counts_are_kept_per_decision_and_declines_by_class() {
     let a = &counts["a"];
     assert_eq!((a.asked, a.answered, a.verified, a.applied), (2, 1, 1, 1));
     assert_eq!(a.declined["unresolved"], 2);
-    assert_eq!(a.declined["unparsed"], 1);
+    assert_eq!(a.declined["unchanged"], 1);
     assert_eq!(counts["b"].previewed, 1);
 }
 
@@ -444,7 +251,8 @@ fn the_classes_of_declines_are_named() {
     let names: BTreeSet<_> = [
         Class::NoExtent,
         Class::Unanswered,
-        Class::Unparsed,
+        Class::OutOfScope,
+        Class::Conflict,
         Class::Unchanged,
         Class::Unresolved,
         Class::Introduced,
@@ -453,7 +261,7 @@ fn the_classes_of_declines_are_named() {
     ]
     .map(Class::name)
     .into();
-    assert_eq!(names.len(), 8);
+    assert_eq!(names.len(), 9);
 }
 
 #[test]

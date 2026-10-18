@@ -1,16 +1,15 @@
-//! The fix by a model. Through `chat`, a model is given the code of a finding,
-//! the symbol it is about or the small file it is in, and answers the new text
-//! of it; through `edit`, an agent is given the findings of a file and changes
-//! the files of a scratch copy of the project (see [`edit`]). Either proposes
-//! a replacement, which the orchestrator applies in memory and keeps only if
-//! the checks accept it (see [`verify`]); a model's word is never taken for
-//! the result.
+//! The fix by a model: an agent that edits. For the findings of a file, a
+//! program runs in a scratch copy of the project with the brief as its
+//! prompt (see [`edit`]); what it changed is a proposal, which the
+//! orchestrator applies in memory and keeps only if the checks accept it (see
+//! [`verify`]). A model's word is never taken for the result, and what it may
+//! change is limited by the scope of the fix (see [`scope`]).
 
 mod account;
 mod edit;
-mod edit_prompt;
 mod extent;
-mod prompt;
+mod reach;
+mod scope;
 mod scratch;
 mod verify;
 
@@ -19,115 +18,82 @@ use std::{
     sync::{Mutex, PoisonError},
 };
 
-use lighthouse_model::{
-    Safety,
-    ucm::{EditOp, FixOutcome},
-};
-use lighthouse_plugin::{Error, FixRequest, Fixer, FixerManifest};
-use lighthouse_protocol::prompt::json_in;
-use lighthouse_spec::{Example, ExampleKind, Fix, FixKind};
-use serde_json::Value;
+use lighthouse_spec::{Example, Fix, FixKind, FixScope};
 
-use super::FixedBy;
+use super::brief;
 use crate::{
     Engine,
-    engine::{Refusal, Route, Usage},
+    engine::{Route, Usage},
 };
 pub use account::ModelCounts;
 pub(super) use account::{Account, Class, Event};
 pub(super) use edit::World;
-pub(super) use edit_prompt::MAX_FINDINGS;
-use prompt::Ask;
+pub(super) use extent::choose as choose_extent;
 pub(super) use scratch::run_verify;
 pub(super) use verify::{Verdict, judge};
 
-/// What a decision tells the model besides its requirement.
-#[derive(Debug, Clone, Default)]
+/// How many findings of one file an agent is given at most.
+pub(super) const MAX_FINDINGS: usize = 20;
+
+/// What a decision tells the agent besides its requirement, and how far the
+/// agent may go.
+#[derive(Debug, Clone)]
 pub(super) struct ModelFix {
     /// The `prompt` of the fix.
     instruction: Option<String>,
-    /// Examples that show a fix.
+    /// Examples that show a fix, as the brief shows them.
     examples: Vec<Example>,
-    /// The decision has no fix of its own: it is given to a model because the
-    /// project binds one.
-    implicit: bool,
+    /// The widest change allowed: the decision's own `scope`, narrowed by the
+    /// project's.
+    scope: FixScope,
 }
 
 impl ModelFix {
-    /// The fix by a model of a decision whose `fix` is `fix`, or that has none
-    /// and `implicit` is true: `None` for a fix made without a model.
-    pub(super) fn of(fix: Option<&Fix>, examples: &[Example], implicit: bool) -> Option<Self> {
+    /// The fix by a model of a decision whose `fix` is `fix`, if any, with
+    /// `cap` the widest scope the project allows.
+    pub(super) fn of(fix: Option<&Fix>, examples: &[Example], cap: FixScope) -> Self {
         let instruction = match fix.map(|f| &f.kind) {
-            None => None,
-            Some(FixKind::Model { prompt }) => prompt.clone(),
-            Some(_) => return None,
+            Some(FixKind::Model { prompt, .. }) => prompt.clone(),
+            _ => None,
         };
-        Some(Self {
+        Self {
             instruction,
-            examples: examples
-                .iter()
-                .filter(|e| e.kind == ExampleKind::Invalid && !e.fixed.is_empty())
-                .cloned()
-                .collect(),
-            implicit,
-        })
+            examples: brief::examples_for(examples),
+            scope: FixScope::of_fix(fix, cap),
+        }
     }
-
-    /// Whether the decision has no fix of its own.
-    pub(super) fn implicit(&self) -> bool {
-        self.implicit
-    }
-}
-
-/// How the model of a run is asked.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Via {
-    /// `chat`: for each finding, the new text of the code around it.
-    Chat,
-    /// `edit`: for each file, an agent that changes the project.
-    Edit,
 }
 
 /// The fixer of the findings given to a model: asks the route of `[models]
-/// edit` if the project binds one, else that of `chat`, and counts what
-/// happens.
+/// edit` and counts what happens.
 pub(super) struct ModelFixer<'e> {
     route: Route<'e>,
-    via: Via,
     fixes: &'e BTreeMap<String, ModelFix>,
     pub(super) account: Account,
-    manifest: FixerManifest,
     /// What the agents said, for the notes of the run.
     said: Mutex<Vec<String>>,
 }
 
 impl<'e> ModelFixer<'e> {
     /// The fixer of the model fixes of `fixes`; `None` when the run has none
-    /// or no model to ask.
+    /// or no agent to ask.
     pub(super) fn new(engine: &'e Engine, fixes: &'e BTreeMap<String, ModelFix>) -> Option<Self> {
         if fixes.is_empty() {
             return None;
         }
-        let (route, via) = match engine.edit_route() {
-            Some(route) => (route, Via::Edit),
-            None => (engine.chat_route()?, Via::Chat),
-        };
         Some(Self {
-            route,
-            via,
+            route: engine.edit_route()?,
             fixes,
             account: Account::default(),
-            manifest: FixerManifest {
-                id: FixedBy::Model.to_string(),
-                requires: Vec::new(),
-            },
             said: Mutex::default(),
         })
     }
 
-    /// Whether the model is asked per file, to edit.
-    pub(super) fn edits(&self) -> bool {
-        self.via == Via::Edit
+    /// How far the fix of `decision` may go.
+    pub(super) fn scope_of(&self, decision: &str) -> FixScope {
+        self.fixes
+            .get(decision)
+            .map_or_else(FixScope::default, |fix| fix.scope)
     }
 
     /// What the requests that went to a model this run took.
@@ -145,133 +111,13 @@ impl<'e> ModelFixer<'e> {
             .chain(said.iter().cloned())
             .collect()
     }
-
-    fn decline(&self, decision: &str, class: Class, reason: String) -> Result<FixOutcome, Error> {
-        self.account.add(decision, Event::Declined(class));
-        Ok(FixOutcome::declined(reason))
-    }
-}
-
-impl Fixer for ModelFixer<'_> {
-    fn manifest(&self) -> &FixerManifest {
-        &self.manifest
-    }
-
-    fn fix(&self, request: &FixRequest) -> Result<FixOutcome, Error> {
-        let (decision, finding) = (request.decision, request.finding);
-        if self.edits() {
-            return self.decline(
-                &decision.id,
-                Class::Unanswered,
-                "a project that binds `edit` asks for the fixes of a file at once".to_owned(),
-            );
-        }
-        let extent = match extent::choose(request.project, finding, request.text) {
-            Ok(extent) => extent,
-            Err(reason) => return self.decline(&decision.id, Class::NoExtent, reason),
-        };
-        let fix = self.fixes.get(&decision.id);
-        let language = request
-            .project
-            .file(&finding.file)
-            .map_or("", |f| f.lang.as_str());
-        let examples = fix.map_or_else(Vec::new, |f| {
-            prompt::examples_for(&f.examples, language, prompt::MAX_EXAMPLES)
-        });
-        let ask = Ask {
-            decision,
-            instruction: fix.and_then(|f| f.instruction.as_deref()),
-            finding,
-            language,
-            extent: &extent,
-            examples: &examples,
-        };
-        let (structured, plain) = match (ask.request(true), ask.request(false)) {
-            (Ok(structured), Ok(plain)) => (structured, plain),
-            (Err(e), _) | (_, Err(e)) => {
-                let reason = format!("the request could not be built: {e}");
-                return self.decline(&decision.id, Class::Unanswered, reason);
-            }
-        };
-        self.account.add(&decision.id, Event::Asked);
-        let asked = |takes_format: bool| {
-            if takes_format {
-                structured.clone()
-            } else {
-                plain.clone()
-            }
-        };
-        let reply = match self.route.ask(&asked) {
-            Ok(reply) => reply,
-            Err(Refusal::Budget) => {
-                let reason = "the budget for models is spent".to_owned();
-                return self.decline(&decision.id, Class::Unanswered, reason);
-            }
-            Err(Refusal::Failed(why)) => {
-                let reason = format!("no model answered: {why}");
-                return self.decline(&decision.id, Class::Unanswered, reason);
-            }
-        };
-        self.account.add(&decision.id, Event::Answered);
-        let text = match replacement(&reply.text, &extent.text) {
-            Ok(text) => text,
-            Err((class, reason)) => return self.decline(&decision.id, class, reason),
-        };
-        Ok(FixOutcome::Proposed {
-            description: format!("model fix by `{}`", reply.model),
-            ops: vec![EditOp::Replace {
-                file: finding.file.clone(),
-                span: extent.span,
-                text,
-            }],
-            safety: Safety::Suggested,
-        })
-    }
-}
-
-/// The new text of the extent a model's answer holds: the `replacement` of the
-/// first JSON object in it, with the extent's trailing newline kept as it was.
-fn replacement(answer: &str, extent: &str) -> Result<String, (Class, String)> {
-    let unparsed = || {
-        (
-            Class::Unparsed,
-            "the answer did not parse: it holds no JSON object with a `replacement` text"
-                .to_owned(),
-        )
-    };
-    let text = json_objects(answer)
-        .find_map(|object| object.get("replacement")?.as_str().map(str::to_owned))
-        .ok_or_else(unparsed)?;
-    let text = match (extent.ends_with('\n'), text.ends_with('\n')) {
-        (true, false) if !text.is_empty() => text + "\n",
-        (false, true) => text.trim_end_matches('\n').to_owned(),
-        _ => text,
-    };
-    if text == extent {
-        return Err((
-            Class::Unchanged,
-            "the model returned the code unchanged".to_owned(),
-        ));
-    }
-    Ok(text)
-}
-
-/// The JSON objects in a model's text: the text itself or a fenced block when
-/// that is one, else every object that starts at a brace in it.
-fn json_objects(answer: &str) -> impl Iterator<Item = Value> + '_ {
-    let whole = json_in(answer).filter(Value::is_object);
-    let scattered = answer.match_indices('{').filter_map(|(at, _)| {
-        serde_json::Deserializer::from_str(&answer[at..])
-            .into_iter::<Value>()
-            .next()?
-            .ok()
-            .filter(Value::is_object)
-    });
-    whole.into_iter().chain(scattered)
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod chain_tests;
 
 #[cfg(test)]
 mod edit_tests;

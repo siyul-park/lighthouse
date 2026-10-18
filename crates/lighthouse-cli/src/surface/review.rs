@@ -7,7 +7,7 @@ use lighthouse_model::Fingerprint;
 use lighthouse_report::{Entry, GroupOptions, Grouped, Groups};
 use lighthouse_session::{
     catalog_at,
-    review::{self, FindingRecord, JudgmentEvent, Query, Recorded, Standing},
+    review::{self, FindingRecord, JudgmentEvent, Query, Recorded, Shown, Standing},
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -131,8 +131,9 @@ pub fn list(ctx: &Context, args: &ReviewListArgs, format: Format) -> Result<Repl
 
 /// `review show`.
 pub fn show(ctx: &Context, args: &FingerprintArgs, format: Format) -> Result<Reply> {
-    let finding = review::show(&ctx.root()?, &args.fingerprint)?;
-    Reply::data(format, &finding, || detail(&finding))
+    let session = ctx.session().ok();
+    let shown = review::show_with_brief(&ctx.root()?, session.as_ref(), &args.fingerprint)?;
+    Reply::data(format, &shown, || detail(&shown))
 }
 
 /// `review history`.
@@ -274,7 +275,8 @@ fn review_text(finding: &FindingRecord) -> String {
     }
 }
 
-fn detail(finding: &FindingRecord) -> String {
+fn detail(shown: &Shown) -> String {
+    let finding = &shown.finding;
     let mut out = String::new();
     let mut field = |label: &str, value: String| {
         let _ = writeln!(out, "{label:<13}{value}");
@@ -311,6 +313,9 @@ fn detail(finding: &FindingRecord) -> String {
     }
     if finding.judgment.is_some() {
         field("judgment:", review_text(finding));
+    }
+    if let Some(brief) = &shown.brief {
+        let _ = write!(out, "\nbrief:\n{brief}");
     }
     out
 }

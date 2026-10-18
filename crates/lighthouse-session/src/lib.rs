@@ -10,6 +10,7 @@ mod decisions;
 mod findings;
 mod generated;
 mod git;
+mod permit;
 mod project;
 mod scope;
 mod selector;

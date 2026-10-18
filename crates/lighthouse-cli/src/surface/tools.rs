@@ -11,7 +11,7 @@ use lighthouse_session::{
     Authored, CheckReport, Session,
     fix::Fixed,
     model::{Attachment, Detachment, EvalReport, Rebuilt, Trained, remote_bound},
-    review::{FindingRecord, Recorded},
+    review::{Recorded, Shown},
 };
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde::de::DeserializeOwned;
@@ -112,7 +112,7 @@ pub const TOOLS: [Tool; 16] = [
         Hints::READ,
         |ctx, args| review::list(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new::<FingerprintArgs, FindingRecord>(
+    Tool::new::<FingerprintArgs, Shown>(
         "review_show",
         &["review", "show"],
         "Finding",

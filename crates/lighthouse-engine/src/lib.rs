@@ -13,7 +13,7 @@ pub use engine::{
 };
 pub use fix::{
     AppliedFix, DeclinedFix, EditUsage, FileChange, FixBinding, FixPlan, FixReport, FixRun,
-    FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, unified_diff,
+    FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, brief, unified_diff,
 };
 pub use tester::{ExampleRun, RuleTester};
 pub use timings::Timings;

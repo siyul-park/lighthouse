@@ -8,15 +8,15 @@ use std::{
 /// Why a fix by a model was declined, as a class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::fix) enum Class {
-    /// There was no code to give the model.
+    /// The finding has no extent for the agent to change.
     NoExtent,
-    /// No model answered: the budget was spent or they failed.
+    /// No agent ran: the budget was spent or they failed.
     Unanswered,
-    /// The agent changed what it was not asked to.
+    /// The agent changed what its scope does not allow.
     OutOfScope,
-    /// The answer was not a replacement.
-    Unparsed,
-    /// The answer left the code as it was.
+    /// A file the agent changed is no longer as the run found it.
+    Conflict,
+    /// The agent left the code as it was.
     Unchanged,
     /// The finding was still there.
     Unresolved,
@@ -34,7 +34,7 @@ impl Class {
             Self::NoExtent => "no-extent",
             Self::Unanswered => "unanswered",
             Self::OutOfScope => "out-of-scope",
-            Self::Unparsed => "unparsed",
+            Self::Conflict => "conflict",
             Self::Unchanged => "unchanged",
             Self::Unresolved => "unresolved",
             Self::Introduced => "introduced",

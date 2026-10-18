@@ -1,5 +1,5 @@
-//! The route of a task: the models `[models]` binds to `chat` or `edit`,
-//! asked to generate (the fix of a finding). A request goes to the models in
+//! The route of a task: the models `[models]` binds to `edit`, asked to
+//! generate (the fix of a finding). A request goes to the models in
 //! turn until one answers: a failure or a spent budget moves it on, a kept
 //! answer is reused without a call. Answers are kept under a key the task
 //! builds from the model at its version and what it is asked, in the result
@@ -16,7 +16,7 @@ use std::{
 
 use lighthouse_model::ModelRef;
 use lighthouse_plugin::ModelClient;
-use lighthouse_spec::{CommandProtocol, ModelProvider, Routing};
+use lighthouse_spec::Routing;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
@@ -29,8 +29,6 @@ const MAX_FAILURES: usize = 3;
 /// One model of the route, as the route asks it.
 pub(crate) struct Member<'a> {
     pub(crate) client: Box<dyn ModelClient + 'a>,
-    /// The model answers in plain text: its request carries no response format.
-    pub(crate) plain: bool,
 }
 
 /// Why no model of the route answered.
@@ -76,13 +74,8 @@ pub(crate) struct Route<'a> {
 }
 
 impl Engine {
-    /// The route of the models `[models] chat` names; `None` when no model is
+    /// The route of the models `[models] edit` names; `None` when no model is
     /// bound or the run asks no model.
-    pub(crate) fn chat_route(&self) -> Option<Route<'_>> {
-        self.route(&self.binding.chat)
-    }
-
-    /// The route of the models `[models] edit` names, with the same limits.
     pub(crate) fn edit_route(&self) -> Option<Route<'_>> {
         self.route(&self.binding.edit)
     }
@@ -98,15 +91,8 @@ impl Engine {
             .filter_map(|reference| {
                 let model = ModelRef::parse(reference)?;
                 let provider = self.binding.provider(model.provider)?;
-                let plain = matches!(
-                    provider,
-                    ModelProvider::Command {
-                        protocol: CommandProtocol::PlainText,
-                        ..
-                    }
-                );
                 let client = clients.build(reference, model.model, &provider);
-                Some(Member { client, plain })
+                Some(Member { client })
             })
             .collect();
         if members.is_empty() {

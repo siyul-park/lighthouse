@@ -3,7 +3,7 @@
 //! Fixers rewrite `TODO` into something, which lets each test choose whether
 //! the fix is good, introduces an error, or breaks the file.
 
-use std::path::Path;
+use std::{collections::BTreeSet, path::Path};
 
 use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, FixedBy, unified_diff};
 use lighthouse_model::{
@@ -14,6 +14,7 @@ use lighthouse_plugin::{
     Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,
 };
+use lighthouse_spec::FixScope;
 use lighthouse_spec::{Catalog, Config};
 
 use crate::support::*;
@@ -409,10 +410,13 @@ fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
 }
 
 #[test]
-fn model_fixes_are_given_to_the_rules_that_have_a_check_and_no_fix_of_their_own() {
+fn model_fixes_are_given_only_to_the_listed_rules_that_have_a_check_and_no_fix_of_their_own() {
     let catalog = lighthouse_spec::Catalog::bundled();
+    let listed: BTreeSet<String> = ["design/exported-doc", "design/declaration-groups"]
+        .map(str::to_owned)
+        .into();
 
-    let plan = FixPlan::from_catalog(catalog).with_model_fixes(catalog);
+    let plan = FixPlan::from_catalog(catalog).with_model_fixes(catalog, &listed, FixScope::Files);
 
     let documented = plan.get("design/exported-doc").unwrap();
     assert_eq!(documented.fixer, FixedBy::Model);
@@ -424,5 +428,9 @@ fn model_fixes_are_given_to_the_rules_that_have_a_check_and_no_fix_of_their_own(
         groups.fixer,
         FixedBy::Fixer("design/declaration-groups".to_owned()),
         "a fix of its own stays"
+    );
+    assert!(
+        plan.get("design/naming").is_none(),
+        "a rule nobody listed has no model fix"
     );
 }

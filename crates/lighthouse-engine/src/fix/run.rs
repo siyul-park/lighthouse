@@ -1,4 +1,5 @@
 mod rollback;
+mod settle;
 mod write;
 
 use std::{
@@ -12,7 +13,7 @@ use lighthouse_spec::Approval;
 
 use super::{
     AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, FixedBy, MAX_ROUNDS, PreviewedFix,
-    model::{Event, run_verify},
+    model::{Class, Event, run_verify},
     propose::{Phase, Proposer},
 };
 
@@ -98,7 +99,8 @@ impl Orchestrator<'_> {
                 )));
             }
             let (proposals, declined) =
-                self.proposer.propose(&outcome, &self.texts, Phase::Rules)?;
+                self.proposer
+                    .propose(&outcome, &self.texts, Phase::Rules, &[])?;
             self.declined.extend(declined);
             if proposals.is_empty() {
                 return Ok(outcome);
@@ -135,59 +137,144 @@ impl Orchestrator<'_> {
     }
 
     /// The round that gives the findings the rules left to a model: its
-    /// answers are kept only if the checks accept them, and then written only
-    /// if the run may (`--unsafe-fixes`, or `approval.fix = "verified"`) and
-    /// the commands of `[fix] verify` pass over them. Otherwise they are
-    /// withdrawn to previews. The run of the last check.
+    /// edits are kept only if the checks accept them, and then written only if
+    /// the run may (`--unsafe-fixes`, or `approval.fix = "allow"`) and the
+    /// commands of `[fix] verify` pass over them. Otherwise they are
+    /// withdrawn to previews; when a command fails, the runs of the chain are
+    /// rolled back newest first until they pass, and their findings are
+    /// declined. The run of the last check.
     fn model_round(&mut self, outcome: Run) -> Result<Run, Error> {
-        let (proposals, declined) = self
-            .proposer
-            .propose(&outcome, &self.texts, Phase::Models)?;
+        let (proposals, declined) =
+            self.proposer
+                .propose(&outcome, &self.texts, Phase::Models, &[])?;
         self.declined.extend(declined);
         if proposals.is_empty() {
             return Ok(outcome);
         }
+        let chain: BTreeMap<Fingerprint, usize> = proposals
+            .iter()
+            .filter(|p| p.fixer == FixedBy::Model)
+            .map(|p| (p.fingerprint.clone(), p.chain))
+            .collect();
         let before = (self.texts.clone(), self.original.clone(), self.rounds);
         let checked = self.apply_round(&outcome, proposals, before.2 + 1)?;
         if !self.applied.iter().any(|a| a.fixer == FixedBy::Model) {
             return Ok(outcome);
         }
-        if let Some(why) = self.withheld() {
-            self.notes.extend(why);
+        if !self.permitted() {
             self.withdraw(before);
             return Ok(outcome);
         }
+        let mut rolled = false;
+        while let Some(why) = self.failing_verify() {
+            if !self.roll_back_newest(&outcome, &chain, &before, &why) {
+                break;
+            }
+            rolled = true;
+        }
+        if !self.applied.iter().any(|a| a.fixer == FixedBy::Model) {
+            self.rounds = before.2;
+            return Ok(outcome);
+        }
         match checked {
-            Some(checked) => Ok(checked),
-            None => self.proposer.engine.check_overlaid(&[], &[], &self.texts),
+            Some(checked) if !rolled => Ok(checked),
+            _ => self.proposer.engine.check_overlaid(&[], &[], &self.texts),
         }
     }
 
-    /// Why the fixes by a model stand as previews, if they do: the notes it
-    /// leaves. Empty when it is just the approval of the project.
-    fn withheld(&self) -> Option<Vec<String>> {
+    /// Whether the run may write the fixes by a model: `--unsafe-fixes`, or
+    /// the approval of the project.
+    fn permitted(&self) -> bool {
+        self.proposer.run.unsafe_fixes || self.proposer.engine.config.approval() == Approval::Allow
+    }
+
+    /// Why the commands of `[fix] verify` do not pass over the texts of the
+    /// run, if they do not.
+    fn failing_verify(&self) -> Option<String> {
         let engine = self.proposer.engine;
-        let permitted =
-            self.proposer.run.unsafe_fixes || engine.config.approval() == Approval::Verified;
-        if !permitted {
-            return Some(Vec::new());
-        }
         let commands = engine.config.verify();
         if commands.is_empty() {
             return None;
         }
-        let failed = if engine.trusted {
-            run_verify(
-                &engine.ws.root,
-                &self.texts,
-                commands,
-                engine.config.verify_timeout(),
-            )
-            .err()
-        } else {
-            Some("`[fix] verify` runs only in a trusted project (`lighthouse trust`)".to_owned())
+        if !engine.trusted {
+            return Some(
+                "`[fix] verify` runs only in a trusted project (`lighthouse trust`)".to_owned(),
+            );
+        }
+        run_verify(
+            &engine.ws.root,
+            &self.texts,
+            commands,
+            engine.config.verify_timeout(),
+        )
+        .err()
+    }
+
+    /// Undoes the newest group of the chain among the fixes by a model that
+    /// stand, and declines its findings with `why`. False when none stands.
+    fn roll_back_newest(
+        &mut self,
+        outcome: &Run,
+        chain: &BTreeMap<Fingerprint, usize>,
+        before: &(Overlays, BTreeMap<PathBuf, (String, String)>, usize),
+        why: &str,
+    ) -> bool {
+        let newest = self
+            .applied
+            .iter()
+            .filter(|a| a.fixer == FixedBy::Model)
+            .filter_map(|a| chain.get(&a.fingerprint))
+            .max()
+            .copied();
+        let Some(newest) = newest else {
+            return false;
         };
-        failed.map(|why| vec![format!("fixes by a model are previews: {why}")])
+        let (undone, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
+            .into_iter()
+            .partition(|a| a.fixer == FixedBy::Model && chain.get(&a.fingerprint) == Some(&newest));
+        self.applied = rest;
+        let reason = format!("rolled back: {why}");
+        for fix in &undone {
+            for file in &fix.files {
+                match before.0.get(file) {
+                    Some(text) => self.texts.insert(file.clone(), text.clone()),
+                    None => self.texts.remove(file),
+                };
+                match before.1.get(file) {
+                    Some(first) => self.original.insert(file.clone(), first.clone()),
+                    None => self.original.remove(file),
+                };
+            }
+            self.previewable.remove(&fix.fingerprint);
+            self.proposer
+                .note_model(&fix.rule_id, Event::Declined(Class::RolledBack));
+            if let Some(finding) = outcome
+                .diagnostics
+                .iter()
+                .find(|d| d.fingerprint == fix.fingerprint)
+            {
+                self.declined.insert(
+                    fix.fingerprint.clone(),
+                    DeclinedFix {
+                        fingerprint: fix.fingerprint.clone(),
+                        rule_id: fix.rule_id.clone(),
+                        file: finding.file.clone(),
+                        line: finding.span.start.line,
+                        reason: reason.clone(),
+                    },
+                );
+            }
+        }
+        let files: Vec<String> = undone
+            .iter()
+            .flat_map(|fix| &fix.files)
+            .map(|f| f.display().to_string())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        self.notes
+            .push(format!("rolled back {}: {why}", files.join(", ")));
+        true
     }
 
     /// Puts the texts back as they were before the fixes by a model, and

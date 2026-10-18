@@ -17,6 +17,7 @@ use super::{
     super::propose::Proposal,
     super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator,
+    settle::{has_model, restate},
 };
 use crate::{Error, Run};
 
@@ -33,7 +34,8 @@ impl Orchestrator<'_> {
         // Safe fixes win a collision, so the ones that apply unasked are not
         // shut out by a suggestion.
         proposals.sort_by_key(|p| p.safety);
-        let (kept, merged) = kept_proposals(proposals);
+        let (mut kept, mut merged, dropped) = kept_proposals(proposals);
+        self.decline_dropped(&dropped);
         let mut candidates = self.round(&kept, before);
         let mut failed = std::mem::take(&mut candidates.failed);
         self.notes.append(&mut candidates.notes);
@@ -48,6 +50,14 @@ impl Orchestrator<'_> {
             None
         } else {
             Some(self.proposer.engine.check_overlaid(&[], &[], &self.texts)?)
+        };
+        let after = match after {
+            Some(run) if has_model(&kept) => {
+                let settled = self.settle(run, &changed)?;
+                restate(&mut kept, &mut merged, &self.texts);
+                Some(settled)
+            }
+            other => other,
         };
         let mut verdict = Verdict::default();
         if let Some(after) = &after {
@@ -179,6 +189,19 @@ impl Orchestrator<'_> {
         }
     }
 
+    /// Declines the fixes by a model that collided with an earlier one of the
+    /// round: they stand for nothing, and the user is told.
+    fn decline_dropped(&mut self, dropped: &[Proposal]) {
+        for p in dropped.iter().filter(|p| p.fixer == FixedBy::Model) {
+            self.proposer
+                .note_model(&p.rule_id, Event::Declined(Class::RolledBack));
+            self.decline_proposal(
+                p,
+                "its edit collides with another fix of this round, which was kept".to_owned(),
+            );
+        }
+    }
+
     fn decline_proposal(&mut self, p: &Proposal, reason: String) {
         self.declined.insert(
             p.fingerprint.clone(),
@@ -195,8 +218,11 @@ impl Orchestrator<'_> {
 
 /// Proposals in order, dropping the ones that collide with an earlier one. A
 /// proposal with exactly the edits of a kept one is covered by it, and
-/// returned with the fingerprint it merged into.
-fn kept_proposals(proposals: Vec<Proposal>) -> (Vec<Proposal>, Vec<(Proposal, Fingerprint)>) {
+/// returned with the fingerprint it merged into. The ones that collide are
+/// returned last.
+pub(super) fn kept_proposals(
+    proposals: Vec<Proposal>,
+) -> (Vec<Proposal>, Vec<(Proposal, Fingerprint)>, Vec<Proposal>) {
     // The order of the edits of each proposal by file and place, found once:
     // two proposals are the same when their edits are, in that order.
     let placed = |p: &Proposal| {
@@ -209,6 +235,7 @@ fn kept_proposals(proposals: Vec<Proposal>) -> (Vec<Proposal>, Vec<(Proposal, Fi
     };
     let mut kept: Vec<(Proposal, Vec<usize>)> = Vec::new();
     let mut merged = Vec::new();
+    let mut dropped = Vec::new();
     for proposal in proposals {
         let order = placed(&proposal);
         let same = kept.iter().find(|(k, kept_order)| {
@@ -227,11 +254,13 @@ fn kept_proposals(proposals: Vec<Proposal>) -> (Vec<Proposal>, Vec<(Proposal, Fi
                 .flat_map(|(k, _)| &k.edits)
                 .any(|k| k.file == e.file && overlap(&k.range, &e.range))
         });
-        if !collides {
+        if collides {
+            dropped.push(proposal);
+        } else {
             kept.push((proposal, order));
         }
     }
-    (kept.into_iter().map(|(p, _)| p).collect(), merged)
+    (kept.into_iter().map(|(p, _)| p).collect(), merged, dropped)
 }
 
 /// The changed files whose check got worse: more findings of error or warn
@@ -239,7 +268,7 @@ fn kept_proposals(proposals: Vec<Proposal>) -> (Vec<Proposal>, Vec<(Proposal, Fi
 /// none; a fingerprint can change when code moves, its owner does not), or a new
 /// gap in the analysis. A change that cannot be pinned on one file (a gap with
 /// no path, a finding in an untouched file) condemns them all.
-fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<PathBuf, String> {
+pub(super) fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<PathBuf, String> {
     type Key<'a> = (&'a Path, &'a str, &'a str);
     fn count(run: &Run) -> BTreeMap<Key<'_>, usize> {
         let mut counts = BTreeMap::new();

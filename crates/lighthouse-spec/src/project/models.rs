@@ -60,17 +60,11 @@ pub struct ModelsSpec {
     /// abstains, the subject is left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<Names>,
-    /// The model (`<provider>/<model>`), or the route of several, that writes
-    /// the fixes no rule makes by itself: one binding for the project, not
-    /// per decision. A request moves to the next model of a route when one
-    /// fails.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chat: Option<Names>,
     /// The model (`<provider>/<model>`), or the route of several, that fixes
     /// by changing files: a headless agent run as a `command` without a
-    /// `protocol`, in a scratch copy of the project. When bound, fixes by a
-    /// model use it instead of `chat`. One binding for the project; a request
-    /// moves to the next model of a route when one fails.
+    /// `protocol`, in a scratch copy of the project. It makes the fixes of
+    /// the decisions `[fix] decisions` lists. One binding for the project; a
+    /// request moves to the next model of a route when one fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edit: Option<Names>,
     /// Which model of a route a request starts at. Default: `ordered`.
@@ -127,8 +121,6 @@ impl Default for Evaluation {
 pub struct Models {
     /// The project's route for decisions no rule binds.
     pub classification: Vec<String>,
-    /// The project's route for the model that writes fixes.
-    pub chat: Vec<String>,
     /// The project's route for the agent that fixes by editing files.
     pub edit: Vec<String>,
     /// Which model of a route a request starts at.
@@ -158,11 +150,6 @@ impl Models {
         Self {
             classification: models
                 .classification
-                .as_ref()
-                .map(|names| names.iter().map(str::to_owned).collect())
-                .unwrap_or_default(),
-            chat: models
-                .chat
                 .as_ref()
                 .map(|names| names.iter().map(str::to_owned).collect())
                 .unwrap_or_default(),
@@ -198,14 +185,14 @@ impl Models {
 
     /// The route a rule names for its decision.
     pub fn route(&self, rule: &str) -> Option<&[String]> {
-        self.rules.get(rule)?.model.as_deref()
+        self.rules.get(rule)?.classification.as_deref()
     }
 
     /// The routes rules name, by decision id.
     pub fn routes(&self) -> impl Iterator<Item = (&str, &[String])> {
         self.rules
             .iter()
-            .filter_map(|(id, rule)| Some((id.as_str(), rule.model.as_deref()?)))
+            .filter_map(|(id, rule)| Some((id.as_str(), rule.classification.as_deref()?)))
     }
 
     /// Every model reference the project binds, with the task it binds it to.
@@ -213,12 +200,11 @@ impl Models {
         let classification = self.classification.iter().chain(
             self.rules
                 .values()
-                .filter_map(|r| r.model.as_ref())
+                .filter_map(|r| r.classification.as_ref())
                 .flatten(),
         );
         classification
             .map(|id| (Task::Classification, id.as_str()))
-            .chain(self.chat.iter().map(|id| (Task::Chat, id.as_str())))
             .chain(self.edit.iter().map(|id| (Task::Edit, id.as_str())))
     }
 

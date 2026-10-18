@@ -21,7 +21,7 @@ pub struct RuleConfig {
     pub generated: Option<bool>,
     /// The models that judge this decision, before the project's
     /// `models.classification`.
-    pub model: Option<Vec<String>>,
+    pub classification: Option<Vec<String>>,
     /// How `lighthouse eval` judges this rule's check.
     pub evaluation: Option<Evaluation>,
 }
@@ -33,7 +33,7 @@ impl RuleConfig {
             level,
             options: Options::new(),
             generated: None,
-            model: None,
+            classification: None,
             evaluation: None,
         }
     }
@@ -46,8 +46,8 @@ impl From<RuleSetting> for RuleConfig {
             RuleSetting::Detailed(detail) => Self {
                 options: detail.options,
                 generated: detail.generated,
-                model: detail
-                    .model
+                classification: detail
+                    .classification
                     .map(|names| names.iter().map(str::to_owned).collect()),
                 evaluation: detail.evaluation,
                 ..Self::new(detail.level.into())
@@ -107,7 +107,7 @@ pub struct RuleDetail {
     /// the project's `models.classification`. When it abstains, the subject is
     /// left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<Names>,
+    pub classification: Option<Names>,
     /// How `lighthouse eval` judges this rule's check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evaluation: Option<Evaluation>,
@@ -152,8 +152,8 @@ pub(crate) fn merge(into: &mut Rules, from: &Rules) {
                 }
                 prev.generated = next.generated.or(prev.generated);
                 prev.evaluation = next.evaluation.or(prev.evaluation);
-                if next.model.is_some() {
-                    prev.model.clone_from(&next.model);
+                if next.classification.is_some() {
+                    prev.classification.clone_from(&next.classification);
                 }
             }
             None => {

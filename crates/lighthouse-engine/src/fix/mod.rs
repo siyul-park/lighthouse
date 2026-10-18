@@ -5,6 +5,7 @@
 //! back every file that got worse and repeats until nothing is left to do.
 
 mod batch;
+pub mod brief;
 mod edits;
 mod lower;
 mod model;
@@ -22,7 +23,7 @@ use std::{
 use lighthouse_model::Severity;
 use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_plugin::FixDecision;
-use lighthouse_spec::{Catalog, Decision, FixKind};
+use lighthouse_spec::{Catalog, Decision, FixKind, FixScope};
 
 pub use edits::unified_diff;
 pub use model::ModelCounts;
@@ -34,12 +35,12 @@ use crate::Run;
 pub const MAX_ROUNDS: usize = 5;
 
 /// What makes a fix: a registered fixer, derived from the rule, or the
-/// project's chat model, which guesses and is held to the checks.
+/// project's agent that edits, which guesses and is held to the checks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FixedBy {
     /// The registered fixer with this id.
     Fixer(String),
-    /// The model `[models] chat` binds.
+    /// The agent `[models] edit` binds.
     Model,
 }
 
@@ -74,27 +75,34 @@ pub struct FixBinding {
 #[derive(Debug, Clone, Default)]
 pub struct FixPlan {
     bindings: BTreeMap<String, FixBinding>,
-    /// What the rules whose fix is by a model add to the prompt.
+    /// What the rules whose fix is by a model add to the brief, and how far
+    /// they may go.
     models: BTreeMap<String, ModelFix>,
+    /// The decisions with a safe fix of their own, and the languages of their
+    /// examples: the project applies those fixes to what an agent leaves.
+    safe: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl FixPlan {
-    /// The fixer of every rule whose decision has a `fix`: the decision's id,
-    /// under which its fixer is registered, with the cap its `safety` puts on
-    /// what the fixer may claim.
+    /// The fixer of every rule whose decision has a `fix` that is not by a
+    /// model: the decision's id, under which its fixer is registered, with
+    /// the cap its `safety` puts on what the fixer may claim.
     pub fn from_catalog(catalog: &Catalog) -> Self {
         let mut plan = Self::default();
         for decision in catalog.decisions() {
             let Some(fix) = &decision.fix else { continue };
-            let model = ModelFix::of(Some(fix), &decision.examples, false);
+            if matches!(fix.kind, FixKind::Model { .. }) {
+                continue;
+            }
+            if fix.safety == Safety::Safe && !matches!(fix.kind, FixKind::Rpc { .. }) {
+                let languages = decision.examples.iter().map(|e| e.language.clone());
+                plan.safe
+                    .insert(decision.id().to_owned(), languages.collect());
+            }
             plan.insert(
                 decision.id(),
                 FixBinding {
-                    fixer: if model.is_some() {
-                        FixedBy::Model
-                    } else {
-                        FixedBy::Fixer(decision.id().to_owned())
-                    },
+                    fixer: FixedBy::Fixer(decision.id().to_owned()),
                     cap: fix.safety,
                     mechanical: decision.severity == Some(Severity::Error),
                     runs_command: matches!(fix.kind, FixKind::Command(_)),
@@ -105,18 +113,27 @@ impl FixPlan {
                     }),
                 },
             );
-            plan.models
-                .extend(model.map(|m| (decision.id().to_owned(), m)));
         }
         plan
     }
 
-    /// Also gives every rule that has a check and no fix of its own the fix
-    /// by a model, which is asked when the project binds a chat model.
+    /// Also gives the rules of `permitted` (the decisions the project lets a
+    /// model fix) the fix by a model, when they have a check and no fix of
+    /// their own, or a fix of type `model`. `cap` is the widest scope the
+    /// project allows any of them.
     #[must_use]
-    pub fn with_model_fixes(mut self, catalog: &Catalog) -> Self {
+    pub fn with_model_fixes(
+        mut self,
+        catalog: &Catalog,
+        permitted: &BTreeSet<String>,
+        cap: FixScope,
+    ) -> Self {
         for decision in catalog.decisions() {
-            if decision.check.is_none() || decision.fix.is_some() {
+            let by_model = decision
+                .fix
+                .as_ref()
+                .is_none_or(|fix| matches!(fix.kind, FixKind::Model { .. }));
+            if decision.check.is_none() || !by_model || !permitted.contains(decision.id()) {
                 continue;
             }
             self.insert(
@@ -130,8 +147,9 @@ impl FixPlan {
                     unsupported: None,
                 },
             );
-            self.models.extend(
-                ModelFix::of(None, &decision.examples, true).map(|m| (decision.id().to_owned(), m)),
+            self.models.insert(
+                decision.id().to_owned(),
+                ModelFix::of(decision.fix.as_ref(), &decision.examples, cap),
             );
         }
         self
@@ -140,6 +158,16 @@ impl FixPlan {
     /// Names `binding` as the fix of `rule`.
     pub fn insert(&mut self, rule: impl Into<String>, binding: FixBinding) {
         self.bindings.insert(rule.into(), binding);
+    }
+
+    /// The decisions whose safe fixes the project applies after an agent, for
+    /// files in `language` (every language when `None`), in the order of
+    /// their ids.
+    pub fn safe_fixes(&self, language: Option<&str>) -> impl Iterator<Item = &str> {
+        self.safe
+            .iter()
+            .filter(move |(_, languages)| language.is_none_or(|l| languages.contains(l)))
+            .map(|(id, _)| id.as_str())
     }
 
     /// How the findings of `rule` are fixed, if they are.

@@ -81,6 +81,34 @@ impl Selector {
     }
 }
 
+impl Selector {
+    /// The `known` ids the patterns select, sorted, and the patterns that
+    /// select none of them.
+    pub fn resolve<'a>(
+        &self,
+        known: impl IntoIterator<Item = &'a str>,
+    ) -> (Vec<String>, Vec<String>) {
+        let known: Vec<&str> = known.into_iter().collect();
+        let mut ids = Vec::new();
+        let mut unmatched = Vec::new();
+        for pattern in &self.patterns {
+            let before = ids.len();
+            ids.extend(
+                known
+                    .iter()
+                    .filter(|id| pattern.matches(id))
+                    .map(|id| (*id).to_owned()),
+            );
+            if ids.len() == before {
+                unmatched.push(pattern.text.clone());
+            }
+        }
+        ids.sort();
+        ids.dedup();
+        (ids, unmatched)
+    }
+}
+
 impl Pattern {
     fn matches(&self, id: &str) -> bool {
         self.glob

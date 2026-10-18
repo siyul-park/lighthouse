@@ -28,7 +28,6 @@ use crate::{
 
 mod batch;
 mod cached;
-mod chat;
 mod client;
 mod config;
 mod models;

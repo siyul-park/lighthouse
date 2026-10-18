@@ -3,14 +3,22 @@
 
 use std::{env, path::Path};
 
+use lighthouse_engine::{
+    FixPlan, active,
+    brief::{self, Target},
+};
 use lighthouse_model::{AgentKind, Attribution, Severity};
-use lighthouse_spec::{Catalog, Decision};
+use lighthouse_plugin::FixDecision;
+use lighthouse_spec::{Catalog, Decision, FixKind, FixScope};
 use lighthouse_store::{Filter, State, Store, Versions};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{Result, Selector, git::user_name, project::catalog_at, selector::long_enough};
+use crate::{
+    Result, Selector, Session, git::user_name, permit::permitted, project::catalog_at,
+    selector::long_enough,
+};
 
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
@@ -51,6 +59,20 @@ pub struct Listed {
     /// What opening the store skipped in the log, such as a last line an
     /// interrupted write cut short.
     pub notices: Vec<String>,
+}
+
+/// A finding as `review show` gives it: the record, and when the project lets
+/// a model fix its decision, the brief for whoever fixes it by hand or with an
+/// agent of their own (the `Finding` kind).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Shown {
+    #[serde(flatten)]
+    pub finding: FindingRecord,
+    /// What the fix of this finding is told, written as the prompt of an
+    /// `edit` run is: the decision, the finding, its scope and how the result
+    /// is checked. Present for the decisions `[fix] decisions` lists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brief: Option<String>,
 }
 
 /// Who a record is attributed to (PROV `wasAttributedTo`): `spec` is
@@ -119,6 +141,14 @@ pub fn show(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
     Ok(existing_store(root)?.finding(fingerprint)?)
 }
 
+/// The finding whose fingerprint starts with `fingerprint`, with its brief
+/// when `session` (the project, if it can be read) lists its decision.
+pub fn show_with_brief(root: &Path, session: Option<&Session>, fingerprint: &str) -> Result<Shown> {
+    let finding = show(root, fingerprint)?;
+    let brief = session.and_then(|session| brief_of(session, &finding));
+    Ok(Shown { finding, brief })
+}
+
 /// Every judgment recorded on a finding, oldest first.
 pub fn history(root: &Path, fingerprint: &str) -> Result<Vec<JudgmentEvent>> {
     long_enough(fingerprint)?;
@@ -162,6 +192,39 @@ pub fn resolve_all(root: &Path, reviews: &[NewJudgment]) -> Result<Vec<Result<Re
         .iter()
         .map(|review| record(&mut store, review))
         .collect())
+}
+
+/// The brief for fixing `finding`, if its decision is one a model may fix.
+fn brief_of(session: &Session, finding: &FindingRecord) -> Option<String> {
+    let permit = permitted(&session.config, &session.catalog, &|_| true).ok()?;
+    if !permit.ids.contains(&finding.decision) {
+        return None;
+    }
+    let decision = session.catalog.decision(&finding.decision)?;
+    let told = FixDecision {
+        id: decision.id().to_owned(),
+        requirement: decision.requirement.clone(),
+        context: decision.context.clone(),
+    };
+    let target = Target {
+        decision: &told,
+        instruction: match decision.fix.as_ref().map(|fix| &fix.kind) {
+            Some(FixKind::Model { prompt, .. }) => prompt.as_deref(),
+            _ => None,
+        },
+        examples: brief::examples_for(&decision.examples),
+        scope: FixScope::of_fix(decision.fix.as_ref(), session.config.fix_scope()),
+        message: &finding.message,
+        evidence: &finding.evidence,
+        place: format!("{}:{}:{}", finding.path, finding.line(), finding.col()),
+    };
+    let plan = FixPlan::from_catalog(&session.catalog);
+    let active = active(&session.config, session.catalog.projects()).ok()?;
+    let tools: Vec<&str> = plan
+        .safe_fixes(None)
+        .filter(|id| active.contains(*id))
+        .collect();
+    Some(brief::brief(&[target], &tools))
 }
 
 /// Whether a finding is a task of a listing: among the open ones, those that

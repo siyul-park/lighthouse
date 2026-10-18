@@ -5,9 +5,8 @@
 use std::sync::Arc;
 
 use lighthouse_plugin::{
-    Capabilities, ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest,
-    EditRequest, Error, FineTuningJob, Model, ModelClient, Registry, Supports, SystemOneRequest,
-    SystemOneResponse,
+    Capabilities, CreateFineTuningJobRequest, EditRequest, Error, FineTuningJob, Model,
+    ModelClient, Registry, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_protocol::hash;
 use lighthouse_spec::ModelProvider;
@@ -90,10 +89,6 @@ impl ModelClient for Refused {
         Err(self.failure())
     }
 
-    fn chat(&self, _: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
-        Err(self.failure())
-    }
-
     fn edit(&self, _: &EditRequest<'_>) -> Result<String, Error> {
         Err(self.failure())
     }
@@ -115,13 +110,6 @@ impl ModelClient for Plugin<'_> {
         asked.model.clone_from(&self.name);
         asked.options.clone_from(&self.options);
         self.model.classify(&asked)
-    }
-
-    fn chat(&self, request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
-        let mut asked = request.clone();
-        asked.body.model.clone_from(&self.name);
-        asked.options.clone_from(&self.options);
-        self.model.chat(&asked)
     }
 
     fn train(&self, request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
@@ -161,7 +149,6 @@ fn refused<'a>(name: &str, reason: String) -> Box<dyn ModelClient + 'a> {
             owned_by: name.to_owned(),
             capabilities: Capabilities {
                 classification: Some(Supports { supported: true }),
-                chat: Some(Supports { supported: true }),
                 ..Capabilities::default()
             },
             version: String::new(),

@@ -15,8 +15,6 @@ use crate::{Result, Selector, Session};
 pub enum Binding {
     /// `models.classification`: the model for decisions nothing else binds.
     Classification,
-    /// `models.chat`: the model that writes the fixes no rule derives.
-    Chat,
     /// `models.edit`: the agent that fixes by changing files.
     Edit,
     /// A rule of the configuration names it.
@@ -30,7 +28,7 @@ pub enum Binding {
 pub struct BoundModel {
     /// `<provider>/<model>`.
     pub model: String,
-    /// The decision it judges; none for the classification, chat and edit
+    /// The decision it judges; none for the classification and edit
     /// models.
     pub decision: Option<String>,
     pub binding: Binding,
@@ -63,9 +61,6 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
     if selector.is_empty() {
         for model in &bound.classification {
             bind(model, None, Binding::Classification);
-        }
-        for model in &bound.chat {
-            bind(model, None, Binding::Chat);
         }
         for model in &bound.edit {
             bind(model, None, Binding::Edit);

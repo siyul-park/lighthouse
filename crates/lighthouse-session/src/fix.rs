@@ -18,7 +18,10 @@ use lighthouse_spec::{Catalog, Decision};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{Result, Selector, Session, check::cache_limit, findings, selector::long_enough};
+use crate::{
+    Result, Selector, Session, check::cache_limit, findings, permit::permitted,
+    selector::long_enough,
+};
 
 /// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
 /// narrows a run from the whole project.
@@ -42,8 +45,8 @@ pub struct Selection {
     pub fixer: Option<String>,
     /// Record the run and its fixes, and leave out what judgments hide.
     pub store: bool,
-    /// What models may do. Fixes by a model ask the project's edit or chat
-    /// model unless `off`.
+    /// What models may do. Fixes by a model ask the project's `edit` agent
+    /// unless `off`.
     pub models: ModelOptions,
     /// Keep the answers of models in `.lighthouse/cache` and reuse them.
     pub cache: bool,
@@ -61,7 +64,7 @@ pub struct Fixed {
     /// How many times fixing was repeated until nothing was left.
     pub rounds: usize,
     /// Fixes by a model that the checks accepted and that were left for a
-    /// hand to apply (`approval.fix = "preview"`, or a failing `[fix] verify`
+    /// hand to apply (`approval.fix = "ask"`, or a failing `[fix] verify`
     /// command), each with its diff. Absent when there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub previews: Vec<Previewed>,
@@ -103,7 +106,7 @@ pub struct Models {
     /// Verified fixes left as previews.
     pub previewed: usize,
     /// Findings left as they were, by the class of the reason: `no-extent`,
-    /// `unanswered`, `out-of-scope`, `unparsed`, `unchanged`, `unresolved`,
+    /// `unanswered`, `out-of-scope`, `unchanged`, `unresolved`,
     /// `introduced`, `incomplete` or `rolled-back`.
     pub declined: BTreeMap<String, usize>,
 }
@@ -302,14 +305,15 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     let catalog = &session.catalog;
     let root = &session.root;
     let bound = session.config.models(catalog.projects())?;
-    let asks_model = !bound.chat.is_empty() || !bound.edit.is_empty();
-    let plan = FixPlan::from_catalog(catalog);
-    let plan = if asks_model {
-        plan.with_model_fixes(catalog)
-    } else {
-        plan
-    };
     let (engine, notices) = session.engine()?;
+    let permit = permitted(&session.config, catalog, &|id| engine.active(id))?;
+    let asks_model = !bound.edit.is_empty() && !permit.ids.is_empty();
+    let plan = FixPlan::from_catalog(catalog);
+    let plan = if permit.ids.is_empty() {
+        plan
+    } else {
+        plan.with_model_fixes(catalog, &permit.ids, session.config.fix_scope())
+    };
     let engine = engine.with_models(request.models.clone());
     // The answers of models are kept in the cache; a project that asks none
     // runs as it always did.
@@ -319,6 +323,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         engine
     };
     let mut messages = notices;
+    messages.extend(permit.warnings);
     let skip = suppressed(&engine, root, catalog, request.store)?;
     let run = FixRun {
         paths: request.targets.paths.clone(),

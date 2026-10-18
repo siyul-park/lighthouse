@@ -181,7 +181,6 @@ fn serves(registry: &Registry, provider: &ModelProvider, task: Task) -> bool {
         let capabilities = &model.manifest().capabilities;
         let capability = match task {
             Task::Classification => capabilities.classification,
-            Task::Chat => capabilities.chat,
             Task::Edit => None,
         };
         capability.is_some_and(|capability| capability.supported)
@@ -194,6 +193,6 @@ fn serves(registry: &Registry, provider: &ModelProvider, task: Task) -> bool {
 fn only_for(task: Task) -> &'static str {
     match task {
         Task::Edit => ": only a command without a protocol does",
-        Task::Classification | Task::Chat => "",
+        Task::Classification => "",
     }
 }

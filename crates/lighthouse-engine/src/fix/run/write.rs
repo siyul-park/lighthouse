@@ -160,7 +160,7 @@ impl Orchestrator<'_> {
             Some(models) => {
                 let usage = models.usage();
                 self.notes.extend(models.finish());
-                let edits = models.edits().then_some(EditUsage {
+                let edits = Some(EditUsage {
                     runs: usage.calls,
                     seconds: usage.time.as_secs_f64(),
                 });
