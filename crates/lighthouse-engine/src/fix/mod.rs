@@ -62,6 +62,9 @@ pub struct FixBinding {
     pub cap: Safety,
     /// The rule is mechanical: its safe fixes apply without asking.
     pub mechanical: bool,
+    /// The languages of the examples of the decision: where its fix is known
+    /// to apply.
+    pub languages: Vec<String>,
     /// The fixer runs a program, which needs the project's trust.
     pub runs_command: bool,
     pub decision: FixDecision,
@@ -78,9 +81,6 @@ pub struct FixPlan {
     /// What the rules whose fix is by a model add to the brief, and how far
     /// they may go.
     models: BTreeMap<String, ModelFix>,
-    /// The decisions with a safe fix of their own, and the languages of their
-    /// examples: the project applies those fixes to what an agent leaves.
-    safe: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl FixPlan {
@@ -94,17 +94,13 @@ impl FixPlan {
             if matches!(fix.kind, FixKind::Model { .. }) {
                 continue;
             }
-            if fix.safety == Safety::Safe && !matches!(fix.kind, FixKind::Rpc { .. }) {
-                let languages = decision.examples.iter().map(|e| e.language.clone());
-                plan.safe
-                    .insert(decision.id().to_owned(), languages.collect());
-            }
             plan.insert(
                 decision.id(),
                 FixBinding {
                     fixer: FixedBy::Fixer(decision.id().to_owned()),
                     cap: fix.safety,
                     mechanical: decision.severity == Some(Severity::Error),
+                    languages: languages_of(decision),
                     runs_command: matches!(fix.kind, FixKind::Command(_)),
                     decision: decision_of(decision),
                     unsupported: matches!(fix.kind, FixKind::Rpc { .. }).then(|| {
@@ -142,6 +138,7 @@ impl FixPlan {
                     fixer: FixedBy::Model,
                     cap: Safety::Suggested,
                     mechanical: false,
+                    languages: Vec::new(),
                     runs_command: false,
                     decision: decision_of(decision),
                     unsupported: None,
@@ -160,14 +157,9 @@ impl FixPlan {
         self.bindings.insert(rule.into(), binding);
     }
 
-    /// The decisions whose safe fixes the project applies after an agent, for
-    /// files in `language` (every language when `None`), in the order of
-    /// their ids.
-    pub fn safe_fixes(&self, language: Option<&str>) -> impl Iterator<Item = &str> {
-        self.safe
-            .iter()
-            .filter(move |(_, languages)| language.is_none_or(|l| languages.contains(l)))
-            .map(|(id, _)| id.as_str())
+    /// The rules with a fix, and how each is fixed, in the order of their ids.
+    pub fn bindings(&self) -> impl Iterator<Item = (&str, &FixBinding)> {
+        self.bindings.iter().map(|(rule, b)| (rule.as_str(), b))
     }
 
     /// How the findings of `rule` are fixed, if they are.
@@ -272,6 +264,16 @@ pub struct FixReport {
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
     pub finished: Run,
+}
+
+/// The languages of the examples of `decision`, sorted.
+fn languages_of(decision: &Decision) -> Vec<String> {
+    let languages: BTreeSet<&str> = decision
+        .examples
+        .iter()
+        .map(|e| e.language.as_str())
+        .collect();
+    languages.into_iter().map(str::to_owned).collect()
 }
 
 /// The decision as a fixer is told about it.

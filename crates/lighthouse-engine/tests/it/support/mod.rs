@@ -292,6 +292,7 @@ pub fn plan(fixer: &str, cap: Safety, mechanical: bool) -> FixPlan {
             fixer: FixedBy::Fixer(fixer.to_owned()),
             cap,
             mechanical,
+            languages: Vec::new(),
             decision: FixDecision {
                 id: "fake/todo".to_owned(),
                 requirement: String::new(),

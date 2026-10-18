@@ -3,6 +3,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -160,7 +161,9 @@ impl Orchestrator<'_> {
     }
 
     /// Keeps the preview of every fix by a model that stands, in case the run
-    /// leaves it for a hand to apply. `bases` holds the texts it changed.
+    /// leaves it for a hand to apply, or why it has none. `bases` holds the
+    /// texts the round changed; a file it left as it was has the text it
+    /// stands in for.
     fn preview_models(
         &mut self,
         kept: &[Proposal],
@@ -175,17 +178,33 @@ impl Orchestrator<'_> {
                 p.fixer == FixedBy::Model && !p.files.iter().any(|f| rolled.contains_key(f))
             });
         for p in standing {
-            if let Some(files) = preview_files(p, |file| bases.get(file).cloned()) {
-                self.previewable.insert(
-                    p.fingerprint.clone(),
-                    Preview {
+            let shown = preview_files(p, |file| {
+                bases
+                    .get(file)
+                    .cloned()
+                    .or_else(|| self.standing_text(file))
+            });
+            let kept = shown.map_or_else(
+                || {
+                    Err(DeclinedFix {
+                        fingerprint: p.fingerprint.clone(),
+                        rule_id: p.rule_id.clone(),
+                        file: p.file.clone(),
+                        line: p.line,
+                        reason: "left for review: its change could not be shown as a preview"
+                            .to_owned(),
+                    })
+                },
+                |files| {
+                    Ok(Preview {
                         fingerprint: p.fingerprint.clone(),
                         description: p.description.clone(),
                         safety: Safety::Suggested,
                         files,
-                    },
-                );
-            }
+                    })
+                },
+            );
+            self.previewable.insert(p.fingerprint.clone(), kept);
         }
     }
 
@@ -202,7 +221,17 @@ impl Orchestrator<'_> {
         }
     }
 
-    fn decline_proposal(&mut self, p: &Proposal, reason: String) {
+    /// The text `file` has now: the one that stands in for it, else the
+    /// one on disk.
+    fn standing_text(&self, file: &Path) -> Option<String> {
+        let root = &self.proposer.engine.ws.root;
+        self.texts
+            .get(file)
+            .cloned()
+            .or_else(|| fs::read_to_string(root.join(file)).ok())
+    }
+
+    pub(super) fn decline_proposal(&mut self, p: &Proposal, reason: String) {
         self.declined.insert(
             p.fingerprint.clone(),
             DeclinedFix {

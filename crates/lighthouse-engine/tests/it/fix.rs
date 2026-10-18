@@ -360,6 +360,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
             fixer: FixedBy::Fixer("grow/grow".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
+            languages: Vec::new(),
             decision: FixDecision {
                 id: "grow/todo".to_owned(),
                 requirement: String::new(),

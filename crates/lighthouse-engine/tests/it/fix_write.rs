@@ -93,6 +93,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
             fixer: FixedBy::Fixer("pair/both".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
+            languages: Vec::new(),
             decision: FixDecision {
                 id: "pair/todo".to_owned(),
                 requirement: String::new(),
@@ -242,6 +243,7 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
             fixer: FixedBy::Fixer("nested/todo".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
+            languages: Vec::new(),
             decision: FixDecision {
                 id: "nested/todo".to_owned(),
                 requirement: String::new(),
@@ -314,6 +316,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
             fixer: FixedBy::Fixer("plain/todo".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
+            languages: Vec::new(),
             decision: FixDecision {
                 id: "plain/todo".to_owned(),
                 requirement: String::new(),

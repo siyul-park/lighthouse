@@ -38,6 +38,9 @@ pub(super) struct Proposal {
     /// For a fix by a model, the place of its group in the chain of the
     /// pass: the later the group, the later it ran.
     pub(super) chain: usize,
+    /// For a fix by a model, the digest of each file it replaces as the run
+    /// found it: the edit applies only over that text.
+    pub(super) bases: BTreeMap<PathBuf, String>,
 }
 
 /// What a fix by a model must have achieved for the checks to keep it.
@@ -170,7 +173,7 @@ impl<'e> Proposer<'e> {
         proposals.extend(self.propose_edits(
             outcome,
             texts,
-            (&lowerer, &sources, &scopes),
+            (&sources, &scopes),
             asked_to_edit,
             &mut decline,
         )?);
@@ -236,6 +239,7 @@ impl<'e> Proposer<'e> {
                 fixer: FixedBy::Fixer(fixer.clone()),
                 cap: Safety::Suggested,
                 mechanical: false,
+                languages: Vec::new(),
                 runs_command: false,
                 unsupported: None,
                 decision: FixDecision {
@@ -352,6 +356,7 @@ impl<'e> Proposer<'e> {
                     files,
                     aim: Aim::Finding,
                     chain: 0,
+                    bases: BTreeMap::new(),
                 })
             }
         }

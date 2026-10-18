@@ -5,9 +5,12 @@
 
 use std::fmt::Write;
 
+use lighthouse_model::Safety;
 use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Example, ExampleKind, FixScope};
 use serde_json::Value;
+
+use super::{FixPlan, FixedBy};
 
 /// How many examples of a decision the brief shows at most.
 pub const MAX_EXAMPLES: usize = 2;
@@ -41,6 +44,18 @@ pub struct Target<'a> {
     pub evidence: &'a Value,
     /// `path:line:col`.
     pub place: String,
+}
+
+/// The decisions whose safe fixes the project applies to what an agent
+/// leaves in files of `language` (of every language when `None`), in the
+/// order of their ids: the tools the agent places code for.
+pub fn safe_fixes<'p>(plan: &'p FixPlan, language: Option<&str>) -> Vec<&'p str> {
+    plan.bindings()
+        .filter(|(_, b)| b.cap == Safety::Safe && matches!(b.fixer, FixedBy::Fixer(_)))
+        .filter(|(_, b)| b.unsupported.is_none())
+        .filter(|(_, b)| language.is_none_or(|l| b.languages.iter().any(|x| x == l)))
+        .map(|(rule, _)| rule)
+        .collect()
 }
 
 /// The brief for `targets`, the findings of one file in the order of their

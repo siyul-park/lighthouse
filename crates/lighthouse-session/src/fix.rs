@@ -106,7 +106,7 @@ pub struct Models {
     /// Verified fixes left as previews.
     pub previewed: usize,
     /// Findings left as they were, by the class of the reason: `no-extent`,
-    /// `unanswered`, `out-of-scope`, `unchanged`, `unresolved`,
+    /// `unanswered`, `out-of-scope`, `conflict`, `unchanged`, `unresolved`,
     /// `introduced`, `incomplete` or `rolled-back`.
     pub declined: BTreeMap<String, usize>,
 }
@@ -312,7 +312,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     let plan = if permit.ids.is_empty() {
         plan
     } else {
-        plan.with_model_fixes(catalog, &permit.ids, session.config.fix_scope())
+        plan.with_model_fixes(catalog, &permit.ids, session.config.fix().scope)
     };
     let engine = engine.with_models(request.models.clone());
     // The answers of models are kept in the cache; a project that asks none
@@ -323,7 +323,6 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         engine
     };
     let mut messages = notices;
-    messages.extend(permit.warnings);
     let skip = suppressed(&engine, root, catalog, request.store)?;
     let run = FixRun {
         paths: request.targets.paths.clone(),

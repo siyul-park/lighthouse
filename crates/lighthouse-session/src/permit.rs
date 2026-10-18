@@ -23,7 +23,7 @@ pub(crate) fn permitted(
     catalog: &Catalog,
     active: &dyn Fn(&str) -> bool,
 ) -> Result<Permitted> {
-    let selector = Selector::new(config.fix_decisions())?;
+    let selector = Selector::new(&config.fix().decisions)?;
     let known = catalog
         .decisions()
         .map(Decision::id)

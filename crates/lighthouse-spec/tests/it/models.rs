@@ -3,7 +3,7 @@
 
 use lighthouse_model::{Safety, Severity};
 use lighthouse_spec::{
-    Approval, CommandProtocol, Config, Evaluation, Fix, FixKind, FixScope, ModelCheck,
+    Approval, CommandProtocol, Config, Evaluation, Fix, FixKind, FixPolicy, FixScope, ModelCheck,
     ModelProvider, Models, Projects, Routing, Select, Subject, Task,
 };
 
@@ -351,9 +351,9 @@ fn edit_is_one_binding_of_the_project_and_fixes_are_asked_for_and_previewed_by_d
         ]
     );
     assert_eq!(config.approval(), Approval::Ask);
-    assert!(config.verify().is_empty());
-    assert!(config.fix_decisions().is_empty(), "no decision is listed");
-    assert_eq!(config.fix_scope(), FixScope::Files);
+    assert!(config.fix().verify.is_empty());
+    assert!(config.fix().decisions.is_empty(), "no decision is listed");
+    assert_eq!(config.fix().scope, FixScope::Files);
 }
 
 #[test]
@@ -385,12 +385,12 @@ fn approval_the_decisions_a_model_may_fix_and_the_commands_that_verify_them_are_
     )
     .unwrap();
     assert_eq!(config.approval(), Approval::Allow);
-    assert_eq!(config.fix_decisions(), ["design/exported-doc", "testing/*"]);
-    assert_eq!(config.fix_scope(), FixScope::Symbol);
-    assert_eq!(config.verify(), [["cargo", "test", "-q"]]);
-    assert_eq!(config.verify_timeout(), std::time::Duration::from_secs(600));
+    assert_eq!(config.fix().decisions, ["design/exported-doc", "testing/*"]);
+    assert_eq!(config.fix().scope, FixScope::Symbol);
+    assert_eq!(config.fix().verify, [["cargo", "test", "-q"]]);
+    assert_eq!(config.fix().timeout, std::time::Duration::from_secs(600));
     let slow = Config::parse_inline("plugins = []\n[fix]\ntimeout = \"20m\"\n").unwrap();
-    assert_eq!(slow.verify_timeout(), std::time::Duration::from_secs(1200));
+    assert_eq!(slow.fix().timeout, std::time::Duration::from_secs(1200));
 
     for (text, wanted) in [
         ("[approval]\nfix = \"always\"\n", "always"),
@@ -532,4 +532,15 @@ fn fix_scope_of_fix_is_the_projects_cap_unless_the_decision_declares_a_narrower_
         FixScope::of_fix(Some(&model(Some(FixScope::Symbol))), FixScope::Files),
         FixScope::Symbol
     );
+}
+
+#[test]
+fn fix_policy_is_the_fix_table_with_its_defaults() {
+    let config = Config::parse_inline("plugins = []\n").unwrap();
+
+    let policy: &FixPolicy = config.fix();
+
+    assert!(policy.decisions.is_empty() && policy.verify.is_empty());
+    assert_eq!(policy.scope, FixScope::Files);
+    assert_eq!(policy.timeout, std::time::Duration::from_secs(600));
 }

@@ -223,6 +223,28 @@ fn an_edit_that_fixes_none_of_its_findings_or_adds_a_warning_is_rolled_back_whol
 }
 
 #[test]
+fn a_finding_that_only_changed_its_fingerprint_with_a_rename_is_not_new() {
+    let target = finding("r", 3, Severity::Warn, "a");
+    let side = finding("design/other", 9, Severity::Warn, "old name");
+    let renamed = finding("design/other", 9, Severity::Warn, "new name");
+    let before = run(vec![target.clone(), side.clone()], Vec::new());
+    let verdict =
+        |after: Vec<Diagnostic>| judge(&[shared(&target)], &[], &before, &run(after, Vec::new()));
+
+    let kept = verdict(vec![renamed.clone()]);
+    assert!(kept.files.is_empty() && kept.own.is_empty(), "{kept:?}");
+
+    let twice = verdict(vec![
+        renamed.clone(),
+        finding("design/other", 12, Severity::Warn, "x"),
+    ]);
+    assert!(
+        twice.files[Path::new(FILE)].starts_with("introduced design/other"),
+        "{twice:?}"
+    );
+}
+
+#[test]
 fn a_new_finding_of_the_rule_stands_for_one_of_the_old_whose_fingerprint_changed() {
     let (a, b) = (
         finding("r", 3, Severity::Info, "a"),

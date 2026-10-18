@@ -25,8 +25,7 @@ use std::{
 
 pub use globset::GlobSet;
 
-use fixing::DEFAULT_VERIFY_TIMEOUT;
-pub use fixing::{Approval, ApprovalSpec, FixSpec};
+pub use fixing::{Approval, ApprovalSpec, FixPolicy, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
 use lighthouse_model::{Options, Severity};
 pub use lighthouse_process::Formatter;
@@ -41,7 +40,7 @@ pub use spec::{GeneratedCheck, OverrideSpec, ProjectSpec};
 
 pub(crate) use standard::standard;
 
-use crate::{Error, FixScope};
+use crate::Error;
 
 /// Name of the configuration file discovered in a project directory.
 pub const FILE_NAME: &str = "lighthouse.toml";
@@ -169,10 +168,7 @@ pub struct Config {
     generated_check: Option<GeneratedCheck>,
     models: Models,
     approval: Approval,
-    fix_decisions: Vec<String>,
-    fix_scope: FixScope,
-    verify: Vec<Vec<String>>,
-    verify_timeout: Duration,
+    fix: FixPolicy,
     extends: Vec<String>,
     rules: Rules,
     overrides: Vec<Override>,
@@ -275,10 +271,7 @@ impl Config {
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
             approval: spec.approval.fix.unwrap_or_default(),
-            fix_decisions: spec.fix.decisions,
-            fix_scope: spec.fix.scope.unwrap_or(FixScope::Files),
-            verify: spec.fix.verify,
-            verify_timeout: spec.fix.timeout.unwrap_or(DEFAULT_VERIFY_TIMEOUT),
+            fix: spec.fix.into(),
             extends: spec.extends,
             rules: rules(spec.rules),
             overrides,
@@ -392,25 +385,10 @@ impl Config {
         self.approval
     }
 
-    /// The decisions a model may fix: ids or globs over them; none when the
-    /// project lists none.
-    pub fn fix_decisions(&self) -> &[String] {
-        &self.fix_decisions
-    }
-
-    /// The widest change any fix by a model may make.
-    pub fn fix_scope(&self) -> FixScope {
-        self.fix_scope
-    }
-
-    /// The commands that must pass with the fixes by models in place.
-    pub fn verify(&self) -> &[Vec<String>] {
-        &self.verify
-    }
-
-    /// How long each of those commands may run.
-    pub fn verify_timeout(&self) -> time::Duration {
-        self.verify_timeout.get()
+    /// What the project allows of fixes by models: the decisions, the widest
+    /// change, and the commands that must pass after them.
+    pub fn fix(&self) -> &FixPolicy {
+        &self.fix
     }
 
     /// Project names named in `extends`, in declaration order.

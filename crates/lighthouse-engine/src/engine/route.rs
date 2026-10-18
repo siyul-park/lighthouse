@@ -119,6 +119,24 @@ impl Engine {
     }
 }
 
+#[cfg(test)]
+impl<'a> Route<'a> {
+    /// A route over `members`, in order, with no budget and no cache.
+    pub(crate) fn of(members: Vec<Member<'a>>) -> Self {
+        Self {
+            members,
+            routing: Routing::Ordered,
+            turn: AtomicUsize::new(0),
+            budget: AtomicUsize::new(usize::MAX),
+            cache: None,
+            memo: Mutex::default(),
+            failures: Mutex::default(),
+            spent: Mutex::default(),
+            notes: Mutex::default(),
+        }
+    }
+}
+
 impl Route<'_> {
     /// The answer of the first model of the order that gives one, and that
     /// model, `<provider>/<model>`. `key` is what a model's answer is kept

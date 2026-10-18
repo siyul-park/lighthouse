@@ -18,6 +18,7 @@ use lighthouse_spec::{Config, FILE_NAME};
 
 use crate::{
     Result,
+    permit::permitted,
     trust::{Basis, Program},
 };
 
@@ -167,7 +168,10 @@ impl Session {
             .with_incomplete(plugins.incomplete)
             .with_trust(self.trusted())
             .with_commands(commands);
-        Ok((engine, plugins.notices))
+        let listed = permitted(&self.config, &self.catalog, &|id| engine.active(id))?;
+        let mut notices = plugins.notices;
+        notices.extend(listed.warnings);
+        Ok((engine, notices))
     }
 
     /// The same project with another local layer, such as a candidate that
@@ -234,7 +238,7 @@ fn commands(config: &Config, catalog: &Catalog) -> Result<Vec<Program>> {
             argv: f.argv.clone(),
         })
         .collect();
-    for argv in config.verify() {
+    for argv in &config.fix().verify {
         found.push(Program {
             what: format!("fix verification: {}", argv.join(" ")),
             argv: argv.clone(),

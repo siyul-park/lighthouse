@@ -64,7 +64,7 @@ impl<'a> World<'a> {
         outcome: &'a Run,
         texts: &'a Overlays,
         scope: &'a Scopes,
-    ) -> Self {
+    ) -> Result<Self, String> {
         let mut files: Vec<(&Path, String)> = outcome
             .project
             .files
@@ -73,13 +73,15 @@ impl<'a> World<'a> {
             .map(|file| (file.path.as_path(), stand(texts, file)))
             .collect();
         files.sort_unstable();
-        Self {
+        let digest = digest_of(&files)
+            .map_err(|e| format!("the files of the project could not be digested: {e}"))?;
+        Ok(Self {
             root,
             outcome,
             texts,
             scope,
-            digest: digest_of(&files).unwrap_or_default(),
-        }
+            digest,
+        })
     }
 
     /// The text `path` has before the agent runs.
@@ -161,7 +163,13 @@ impl ModelFixer<'_> {
         self.count(batch, Event::Asked);
         let tools: Vec<&str> = batch.tools.iter().map(String::as_str).collect();
         let prompt = brief(&batch.targets, &tools);
-        let prompt_digest = digest_of(&prompt).unwrap_or_default();
+        let prompt_digest = match digest_of(&prompt) {
+            Ok(digest) => digest,
+            Err(e) => {
+                let reason = format!("the brief could not be digested: {e}");
+                return Err(self.decline_all(batch, Class::Unanswered, reason));
+            }
+        };
         let key = |_: &Member<'_>, model: &str| key(model, &prompt_digest, &world.digest);
         let call = |member: &Member<'_>| run(member, &prompt, world);
         let (attempt, model) = match self.route.through(&key, &call) {
@@ -246,10 +254,19 @@ fn run(member: &Member<'_>, prompt: &str, world: &World<'_>) -> Result<Attempt, 
     let changes = scratch
         .changes(world.root, world.texts)
         .map_err(|e| format!("the scratch copy of the project could not be read: {e}"))?;
-    let bases = changes
-        .keys()
-        .filter_map(|path| Some((path.clone(), hash::sha256(&world.text(path)?))))
-        .collect();
+    let mut bases = BTreeMap::new();
+    for (path, change) in &changes {
+        if *change == Change::Created {
+            continue;
+        }
+        let found = world.text(path).ok_or_else(|| {
+            format!(
+                "`{}`, which the agent changed, cannot be read",
+                path.display()
+            )
+        })?;
+        bases.insert(path.clone(), hash::sha256(&found));
+    }
     Ok(Attempt {
         changes,
         bases,

@@ -9,7 +9,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use lighthouse_model::{Diagnostic, Fingerprint, Severity};
@@ -49,7 +49,7 @@ pub(in crate::fix) fn judge(
     for proposal in kept.iter().filter(|p| p.fixer == FixedBy::Model) {
         match proposal.aim {
             Aim::Finding => {
-                if let Some((class, reason)) = flaw(proposal, after, &known) {
+                if let Some((class, reason)) = flaw(proposal, (before, after), &known) {
                     reject(&mut verdict, &[proposal], class, reason);
                 }
             }
@@ -90,7 +90,7 @@ fn judge_file(
     known: &BTreeSet<&Fingerprint>,
 ) {
     let reached = reach(&group[0].files, before, after);
-    if let Some((class, reason)) = regression(&reached, after, known) {
+    if let Some((class, reason)) = regression(&reached, (before, after), known) {
         return reject(verdict, group, class, reason);
     }
     let left = unresolved(group, after, known);
@@ -141,7 +141,7 @@ fn unresolved<'p>(
 /// holds the fingerprints of the findings before it.
 fn flaw(
     proposal: &Proposal,
-    after: &Run,
+    (before, after): (&Run, &Run),
     known: &BTreeSet<&Fingerprint>,
 ) -> Option<(Class, String)> {
     // A rewrite that keeps the problem can change the text a fingerprint
@@ -155,7 +155,7 @@ fn flaw(
     {
         return Some((Class::Unresolved, UNRESOLVED.to_owned()));
     }
-    regression(&proposal.files, after, known)
+    regression(&proposal.files, (before, after), known)
 }
 
 /// The findings of the check `after` in `files` that were not there before.
@@ -170,16 +170,17 @@ fn new_in<'a>(
         .filter(move |d| files.contains(&d.file) && !known.contains(&d.fingerprint))
 }
 
-/// A finding of error or warn severity that is new in `files`, or a gap in
-/// their analysis, after the check `after`.
+/// A decision with more findings of error or warn severity in a file of
+/// `files` after the check `after` than `before` it, or a gap in their
+/// analysis. Findings are counted, not matched by fingerprint: a fingerprint
+/// hashes the symbol path, so renaming a symbol would make all of its old
+/// findings look new.
 fn regression(
     files: &[PathBuf],
-    after: &Run,
+    (before, after): (&Run, &Run),
     known: &BTreeSet<&Fingerprint>,
 ) -> Option<(Class, String)> {
-    if let Some(new) =
-        new_in(files, after, known).find(|d| matches!(d.severity, Severity::Error | Severity::Warn))
-    {
+    if let Some(new) = introduced(files, (before, after), known) {
         return Some((
             Class::Introduced,
             format!("introduced {} at line {}", new.rule_id, new.span.start.line),
@@ -195,4 +196,44 @@ fn regression(
                 format!("analysis incomplete: {}", gap.reason),
             )
         })
+}
+
+/// The finding, of a decision that has more of error or warn severity in a
+/// file of `files` after the check than before it, that is not one of those
+/// of before when one of them is not; else the first of them.
+fn introduced<'a>(
+    files: &[PathBuf],
+    (before, after): (&Run, &'a Run),
+    known: &BTreeSet<&Fingerprint>,
+) -> Option<&'a Diagnostic> {
+    let mut held: BTreeMap<(&Path, &str), usize> = BTreeMap::new();
+    for d in loud_in(files, before) {
+        *held
+            .entry((d.file.as_path(), d.rule_id.as_str()))
+            .or_default() += 1;
+    }
+    let mut now: BTreeMap<(&Path, &str), Vec<&'a Diagnostic>> = BTreeMap::new();
+    for d in loud_in(files, after) {
+        now.entry((d.file.as_path(), d.rule_id.as_str()))
+            .or_default()
+            .push(d);
+    }
+    now.into_iter()
+        .filter(|(key, found)| found.len() > held.get(key).copied().unwrap_or(0))
+        .find_map(|(_, found)| {
+            found
+                .iter()
+                .find(|d| !known.contains(&d.fingerprint))
+                .or(found.first())
+                .copied()
+        })
+}
+
+/// The findings of error or warn severity of the check `run` in `files`.
+fn loud_in<'r>(files: &[PathBuf], run: &'r Run) -> Vec<&'r Diagnostic> {
+    run.diagnostics
+        .iter()
+        .filter(|d| files.contains(&d.file))
+        .filter(|d| matches!(d.severity, Severity::Error | Severity::Warn))
+        .collect()
 }

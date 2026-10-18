@@ -131,8 +131,8 @@ pub fn list(ctx: &Context, args: &ReviewListArgs, format: Format) -> Result<Repl
 
 /// `review show`.
 pub fn show(ctx: &Context, args: &FingerprintArgs, format: Format) -> Result<Reply> {
-    let session = ctx.session().ok();
-    let shown = review::show_with_brief(&ctx.root()?, session.as_ref(), &args.fingerprint)?;
+    let session = ctx.session()?;
+    let shown = review::show_with_brief(&ctx.root()?, Some(&session), &args.fingerprint)?;
     Reply::data(format, &shown, || detail(&shown))
 }
 

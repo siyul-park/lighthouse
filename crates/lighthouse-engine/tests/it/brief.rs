@@ -2,7 +2,7 @@
 
 use lighthouse_engine::{
     FixPlan,
-    brief::{MAX_EXAMPLES, examples_for},
+    brief::{MAX_EXAMPLES, examples_for, safe_fixes},
 };
 use lighthouse_spec::{Catalog, Example};
 use serde_json::json;
@@ -41,14 +41,26 @@ fn examples_for_keeps_the_invalid_examples_that_show_a_fix_and_at_most_the_limit
 }
 
 #[test]
-fn fix_plan_safe_fixes_are_the_decisions_with_a_safe_fix_in_the_language() {
+fn safe_fixes_are_the_decisions_with_a_safe_fix_in_the_language() {
     let plan = FixPlan::from_catalog(Catalog::bundled());
 
-    let rust: Vec<&str> = plan.safe_fixes(Some("rust")).collect();
-    let none: Vec<&str> = plan.safe_fixes(Some("cobol")).collect();
-    let any: Vec<&str> = plan.safe_fixes(None).collect();
+    let rust = safe_fixes(&plan, Some("rust"));
+    let none = safe_fixes(&plan, Some("cobol"));
+    let any = safe_fixes(&plan, None);
 
     assert!(rust.contains(&"design/declaration-groups"), "{rust:?}");
     assert!(none.is_empty(), "{none:?}");
     assert!(any.len() >= rust.len());
+}
+
+#[test]
+fn fix_plan_bindings_name_the_rules_with_a_fix_in_the_order_of_their_ids() {
+    let plan = FixPlan::from_catalog(Catalog::bundled());
+
+    let rules: Vec<&str> = plan.bindings().map(|(rule, _)| rule).collect();
+
+    let mut sorted = rules.clone();
+    sorted.sort_unstable();
+    assert_eq!(rules, sorted);
+    assert!(rules.contains(&"design/declaration-groups"));
 }

@@ -178,7 +178,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                 "minimum": 0,
                 "type": "integer"
               },
-              "description": "Findings left as they were, by the class of the reason: `no-extent`,\n`unanswered`, `out-of-scope`, `unchanged`, `unresolved`,\n`introduced`, `incomplete` or `rolled-back`.",
+              "description": "Findings left as they were, by the class of the reason: `no-extent`,\n`unanswered`, `out-of-scope`, `conflict`, `unchanged`, `unresolved`,\n`introduced`, `incomplete` or `rolled-back`.",
               "type": "object"
             },
             "previewed": {

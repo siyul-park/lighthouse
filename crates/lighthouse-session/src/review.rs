@@ -145,7 +145,10 @@ pub fn show(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
 /// when `session` (the project, if it can be read) lists its decision.
 pub fn show_with_brief(root: &Path, session: Option<&Session>, fingerprint: &str) -> Result<Shown> {
     let finding = show(root, fingerprint)?;
-    let brief = session.and_then(|session| brief_of(session, &finding));
+    let brief = match session {
+        Some(session) => brief_of(session, &finding)?,
+        None => None,
+    };
     Ok(Shown { finding, brief })
 }
 
@@ -195,12 +198,14 @@ pub fn resolve_all(root: &Path, reviews: &[NewJudgment]) -> Result<Vec<Result<Re
 }
 
 /// The brief for fixing `finding`, if its decision is one a model may fix.
-fn brief_of(session: &Session, finding: &FindingRecord) -> Option<String> {
-    let permit = permitted(&session.config, &session.catalog, &|_| true).ok()?;
+fn brief_of(session: &Session, finding: &FindingRecord) -> Result<Option<String>> {
+    let permit = permitted(&session.config, &session.catalog, &|_| true)?;
+    let Some(decision) = session.catalog.decision(&finding.decision) else {
+        return Ok(None);
+    };
     if !permit.ids.contains(&finding.decision) {
-        return None;
+        return Ok(None);
     }
-    let decision = session.catalog.decision(&finding.decision)?;
     let told = FixDecision {
         id: decision.id().to_owned(),
         requirement: decision.requirement.clone(),
@@ -213,18 +218,18 @@ fn brief_of(session: &Session, finding: &FindingRecord) -> Option<String> {
             _ => None,
         },
         examples: brief::examples_for(&decision.examples),
-        scope: FixScope::of_fix(decision.fix.as_ref(), session.config.fix_scope()),
+        scope: FixScope::of_fix(decision.fix.as_ref(), session.config.fix().scope),
         message: &finding.message,
         evidence: &finding.evidence,
         place: format!("{}:{}:{}", finding.path, finding.line(), finding.col()),
     };
     let plan = FixPlan::from_catalog(&session.catalog);
-    let active = active(&session.config, session.catalog.projects()).ok()?;
-    let tools: Vec<&str> = plan
-        .safe_fixes(None)
+    let active = active(&session.config, session.catalog.projects())?;
+    let tools: Vec<&str> = brief::safe_fixes(&plan, None)
+        .into_iter()
         .filter(|id| active.contains(*id))
         .collect();
-    Some(brief::brief(&[target], &tools))
+    Ok(Some(brief::brief(&[target], &tools)))
 }
 
 /// Whether a finding is a task of a listing: among the open ones, those that

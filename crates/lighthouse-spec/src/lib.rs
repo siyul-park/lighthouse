@@ -35,9 +35,10 @@ pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, l
 pub use pack::{Pack, Section};
 pub(crate) use pack::{PackSpec, SectionSpec};
 pub use project::{
-    Approval, ApprovalSpec, CommandProtocol, Config, Evaluation, FILE_NAME, FixSpec, Formatter,
-    GeneratedCheck, GlobSet, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec,
-    Projects, RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, Task, glob_set,
+    Approval, ApprovalSpec, CommandProtocol, Config, Evaluation, FILE_NAME, FixPolicy, FixSpec,
+    Formatter, GeneratedCheck, GlobSet, Level, ModelProvider, Models, OverrideSpec, PluginRef,
+    ProjectSpec, Projects, RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, Task,
+    glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 

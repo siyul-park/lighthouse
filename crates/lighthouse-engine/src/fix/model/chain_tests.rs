@@ -2,21 +2,30 @@
 //! accepted with, and an edit made over texts that are not there any more is a
 //! conflict. And the files a change reaches.
 
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::Mutex};
 
-use lighthouse_model::ucm::{
-    Edge, EdgeKind, File, Fragment, FunctionSummary, Node, Project, Resolution, Signature, Symbol,
-    Target, TypeRef,
+use lighthouse_model::{
+    Severity,
+    ucm::{
+        Edge, EdgeKind, File, Fragment, FunctionSummary, Node, Project, Resolution, Signature,
+        Symbol, Target, TypeRef,
+    },
 };
+use lighthouse_plugin::{Capabilities, EditRequest, Error, FixDecision, Model, ModelClient};
 use lighthouse_protocol::hash;
+use lighthouse_spec::FixScope;
 
 use super::{
+    Account, ModelFixer,
     edit::{World, conflict},
     reach::reach,
     scratch::Scratch,
-    tests::{FILE, run, symbol},
+    tests::{FILE, finding, run, symbol},
 };
-use crate::{Overlays, Run, engine::Scopes};
+use crate::{
+    Overlays, Run,
+    engine::{Member, Route, Scopes},
+};
 
 fn function(name: &str, file: &str, result: &str) -> (Symbol, FunctionSummary) {
     let mut symbol = symbol(name, (1, 1), 2);
@@ -120,7 +129,7 @@ fn a_run_sees_the_edits_accepted_before_it_and_a_stale_result_is_a_conflict() {
         "the copy of the second run holds what the first was accepted with"
     );
 
-    let world = World::new(root.path(), &outcome, &first, &scope);
+    let world = World::new(root.path(), &outcome, &first, &scope).unwrap();
     let found = |text: &str| BTreeMap::from([(PathBuf::from(FILE), hash::sha256(text))]);
     assert_eq!(conflict(&found("first run\n"), &world), None);
     let stale = conflict(&found("disk\n"), &world).unwrap();
@@ -128,4 +137,93 @@ fn a_run_sees_the_edits_accepted_before_it_and_a_stale_result_is_a_conflict() {
         stale.contains(FILE) && stale.contains("earlier edit"),
         "{stale}"
     );
+}
+
+/// An agent that leaves `agent` in the file of the project.
+struct Agent(Model);
+
+impl ModelClient for Agent {
+    fn manifest(&self) -> &Model {
+        &self.0
+    }
+
+    fn edit(&self, request: &EditRequest<'_>) -> Result<String, Error> {
+        fs::write(request.dir.join(FILE), "agent\n").map_err(|e| Error::Failed(e.to_string()))?;
+        Ok(String::new())
+    }
+}
+
+fn agent() -> Agent {
+    Agent(Model {
+        id: "agent/m".to_owned(),
+        object: "model".to_owned(),
+        created: 0,
+        owned_by: "agent".to_owned(),
+        capabilities: Capabilities::default(),
+        version: "1".to_owned(),
+        deterministic: false,
+        abstains: false,
+        cost: 0.0,
+    })
+}
+
+fn indexed(hash: &str) -> Run {
+    let file = File {
+        path: FILE.into(),
+        lang: "go".to_owned(),
+        hash: hash.to_owned(),
+        generated: false,
+        test: false,
+    };
+    Run {
+        project: Project::merge([Fragment {
+            files: vec![file],
+            ..Fragment::default()
+        }]),
+        ..Run::default()
+    }
+}
+
+#[test]
+fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_conflict() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join(FILE), "disk\n").unwrap();
+    let outcome = indexed("h");
+    let texts = Overlays::new();
+    let (scope, _) = Scopes::new(&[], root.path()).unwrap();
+    let fixes = BTreeMap::new();
+    let fixer = ModelFixer {
+        route: Route::of(vec![Member {
+            client: Box::new(agent()),
+        }]),
+        fixes: &fixes,
+        account: Account::default(),
+        said: Mutex::default(),
+    };
+    let finding = finding("r", 1, Severity::Warn, "a");
+    let decision = FixDecision {
+        id: "r".to_owned(),
+        requirement: String::new(),
+        context: String::new(),
+    };
+    let batch = fixer.batch(
+        std::path::Path::new(FILE),
+        &[(&finding, &decision, None)],
+        Vec::new(),
+    );
+    let world = || World::new(root.path(), &outcome, &texts, &scope).unwrap();
+
+    let first = fixer.edit(&batch, &world()).unwrap();
+    assert_eq!(first.texts[std::path::Path::new(FILE)], "agent\n");
+
+    // The file changes while the digest of the files stays the one the answer
+    // is kept under, as when an earlier edit of the pass was not kept.
+    fs::write(root.path().join(FILE), "moved\n").unwrap();
+    let reason = fixer.edit(&batch, &world()).err().expect("a conflict");
+
+    assert!(reason.contains("not as the agent found it"), "{reason}");
+    assert_eq!(fixer.scope_of("r"), FixScope::Files);
+    let counts = &fixer.account.counts()["r"];
+    assert_eq!(counts.declined["conflict"], 1, "{counts:?}");
+    assert_eq!(counts.asked, 2);
 }

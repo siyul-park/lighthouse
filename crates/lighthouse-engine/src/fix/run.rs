@@ -1,3 +1,4 @@
+mod chain;
 mod rollback;
 mod settle;
 mod write;
@@ -13,9 +14,10 @@ use lighthouse_spec::Approval;
 
 use super::{
     AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, FixedBy, MAX_ROUNDS, PreviewedFix,
-    model::{Class, Event, run_verify},
-    propose::{Phase, Proposer},
+    model::run_verify,
+    propose::{Phase, Proposal, Proposer},
 };
+use chain::{Links, Mark};
 
 use crate::{Engine, Error, Overlays, Run};
 
@@ -36,7 +38,7 @@ pub(super) struct Orchestrator<'e> {
     rounds: usize,
     /// The previews of the fixes by a model that stand applied in `texts`,
     /// by fingerprint: those the run withholds are reported.
-    previewable: BTreeMap<Fingerprint, Preview>,
+    previewable: BTreeMap<Fingerprint, Result<Preview, DeclinedFix>>,
     /// Fixes by a model that were accepted and are left for a hand.
     previews: Vec<PreviewedFix>,
 }
@@ -151,35 +153,70 @@ impl Orchestrator<'_> {
         if proposals.is_empty() {
             return Ok(outcome);
         }
-        let chain: BTreeMap<Fingerprint, usize> = proposals
+        let links: Links = proposals
             .iter()
             .filter(|p| p.fixer == FixedBy::Model)
             .map(|p| (p.fingerprint.clone(), p.chain))
             .collect();
-        let before = (self.texts.clone(), self.original.clone(), self.rounds);
-        let checked = self.apply_round(&outcome, proposals, before.2 + 1)?;
-        if !self.applied.iter().any(|a| a.fixer == FixedBy::Model) {
+        let start = self.mark();
+        let (marks, current) = self.apply_chain(&outcome, proposals, start.2 + 1)?;
+        if !self.has_model_fix() {
             return Ok(outcome);
         }
         if !self.permitted() {
-            self.withdraw(before);
+            self.withdraw(start);
             return Ok(outcome);
         }
         let mut rolled = false;
         while let Some(why) = self.failing_verify() {
-            if !self.roll_back_newest(&outcome, &chain, &before, &why) {
+            if !self.roll_back_newest(&outcome, &links, &marks, &why) {
                 break;
             }
             rolled = true;
         }
-        if !self.applied.iter().any(|a| a.fixer == FixedBy::Model) {
-            self.rounds = before.2;
+        if !self.has_model_fix() {
+            self.rounds = start.2;
             return Ok(outcome);
         }
-        match checked {
+        match current {
             Some(checked) if !rolled => Ok(checked),
             _ => self.proposer.engine.check_overlaid(&[], &[], &self.texts),
         }
+    }
+
+    /// Applies the links of the chain in `proposals` one at a time, each over
+    /// what the ones before it left and judged by itself. The state before
+    /// each, by link, and the check of the last state that changed.
+    fn apply_chain(
+        &mut self,
+        outcome: &Run,
+        proposals: Vec<Proposal>,
+        round: usize,
+    ) -> Result<(BTreeMap<usize, Mark>, Option<Run>), Error> {
+        let mut links: BTreeMap<usize, Vec<Proposal>> = BTreeMap::new();
+        for p in proposals {
+            links.entry(p.chain).or_default().push(p);
+        }
+        let mut marks = BTreeMap::new();
+        let mut current: Option<Run> = None;
+        for (number, link) in links {
+            let link = self.made_over_standing(link);
+            if link.is_empty() {
+                continue;
+            }
+            let mark = self.mark();
+            let before = current.as_ref().unwrap_or(outcome);
+            let checked = self.apply_round(before, link, round)?;
+            let changed = self.texts != mark.0;
+            marks.insert(number, mark);
+            if changed {
+                current = Some(match checked {
+                    Some(checked) => checked,
+                    None => self.proposer.engine.check_overlaid(&[], &[], &self.texts)?,
+                });
+            }
+        }
+        Ok((marks, current))
     }
 
     /// Whether the run may write the fixes by a model: `--unsafe-fixes`, or
@@ -192,7 +229,7 @@ impl Orchestrator<'_> {
     /// run, if they do not.
     fn failing_verify(&self) -> Option<String> {
         let engine = self.proposer.engine;
-        let commands = engine.config.verify();
+        let commands = &engine.config.fix().verify;
         if commands.is_empty() {
             return None;
         }
@@ -205,95 +242,9 @@ impl Orchestrator<'_> {
             &engine.ws.root,
             &self.texts,
             commands,
-            engine.config.verify_timeout(),
+            engine.config.fix().timeout,
         )
         .err()
-    }
-
-    /// Undoes the newest group of the chain among the fixes by a model that
-    /// stand, and declines its findings with `why`. False when none stands.
-    fn roll_back_newest(
-        &mut self,
-        outcome: &Run,
-        chain: &BTreeMap<Fingerprint, usize>,
-        before: &(Overlays, BTreeMap<PathBuf, (String, String)>, usize),
-        why: &str,
-    ) -> bool {
-        let newest = self
-            .applied
-            .iter()
-            .filter(|a| a.fixer == FixedBy::Model)
-            .filter_map(|a| chain.get(&a.fingerprint))
-            .max()
-            .copied();
-        let Some(newest) = newest else {
-            return false;
-        };
-        let (undone, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
-            .into_iter()
-            .partition(|a| a.fixer == FixedBy::Model && chain.get(&a.fingerprint) == Some(&newest));
-        self.applied = rest;
-        let reason = format!("rolled back: {why}");
-        for fix in &undone {
-            for file in &fix.files {
-                match before.0.get(file) {
-                    Some(text) => self.texts.insert(file.clone(), text.clone()),
-                    None => self.texts.remove(file),
-                };
-                match before.1.get(file) {
-                    Some(first) => self.original.insert(file.clone(), first.clone()),
-                    None => self.original.remove(file),
-                };
-            }
-            self.previewable.remove(&fix.fingerprint);
-            self.proposer
-                .note_model(&fix.rule_id, Event::Declined(Class::RolledBack));
-            if let Some(finding) = outcome
-                .diagnostics
-                .iter()
-                .find(|d| d.fingerprint == fix.fingerprint)
-            {
-                self.declined.insert(
-                    fix.fingerprint.clone(),
-                    DeclinedFix {
-                        fingerprint: fix.fingerprint.clone(),
-                        rule_id: fix.rule_id.clone(),
-                        file: finding.file.clone(),
-                        line: finding.span.start.line,
-                        reason: reason.clone(),
-                    },
-                );
-            }
-        }
-        let files: Vec<String> = undone
-            .iter()
-            .flat_map(|fix| &fix.files)
-            .map(|f| f.display().to_string())
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        self.notes
-            .push(format!("rolled back {}: {why}", files.join(", ")));
-        true
-    }
-
-    /// Puts the texts back as they were before the fixes by a model, and
-    /// moves those fixes from applied to previews.
-    fn withdraw(&mut self, before: (Overlays, BTreeMap<PathBuf, (String, String)>, usize)) {
-        (self.texts, self.original, self.rounds) = before;
-        let (models, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
-            .into_iter()
-            .partition(|a| a.fixer == FixedBy::Model);
-        self.applied = rest;
-        for fix in models {
-            if let Some(preview) = self.previewable.remove(&fix.fingerprint) {
-                self.proposer.note_model(&fix.rule_id, Event::Previewed);
-                self.previews.push(PreviewedFix {
-                    rule_id: fix.rule_id,
-                    preview,
-                });
-            }
-        }
     }
 
     /// A hash of every text the run holds, which two rounds share only when

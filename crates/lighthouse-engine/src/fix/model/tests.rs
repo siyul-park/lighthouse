@@ -1,7 +1,11 @@
 //! The fix by a model: the extent an agent may change, and how its result is
 //! judged.
 
-use std::{collections::BTreeSet, fs, path::PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::PathBuf,
+};
 
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Position, Safety, Severity, Span,
@@ -138,6 +142,7 @@ pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
         files: vec![finding.file.clone()],
         aim: Aim::Finding,
         chain: 0,
+        bases: BTreeMap::new(),
     }
 }
 

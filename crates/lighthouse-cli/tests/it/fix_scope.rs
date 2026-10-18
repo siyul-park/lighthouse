@@ -1,7 +1,8 @@
 //! Who may have a finding fixed by a model, and how far the change may go:
-//! `[fix] decisions`, the scope of the fix, the chain of runs of a pass and
-//! the brief of a review task. The agent is a small shell script that edits
-//! the files of its working directory, so no real agent is run.
+//! `[fix] decisions`, the scope of the fix and the brief of a review task.
+//! The chain of runs of a pass is in `fix_chain`. The agent is a small shell
+//! script that edits the files of its working directory, so no real agent is
+//! run.
 
 use std::fs;
 
@@ -15,11 +16,11 @@ use crate::{
     models_plugin::{fingerprints, lighthouse},
 };
 
-const BAN: &str = "local/naming-ban";
+pub(crate) const BAN: &str = "local/naming-ban";
 
 /// The decision of `models.rs` with the fix block of a model that may go to
 /// any file.
-const WIDE: &str = r#"apiVersion: lighthouse/v1alpha1
+pub(crate) const WIDE: &str = r#"apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: local/naming-ban
@@ -52,38 +53,43 @@ spec:
 "#;
 
 /// The file named by the first `Where:` line of the prompt, fixed.
-const FIX_OWN_FILE: &str = "prompt=$(cat)\nfile=$(printf '%s\\n' \"$prompt\" | sed -n 's/^Where: \\([^:]*\\):.*/\\1/p' | head -1)\nsed 's/bad_one/fixed_one/' \"$file\" > \"$file.new\" && mv \"$file.new\" \"$file\"\n";
+pub(crate) const FIX_OWN_FILE: &str = "prompt=$(cat)\nfile=$(printf '%s\\n' \"$prompt\" | sed -n 's/^Where: \\([^:]*\\):.*/\\1/p' | head -1)\nsed 's/bad_one/fixed_one/' \"$file\" > \"$file.new\" && mv \"$file.new\" \"$file\"\n";
 
 /// `models` and `fix` tables of a project that lists the decision, with
 /// `fix` among the lines of the `[fix]` table.
-fn listed(fix: &str, approval: &str) -> String {
+pub(crate) fn listed(fix: &str, approval: &str) -> String {
     format!("{approval}[fix]\ndecisions = [\"{BAN}\"]\n{fix}")
 }
 
 /// A project that binds `edit` to `agent`, with `rest` after the `models`
 /// tables; and the directory the script lives in.
-fn with_agent(agent: &str, rest: &str) -> (TempDir, TempDir) {
+pub(crate) fn with_agent(agent: &str, rest: &str) -> (TempDir, TempDir) {
+    agent_project("", agent, rest)
+}
+
+/// The same, with `rules` among the entries of the `rules` table.
+pub(crate) fn agent_project(rules: &str, agent: &str, rest: &str) -> (TempDir, TempDir) {
     let scripts = tempfile::tempdir().unwrap();
     write(scripts.path(), "agent.sh", agent);
     let script = scripts.path().join("agent.sh");
     let dir = project(&format!(
-        "[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{rest}",
+        "{rules}[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{rest}",
         script.to_str().unwrap()
     ));
     (dir, scripts)
 }
 
-fn fix(dir: &TempDir, arguments: Value) -> Value {
+pub(crate) fn fix(dir: &TempDir, arguments: Value) -> Value {
     let mut arguments = arguments;
     arguments["decision"] = json!([BAN]);
     Client::trusting(dir.path()).tool("fix", arguments).unwrap()
 }
 
-fn read(dir: &TempDir, name: &str) -> String {
+pub(crate) fn read(dir: &TempDir, name: &str) -> String {
     fs::read_to_string(dir.path().join(name)).unwrap()
 }
 
-const ALLOW: &str = "[approval]\nfix = \"allow\"\n";
+pub(crate) const ALLOW: &str = "[approval]\nfix = \"allow\"\n";
 
 #[test]
 fn nothing_binds_and_nothing_is_listed_so_a_fix_run_is_what_it_was() {
@@ -243,50 +249,6 @@ fn the_scope_of_the_project_caps_a_decision_that_may_go_to_files() {
     );
 }
 
-/// Two modules with a banned function each, and a shared file.
-fn chain_project(agent: &str, rest: &str) -> (TempDir, TempDir) {
-    let (dir, scripts) = with_agent(agent, rest);
-    write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
-    write(dir.path(), "src/lib.rs", "mod a;\nmod b;\nmod shared;\n");
-    write(dir.path(), "src/a.rs", "pub fn bad_one() {}\n");
-    write(dir.path(), "src/b.rs", "pub fn bad_one() {}\n");
-    write(dir.path(), "src/shared.rs", "// log\n");
-    (dir, scripts)
-}
-
-#[test]
-fn a_later_run_starts_from_what_the_earlier_ones_were_accepted_with() {
-    let agent = format!("{FIX_OWN_FILE}echo '// run' >> src/shared.rs\n");
-    let (dir, _agent) = chain_project(&agent, &listed("", ALLOW));
-
-    let fixed = fix(&dir, json!({}));
-
-    assert_eq!(read(&dir, "src/a.rs"), "pub fn fixed_one() {}\n");
-    assert_eq!(read(&dir, "src/b.rs"), "pub fn fixed_one() {}\n");
-    assert_eq!(
-        read(&dir, "src/shared.rs"),
-        "// log\n// run\n// run\n",
-        "the second run saw what the first wrote"
-    );
-    assert_eq!(fixed["usage"]["edit"]["runs"], 2, "{fixed}");
-    assert_eq!(fixed["applied"].as_array().unwrap().len(), 2, "{fixed}");
-}
-
-#[test]
-fn a_failing_verify_rolls_the_newest_run_back_and_keeps_the_ones_before() {
-    let verify = "verify = [[\"sh\", \"-c\", \"! grep -q fixed_one src/b.rs\"]]\n";
-    let (dir, _agent) = chain_project(FIX_OWN_FILE, &listed(verify, ALLOW));
-
-    let fixed = fix(&dir, json!({}));
-
-    assert_eq!(read(&dir, "src/a.rs"), "pub fn fixed_one() {}\n");
-    assert_eq!(read(&dir, "src/b.rs"), "pub fn bad_one() {}\n");
-    assert_eq!(fixed["applied"].as_array().unwrap().len(), 1, "{fixed}");
-    let reason = fixed["declined"][0]["reason"].as_str().unwrap();
-    assert!(reason.starts_with("rolled back"), "{reason}");
-    assert_eq!(fixed["models"][BAN]["declined"], json!({"rolled-back": 1}));
-}
-
 #[test]
 fn a_glob_that_matches_no_decision_is_a_warning_naming_it() {
     let dir = project("[fix]\ndecisions = [\"nonesuch/*\", \"local/naming-ban\"]\n");
@@ -297,6 +259,12 @@ fn a_glob_that_matches_no_decision_is_a_warning_naming_it() {
     let messages = fixed["messages"].to_string();
     assert!(messages.contains("lists `nonesuch/*`"), "{messages}");
     assert!(!messages.contains("lists `local/naming-ban`"), "{messages}");
+
+    // It is said where the project is loaded, so `check` says it too.
+    let out = lighthouse(dir.path(), &["check", "--no-cache"]);
+    let text =
+        String::from_utf8_lossy(&out.stdout).to_string() + &String::from_utf8_lossy(&out.stderr);
+    assert!(text.contains("lists `nonesuch/*`"), "{text}");
 }
 
 #[test]
@@ -398,103 +366,6 @@ fn unsafe_fixes_and_a_dry_run_apply_to_fixes_by_a_model_as_to_any_other() {
     let done = fix(&dir, json!({"unsafeFixes": true}));
     assert_eq!(done["applied"].as_array().unwrap().len(), 1, "{done}");
     assert_eq!(read(&dir, "src/lib.rs"), "pub fn fixed_one() {}\n");
-}
-
-/// An error decision with a safe fix of its own: a helper named `zzz_helper`
-/// is renamed, the way a reorder puts code where a rule wants it.
-const TIDY: &str = r#"apiVersion: lighthouse/v1alpha1
-kind: Decision
-metadata:
-  name: local/helper-name
-spec:
-  title: Helper name
-  context: A helper has the name the project gives it.
-  scope: { subject: symbol }
-  requirement: A helper MUST NOT be named zzz_helper.
-  severity: error
-  check:
-    type: cel
-    where: symbol.kind == "function" && symbol.name == "zzz_helper"
-    message: "{{ symbol.name }} is misnamed"
-  fix:
-    type: ops
-    safety: safe
-    ops:
-      - op: replace
-        file: finding.file
-        span: finding.span
-        text: pub fn aaa_helper() {}
-  examples:
-    - name: bad
-      language: rust
-      kind: invalid
-      files: [{ path: src/lib.rs, body: "pub fn zzz_helper() {}\n" }]
-      fixed: [{ path: src/lib.rs, body: "pub fn aaa_helper() {}\n" }]
-      expect: [{ line: 1 }]
-    - name: good
-      language: rust
-      kind: valid
-      files: [{ path: src/lib.rs, body: "pub fn aaa_helper() {}\n" }]
-"#;
-
-/// A project whose agent fixes the banned function and adds a misnamed
-/// helper, which the safe fix of `local/helper-name` renames; and the file
-/// the agent keeps its brief in.
-fn settled_project(approval: &str) -> (TempDir, TempDir, std::path::PathBuf) {
-    let scripts = tempfile::tempdir().unwrap();
-    let told = scripts.path().join("told");
-    let keep = format!(
-        "prompt=$(cat)\nprintf '%s\\n' \"$prompt\" > {:?}\n",
-        told.to_str().unwrap()
-    );
-    let agent = format!(
-        "{}printf 'pub fn zzz_helper() {{}}\\n' >> src/lib.rs\n",
-        FIX_OWN_FILE.replacen("prompt=$(cat)\n", &keep, 1)
-    );
-    write(scripts.path(), "agent.sh", &agent);
-    let script = scripts.path().join("agent.sh");
-    let dir = project(&format!(
-        "\"local/helper-name\" = \"error\"\n[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}",
-        script.to_str().unwrap(),
-        listed("", approval)
-    ));
-    write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
-    write(dir.path(), ".lighthouse/decisions/tidy.yaml", TIDY);
-    write(dir.path(), "src/lib.rs", "pub fn bad_one() {}\n");
-    (dir, scripts, told)
-}
-
-#[test]
-fn the_safe_fixes_of_the_project_run_on_an_edit_before_it_is_judged() {
-    let (dir, _agent, told) = settled_project(ALLOW);
-
-    let fixed = fix(&dir, json!({}));
-
-    assert_eq!(
-        read(&dir, "src/lib.rs"),
-        "pub fn fixed_one() {}\npub fn aaa_helper() {}\n",
-        "{fixed}"
-    );
-    assert_eq!(fixed["models"][BAN]["verified"], 1, "{fixed}");
-    assert_eq!(fixed["models"][BAN]["applied"], 1, "{fixed}");
-    let brief = fs::read_to_string(&told).unwrap();
-    assert!(
-        brief.contains("The project's tools fix these after you")
-            && brief.contains("local/helper-name"),
-        "{brief}"
-    );
-}
-
-#[test]
-fn the_preview_of_an_edit_shows_the_text_the_safe_fixes_left() {
-    let (dir, _agent, _told) = settled_project("");
-
-    let fixed = fix(&dir, json!({}));
-
-    assert_eq!(read(&dir, "src/lib.rs"), "pub fn bad_one() {}\n");
-    let preview = fixed["previews"][0].to_string();
-    assert!(preview.contains("aaa_helper"), "{preview}");
-    assert!(!preview.contains("zzz_helper"), "{preview}");
 }
 
 #[test]

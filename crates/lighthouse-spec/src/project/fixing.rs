@@ -38,6 +38,32 @@ impl ApprovalSpec {
     }
 }
 
+/// What a project allows of fixes by models, as it resolves: the `fix` table
+/// with its defaults.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixPolicy {
+    /// The decisions a model may fix: ids or globs over them; none when the
+    /// project lists none.
+    pub decisions: Vec<String>,
+    /// The widest change any fix by a model may make.
+    pub scope: FixScope,
+    /// The commands that must pass with the fixes by models in place.
+    pub verify: Vec<Vec<String>>,
+    /// How long each of those commands may run.
+    pub timeout: std::time::Duration,
+}
+
+impl From<FixSpec> for FixPolicy {
+    fn from(spec: FixSpec) -> Self {
+        Self {
+            decisions: spec.decisions,
+            scope: spec.scope.unwrap_or(FixScope::Files),
+            verify: spec.verify,
+            timeout: spec.timeout.unwrap_or(DEFAULT_VERIFY_TIMEOUT).get(),
+        }
+    }
+}
+
 /// The `fix` table of a project.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

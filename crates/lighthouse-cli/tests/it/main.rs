@@ -10,6 +10,7 @@ mod command_sarif;
 mod environment;
 mod explore;
 mod fix;
+mod fix_chain;
 mod fix_edit;
 mod fix_scope;
 mod fix_trust;
