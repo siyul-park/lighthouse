@@ -64,6 +64,14 @@ pub struct Registered {
     pub incomplete: Vec<Incomplete>,
 }
 
+/// A listed plugin that is part of the project, and the program it runs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalPlugin {
+    pub id: String,
+    /// The executable and its arguments, as they are started.
+    pub argv: Vec<String>,
+}
+
 /// A listed plugin whose handshake failed: registered without languages so the
 /// configuration stays valid, while its gap is reported as incomplete.
 struct Unavailable(lighthouse_plugin::PluginManifest);
@@ -137,14 +145,6 @@ pub fn register(
         })?;
     }
     Ok(registered)
-}
-
-/// A listed plugin that is part of the project, and the program it runs.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LocalPlugin {
-    pub id: String,
-    /// The executable and its arguments, as they are started.
-    pub argv: Vec<String>,
 }
 
 /// The listed plugins that live inside the project at `root`
