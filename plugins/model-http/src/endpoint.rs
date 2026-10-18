@@ -1,7 +1,13 @@
 //! How a provider is reached, from the `options` of its declaration.
 
+use std::time::Duration;
+
 use lighthouse_protocol::ErrorObject;
+use lighthouse_resource::Duration as Span;
 use serde_json::{Map, Value};
+
+/// How long a request may take when the provider does not say.
+const TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug, PartialEq)]
 pub struct Endpoint {
@@ -11,11 +17,14 @@ pub struct Endpoint {
     pub key_env: Option<String>,
     /// Merged shallowly into every request body; its keys override.
     pub extra_body: Map<String, Value>,
+    /// How long one request may take.
+    pub timeout: Duration,
 }
 
 impl Endpoint {
     /// Reads the options of a provider: `protocol` (one name or a list),
-    /// `baseUrl`, `keyEnv` and `extraBody`.
+    /// `baseUrl`, `keyEnv`, `extraBody` and `timeout` (a duration such as
+    /// `10m`).
     pub fn of(options: &Map<String, Value>) -> Result<Self, ErrorObject> {
         let text = |key: &str| options.get(key).and_then(Value::as_str).map(str::to_owned);
         let protocols = match options.get("protocol") {
@@ -27,6 +36,13 @@ impl Endpoint {
                 .collect(),
             _ => return Err("the provider declares no `protocol`".into()),
         };
+        let timeout = match text("timeout") {
+            Some(span) => span
+                .parse::<Span>()
+                .map_err(|e| format!("`timeout`: {e}"))?
+                .get(),
+            None => TIMEOUT,
+        };
         Ok(Self {
             protocols,
             base_url: text("baseUrl").ok_or("the provider declares no `baseUrl`")?,
@@ -36,6 +52,7 @@ impl Endpoint {
                 .and_then(Value::as_object)
                 .cloned()
                 .unwrap_or_default(),
+            timeout,
         })
     }
 
@@ -72,6 +89,7 @@ impl Endpoint {
             base_url: base_url.to_owned(),
             key_env: None,
             extra_body: Map::new(),
+            timeout: TIMEOUT,
         }
     }
 }
@@ -94,6 +112,21 @@ mod tests {
         })))
         .unwrap();
         assert_eq!(endpoint.extra_body["max_tokens"], 1024);
+    }
+
+    #[test]
+    fn the_endpoint_reads_the_timeout_and_defaults_to_two_minutes() {
+        let read = |timeout: Option<&str>| {
+            let mut declared = json!({"protocol": "openai", "baseUrl": "https://x"});
+            if let Some(timeout) = timeout {
+                declared["timeout"] = json!(timeout);
+            }
+            Endpoint::of(&options(declared))
+        };
+        assert_eq!(read(None).unwrap().timeout, Duration::from_secs(120));
+        assert_eq!(read(Some("10m")).unwrap().timeout, Duration::from_secs(600));
+        assert_eq!(read(Some("90s")).unwrap().timeout, Duration::from_secs(90));
+        assert!(read(Some("soon")).is_err());
     }
 
     #[test]

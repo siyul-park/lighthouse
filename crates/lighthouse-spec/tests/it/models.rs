@@ -109,6 +109,20 @@ fn a_provider_is_reached_by_url_command_or_plugin_and_openai_is_built_in() {
 }
 
 #[test]
+fn a_timeout_reaches_model_http_as_a_duration_and_is_absent_without_one() {
+    let ModelProvider::Rpc { options, .. } =
+        provider("protocol = \"openai\"\nbaseUrl = \"https://x/v1\"\ntimeout = \"10m\"\n")
+    else {
+        panic!("a baseUrl provider is a model-http provider");
+    };
+    assert_eq!(options["timeout"], "10m");
+    let ModelProvider::Rpc { options, .. } = binding().provider("openrouter").unwrap() else {
+        panic!("a baseUrl provider is a model-http provider");
+    };
+    assert!(!options.contains_key("timeout"));
+}
+
+#[test]
 fn local_is_built_in_and_costs_nothing_and_cannot_be_declared() {
     let ModelProvider::Rpc {
         plugin,
@@ -370,9 +384,9 @@ fn approval_and_the_commands_that_verify_fixes_are_read_and_checked() {
 
 #[test]
 fn a_field_of_another_reach_is_refused() {
-    let timeout = invalid("protocol = \"openai\"\ntimeout = \"5s\"\n");
+    let timeout = invalid("plugin = \"model-local\"\ntimeout = \"5s\"\n");
     assert!(
-        timeout.contains("`baseUrl` provider has no `timeout`"),
+        timeout.contains("`plugin` provider has no `timeout`"),
         "{timeout}"
     );
     let options = invalid("protocol = \"typesafe\"\ncommand = [\"run\"]\noptions = { a = 1 }\n");

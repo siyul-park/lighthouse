@@ -536,7 +536,7 @@
           "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification)\nor `openai` (it serves `chat`), or plain text without a `protocol`\n(it serves `chat` and `edit`); a `plugin` must not name one: its\nhandshake says what it serves."
         },
         "timeout": {
-          "description": "`command` only: how long one run may take, such as `90s`. Default: 120s\n(10m for `edit`).",
+          "description": "How long one request may take, such as `90s`: a run of a `command`\n(default 120s, 10m for `edit`) or an HTTP request of a `baseUrl`\nprovider (default 120s; reasoning models may need `10m`). A `plugin`\nprovider has none: a plugin is not told one.",
           "type": [
             "string",
             "null"

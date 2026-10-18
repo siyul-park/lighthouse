@@ -1,5 +1,7 @@
 //! A client for tests: records what it is asked and answers with the next reply.
 
+use std::time::Duration;
+
 use lighthouse_protocol::ErrorObject;
 use serde_json::Value;
 
@@ -26,7 +28,13 @@ impl Recording {
 }
 
 impl Client for Recording {
-    fn post(&self, url: &str, _: Option<&str>, body: &Value) -> Result<Value, ErrorObject> {
+    fn post(
+        &self,
+        url: &str,
+        _: Option<&str>,
+        body: &Value,
+        _: Duration,
+    ) -> Result<Value, ErrorObject> {
         self.asked
             .lock()
             .unwrap()

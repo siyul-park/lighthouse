@@ -10,8 +10,6 @@ use std::time::Duration;
 use lighthouse_protocol::ErrorObject;
 use serde_json::Value;
 
-/// How long a request may take.
-const TIMEOUT: Duration = Duration::from_secs(120);
 /// How many times a busy service is asked again.
 const RETRIES: usize = 3;
 /// The longest a service may ask to wait.
@@ -19,10 +17,16 @@ const MAX_PAUSE: Duration = Duration::from_secs(60);
 
 /// Something that posts a JSON body and gives the JSON that answers.
 pub trait Client: Sync {
-    /// Posts `body` to `url`, with `key` as the bearer when there is one. An
-    /// error status fails with the error body the service answered, which
-    /// travels as the `data` of the JSON-RPC error.
-    fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, ErrorObject>;
+    /// Posts `body` to `url`, with `key` as the bearer when there is one, giving
+    /// up after `timeout`. An error status fails with the error body the
+    /// service answered, which travels as the `data` of the JSON-RPC error.
+    fn post(
+        &self,
+        url: &str,
+        key: Option<&str>,
+        body: &Value,
+        timeout: Duration,
+    ) -> Result<Value, ErrorObject>;
 }
 
 /// The client over the network: one agent, so connections are reused.
@@ -33,7 +37,6 @@ pub struct Http {
 impl Http {
     pub fn new() -> Self {
         let agent = ureq::Agent::config_builder()
-            .timeout_global(Some(TIMEOUT))
             .http_status_as_error(false)
             .build()
             .into();
@@ -42,10 +45,16 @@ impl Http {
 }
 
 impl Client for Http {
-    fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, ErrorObject> {
+    fn post(
+        &self,
+        url: &str,
+        key: Option<&str>,
+        body: &Value,
+        timeout: Duration,
+    ) -> Result<Value, ErrorObject> {
         let mut pause = Duration::from_secs(1);
         for _ in 0..RETRIES {
-            match post(&self.agent, url, key, body) {
+            match post(&self.agent, url, key, body, timeout) {
                 Err(refused) if matches!(refused.status, Some(429 | 503 | 529)) => {
                     let wait = refused
                         .retry_after
@@ -57,7 +66,7 @@ impl Client for Http {
                 other => return other.map_err(|refused| refused.error),
             }
         }
-        post(&self.agent, url, key, body).map_err(|refused| refused.error)
+        post(&self.agent, url, key, body, timeout).map_err(|refused| refused.error)
     }
 }
 
@@ -78,8 +87,18 @@ fn unreached(e: ureq::Error) -> Refused {
     }
 }
 
-fn post(agent: &ureq::Agent, url: &str, key: Option<&str>, body: &Value) -> Result<Value, Refused> {
-    let mut call = agent.post(url);
+fn post(
+    agent: &ureq::Agent,
+    url: &str,
+    key: Option<&str>,
+    body: &Value,
+    timeout: Duration,
+) -> Result<Value, Refused> {
+    let mut call = agent
+        .post(url)
+        .config()
+        .timeout_global(Some(timeout))
+        .build();
     if let Some(key) = key {
         call = call.header("Authorization", &format!("Bearer {key}"));
     }

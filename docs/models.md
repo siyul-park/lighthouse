@@ -104,6 +104,7 @@ protocol = "openai"
 baseUrl = "https://openrouter.ai/api/v1"
 keyEnv = "OPENROUTER_API_KEY"
 cost = 1
+# timeout = "10m"                 # per request, default 120s; reasoning models may need it
 
 [models.providers.ollama]         # Ollama, LM Studio (:1234) and llama-server (:8080) alike
 protocol = "openai"

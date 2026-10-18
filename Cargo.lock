@@ -2022,6 +2022,7 @@ version = "0.1.0"
 dependencies = [
  "async-openai",
  "lighthouse-protocol",
+ "lighthouse-resource",
  "serde",
  "serde_json",
  "ureq",

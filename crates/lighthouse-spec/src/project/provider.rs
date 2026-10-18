@@ -111,8 +111,10 @@ pub struct ProviderSpec {
     /// What one answer costs. Default: 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
-    /// `command` only: how long one run may take, such as `90s`. Default: 120s
-    /// (10m for `edit`).
+    /// How long one request may take, such as `90s`: a run of a `command`
+    /// (default 120s, 10m for `edit`) or an HTTP request of a `baseUrl`
+    /// provider (default 120s; reasoning models may need `10m`). A `plugin`
+    /// provider has none: a plugin is not told one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
     /// `command` only: variables the program is given besides the allowlist.
@@ -284,6 +286,9 @@ impl ProviderSpec {
         if let Some(extra) = &self.extra_body {
             options.insert("extraBody".to_owned(), Value::Object(extra.clone()));
         }
+        if let Some(timeout) = self.timeout {
+            options.insert("timeout".to_owned(), Value::from(timeout.to_string()));
+        }
         Ok(ModelProvider::Rpc {
             plugin: HTTP_PLUGIN.to_owned(),
             options,
@@ -331,6 +336,7 @@ impl ProviderSpec {
         only(
             "a `plugin` provider",
             &[
+                ("timeout", self.timeout.is_some()),
                 ("protocol", self.protocol.is_some()),
                 ("keyEnv", self.key_env.is_some()),
                 ("extraBody", self.extra_body.is_some()),
@@ -344,9 +350,8 @@ impl ProviderSpec {
     }
 
     /// The fields only a `command` has, and whether each is given.
-    fn command_only(&self) -> [(&'static str, bool); 3] {
+    fn command_only(&self) -> [(&'static str, bool); 2] {
         [
-            ("timeout", self.timeout.is_some()),
             ("env", !self.env.is_empty()),
             ("pointer", self.pointer.is_some()),
         ]

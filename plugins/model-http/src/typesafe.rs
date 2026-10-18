@@ -20,6 +20,7 @@ pub fn systemone(
         &endpoint.url(SYSTEM_ONE.path),
         endpoint.key()?.as_deref(),
         &body,
+        endpoint.timeout,
     )?;
     serde_json::from_value(response)
         .map_err(|e| format!("the response does not fit System One's: {e}").into())

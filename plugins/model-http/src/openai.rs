@@ -29,6 +29,7 @@ pub fn create_chat_completion(
         &endpoint.url("chat/completions"),
         endpoint.key()?.as_deref(),
         &body,
+        endpoint.timeout,
     )?;
     if let Some(error) = response.get("error").filter(|e| !e.is_null()) {
         return Err(ErrorObject::with_data(
