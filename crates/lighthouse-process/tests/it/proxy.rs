@@ -25,6 +25,7 @@ fn a_name_matches_itself_in_any_case_and_a_suffix_matches_what_is_below_it() {
     let list = names(&["api.example.com", "*.cdn.test", "127.0.0.1:8080"]);
 
     assert!(allows(&list, "API.example.com", 443));
+    assert!(allows(&list, "API.example.com", 80));
     assert!(allows(&list, "a.cdn.test", 443));
     assert!(allows(&list, "a.b.cdn.test", 443));
     assert!(!allows(&list, "cdn.test", 443), "a suffix is what is below");
@@ -35,6 +36,11 @@ fn a_name_matches_itself_in_any_case_and_a_suffix_matches_what_is_below_it() {
         !allows(&list, "127.0.0.1", 8081),
         "a listed port is the only one"
     );
+    assert!(
+        !allows(&list, "api.example.com", 22),
+        "a name alone is 80 and 443"
+    );
+    assert!(!allows(&list, "a.cdn.test", 8443));
 }
 
 #[test]
@@ -72,7 +78,7 @@ fn a_connect_to_a_host_below_a_listed_suffix_passes_the_list() {
     let proxy = Proxy::start(&names(&["*.example.test"])).unwrap();
 
     let refused = ask(&proxy, "CONNECT other.test:443 HTTP/1.1\r\n\r\n");
-    let listed = ask(&proxy, "CONNECT api.example.test:1 HTTP/1.1\r\n\r\n");
+    let listed = ask(&proxy, "CONNECT api.example.test:443 HTTP/1.1\r\n\r\n");
 
     assert!(refused.starts_with("HTTP/1.1 403"), "{refused}");
     assert!(
@@ -89,7 +95,7 @@ fn a_plain_request_in_absolute_form_is_forwarded_by_host() {
     let forwarded = ask(
         &proxy,
         &format!(
-            "GET http://127.0.0.1:{port}/x HTTP/1.1\r\nHost: a\r\nProxy-Connection: keep-alive\r\n\r\n"
+            "GET http://127.0.0.1:{port}/x HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nProxy-Connection: keep-alive\r\n\r\n"
         ),
     );
     let refused = ask(
@@ -109,4 +115,67 @@ fn a_request_that_is_not_for_a_proxy_is_a_bad_request() {
     let answer = ask(&proxy, "GET /path HTTP/1.1\r\n\r\n");
 
     assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
+}
+
+#[test]
+fn a_host_with_odd_characters_is_a_bad_request_and_is_never_recorded() {
+    let proxy = Proxy::start(&names(&["*.test"])).unwrap();
+
+    for target in [
+        "a\tb.test:443",
+        "a%0d.test:443",
+        "a\u{e9}.test:443",
+        "a_b.test:443",
+    ] {
+        let answer = ask(&proxy, &format!("CONNECT {target} HTTP/1.1\r\n\r\n"));
+        assert!(answer.starts_with("HTTP/1.1 400"), "{target}: {answer}");
+    }
+    let bracketed = ask(&proxy, "CONNECT [::1]:443 HTTP/1.1\r\n\r\n");
+
+    assert!(bracketed.starts_with("HTTP/1.1 403"), "{bracketed}");
+    assert_eq!(proxy.blocked(), ["::1"]);
+}
+
+#[test]
+fn a_plain_request_whose_host_header_names_another_host_is_a_bad_request() {
+    let port = server();
+    let proxy = Proxy::start(&names(&[&format!("127.0.0.1:{port}")])).unwrap();
+
+    let answer = ask(
+        &proxy,
+        &format!("GET http://127.0.0.1:{port}/ HTTP/1.1\r\nHost: evil.test\r\n\r\n"),
+    );
+
+    assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
+}
+
+#[test]
+fn the_hosts_it_refuses_are_kept_up_to_a_hundred_and_the_rest_are_counted() {
+    let proxy = Proxy::start(&[]).unwrap();
+
+    for n in 0..103 {
+        ask(
+            &proxy,
+            &format!("CONNECT h{n:03}.test:443 HTTP/1.1\r\n\r\n"),
+        );
+    }
+
+    let blocked = proxy.blocked();
+    assert_eq!(blocked.len(), 101, "{blocked:?}");
+    assert_eq!(blocked[0], "h000.test");
+    assert_eq!(blocked[100], "and 3 more");
+}
+
+#[test]
+fn clients_past_the_limit_are_turned_away_while_the_others_wait() {
+    let proxy = Proxy::start(&names(&["a.test"])).unwrap();
+    let held: Vec<TcpStream> = (0..64)
+        .map(|_| TcpStream::connect(("127.0.0.1", proxy.port())).unwrap())
+        .collect();
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    let answer = ask(&proxy, "CONNECT a.test:443 HTTP/1.1\r\n\r\n");
+
+    assert!(answer.starts_with("HTTP/1.1 503"), "{answer}");
+    drop(held);
 }

@@ -196,7 +196,7 @@ fn through_proxy(port: u16) -> String {
             head -n 1 <&3 | tr -d '\r'
             exec 3<&-
         }}
-        ask 'GET http://127.0.0.1:{port}/ HTTP/1.1\r\nHost: a\r\n\r\n'
+        ask 'GET http://127.0.0.1:{port}/ HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n'
         ask 'CONNECT localhost:{port} HTTP/1.1\r\n\r\n'
         (exec 3<>/dev/tcp/127.0.0.1/{port}) 2>/dev/null && echo went-around
         echo done
