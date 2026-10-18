@@ -36,7 +36,7 @@ pub(crate) fn read(dir: &TempDir, name: &str) -> String {
 
 /// A Go project with the design and testing rules; `None` after a skip
 /// message when there is no Go toolchain.
-fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
+pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
     let plugin = lighthouse_test_support::lang_go()?;
     let dir = tempfile::tempdir().unwrap();
     let local = if files

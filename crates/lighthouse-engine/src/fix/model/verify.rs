@@ -199,8 +199,9 @@ fn regression(
 }
 
 /// The finding, of a decision that has more of error or warn severity in a
-/// file of `files` after the check than before it, that is not one of those
-/// of before when one of them is not; else the first of them.
+/// file of `files` after the check than before it, counted per (file, rule)
+/// like `run::rollback`'s `worse`, that is not one of those of before when one
+/// of them is not; else the first of them.
 fn introduced<'a>(
     files: &[PathBuf],
     (before, after): (&Run, &'a Run),

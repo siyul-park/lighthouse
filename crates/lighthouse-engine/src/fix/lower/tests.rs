@@ -263,6 +263,39 @@ fn reorder_leaves_declarations_it_does_not_list_in_their_places() {
     );
 }
 
+const GROUPED: &str = "// modes\nconst (\n    a = 1\n    b = 2\n)\n\nfn c() {}\n\nfn d() {}\n";
+const GROUPED_SYMBOLS: &[(&str, u32, u32)] = &[("a", 3, 3), ("b", 4, 4), ("c", 7, 7), ("d", 9, 9)];
+
+#[test]
+fn reorder_moves_a_parenthesized_declaration_whole_with_its_comment() {
+    let case = case(GROUPED, GROUPED_SYMBOLS, vec![]);
+    let op = EditOp::Reorder {
+        owner: Owner::File(FILE.into()),
+        order: vec![id("c"), id("a"), id("b"), id("d")],
+    };
+
+    assert_eq!(
+        case.run(&[op]).unwrap(),
+        "fn c() {}\n\n// modes\nconst (\n    a = 1\n    b = 2\n)\n\nfn d() {}\n"
+    );
+}
+
+#[test]
+fn reorder_declines_a_parenthesized_declaration_whose_specs_are_ordered_apart() {
+    let case = case(GROUPED, GROUPED_SYMBOLS, vec![]);
+    let op = EditOp::Reorder {
+        owner: Owner::File(FILE.into()),
+        order: vec![id("b"), id("c"), id("a"), id("d")],
+    };
+
+    let why = case.run(&[op]).unwrap_err();
+
+    assert!(
+        why.contains("`b`: a grouped declaration mixes groups, `a` is ordered apart"),
+        "{why}"
+    );
+}
+
 #[test]
 fn reorder_sorts_each_block_on_its_own() {
     let text = "fn b() {}\n\nimpl X {\n    fn d() {}\n\n    fn c() {}\n}\n\nfn a() {}\n";

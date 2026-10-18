@@ -293,12 +293,13 @@ pub(super) fn kept_proposals(
 }
 
 /// The changed files whose check got worse: more findings of error or warn
-/// severity for some rule and owner (the symbol, or the file for a finding with
-/// none; a fingerprint can change when code moves, its owner does not), or a new
-/// gap in the analysis. A change that cannot be pinned on one file (a gap with
-/// no path, a finding in an untouched file) condemns them all.
+/// severity for some rule in a file, wherever in it (a finding that moves to
+/// another symbol of the file is not new, as `model::verify`'s `introduced`
+/// counts it), or a new gap in the analysis. A change that cannot be pinned on
+/// one file (a gap with no path, a finding in an untouched file) condemns them
+/// all.
 pub(super) fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<PathBuf, String> {
-    type Key<'a> = (&'a Path, &'a str, &'a str);
+    type Key<'a> = (&'a Path, &'a str);
     fn count(run: &Run) -> BTreeMap<Key<'_>, usize> {
         let mut counts = BTreeMap::new();
         let loud = run
@@ -306,9 +307,8 @@ pub(super) fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<
             .iter()
             .filter(|d| matches!(d.severity, Severity::Error | Severity::Warn));
         for d in loud {
-            let owner = d.symbol.as_deref().unwrap_or_default();
             *counts
-                .entry((d.file.as_path(), d.rule_id.as_str(), owner))
+                .entry((d.file.as_path(), d.rule_id.as_str()))
                 .or_insert(0) += 1;
         }
         counts
@@ -321,7 +321,7 @@ pub(super) fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<
         if known.get(key).copied().unwrap_or(0) >= *now {
             continue;
         }
-        let (file, rule, _) = key;
+        let (file, rule) = key;
         let reason = format!("it introduced a finding of {rule}");
         if changed.iter().any(|c| c.as_path() == *file) {
             bad.entry(file.to_path_buf()).or_insert(reason);

@@ -6,6 +6,7 @@ mod cache_digests;
 mod cache_store;
 mod engine;
 mod fix;
+mod fix_judge;
 mod fix_safety;
 mod fix_write;
 mod models;

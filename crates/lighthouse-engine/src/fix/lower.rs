@@ -163,12 +163,13 @@ pub(crate) struct Sources<'a> {
 }
 
 /// A declaration located in its file: the symbol, the whole lines its extent
-/// fills and the bracket it sits in.
+/// fills, the bracket it sits in and, for one of a parenthesized group, where
+/// that closes.
 struct Block {
     symbol: Symbol,
     lines: Range<usize>,
     container: Option<usize>,
-    group: bool,
+    group: Option<usize>,
 }
 
 impl<'a> Lowerer<'a> {
@@ -268,7 +269,7 @@ impl<'a> Lowerer<'a> {
         if moved.symbol.id == beside.symbol.id {
             return Err("a declaration cannot be moved next to itself".to_owned());
         }
-        if moved.group || beside.group {
+        if moved.group.is_some() || beside.group.is_some() {
             return Err(format!(
                 "`{}` is one of a parenthesized group, whose order is part of its meaning",
                 moved.symbol.name
@@ -326,15 +327,13 @@ impl<'a> Lowerer<'a> {
             return Err("the declarations to reorder do not share the named owner".to_owned());
         }
         let text = self.sources.text(&file)?;
+        let blocks = self.units(blocks)?;
         let mut containers: BTreeMap<Option<usize>, Vec<&Block>> = BTreeMap::new();
         for block in &blocks {
             containers.entry(block.container).or_default().push(block);
         }
         let mut edits = Vec::new();
         for group in containers.values() {
-            if group.iter().any(|b| b.group) {
-                continue;
-            }
             let mut slots: Vec<&Block> = group.clone();
             slots.sort_by_key(|b| b.lines.start);
             if slots.windows(2).any(|w| w[0].lines.end > w[1].lines.start) {
@@ -356,6 +355,68 @@ impl<'a> Lowerer<'a> {
             }
         }
         Ok(edits)
+    }
+
+    /// `blocks` as the reorder moves them: the specs of a parenthesized
+    /// declaration are one block, the declaration from its keyword line, with
+    /// the comment lines that lead it, to its closing paren, put where its first
+    /// spec is listed. Its specs must be listed together and in file order, or
+    /// the order asks to split it, and the reorder is declined.
+    fn units(&self, blocks: Vec<Block>) -> Result<Vec<Block>, String> {
+        let mut units = Vec::new();
+        let mut first: BTreeMap<usize, String> = BTreeMap::new();
+        let mut previous: Option<(usize, usize)> = None;
+        for block in blocks {
+            let (Some(open), Some(close)) = (block.container, block.group) else {
+                units.push(block);
+                previous = None;
+                continue;
+            };
+            let follows = previous.is_some_and(|(p, start)| p == open && start < block.lines.start);
+            previous = Some((open, block.lines.start));
+            if let Some(name) = first.get(&open) {
+                if follows {
+                    continue;
+                }
+                return Err(format!(
+                    "`{name}`: a grouped declaration mixes groups, `{}` is ordered apart from it; split it",
+                    block.symbol.name
+                ));
+            }
+            first.insert(open, block.symbol.name.clone());
+            units.push(self.unit(block, open, close)?);
+        }
+        Ok(units)
+    }
+
+    /// The parenthesized declaration with the paren `open`..`close`, in place
+    /// of its spec `spec`.
+    fn unit(&self, spec: Block, open: usize, close: usize) -> Result<Block, String> {
+        let file = &spec.symbol.file;
+        let text = self.sources.text(file)?;
+        let mut start = text[..open].rfind('\n').map_or(0, |n| n + 1);
+        let end = line_end_after(&text, close + 1);
+        if text[start..open].split_whitespace().count() != 1 || code_follows(&text[close + 1..end])
+        {
+            return Err(format!(
+                "`{}` is one of a parenthesized group that shares its lines with other code",
+                spec.symbol.name
+            ));
+        }
+        while start > 0 {
+            let above = text[..start - 1].rfind('\n').map_or(0, |n| n + 1);
+            if !text[above..start].trim_start().starts_with("//") {
+                break;
+            }
+            start = above;
+        }
+        let container = self.sources.containers(file)?.at(open).open;
+        Ok(Block {
+            lines: start..end,
+            container,
+            group: None,
+            ..spec
+        })
     }
 
     fn rename(&self, id: &SymbolId, name: &str) -> Result<Vec<TextEdit>, String> {

@@ -10,9 +10,9 @@
 pub(crate) struct Container {
     /// Offset of the opening bracket; `None` at file level.
     pub open: Option<usize>,
-    /// A `(` group, such as Go's `const ( ... )` block: its members depend on
-    /// their place and are never moved.
-    pub group: bool,
+    /// The closing paren of a `(` group, such as Go's `const ( ... )` block:
+    /// its members depend on their place and are never moved one by one.
+    pub group: Option<usize>,
 }
 
 struct Frame {
@@ -99,7 +99,7 @@ impl Containers {
         let inner = at.map(|n| &self.frames[n]);
         Container {
             open: inner.map(|f| f.open),
-            group: inner.is_some_and(|f| f.group),
+            group: inner.filter(|f| f.group).map(|f| f.close),
         }
     }
 }
