@@ -158,7 +158,29 @@ command = ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-che
 timeout = "10m"
 ```
 
-Both recipes use the narrowest permission the tool offers for editing files in its working
+```toml
+[models]
+edit = "oc/nim/z-ai/glm-5.3"        # provider oc; opencode's own model is nim/z-ai/glm-5.3
+[models.providers.oc]
+command = ["opencode", "run", "--pure", "--model", "{model}"]   # the prompt arrives on stdin
+keyEnv = "NVIDIA_API_KEY"           # passed through; opencode reads it as {env:NVIDIA_API_KEY}
+timeout = "10m"
+[models.providers.oc.env]
+OPENCODE_DISABLE_PROJECT_CONFIG = "1"   # only the configuration below applies
+OPENCODE_CONFIG_CONTENT = '''
+{"permission": {"*": "deny", "read": "allow", "list": "allow", "glob": "allow", "grep": "allow", "edit": "allow"},
+ "provider": {"nim": {"npm": "@ai-sdk/openai-compatible",
+   "options": {"baseURL": "https://integrate.api.nvidia.com/v1", "apiKey": "{env:NVIDIA_API_KEY}"},
+   "models": {"z-ai/glm-5.3": {}}}}}
+'''
+```
+
+The opencode recipe allows only the file tools through its `permission` table, in the configuration
+it is given instead of the project's, and `--pure` runs it without external plugins. The provider
+block is any OpenAI-compatible service; the key stays in the environment. Never add `--auto`: it
+approves every permission request.
+
+The `claude` and `codex` recipes use the narrowest permission the tool offers for editing files in its working
 directory: `claude -p` (prompt on stdin) with `--permission-mode acceptEdits` and only the file
 tools in `--allowedTools`; `codex exec` (prompt on stdin through `-`) with `--sandbox
 workspace-write`, and `--skip-git-repo-check` because the scratch copy has no repository. Never use

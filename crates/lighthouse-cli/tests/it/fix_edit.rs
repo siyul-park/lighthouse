@@ -283,12 +283,14 @@ fn the_recipes_of_the_docs_skip_no_permission_check() {
 
     assert!(recipes.iter().any(|r| r.contains("\"claude\", \"-p\"")));
     assert!(recipes.iter().any(|r| r.contains("\"codex\", \"exec\"")));
+    assert!(recipes.iter().any(|r| r.contains("\"opencode\", \"run\"")));
     for flag in [
         "--dangerously-skip-permissions",
         "--allow-dangerously-skip-permissions",
         "bypassPermissions",
         "--yolo",
         "--full-auto",
+        "--auto",
         "danger-full-access",
         "--dangerously-bypass-approvals-and-sandbox",
     ] {
