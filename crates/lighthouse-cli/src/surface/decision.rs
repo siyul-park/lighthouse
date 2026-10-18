@@ -6,9 +6,10 @@ use std::{
     io::{Read, stdin},
 };
 
+use lighthouse_report::{Aim, CheckInfo, Descriptor, FixInfo};
 use lighthouse_session::{
-    Authored, DecisionRow, DecisionTest, Session, active_decisions, create_decision, decision_rows,
-    explain,
+    Authored, DecisionRow, DecisionTest, Fixing, Session, active_decisions, create_decision,
+    decision_rows, explain,
     model::{self, EvalReport, EvalRequest, Side},
     replace_decision, test_decisions,
 };
@@ -38,6 +39,12 @@ pub(super) struct DecisionItem {
     row: DecisionRow,
     /// Whether this project's configuration enables it.
     enabled: bool,
+    /// How its check runs here; absent for a decision without one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    check: Option<CheckInfo>,
+    /// How its fix runs here; absent for a decision without one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fix: Option<FixInfo>,
 }
 
 /// The `DecisionShow` kind.
@@ -46,6 +53,9 @@ pub(super) struct DecisionShow {
     id: String,
     /// Context, requirement, examples and status.
     markdown: String,
+    /// How its check and fix run here; absent for a decision without a check.
+    #[serde(flatten)]
+    descriptor: Option<Descriptor>,
 }
 
 /// The `DecisionTest` kind: the examples of the checked decisions, run.
@@ -62,13 +72,22 @@ pub fn list(ctx: &Context, args: &DecisionListArgs, format: Format) -> Result<Re
     let session = ctx.session()?;
     let registry = session.in_process_registry()?;
     let enabled = active_decisions(&session)?;
+    let fixing = Fixing::of(&session)?;
     let rows = decision_rows(&session.catalog, &registry, args.all);
     let Page { items, omitted } = page(rows, args.limit);
     let decisions: Vec<DecisionItem> = items
         .into_iter()
-        .map(|row| DecisionItem {
-            enabled: enabled.contains(&row.id),
-            row,
+        .map(|row| {
+            let descriptor = session
+                .catalog
+                .decision(&row.id)
+                .and_then(|decision| fixing.describe(decision, Aim::Decision(&row.id)));
+            DecisionItem {
+                enabled: enabled.contains(&row.id),
+                check: descriptor.as_ref().map(|d| d.check),
+                fix: descriptor.and_then(|d| d.fix),
+                row,
+            }
         })
         .collect();
     let list = DecisionList { decisions, omitted };
@@ -94,10 +113,29 @@ pub fn list(ctx: &Context, args: &DecisionListArgs, format: Format) -> Result<Re
 pub fn show(ctx: &Context, args: &DecisionShowArgs, format: Format) -> Result<Reply> {
     let session = ctx.session()?;
     let registry = session.in_process_registry()?;
-    let markdown = explain(&session.catalog, &registry, &args.id)?;
+    let mut markdown = explain(&session.catalog, &registry, &args.id)?;
+    let descriptor = session.catalog.decision(&args.id).and_then(|decision| {
+        Fixing::of(&session)
+            .ok()?
+            .describe(decision, Aim::Decision(&args.id))
+    });
+    if let Some(descriptor) = &descriptor {
+        let _ = writeln!(
+            markdown,
+            "check: {} ({})\n{}",
+            descriptor.check.by.as_str(),
+            if descriptor.check.runs {
+                "runs"
+            } else {
+                "does not run here"
+            },
+            descriptor.line("<fingerprint>", false)
+        );
+    }
     let shown = DecisionShow {
         id: args.id.clone(),
         markdown: markdown.clone(),
+        descriptor,
     };
     Reply::data(format, &shown, || markdown)
 }

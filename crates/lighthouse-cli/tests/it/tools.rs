@@ -12,13 +12,14 @@ use serde_json::Value;
 
 /// Flags a tool does not take: they choose how the CLI prints or what it
 /// touches, while a tool always returns the JSON output.
-const CLI_ONLY: [&str; 10] = [
+const CLI_ONLY: [&str; 11] = [
     "help",
     "version",
     "format",
     "timings",
     "fix",
     "fixer",
+    "fingerprint",
     "color",
     "config",
     "unsafe-fixes",
@@ -65,7 +66,6 @@ fn argument_names(path: &[&str]) -> BTreeSet<String> {
     command_at(path)
         .get_arguments()
         .filter(|arg| arg.get_long().is_none_or(|long| !CLI_ONLY.contains(&long)))
-        .filter(|arg| !CLI_ONLY.contains(&arg.get_id().as_str()))
         .map(|arg| match arg.get_long() {
             Some(long) => camel_case(long),
             None => camel_case(&arg.get_id().as_str().replace('_', "-")),

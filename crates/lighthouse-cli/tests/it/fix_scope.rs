@@ -36,7 +36,7 @@ spec:
     message: "{{ symbol.name }} is banned"
   fix:
     type: model
-    safety: suggested
+    safety: unsafe
     scope: files
     prompt: Rename it; update the callers.
   examples:
@@ -271,7 +271,7 @@ fn a_glob_that_matches_no_decision_is_a_warning_naming_it() {
 }
 
 #[test]
-fn review_show_carries_the_brief_of_a_listed_decision_only() {
+fn review_show_carries_the_brief_and_the_fix_of_a_finding_whose_fix_is_not_safe() {
     let (dir, _agent) = with_agent("true\n", &listed("scope = \"symbol\"\n", ""));
     write(dir.path(), "src/lib.rs", "pub fn bad_one() {}\n");
     assert!(
@@ -282,12 +282,27 @@ fn review_show_carries_the_brief_of_a_listed_decision_only() {
     let fingerprint = fingerprints(dir.path())[&"bad_one".to_owned()].clone();
 
     let show = |dir: &TempDir| {
-        let shown = Client::trusting(dir.path())
+        Client::trusting(dir.path())
             .tool("review_show", json!({"fingerprint": &fingerprint[..12]}))
-            .unwrap();
-        shown["brief"].as_str().map(str::to_owned)
+            .unwrap()
     };
-    let brief = show(&dir).expect("a brief");
+    let listed_show = show(&dir);
+    let brief = listed_show["brief"].as_str().expect("a brief").to_owned();
+    assert_eq!(
+        listed_show["fix"],
+        json!({
+            "by": "model",
+            "safety": "unsafe",
+            "runs": true,
+            "approval": "ask",
+            "apply": format!("lighthouse check --fix --unsafe-fixes --fingerprint {}", listed_show["fingerprint"].as_str().unwrap()),
+            "tool": {"name": "fix", "arguments": {
+                "fingerprints": [listed_show["fingerprint"]],
+                "unsafeFixes": true
+            }}
+        }),
+        "{listed_show}"
+    );
 
     for expected in [
         "Decision: local/naming-ban",
@@ -306,7 +321,12 @@ fn review_show_carries_the_brief_of_a_listed_decision_only() {
             .status
             .success()
     );
-    assert_eq!(show(&unlisted), None);
+    let unlisted_show = show(&unlisted);
+    assert!(
+        unlisted_show["brief"].is_string(),
+        "a finding without a fix has a brief"
+    );
+    assert!(unlisted_show.get("fix").is_none(), "{unlisted_show}");
 }
 
 #[test]

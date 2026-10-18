@@ -13,11 +13,7 @@ fn engine_preview_fixes_shows_the_change_and_writes_nothing() {
     let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
     let findings: Vec<_> = outcome.diagnostics.iter().collect();
 
-    let previews = engine.preview_fixes(
-        &plan("fake/to-done", Safety::Safe, true),
-        &outcome,
-        &findings,
-    );
+    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Safe), &outcome, &findings);
 
     assert_eq!(previews.len(), 1);
     assert_eq!(previews[0].safety, Safety::Safe);
@@ -27,19 +23,15 @@ fn engine_preview_fixes_shows_the_change_and_writes_nothing() {
 }
 
 #[test]
-fn engine_preview_fixes_calls_a_fix_suggested_when_applying_needs_unsafe_fixes() {
+fn engine_preview_fixes_calls_a_fix_unsafe_when_writing_it_needs_permission() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
     let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
     let findings: Vec<_> = outcome.diagnostics.iter().collect();
 
-    for plan in [
-        plan("fake/to-done", Safety::Suggested, true),
-        plan("fake/to-done", Safety::Safe, false),
-    ] {
-        let previews = engine.preview_fixes(&plan, &outcome, &findings);
-        assert_eq!(previews[0].safety, Safety::Suggested);
-    }
+    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Unsafe), &outcome, &findings);
+
+    assert_eq!(previews[0].safety, Safety::Unsafe);
 }
 
 #[test]
@@ -51,11 +43,7 @@ fn engine_preview_fixes_skips_what_cannot_be_proposed() {
 
     let none = engine.preview_fixes(&FixPlan::default(), &outcome, &findings);
     assert!(none.is_empty(), "a rule without a fix");
-    let unknown = engine.preview_fixes(
-        &plan("fake/missing", Safety::Safe, true),
-        &outcome,
-        &findings,
-    );
+    let unknown = engine.preview_fixes(&plan("fake/missing", Safety::Safe), &outcome, &findings);
     assert!(unknown.is_empty(), "a fixer that is not registered");
 }
 

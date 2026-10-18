@@ -240,7 +240,7 @@ fn evaluate(fix: &str, finding: &Diagnostic) -> Result<FixOutcome, Error> {
 
 #[test]
 fn a_move_takes_its_node_and_anchor_from_the_finding() {
-    let fix = "safety: suggested\ntype: ops\nops:\n  - op: move\n    node: finding.evidence.callee\n    after: finding.evidence.caller";
+    let fix = "safety: unsafe\ntype: ops\nops:\n  - op: move\n    node: finding.evidence.callee\n    after: finding.evidence.caller";
     let evidence = json!({ "callee": id("a").as_str(), "caller": id("c").as_str() });
 
     let outcome = evaluate(fix, &finding(Some("a"), evidence)).unwrap();
@@ -260,7 +260,7 @@ fn a_move_takes_its_node_and_anchor_from_the_finding() {
             anchor: Anchor::After(node("c"))
         }]
     );
-    assert_eq!(safety, lighthouse_model::Safety::Suggested);
+    assert_eq!(safety, lighthouse_model::Safety::Unsafe);
     assert_eq!(description, "Probe");
 }
 
@@ -320,8 +320,9 @@ fn guards_choose_which_operations_apply() {
 
 #[test]
 fn delete_names_a_node_or_a_range() {
-    let node_fix = "safety: suggested\ntype: ops\nops: [{ op: delete, node: finding.symbol }]";
-    let range_fix = "safety: suggested\ntype: ops\nops: [{ op: delete, file: finding.file, span: finding.span }]";
+    let node_fix = "safety: unsafe\ntype: ops\nops: [{ op: delete, node: finding.symbol }]";
+    let range_fix =
+        "safety: unsafe\ntype: ops\nops: [{ op: delete, file: finding.file, span: finding.span }]";
 
     let by_node = ops(evaluate(node_fix, &finding(Some("b"), json!({}))).unwrap());
     let by_range = ops(evaluate(range_fix, &finding(None, json!({}))).unwrap());
@@ -338,8 +339,8 @@ fn delete_names_a_node_or_a_range() {
 
 #[test]
 fn rename_and_replace_fill_their_templates() {
-    let rename = "safety: suggested\nrequires: [complete-references]\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: '{{ symbol.name }}New{{ 1 + 1 }}' }]";
-    let replace = "safety: suggested\ntype: ops\nops: [{ op: replace, file: finding.file, span: finding.span, text: '// {{ finding.decision }}: {{ symbol.kind }}' }]";
+    let rename = "safety: unsafe\nrequires: [complete-references]\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: '{{ symbol.name }}New{{ 1 + 1 }}' }]";
+    let replace = "safety: unsafe\ntype: ops\nops: [{ op: replace, file: finding.file, span: finding.span, text: '// {{ finding.decision }}: {{ symbol.kind }}' }]";
 
     let renamed = ops(evaluate(rename, &finding(Some("a"), json!({}))).unwrap());
     let replaced = ops(evaluate(replace, &finding(Some("a"), json!({}))).unwrap());
@@ -363,7 +364,7 @@ fn rename_and_replace_fill_their_templates() {
 
 #[test]
 fn an_expression_that_fails_is_an_error_naming_the_fix() {
-    let fix = "safety: suggested\ntype: ops\nops: [{ op: delete, node: finding.evidence.missing }]";
+    let fix = "safety: unsafe\ntype: ops\nops: [{ op: delete, node: finding.evidence.missing }]";
 
     let error = evaluate(fix, &finding(None, json!({}))).unwrap_err();
 
@@ -372,7 +373,7 @@ fn an_expression_that_fails_is_an_error_naming_the_fix() {
 
 #[test]
 fn a_node_that_is_not_a_symbol_id_is_an_error() {
-    let fix = "safety: suggested\ntype: ops\nops: [{ op: delete, node: \"'nope'\" }]";
+    let fix = "safety: unsafe\ntype: ops\nops: [{ op: delete, node: \"'nope'\" }]";
 
     let error = evaluate(fix, &finding(None, json!({}))).unwrap_err();
 
@@ -466,7 +467,7 @@ fn try_command(
     finding: &Diagnostic,
 ) -> Result<FixOutcome, Error> {
     let fix = format!(
-        "safety: suggested\ntype: command\nargv: {argv}\noutput: {output}\ntimeout: 5s\n{extra}"
+        "safety: unsafe\ntype: command\nargv: {argv}\noutput: {output}\ntimeout: 5s\n{extra}"
     );
     run(
         local(&fix).as_ref(),
@@ -629,7 +630,7 @@ fn exit_two_a_signal_and_a_timeout_are_errors_that_apply_nothing() {
     let killed = try_command("", r#"["sh", "-c", "kill -9 $$"]"#, "text", "", &at)
         .unwrap_err()
         .to_string();
-    let slow = "safety: suggested\ntype: command\nargv: [\"sleep\", \"5\"]\ntimeout: 1s";
+    let slow = "safety: unsafe\ntype: command\nargv: [\"sleep\", \"5\"]\ntimeout: 1s";
     let started = std::time::Instant::now();
     let timed_out = run(
         local(slow).as_ref(),
@@ -665,7 +666,7 @@ fn a_program_that_cannot_start_is_an_error() {
 
 #[test]
 fn a_command_runs_only_in_a_project_the_user_trusts_whoever_wrote_it() {
-    let fix = format!("safety: suggested\ntype: command\nargv: {SHOUT}\noutput: text");
+    let fix = format!("safety: unsafe\ntype: command\nargv: {SHOUT}\noutput: text");
     let project = project(&["a"]);
     let at = finding(None, json!({}));
 
@@ -751,8 +752,7 @@ fn the_bundled_fixers_of_a_pack_are_those_of_its_decisions_with_a_fix() {
 
 #[test]
 fn a_rename_must_declare_that_it_needs_complete_references() {
-    let fix =
-        "safety: suggested\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: x }]";
+    let fix = "safety: unsafe\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: x }]";
 
     let error = local_layer(fix).unwrap_err();
 
@@ -761,8 +761,7 @@ fn a_rename_must_declare_that_it_needs_complete_references() {
 
 #[test]
 fn a_command_argument_may_not_embed_a_placeholder_or_use_root() {
-    let build =
-        |argv: &str| local_layer(&format!("safety: suggested\ntype: command\nargv: {argv}"));
+    let build = |argv: &str| local_layer(&format!("safety: unsafe\ntype: command\nargv: {argv}"));
 
     for bad in [r#"["tool", "--out={file}"]"#, r#"["tool", "{root}"]"#] {
         let error = build(bad).unwrap_err();

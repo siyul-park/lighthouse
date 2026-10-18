@@ -9,7 +9,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": false
   },
-  "description": "Fix findings with the fixers the decisions name (`fixable: safe|suggested` in `decision_list`). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafeFixes` is set. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.",
+  "description": "Fix findings with the fixers the decisions name (`fix` in `decision_list`: who makes it, `safe` or `unsafe`, whether it runs). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only `safe` fixes are written, whatever makes them; an `unsafe` one is returned as a preview with its diff and the call that applies exactly it (`fingerprints` with `unsafeFixes`), unless `unsafeFixes` is set or the project's `[approval] fix` is `allow`. Applying a preview makes a deterministic fix again and takes a model's from the answer kept when it was previewed: a file that changed since gives a conflict and writes nothing. `noModels` asks no model. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes, the `previews` and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`fix`, the tool of `check --fix`: which findings, and how to fix them.\nName at least one of `paths`, `decision` and `fingerprints`: a fix through\nMCP never defaults to the whole project.",
@@ -37,11 +37,16 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       },
       "fixer": {
         "default": null,
-        "description": "Use this registered fixer for the selected findings instead of the one\ntheir decision names. Its fixes count as suggested.",
+        "description": "Use this registered fixer for the selected findings instead of the one\ntheir decision names. Its fixes are `unsafe`.",
         "type": [
           "string",
           "null"
         ]
+      },
+      "noModels": {
+        "default": false,
+        "description": "Ask no model: what they would fix is left to review.",
+        "type": "boolean"
       },
       "paths": {
         "default": [],
@@ -53,7 +58,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       },
       "unsafeFixes": {
         "default": false,
-        "description": "Also apply suggested fixes, which are judgment calls: review the diff.",
+        "description": "Also write `unsafe` fixes, which are judgment calls, whatever makes\nthem; without it, or `[approval] fix = \"allow\"`, they are shown as\npreviews, and a preview is applied by naming its finding.",
         "type": "boolean"
       }
     },
@@ -208,10 +213,14 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "type": "object"
       },
       "previews": {
-        "description": "Fixes by a model that the checks accepted and that were left for a\nhand to apply (`approval.fix = \"ask\"`, or a failing `[fix] verify`\ncommand), each with its diff. Absent when there are none.",
+        "description": "`unsafe` fixes, by any provider, that the checks accepted and that were\nleft for a hand to apply (`approval.fix = \"ask\"` without\n`--unsafe-fixes`, or a failing `[fix] verify` command), each with its\ndiff and how to apply it. Absent when there are none.",
         "items": {
-          "description": "A fix by a model that was left for a hand to apply.",
+          "description": "An `unsafe` fix that was left for a hand to apply.",
           "properties": {
+            "apply": {
+              "description": "The command line.",
+              "type": "string"
+            },
             "decision": {
               "type": "string"
             },
@@ -231,17 +240,37 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
             "fingerprint": {
               "type": "string"
             },
+            "fixer": {
+              "type": "string"
+            },
             "safety": {
               "type": "string"
+            },
+            "tool": {
+              "description": "A tool call: the twin of a command line.",
+              "properties": {
+                "arguments": true,
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "arguments"
+              ],
+              "type": "object"
             }
           },
           "required": [
             "fingerprint",
             "decision",
+            "fixer",
             "safety",
             "description",
             "files",
-            "diff"
+            "diff",
+            "apply",
+            "tool"
           ],
           "type": "object"
         },

@@ -1,3 +1,4 @@
+mod descriptor;
 pub mod docs;
 mod expected;
 mod fix;
@@ -10,6 +11,7 @@ use std::fmt::Write;
 
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 
+pub use descriptor::{Aim, Apply, CheckBy, CheckInfo, Descriptor, FixBy, FixInfo, ToolCall};
 pub use group::{Entry, GroupOptions, Grouped, Groups, Judgments, Omitted};
 pub use report::{Briefing, Compact, Counts, Detail, Full, Gap, Report, Status, report, shown};
 

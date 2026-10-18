@@ -13,6 +13,7 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::{
+    descriptor::Descriptor,
     expected::{ExampleKey, Expected, expected},
     fix::Shown,
     group::{
@@ -59,6 +60,8 @@ pub struct Briefing<'a> {
     pub sources: Option<&'a BTreeMap<String, String>>,
     /// The report is data for a program: hints name tool calls
     /// (`fix {...}`), not command lines.
+    /// How the check and the fix of each decision run, by decision id.
+    pub descriptors: Option<&'a BTreeMap<String, Descriptor>>,
     pub tool_form: bool,
 }
 
@@ -80,6 +83,7 @@ impl Briefing<'_> {
             catalog: self.catalog,
             limit: self.limit,
             tool_form: self.tool_form,
+            descriptors: self.descriptors,
         }
     }
 

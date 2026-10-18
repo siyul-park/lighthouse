@@ -27,7 +27,9 @@ use std::{
 
 use clap::ValueEnum;
 use lighthouse_report::Format;
-use lighthouse_session::{CheckRequest, Checked, ModelOptions, RunStatus, Session, baseline};
+use lighthouse_session::{
+    AGENT_LOOP, CheckRequest, Checked, ModelOptions, RunStatus, Session, baseline,
+};
 use serde_json::{Value, json};
 
 use crate::terminal::Result;
@@ -246,7 +248,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool, unbaselined: bool) -> O
     let incomplete = summary.status == RunStatus::Incomplete;
     if summary.errors + summary.warnings > 0 || (incomplete && !allow_incomplete) {
         return Some(block(format!(
-            "Lighthouse found problems in the file you just edited. Fix them, then continue.\n{}{}",
+            "Lighthouse found problems in the file you just edited. Fix them, then continue.\n{}{}\nHow to fix:\n{AGENT_LOOP}",
             checked.render(Format::Agent, Some(EDIT_LIMIT)),
             note.map_or_else(String::new, |n| format!("\n{n}")),
         )));
@@ -297,7 +299,7 @@ fn at_stop(checked: &Checked, allow_incomplete: bool, stop_hook_active: bool) ->
             }.to_owned());
         }
         return Some(block(format!(
-            "Lighthouse: {}\n{}",
+            "Lighthouse: {}\n{}\nHow to fix:\n{AGENT_LOOP}",
             why.join(" "),
             checked.render(Format::Agent, Some(STOP_LIMIT))
         )));

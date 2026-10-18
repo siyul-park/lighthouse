@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
 };
 
-use lighthouse_model::{Fingerprint, Preview};
+use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_protocol::hash::Hasher;
 use lighthouse_spec::Approval;
 
@@ -36,10 +36,10 @@ pub(super) struct Orchestrator<'e> {
     declined: BTreeMap<Fingerprint, DeclinedFix>,
     notes: Vec<String>,
     rounds: usize,
-    /// The previews of the fixes by a model that stand applied in `texts`,
-    /// by fingerprint: those the run withholds are reported.
+    /// The previews of the `unsafe` fixes that stand applied in `texts`, by
+    /// fingerprint: those the run withholds are reported.
     previewable: BTreeMap<Fingerprint, Result<Preview, DeclinedFix>>,
-    /// Fixes by a model that were accepted and are left for a hand.
+    /// `unsafe` fixes that were accepted and are left for a hand.
     previews: Vec<PreviewedFix>,
 }
 
@@ -104,7 +104,10 @@ impl Orchestrator<'_> {
                 self.proposer
                     .propose(&outcome, &self.texts, Phase::Rules, &[])?;
             self.declined.extend(declined);
+            let (proposals, withheld): (Vec<_>, Vec<_>) =
+                proposals.into_iter().partition(|p| self.permits(p.safety));
             if proposals.is_empty() {
+                self.preview(&outcome, withheld, round)?;
                 return Ok(outcome);
             }
             let first_applied = self.applied.len();
@@ -138,6 +141,24 @@ impl Orchestrator<'_> {
         }
     }
 
+    /// Verifies the `withheld` fixes the run may not write, over the state the
+    /// rounds left, and reports those the checks accept as previews. The texts
+    /// are left as they were.
+    fn preview(
+        &mut self,
+        outcome: &Run,
+        withheld: Vec<Proposal>,
+        round: usize,
+    ) -> Result<(), Error> {
+        if withheld.is_empty() {
+            return Ok(());
+        }
+        let start = self.mark();
+        self.apply_round(outcome, withheld, round)?;
+        self.withdraw(start);
+        Ok(())
+    }
+
     /// The round that gives the findings the rules left to a model: its
     /// edits are kept only if the checks accept them, and then written only if
     /// the run may (`--unsafe-fixes`, or `approval.fix = "allow"`) and the
@@ -163,7 +184,7 @@ impl Orchestrator<'_> {
         if !self.has_model_fix() {
             return Ok(outcome);
         }
-        if !self.permitted() {
+        if !self.permits(Safety::Unsafe) {
             self.withdraw(start);
             return Ok(outcome);
         }
@@ -219,10 +240,12 @@ impl Orchestrator<'_> {
         Ok((marks, current))
     }
 
-    /// Whether the run may write the fixes by a model: `--unsafe-fixes`, or
-    /// the approval of the project.
-    fn permitted(&self) -> bool {
-        self.proposer.run.unsafe_fixes
+    /// Whether the run may write a fix of this safety, whoever makes it: a
+    /// `safe` fix always, an `unsafe` one with `--unsafe-fixes` or the
+    /// project's `[approval] fix = "allow"`.
+    fn permits(&self, safety: Safety) -> bool {
+        safety == Safety::Safe
+            || self.proposer.run.unsafe_fixes
             || self.proposer.engine.config.fix().approval == Approval::Allow
     }
 

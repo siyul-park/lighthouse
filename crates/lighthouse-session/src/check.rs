@@ -9,13 +9,17 @@ use std::{
 
 use lighthouse_engine::{Engine, FixPlan, ModelOptions, Run, cache};
 use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed};
-use lighthouse_report::{Briefing, Compact, Detail, Format, Full, Report, render, report};
+use lighthouse_report::{
+    Briefing, Compact, Descriptor, Detail, Format, Full, Report, render, report,
+};
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{Remembered, Result, Selector, Session, findings, model::attached, review, scope};
+use crate::{
+    Fixing, Remembered, Result, Selector, Session, findings, model::attached, review, scope,
+};
 
 /// The environment variable that sets the size limit of the cache, in MB.
 const CACHE_LIMIT_VAR: &str = "LIGHTHOUSE_CACHE_LIMIT_MB";
@@ -118,6 +122,9 @@ pub struct Checked {
     engine: Engine,
     /// The project root, to read the files SARIF columns are measured in.
     root: PathBuf,
+    /// How the check and the fix of each decision with a finding run, by
+    /// decision id.
+    descriptors: BTreeMap<String, Descriptor>,
 }
 
 impl Checked {
@@ -308,6 +315,7 @@ impl Checked {
             fixes: None,
             sources: None,
             tool_form: false,
+            descriptors: Some(&self.descriptors),
         }
     }
 }
@@ -366,6 +374,13 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
         .chain(&remembered.suppressions)
         .cloned()
         .collect();
+    let descriptors = Fixing::of(session)?.all(
+        &catalog,
+        run.diagnostics
+            .iter()
+            .chain(&run.reviews)
+            .map(|d| d.rule_id.as_str()),
+    );
     Ok(Checked {
         run,
         catalog,
@@ -374,6 +389,7 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
         messages,
         engine,
         root,
+        descriptors,
     })
 }
 

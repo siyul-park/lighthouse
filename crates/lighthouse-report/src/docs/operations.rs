@@ -169,7 +169,7 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
          A decision's `fix:` block says how the findings of its rule are fixed. Its \
          `type` is one of `ops`, `command` and `rpc`; it carries a `safety` cap, and \
          may list the provider capabilities it `requires`:\n\n\
-         ```yaml\nfix:\n  safety: safe        # safe | suggested\n  requires: [extent]  # optional\n  type: ops           # ops | command | rpc\n  ops: [...]\n```\n\n\
+         ```yaml\nfix:\n  safety: safe        # safe | unsafe\n  requires: [extent]  # optional\n  type: ops           # ops | command | rpc\n  ops: [...]\n```\n\n\
          The `ops` type is a list of the generic operations below. Operations state \
          edits over code-model nodes; the orchestrator lowers them to text edits with \
          the spans the language provider reports, formats, re-checks and rolls back \
@@ -204,7 +204,7 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
          The `command` type is the simple text contract: a program, without a shell, on a \
          scratch copy of the finding's file. Structured data goes through `rpc`, not through \
          commands.\n\n\
-         ```yaml\nfix:\n  safety: suggested\n  type: command\n  argv: [\"gofmt\", \"-s\", \"-w\", \"{file}\"]\n  output: in-place   # in-place | text\n  stdin: none        # none | file\n  env: {}            # extra variables\n  timeout: 30s\n  scope: file\n```\n\n\
+         ```yaml\nfix:\n  safety: unsafe\n  type: command\n  argv: [\"gofmt\", \"-s\", \"-w\", \"{file}\"]\n  output: in-place   # in-place | text\n  stdin: none        # none | file\n  env: {}            # extra variables\n  timeout: 30s\n  scope: file\n```\n\n\
          - **Exit codes:** `0` succeeds, with the result per `output`; an empty result changes \
          nothing. `1` declines, with the reason from stderr. `2` and above, a signal or a \
          timeout is an error: nothing is applied and the capped stderr goes into the notice.\n\

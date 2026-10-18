@@ -25,10 +25,7 @@ fn a_fix_that_holds_is_applied_and_reported() {
     let engine = engine(&dir, "");
 
     let report = engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "fn a\nDONE here\n");
@@ -57,7 +54,7 @@ fn a_fix_that_introduces_an_error_is_rolled_back() {
     let engine = engine(&dir, "");
 
     let report = engine
-        .fix(&plan("fake/to-bad", Safety::Safe, true), &FixRun::default())
+        .fix(&plan("fake/to-bad", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "fn a\nTODO here\n", "the file is as it was");
@@ -77,10 +74,7 @@ fn a_fix_that_makes_the_file_unanalyzable_is_rolled_back() {
     let engine = engine(&dir, "");
 
     let report = engine
-        .fix(
-            &plan("fake/to-broken", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-broken", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "fn a\nTODO here\n");
@@ -98,7 +92,7 @@ fn a_dry_run_leaves_the_files_and_still_reports_the_changes() {
     };
 
     let report = engine
-        .fix(&plan("fake/to-done", Safety::Safe, true), &run)
+        .fix(&plan("fake/to-done", Safety::Safe), &run)
         .unwrap();
 
     assert_eq!(text(&dir), "TODO\n");
@@ -112,10 +106,7 @@ fn an_incomplete_analysis_blocks_fixing() {
     let engine = engine(&dir, "");
 
     let error = engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap_err();
 
     assert!(matches!(error, Error::Fix(_)), "{error}");
@@ -124,49 +115,73 @@ fn an_incomplete_analysis_blocks_fixing() {
 }
 
 #[test]
-fn a_suggested_fix_needs_unsafe_fixes() {
+fn an_unsafe_fix_is_previewed_until_the_run_may_write_it() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
-    let suggested = plan("fake/to-done", Safety::Suggested, true);
+    let unsafe_fix = plan("fake/to-done", Safety::Unsafe);
 
-    let held = engine.fix(&suggested, &FixRun::default()).unwrap();
+    let held = engine.fix(&unsafe_fix, &FixRun::default()).unwrap();
+
     assert_eq!(text(&dir), "TODO\n");
-    assert!(held.declined[0].reason.contains("--unsafe-fixes"));
+    assert!(held.applied.is_empty() && held.declined.is_empty());
+    let shown = &held.previews[0];
+    assert_eq!(shown.rule_id, "fake/todo");
+    assert_eq!(shown.fixer, FixedBy::Fixer("fake/to-done".to_owned()));
+    assert_eq!(shown.preview.safety, Safety::Unsafe);
+    assert!(shown.preview.files[0].hunks.contains("+DONE"));
 
     let run = FixRun {
         unsafe_fixes: true,
         ..FixRun::default()
     };
-    engine.fix(&suggested, &run).unwrap();
+    let written = engine.fix(&unsafe_fix, &run).unwrap();
     assert_eq!(text(&dir), "DONE\n");
+    assert!(written.previews.is_empty());
+}
+
+#[test]
+fn the_approval_of_the_project_writes_an_unsafe_fix_of_any_provider() {
+    let dir = project("TODO\n");
+    let engine = engine(&dir, "[approval]\nfix = \"allow\"\n");
+
+    let report = engine
+        .fix(&plan("fake/to-done", Safety::Unsafe), &FixRun::default())
+        .unwrap();
+
+    assert_eq!(text(&dir), "DONE\n");
+    assert_eq!(report.applied[0].safety, Safety::Unsafe);
+    assert!(report.previews.is_empty());
+}
+
+#[test]
+fn a_dry_run_previews_what_it_may_not_write_and_writes_nothing() {
+    let dir = project("TODO\n");
+    let engine = engine(&dir, "");
+    let run = FixRun {
+        dry_run: true,
+        ..FixRun::default()
+    };
+
+    let report = engine
+        .fix(&plan("fake/to-done", Safety::Unsafe), &run)
+        .unwrap();
+
+    assert_eq!(text(&dir), "TODO\n");
+    assert_eq!(report.previews.len(), 1);
+    assert!(report.changes.is_empty());
 }
 
 #[test]
 fn the_decision_caps_what_a_fixer_claims() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
-    // The fixer claims `safe`; the decision says `suggested`.
-    let capped = plan("fake/to-done-claimed-safe", Safety::Suggested, true);
+    // The fixer claims `safe`; the decision says `unsafe`.
+    let capped = plan("fake/to-done-claimed-safe", Safety::Unsafe);
 
     let report = engine.fix(&capped, &FixRun::default()).unwrap();
 
     assert_eq!(text(&dir), "TODO\n");
-    assert!(report.declined[0].reason.contains("suggested"));
-}
-
-#[test]
-fn a_non_mechanical_rule_is_not_fixed_without_unsafe_fixes() {
-    let dir = project("TODO\n");
-    let engine = engine(&dir, "");
-
-    engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, false),
-            &FixRun::default(),
-        )
-        .unwrap();
-
-    assert_eq!(text(&dir), "TODO\n");
+    assert_eq!(report.previews[0].preview.safety, Safety::Unsafe);
 }
 
 #[test]
@@ -175,10 +190,7 @@ fn a_missing_provider_capability_declines_instead_of_guessing() {
     let engine = engine(&dir, "");
 
     let report = engine
-        .fix(
-            &plan("fake/needs-extent", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/needs-extent", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "TODO\n");
@@ -196,10 +208,7 @@ fn findings_in_one_file_are_fixed_together() {
     let engine = engine(&dir, "");
 
     let report = engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "DONE DONE\n");
@@ -221,7 +230,7 @@ fn an_unknown_fixer_override_is_an_error() {
 }
 
 #[test]
-fn a_fixer_override_applies_to_a_rule_without_a_fix_as_a_suggestion() {
+fn a_fixer_override_applies_to_a_rule_without_a_fix_as_an_unsafe_fix() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
     let run = FixRun {
@@ -232,7 +241,8 @@ fn a_fixer_override_applies_to_a_rule_without_a_fix_as_a_suggestion() {
 
     let held = engine.fix(&FixPlan::default(), &run).unwrap();
     assert_eq!(text(&dir), "TODO\n");
-    assert!(held.declined[0].reason.contains("--unsafe-fixes"));
+    assert!(held.declined.is_empty());
+    assert_eq!(held.previews[0].preview.safety, Safety::Unsafe);
 
     let run = FixRun {
         unsafe_fixes: true,
@@ -257,7 +267,7 @@ fn findings_a_run_skips_are_left_alone() {
     };
 
     let report = engine
-        .fix(&plan("fake/to-done", Safety::Safe, true), &run)
+        .fix(&plan("fake/to-done", Safety::Safe), &run)
         .unwrap();
 
     assert_eq!(text(&dir), "TODO\n");
@@ -274,10 +284,7 @@ formatter = ["sh", "-c", "tr -s ' ' < \"$0\" > \"$0.tmp\" && mv \"$0.tmp\" \"$0\
     let engine = engine(&dir, formatter).with_trust(true);
 
     engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "DONE here\n");
@@ -289,10 +296,7 @@ fn a_formatter_that_fails_rolls_the_file_back() {
     let engine = engine(&dir, "[languages.toy]\nformatter = [\"false\"]\n").with_trust(true);
 
     let report = engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "TODO\n");
@@ -359,7 +363,6 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
         FixBinding {
             fixer: FixedBy::Fixer("grow/grow".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "grow/todo".to_owned(),
@@ -383,7 +386,7 @@ fn findings_that_propose_the_same_edit_share_one_application() {
     let engine = engine(&dir, "");
 
     let report = engine
-        .fix(&plan("fake/line", Safety::Safe, true), &FixRun::default())
+        .fix(&plan("fake/line", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "DONE and DONE\n");
@@ -403,10 +406,8 @@ fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
         FixedBy::Fixer("design/declaration-groups".to_owned())
     );
     assert_eq!(groups.cap, Safety::Safe);
-    assert!(groups.mechanical);
     let banners = plan.get("design/comments").unwrap();
-    assert_eq!(banners.cap, Safety::Suggested);
-    assert!(!banners.mechanical);
+    assert_eq!(banners.cap, Safety::Unsafe);
     assert!(plan.get("design/exported-doc").is_none());
 }
 
@@ -421,8 +422,8 @@ fn model_fixes_are_given_only_to_the_listed_rules_that_have_a_check_and_no_fix_o
 
     let documented = plan.get("design/exported-doc").unwrap();
     assert_eq!(documented.fixer, FixedBy::Model);
-    assert_eq!(documented.cap, Safety::Suggested);
-    assert!(!documented.mechanical && !documented.runs_command);
+    assert_eq!(documented.cap, Safety::Unsafe);
+    assert!(!documented.runs_command);
     assert_eq!(documented.decision.id, "design/exported-doc");
     let groups = plan.get("design/declaration-groups").unwrap();
     assert_eq!(

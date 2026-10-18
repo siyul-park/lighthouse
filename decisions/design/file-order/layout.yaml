@@ -126,7 +126,7 @@ spec:
     identity:
       subject: func.id
   fix:
-    safety: suggested
+    safety: unsafe
     requires:
       - extent
     type: ops

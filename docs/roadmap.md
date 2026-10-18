@@ -69,7 +69,7 @@ The biggest direct cut in agent work, and it needs no labels: the verifier alrea
   carrying the brief.
   - Headless agent CLIs are `edit` providers (a `command` without a protocol); chat models serve
     classification only.
-  - The fixer's output is always verified (apply, format, re-check, roll back) and is always `suggested`.
+  - The fixer's output is always verified (apply, format, re-check, roll back) and is always `unsafe`.
   - `[approval] fix` (`ask`, the default, or `allow`) says whether a verified change is applied without a person.
 
 ### Local models

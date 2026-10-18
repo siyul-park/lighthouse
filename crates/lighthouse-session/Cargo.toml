@@ -15,6 +15,7 @@ lighthouse-engine.workspace = true
 lighthouse-ml.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
+lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
 lighthouse-report.workspace = true
 lighthouse-resource.workspace = true

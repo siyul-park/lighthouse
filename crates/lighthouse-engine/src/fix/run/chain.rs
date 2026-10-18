@@ -10,7 +10,7 @@ use std::{
     path::PathBuf,
 };
 
-use lighthouse_model::{Fingerprint, Preview};
+use lighthouse_model::Fingerprint;
 use lighthouse_protocol::hash;
 
 use super::{
@@ -130,33 +130,38 @@ impl Orchestrator<'_> {
         true
     }
 
-    /// Puts the run back as it was at `mark`, before the fixes by a model, and
-    /// moves those fixes from applied to previews. A fix of which no preview
-    /// could be made is declined: a fix that was verified is applied,
-    /// previewed or declined, never lost.
+    /// Puts the run back as it was at `mark`, before the fixes the run may not
+    /// write, and moves those fixes from applied to previews. A fix of which
+    /// no preview could be made is declined: a fix that was verified is
+    /// applied, previewed or declined, never lost.
     pub(super) fn withdraw(&mut self, mark: Mark) {
         (self.texts, self.original, self.rounds) = mark;
-        let (models, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
+        let (withheld, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
             .into_iter()
-            .partition(|a| a.fixer == FixedBy::Model);
+            .partition(|a| !self.permits(a.safety));
         self.applied = rest;
-        for fix in models {
+        for fix in withheld {
+            let model = fix.fixer == FixedBy::Model;
             match self.previewable.remove(&fix.fingerprint) {
-                Some(Ok(preview)) => self.preview(fix.rule_id, preview),
-                Some(Err(declined)) => self.decline_withdrawn(declined),
+                Some(Ok(preview)) => {
+                    if model {
+                        self.proposer.note_model(&fix.rule_id, Event::Previewed);
+                    }
+                    self.previews.push(PreviewedFix {
+                        rule_id: fix.rule_id,
+                        fixer: fix.fixer,
+                        preview,
+                    });
+                }
+                Some(Err(declined)) => {
+                    if model {
+                        self.proposer
+                            .note_model(&declined.rule_id, Event::Declined(Class::RolledBack));
+                    }
+                    self.declined.insert(declined.fingerprint.clone(), declined);
+                }
                 None => {}
             }
         }
-    }
-
-    fn preview(&mut self, rule_id: String, preview: Preview) {
-        self.proposer.note_model(&rule_id, Event::Previewed);
-        self.previews.push(PreviewedFix { rule_id, preview });
-    }
-
-    fn decline_withdrawn(&mut self, declined: DeclinedFix) {
-        self.proposer
-            .note_model(&declined.rule_id, Event::Declined(Class::RolledBack));
-        self.declined.insert(declined.fingerprint.clone(), declined);
     }
 }

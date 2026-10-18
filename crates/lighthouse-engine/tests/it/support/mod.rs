@@ -284,14 +284,13 @@ pub fn project(text: &str) -> TempDir {
     dir
 }
 
-pub fn plan(fixer: &str, cap: Safety, mechanical: bool) -> FixPlan {
+pub fn plan(fixer: &str, cap: Safety) -> FixPlan {
     let mut plan = FixPlan::default();
     plan.insert(
         "fake/todo",
         FixBinding {
             fixer: FixedBy::Fixer(fixer.to_owned()),
             cap,
-            mechanical,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "fake/todo".to_owned(),

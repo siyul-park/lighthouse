@@ -92,7 +92,6 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
         FixBinding {
             fixer: FixedBy::Fixer("pair/both".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "pair/todo".to_owned(),
@@ -242,7 +241,6 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
         FixBinding {
             fixer: FixedBy::Fixer("nested/todo".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "nested/todo".to_owned(),
@@ -315,7 +313,6 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
         FixBinding {
             fixer: FixedBy::Fixer("plain/todo".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "plain/todo".to_owned(),
@@ -349,10 +346,7 @@ fn a_formatter_is_told_the_real_path_and_finds_the_settings_next_to_its_copy() {
     let by_path = "[languages.toy]\nformatter = { argv = [\"sh\", \"-c\", \"cat; echo \\\"// $0\\\"\", \"{path}\"], stdin = \"file\", output = \"text\" }\n";
     engine(&dir, by_path)
         .with_trust(true)
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "DONE\n// a.toy\n");
@@ -362,10 +356,7 @@ fn a_formatter_is_told_the_real_path_and_finds_the_settings_next_to_its_copy() {
 
     engine(&dir, by_copy)
         .with_trust(true)
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(

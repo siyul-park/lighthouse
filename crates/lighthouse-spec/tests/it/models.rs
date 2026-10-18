@@ -506,7 +506,7 @@ fn a_share_to_explore_outside_zero_and_one_is_a_configuration_error() {
 #[test]
 fn fix_scope_of_fix_is_the_projects_cap_unless_the_decision_declares_a_narrower_scope() {
     let model = |scope| Fix {
-        safety: Safety::Suggested,
+        safety: Safety::Unsafe,
         requires: Vec::new(),
         kind: FixKind::Model {
             prompt: None,

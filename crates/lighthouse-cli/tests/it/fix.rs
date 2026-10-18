@@ -134,7 +134,7 @@ fn fix_applies_safe_fixes_and_reports_what_is_left() {
 }
 
 #[test]
-fn suggested_fixes_wait_for_unsafe_fixes() {
+fn unsafe_fixes_are_previewed_until_asked_for() {
     let banner = "package demo\n\n// ---- Helpers ----\n\nfunc helper() int { return 1 }\n";
     let Some(dir) = go_project(&[("a.go", banner)], "") else {
         return;
@@ -144,17 +144,21 @@ fn suggested_fixes_wait_for_unsafe_fixes() {
         .args(["check", "--fix"])
         .assert()
         .success()
-        .stderr(predicate::str::contains("not fixed a.go:3 design/comments"))
-        .stderr(predicate::str::contains("--unsafe-fixes"));
+        .stderr(predicate::str::contains(
+            "preview design/comments [unsafe] a.go",
+        ))
+        .stderr(predicate::str::contains("-// ---- Helpers ----"))
+        .stderr(predicate::str::contains(
+            "apply: lighthouse check --fix --unsafe-fixes --fingerprint ",
+        ))
+        .stderr(predicate::str::contains("not fixed").not());
     assert_eq!(read(&dir, "a.go"), banner);
 
     lighthouse(dir.path())
         .args(["check", "--fix", "--unsafe-fixes"])
         .assert()
         .success()
-        .stderr(predicate::str::contains(
-            "fixed design/comments [suggested]",
-        ));
+        .stderr(predicate::str::contains("fixed design/comments [unsafe]"));
     assert_eq!(
         read(&dir, "a.go"),
         "package demo\n\nfunc helper() int { return 1 }\n"
@@ -403,7 +407,7 @@ pub(crate) fn text_project(rule: &str) -> TempDir {
 fn a_fixer_can_be_named_for_a_rule_that_has_none() {
     let dir = text_project(UPPERCASE);
     // A rule with no fix of its own flags the same file; the fixer of
-    // `local/shout` is named for it and counts as a suggestion.
+    // `local/shout` is named for it and its fix is `unsafe`.
     write(dir.path(), ".lighthouse/decisions/plain.yaml", PLAIN);
     write(
         dir.path(),
@@ -421,18 +425,21 @@ fn a_fixer_can_be_named_for_a_rule_that_has_none() {
         "local/plain",
     ];
 
+    trust(dir.path());
     lighthouse(dir.path())
         .args(named)
         .assert()
-        .stderr(predicate::str::contains("--unsafe-fixes"));
+        .stderr(predicate::str::contains("preview local/plain [unsafe]"))
+        .stderr(predicate::str::contains(
+            "apply: lighthouse check --fix --unsafe-fixes",
+        ));
     assert_eq!(read(&dir, "a.txt"), "hello\n");
 
-    trust(dir.path());
     lighthouse(dir.path())
         .args(named)
         .arg("--unsafe-fixes")
         .assert()
-        .stderr(predicate::str::contains("fixed local/plain [suggested]"));
+        .stderr(predicate::str::contains("fixed local/plain [unsafe]"));
     assert_eq!(read(&dir, "a.txt"), "HELLO\n");
 }
 

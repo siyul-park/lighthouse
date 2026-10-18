@@ -330,7 +330,7 @@ fn rule_tester_check() {
 }
 
 const FIX: &str = "fix:
-  safety: suggested
+  safety: unsafe
   type: ops
   ops:
     - op: delete

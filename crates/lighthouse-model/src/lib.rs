@@ -18,7 +18,7 @@ pub use diagnostic::{
     SuppressionStatus, evidence_digest,
 };
 pub use document::Document;
-pub use fix::{Preview, PreviewEdit, PreviewFile, Safety};
+pub use fix::{Preview, PreviewEdit, PreviewFile, Safety, Unavailable};
 pub use model_ref::ModelRef;
 pub use review::{AgentKind, Attribution, Judgment, Label, Role};
 pub use scope::{Reach, RunScope, TestScope};

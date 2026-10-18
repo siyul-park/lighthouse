@@ -82,7 +82,7 @@ fn a_finding_that_moves_to_another_symbol_of_the_file_is_not_new() {
     let (dir, engine) = judged("fn a\nTODO WARN\n");
 
     let report = engine
-        .fix(&plan("judged/move", Safety::Safe, true), &FixRun::default())
+        .fix(&plan("judged/move", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "fn a\nfn b\n WARN\n", "{:?}", report.declined);
@@ -95,7 +95,7 @@ fn a_fix_that_adds_a_finding_of_a_rule_to_the_file_is_rolled_back() {
     let (dir, engine) = judged("fn a\nTODO WARN\nfn b\n");
 
     let report = engine
-        .fix(&plan("judged/grow", Safety::Safe, true), &FixRun::default())
+        .fix(&plan("judged/grow", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "fn a\nTODO WARN\nfn b\n");

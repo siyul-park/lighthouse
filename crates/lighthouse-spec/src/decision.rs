@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use lighthouse_model::{Severity, squash};
+use lighthouse_model::{Safety, Severity, squash};
 use lighthouse_resource::{Metadata, Resource, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -64,7 +64,7 @@ pub struct DecisionSpec {
     /// definitive: it needs no review and only a directive in the code
     /// waives it, and its fix may be safe. `warn` and `info` are review
     /// tasks: a reviewer's judgment may hide them and a fix is at most
-    /// suggested. A decision without a `check` has none. A configuration
+    /// unsafe. A decision without a `check` has none. A configuration
     /// `level` changes what is reported and the exit code, never this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<Severity>,
@@ -250,6 +250,20 @@ impl Deref for Decision {
 }
 
 impl DecisionSpec {
+    /// The widest safety a fix of this decision can have, whoever makes the
+    /// fix: the one place that says. A fix is `safe` only when a program makes
+    /// it and the decision authors `error`, and then as far as its `safety`
+    /// allows; every other fix, a model's among them, is `unsafe`. A
+    /// provider's claim can make it `unsafe`, never `safe` again.
+    pub fn fix_safety(&self) -> Safety {
+        match &self.fix {
+            Some(fix) if fix.deterministic() && self.severity == Some(Severity::Error) => {
+                fix.safety
+            }
+            _ => Safety::Unsafe,
+        }
+    }
+
     /// Whether a program decides the decision's findings, as opposed to agent
     /// review (`judged`) or nothing (documentation).
     pub fn automated(&self) -> bool {

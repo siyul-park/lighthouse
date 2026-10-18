@@ -121,15 +121,14 @@ Fixers that run a program (`command`) are not previewed: they need the project's
 trust and are slow; their group carries only `apply`.
 
 - `--format json` and the `check`/`fix` tools: an instance carries
-  `fix: {"safety": "safe"|"suggested", "diff": "@@ -l,n +l,n @@ ..."}` in its
+  `fix: {"safety": "safe"|"unsafe", "diff": "@@ -l,n +l,n @@ ..."}` in its
   fourth element, a unified diff with one line of context, at most about 12
   lines. A longer fix is `{"safety", "summary": "<description> (N lines)"}`.
-  `safety` is `suggested` whenever applying needs unsafe fixes (a suggested
-  fix, or a rule that is not mechanical). `detail: full` has the same `fix`
+  `safety` is `unsafe` whenever applying needs unsafe fixes. `detail: full` has the same `fix`
   object. In the text format the hunk is printed indented under the finding.
 - A group of a fixable decision has `apply`: `fix {"decision":["<id>"]}` (the `fix` tool), or `lighthouse check --fix --decision
-  <id>` (with `--unsafe-fixes` for suggested fixes), or the `fix` tool call
-  through MCP.
+  <id>` (with `--unsafe-fixes` for unsafe fixes), or the `fix` tool call
+  through MCP; its `fix` line also says who fixes, the safety and whether it runs.
 - A diff gets `--- a/<path>` / `+++ b/<path>` headers when the fix edits a file
   other than the finding's.
 - SARIF columns count UTF-16 code units, as SARIF defines them, so locations
@@ -140,19 +139,21 @@ trust and are slow; their group carries only `apply`.
   insertedContent}]}]`, for up to 200 findings.
 
 Prefer `check --fix` for safe fixes, and read the diff before applying
-suggested ones.
+unsafe ones: a preview is applied by its fingerprint (`check --fix
+--unsafe-fixes --fingerprint <fp>`, or the `fix` tool with `fingerprints` and
+`unsafeFixes`).
 
 ### Fixing
 
 `fix` applies the fixes that the catalog attaches to rules (`fixable: safe` or
-`suggested` in `decision_list`, `decision_show` and the skill; see "Fixing" in
+`unsafe` in `decision_list`, `decision_show` and the skill; see "Fixing" in
 [architecture.md](architecture.md)). Name what to fix with `fingerprints` (from
 `check`; prefixes are accepted), `paths` (under the project root) or `decision`: a
 fix never defaults to the whole project. Use `dryRun` first: it returns the
-`diff` and leaves every file as it was. Only safe fixes of mechanical rules are
-applied unless `unsafeFixes` is set; suggested ones are then judgment calls to
-review in the diff, and without it they come back in `declined` with the
-reason. Every applied fix has been formatted (the `[languages.<id>] formatter`
+`diff` and leaves every file as it was. Only safe fixes are applied unless
+`unsafeFixes` is set or the project allows it (`[approval] fix = "allow"`); unsafe ones
+are then judgment calls to review in the diff, and without it they come back in
+`previews` with their diff, whatever program makes them. `noModels` asks no model. Every applied fix has been formatted (the `[languages.<id>] formatter`
 of `lighthouse.toml`), re-checked and, for a file that gained an error or stopped
 being analyzable, rolled back, so `declined` also says what was undone and why.
 Findings that a judgment hides are never fixed, and a run refuses to start

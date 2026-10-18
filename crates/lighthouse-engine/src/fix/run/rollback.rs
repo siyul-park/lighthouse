@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Fingerprint, Preview, Safety};
+use lighthouse_model::{Fingerprint, Preview};
 
 use lighthouse_protocol::hash;
 
@@ -33,7 +33,7 @@ impl Orchestrator<'_> {
         round: usize,
     ) -> Result<Option<Run>, Error> {
         // Safe fixes win a collision, so the ones that apply unasked are not
-        // shut out by a suggestion.
+        // shut out by an unsafe one.
         proposals.sort_by_key(|p| p.safety);
         let (mut kept, mut merged, dropped) = kept_proposals(proposals);
         self.decline_dropped(&dropped);
@@ -80,7 +80,7 @@ impl Orchestrator<'_> {
             self.notes
                 .push(format!("rolled back {}: {reason}", file.display()));
         }
-        self.preview_models(&kept, &merged, &rolled, &candidates.bases);
+        self.keep_previews(&kept, &merged, &rolled, &candidates.bases);
         for file in changed.iter().filter(|f| !rolled.contains_key(*f)) {
             self.original.entry(file.clone()).or_insert_with(|| {
                 let base = candidates.bases.remove(file).unwrap_or_default();
@@ -160,23 +160,22 @@ impl Orchestrator<'_> {
         any
     }
 
-    /// Keeps the preview of every fix by a model that stands, in case the run
-    /// leaves it for a hand to apply, or why it has none. `bases` holds the
+    /// Keeps the preview of every standing fix the run may not write, in case
+    /// it leaves it for a hand to apply, or why it has none. `bases` holds the
     /// texts the round changed; a file it left as it was has the text it
     /// stands in for.
-    fn preview_models(
+    fn keep_previews(
         &mut self,
         kept: &[Proposal],
         merged: &[(Proposal, Fingerprint)],
         rolled: &BTreeMap<PathBuf, String>,
         bases: &BTreeMap<PathBuf, String>,
     ) {
-        let standing = kept
+        let standing: Vec<&Proposal> = kept
             .iter()
             .chain(merged.iter().map(|(p, _)| p))
-            .filter(|p| {
-                p.fixer == FixedBy::Model && !p.files.iter().any(|f| rolled.contains_key(f))
-            });
+            .filter(|p| !self.permits(p.safety) && !p.files.iter().any(|f| rolled.contains_key(f)))
+            .collect();
         for p in standing {
             let shown = preview_files(p, |file| {
                 bases
@@ -199,7 +198,7 @@ impl Orchestrator<'_> {
                     Ok(Preview {
                         fingerprint: p.fingerprint.clone(),
                         description: p.description.clone(),
-                        safety: Safety::Suggested,
+                        safety: p.safety,
                         files,
                     })
                 },

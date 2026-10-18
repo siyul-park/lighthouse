@@ -211,7 +211,7 @@ fn run_proposals(number: usize, run: &Accepted<'_>) -> Vec<Proposal> {
             line: finding.span.start.line,
             fixer: FixedBy::Model,
             description: format!("model edit by `{}`", run.model),
-            safety: Safety::Suggested,
+            safety: Safety::Unsafe,
             edits: edits.clone(),
             files: files.clone(),
             aim: Aim::File,

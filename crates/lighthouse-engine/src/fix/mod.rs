@@ -20,7 +20,6 @@ use std::{
     path::PathBuf,
 };
 
-use lighthouse_model::Severity;
 use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Catalog, Decision, FixKind, FixScope};
@@ -58,10 +57,9 @@ impl fmt::Display for FixedBy {
 pub struct FixBinding {
     /// What serves the rule.
     pub fixer: FixedBy,
-    /// What the fixer may claim at most.
+    /// The effective safety of the fix at best, [`DecisionSpec::fix_safety`]: what
+    /// the fixer claims can only be as safe as this.
     pub cap: Safety,
-    /// The rule is mechanical: its safe fixes apply without asking.
-    pub mechanical: bool,
     /// The languages of the examples of the decision: where its fix is known
     /// to apply.
     pub languages: Vec<String>,
@@ -98,8 +96,7 @@ impl FixPlan {
                 decision.id(),
                 FixBinding {
                     fixer: FixedBy::Fixer(decision.id().to_owned()),
-                    cap: fix.safety,
-                    mechanical: decision.severity == Some(Severity::Error),
+                    cap: decision.fix_safety(),
                     languages: languages_of(decision),
                     runs_command: matches!(fix.kind, FixKind::Command(_)),
                     decision: decision_of(decision),
@@ -136,8 +133,7 @@ impl FixPlan {
                 decision.id(),
                 FixBinding {
                     fixer: FixedBy::Model,
-                    cap: Safety::Suggested,
-                    mechanical: false,
+                    cap: decision.fix_safety(),
                     languages: Vec::new(),
                     runs_command: false,
                     decision: decision_of(decision),
@@ -181,11 +177,11 @@ pub struct FixRun {
     pub skip: BTreeSet<Fingerprint>,
     /// Do everything but leave the files as they were.
     pub dry_run: bool,
-    /// Also apply suggested fixes.
+    /// Also write `unsafe` fixes, as `[approval] fix = "allow"` does.
     pub unsafe_fixes: bool,
     /// Use this registered fixer for every selected finding instead of the
     /// catalog's; needs `rules` or `fingerprints`. Its proposals are
-    /// suggestions at most.
+    /// `unsafe`.
     pub fixer: Option<String>,
 }
 
@@ -220,10 +216,12 @@ pub struct FileChange {
     pub after: String,
 }
 
-/// A fix by a model that the checks accepted and the run left for a hand.
+/// An `unsafe` fix that the checks accepted and the run was not permitted to
+/// write.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreviewedFix {
     pub rule_id: String,
+    pub fixer: FixedBy,
     pub preview: Preview,
 }
 
@@ -247,9 +245,10 @@ pub struct FixReport {
     pub rounds: usize,
     /// What the user should know: files rolled back, rounds exhausted.
     pub notes: Vec<String>,
-    /// The fixes by a model that the checks accepted and the run left for a
-    /// hand to apply: the project's approval, or a failing `[fix] verify`
-    /// command, withheld them. With `dry_run` they are the same.
+    /// The `unsafe` fixes, by any provider, that the checks accepted and the
+    /// run left for a hand to apply: no `[approval] fix = "allow"` and no
+    /// `unsafe_fixes`, or a failing `[fix] verify` command, withheld them. With
+    /// `dry_run` they are the same.
     pub previews: Vec<PreviewedFix>,
     /// What became of the findings given to a model, by decision; empty when
     /// no model was asked.

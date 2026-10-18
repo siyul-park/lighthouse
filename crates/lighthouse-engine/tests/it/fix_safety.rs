@@ -24,10 +24,7 @@ fn an_untrusted_project_is_not_formatted_but_is_still_verified() {
     let unformatted = engine(&dir, formatter);
 
     let report = unformatted
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "DONE   here\n", "applied, unformatted");
@@ -38,7 +35,7 @@ fn an_untrusted_project_is_not_formatted_but_is_still_verified() {
     );
     let bad = project("TODO\n");
     let verified = engine(&bad, "")
-        .fix(&plan("fake/to-bad", Safety::Safe, true), &FixRun::default())
+        .fix(&plan("fake/to-bad", Safety::Safe), &FixRun::default())
         .unwrap();
     assert_eq!(
         text(&bad),
@@ -61,7 +58,7 @@ fn a_dry_run_verifies_in_memory_and_leaves_the_disk_byte_identical() {
     };
 
     let report = engine
-        .fix(&plan("fake/to-done", Safety::Safe, true), &run)
+        .fix(&plan("fake/to-done", Safety::Safe), &run)
         .unwrap();
 
     assert_eq!(report.changes[0].after, "fn a\nDONE here\n");
@@ -138,7 +135,6 @@ fn a_file_that_changed_since_it_was_read_is_skipped_and_its_fix_is_declined() {
         FixBinding {
             fixer: FixedBy::Fixer("meddle/meddle".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "meddle/todo".to_owned(),
@@ -179,10 +175,7 @@ fn a_file_that_changes_while_verifying_is_not_written_over() {
     let engine = engine(&dir, &formatter).with_trust(true);
 
     let report = engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(
@@ -223,7 +216,7 @@ fn a_named_fixer_needs_the_rules_or_fingerprints_it_is_for() {
 }
 
 #[test]
-fn eligibility_is_decided_before_a_fixer_is_asked() {
+fn an_unsafe_fix_is_asked_for_in_every_run_to_be_shown() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static ASKED: AtomicUsize = AtomicUsize::new(0);
     struct Counting(FixerManifest);
@@ -274,8 +267,7 @@ fn eligibility_is_decided_before_a_fixer_is_asked() {
         "count/todo",
         FixBinding {
             fixer: FixedBy::Fixer("count/count".to_owned()),
-            cap: Safety::Suggested,
-            mechanical: true,
+            cap: Safety::Unsafe,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "count/todo".to_owned(),
@@ -290,8 +282,8 @@ fn eligibility_is_decided_before_a_fixer_is_asked() {
     engine.fix(&plan, &FixRun::default()).unwrap();
     assert_eq!(
         ASKED.load(Ordering::SeqCst),
-        0,
-        "a suggested fix is not even asked for"
+        1,
+        "an unsafe fix is asked for, to be previewed"
     );
 
     let run = FixRun {
@@ -299,14 +291,14 @@ fn eligibility_is_decided_before_a_fixer_is_asked() {
         ..FixRun::default()
     };
     engine.fix(&plan, &run).unwrap();
-    assert_eq!(ASKED.load(Ordering::SeqCst), 1);
+    assert_eq!(ASKED.load(Ordering::SeqCst), 2);
 }
 
 #[test]
 fn an_unsupported_fix_declines_its_findings_with_its_reason() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
-    let mut unsupported = plan("fake/to-done", Safety::Safe, true);
+    let mut unsupported = plan("fake/to-done", Safety::Safe);
     unsupported.insert(
         "fake/todo",
         FixBinding {
@@ -382,7 +374,6 @@ fn a_proposal_whose_edits_overlap_each_other_is_declined() {
         FixBinding {
             fixer: FixedBy::Fixer("twin/twin".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "twin/todo".to_owned(),
@@ -481,7 +472,6 @@ fn fixes_that_undo_each_other_stop_the_run_and_name_their_rules() {
         FixBinding {
             fixer: FixedBy::Fixer("flip/any".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "flip/any".to_owned(),
@@ -548,7 +538,6 @@ fn a_fix_that_adds_a_warning_is_rolled_back_like_one_that_adds_an_error() {
         FixBinding {
             fixer: FixedBy::Fixer("warned/todo".to_owned()),
             cap: Safety::Safe,
-            mechanical: true,
             languages: Vec::new(),
             decision: FixDecision {
                 id: "warned/todo".to_owned(),
@@ -580,10 +569,7 @@ fn a_written_file_keeps_its_mode() {
     let engine = engine(&dir, "");
 
     engine
-        .fix(
-            &plan("fake/to-done", Safety::Safe, true),
-            &FixRun::default(),
-        )
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
         .unwrap();
 
     assert_eq!(text(&dir), "DONE\n");
@@ -666,7 +652,6 @@ fn a_fix_cannot_reach_outside_the_project_or_into_a_symlink() {
             FixBinding {
                 fixer: FixedBy::Fixer("reach/reach".to_owned()),
                 cap: Safety::Safe,
-                mechanical: true,
                 languages: Vec::new(),
                 decision: FixDecision {
                     id: "reach/todo".to_owned(),

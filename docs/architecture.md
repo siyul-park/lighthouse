@@ -564,9 +564,9 @@ fixed: the optional `fix:` block of its decision (see [Fixer spec](fixer-spec.md
 resolution is deterministic, `finding.decision` to `decision.fix` to the fixer registered
 under the decision's id; there is no list of competing fixers and no fallback chain.
 `--fixer <id>` is an explicit override that must name a registered fixer; it replaces the
-decision's fixer for the selected findings, whose proposals count as `suggested`, and it
+decision's fixer for the selected findings, whose proposals count as `unsafe`, and it
 is the way to use a fixer for a rule that has no `fix:`. Documentation, `decision show` and the
-skill show `fixable: safe|suggested`.
+skill show `fixable: safe|unsafe`.
 
 **Edit operations, not a round-trip IR.** Fixers do not rewrite source and there is no
 lift-transform-lower pipeline (that would need a code generator per language and lose
@@ -614,13 +614,22 @@ catalog that uses `rename` must list `complete-references` in `requires`.
 normalized (no `..`, not absolute), a non-generated file of the analyzed project, and
 reached through no symlink; anything else is declined before any text is read.
 
-**Safety.** A proposal is `safe` or `suggested`. The decision's `safety` caps what its
-fixer may claim: a fixer that returns `safe` for a `suggested` decision is downgraded.
-`safe` is reserved for mechanical decisions (the catalog validation refuses it elsewhere).
-By default only safe fixes of mechanical rules are applied; `--unsafe-fixes` (MCP
-`unsafeFixes`) also applies suggested ones. Eligibility is decided from the decision before
-a fixer is asked, so a suggested fix, a command included, never even runs without
-`--unsafe-fixes`; the finding is reported as left alone, with the reason. `--fixer <id>`
+**Safety.** A fix is `safe` or `unsafe`, whatever provider makes it (ops, command, rpc or
+a model), and one function, `DecisionSpec::fix_safety`, says which: `safe` only for a
+deterministic fix of a decision that authors `error`; a model's fix, and any fix of a
+`warn` or `info` decision, is `unsafe`. A fixer may claim less than that, never more. One
+permission writes a fix of any provider: a `safe` fix is written; an `unsafe` one is written
+under `[approval] fix = "allow"` or `--unsafe-fixes` (MCP `unsafeFixes`), and otherwise it is
+verified in memory and reported as `previewed` with its diff, never written. Applying a
+preview is `check --fix --unsafe-fixes --fingerprint <fp>` (the `fingerprints` of the `fix`
+tool): a deterministic fix is computed again, a model fix is served from the edit cache,
+which is keyed on the digests of the files it read, and re-verified, so a base that changed
+since is a `conflict` and nothing is written. `--no-models` (MCP `noModels`) asks no model.
+Every decision carries one descriptor, built in one place (`lighthouse_session::Fixing`),
+that says who checks and who fixes, the safety, whether the fix runs and if not why (no edit
+binding, untrusted project, sandbox unavailable, budget spent, provider unavailable), the
+approval, and the command line and tool call that apply it; `decision list`, `decision show`,
+the check groups, `review_show` and the hooks print it. `--fixer <id>`
 (the `fixer` argument of the `fix` tool) names a registered fixer for the selected findings and
 needs `--decision` or fingerprints.
 
@@ -678,7 +687,7 @@ for constructors) and `testing/file-layout` (a `move` of a fixture above, or a h
 below, the tests) are safe; `design/layout` and
 `design/layout` (a `move` next to the related symbol or the caller),
 `design/comments` and `core/no-unused-allow` (a `delete` of the comment or the
-annotation line) are suggested. An `impl` block is not a symbol, so
+annotation line) are unsafe. An `impl` block is not a symbol, so
 reordering a Rust file cannot move one: such findings are declined and fixed by hand.
 `lighthouse check .` on this repository is clean, and `check --fix` brought it there.
 

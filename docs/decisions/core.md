@@ -80,7 +80,7 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`core/allow`](#allow-a-finding-in-source-with-a-reason) | Allow a finding in source, with a reason | error · builtin |  |  |
-| [`core/no-unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · builtin | suggested |  |
+| [`core/no-unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · builtin | unsafe |  |
 
 ### Allow a finding in source, with a reason
 
@@ -110,7 +110,7 @@ Also: rust
 
 ### Allow annotations suppress something
 
-`core/no-unused-allow` · file · warn · builtin · fix: suggested
+`core/no-unused-allow` · file · warn · builtin · fix: unsafe
 
 *An exception that no longer applies is noise that hides the next real one. A `lighthouse-disable` range that covers no finding is as stale as a single directive, and so is a `lighthouse-enable` that closes no range, or a directive that names no decision (there is no form without ids).*
 

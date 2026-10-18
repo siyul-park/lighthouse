@@ -6,7 +6,7 @@ A decision's `fix:` block says how the findings of its rule are fixed. Its `type
 
 ```yaml
 fix:
-  safety: safe        # safe | suggested
+  safety: safe        # safe | unsafe
   requires: [extent]  # optional
   type: ops           # ops | command | rpc
   ops: [...]
@@ -108,7 +108,7 @@ The `command` type is the simple text contract: a program, without a shell, on a
 
 ```yaml
 fix:
-  safety: suggested
+  safety: unsafe
   type: command
   argv: ["gofmt", "-s", "-w", "{file}"]
   output: in-place   # in-place | text

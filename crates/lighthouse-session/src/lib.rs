@@ -7,6 +7,7 @@
 mod authoring;
 mod check;
 mod decisions;
+mod descriptor;
 mod findings;
 mod generated;
 mod git;
@@ -29,8 +30,9 @@ pub use decisions::{
     DecisionRow, DecisionTest, active_decisions, catalog_index, config_summary, decision_rows,
     decision_text, explain, test_decisions,
 };
+pub use descriptor::Fixing;
 pub use findings::Remembered;
-pub use generated::{SKILL_MARKER, bundled_docs, schema_of, schemas, skill, skill_for};
+pub use generated::{AGENT_LOOP, SKILL_MARKER, bundled_docs, schema_of, schemas, skill, skill_for};
 pub use git::head;
 pub use lighthouse_engine::{FailOn, ModelOptions, Timings, cache};
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};

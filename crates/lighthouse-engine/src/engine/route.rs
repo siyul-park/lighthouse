@@ -41,6 +41,8 @@ pub(crate) enum Refusal {
     Budget,
     /// The models failed, or are no longer asked; the last reason.
     Failed(String),
+    /// The run only replays kept answers and none is kept for the request.
+    Unkept,
 }
 
 /// What the route was asked and cost this run.
@@ -70,6 +72,8 @@ pub(crate) struct Route<'a> {
     /// Requests that went through the route, to rotate its models.
     turn: AtomicUsize,
     budget: AtomicUsize,
+    /// Only kept answers are used; no model is asked.
+    replay: bool,
     cache: Option<Cache>,
     /// The answers of this run, which the cache may not keep.
     memo: Mutex<BTreeMap<Digest, Value>>,
@@ -125,6 +129,7 @@ impl Engine {
             routing: self.binding.routing,
             turn: AtomicUsize::new(0),
             budget: AtomicUsize::new(self.binding.budget),
+            replay: self.models.replay,
             cache,
             memo: Mutex::default(),
             failures: Mutex::default(),
@@ -144,6 +149,7 @@ impl<'a> Route<'a> {
             routing: Routing::Ordered,
             turn: AtomicUsize::new(0),
             budget: AtomicUsize::new(usize::MAX),
+            replay: false,
             cache: None,
             memo: Mutex::default(),
             failures: Mutex::default(),
@@ -174,6 +180,10 @@ impl Route<'_> {
             let key = key(member, &named(manifest));
             if let Some(kept) = self.kept(&key) {
                 return Ok((kept, manifest.id.clone()));
+            }
+            if self.replay {
+                refusal = Refusal::Unkept;
+                continue;
             }
             if let Some(reason) = self.skipped(&manifest.id) {
                 refusal = Refusal::Failed(reason);

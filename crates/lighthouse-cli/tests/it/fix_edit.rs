@@ -15,26 +15,27 @@ use crate::{
     models_plugin::lighthouse,
 };
 
-const LIB: &str = "pub fn bad_one() {}\npub fn fine() {}\n";
-const FIXED: &str = "pub fn fixed_one() {}\npub fn fine() {}\n";
+pub(crate) const LIB: &str = "pub fn bad_one() {}\npub fn fine() {}\n";
+pub(crate) const FIXED: &str = "pub fn fixed_one() {}\npub fn fine() {}\n";
 
 /// Two functions with the name the decision bans, in modules of their own.
 const PAIR: &str = "mod a {\n    pub fn bad_one() {}\n}\nmod b {\n    pub fn bad_one() {}\n}\n";
 
-const OTHER: &str = "pub fn other_one() {}\n";
+pub(crate) const OTHER: &str = "pub fn other_one() {}\n";
 
-const LISTED: &str = "[fix]\ndecisions = [\"local/naming-ban\"]\n";
+pub(crate) const LISTED: &str = "[fix]\ndecisions = [\"local/naming-ban\"]\n";
 
-const ALLOWED: &str = "[approval]\nfix = \"allow\"\n[fix]\ndecisions = [\"local/naming-ban\"]\n";
+pub(crate) const ALLOWED: &str =
+    "[approval]\nfix = \"allow\"\n[fix]\ndecisions = [\"local/naming-ban\"]\n";
 
 /// The agent that renames the banned function in `src/lib.rs`.
-const RENAME: &str =
+pub(crate) const RENAME: &str =
     "sed 's/bad_one/fixed_one/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n";
 
 /// A project that binds `edit` to the script `agent`, with `provider` among
 /// the lines of the provider and `extra` after the `models` tables; and the
 /// directory the script lives in.
-fn edited(agent: &str, provider: &str, extra: &str) -> (TempDir, TempDir) {
+pub(crate) fn edited(agent: &str, provider: &str, extra: &str) -> (TempDir, TempDir) {
     let scripts = tempfile::tempdir().unwrap();
     write(scripts.path(), "agent.sh", agent);
     let script = scripts.path().join("agent.sh");
@@ -47,7 +48,7 @@ fn edited(agent: &str, provider: &str, extra: &str) -> (TempDir, TempDir) {
     (dir, scripts)
 }
 
-fn lib(dir: &TempDir) -> String {
+pub(crate) fn lib(dir: &TempDir) -> String {
     fs::read_to_string(dir.path().join("src/lib.rs")).unwrap()
 }
 
@@ -71,7 +72,7 @@ fn an_edit_that_fixes_the_finding_is_applied_when_the_project_approves() {
     assert_eq!(fixed["applied"].as_array().unwrap().len(), 1, "{fixed}");
     let applied = &fixed["applied"][0];
     assert_eq!(applied["fixer"], "lighthouse/model");
-    assert_eq!(applied["safety"], "suggested");
+    assert_eq!(applied["safety"], "unsafe");
     assert_eq!(applied["description"], "model edit by `agent/m`");
     assert_eq!(
         counts(&fixed),

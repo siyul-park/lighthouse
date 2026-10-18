@@ -27,17 +27,17 @@ judged is remembered with its reason and is not raised again.
    read the decision: MCP resource `lighthouse://decisions/<id>`, tool
    `decision_show`, or `lighthouse decision show <id>`. `detail: "full"` (`--detail full`)
    returns one self-contained record per finding instead.
-3. **Fix** the code, then **recheck**. Findings of a rule marked `fixable` in
-   the digest below can be fixed for you: MCP tool `fix` (by `fingerprints`,
-   `paths` or `decision`, `dryRun` first to see the diff), or
-   `lighthouse check --fix`.
-   A fixable finding carries its fix as a unified diff (`fix`) and its group an
-   `apply` command: prefer `check --fix` for safe fixes, and read the diff of a
-   suggested one before applying it.
-   Only safe fixes of mechanical rules apply by default; `unsafeFixes` also
-   applies suggested ones. Every fix is verified and rolled back if it makes
-   the file worse. Review the diff like any other change. A run that reports `incomplete` did not
-   check everything: it is not a pass.
+3. **Fix** the code, then **recheck**. Each group says how its decision is
+   fixed: `fix` names who makes the fix, its `safety` (`safe` or `unsafe`),
+   whether it runs here and the call that applies it, and `brief` marks a
+   decision whose findings you fix by hand with the brief of `review_show`.
+   The loop:
+   {{fix-loop}}
+   Only `safe` fixes are written, whoever makes them; an `unsafe` fix is shown
+   as a preview with its diff, unless the project's `[approval] fix = "allow"`
+   or `unsafeFixes` says otherwise. Every fix is verified and rolled back if it
+   makes the file worse. Review the diff like any other change. A run that
+   reports `incomplete` did not check everything: it is not a pass.
 4. **Judge** the findings that ask for review (`review_list`: those of
    decisions that authored `warn` or `info`, whatever level the configuration
    reports them at): fix them, or record a judgment with `review_resolve`.

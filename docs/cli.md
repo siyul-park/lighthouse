@@ -125,16 +125,19 @@ Options:
           Print where the time went to stderr, phase by phase: reading, each language provider, merging, analyzers, the slowest rules, identity, the store and the report. Findings and exit code do not change
 
       --fix
-          Fix what the catalog's fixers can fix, then report what is left. Only safe fixes of mechanical rules are applied; each is verified (formatted, re-checked) and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed
+          Fix what the catalog's fixers can fix, then report what is left. Only safe fixes are written, whatever makes them (a rule, a command, a model); unsafe ones are shown as previews with how to apply them. Each fix is verified (formatted, re-checked) and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed
+
+      --fingerprint <FINGERPRINT>
+          With --fix: fix only the findings with these fingerprints (repeatable; prefixes of at least 7 characters allowed). With --unsafe-fixes it applies the preview of each: a deterministic fix is made again, a model's is taken from the answer kept when it was previewed, and a file that changed since gives a conflict
 
       --dry-run
           Print the unified diff and leave every file as it was
 
       --unsafe-fixes
-          Also apply suggested fixes, which are judgment calls: review the diff
+          Also write `unsafe` fixes, which are judgment calls, whatever makes them; without it, or `[approval] fix = "allow"`, they are shown as previews, and a preview is applied by naming its finding
 
       --fixer <ID>
-          Use this registered fixer for the selected findings instead of the one their decision names. Its fixes count as suggested
+          Use this registered fixer for the selected findings instead of the one their decision names. Its fixes are `unsafe`
 
   -h, --help
           Print help (see a summary with '-h')

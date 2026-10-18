@@ -38,7 +38,7 @@ pub fn simulate_unavailable(reason: &str) -> Simulation {
 }
 
 /// Whether sandboxed programs can run here, and if not, why.
-pub(super) fn available() -> Result<(), String> {
+pub fn available() -> Result<(), String> {
     let simulated = SIMULATED
         .lock()
         .ok()

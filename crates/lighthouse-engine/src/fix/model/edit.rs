@@ -190,6 +190,10 @@ impl ModelFixer<'_> {
                 let reason = format!("no model answered: {why}");
                 return Err(self.decline_all(batch, Class::Unanswered, reason));
             }
+            Err(Refusal::Unkept) => {
+                let reason = "no kept answer matches the files as they are now: they changed since the preview, or it was never made (run `check --fix` again for a new one)".to_owned();
+                return Err(self.decline_all(batch, Class::Conflict, reason));
+            }
         };
         self.count(batch, Event::Answered);
         if !attempt.said.is_empty() {

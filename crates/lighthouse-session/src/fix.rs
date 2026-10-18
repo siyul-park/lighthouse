@@ -13,6 +13,7 @@ use lighthouse_engine::{
     cache, unified_diff,
 };
 use lighthouse_model::Fingerprint;
+use lighthouse_report::{Aim, Apply};
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use schemars::JsonSchema;
@@ -39,7 +40,9 @@ pub struct Selection {
     pub targets: Targets,
     /// Do everything but leave the files as they were.
     pub dry_run: bool,
-    /// Also apply suggested fixes.
+    /// Also write `unsafe` fixes, as `[approval] fix = "allow"` does. With
+    /// fingerprints, it applies the previews of those findings: a model is not
+    /// asked again.
     pub unsafe_fixes: bool,
     /// Use this registered fixer instead of the catalog's.
     pub fixer: Option<String>,
@@ -63,9 +66,10 @@ pub struct Fixed {
     pub declined: Vec<Declined>,
     /// How many times fixing was repeated until nothing was left.
     pub rounds: usize,
-    /// Fixes by a model that the checks accepted and that were left for a
-    /// hand to apply (`approval.fix = "ask"`, or a failing `[fix] verify`
-    /// command), each with its diff. Absent when there are none.
+    /// `unsafe` fixes, by any provider, that the checks accepted and that were
+    /// left for a hand to apply (`approval.fix = "ask"` without
+    /// `--unsafe-fixes`, or a failing `[fix] verify` command), each with its
+    /// diff and how to apply it. Absent when there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub previews: Vec<Previewed>,
     /// What became of the findings given to a model, by decision. Absent when
@@ -80,16 +84,20 @@ pub struct Fixed {
     pub messages: Vec<String>,
 }
 
-/// A fix by a model that was left for a hand to apply.
+/// An `unsafe` fix that was left for a hand to apply.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct Previewed {
     pub fingerprint: String,
     pub decision: String,
+    pub fixer: String,
     pub safety: String,
     pub description: String,
     pub files: Vec<String>,
     /// The unified diff of the fix.
     pub diff: String,
+    /// Applies exactly this fix, as a command line and as a tool call.
+    #[serde(flatten)]
+    pub apply: Apply,
 }
 
 /// What became of the findings of one decision that were given to a model.
@@ -178,6 +186,7 @@ impl Fixed {
                 fix.description
             ));
             lines.extend(fix.diff.lines().map(|line| format!("  {line}")));
+            lines.push(format!("  apply: {}", fix.apply.apply));
         }
         for fix in &self.declined {
             lines.push(format!(
@@ -251,21 +260,29 @@ impl From<&ModelCounts> for Models {
     }
 }
 
-impl From<&PreviewedFix> for Previewed {
-    fn from(fix: &PreviewedFix) -> Self {
+impl Previewed {
+    /// The fix `fix` as reported, its application naming the finding by the
+    /// first `width` characters of its fingerprint.
+    fn new(fix: &PreviewedFix, width: usize) -> Self {
         let preview = &fix.preview;
+        let fingerprint = preview.fingerprint.as_str();
         let diff = preview
             .files
             .iter()
             .map(|file| format!("--- a/{0}\n+++ b/{0}\n{1}\n", file.path, file.hunks))
             .collect();
         Self {
-            fingerprint: preview.fingerprint.as_str().to_owned(),
+            fingerprint: fingerprint.to_owned(),
             decision: fix.rule_id.clone(),
+            fixer: fix.fixer.to_string(),
             safety: preview.safety.to_string(),
             description: preview.description.clone(),
             files: preview.files.iter().map(|f| f.path.clone()).collect(),
             diff,
+            apply: Apply::of(
+                Aim::Finding(fingerprint.get(..width).unwrap_or(fingerprint)),
+                true,
+            ),
         }
     }
 }
@@ -314,7 +331,10 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     } else {
         plan.with_model_fixes(catalog, &permit.ids, session.config.fix().scope)
     };
-    let engine = engine.with_models(request.models.clone());
+    let engine = engine.with_models(ModelOptions {
+        replay: !request.targets.fingerprints.is_empty() && request.unsafe_fixes,
+        ..request.models.clone()
+    });
     // The answers of models are kept in the cache; a project that asks none
     // runs as it always did.
     let engine = if asks_model && request.cache {
@@ -349,13 +369,18 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         .iter()
         .map(|c| unified_diff(&c.path, &c.before, &c.after))
         .collect();
+    let widths = shortest(&report);
     Ok(Fixed {
         dry_run: request.dry_run,
         diff,
         applied: report.applied.iter().map(Applied::from).collect(),
         declined: report.declined.iter().map(Declined::from).collect(),
         rounds: report.rounds,
-        previews: report.previews.iter().map(Previewed::from).collect(),
+        previews: report
+            .previews
+            .iter()
+            .map(|fix| Previewed::new(fix, widths[fix.preview.fingerprint.as_str()]))
+            .collect(),
         models: report
             .models
             .iter()
@@ -371,6 +396,26 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         }),
         messages,
     })
+}
+
+/// How many characters of each fingerprint of the run and its previews tell it
+/// apart from the others, by fingerprint.
+fn shortest(report: &lighthouse_engine::FixReport) -> BTreeMap<&str, usize> {
+    let all: BTreeSet<&str> = report
+        .finished
+        .diagnostics
+        .iter()
+        .map(|d| d.fingerprint.as_str())
+        .chain(
+            report
+                .previews
+                .iter()
+                .map(|p| p.preview.fingerprint.as_str()),
+        )
+        .collect();
+    let all: Vec<&str> = all.into_iter().collect();
+    let widths = Fingerprint::prefix_widths(&all);
+    all.into_iter().zip(widths).collect()
 }
 
 /// Reads the project as it is before any fix, recording it when the run uses

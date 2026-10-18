@@ -138,7 +138,7 @@ pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
         line: finding.span.start.line,
         fixer: FixedBy::Model,
         description: "model fix".to_owned(),
-        safety: Safety::Suggested,
+        safety: Safety::Unsafe,
         edits: Vec::new(),
         files: vec![finding.file.clone()],
         aim: Aim::Finding,

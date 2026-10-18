@@ -63,7 +63,7 @@ Result: [CheckReport](../schema/check-report.schema.json).
 
 Fix findings with the fixers their decisions name.
 
-Fix findings with the fixers the decisions name (`fixable: safe|suggested` in `decision_list`). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafeFixes` is set. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.
+Fix findings with the fixers the decisions name (`fix` in `decision_list`: who makes it, `safe` or `unsafe`, whether it runs). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only `safe` fixes are written, whatever makes them; an `unsafe` one is returned as a preview with its diff and the call that applies exactly it (`fingerprints` with `unsafeFixes`), unless `unsafeFixes` is set or the project's `[approval] fix` is `allow`. Applying a preview makes a deterministic fix again and takes a model's from the answer kept when it was previewed: a file that changed since gives a conflict and writes nothing. `noModels` asks no model. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes, the `previews` and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.
 
 Result: [FixReport](../schema/fix-report.schema.json).
 
@@ -72,9 +72,10 @@ Result: [FixReport](../schema/fix-report.schema.json).
 | `decision` | string[] | `[]` | Fix the findings of these decisions: ids or globs. |
 | `dryRun` | boolean | `false` | Print the unified diff and leave every file as it was. |
 | `fingerprints` | string[] | `[]` | Fix these findings: fingerprints or unique prefixes of at least 7 characters. |
-| `fixer` | string \| null | `null` | Use this registered fixer for the selected findings instead of the one their decision names. Its fixes count as suggested. |
+| `fixer` | string \| null | `null` | Use this registered fixer for the selected findings instead of the one their decision names. Its fixes are `unsafe`. |
+| `noModels` | boolean | `false` | Ask no model: what they would fix is left to review. |
 | `paths` | string[] | `[]` | Fix findings under these paths. |
-| `unsafeFixes` | boolean | `false` | Also apply suggested fixes, which are judgment calls: review the diff. |
+| `unsafeFixes` | boolean | `false` | Also write `unsafe` fixes, which are judgment calls, whatever makes them; without it, or `[approval] fix = "allow"`, they are shown as previews, and a preview is applied by naming its finding. |
 
 ## decision_list
 

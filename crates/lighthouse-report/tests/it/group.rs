@@ -4,9 +4,14 @@
 use std::collections::BTreeMap;
 
 use lighthouse_model::{
-    Diagnostic, Fingerprint, Position, Preview, PreviewEdit, PreviewFile, Severity, Span,
+    Diagnostic, Fingerprint, Position, Preview, PreviewEdit, PreviewFile, Safety, Severity, Span,
+    Unavailable,
 };
-use lighthouse_report::{Briefing, Entry, Format, GroupOptions, Grouped, render};
+use lighthouse_report::{
+    Aim, Apply, Briefing, CheckBy, CheckInfo, Descriptor, Entry, FixBy, FixInfo, Format,
+    GroupOptions, Grouped, render,
+};
+use lighthouse_spec::Approval;
 use serde_json::{Value, json};
 
 use crate::json_of;
@@ -296,4 +301,163 @@ fn a_fix_diff_names_the_files_when_it_edits_one_besides_the_findings() {
         "{other}"
     );
     assert!(other.contains("--- a/b.txt\n+++ b/b.txt\n"), "{other}");
+}
+
+fn fix_of(
+    by: FixBy,
+    safety: Safety,
+    why: Option<Unavailable>,
+    approval: Option<Approval>,
+) -> FixInfo {
+    FixInfo {
+        by,
+        safety,
+        runs: why.is_none(),
+        why,
+        approval,
+        apply: Apply::of(Aim::Decision("acme/a"), safety == Safety::Unsafe),
+    }
+}
+
+fn described(descriptor: Descriptor, tool_form: bool) -> String {
+    let descriptors = BTreeMap::from([("acme/a".to_owned(), descriptor)]);
+    let entries = vec![entry("acme/a", Severity::Warn, "x.go", 1, &spread(1))];
+    Grouped::of(
+        entries,
+        &GroupOptions {
+            descriptors: Some(&descriptors),
+            tool_form,
+            ..GroupOptions::default()
+        },
+    )
+    .text()
+}
+
+fn descriptor(fix: Option<FixInfo>, brief: bool) -> Descriptor {
+    Descriptor {
+        check: CheckInfo {
+            by: CheckBy::Cel,
+            runs: true,
+        },
+        fix,
+        brief,
+    }
+}
+
+#[test]
+fn a_group_says_in_one_line_how_its_fix_is_made_and_applied() {
+    let safe = descriptor(Some(fix_of(FixBy::Ops, Safety::Safe, None, None)), false);
+    let text = described(safe.clone(), false);
+    assert!(
+        text.contains("  fix: safe (ops) \u{2014} lighthouse check --fix --decision acme/a\n"),
+        "{text}"
+    );
+    let text = described(safe, true);
+    assert!(
+        text.contains("  fix: safe (ops) \u{2014} fix {\"decision\":[\"acme/a\"]}\n"),
+        "{text}"
+    );
+
+    let asked = fix_of(FixBy::Model, Safety::Unsafe, None, Some(Approval::Ask));
+    let text = described(descriptor(Some(asked), true), false);
+    assert!(
+        text.contains(
+            "  fix: unsafe (model, previewed under ask) \u{2014} lighthouse check --fix --unsafe-fixes --decision acme/a\n"
+        ),
+        "{text}"
+    );
+
+    let allowed = fix_of(FixBy::Command, Safety::Unsafe, None, Some(Approval::Allow));
+    let text = described(descriptor(Some(allowed), true), false);
+    assert!(
+        text.contains("fix: unsafe (command, written under allow)"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_group_without_a_fix_or_with_one_that_does_not_run_points_to_the_brief() {
+    let none = described(descriptor(None, true), true);
+    assert!(
+        none.contains(&format!(
+            "  fix: none \u{2014} review_show {} for a brief\n",
+            spread(1)
+        )),
+        "{none}"
+    );
+
+    let idle = fix_of(
+        FixBy::Model,
+        Safety::Unsafe,
+        Some(Unavailable::NoEditBinding),
+        Some(Approval::Ask),
+    );
+    let text = described(descriptor(Some(idle), true), false);
+    assert!(
+        text.contains(&format!(
+            "  fix: unsafe (model, not running: no edit binding) \u{2014} lighthouse review show {} for a brief\n",
+            spread(1)
+        )),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_group_in_json_carries_the_descriptor_once() {
+    let idle = fix_of(
+        FixBy::Command,
+        Safety::Safe,
+        Some(Unavailable::UntrustedProject),
+        None,
+    );
+    let descriptors = BTreeMap::from([("acme/a".to_owned(), descriptor(Some(idle), true))]);
+    let entries = vec![
+        entry("acme/a", Severity::Warn, "x.go", 1, &spread(1)),
+        entry("acme/a", Severity::Warn, "x.go", 2, &spread(2)),
+    ];
+
+    let group = &json_of(
+        &Grouped::of(
+            entries,
+            &GroupOptions {
+                descriptors: Some(&descriptors),
+                ..GroupOptions::default()
+            },
+        )
+        .data(),
+    )["groups"][0];
+
+    assert_eq!(group["check"], json!({"by": "cel", "runs": true}));
+    assert_eq!(
+        group["fix"],
+        json!({
+            "by": "command",
+            "safety": "safe",
+            "runs": false,
+            "why": "untrusted project",
+            "apply": "lighthouse check --fix --decision acme/a",
+            "tool": {"name": "fix", "arguments": {"decision": ["acme/a"]}}
+        })
+    );
+    assert_eq!(group["brief"], true);
+}
+
+#[test]
+fn a_tool_call_is_a_line_of_its_name_and_arguments() {
+    let call = Apply::of(Aim::Finding("a1b2c3d"), true);
+
+    assert_eq!(
+        call.tool_line(),
+        r#"fix {"fingerprints":["a1b2c3d"],"unsafeFixes":true}"#
+    );
+}
+
+#[test]
+fn a_descriptor_line_for_a_decision_without_a_fix_names_the_brief_of_the_finding() {
+    let none = descriptor(None, true);
+
+    assert_eq!(
+        none.line("a1b2c3d", false),
+        "fix: none \u{2014} lighthouse review show a1b2c3d for a brief"
+    );
 }

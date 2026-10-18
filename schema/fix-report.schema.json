@@ -146,10 +146,14 @@
       "type": "object"
     },
     "previews": {
-      "description": "Fixes by a model that the checks accepted and that were left for a\nhand to apply (`approval.fix = \"ask\"`, or a failing `[fix] verify`\ncommand), each with its diff. Absent when there are none.",
+      "description": "`unsafe` fixes, by any provider, that the checks accepted and that were\nleft for a hand to apply (`approval.fix = \"ask\"` without\n`--unsafe-fixes`, or a failing `[fix] verify` command), each with its\ndiff and how to apply it. Absent when there are none.",
       "items": {
-        "description": "A fix by a model that was left for a hand to apply.",
+        "description": "An `unsafe` fix that was left for a hand to apply.",
         "properties": {
+          "apply": {
+            "description": "The command line.",
+            "type": "string"
+          },
           "decision": {
             "type": "string"
           },
@@ -169,17 +173,37 @@
           "fingerprint": {
             "type": "string"
           },
+          "fixer": {
+            "type": "string"
+          },
           "safety": {
             "type": "string"
+          },
+          "tool": {
+            "description": "A tool call: the twin of a command line.",
+            "properties": {
+              "arguments": true,
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "arguments"
+            ],
+            "type": "object"
           }
         },
         "required": [
           "fingerprint",
           "decision",
+          "fixer",
           "safety",
           "description",
           "files",
-          "diff"
+          "diff",
+          "apply",
+          "tool"
         ],
         "type": "object"
       },

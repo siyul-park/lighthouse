@@ -136,10 +136,9 @@ impl<'e> Proposer<'e> {
                 decline(finding, "the rule has no fix".to_owned());
                 continue;
             };
-            // Eligibility comes first: a fix that would not be applied is never
-            // even asked for, so a command never runs for nothing. A fix by a
-            // model is asked for whatever the run may apply: what it may do
-            // with the edit is settled after the checks.
+            // A fix the rule or the project does not run is declined before it
+            // is asked for. What the run may write of the rest is settled
+            // after the checks.
             if let Some(why) = &binding.unsupported {
                 decline(finding, why.clone());
                 continue;
@@ -157,21 +156,8 @@ impl<'e> Proposer<'e> {
                 asked_to_edit.push((finding, binding));
                 continue;
             }
-            if let Some(why) = self.ineligible(&binding) {
-                decline(finding, why);
-                continue;
-            }
             match self.propose_one(outcome, finding, &binding, &lowerer, &sources) {
-                Ok(proposal) if self.run.unsafe_fixes || proposal.safety == Safety::Safe => {
-                    proposals.push(proposal);
-                }
-                Ok(proposal) => {
-                    let reason = format!(
-                        "the fixer proposes a {} fix ({}); it is applied only with unsafe fixes (`--unsafe-fixes`, MCP `unsafeFixes`)",
-                        proposal.safety, proposal.description
-                    );
-                    decline(finding, reason);
-                }
+                Ok(proposal) => proposals.push(proposal),
                 Err(reason) => decline(finding, reason),
             }
         }
@@ -183,24 +169,6 @@ impl<'e> Proposer<'e> {
             &mut decline,
         )?);
         Ok((proposals, declined))
-    }
-
-    /// Why a fix may not be applied in this run, if it may not: judged from
-    /// the binding alone.
-    pub(super) fn ineligible(&self, binding: &FixBinding) -> Option<String> {
-        if self.run.unsafe_fixes {
-            return None;
-        }
-        let why = if binding.cap == Safety::Suggested {
-            format!("its fix is {}", binding.cap)
-        } else if !binding.mechanical {
-            "its rule is not mechanical".to_owned()
-        } else {
-            return None;
-        };
-        Some(format!(
-            "{why}, so it is applied only with unsafe fixes (`--unsafe-fixes`, MCP `unsafeFixes`)"
-        ))
     }
 
     /// The findings the run was asked to fix. A finding of a rule without a
@@ -242,8 +210,7 @@ impl<'e> Proposer<'e> {
         match &self.run.fixer {
             Some(fixer) => Some(FixBinding {
                 fixer: FixedBy::Fixer(fixer.clone()),
-                cap: Safety::Suggested,
-                mechanical: false,
+                cap: Safety::Unsafe,
                 languages: Vec::new(),
                 runs_command: false,
                 unsupported: None,

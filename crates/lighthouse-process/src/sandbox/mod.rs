@@ -30,7 +30,7 @@ pub use bridge::bridge;
 pub use bubblewrap::argv as bwrap_argv;
 pub use entries::{check_host, check_write};
 pub use plan::{Bridge, Denied, Plan};
-pub use probe::{Simulation, simulate_unavailable};
+pub use probe::{Simulation, available, simulate_unavailable};
 pub use proxy::{Proxy, allows};
 pub use seatbelt::profile as seatbelt_profile;
 

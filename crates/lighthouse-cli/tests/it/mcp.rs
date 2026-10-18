@@ -614,7 +614,7 @@ fn fix_previews_with_dry_run_then_applies_and_reports_both_lists() {
 }
 
 #[test]
-fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
+fn fix_selects_by_fingerprint_and_previews_unsafe_fixes_until_asked() {
     let dir = rust_project();
     let banner = "// ===== Types =====\n\npub struct Store;\n";
     fs::write(dir.path().join("src/lib.rs"), banner).unwrap();
@@ -632,24 +632,26 @@ fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
         .tool("fix", json!({ "fingerprints": [fingerprint] }))
         .unwrap();
     assert!(held["applied"].as_array().unwrap().is_empty());
+    assert!(held["declined"].as_array().unwrap().is_empty(), "{held}");
+    let preview = &held["previews"][0];
+    assert_eq!(preview["safety"], "unsafe");
     assert!(
-        held["declined"][0]["reason"]
+        preview["diff"]
             .as_str()
             .unwrap()
-            .contains("`unsafeFixes`")
+            .contains("-// ===== Types =====")
     );
+    assert_eq!(preview["tool"]["name"], "fix");
+    assert_eq!(preview["tool"]["arguments"]["unsafeFixes"], true);
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
         banner
     );
 
     let done = client
-        .tool(
-            "fix",
-            json!({ "fingerprints": [fingerprint], "unsafeFixes": true }),
-        )
+        .tool("fix", preview["tool"]["arguments"].clone())
         .unwrap();
-    assert_eq!(done["applied"][0]["safety"], "suggested");
+    assert_eq!(done["applied"][0]["safety"], "unsafe");
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
         "pub struct Store;\n"

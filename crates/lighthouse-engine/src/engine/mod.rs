@@ -286,6 +286,10 @@ pub struct ModelOptions {
     /// Models are asked at all. Off, the subjects they would judge are
     /// reported for review.
     pub off: bool,
+    /// Ask no model; use the answers kept from earlier runs and nothing else.
+    /// A request with no kept answer is not answered. Applying a preview
+    /// replays the answer it was made from.
+    pub replay: bool,
     /// Ask models that cost about the whole project, not only the files the
     /// run reports.
     pub all: bool,

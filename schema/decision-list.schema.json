@@ -7,9 +7,159 @@
       "items": {
         "description": "One decision of a listing.",
         "properties": {
+          "check": {
+            "description": "How its check runs here; absent for a decision without one.",
+            "properties": {
+              "by": {
+                "description": "What decides the findings of a decision.",
+                "enum": [
+                  "builtin",
+                  "cel",
+                  "command",
+                  "model"
+                ],
+                "type": "string"
+              },
+              "runs": {
+                "description": "False when the check cannot run in this project, such as a command in\na project nobody trusted.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "by",
+              "runs"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "enabled": {
             "description": "Whether this project's configuration enables it.",
             "type": "boolean"
+          },
+          "fix": {
+            "description": "How its fix runs here; absent for a decision without one.",
+            "properties": {
+              "apply": {
+                "description": "The command line.",
+                "type": "string"
+              },
+              "approval": {
+                "anyOf": [
+                  {
+                    "description": "Whether a fix a model proposed and the checks accepted is written.",
+                    "oneOf": [
+                      {
+                        "const": "ask",
+                        "description": "Reported with its diff (previewed) and left for a hand to apply.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "allow",
+                        "description": "Written (applied) like any other applied fix, without `--unsafe-fixes`.",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "What becomes of an `unsafe` fix run without `--unsafe-fixes`: `ask`\npreviews it, `allow` writes it. Absent for a `safe` fix."
+              },
+              "by": {
+                "description": "What makes the fix of a decision.",
+                "enum": [
+                  "ops",
+                  "command",
+                  "model",
+                  "rpc"
+                ],
+                "type": "string"
+              },
+              "runs": {
+                "description": "False when the fix cannot run, and `why` says why.",
+                "type": "boolean"
+              },
+              "safety": {
+                "description": "The effective safety of the fix at best: a provider can only lower it.",
+                "oneOf": [
+                  {
+                    "const": "safe",
+                    "description": "Mechanical and meaning-preserving: written by `--fix`.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsafe",
+                    "description": "Probably right but a judgment call: written only when the project allows\nit or the run asks for unsafe fixes, else previewed.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "tool": {
+                "description": "A tool call: the twin of a command line.",
+                "properties": {
+                  "arguments": true,
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "arguments"
+                ],
+                "type": "object"
+              },
+              "why": {
+                "anyOf": [
+                  {
+                    "description": "Why the fix of a decision does not run, whoever would make it: one of a\nclosed set, said the same way for a rule, a command, a plugin and a model.",
+                    "oneOf": [
+                      {
+                        "const": "no edit binding",
+                        "description": "A model fix, and no agent that edits is bound to the decision.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "untrusted project",
+                        "description": "The fix runs a program, and the user has not trusted the project.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "sandbox unavailable",
+                        "description": "The fix runs a program, and this machine has no sandbox to run it in.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "budget spent",
+                        "description": "A model fix, and the budget for models allows no request.",
+                        "type": "string"
+                      },
+                      {
+                        "const": "provider unavailable",
+                        "description": "Nothing serves the kind of fix the decision names.",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "by",
+              "safety",
+              "runs",
+              "apply",
+              "tool"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "id": {
             "type": "string"

@@ -4,7 +4,7 @@
 use std::fs;
 
 use assert_cmd::Command;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tempfile::TempDir;
 
 use crate::checks::home;
@@ -80,9 +80,18 @@ fn a_declaration_move_shows_its_diff_and_how_to_apply_it() {
     assert!(diff.contains("+pub struct Store;"), "{diff}");
     assert!(diff.lines().count() <= 12, "{diff}");
     assert_eq!(
-        group["apply"],
-        "fix {\"decision\":[\"design/declaration-groups\"]}"
+        group["fix"],
+        json!({
+            "by": "ops",
+            "safety": "safe",
+            "runs": true,
+            "apply": "lighthouse check --fix --decision design/declaration-groups",
+            "tool": {"name": "fix", "arguments": {"decision": ["design/declaration-groups"]}}
+        }),
+        "{group}"
     );
+    assert_eq!(group["check"], json!({"by": "builtin", "runs": true}));
+    assert!(group.get("brief").is_none(), "a safe fix needs no brief");
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
         MISORDERED
@@ -118,7 +127,11 @@ fn a_long_fix_is_summarized_and_a_finding_without_a_fix_has_none() {
     let plain = report(&dir, &[]);
     let undocumented = group(&plain, "design/exported-doc");
     assert_eq!(instance(&undocumented).as_array().unwrap().len(), 3);
-    assert!(undocumented.get("apply").is_none());
+    assert!(undocumented.get("fix").is_none());
+    assert_eq!(
+        undocumented["brief"], true,
+        "no fix: review_show has a brief"
+    );
 }
 
 #[test]
@@ -169,13 +182,17 @@ fn a_delete_fix_replaces_a_region_with_nothing() {
 
     let compact = report(&dir, &[]);
     let group = group(&compact, "design/comments");
-    assert_eq!(instance(&group)[3]["fix"]["safety"], "suggested", "{group}");
+    assert_eq!(instance(&group)[3]["fix"]["safety"], "unsafe", "{group}");
+    assert_eq!(group["fix"]["safety"], "unsafe", "{group}");
+    assert_eq!(group["fix"]["approval"], "ask", "{group}");
+    assert_eq!(group["fix"]["tool"]["arguments"]["unsafeFixes"], true);
     assert!(
-        group["apply"]
+        group["fix"]["apply"]
             .as_str()
             .unwrap()
-            .contains("\"unsafeFixes\":true")
+            .starts_with("lighthouse check --fix --unsafe-fixes --decision ")
     );
+    assert_eq!(group["brief"], true, "an unsafe fix has a brief");
     assert!(
         instance(&group)[3]["fix"]["diff"]
             .as_str()
@@ -187,7 +204,7 @@ fn a_delete_fix_replaces_a_region_with_nothing() {
 const SHOUT: &str = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/shout\nspec:\n  title: Notes are upper case\n  context: Notes are read from far away.\n  scope:\n    subject: file\n  requirement: A note MUST be written in upper case.\n  severity: error\n  check:\n    type: cel\n    select: file\n    where: \"file.path.endsWith(\\\".txt\\\") && file.lines > 0\"\n    message: \"{{ file.path }} is not shouting\"\n    evidence:\n      path: file.path\n  fix:\n    safety: safe\n    type: command\n    argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]\n    output: text\n  examples:\n    - name: quiet\n      language: text\n      kind: invalid\n      files:\n        - path: a.txt\n          body: hello\n      expect:\n        - line: 1\n      fixed:\n        - path: a.txt\n          body: HELLO\n    - name: loud\n      language: text\n      kind: valid\n      files:\n        - path: a.txt\n          body: HELLO\n";
 
 #[test]
-fn a_command_fix_is_not_previewed_and_only_names_how_to_apply_it() {
+fn a_command_fix_is_not_previewed_and_says_why_it_does_not_run_untrusted() {
     let dir = tempfile::tempdir().unwrap();
     let write = |name: &str, text: &str| {
         let path = dir.path().join(name);
@@ -208,12 +225,25 @@ fn a_command_fix_is_not_previewed_and_only_names_how_to_apply_it() {
         .env("XDG_CONFIG_HOME", dir.path().join(".home"))
         .env("XDG_DATA_HOME", dir.path().join(".home"))
         .env("XDG_CACHE_HOME", dir.path().join(".home"))
+        .env_remove("LIGHTHOUSE_TRUST")
         .args(["check", "--no-store", "--format", "json"])
         .output()
         .unwrap();
     let report: Value = serde_json::from_slice(&out.stdout).unwrap();
     let shout = group(&report, "local/shout");
-    assert_eq!(shout["apply"], "fix {\"decision\":[\"local/shout\"]}");
+    assert_eq!(
+        shout["fix"],
+        json!({
+            "by": "command",
+            "safety": "safe",
+            "runs": false,
+            "why": "untrusted project",
+            "apply": "lighthouse check --fix --decision local/shout",
+            "tool": {"name": "fix", "arguments": {"decision": ["local/shout"]}}
+        }),
+        "{shout}"
+    );
+    assert_eq!(shout["brief"], true, "a fix that does not run has a brief");
     assert_eq!(
         shout["files"]["a.txt"][0].as_array().unwrap().len(),
         3,

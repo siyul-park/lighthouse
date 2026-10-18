@@ -9,15 +9,47 @@ use crate::{Fingerprint, Position};
 )]
 #[serde(rename_all = "lowercase")]
 pub enum Safety {
-    /// Mechanical and meaning-preserving: applied by default.
+    /// Mechanical and meaning-preserving: written by `--fix`.
     Safe,
-    /// Probably right but a judgment call: applied only when asked for.
-    Suggested,
+    /// Probably right but a judgment call: written only when the project allows
+    /// it or the run asks for unsafe fixes, else previewed.
+    Unsafe,
 }
 
 vocabulary!(Safety, "safety" {
     Safe => "safe",
-    Suggested => "suggested",
+    Unsafe => "unsafe",
+});
+
+/// Why the fix of a decision does not run, whoever would make it: one of a
+/// closed set, said the same way for a rule, a command, a plugin and a model.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+pub enum Unavailable {
+    /// A model fix, and no agent that edits is bound to the decision.
+    #[serde(rename = "no edit binding")]
+    NoEditBinding,
+    /// The fix runs a program, and the user has not trusted the project.
+    #[serde(rename = "untrusted project")]
+    UntrustedProject,
+    /// The fix runs a program, and this machine has no sandbox to run it in.
+    #[serde(rename = "sandbox unavailable")]
+    SandboxUnavailable,
+    /// A model fix, and the budget for models allows no request.
+    #[serde(rename = "budget spent")]
+    BudgetSpent,
+    /// Nothing serves the kind of fix the decision names.
+    #[serde(rename = "provider unavailable")]
+    ProviderUnavailable,
+}
+
+vocabulary!(Unavailable, "reason" {
+    NoEditBinding => "no edit binding",
+    UntrustedProject => "untrusted project",
+    SandboxUnavailable => "sandbox unavailable",
+    BudgetSpent => "budget spent",
+    ProviderUnavailable => "provider unavailable",
 });
 
 /// The fix proposed for one finding, computed without writing anything: what
@@ -26,9 +58,7 @@ vocabulary!(Safety, "safety" {
 pub struct Preview {
     pub fingerprint: Fingerprint,
     pub description: String,
-    /// `Suggested` when applying the fix needs unsafe fixes, whatever the
-    /// fixer claims: a suggested proposal, a suggested cap or a rule that is
-    /// not mechanical.
+    /// The effective safety: `Unsafe` when writing the fix needs permission.
     pub safety: Safety,
     /// The files it changes, sorted by path.
     pub files: Vec<PreviewFile>,

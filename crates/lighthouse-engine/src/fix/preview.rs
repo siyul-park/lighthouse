@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, Safety, ucm::Capability,
+    Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, ucm::Capability,
     utf16_position,
 };
 use similar::{ChangeTag, TextDiff};
@@ -55,16 +55,10 @@ impl Engine {
                 let changed = preview_files(&proposal, |file| {
                     sources.text(file).ok().map(|text| (*text).clone())
                 })?;
-                let needs_unsafe =
-                    proposal.safety == Safety::Suggested || proposer.ineligible(binding).is_some();
                 Some(Preview {
                     fingerprint: finding.fingerprint.clone(),
                     description: proposal.description,
-                    safety: if needs_unsafe {
-                        Safety::Suggested
-                    } else {
-                        Safety::Safe
-                    },
+                    safety: proposal.safety,
                     files: changed,
                 })
             })

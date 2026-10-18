@@ -6,7 +6,7 @@ use std::fmt::Write;
 use lighthouse_model::Fingerprint;
 use lighthouse_report::{Entry, GroupOptions, Grouped, Groups};
 use lighthouse_session::{
-    catalog_at,
+    Fixing, catalog_at,
     review::{self, FindingRecord, JudgmentEvent, Query, Recorded, Shown, Standing},
 };
 use schemars::JsonSchema;
@@ -105,10 +105,18 @@ pub fn list(ctx: &Context, args: &ReviewListArgs, format: Format) -> Result<Repl
             Reply::json(&match args.detail {
                 Detail::Compact => {
                     let catalog = catalog_at(&root).ok();
+                    let descriptors = ctx.session().ok().and_then(|session| {
+                        let fixing = Fixing::of(&session).ok()?;
+                        Some(fixing.all(
+                            &session.catalog,
+                            tasks.findings.iter().map(|f| f.decision.as_str()),
+                        ))
+                    });
                     let options = GroupOptions {
                         catalog: catalog.as_ref(),
                         limit: Some(limit),
                         tool_form: true,
+                        descriptors: descriptors.as_ref(),
                     };
                     let entries = tasks.findings.iter().map(entry).collect();
                     ReviewList::Compact {

@@ -5,13 +5,14 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Fingerprint, Judgment, Preview, Safety, Severity, squash};
-use lighthouse_spec::{Catalog, Decision, FixKind};
+use lighthouse_model::{Fingerprint, Judgment, Preview, Severity, squash};
+use lighthouse_spec::Catalog;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::{
+    descriptor::Descriptor,
     expected::{ExampleKey, expected},
     fix::Shown,
     text::{bounded, evidence, pairs},
@@ -101,6 +102,8 @@ pub struct GroupOptions<'a> {
     /// The groups are data for a program: hints name tool calls, not
     /// command lines.
     pub tool_form: bool,
+    /// How the check and the fix of each decision run, by decision id.
+    pub descriptors: Option<&'a BTreeMap<String, Descriptor>>,
 }
 
 /// Findings grouped by decision, then by file, as many as fit a limit.
@@ -123,8 +126,10 @@ struct Group {
     requirement: Option<String>,
     /// The expected structure by language, once for all findings of it.
     expected: Vec<(Option<String>, String)>,
-    /// How to apply the fix of the decision, when it has one.
-    apply: Option<String>,
+    /// How the check and the fix of the decision run, and the fingerprint of
+    /// its first finding, which the text offers to brief.
+    descriptor: Option<(Descriptor, String)>,
+    tool_form: bool,
     /// The evidence every finding of the group agrees on.
     evidence: Map<String, Value>,
     files: BTreeMap<String, Vec<Instance>>,
@@ -282,7 +287,11 @@ impl Group {
             review,
             requirement: decision.map(|d| squash(&d.requirement)),
             expected: expecteds,
-            apply: decision.and_then(|d| apply_line(d, options.tool_form)),
+            descriptor: options
+                .descriptors
+                .and_then(|all| all.get(&first.decision))
+                .map(|descriptor| (descriptor.clone(), first.fingerprint.clone())),
+            tool_form: options.tool_form,
             evidence: shared,
             files,
         }
@@ -316,8 +325,14 @@ impl Group {
                 group.insert("expected".to_owned(), Value::Object(by_language));
             }
         }
-        if let Some(apply) = &self.apply {
-            group.insert("apply".to_owned(), json!(apply));
+        if let Some((descriptor, _)) = &self.descriptor {
+            group.insert("check".to_owned(), json!(descriptor.check));
+            if let Some(fix) = &descriptor.fix {
+                group.insert("fix".to_owned(), json!(fix));
+            }
+            if descriptor.brief {
+                group.insert("brief".to_owned(), json!(true));
+            }
         }
         if !self.evidence.is_empty() {
             group.insert("evidence".to_owned(), Value::Object(self.evidence.clone()));
@@ -360,8 +375,8 @@ impl Group {
                 let _ = writeln!(out, "  {label} {excerpt}");
             }
         }
-        if let Some(apply) = &self.apply {
-            let _ = writeln!(out, "  apply: {apply}");
+        if let Some((descriptor, fingerprint)) = &self.descriptor {
+            let _ = writeln!(out, "  {}", descriptor.line(fingerprint, self.tool_form));
         }
         if let Some(shared) = pairs(&self.evidence) {
             let _ = writeln!(out, "  evidence: {shared}");
@@ -443,26 +458,6 @@ pub(crate) fn judgments_line() -> String {
         .map(|(j, m)| format!("{j}={m}"))
         .collect::<Vec<_>>()
         .join("; ")
-}
-
-/// How the fix of a decision is applied for all its findings: `check --fix`
-/// on the command line, the `fix` tool, with unsafe fixes when the
-/// decision's fix is only suggested or its rule is not mechanical. None for a
-/// decision without a fix that can run.
-fn apply_line(decision: &Decision, tool_form: bool) -> Option<String> {
-    let fix = decision.fix.as_ref()?;
-    if matches!(fix.kind, FixKind::Rpc { .. }) {
-        return None;
-    }
-    let unsafe_fixes =
-        fix.safety == Safety::Suggested || decision.severity != Some(Severity::Error);
-    let rule = decision.id();
-    Some(match (tool_form, unsafe_fixes) {
-        (false, false) => format!("lighthouse check --fix --decision {rule}"),
-        (false, true) => format!("lighthouse check --fix --unsafe-fixes --decision {rule}"),
-        (true, false) => format!("fix {{\"decision\":[\"{rule}\"]}}"),
-        (true, true) => format!("fix {{\"decision\":[\"{rule}\"],\"unsafeFixes\":true}}"),
-    })
 }
 
 /// The evidence of a finding that may be shared or may set it apart: its

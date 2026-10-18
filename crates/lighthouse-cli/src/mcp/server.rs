@@ -33,10 +33,10 @@ impl ServerHandler for Lighthouse {
         )
         .with_instructions(
             "Lighthouse remembers this project's design decisions and enforces them as rules. \
-             Call `check` after changing code; fix findings (`fix` does it for decisions marked \
-             fixable, `dryRun` first) or judge the ones that ask for review with \
-             `review_list` and `review_resolve`. Read lighthouse://decisions/{id} for the full \
-             text of a decision.",
+             Call `check` after changing code and fix what a group's `fix` says is `safe` with \
+             `fix`; for the rest `review_show` gives a brief to fix it by hand; judge the \
+             findings that ask for review with `review_list` and `review_resolve`. Read \
+             lighthouse://decisions/{id} for the full text of a decision.",
         )
     }
 

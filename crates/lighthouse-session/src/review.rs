@@ -9,6 +9,7 @@ use lighthouse_engine::{
 };
 use lighthouse_model::{AgentKind, Attribution, Severity};
 use lighthouse_plugin::FixDecision;
+use lighthouse_report::{Aim, FixInfo};
 use lighthouse_spec::{Catalog, Decision, FixKind, FixScope};
 use lighthouse_store::{Filter, State, Store, Versions};
 use schemars::JsonSchema;
@@ -16,8 +17,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    Result, Selector, Session, git::user_name, permit::permitted, project::catalog_at,
-    selector::long_enough,
+    Fixing, Result, Selector, Session, git::user_name, project::catalog_at, selector::long_enough,
 };
 
 pub use lighthouse_store::{
@@ -61,18 +61,22 @@ pub struct Listed {
     pub notices: Vec<String>,
 }
 
-/// A finding as `review show` gives it: the record, and when the project lets
-/// a model fix its decision, the brief for whoever fixes it by hand or with an
-/// agent of their own (the `Finding` kind).
+/// A finding as `review show` gives it: the record, how its fix runs, and the
+/// brief for whoever fixes it by hand or with an agent of their own when its
+/// fix is absent, `unsafe` or not running (the `Finding` kind).
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct Shown {
     #[serde(flatten)]
     pub finding: FindingRecord,
     /// What the fix of this finding is told, written as the prompt of an
     /// `edit` run is: the decision, the finding, its scope and how the result
-    /// is checked. Present for the decisions `[fix] decisions` lists.
+    /// is checked. Present when the descriptor of its decision says `brief`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brief: Option<String>,
+    /// How the fix of the decision runs here, applied to this finding alone;
+    /// absent when the decision has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<FixInfo>,
 }
 
 /// Who a record is attributed to (PROV `wasAttributedTo`): `spec` is
@@ -141,15 +145,31 @@ pub fn show(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
     Ok(existing_store(root)?.finding(fingerprint)?)
 }
 
-/// The finding whose fingerprint starts with `fingerprint`, with its brief
-/// when `session` (the project, if it can be read) lists its decision.
+/// The finding whose fingerprint starts with `fingerprint`, with how its fix
+/// runs and its brief when `session` (the project, if it can be read) knows
+/// its decision.
 pub fn show_with_brief(root: &Path, session: Option<&Session>, fingerprint: &str) -> Result<Shown> {
     let finding = show(root, fingerprint)?;
-    let brief = match session {
-        Some(session) => brief_of(session, &finding)?,
-        None => None,
+    let Some((session, decision)) =
+        session.and_then(|s| Some((s, s.catalog.decision(&finding.decision)?)))
+    else {
+        return Ok(Shown {
+            finding,
+            brief: None,
+            fix: None,
+        });
     };
-    Ok(Shown { finding, brief })
+    let aim = Aim::Finding(finding.fingerprint.as_str());
+    let described = Fixing::of(session)?.describe(decision, aim);
+    let brief = match &described {
+        Some(descriptor) if descriptor.brief => Some(brief_of(session, decision, &finding)?),
+        _ => None,
+    };
+    Ok(Shown {
+        finding,
+        brief,
+        fix: described.and_then(|descriptor| descriptor.fix),
+    })
 }
 
 /// Every judgment recorded on a finding, oldest first.
@@ -197,15 +217,8 @@ pub fn resolve_all(root: &Path, reviews: &[NewJudgment]) -> Result<Vec<Result<Re
         .collect())
 }
 
-/// The brief for fixing `finding`, if its decision is one a model may fix.
-fn brief_of(session: &Session, finding: &FindingRecord) -> Result<Option<String>> {
-    let permit = permitted(&session.config, &session.catalog, &|_| true)?;
-    let Some(decision) = session.catalog.decision(&finding.decision) else {
-        return Ok(None);
-    };
-    if !permit.ids.contains(&finding.decision) {
-        return Ok(None);
-    }
+/// The brief for fixing `finding` by `decision`.
+fn brief_of(session: &Session, decision: &Decision, finding: &FindingRecord) -> Result<String> {
     let told = FixDecision {
         id: decision.id().to_owned(),
         requirement: decision.requirement.clone(),
@@ -229,7 +242,7 @@ fn brief_of(session: &Session, finding: &FindingRecord) -> Result<Option<String>
         .into_iter()
         .filter(|id| active.contains(*id))
         .collect();
-    Ok(Some(brief::brief(&[target], &tools)))
+    Ok(brief::brief(&[target], &tools))
 }
 
 /// Whether a finding is a task of a listing: among the open ones, those that

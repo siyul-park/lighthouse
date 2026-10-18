@@ -25,7 +25,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[schemars(transform = refuse_strays)]
 pub struct Fix {
-    /// Caps what the fixer may claim: a `safe` proposal under a `suggested`
+    /// Caps what the fixer may claim: a `safe` proposal under an `unsafe`
     /// decision is downgraded. `safe` is reserved for decisions that author `error`.
     pub safety: Safety,
     /// Provider capabilities the fix needs; without them it is declined.
@@ -92,7 +92,7 @@ impl Fix {
         }
         if self.safety == Safety::Safe && decision.severity != Some(Severity::Error) {
             return Some(
-                "`safe` is reserved for decisions that author `error`; use `suggested`".to_owned(),
+                "`safe` is reserved for decisions that author `error`; use `unsafe`".to_owned(),
             );
         }
         match &self.kind {
@@ -106,7 +106,7 @@ impl Fix {
             }
             FixKind::Command(command) => command.problem(),
             FixKind::Model { .. } if self.safety == Safety::Safe => {
-                Some("a fix by a model is never `safe`; use `suggested`".to_owned())
+                Some("a fix by a model is never `safe`; use `unsafe`".to_owned())
             }
             FixKind::Model { .. } => None,
             // Kept, and declined when a fix is asked for; see `FixPlan`.

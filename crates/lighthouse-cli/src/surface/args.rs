@@ -168,11 +168,13 @@ pub struct FixOptions {
     /// Print the unified diff and leave every file as it was.
     #[arg(long, requires = "fix")]
     pub dry_run: bool,
-    /// Also apply suggested fixes, which are judgment calls: review the diff.
+    /// Also write `unsafe` fixes, which are judgment calls, whatever makes
+    /// them; without it, or `[approval] fix = "allow"`, they are shown as
+    /// previews, and a preview is applied by naming its finding.
     #[arg(long, requires = "fix")]
     pub unsafe_fixes: bool,
     /// Use this registered fixer for the selected findings instead of the one
-    /// their decision names. Its fixes count as suggested.
+    /// their decision names. Its fixes are `unsafe`.
     #[arg(long, requires = "fix", value_name = "ID")]
     pub fixer: Option<String>,
 }
@@ -190,6 +192,8 @@ pub struct FixArgs {
     /// Fix these findings: fingerprints or unique prefixes of at least 7
     /// characters.
     pub fingerprints: Vec<String>,
+    /// Ask no model: what they would fix is left to review.
+    pub no_models: bool,
     #[serde(flatten)]
     pub options: FixOptions,
 }

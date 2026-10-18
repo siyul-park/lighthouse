@@ -3,7 +3,9 @@
 
 use std::{path::Path, time::Duration};
 
-use lighthouse_process::{Invocation, Profile, Sandbox, Simulation, run, simulate_unavailable};
+use lighthouse_process::{
+    Invocation, Profile, Sandbox, Simulation, run, sandbox_available, simulate_unavailable,
+};
 
 #[test]
 fn a_backend_that_cannot_be_used_fails_the_run_and_never_runs_it_unsandboxed() {
@@ -28,4 +30,5 @@ fn a_backend_that_cannot_be_used_fails_the_run_and_never_runs_it_unsandboxed() {
         "{error}"
     );
     assert!(error.ends_with("or set [sandbox] enabled = false in a trusted project"));
+    assert_eq!(sandbox_available(), Err("no backend here".to_owned()));
 }

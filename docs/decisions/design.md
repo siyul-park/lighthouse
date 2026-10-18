@@ -489,12 +489,12 @@ Declaration order should let a reader follow ownership and behavior from public 
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/layout`](#declarations-are-laid-out-for-reading) | Declarations are laid out for reading | warn · cel | suggested |  |
+| [`design/layout`](#declarations-are-laid-out-for-reading) | Declarations are laid out for reading | warn · cel | unsafe |  |
 | [`design/declaration-groups`](#declarations-follow-ownership-groups) | Declarations follow ownership groups | error · order | safe |  |
 
 ### Declarations are laid out for reading
 
-`design/layout` · file · warn · cel · fix: suggested
+`design/layout` · file · warn · cel · fix: unsafe
 
 *Layout is documentation that cannot go stale: readers follow behavior from intent to mechanics, and distance between collaborators hides their relationship (Martin, Clean Code ch. 5 and G10 Vertical Separation: the newspaper metaphor, vertical distance and ordering). Kinds, in report order; a function is reported once. `callers-first`: a private function or method is declared before its caller (the first caller in the file, or with `sharedAfterLastCaller` the last one), so the caller must come first. The fix moves the callee after the caller. A function in a method group the layout orders by visibility is left as it is, and so is a Rust trait method before its implementation: those orders are decided by `design/declaration-groups`. `gap`: a method is separated from the previous method of its type by another declaration (a function, a type, or a method of another type; with `visibilityGroups`, a method of another type in the other visibility group is not a separation), so the methods of one owner are kept together. The fix moves the method after the previous one. Ordering never justifies splits: these rules MUST NOT justify artificial file splits, wrappers or duplicated helpers. Reading order within a cohesive implementation, symmetric siblings and where an owner's symbols live are judged: a method separated from nothing but shown out of order, and a function that lives in another file than its owner, are put to a model, with the requirement and the examples as the question.*
 
@@ -563,7 +563,7 @@ Comments preserve facts that code cannot express; they should not narrate code t
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`design/exported-doc`](#exported-symbols-are-documented) | Exported symbols are documented | warn · cel |  |  |
-| [`design/comments`](#a-comment-states-a-fact-the-code-cannot) | A comment states a fact the code cannot | warn · cel | suggested |  |
+| [`design/comments`](#a-comment-states-a-fact-the-code-cannot) | A comment states a fact the code cannot | warn · cel | unsafe |  |
 
 ### Exported symbols are documented
 
@@ -606,9 +606,9 @@ Also: rust
 
 ### A comment states a fact the code cannot
 
-`design/comments` · file · warn · cel · fix: suggested
+`design/comments` · file · warn · cel · fix: unsafe
 
-*A comment is justified only by a fact the code cannot say. A banner restates structure that names and file layout already carry, and narration repeats the code and goes stale (Martin, Clean Code ch. 4: redundant comments, noise, position markers). Banner (kind `banner`, reported by the check, with a fix that deletes the comment). Go: Reported when every non-blank line of a comment group is a banner line. A group that mixes banner lines with prose (a table, a diagram) is documentation and passes. Rust: Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//` or block comment made only of banner lines is reported. Further kinds apply to comments that are prose: not documentation, without a code fence and not a directive (`go:`, `+build`, `nolint`, `lint:`, `lighthouse-`, `#[`, `SAFETY:`, `noqa`, `tool:name`). `code`: a standalone comment that is not attached to a declaration and whose every line looks like code (`codePatterns`); delete it, version control keeps history (fix, suggested). `history`: a line that records who changed what and when (`historyPatterns`). `closing`: a comment after a closing brace that names the block it closes. `todo`: a comment that starts with one of `todoKeywords`. `code` is on by default; `history`, `closing` and `todo` are off by default and on in the strict project. Narration and facts are judged: every other comment that is not documentation, a directive or generated code is put to a model, with the requirement and the examples as the question.*
+*A comment is justified only by a fact the code cannot say. A banner restates structure that names and file layout already carry, and narration repeats the code and goes stale (Martin, Clean Code ch. 4: redundant comments, noise, position markers). Banner (kind `banner`, reported by the check, with a fix that deletes the comment). Go: Reported when every non-blank line of a comment group is a banner line. A group that mixes banner lines with prose (a table, a diagram) is documentation and passes. Rust: Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//` or block comment made only of banner lines is reported. Further kinds apply to comments that are prose: not documentation, without a code fence and not a directive (`go:`, `+build`, `nolint`, `lint:`, `lighthouse-`, `#[`, `SAFETY:`, `noqa`, `tool:name`). `code`: a standalone comment that is not attached to a declaration and whose every line looks like code (`codePatterns`); delete it, version control keeps history (fix, unsafe). `history`: a line that records who changed what and when (`historyPatterns`). `closing`: a comment after a closing brace that names the block it closes. `todo`: a comment that starts with one of `todoKeywords`. `code` is on by default; `history`, `closing` and `todo` are off by default and on in the strict project. Narration and facts are judged: every other comment that is not documentation, a directive or generated code is put to a model, with the requirement and the examples as the question.*
 
 A comment MUST NOT only label a section of code: banner lines such as `// ---- Helpers ----`, `// ====` rules and `// MARK:` markers are a substitute for splitting, naming or ordering, and SHOULD be replaced by one of them. Comments MUST NOT narrate code, restate names, label control-flow phases, or explain obvious behavior; a better name, type, or structure SHOULD be preferred. Comments MAY be added only when clearly necessary to preserve invariants and consequences, external or cross-package constraints, rejected alternatives with evidence, or external contracts or specifications. A necessary comment MUST state the smallest sufficient fact, constraint, invariant, or consequence.
 

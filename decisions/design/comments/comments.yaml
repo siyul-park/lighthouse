@@ -23,7 +23,7 @@ spec:
     a directive (`go:`, `+build`, `nolint`, `lint:`, `lighthouse-`, `#[`,
     `SAFETY:`, `noqa`, `tool:name`). `code`: a standalone comment that is not attached
     to a declaration and whose every line looks like code (`codePatterns`);
-    delete it, version control keeps history (fix, suggested). `history`: a
+    delete it, version control keeps history (fix, unsafe). `history`: a
     line that records who changed what and when (`historyPatterns`). `closing`:
     a comment after a closing brace that names the block it closes. `todo`: a
     comment that starts with one of `todoKeywords`. `code` is on by default;
@@ -160,7 +160,7 @@ spec:
       subject: comment.file
       snippet: comment.text
   fix:
-    safety: suggested
+    safety: unsafe
     type: ops
     ops:
       - op: delete

@@ -242,7 +242,7 @@ fn the_bundled_fixes_say_what_each_rule_needs_to_be_fixed() {
         assert_eq!(safety(id).as_deref(), Some("safe"), "{id}");
     }
     for id in ["design/layout", "design/comments", "core/no-unused-allow"] {
-        assert_eq!(safety(id).as_deref(), Some("suggested"), "{id}");
+        assert_eq!(safety(id).as_deref(), Some("unsafe"), "{id}");
     }
 }
 

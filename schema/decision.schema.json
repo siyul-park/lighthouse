@@ -555,7 +555,7 @@
               "type": "null"
             }
           ],
-          "description": "The severity of the decision's findings, as authored. `error` is\ndefinitive: it needs no review and only a directive in the code\nwaives it, and its fix may be safe. `warn` and `info` are review\ntasks: a reviewer's judgment may hide them and a fix is at most\nsuggested. A decision without a `check` has none. A configuration\n`level` changes what is reported and the exit code, never this."
+          "description": "The severity of the decision's findings, as authored. `error` is\ndefinitive: it needs no review and only a directive in the code\nwaives it, and its fix may be safe. `warn` and `info` are review\ntasks: a reviewer's judgment may hide them and a fix is at most\nunsafe. A decision without a `check` has none. A configuration\n`level` changes what is reported and the exit code, never this."
         },
         "status": {
           "$ref": "#/$defs/DecisionStatus",
@@ -765,7 +765,7 @@
             },
             "safety": {
               "$ref": "#/$defs/Safety",
-              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
+              "description": "Caps what the fixer may claim: a `safe` proposal under an `unsafe`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
             "type": {
               "const": "ops",
@@ -810,7 +810,7 @@
             },
             "safety": {
               "$ref": "#/$defs/Safety",
-              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
+              "description": "Caps what the fixer may claim: a `safe` proposal under an `unsafe`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
             "stdin": {
               "$ref": "#/$defs/Stdin",
@@ -853,7 +853,7 @@
             },
             "safety": {
               "$ref": "#/$defs/Safety",
-              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
+              "description": "Caps what the fixer may claim: a `safe` proposal under an `unsafe`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
             "scope": {
               "anyOf": [
@@ -894,7 +894,7 @@
             },
             "safety": {
               "$ref": "#/$defs/Safety",
-              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
+              "description": "Caps what the fixer may claim: a `safe` proposal under an `unsafe`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
             "type": {
               "const": "rpc",
@@ -918,7 +918,7 @@
         },
         "safety": {
           "$ref": "#/$defs/Safety",
-          "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
+          "description": "Caps what the fixer may claim: a `safe` proposal under an `unsafe`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
         }
       },
       "required": [
@@ -1317,12 +1317,12 @@
       "oneOf": [
         {
           "const": "safe",
-          "description": "Mechanical and meaning-preserving: applied by default.",
+          "description": "Mechanical and meaning-preserving: written by `--fix`.",
           "type": "string"
         },
         {
-          "const": "suggested",
-          "description": "Probably right but a judgment call: applied only when asked for.",
+          "const": "unsafe",
+          "description": "Probably right but a judgment call: written only when the project allows\nit or the run asks for unsafe fixes, else previewed.",
           "type": "string"
         }
       ]

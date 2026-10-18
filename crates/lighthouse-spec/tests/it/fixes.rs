@@ -1,7 +1,7 @@
 //! The `fix:` block of a decision: what a catalog accepts and what it refuses.
 
-use lighthouse_model::{Safety, ucm::Capability};
-use lighthouse_spec::{Catalog, CommandSpec, Fix, FixKind, OpSpec, OrderScope};
+use lighthouse_model::{Safety, Severity, ucm::Capability};
+use lighthouse_spec::{Catalog, CommandSpec, DecisionSpec, Fix, FixKind, OpSpec, OrderScope};
 use lighthouse_test_support::catalog::*;
 
 fn rejected(files: Files, needle: &str) {
@@ -77,19 +77,19 @@ fn a_fix_of_every_operation_loads_and_is_readable() {
 
 #[test]
 fn a_fix_names_its_type_and_the_type_decides_its_fields() {
-    let untyped = "  fix:\n    safety: suggested\n    ops: [{ op: delete, node: x }]\n";
+    let untyped = "  fix:\n    safety: unsafe\n    ops: [{ op: delete, node: x }]\n";
     rejected(fixable(untyped), "type");
-    let none = "  fix:\n    safety: suggested\n    type: ops\n";
+    let none = "  fix:\n    safety: unsafe\n    type: ops\n";
     rejected(fixable(none), "ops");
-    let stray = "  fix:\n    safety: suggested\n    type: ops\n    ops: [{ op: delete, node: x }]\n    argv: [x]\n";
+    let stray = "  fix:\n    safety: unsafe\n    type: ops\n    ops: [{ op: delete, node: x }]\n    argv: [x]\n";
     rejected(fixable(stray), "argv");
-    let unknown = "  fix:\n    safety: suggested\n    type: wasm\n";
+    let unknown = "  fix:\n    safety: unsafe\n    type: wasm\n";
     rejected(fixable(unknown), "wasm");
 }
 
 #[test]
 fn the_rpc_type_is_kept_without_failing_the_pack() {
-    let rpc = "  fix:\n    safety: suggested\n    type: rpc\n    params: { method: fix }\n";
+    let rpc = "  fix:\n    safety: unsafe\n    type: rpc\n    params: { method: fix }\n";
 
     let catalog = Catalog::from_files(fixable(rpc)).unwrap();
 
@@ -99,14 +99,14 @@ fn the_rpc_type_is_kept_without_failing_the_pack() {
 
 #[test]
 fn an_unknown_operation_or_parameter_is_refused() {
-    let op = "  fix:\n    safety: suggested\n    type: ops\n    ops: [{ op: shuffle }]\n";
+    let op = "  fix:\n    safety: unsafe\n    type: ops\n    ops: [{ op: shuffle }]\n";
     rejected(fixable(op), "shuffle");
-    let param = "  fix:\n    safety: suggested\n    type: ops\n    ops: [{ op: delete, node: x, colour: red }]\n";
+    let param = "  fix:\n    safety: unsafe\n    type: ops\n    ops: [{ op: delete, node: x, colour: red }]\n";
     rejected(fixable(param), "colour");
 }
 
 fn ops(list: &str) -> String {
-    format!("  fix:\n    safety: suggested\n    type: ops\n    ops: {list}\n")
+    format!("  fix:\n    safety: unsafe\n    type: ops\n    ops: {list}\n")
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn fixed_examples_must_name_files_of_an_invalid_example() {
 #[test]
 fn a_command_needs_a_program_and_a_usable_timeout() {
     let command =
-        |fields: &str| format!("  fix:\n    safety: suggested\n    type: command\n    {fields}\n");
+        |fields: &str| format!("  fix:\n    safety: unsafe\n    type: command\n    {fields}\n");
     rejected(fixable(&command("argv: []")), "needs a program");
     rejected(
         fixable(&command("argv: [gofmt]\n    timeout: soon")),
@@ -256,4 +256,48 @@ fn an_operations_guard_is_readable() {
 
     assert_eq!(ops[0].when(), Some("finding.evidence.role == 'x'"));
     assert_eq!(ops[1].when(), None);
+}
+
+#[test]
+fn the_effective_safety_of_a_fix_is_decided_in_one_place() {
+    let load = |fix: &str| {
+        Catalog::from_files(fixable(fix))
+            .unwrap()
+            .decision("p/a")
+            .unwrap()
+            .clone()
+    };
+    let ops_safe = load(MOVE);
+    let ops_unsafe = load(&MOVE.replace("safety: safe", "safety: unsafe"));
+    let model = load("  fix:\n    safety: unsafe\n    type: model\n");
+    let unfixed = Catalog::from_files(decision_with(&format!(
+        "{CHECKED}{}",
+        EXAMPLES.replace("      fixed: [{ path: a.go, body: y }]\n", "")
+    )))
+    .unwrap()
+    .decision("p/a")
+    .unwrap()
+    .clone();
+
+    assert_eq!(ops_safe.fix_safety(), Safety::Safe);
+    assert_eq!(ops_unsafe.fix_safety(), Safety::Unsafe);
+    assert_eq!(
+        model.fix_safety(),
+        Safety::Unsafe,
+        "a model's is never safe"
+    );
+    assert_eq!(
+        unfixed.fix_safety(),
+        Safety::Unsafe,
+        "a model would make it"
+    );
+    let warned = ops_safe.map_spec(|spec| DecisionSpec {
+        severity: Some(Severity::Warn),
+        ..spec
+    });
+    assert_eq!(
+        warned.fix_safety(),
+        Safety::Unsafe,
+        "a safe fix of a decision that does not author `error` is unsafe"
+    );
 }

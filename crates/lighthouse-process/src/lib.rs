@@ -11,6 +11,8 @@ mod format;
 mod sandbox;
 
 pub use format::Formatter;
+/// Whether sandboxed programs can run on this machine, and if not, why.
+pub use sandbox::available as sandbox_available;
 pub use sandbox::{
     Bridge, DENIED, Denied, Plan, Policy, Profile, Proxy, Sandbox, Simulation, allows, bridge,
     bwrap_argv, check_host, check_write, is_project_secret, seatbelt_profile, secrets,

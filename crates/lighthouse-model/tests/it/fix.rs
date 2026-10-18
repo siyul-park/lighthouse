@@ -11,10 +11,10 @@ fn at(line: u32, col: u32) -> Position {
 #[test]
 fn safety_is_read_and_written_as_its_lowercase_name() {
     assert_eq!("safe".parse::<Safety>().unwrap(), Safety::Safe);
-    assert_eq!("suggested".parse::<Safety>().unwrap(), Safety::Suggested);
-    assert_eq!(Safety::Suggested.to_string(), "suggested");
-    let error = "unsafe".parse::<Safety>().unwrap_err();
-    assert!(error.to_string().contains("unknown safety `unsafe`"));
+    assert_eq!("unsafe".parse::<Safety>().unwrap(), Safety::Unsafe);
+    assert_eq!(Safety::Unsafe.to_string(), "unsafe");
+    let error = "risky".parse::<Safety>().unwrap_err();
+    assert!(error.to_string().contains("unknown safety `risky`"));
     assert_eq!(serde_json::to_value(Safety::Safe).unwrap(), json!("safe"));
 }
 

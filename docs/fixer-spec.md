@@ -8,7 +8,7 @@ a `fix:` too.
 
 ```yaml
 fix:
-  safety: safe            # safe | suggested: the cap on what the fixer may claim
+  safety: safe            # safe | unsafe: the cap on what the fixer may claim
   requires: [extent]      # optional provider capabilities; absent means declined
   # exactly one of:
   ops:                    # CEL over the finding and the code model
@@ -41,7 +41,7 @@ fix:
   (optionally with `prompt` and `scope: symbol | files`; undeclared, the decision limits nothing and `[fix] scope` decides) or has a check and no
   fix of its own. Without an `edit` binding the finding stays a review task carrying the brief.
   The agent runs in a scratch copy of the project, once per file; each changed file is a
-  whole-file `Replace`, `suggested` and never `safe` (`safety: safe` is refused). The orchestrator
+  whole-file `Replace`, `unsafe` and never `safe` (`safety: safe` is refused). The orchestrator
   keeps it only if the scope holds, the finding is gone, nothing of `warn` or `error` is new in the
   changed and referencing files and they are fully analyzed, then writes it (`[approval] fix =
   "allow"`) or reports a preview (`"ask"`); `--unsafe-fixes` writes it whatever the approval, and
@@ -91,7 +91,7 @@ fix:
   registered fixer, that every `reorder` key is registered and that the `requires` list
   covers what the operations need.
 - **Testing:** an invalid example may carry `fixed:`, the new text of each file that
-  changes. `lighthouse rule test` applies the fix to the example (suggested ones too),
+  changes. `lighthouse rule test` applies the fix to the example (unsafe ones too),
   asserts the files equal `fixed` (a final newline aside), checks that the rule no longer
   fires and that applying the fix again changes nothing. `decision_create` and `decision_update`
   run the same examples in their gate.

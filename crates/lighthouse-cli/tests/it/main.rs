@@ -15,6 +15,7 @@ mod fix_edit;
 mod fix_groups;
 mod fix_scope;
 mod fix_trust;
+mod fx;
 mod help;
 mod hook_session;
 mod internal;

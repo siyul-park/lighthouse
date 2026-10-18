@@ -23,7 +23,7 @@ spec:
     type: builtin
     id: core/no-unused-allow
   fix:
-    safety: suggested
+    safety: unsafe
     type: ops
     ops:
       - op: delete

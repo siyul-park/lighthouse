@@ -27,17 +27,20 @@ judged is remembered with its reason and is not raised again.
    read the decision: MCP resource `lighthouse://decisions/<id>`, tool
    `decision_show`, or `lighthouse decision show <id>`. `detail: "full"` (`--detail full`)
    returns one self-contained record per finding instead.
-3. **Fix** the code, then **recheck**. Findings of a rule marked `fixable` in
-   the digest below can be fixed for you: MCP tool `fix` (by `fingerprints`,
-   `paths` or `decision`, `dryRun` first to see the diff), or
-   `lighthouse check --fix`.
-   A fixable finding carries its fix as a unified diff (`fix`) and its group an
-   `apply` command: prefer `check --fix` for safe fixes, and read the diff of a
-   suggested one before applying it.
-   Only safe fixes of mechanical rules apply by default; `unsafeFixes` also
-   applies suggested ones. Every fix is verified and rolled back if it makes
-   the file worse. Review the diff like any other change. A run that reports `incomplete` did not
-   check everything: it is not a pass.
+3. **Fix** the code, then **recheck**. Each group says how its decision is
+   fixed: `fix` names who makes the fix, its `safety` (`safe` or `unsafe`),
+   whether it runs here and the call that applies it, and `brief` marks a
+   decision whose findings you fix by hand with the brief of `review_show`.
+   The loop:
+   1. `check`.
+   2. `fix` the groups whose `fix` is `safe`.
+   3. For the others, `review_show` the finding, edit with its brief, `check` again.
+   4. Use `fix` with a model only if the project bound one and you want it to run: an `unsafe` fix comes back as a preview whose `apply` call writes exactly that fix, and `noModels` asks none.
+   Only `safe` fixes are written, whoever makes them; an `unsafe` fix is shown
+   as a preview with its diff, unless the project's `[approval] fix = "allow"`
+   or `unsafeFixes` says otherwise. Every fix is verified and rolled back if it
+   makes the file worse. Review the diff like any other change. A run that
+   reports `incomplete` did not check everything: it is not a pass.
 4. **Judge** the findings that ask for review (`review_list`: those of
    decisions that authored `warn` or `info`, whatever level the configuration
    reports them at): fix them, or record a judgment with `review_resolve`.
@@ -77,14 +80,14 @@ Do not memorize decision text; ask for it when a finding names a rule.
 
 ## Active decisions (23)
 
-A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.
+A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|unsafe` marks a decision with a fixer and the safety of its fix.
 
 ### core
 
 - `core/file-size` (warn) Files stay small and cohesive
 - `core/formatted` (warn) A file is as its formatter writes it
 - `core/allow` (error) Allow a finding in source, with a reason
-- `core/no-unused-allow` (warn, fixable: suggested) Allow annotations suppress something
+- `core/no-unused-allow` (warn, fixable: unsafe) Allow annotations suppress something
 - `core/decision-naming` (warn) Decision names follow the ESLint convention
 
 ### design
@@ -99,10 +102,10 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/ownership` (warn) State, generated code and platform code have one owner
 - `design/concurrency` (warn) Cancellation is explicit and tasks can be stopped
 - `design/errors` (warn) Errors keep their identity and are returned, not thrown
-- `design/layout` (warn, fixable: suggested) Declarations are laid out for reading
+- `design/layout` (warn, fixable: unsafe) Declarations are laid out for reading
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
 - `design/exported-doc` (warn) Exported symbols are documented
-- `design/comments` (warn, fixable: suggested) A comment states a fact the code cannot
+- `design/comments` (warn, fixable: unsafe) A comment states a fact the code cannot
 
 ### testing
 
