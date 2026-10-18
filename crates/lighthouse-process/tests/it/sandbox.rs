@@ -298,3 +298,21 @@ fn a_program_leads_its_group_in_a_session_of_its_own_and_has_no_terminal() {
 
     assert_eq!(lines(&ran), ["leader", "no terminal"], "{ran:?}");
 }
+
+#[cfg(target_os = "macos")]
+#[test]
+fn a_program_cannot_reach_the_keychain_service() {
+    let world = World::new();
+    let script = "/usr/bin/security list-keychains >/dev/null 2>&1 && echo reached";
+    let control = std::process::Command::new("/usr/bin/security")
+        .arg("list-keychains")
+        .output()
+        .unwrap();
+    if !control.status.success() {
+        return;
+    }
+
+    let ran = world.run(script, &world.profile(&[]));
+
+    assert_eq!(lines(&ran), Vec::<String>::new(), "{ran:?}");
+}

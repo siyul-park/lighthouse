@@ -75,7 +75,7 @@ fn seatbelt_reads_all_but_the_secrets_and_writes_the_list() {
 (allow process-fork)
 (allow signal (target same-sandbox))
 (allow sysctl-read)
-(allow mach-lookup)
+(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo") (global-name "com.apple.system.opendirectoryd.membership") (global-name "com.apple.logd") (global-name "com.apple.system.notification_center") (global-name "com.apple.bsd.dirhelper") (global-name "com.apple.trustd.agent"))
 (allow ipc-posix-shm)
 (allow file-ioctl)
 (allow file-read*)
