@@ -8,6 +8,7 @@
 mod backend;
 mod bridge;
 mod bubblewrap;
+mod entries;
 mod plan;
 mod probe;
 mod proxy;
@@ -27,6 +28,7 @@ pub(crate) use backend::{ended, wrap};
 use bridge::Uplink;
 pub use bridge::bridge;
 pub use bubblewrap::argv as bwrap_argv;
+pub use entries::{check_host, check_write};
 pub use plan::{Bridge, Denied, Plan};
 pub use probe::{Simulation, simulate_unavailable};
 pub use proxy::{Proxy, allows};
@@ -84,6 +86,9 @@ pub struct Policy {
     pub enabled: bool,
     /// The hosts that checks and verification commands may reach.
     pub network: Vec<String>,
+    /// The places besides their own that they may write: paths below the
+    /// project, or below the home directory with a `~/` in front.
+    pub write: Vec<String>,
 }
 
 impl Default for Policy {
@@ -91,11 +96,27 @@ impl Default for Policy {
         Self {
             enabled: true,
             network: Vec::new(),
+            write: Vec::new(),
         }
     }
 }
 
 impl Policy {
+    /// The places of `write` as paths, for a program run for the project at
+    /// `root`. One that would be a secret is left out whatever it says.
+    pub fn writes(&self, root: &Path) -> Vec<PathBuf> {
+        let home = env::var_os("HOME").map(PathBuf::from);
+        let secret = secrets(home.as_deref(), root);
+        self.write
+            .iter()
+            .filter_map(|entry| match entry.strip_prefix("~/") {
+                Some(rest) => home.as_ref().map(|home| home.join(rest)),
+                None => Some(root.join(entry)),
+            })
+            .filter(|path| !secret.iter().any(|secret| path.starts_with(secret)))
+            .collect()
+    }
+
     /// `profile` when the project sandboxes its programs, else none.
     pub fn sandbox<'a>(&self, profile: &'a Profile) -> Sandbox<'a> {
         if self.enabled {

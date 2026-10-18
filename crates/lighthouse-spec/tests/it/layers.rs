@@ -200,6 +200,7 @@ fn the_sandbox_is_on_without_hosts_and_each_key_is_the_later_layers() {
                 json!(["a.test"]),
                 USER_FILE.to_owned()
             ),
+            ("sandbox.write".to_owned(), json!([]), BUNDLED.to_owned()),
         ]
     );
     assert!(
@@ -211,6 +212,73 @@ fn the_sandbox_is_on_without_hosts_and_each_key_is_the_later_layers() {
                 && entry.value == json!(true)
                 && entry.origin == BUNDLED),
         "the default is shown"
+    );
+}
+
+#[test]
+fn the_places_programs_may_write_are_a_key_of_the_later_layers() {
+    assert!(layers(&[]).0.sandbox().write.is_empty());
+
+    let (config, stack) = layers(&[
+        (
+            USER_FILE,
+            "[sandbox]\nwrite = [\"target\", \"~/.cargo/registry\"]\n",
+        ),
+        (LOCAL_FILE, "[sandbox]\nwrite = [\"out\"]\n"),
+    ]);
+
+    assert_eq!(config.sandbox().write, ["out"], "a list is replaced");
+    assert!(
+        stack
+            .entries()
+            .iter()
+            .any(|entry| entry.key == "sandbox.write"
+                && entry.value == json!(["out"])
+                && entry.origin == LOCAL_FILE)
+    );
+}
+
+#[test]
+fn a_host_or_a_place_that_cannot_mean_what_it_says_is_refused_naming_the_file_and_the_key() {
+    for (text, key, entry) in [
+        ("[sandbox]\nnetwork = [\"*\"]\n", "sandbox.network", "*"),
+        (
+            "[sandbox]\nnetwork = [\"*.com\"]\n",
+            "sandbox.network",
+            "*.com",
+        ),
+        (
+            "[sandbox]\nnetwork = [\"a.test:0\"]\n",
+            "sandbox.network",
+            "a.test:0",
+        ),
+        ("[sandbox]\nwrite = [\"/\"]\n", "sandbox.write", "/"),
+        (
+            "[sandbox]\nwrite = [\"~/.ssh\"]\n",
+            "sandbox.write",
+            "~/.ssh",
+        ),
+        ("[sandbox]\nwrite = [\"../x\"]\n", "sandbox.write", "../x"),
+    ] {
+        let message = refused(USER_FILE, text);
+        assert!(
+            message.contains(USER_FILE)
+                && message.contains(key)
+                && message.contains(&format!("`{entry}`")),
+            "{message}"
+        );
+    }
+    let error = Layers::build(
+        Format::Toml,
+        "lighthouse.toml",
+        &document("[sandbox]\nnetwork = [\"*.org\"]\n"),
+        Vec::new(),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+        error.contains("lighthouse.toml") && error.contains("sandbox.network"),
+        "{error}"
     );
 }
 
@@ -352,7 +420,8 @@ fn the_defaults_are_the_bundled_layer() {
             "models.explore",
             "models.routing",
             "sandbox.enabled",
-            "sandbox.network"
+            "sandbox.network",
+            "sandbox.write"
         ]
     );
 }

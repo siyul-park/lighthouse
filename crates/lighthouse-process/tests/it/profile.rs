@@ -3,8 +3,8 @@
 use std::{fs, path::PathBuf};
 
 use lighthouse_process::{
-    Bridge, DENIED, Denied, Plan, Policy, Profile, Sandbox, bwrap_argv, is_project_secret,
-    seatbelt_profile, secrets,
+    Bridge, DENIED, Denied, Plan, Policy, Profile, Sandbox, bwrap_argv, check_host, check_write,
+    is_project_secret, seatbelt_profile, secrets,
 };
 
 fn path(text: &str) -> PathBuf {
@@ -219,4 +219,88 @@ fn a_policy_that_is_off_runs_the_program_without_a_sandbox() {
 
     assert!(matches!(on.sandbox(&profile), Sandbox::On(_)));
     assert!(matches!(off.sandbox(&profile), Sandbox::Off));
+}
+
+#[test]
+fn a_host_is_a_name_or_a_suffix_of_two_labels_with_an_optional_port() {
+    for good in [
+        "a.test",
+        "*.example.com",
+        "api.x.test:8443",
+        "127.0.0.1:80",
+        "A-b.test",
+    ] {
+        assert_eq!(check_host(good), Ok(()), "{good}");
+    }
+    for bad in [
+        "",
+        "*",
+        "*.",
+        "*.com",
+        "*.com:443",
+        "a.test:0",
+        "a.test:65536",
+        "a.test:x",
+        "a.test:",
+        "a..test",
+        ".a.test",
+        "a.test.",
+        "a b.test",
+        "a/b.test",
+        "*a.test",
+        "a.*.test",
+        "https://a.test",
+        "[::1]:80",
+    ] {
+        assert!(check_host(bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn a_place_to_write_is_below_the_project_or_the_home_directory_and_never_a_secret() {
+    for good in ["target", "out/x", "~/.cargo/registry", "~/.cache/go-build"] {
+        assert_eq!(check_write(good), Ok(()), "{good}");
+    }
+    for bad in [
+        "",
+        "/",
+        ".",
+        "~",
+        "~/",
+        "/etc",
+        "/tmp/x",
+        "../x",
+        "a/../../x",
+        "~/../x",
+        "~root/x",
+        ".env",
+        ".env.local",
+        ".lighthouse/local.toml",
+        "~/.ssh",
+        "~/.ssh/keys",
+        "~/.aws/x",
+    ] {
+        assert!(check_write(bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn the_places_of_a_policy_are_below_the_project_and_the_home_directory() {
+    let root = tempfile::tempdir().unwrap();
+    let policy = Policy {
+        write: vec![
+            "target".to_owned(),
+            "~/.cargo/registry".to_owned(),
+            "~/.ssh/x".to_owned(),
+        ],
+        ..Policy::default()
+    };
+    let home = path(&std::env::var("HOME").unwrap());
+
+    let places = policy.writes(root.path());
+
+    assert_eq!(
+        places,
+        [root.path().join("target"), home.join(".cargo/registry")]
+    );
 }

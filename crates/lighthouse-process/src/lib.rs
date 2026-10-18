@@ -13,7 +13,8 @@ mod sandbox;
 pub use format::Formatter;
 pub use sandbox::{
     Bridge, DENIED, Denied, Plan, Policy, Profile, Proxy, Sandbox, Simulation, allows, bridge,
-    bwrap_argv, is_project_secret, seatbelt_profile, secrets, simulate_unavailable,
+    bwrap_argv, check_host, check_write, is_project_secret, seatbelt_profile, secrets,
+    simulate_unavailable,
 };
 
 use sandbox::{Started, ended, runnable, wrap};

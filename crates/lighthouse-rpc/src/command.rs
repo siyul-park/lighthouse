@@ -110,6 +110,7 @@ impl CommandModel {
             policy: Policy {
                 enabled: sandbox.enabled,
                 network: network.clone(),
+                write: Vec::new(),
             },
             timeout: timeout.map_or(MODEL_TIMEOUT, Limit::get),
             edit_timeout: timeout.map_or(EDIT_TIMEOUT, Limit::get),

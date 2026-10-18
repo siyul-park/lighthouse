@@ -184,10 +184,12 @@ impl Invocation<'_> {
         let shown = argv.join(" ");
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
         let policy = &self.ctx.workspace.sandbox;
-        let profile = Profile {
+        let root = &self.ctx.workspace.root;
+        let mut profile = Profile {
             network: policy.network.clone(),
-            ..Profile::new(&self.ctx.workspace.root).caching()
+            ..Profile::new(root).caching()
         };
+        profile.writes.extend(policy.writes(root));
         let output = lighthouse_process::run(&lighthouse_process::Invocation {
             argv,
             dir: &self.ctx.workspace.root,

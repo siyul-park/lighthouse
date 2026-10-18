@@ -306,6 +306,10 @@ impl ProviderSpec {
         if argv.is_empty() {
             return Err("`command` is empty".to_owned());
         }
+        for host in &self.network {
+            lighthouse_process::check_host(host)
+                .map_err(|why| format!("`network` entry `{host}`: {why}"))?;
+        }
         let protocol = match self.protocol.as_ref().map(|p| p.iter().collect::<Vec<_>>()) {
             None => {
                 if self.pointer.is_some() {

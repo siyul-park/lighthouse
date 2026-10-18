@@ -36,9 +36,11 @@ pub struct Layer {
 impl Layer {
     /// The layer written in `text`, the content of the file `origin`.
     pub fn parse(origin: &str, text: &str) -> Result<Self, Error> {
+        let spec = EnvironmentSpec::parse(origin, text)?;
+        spec.sandbox.check(origin)?;
         Ok(Self {
             origin: origin.to_owned(),
-            spec: EnvironmentSpec::parse(origin, text)?,
+            spec,
         })
     }
 }
@@ -75,6 +77,7 @@ impl Layers {
     ) -> Result<(Config, Self), Error> {
         let project = parse_project(format, path, text)?;
         let own = EnvironmentSpec::of_project(&project.spec);
+        own.sandbox.check(path)?;
         let mut personal = EnvironmentSpec::default();
         for layer in &files {
             personal.over(&layer.spec);
@@ -126,6 +129,7 @@ fn defaults() -> Layer {
             sandbox: SandboxSpec {
                 enabled: Some(true),
                 network: Some(Vec::new()),
+                write: Some(Vec::new()),
             },
             ..EnvironmentSpec::default()
         },
@@ -165,6 +169,10 @@ fn flatten(env: &EnvironmentSpec) -> Vec<(String, Value)> {
     out.push((
         "sandbox.network".to_owned(),
         env.sandbox.network.as_ref().and_then(to_value),
+    ));
+    out.push((
+        "sandbox.write".to_owned(),
+        env.sandbox.write.as_ref().and_then(to_value),
     ));
     out.extend(
         models

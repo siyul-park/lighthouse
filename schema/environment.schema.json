@@ -273,6 +273,16 @@
             "array",
             "null"
           ]
+        },
+        "write": {
+          "description": "The places besides their own that command checks and `[fix] verify`\ncommands may write: paths below the project, or below the home\ndirectory with `~/` in front, such as `target` or `~/.cargo/registry`.\nNever a secret. Default: none.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "type": "object"

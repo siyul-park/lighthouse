@@ -155,3 +155,31 @@ fn without_a_home_a_sandboxed_program_is_not_run_for_the_secrets_cannot_be_locat
     );
     assert!(!said.contains("plain=[visible]"), "{said}");
 }
+
+#[test]
+fn a_check_writes_a_place_outside_its_own_only_when_the_project_lists_it() {
+    let script = r#"mkdir -p out && touch out/x && echo "$1:1: wr"ote; exit 1"#;
+    let dir = project(&decision(&format!(
+        "  check:\n    type: command\n    argv: [sh, -c, {script:?}, sh, \"{{file}}\"]\n"
+    )));
+    trust(dir.path());
+    let ran = |dir: &TempDir| {
+        let out = lighthouse(dir.path()).arg("check").output().unwrap();
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+
+    assert!(!ran(&dir).contains(": wrote"), "a place nobody listed");
+    assert!(!dir.path().join("out/x").exists());
+
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_test_support::project(
+            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n[sandbox]\nwrite = [\"out\"]\n",
+        ),
+    );
+    trust(dir.path());
+
+    assert!(ran(&dir).contains(": wrote"), "a place the project listed");
+    assert!(dir.path().join("out/x").exists());
+}

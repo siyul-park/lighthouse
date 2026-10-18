@@ -112,11 +112,12 @@ pub(in crate::fix) fn run_verify(
 ) -> Result<(), String> {
     let scratch = Scratch::new(root, texts)
         .map_err(|e| format!("the scratch copy of the project failed: {e}"))?;
-    let profile = Profile {
+    let mut profile = Profile {
         writes: vec![scratch.path().to_owned()],
         network: policy.network.clone(),
         ..Profile::new(root).caching()
     };
+    profile.writes.extend(policy.writes(scratch.path()));
     for argv in commands {
         let shown = argv.join(" ");
         let ran = lighthouse_process::run(&Invocation {

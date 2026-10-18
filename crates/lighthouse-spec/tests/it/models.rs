@@ -596,3 +596,27 @@ fn a_command_provider_lists_the_hosts_it_may_reach_and_no_other_reach_has_the_ke
         assert!(error.contains(wanted), "{error}");
     }
 }
+
+#[test]
+fn a_host_a_provider_lists_that_cannot_mean_what_it_says_makes_the_provider_invalid() {
+    let invalid = |network: &str| {
+        Config::parse_inline(&format!(
+            "plugins = []\n[models.providers.p]\ncommand = [\"agent\"]\nnetwork = {network}\n"
+        ))
+        .unwrap()
+        .models(&lighthouse_spec::Projects::default())
+        .unwrap()
+        .invalid
+        .get("p")
+        .cloned()
+    };
+
+    for bad in ["\"*\"", "\"*.com\"", "\"a.test:99999\"", "\"\""] {
+        let error = invalid(&format!("[{bad}]")).expect(bad);
+        assert!(
+            error.contains("`network`") && error.contains(bad.trim_matches('"')),
+            "{error}"
+        );
+    }
+    assert_eq!(invalid("[\"api.test\", \"*.cdn.test:8443\"]"), None);
+}
