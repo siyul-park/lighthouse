@@ -11,7 +11,7 @@ use std::{
     sync::PoisonError,
 };
 
-use lighthouse_model::{Diagnostic, Span, ucm::File};
+use lighthouse_model::{Diagnostic, Span, Unavailable, ucm::File};
 use lighthouse_plugin::{EditRequest, FixDecision};
 use lighthouse_protocol::hash;
 use lighthouse_spec::FixScope;
@@ -183,16 +183,12 @@ impl ModelFixer<'_> {
         let (attempt, model) = match self.route.through(&batch.binding, &key, &call) {
             Ok(found) => found,
             Err(Refusal::Budget) => {
-                let reason = "the budget for models is spent".to_owned();
+                let reason = format!("left for review: {}", Unavailable::BudgetSpent);
                 return Err(self.decline_all(batch, Class::Unanswered, reason));
             }
             Err(Refusal::Failed(why)) => {
                 let reason = format!("no model answered: {why}");
                 return Err(self.decline_all(batch, Class::Unanswered, reason));
-            }
-            Err(Refusal::Unkept) => {
-                let reason = "no kept answer matches the files as they are now: they changed since the preview, or it was never made (run `check --fix` again for a new one)".to_owned();
-                return Err(self.decline_all(batch, Class::Conflict, reason));
             }
         };
         self.count(batch, Event::Answered);

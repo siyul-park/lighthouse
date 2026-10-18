@@ -120,6 +120,8 @@ pub struct Checked {
     /// when its limit has chosen the findings to show, and a preview needs the
     /// engine's registry and workspace; the engine is not rebuilt for it.
     engine: Engine,
+    /// How each decision is fixed, to preview the fixes.
+    plan: FixPlan,
     /// The project root, to read the files SARIF columns are measured in.
     root: PathBuf,
     /// How the check and the fix of each decision with a finding run, by
@@ -258,9 +260,8 @@ impl Checked {
     /// does not apply cleanly, runs a program or does not exist has none.
     /// Applying a fix goes through a fix run, which verifies it.
     pub fn fixes(&self, findings: &[&Diagnostic]) -> BTreeMap<String, Preview> {
-        let plan = FixPlan::from_catalog(&self.catalog);
         self.engine
-            .preview_fixes(&plan, &self.run, findings)
+            .preview_fixes(&self.plan, findings)
             .into_iter()
             .map(|preview| (preview.fingerprint.as_str().to_owned(), preview))
             .collect()
@@ -374,7 +375,8 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
         .chain(&remembered.suppressions)
         .cloned()
         .collect();
-    let descriptors = Fixing::of(session)?.all(
+    let fixing = Fixing::of(session)?;
+    let descriptors = fixing.all(
         &catalog,
         run.diagnostics
             .iter()
@@ -388,6 +390,7 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
         suppressions,
         messages,
         engine,
+        plan: fixing.plan().clone(),
         root,
         descriptors,
     })

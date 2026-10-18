@@ -121,7 +121,7 @@ fn what_the_sandbox_allows_is_part_of_the_trust_a_personal_file_cannot_change_al
             .output()
             .unwrap();
         let stderr = String::from_utf8(out.stderr).unwrap();
-        !stderr.contains("not trusted")
+        !stderr.contains("untrusted project")
     };
     assert!(trusted(&dir));
 

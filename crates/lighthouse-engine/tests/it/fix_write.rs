@@ -3,7 +3,7 @@
 use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy};
+use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy, Needs};
 use lighthouse_model::{
     Safety,
     ucm::{EditOp, FixOutcome},
@@ -98,8 +98,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
     (
@@ -247,8 +246,7 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 
@@ -319,8 +317,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 

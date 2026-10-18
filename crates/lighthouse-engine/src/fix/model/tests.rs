@@ -144,6 +144,7 @@ pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
         aim: Aim::Finding,
         chain: 0,
         bases: BTreeMap::new(),
+        batch: vec![finding.fingerprint.clone()],
     }
 }
 

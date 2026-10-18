@@ -159,8 +159,8 @@ pub fn show_with_brief(root: &Path, session: Option<&Session>, fingerprint: &str
             fix: None,
         });
     };
-    let aim = Aim::Finding(finding.fingerprint.as_str());
-    let described = Fixing::of(session)?.describe(decision, aim);
+    let fingerprints = [finding.fingerprint.as_str()];
+    let described = Fixing::of(session)?.describe(decision, Aim::Findings(&fingerprints));
     let brief = match &described {
         Some(descriptor) if descriptor.brief => Some(brief_of(session, decision, &finding)?),
         _ => None,

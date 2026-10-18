@@ -125,8 +125,13 @@
                   "type": "string"
                 },
                 {
+                  "const": "no budget",
+                  "description": "A model that costs, and `[models] budget` allows no request.",
+                  "type": "string"
+                },
+                {
                   "const": "budget spent",
-                  "description": "A model fix, and the budget for models allows no request.",
+                  "description": "A model that costs, and the requests the budget allows were made.",
                   "type": "string"
                 },
                 {

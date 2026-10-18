@@ -129,7 +129,7 @@ fn a_listed_decision_without_an_agent_is_left_for_review() {
 
     let reason = fixed["declined"][0]["reason"].as_str().unwrap();
     assert!(
-        reason.contains("`[models] edit` is not bound") && reason.contains("review show"),
+        reason.contains("no edit binding") && reason.contains("review show"),
         "{reason}"
     );
 }
@@ -295,10 +295,9 @@ fn review_show_carries_the_brief_and_the_fix_of_a_finding_whose_fix_is_not_safe(
             "safety": "unsafe",
             "runs": true,
             "approval": "ask",
-            "apply": format!("lighthouse check --fix --unsafe-fixes --fingerprint {}", listed_show["fingerprint"].as_str().unwrap()),
+            "apply": format!("lighthouse check --fix --fingerprint {}", listed_show["fingerprint"].as_str().unwrap()),
             "tool": {"name": "fix", "arguments": {
-                "fingerprints": [listed_show["fingerprint"]],
-                "unsafeFixes": true
+                "fingerprints": [listed_show["fingerprint"]]
             }}
         }),
         "{listed_show}"

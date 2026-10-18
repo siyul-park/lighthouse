@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Diagnostic, Safety};
+use lighthouse_model::{Diagnostic, Fingerprint, Safety};
 use lighthouse_protocol::hash;
 use lighthouse_spec::FixScope;
 
@@ -202,6 +202,11 @@ fn run_proposals(number: usize, run: &Accepted<'_>) -> Vec<Proposal> {
         .map(|(file, (before, _))| (file.clone(), hash::sha256(before)))
         .collect();
     let files: Vec<PathBuf> = run.files.keys().cloned().collect();
+    let batch: Vec<Fingerprint> = run
+        .findings
+        .iter()
+        .map(|finding| finding.fingerprint.clone())
+        .collect();
     run.findings
         .iter()
         .map(|finding| Proposal {
@@ -217,6 +222,7 @@ fn run_proposals(number: usize, run: &Accepted<'_>) -> Vec<Proposal> {
             aim: Aim::File,
             chain: number,
             bases: bases.clone(),
+            batch: batch.clone(),
         })
         .collect()
 }

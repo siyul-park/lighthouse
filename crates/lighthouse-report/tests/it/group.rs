@@ -315,7 +315,7 @@ fn fix_of(
         runs: why.is_none(),
         why,
         approval,
-        apply: Apply::of(Aim::Decision("acme/a"), safety == Safety::Unsafe),
+        apply: Apply::of(Aim::Decision("acme/a"), false),
     }
 }
 
@@ -362,7 +362,7 @@ fn a_group_says_in_one_line_how_its_fix_is_made_and_applied() {
     let text = described(descriptor(Some(asked), true), false);
     assert!(
         text.contains(
-            "  fix: unsafe (model, previewed under ask) \u{2014} lighthouse check --fix --unsafe-fixes --decision acme/a\n"
+            "  fix: unsafe (model, previewed under ask; apply each preview by its fingerprint) \u{2014} lighthouse check --fix --decision acme/a\n"
         ),
         "{text}"
     );
@@ -444,11 +444,11 @@ fn a_group_in_json_carries_the_descriptor_once() {
 
 #[test]
 fn a_tool_call_is_a_line_of_its_name_and_arguments() {
-    let call = Apply::of(Aim::Finding("a1b2c3d"), true);
+    let call = Apply::of(Aim::Findings(&["a1b2c3d", "e4f5a6b"]), true);
 
     assert_eq!(
         call.tool_line(),
-        r#"fix {"fingerprints":["a1b2c3d"],"unsafeFixes":true}"#
+        r#"fix {"fingerprints":["a1b2c3d","e4f5a6b"],"unsafeFixes":true}"#
     );
 }
 

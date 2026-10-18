@@ -14,8 +14,7 @@ fn a_command_runs_only_after_the_user_trusts_the_project() {
     lighthouse(dir.path())
         .args(["check", "--fix"])
         .assert()
-        .stderr(predicate::str::contains("not trusted"))
-        .stderr(predicate::str::contains("tr a-z A-Z"));
+        .stderr(predicate::str::contains("untrusted project"));
     assert_eq!(read(&dir, "a.txt"), "hello\n");
 
     trust(dir.path());
@@ -41,7 +40,7 @@ fn a_change_to_the_configuration_or_the_rules_withdraws_trust() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--dry-run"])
         .assert()
-        .stderr(predicate::str::contains("not trusted"));
+        .stderr(predicate::str::contains("untrusted project"));
 
     write(dir.path(), "lighthouse.toml", &config);
     lighthouse(dir.path())
@@ -58,7 +57,7 @@ fn a_change_to_the_configuration_or_the_rules_withdraws_trust() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--dry-run"])
         .assert()
-        .stderr(predicate::str::contains("not trusted"));
+        .stderr(predicate::str::contains("untrusted project"));
 }
 
 #[test]
@@ -73,7 +72,7 @@ fn trust_can_be_revoked_and_ci_can_override_it() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--dry-run"])
         .assert()
-        .stderr(predicate::str::contains("not trusted"));
+        .stderr(predicate::str::contains("untrusted project"));
     lighthouse(dir.path())
         .env("LIGHTHOUSE_TRUST", "1")
         .args(["check", "--fix", "--dry-run"])
@@ -122,7 +121,7 @@ fn trust_lists_what_it_trusts_and_needs_a_terminal_or_yes() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--dry-run"])
         .assert()
-        .stderr(predicate::str::contains("not trusted"));
+        .stderr(predicate::str::contains("untrusted project"));
 
     lighthouse(dir.path())
         .args(["trust", "--yes"])
@@ -165,5 +164,5 @@ fn a_program_inside_the_project_is_trusted_by_its_content() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--dry-run"])
         .assert()
-        .stderr(predicate::str::contains("not trusted"));
+        .stderr(predicate::str::contains("untrusted project"));
 }

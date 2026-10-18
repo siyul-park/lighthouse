@@ -185,12 +185,16 @@ fn a_delete_fix_replaces_a_region_with_nothing() {
     assert_eq!(instance(&group)[3]["fix"]["safety"], "unsafe", "{group}");
     assert_eq!(group["fix"]["safety"], "unsafe", "{group}");
     assert_eq!(group["fix"]["approval"], "ask", "{group}");
-    assert_eq!(group["fix"]["tool"]["arguments"]["unsafeFixes"], true);
+    assert!(
+        group["fix"]["tool"]["arguments"]
+            .get("unsafeFixes")
+            .is_none()
+    );
     assert!(
         group["fix"]["apply"]
             .as_str()
             .unwrap()
-            .starts_with("lighthouse check --fix --unsafe-fixes --decision ")
+            .starts_with("lighthouse check --fix --decision ")
     );
     assert_eq!(group["brief"], true, "an unsafe fix has a brief");
     assert!(

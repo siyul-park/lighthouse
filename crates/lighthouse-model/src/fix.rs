@@ -36,7 +36,10 @@ pub enum Unavailable {
     /// The fix runs a program, and this machine has no sandbox to run it in.
     #[serde(rename = "sandbox unavailable")]
     SandboxUnavailable,
-    /// A model fix, and the budget for models allows no request.
+    /// A model that costs, and `[models] budget` allows no request.
+    #[serde(rename = "no budget")]
+    NoBudget,
+    /// A model that costs, and the requests the budget allows were made.
     #[serde(rename = "budget spent")]
     BudgetSpent,
     /// Nothing serves the kind of fix the decision names.
@@ -48,6 +51,7 @@ vocabulary!(Unavailable, "reason" {
     NoEditBinding => "no edit binding",
     UntrustedProject => "untrusted project",
     SandboxUnavailable => "sandbox unavailable",
+    NoBudget => "no budget",
     BudgetSpent => "budget spent",
     ProviderUnavailable => "provider unavailable",
 });

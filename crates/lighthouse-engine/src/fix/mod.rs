@@ -7,6 +7,7 @@
 mod batch;
 pub mod brief;
 mod edits;
+mod kept;
 mod lower;
 mod model;
 mod preview;
@@ -22,20 +23,21 @@ use std::{
 
 use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_plugin::FixDecision;
-use lighthouse_spec::{Catalog, Decision, FixKind, FixScope};
+use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Task};
+use serde::{Deserialize, Serialize};
 
 pub use edits::unified_diff;
 pub use model::ModelCounts;
 use model::ModelFix;
 
-use crate::Run;
+use crate::{Needs, Run};
 
 /// How many apply-and-recheck rounds a run takes before it stops.
 pub const MAX_ROUNDS: usize = 5;
 
 /// What makes a fix: a registered fixer, derived from the rule, or the
 /// project's agent that edits, which guesses and is held to the checks.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FixedBy {
     /// The registered fixer with this id.
     Fixer(String),
@@ -63,12 +65,10 @@ pub struct FixBinding {
     /// The languages of the examples of the decision: where its fix is known
     /// to apply.
     pub languages: Vec<String>,
-    /// The fixer runs a program, which needs the project's trust.
-    pub runs_command: bool,
+    /// What the fix needs to run: when [`Availability`] says it cannot, the
+    /// rule's findings are declined with the reason.
+    pub needs: Needs,
     pub decision: FixDecision,
-    /// Why the fix cannot run at all, such as a kind this version does not
-    /// support; the rule's findings are then declined with this text.
-    pub unsupported: Option<String>,
 }
 
 /// The fixer of each rule, by rule id. Built from the catalog by the caller:
@@ -98,12 +98,12 @@ impl FixPlan {
                     fixer: FixedBy::Fixer(decision.id().to_owned()),
                     cap: decision.fix_safety(),
                     languages: languages_of(decision),
-                    runs_command: matches!(fix.kind, FixKind::Command(_)),
+                    needs: match fix.kind {
+                        FixKind::Command(_) => Needs::Program,
+                        FixKind::Rpc { .. } => Needs::Unserved,
+                        _ => Needs::Nothing,
+                    },
                     decision: decision_of(decision),
-                    unsupported: matches!(fix.kind, FixKind::Rpc { .. }).then(|| {
-                        "the fix of this rule is of kind `rpc`, which is not yet supported"
-                            .to_owned()
-                    }),
                 },
             );
         }
@@ -135,9 +135,11 @@ impl FixPlan {
                     fixer: FixedBy::Model,
                     cap: decision.fix_safety(),
                     languages: Vec::new(),
-                    runs_command: false,
+                    needs: Needs::Model {
+                        decision: decision.id().to_owned(),
+                        task: Task::Edit,
+                    },
                     decision: decision_of(decision),
-                    unsupported: None,
                 },
             );
             self.models.insert(
@@ -183,6 +185,8 @@ pub struct FixRun {
     /// catalog's; needs `rules` or `fingerprints`. Its proposals are
     /// `unsafe`.
     pub fixer: Option<String>,
+    /// Ask no agent that edits: what a model would fix is left to review.
+    pub no_models: bool,
 }
 
 /// A fix that was applied.
@@ -196,6 +200,9 @@ pub struct AppliedFix {
     /// Every file the fix changed.
     pub files: Vec<PathBuf>,
     pub round: usize,
+    /// What the fix changed, in the state of the files it was verified over;
+    /// `None` when it could not be shown.
+    pub preview: Option<Preview>,
 }
 
 /// A finding that was left as it was, and why.
@@ -217,12 +224,19 @@ pub struct FileChange {
 }
 
 /// An `unsafe` fix that the checks accepted and the run was not permitted to
-/// write.
+/// write, kept for a hand to apply: only if the files are still as it was
+/// verified over.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreviewedFix {
     pub rule_id: String,
     pub fixer: FixedBy,
     pub preview: Preview,
+    /// The digest of each file the fix changes, as it was verified over.
+    pub bases: BTreeMap<PathBuf, String>,
+    /// The findings the fix was made for, this one among them: a run of a
+    /// model is made for all the findings of a file, and applied for them
+    /// all.
+    pub batch: Vec<Fingerprint>,
 }
 
 /// What the runs of an agent that edits took.

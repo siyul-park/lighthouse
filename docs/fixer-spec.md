@@ -78,10 +78,10 @@ fix:
   either withdraws it, and `lighthouse trust --revoke` removes it. `LIGHTHOUSE_TRUST=1`
   trusts every project, for CI. The repository cannot grant trust itself: no setting in
   `lighthouse.toml` does (the commands of `[fix] verify` and of command model providers are listed
-  by `lighthouse trust` like the others). Without trust a command fix is declined with a
-  message naming the command, and formatting is skipped with a note.
+  by `lighthouse trust` like the others). Without trust a command fix is declined as an
+  untrusted project, like every fix that runs a program, and formatting is skipped with a note.
 - **Validation** (every catalog load, local layers included): exactly one kind; a decision
-  with an implementation; `safe` only on mechanical decisions; every CEL expression and
+  with an implementation; `safe` only on decisions that author `error`; every CEL expression and
   template compiles; operation parameters are well-typed (one of `before`/`after`, `node`
   or `file` and `span`, qualified order keys); a command has a program and a timeout;
   `rename` lists `complete-references`; placeholders fill whole arguments; an `rpc` fix is

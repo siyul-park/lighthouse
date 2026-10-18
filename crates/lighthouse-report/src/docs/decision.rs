@@ -108,7 +108,7 @@ fn row(decision: &Decision) -> String {
     let fix = decision
         .fix
         .as_ref()
-        .map_or_else(String::new, |fix| fix.safety.to_string());
+        .map_or_else(String::new, |_| decision.fix_safety().to_string());
     format!(
         "| {id} | {} | {} | {fix} | {requirement} |\n",
         cell(&decision.title),
@@ -125,8 +125,8 @@ fn entry(decision: &Decision, level_of_title: usize, sources: Option<&str>) -> S
         decision.scope.subject,
         level(decision)
     );
-    if let Some(fix) = &decision.fix {
-        let _ = write!(meta, " · fix: {}", fix.safety);
+    if decision.fix.is_some() {
+        let _ = write!(meta, " · fix: {}", decision.fix_safety());
     }
     if !decision.status.is_default() {
         let _ = write!(meta, " · {}", decision.status);

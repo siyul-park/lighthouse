@@ -114,8 +114,11 @@ fix = "ask"                                        # default; "allow" writes a v
   fixes would be written. They need a trusted project and are part of what `lighthouse trust` lists.
 - **Approval.** With `approval.fix = "ask"` a verified fix is not written: the report carries it as a
   preview with its diff (`previews` in the `fix` JSON, `preview ...` lines in `check --fix`), awaiting
-  a hand; applying it is `check --fix --unsafe-fixes --fingerprint <fp>`, which serves the edit from
-  the cache (the model is not asked again) and re-verifies it, `conflict` if the files changed. With
+  a hand. The run keeps each preview in the result cache with the digests of the files it changes;
+  applying it, `check --fix --unsafe-fixes --fingerprint <fp>` with the fingerprints of all the findings
+  of its run, writes exactly that edit after re-verifying it, without asking the model again. A file that
+  changed since is a `conflict`, and a preview that is not kept (`--no-cache`, or never made) is declined
+  as `unanswered`. With
   `"allow"` it is written like any applied fix. `--unsafe-fixes` also writes verified model fixes
   whatever the approval: the same permission every unsafe fix of every provider has. `--dry-run`
   writes nothing either way.

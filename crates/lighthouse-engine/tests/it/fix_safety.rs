@@ -4,7 +4,7 @@
 use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy};
+use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy, Needs};
 use lighthouse_model::{
     Diagnostic, Options, Safety,
     ucm::{EditOp, FixOutcome},
@@ -141,8 +141,7 @@ fn a_file_that_changed_since_it_was_read_is_skipped_and_its_fix_is_declined() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 
@@ -274,8 +273,7 @@ fn an_unsafe_fix_is_asked_for_in_every_run_to_be_shown() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 
@@ -302,10 +300,7 @@ fn an_unsupported_fix_declines_its_findings_with_its_reason() {
     unsupported.insert(
         "fake/todo",
         FixBinding {
-            runs_command: false,
-            unsupported: Some(
-                "the fix of this rule is of kind `rpc`, which is not yet supported".to_owned(),
-            ),
+            needs: Needs::Unserved,
             ..unsupported.get("fake/todo").unwrap().clone()
         },
     );
@@ -313,7 +308,11 @@ fn an_unsupported_fix_declines_its_findings_with_its_reason() {
     let report = engine.fix(&unsupported, &FixRun::default()).unwrap();
 
     assert_eq!(text(&dir), "TODO\n");
-    assert!(report.declined[0].reason.contains("rpc"));
+    assert!(
+        report.declined[0].reason.contains("provider unavailable"),
+        "{}",
+        report.declined[0].reason
+    );
 }
 
 #[test]
@@ -380,8 +379,7 @@ fn a_proposal_whose_edits_overlap_each_other_is_declined() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 
@@ -478,8 +476,7 @@ fn fixes_that_undo_each_other_stop_the_run_and_name_their_rules() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 
@@ -544,8 +541,7 @@ fn a_fix_that_adds_a_warning_is_rolled_back_like_one_that_adds_an_error() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 
@@ -658,8 +654,7 @@ fn a_fix_cannot_reach_outside_the_project_or_into_a_symlink() {
                     requirement: String::new(),
                     context: String::new(),
                 },
-                runs_command: false,
-                unsupported: None,
+                needs: Needs::Nothing,
             },
         );
 

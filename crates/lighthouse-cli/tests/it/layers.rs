@@ -189,7 +189,7 @@ fn a_personal_file_withdraws_the_trust_given_to_the_project_without_it() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--dry-run"])
         .assert()
-        .stderr(predicate::str::contains("not trusted"));
+        .stderr(predicate::str::contains("untrusted project"));
 
     fs::remove_file(dir.path().join(LOCAL_FILE)).unwrap();
     lighthouse(dir.path())
@@ -464,10 +464,10 @@ fn a_limit_in_a_personal_file_keeps_the_trust_and_a_program_withdraws_it() {
             .unwrap();
         let stderr = String::from_utf8(out.stderr).unwrap();
         assert!(
-            stderr.contains("would fix local/shout") || stderr.contains("not trusted"),
+            stderr.contains("would fix local/shout") || stderr.contains("untrusted project"),
             "{stderr}"
         );
-        !stderr.contains("not trusted")
+        !stderr.contains("untrusted project")
     };
     assert!(trusted(&dir));
 

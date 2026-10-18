@@ -7,10 +7,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde::{Deserialize, Serialize};
 use similar::TextDiff;
 
 /// Replaces `range` of `file`'s text with `text`; an empty range inserts.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct TextEdit {
     pub file: PathBuf,
     pub range: Range<usize>,

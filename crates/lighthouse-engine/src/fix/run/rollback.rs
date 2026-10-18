@@ -17,7 +17,7 @@ use super::{
     super::preview::preview_files,
     super::propose::Proposal,
     super::{AppliedFix, DeclinedFix, FixedBy},
-    Orchestrator,
+    Orchestrator, Standing,
     settle::{has_model, restate},
 };
 use crate::{Error, Run};
@@ -146,6 +146,11 @@ impl Orchestrator<'_> {
                     self.proposer.note_model(&p.rule_id, Event::Verified);
                 }
                 any = true;
+                let preview = self
+                    .previewable
+                    .get(&p.fingerprint)
+                    .and_then(|standing| standing.shown.as_ref().ok())
+                    .cloned();
                 self.applied.push(AppliedFix {
                     fingerprint: p.fingerprint.clone(),
                     rule_id: p.rule_id.clone(),
@@ -154,14 +159,15 @@ impl Orchestrator<'_> {
                     safety: p.safety,
                     files: files.clone(),
                     round,
+                    preview,
                 });
             }
         }
         any
     }
 
-    /// Keeps the preview of every standing fix the run may not write, in case
-    /// it leaves it for a hand to apply, or why it has none. `bases` holds the
+    /// Keeps what every standing fix changes, in case the run may not write it
+    /// and leaves it for a hand to apply, or why it has none. `bases` holds the
     /// texts the round changed; a file it left as it was has the text it
     /// stands in for.
     fn keep_previews(
@@ -174,36 +180,40 @@ impl Orchestrator<'_> {
         let standing: Vec<&Proposal> = kept
             .iter()
             .chain(merged.iter().map(|(p, _)| p))
-            .filter(|p| !self.permits(p.safety) && !p.files.iter().any(|f| rolled.contains_key(f)))
+            .filter(|p| !p.files.iter().any(|f| rolled.contains_key(f)))
             .collect();
         for p in standing {
-            let shown = preview_files(p, |file| {
+            let files = preview_files(p, |file| {
                 bases
                     .get(file)
                     .cloned()
                     .or_else(|| self.standing_text(file))
             });
-            let kept = shown.map_or_else(
-                || {
-                    Err(DeclinedFix {
-                        fingerprint: p.fingerprint.clone(),
-                        rule_id: p.rule_id.clone(),
-                        file: p.file.clone(),
-                        line: p.line,
-                        reason: "left for review: its change could not be shown as a preview"
-                            .to_owned(),
-                    })
-                },
-                |files| {
-                    Ok(Preview {
-                        fingerprint: p.fingerprint.clone(),
-                        description: p.description.clone(),
-                        safety: p.safety,
-                        files,
-                    })
+            let shown = match files {
+                Some(files) => Ok(Preview {
+                    fingerprint: p.fingerprint.clone(),
+                    description: p.description.clone(),
+                    safety: p.safety,
+                    files,
+                }),
+                // What is written needs no preview; what is not, is declined.
+                None if self.permits(p.safety) => continue,
+                None => Err(DeclinedFix {
+                    fingerprint: p.fingerprint.clone(),
+                    rule_id: p.rule_id.clone(),
+                    file: p.file.clone(),
+                    line: p.line,
+                    reason: "left for review: its change could not be shown as a preview"
+                        .to_owned(),
+                }),
+            };
+            self.previewable.insert(
+                p.fingerprint.clone(),
+                Standing {
+                    proposal: p.clone(),
+                    shown,
                 },
             );
-            self.previewable.insert(p.fingerprint.clone(), kept);
         }
     }
 

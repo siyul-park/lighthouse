@@ -133,6 +133,7 @@ impl Orchestrator<'_> {
             );
         }
         let (models, model_calls, model_cost, model_edits) = self.model_counts(&kept);
+        self.notes.extend(self.proposer.finish_kept());
         Ok(FixReport {
             applied: kept,
             declined: self.declined.into_values().collect(),

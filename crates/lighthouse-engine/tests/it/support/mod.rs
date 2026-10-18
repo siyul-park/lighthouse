@@ -5,7 +5,7 @@
 use lighthouse_spec::Catalog;
 use std::{fs, sync::LazyLock};
 
-use lighthouse_engine::{Engine, FixBinding, FixPlan, FixedBy};
+use lighthouse_engine::{Engine, FixBinding, FixPlan, FixedBy, Needs};
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, LineIndex, Options, Position, Safety, Severity, Span,
     ucm::{
@@ -297,8 +297,7 @@ pub fn plan(fixer: &str, cap: Safety) -> FixPlan {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
     plan

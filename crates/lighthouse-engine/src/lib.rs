@@ -9,7 +9,8 @@ mod timings;
 
 pub use documents::SKIPPED_DIRS;
 pub use engine::{
-    CommandModels, EXIT_INCOMPLETE, Engine, Error, FailOn, ModelOptions, Overlays, Run, active,
+    Availability, CommandModels, EXIT_INCOMPLETE, Engine, Error, FailOn, ModelOptions, Needs,
+    Overlays, Run, active,
 };
 pub use fix::{
     AppliedFix, DeclinedFix, EditUsage, FileChange, FixBinding, FixPlan, FixReport, FixRun,

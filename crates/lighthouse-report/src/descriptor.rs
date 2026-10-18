@@ -60,23 +60,26 @@ pub struct Apply {
 pub enum Aim<'a> {
     /// Every finding of a decision.
     Decision(&'a str),
-    /// One finding, by its fingerprint or a prefix of at least 7 characters.
-    Finding(&'a str),
+    /// Findings, by their fingerprints or prefixes of at least 7 characters.
+    Findings(&'a [&'a str]),
 }
 
 impl Apply {
     /// The application of the fixes `aim` names; `unsafe_fixes` asks for
-    /// permission to write the `unsafe` ones.
+    /// permission to write the `unsafe` ones, as applying their previews
+    /// does. Without it the `unsafe` ones are previewed, not written.
     pub fn of(aim: Aim<'_>, unsafe_fixes: bool) -> Self {
-        let (flag, selector, arguments) = match aim {
-            Aim::Decision(id) => ("--decision", id, json!({ "decision": [id] })),
-            Aim::Finding(fingerprint) => (
-                "--fingerprint",
-                fingerprint,
-                json!({ "fingerprints": [fingerprint] }),
+        let (selector, mut arguments) = match aim {
+            Aim::Decision(id) => (format!("--decision {id}"), json!({ "decision": [id] })),
+            Aim::Findings(fingerprints) => (
+                fingerprints
+                    .iter()
+                    .map(|fingerprint| format!("--fingerprint {fingerprint}"))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                json!({ "fingerprints": fingerprints }),
             ),
         };
-        let mut arguments = arguments;
         let permission = if unsafe_fixes {
             arguments["unsafeFixes"] = json!(true);
             " --unsafe-fixes"
@@ -84,7 +87,7 @@ impl Apply {
             ""
         };
         Self {
-            apply: format!("lighthouse check --fix{permission} {flag} {selector}"),
+            apply: format!("lighthouse check --fix{permission} {selector}"),
             tool: ToolCall {
                 name: "fix",
                 arguments,
@@ -145,7 +148,9 @@ impl Descriptor {
         };
         let how = match (fix.why, fix.approval) {
             (Some(why), _) => format!(", not running: {why}"),
-            (None, Some(Approval::Ask)) => ", previewed under ask".to_owned(),
+            (None, Some(Approval::Ask)) => {
+                ", previewed under ask; apply each preview by its fingerprint".to_owned()
+            }
             (None, Some(Approval::Allow)) => ", written under allow".to_owned(),
             (None, None) => String::new(),
         };

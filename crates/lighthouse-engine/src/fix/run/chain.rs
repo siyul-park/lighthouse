@@ -17,7 +17,7 @@ use super::{
     super::model::{Class, Event},
     super::propose::Proposal,
     super::{DeclinedFix, FixedBy, PreviewedFix},
-    Orchestrator,
+    Orchestrator, Standing,
 };
 use crate::{Overlays, Run};
 
@@ -143,17 +143,26 @@ impl Orchestrator<'_> {
         for fix in withheld {
             let model = fix.fixer == FixedBy::Model;
             match self.previewable.remove(&fix.fingerprint) {
-                Some(Ok(preview)) => {
+                Some(Standing {
+                    proposal,
+                    shown: Ok(preview),
+                }) => {
                     if model {
                         self.proposer.note_model(&fix.rule_id, Event::Previewed);
                     }
+                    self.proposer.keep(&proposal);
                     self.previews.push(PreviewedFix {
                         rule_id: fix.rule_id,
                         fixer: fix.fixer,
                         preview,
+                        bases: proposal.bases,
+                        batch: proposal.batch,
                     });
                 }
-                Some(Err(declined)) => {
+                Some(Standing {
+                    shown: Err(declined),
+                    ..
+                }) => {
                     if model {
                         self.proposer
                             .note_model(&declined.rule_id, Event::Declined(Class::RolledBack));

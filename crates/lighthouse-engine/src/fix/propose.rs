@@ -4,24 +4,29 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::{
-    Diagnostic, Fingerprint, Safety,
+    Diagnostic, Fingerprint, Safety, Unavailable,
     ucm::{Capability, EditOp, FixOutcome},
 };
 use lighthouse_plugin::{FixDecision, FixRequest, Fixer};
+use lighthouse_protocol::hash;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{
     DeclinedFix, FixBinding, FixPlan, FixRun, FixedBy,
     edits::{TextEdit, self_overlap},
+    kept::NOT_KEPT,
     lower::{Lowerer, Sources},
     model::{Event, ModelFixer},
 };
-use crate::{Engine, Error, Overlays, Run, engine::Scopes};
+use crate::{Engine, Error, Needs, Overlays, Run, cache::Cache, engine::Scopes};
 
-/// Why a fix by a model is left to review.
-const NO_EDIT: &str = "left for review: `[models] edit` is not bound (and the rule binds no `edit`), or models are off (`--no-models`); `review show` gives the brief";
+/// Why a fix by a model is left to review when the run asks no model.
+const NO_MODELS: &str =
+    "left for review: models are off (`--no-models`); `review show` gives the brief";
 
 /// A finding's fix, lowered and ready to apply.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct Proposal {
     pub(super) fingerprint: Fingerprint,
     pub(super) rule_id: String,
@@ -38,13 +43,16 @@ pub(super) struct Proposal {
     /// For a fix by a model, the place of its group in the chain of the
     /// pass: the later the group, the later it ran.
     pub(super) chain: usize,
-    /// For a fix by a model, the digest of each file it replaces as the run
-    /// found it: the edit applies only over that text.
+    /// The digest of each file the edits are in, as the fix was made over it:
+    /// the edits apply only over that text.
     pub(super) bases: BTreeMap<PathBuf, String>,
+    /// The findings the fix was made for, this one among them: a run of an
+    /// agent is for all the findings of a file.
+    pub(super) batch: Vec<Fingerprint>,
 }
 
 /// What a fix by a model must have achieved for the checks to keep it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) enum Aim {
     /// The finding the proposal is for is gone.
     Finding,
@@ -70,6 +78,8 @@ pub(super) struct Proposer<'e> {
     pub(super) run: &'e FixRun,
     /// The fixer of the model fixes; `None` when no model is to be asked.
     pub(super) models: Option<ModelFixer<'e>>,
+    /// Where the fixes a run withholds are kept; `None` keeps nothing.
+    pub(super) kept: Option<Cache>,
 }
 
 impl<'e> Proposer<'e> {
@@ -80,7 +90,15 @@ impl<'e> Proposer<'e> {
             plan,
             run,
             models: None,
+            kept: None,
         }
+    }
+
+    /// The same, keeping the fixes the run withholds in `cache`.
+    #[must_use]
+    pub(super) fn keeping(mut self, cache: Option<Cache>) -> Self {
+        self.kept = cache;
+        self
     }
 
     /// The same, asking the agents the project binds for `edit`.
@@ -136,20 +154,35 @@ impl<'e> Proposer<'e> {
                 decline(finding, "the rule has no fix".to_owned());
                 continue;
             };
-            // A fix the rule or the project does not run is declined before it
-            // is asked for. What the run may write of the rest is settled
-            // after the checks.
-            if let Some(why) = &binding.unsupported {
-                decline(finding, why.clone());
+            // A fix that cannot run here is declined before it is asked for.
+            // What the run may write of the rest is settled after the checks.
+            if let Err(why) = self.engine.availability().of(&binding.needs) {
+                let hint = match why {
+                    Unavailable::UntrustedProject => " (run `lighthouse trust`)",
+                    _ => "",
+                };
+                decline(
+                    finding,
+                    format!("left for review: {why}{hint}; `review show` gives the brief"),
+                );
                 continue;
             }
-            if model
-                && self
-                    .models
-                    .as_ref()
-                    .is_none_or(|models| models.edit_for(&finding.rule_id).is_empty())
-            {
-                decline(finding, NO_EDIT.to_owned());
+            match self.applied_preview(finding, &binding, &sources) {
+                Some(Ok(proposal)) => {
+                    proposals.push(proposal);
+                    continue;
+                }
+                Some(Err((class, reason))) => {
+                    if model {
+                        self.note_model(&finding.rule_id, Event::Declined(class));
+                    }
+                    decline(finding, reason);
+                    continue;
+                }
+                None => {}
+            }
+            if model && self.models.is_none() {
+                decline(finding, NO_MODELS.to_owned());
                 continue;
             }
             if model {
@@ -212,8 +245,7 @@ impl<'e> Proposer<'e> {
                 fixer: FixedBy::Fixer(fixer.clone()),
                 cap: Safety::Unsafe,
                 languages: Vec::new(),
-                runs_command: false,
-                unsupported: None,
+                needs: Needs::Nothing,
                 decision: FixDecision {
                     id: rule.to_owned(),
                     requirement: String::new(),
@@ -299,23 +331,11 @@ impl<'e> Proposer<'e> {
                 ops,
                 safety,
             } => {
-                let mut edits = Vec::new();
-                for op in &ops {
-                    edits.extend(
-                        lowerer
-                            .lower(op)
-                            .map_err(|why| format!("{}: {why}", op_name(op)))?,
-                    );
+                let safety = safety.max(binding.cap);
+                if safety == Safety::Unsafe && self.applies_previews() {
+                    return Err(NOT_KEPT.to_owned());
                 }
-                if edits.is_empty() {
-                    return Err("the fix changes nothing".to_owned());
-                }
-                if self_overlap(&edits) {
-                    return Err("the edits of the fix overlap each other".to_owned());
-                }
-                let mut files: Vec<PathBuf> = edits.iter().map(|e| e.file.clone()).collect();
-                files.sort();
-                files.dedup();
+                let (edits, bases) = lowered(&ops, lowerer, sources)?;
                 Ok(Proposal {
                     fingerprint: finding.fingerprint.clone(),
                     rule_id: finding.rule_id.clone(),
@@ -323,16 +343,50 @@ impl<'e> Proposer<'e> {
                     line: finding.span.start.line,
                     fixer: binding.fixer.clone(),
                     description,
-                    safety: safety.max(binding.cap),
+                    safety,
                     edits,
-                    files,
+                    files: bases.keys().cloned().collect(),
                     aim: Aim::Finding,
                     chain: 0,
-                    bases: BTreeMap::new(),
+                    bases,
+                    batch: vec![finding.fingerprint.clone()],
                 })
             }
         }
     }
+}
+
+/// The text edits of `ops`, and the digest of each file they are in as the fix
+/// is made over it.
+fn lowered(
+    ops: &[EditOp],
+    lowerer: &Lowerer,
+    sources: &Sources,
+) -> Result<(Vec<TextEdit>, BTreeMap<PathBuf, String>), String> {
+    let mut edits = Vec::new();
+    for op in ops {
+        edits.extend(
+            lowerer
+                .lower(op)
+                .map_err(|why| format!("{}: {why}", op_name(op)))?,
+        );
+    }
+    if edits.is_empty() {
+        return Err("the fix changes nothing".to_owned());
+    }
+    if self_overlap(&edits) {
+        return Err("the edits of the fix overlap each other".to_owned());
+    }
+    let mut bases = BTreeMap::new();
+    for edit in &edits {
+        if !bases.contains_key(&edit.file) {
+            bases.insert(
+                edit.file.clone(),
+                hash::sha256(sources.text(&edit.file)?.as_str()),
+            );
+        }
+    }
+    Ok((edits, bases))
 }
 
 fn op_name(op: &EditOp) -> &'static str {

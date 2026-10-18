@@ -33,9 +33,9 @@ judged is remembered with its reason and is not raised again.
    decision whose findings you fix by hand with the brief of `review_show`.
    The loop:
    1. `check`.
-   2. `fix` the groups whose `fix` is `safe`.
+   2. `fix` the groups whose `fix` is `safe` and runs.
    3. For the others, `review_show` the finding, edit with its brief, `check` again.
-   4. Use `fix` with a model only if the project bound one and you want it to run: an `unsafe` fix comes back as a preview whose `apply` call writes exactly that fix, and `noModels` asks none.
+   4. An `unsafe` fix that runs (every fix by a model is) is previewed first: `fix` the group, read the diffs, then run the `apply` of a preview to write exactly that fix. Passing `noModels` asks no model.
    Only `safe` fixes are written, whoever makes them; an `unsafe` fix is shown
    as a preview with its diff, unless the project's `[approval] fix = "allow"`
    or `unsafeFixes` says otherwise. Every fix is verified and rolled back if it

@@ -13,14 +13,17 @@ use lighthouse_engine::{
     cache, unified_diff,
 };
 use lighthouse_model::Fingerprint;
-use lighthouse_report::{Aim, Apply};
+use lighthouse_report::{Aim, Apply, FixBy};
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    Result, Selector, Session, check::cache_limit, findings, permit::permitted,
+    Result, Selector, Session,
+    check::cache_limit,
+    descriptor::{fix_by, fix_plan},
+    findings,
     selector::long_enough,
 };
 
@@ -41,8 +44,8 @@ pub struct Selection {
     /// Do everything but leave the files as they were.
     pub dry_run: bool,
     /// Also write `unsafe` fixes, as `[approval] fix = "allow"` does. With
-    /// fingerprints, it applies the previews of those findings: a model is not
-    /// asked again.
+    /// fingerprints, it applies the previews of those findings, exactly as
+    /// they were shown.
     pub unsafe_fixes: bool,
     /// Use this registered fixer instead of the catalog's.
     pub fixer: Option<String>,
@@ -261,11 +264,22 @@ impl From<&ModelCounts> for Models {
 }
 
 impl Previewed {
-    /// The fix `fix` as reported, its application naming the finding by the
-    /// first `width` characters of its fingerprint.
-    fn new(fix: &PreviewedFix, width: usize) -> Self {
+    /// The fix `fix` as reported, its application naming the findings it was
+    /// made for by the first characters of their fingerprints that tell them
+    /// apart, `widths` of each.
+    fn new(fix: &PreviewedFix, plan: &FixPlan, widths: &BTreeMap<&str, usize>) -> Self {
         let preview = &fix.preview;
         let fingerprint = preview.fingerprint.as_str();
+        let batch: Vec<&str> = fix
+            .batch
+            .iter()
+            .map(|member| {
+                let member = member.as_str();
+                member
+                    .get(..widths.get(member).copied().unwrap_or(member.len()))
+                    .unwrap_or(member)
+            })
+            .collect();
         let diff = preview
             .files
             .iter()
@@ -274,15 +288,16 @@ impl Previewed {
         Self {
             fingerprint: fingerprint.to_owned(),
             decision: fix.rule_id.clone(),
-            fixer: fix.fixer.to_string(),
+            fixer: plan
+                .get(&fix.rule_id)
+                .map_or(FixBy::Ops, |binding| fix_by(&binding.needs))
+                .as_str()
+                .to_owned(),
             safety: preview.safety.to_string(),
             description: preview.description.clone(),
             files: preview.files.iter().map(|f| f.path.clone()).collect(),
             diff,
-            apply: Apply::of(
-                Aim::Finding(fingerprint.get(..width).unwrap_or(fingerprint)),
-                true,
-            ),
+            apply: Apply::of(Aim::Findings(&batch), true),
         }
     }
 }
@@ -321,23 +336,12 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     }
     let catalog = &session.catalog;
     let root = &session.root;
-    let bound = session.config.models(catalog.projects())?;
     let (engine, notices) = session.engine()?;
-    let permit = permitted(&session.config, catalog, &|id| engine.active(id))?;
-    let asks_model = bound.binds_edit() && !permit.ids.is_empty();
-    let plan = FixPlan::from_catalog(catalog);
-    let plan = if permit.ids.is_empty() {
-        plan
-    } else {
-        plan.with_model_fixes(catalog, &permit.ids, session.config.fix().scope)
-    };
-    let engine = engine.with_models(ModelOptions {
-        replay: !request.targets.fingerprints.is_empty() && request.unsafe_fixes,
-        ..request.models.clone()
-    });
-    // The answers of models are kept in the cache; a project that asks none
-    // runs as it always did.
-    let engine = if asks_model && request.cache {
+    let plan = fix_plan(session, &|id| engine.active(id))?;
+    let engine = engine.with_models(request.models.clone());
+    // The answers of models and the previews a run leaves are kept in the
+    // cache.
+    let engine = if request.cache {
         engine.with_cache(cache::dir(root), cache_limit())
     } else {
         engine
@@ -357,6 +361,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         dry_run: request.dry_run,
         unsafe_fixes: request.unsafe_fixes,
         fixer: request.fixer.clone(),
+        no_models: false,
     };
     let mut report = engine.fix(&plan, &run)?;
     messages.extend(report.notes.iter().cloned());
@@ -379,7 +384,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         previews: report
             .previews
             .iter()
-            .map(|fix| Previewed::new(fix, widths[fix.preview.fingerprint.as_str()]))
+            .map(|fix| Previewed::new(fix, &plan, &widths))
             .collect(),
         models: report
             .models
@@ -410,7 +415,7 @@ fn shortest(report: &lighthouse_engine::FixReport) -> BTreeMap<&str, usize> {
             report
                 .previews
                 .iter()
-                .map(|p| p.preview.fingerprint.as_str()),
+                .flat_map(|p| p.batch.iter().map(Fingerprint::as_str)),
         )
         .collect();
     let all: Vec<&str> = all.into_iter().collect();

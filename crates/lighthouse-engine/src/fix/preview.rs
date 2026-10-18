@@ -1,67 +1,46 @@
-//! Fix previews: what the fix of a finding would change, computed in memory.
-//! A preview is the fixer's proposal lowered to text edits and applied to the
-//! text on disk, nothing more: it is not formatted, not re-checked and not
-//! written. Applying a fix goes through the verified path of a fix run.
+//! Fix previews: what the fix of a finding changes. A preview is made by the
+//! fix run itself, over the state the rounds leave, so that a finding shows the
+//! diff the run would write, or keep for a hand, and never another.
 
 use std::path::Path;
 
 use lighthouse_model::{
-    Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, ucm::Capability,
-    utf16_position,
+    Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, utf16_position,
 };
 use similar::{ChangeTag, TextDiff};
 
-use super::{
-    FixPlan, FixRun, FixedBy,
-    edits::apply,
-    lower::{Lowerer, Sources},
-    propose::{Proposal, Proposer},
-};
-use crate::{Engine, Overlays, Run};
+use super::{FixPlan, FixRun, edits::apply, propose::Proposal};
+use crate::Engine;
 
 /// Lines of unchanged text around a change in the hunks of a preview.
 const CONTEXT: usize = 1;
 
 impl Engine {
-    /// The previews of the fixes of `findings`, those that propose a fix that
-    /// applies cleanly and changes something. A finding without a fix, one
-    /// whose fixer runs a program (it cannot run without trust) and one the
-    /// fixer declines have none.
-    pub fn preview_fixes(
-        &self,
-        plan: &FixPlan,
-        outcome: &Run,
-        findings: &[&Diagnostic],
-    ) -> Vec<Preview> {
-        let run = FixRun::default();
-        let proposer = Proposer::new(self, plan, &run);
-        let overlays = Overlays::new();
-        let sources = Sources::new(&self.ws.root, &outcome.project, &overlays);
-        let complete = |language: &str| self.provides(language, Capability::CompleteReferences);
-        let lowerer = Lowerer::new(&outcome.project, &sources, &complete);
-        findings
+    /// The previews of the fixes of `findings`: what a dry run of the fixes
+    /// would change, one for each finding whose fix is accepted by the checks,
+    /// whoever makes it but a model, which is not asked. A finding without a
+    /// fix and one the fixer declines have none.
+    pub fn preview_fixes(&self, plan: &FixPlan, findings: &[&Diagnostic]) -> Vec<Preview> {
+        let fingerprints: Vec<String> = findings
             .iter()
-            .filter_map(|finding| {
-                let binding = plan.get(&finding.rule_id)?;
-                if binding.unsupported.is_some()
-                    || binding.runs_command
-                    || binding.fixer == FixedBy::Model
-                {
-                    return None;
-                }
-                let proposal = proposer
-                    .propose_one(outcome, finding, binding, &lowerer, &sources)
-                    .ok()?;
-                let changed = preview_files(&proposal, |file| {
-                    sources.text(file).ok().map(|text| (*text).clone())
-                })?;
-                Some(Preview {
-                    fingerprint: finding.fingerprint.clone(),
-                    description: proposal.description,
-                    safety: proposal.safety,
-                    files: changed,
-                })
-            })
+            .filter(|finding| plan.get(&finding.rule_id).is_some())
+            .map(|finding| finding.fingerprint.as_str().to_owned())
+            .collect();
+        if fingerprints.is_empty() {
+            return Vec::new();
+        }
+        let run = FixRun {
+            fingerprints,
+            dry_run: true,
+            no_models: true,
+            ..FixRun::default()
+        };
+        let Ok(report) = self.fix(plan, &run) else {
+            return Vec::new();
+        };
+        let applied = report.applied.into_iter().filter_map(|fix| fix.preview);
+        applied
+            .chain(report.previews.into_iter().map(|fix| fix.preview))
             .collect()
     }
 }

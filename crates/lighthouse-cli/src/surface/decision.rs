@@ -114,11 +114,10 @@ pub fn show(ctx: &Context, args: &DecisionShowArgs, format: Format) -> Result<Re
     let session = ctx.session()?;
     let registry = session.in_process_registry()?;
     let mut markdown = explain(&session.catalog, &registry, &args.id)?;
-    let descriptor = session.catalog.decision(&args.id).and_then(|decision| {
-        Fixing::of(&session)
-            .ok()?
-            .describe(decision, Aim::Decision(&args.id))
-    });
+    let descriptor = match session.catalog.decision(&args.id) {
+        Some(decision) => Fixing::of(&session)?.describe(decision, Aim::Decision(&args.id)),
+        None => None,
+    };
     if let Some(descriptor) = &descriptor {
         let _ = writeln!(
             markdown,

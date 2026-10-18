@@ -421,7 +421,7 @@ fn the_tool_call_of_a_preview_applies_exactly_that_fix() {
 }
 
 #[test]
-fn a_deterministic_preview_is_recomputed_when_applied() {
+fn a_deterministic_preview_is_applied_as_it_was_shown() {
     let (dir, _agent) = project("");
     let done = fix(dir.path(), json!({"decision": ["local/command-unsafe"]}));
     let (_, args) = previewed(&done);
@@ -519,14 +519,13 @@ fn listed(client: &mut Client) -> Value {
         .into()
 }
 
-fn call(id: &str, unsafe_fixes: bool) -> Value {
-    let mut arguments = json!({"decision": [id]});
-    let mut command = format!("lighthouse check --fix --decision {id}");
-    if unsafe_fixes {
-        arguments["unsafeFixes"] = json!(true);
-        command = format!("lighthouse check --fix --unsafe-fixes --decision {id}");
-    }
-    json!({"apply": command, "tool": {"name": "fix", "arguments": arguments}})
+/// How a decision is fixed: the step that writes a safe fix and previews an
+/// unsafe one, never one that writes it unseen.
+fn call(id: &str) -> Value {
+    json!({
+        "apply": format!("lighthouse check --fix --decision {id}"),
+        "tool": {"name": "fix", "arguments": {"decision": [id]}}
+    })
 }
 
 /// The `fix` of a descriptor: `by`, `safety` and `approval` as given, and the
@@ -539,7 +538,7 @@ fn fix_json(by: &str, safety: &str, runs: bool, why: Option<&str>, id: &str) -> 
     if safety == "unsafe" {
         fix["approval"] = json!("ask");
     }
-    for (key, value) in call(id, safety == "unsafe").as_object().unwrap() {
+    for (key, value) in call(id).as_object().unwrap() {
         fix[key] = value.clone();
     }
     fix
@@ -685,4 +684,227 @@ fn a_finding_of_a_decision_without_an_edit_agent_has_a_brief_and_no_running_fix(
             .unwrap()
             .contains("Decision: local/model")
     );
+}
+
+/// The project with a second decision over `model.txt`, fixed by the same
+/// agent: two findings in one file, which one run of the agent fixes.
+fn batched() -> (TempDir, TempDir, TempDir) {
+    let (dir, scripts, marks) = counted();
+    let first = read(&dir, ".lighthouse/decisions/model.yaml");
+    write(
+        dir.path(),
+        ".lighthouse/decisions/model-two.yaml",
+        &first
+            .replace("name: local/model\n", "name: local/model-two\n")
+            .replace("file.lines > 3", "file.lines > 2"),
+    );
+    let toml = read(&dir, "lighthouse.toml");
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &toml
+            .replace(
+                "\"decisions\" = [\"local/model\"]",
+                "\"decisions\" = [\"local/model\", \"local/model-two\"]",
+            )
+            .replace(
+                "\"rules\" = { ",
+                "\"rules\" = { \"local/model-two\" = \"warn\", ",
+            ),
+    );
+    (dir, scripts, marks)
+}
+
+#[test]
+fn the_findings_of_one_run_of_an_agent_are_previewed_and_applied_together() {
+    let (dir, _agent, marks) = batched();
+    let done = fix(
+        dir.path(),
+        json!({"decision": ["local/model", "local/model-two"]}),
+    );
+    let previews = done["previews"].as_array().unwrap();
+    assert_eq!(previews.len(), 2, "{done}");
+    assert_eq!(calls(&marks.path().join("calls")), 1, "one run for both");
+    let batch: Vec<&str> = previews
+        .iter()
+        .map(|p| p["fingerprint"].as_str().unwrap())
+        .collect();
+    for preview in previews {
+        let fingerprints = preview["tool"]["arguments"]["fingerprints"]
+            .as_array()
+            .unwrap();
+        assert_eq!(
+            fingerprints.len(),
+            2,
+            "every apply names the batch: {preview}"
+        );
+        for member in &batch {
+            assert!(
+                fingerprints
+                    .iter()
+                    .any(|f| member.starts_with(f.as_str().unwrap())),
+                "{member} {preview}"
+            );
+        }
+    }
+    let (_, args) = previewed(&done);
+
+    let out = lighthouse(dir.path())
+        .env("LIGHTHOUSE_TRUST", "1")
+        .args(&args)
+        .output()
+        .unwrap();
+
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("2 fix(es) applied"),
+        "{out:?}"
+    );
+    assert_eq!(read(&dir, "model.txt"), "x\n");
+    assert_eq!(
+        calls(&marks.path().join("calls")),
+        1,
+        "the agent is not asked again"
+    );
+}
+
+#[test]
+fn applying_a_preview_without_the_cache_declines_it_as_not_kept() {
+    let (dir, _agent, marks) = counted();
+    let done = fix(dir.path(), json!({"decision": ["local/model"]}));
+    let (_, mut args) = previewed(&done);
+    args.push("--no-cache".to_owned());
+
+    let out = lighthouse(dir.path())
+        .env("LIGHTHOUSE_TRUST", "1")
+        .args(&args)
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("the preview is not kept (run without --no-cache, or fix again)"),
+        "{stderr}"
+    );
+    assert_eq!(read(&dir, "model.txt"), LONG);
+    assert_eq!(
+        calls(&marks.path().join("calls")),
+        1,
+        "the agent is not asked again"
+    );
+}
+
+#[test]
+fn a_preview_that_was_never_made_is_not_made_by_applying_it() {
+    for provider in PROVIDERS.iter().filter(|p| p.safety == "unsafe") {
+        let (dir, _agent) = project("");
+        let shown = fix(
+            dir.path(),
+            json!({"decision": [provider.id], "dryRun": true}),
+        );
+        let fingerprint = shown["previews"][0]["fingerprint"].as_str().unwrap();
+        let (other, _other_agent) = project("");
+
+        let applied = fix(
+            other.path(),
+            json!({"fingerprints": [fingerprint], "unsafeFixes": true}),
+        );
+
+        assert!(
+            applied["applied"].as_array().unwrap().is_empty(),
+            "{applied}"
+        );
+        assert_eq!(read(&other, provider.file), LONG, "{}", provider.id);
+    }
+}
+
+#[test]
+fn under_allow_a_fingerprint_names_what_to_fix_and_the_fix_is_written() {
+    let (dir, _agent) = project("[approval]\nfix = \"allow\"\n");
+    let out = lighthouse(dir.path())
+        .env("LIGHTHOUSE_TRUST", "1")
+        .args([
+            "check",
+            "--format",
+            "json",
+            "--decision",
+            "local/command-unsafe",
+        ])
+        .output()
+        .unwrap();
+    let report: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let fingerprint = report["groups"][0]["files"]["command-unsafe.txt"][0][2]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let done = fix(dir.path(), json!({"fingerprints": [fingerprint]}));
+
+    assert_eq!(done["applied"].as_array().unwrap().len(), 1, "{done}");
+    assert_eq!(read(&dir, "command-unsafe.txt"), "A\nB\nC\nD\n");
+    assert!(done["previews"].is_null(), "{done}");
+}
+
+#[test]
+fn a_deterministic_preview_over_a_changed_base_is_a_conflict_and_is_not_made_again() {
+    let (dir, _agent) = project("");
+    let done = fix(dir.path(), json!({"decision": ["local/command-unsafe"]}));
+    let (_, args) = previewed(&done);
+    write(dir.path(), "command-unsafe.txt", "a\nb\nc\nd\ne\n");
+
+    let out = lighthouse(dir.path())
+        .env("LIGHTHOUSE_TRUST", "1")
+        .args(&args)
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("is not as it was when the preview was made"),
+        "{stderr}"
+    );
+    assert_eq!(read(&dir, "command-unsafe.txt"), "a\nb\nc\nd\ne\n");
+}
+
+#[test]
+fn a_model_without_budget_says_so_in_the_descriptor() {
+    let (dir, _agent) = project("");
+    let toml = read(&dir, "lighthouse.toml");
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &toml.replace("\"models\" = { ", "\"models\" = { \"budget\" = 0, "),
+    );
+
+    let decisions = listed(&mut Client::trusting(dir.path()));
+
+    assert_eq!(
+        decisions["local/model"]["fix"],
+        fix_json("model", "unsafe", false, Some("no budget"), "local/model")
+    );
+    assert_eq!(decisions["local/ops-safe"]["fix"]["runs"], true);
+}
+
+#[test]
+fn the_preview_of_a_check_is_the_preview_of_a_fix_run_for_a_command_too() {
+    let (dir, _agent) = project("");
+    let out = lighthouse(dir.path())
+        .env("LIGHTHOUSE_TRUST", "1")
+        .args([
+            "check",
+            "--format",
+            "json",
+            "--decision",
+            "local/command-unsafe",
+        ])
+        .output()
+        .unwrap();
+    let report: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let shown = report["groups"][0]["files"]["command-unsafe.txt"][0][3]["fix"].clone();
+
+    let done = fix(dir.path(), json!({"decision": ["local/command-unsafe"]}));
+
+    assert_eq!(shown["safety"], "unsafe", "{report}");
+    let hunks = shown["diff"].as_str().unwrap();
+    let diff = done["previews"][0]["diff"].as_str().unwrap();
+    assert!(diff.contains(hunks), "{hunks}\n{diff}");
 }

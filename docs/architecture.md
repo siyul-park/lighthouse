@@ -622,13 +622,18 @@ permission writes a fix of any provider: a `safe` fix is written; an `unsafe` on
 under `[approval] fix = "allow"` or `--unsafe-fixes` (MCP `unsafeFixes`), and otherwise it is
 verified in memory and reported as `previewed` with its diff, never written. Applying a
 preview is `check --fix --unsafe-fixes --fingerprint <fp>` (the `fingerprints` of the `fix`
-tool): a deterministic fix is computed again, a model fix is served from the edit cache,
-which is keyed on the digests of the files it read, and re-verified, so a base that changed
-since is a `conflict` and nothing is written. `--no-models` (MCP `noModels`) asks no model.
+tool), naming all the findings the fix was made for: whoever made it, a preview is kept in
+the result cache with the digests of the files it changes, and applying it writes exactly
+that edit, never a fix made again and never a model asked again. A file that is not as it
+was is a `conflict` and nothing is written; a preview that is not kept (`--no-cache`, or
+never made) is declined as `unanswered`. A check shows the same previews, because it takes
+the same verified path in a dry run. `--no-models` (MCP `noModels`) asks no model.
 Every decision carries one descriptor, built in one place (`lighthouse_session::Fixing`),
 that says who checks and who fixes, the safety, whether the fix runs and if not why (no edit
-binding, untrusted project, sandbox unavailable, budget spent, provider unavailable), the
-approval, and the command line and tool call that apply it; `decision list`, `decision show`,
+binding, untrusted project, sandbox unavailable, no budget, provider unavailable: one
+`Availability` of the engine decides it, for the descriptor and for the fix run that declines
+what cannot run), the approval, and the command line and tool call of the step that writes a
+`safe` fix and previews an `unsafe` one; `decision list`, `decision show`,
 the check groups, `review_show` and the hooks print it. `--fixer <id>`
 (the `fixer` argument of the `fix` tool) names a registered fixer for the selected findings and
 needs `--decision` or fingerprints.

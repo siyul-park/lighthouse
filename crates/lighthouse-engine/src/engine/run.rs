@@ -20,8 +20,8 @@ impl Engine {
             active: self.active.iter().cloned().collect(),
             ..Run::default()
         };
-        let cache = self.cache.as_ref().and_then(|settings| {
-            Cache::open(&settings.dir, settings.limit)
+        let cache = self.open_cache().and_then(|opened| {
+            opened
                 .map_err(|e| {
                     run.notices
                         .insert(format!("the result cache is not used: {e}"));

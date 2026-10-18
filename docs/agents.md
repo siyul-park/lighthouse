@@ -113,12 +113,12 @@ finding, the gaps, `resolve:` and `reasons:` once, and the summary.
 ### Fix previews
 
 A finding whose decision has a fix shows what the fix would change, computed on
-demand and in memory by the fixer and orchestrator that `fix` uses: nothing is
-written, formatted or re-checked, so treat it as a preview of the proposal
-(applying still goes through the verified path). Only proposals that apply
-cleanly are shown, and only for the findings the report shows after `limit`.
-Fixers that run a program (`command`) are not previewed: they need the project's
-trust and are slow; their group carries only `apply`.
+demand by a dry run of the same verified path that `fix` takes, whoever makes the
+fix (a rule, a command, a plugin): applied in memory, formatted, re-checked and
+judged, with nothing written. So a finding never shows two different diffs. Only
+fixes the checks accept are shown, and only for the findings the report shows
+after `limit`. A fix that runs a program needs the project's trust, and a fix by
+a model is not asked for here: their group carries only `fix`, which says why.
 
 - `--format json` and the `check`/`fix` tools: an instance carries
   `fix: {"safety": "safe"|"unsafe", "diff": "@@ -l,n +l,n @@ ..."}` in its
@@ -126,9 +126,12 @@ trust and are slow; their group carries only `apply`.
   lines. A longer fix is `{"safety", "summary": "<description> (N lines)"}`.
   `safety` is `unsafe` whenever applying needs unsafe fixes. `detail: full` has the same `fix`
   object. In the text format the hunk is printed indented under the finding.
-- A group of a fixable decision has `apply`: `fix {"decision":["<id>"]}` (the `fix` tool), or `lighthouse check --fix --decision
-  <id>` (with `--unsafe-fixes` for unsafe fixes), or the `fix` tool call
-  through MCP; its `fix` line also says who fixes, the safety and whether it runs.
+- A group of a fixable decision has `fix`, which says who fixes, the safety,
+  whether it runs and `apply`: `lighthouse check --fix --decision <id>` or the
+  `fix` tool call `fix {"decision":["<id>"]}`. That step writes a `safe` fix and
+  previews an `unsafe` one, under `ask`; each preview then carries its own
+  `apply`, with `--unsafe-fixes` and the fingerprints of every finding the same
+  run of the fix was made for.
 - A diff gets `--- a/<path>` / `+++ b/<path>` headers when the fix edits a file
   other than the finding's.
 - SARIF columns count UTF-16 code units, as SARIF defines them, so locations
@@ -145,8 +148,8 @@ unsafe ones: a preview is applied by its fingerprint (`check --fix
 
 ### Fixing
 
-`fix` applies the fixes that the catalog attaches to rules (`fixable: safe` or
-`unsafe` in `decision_list`, `decision_show` and the skill; see "Fixing" in
+`fix` applies the fixes that the catalog attaches to rules (`fix` in
+`decision_list` and `decision_show`, `fixable: safe|unsafe` in the skill; see "Fixing" in
 [architecture.md](architecture.md)). Name what to fix with `fingerprints` (from
 `check`; prefixes are accepted), `paths` (under the project root) or `decision`: a
 fix never defaults to the whole project. Use `dryRun` first: it returns the

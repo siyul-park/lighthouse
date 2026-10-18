@@ -105,13 +105,13 @@ pub fn list(ctx: &Context, args: &ReviewListArgs, format: Format) -> Result<Repl
             Reply::json(&match args.detail {
                 Detail::Compact => {
                     let catalog = catalog_at(&root).ok();
-                    let descriptors = ctx.session().ok().and_then(|session| {
-                        let fixing = Fixing::of(&session).ok()?;
-                        Some(fixing.all(
+                    let descriptors = match ctx.session() {
+                        Ok(session) => Some(Fixing::of(&session)?.all(
                             &session.catalog,
                             tasks.findings.iter().map(|f| f.decision.as_str()),
-                        ))
-                    });
+                        )),
+                        Err(_) => None,
+                    };
                     let options = GroupOptions {
                         catalog: catalog.as_ref(),
                         limit: Some(limit),

@@ -11,6 +11,7 @@ use lighthouse_spec::{Example, ExampleKind, FixScope};
 use serde_json::Value;
 
 use super::{FixPlan, FixedBy};
+use crate::Needs;
 
 /// How many examples of a decision the brief shows at most.
 pub const MAX_EXAMPLES: usize = 2;
@@ -52,7 +53,7 @@ pub struct Target<'a> {
 pub fn safe_fixes<'p>(plan: &'p FixPlan, language: Option<&str>) -> Vec<&'p str> {
     plan.bindings()
         .filter(|(_, b)| b.cap == Safety::Safe && matches!(b.fixer, FixedBy::Fixer(_)))
-        .filter(|(_, b)| b.unsupported.is_none())
+        .filter(|(_, b)| b.needs != Needs::Unserved)
         .filter(|(_, b)| language.is_none_or(|l| b.languages.iter().any(|x| x == l)))
         .map(|(rule, _)| rule)
         .collect()

@@ -5,7 +5,7 @@
 
 use std::{collections::BTreeSet, path::Path};
 
-use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, FixedBy, unified_diff};
+use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, FixedBy, Needs, unified_diff};
 use lighthouse_model::{
     Safety,
     ucm::{EditOp, FixOutcome},
@@ -14,8 +14,8 @@ use lighthouse_plugin::{
     Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,
 };
-use lighthouse_spec::FixScope;
 use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::{FixScope, Task};
 
 use crate::support::*;
 
@@ -369,8 +369,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
                 requirement: String::new(),
                 context: String::new(),
             },
-            runs_command: false,
-            unsupported: None,
+            needs: Needs::Nothing,
         },
     );
 
@@ -423,7 +422,13 @@ fn model_fixes_are_given_only_to_the_listed_rules_that_have_a_check_and_no_fix_o
     let documented = plan.get("design/exported-doc").unwrap();
     assert_eq!(documented.fixer, FixedBy::Model);
     assert_eq!(documented.cap, Safety::Unsafe);
-    assert!(!documented.runs_command);
+    assert_eq!(
+        documented.needs,
+        Needs::Model {
+            decision: "design/exported-doc".to_owned(),
+            task: Task::Edit
+        }
+    );
     assert_eq!(documented.decision.id, "design/exported-doc");
     let groups = plan.get("design/declaration-groups").unwrap();
     assert_eq!(

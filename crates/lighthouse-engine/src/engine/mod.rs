@@ -23,9 +23,14 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    annotations, cache::Cache, documents::Documents, facts::FindingFacts, timings::Timings,
+    annotations,
+    cache::{Cache, Error as CacheError},
+    documents::Documents,
+    facts::FindingFacts,
+    timings::Timings,
 };
 
+mod availability;
 mod batch;
 mod cached;
 mod client;
@@ -36,6 +41,7 @@ mod route;
 mod run;
 mod scopes;
 
+pub use availability::{Availability, Needs};
 use cached::RunCache;
 pub use client::CommandModels;
 pub use config::active;
@@ -286,10 +292,6 @@ pub struct ModelOptions {
     /// Models are asked at all. Off, the subjects they would judge are
     /// reported for review.
     pub off: bool,
-    /// Ask no model; use the answers kept from earlier runs and nothing else.
-    /// A request with no kept answer is not answered. Applying a preview
-    /// replays the answer it was made from.
-    pub replay: bool,
     /// Ask models that cost about the whole project, not only the files the
     /// run reports.
     pub all: bool,
@@ -392,6 +394,12 @@ impl Engine {
         self.ws.cache_dir = Some(dir.clone());
         self.cache = Some(CacheSettings { dir, limit });
         self
+    }
+
+    /// Opens the result cache, if the engine keeps one.
+    pub(crate) fn open_cache(&self) -> Option<Result<Cache, CacheError>> {
+        let settings = self.cache.as_ref()?;
+        Some(Cache::open(&settings.dir, settings.limit))
     }
 
     /// Sets what the run may do with models.

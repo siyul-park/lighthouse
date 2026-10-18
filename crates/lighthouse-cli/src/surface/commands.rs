@@ -126,16 +126,17 @@ pub struct CheckCommand {
     pub timings: bool,
     /// Fix what the catalog's fixers can fix, then report what is left. Only
     /// safe fixes are written, whatever makes them (a rule, a command, a
-    /// model); unsafe ones are shown as previews with how to apply them. Each
+    /// plugin); unsafe ones, which every fix by a model is, are shown as
+    /// previews with how to apply them. Each
     /// fix is verified (formatted, re-checked) and a file that gets worse is
     /// rolled back. PATHS and --decision select which findings are fixed.
     #[arg(long)]
     pub fix: bool,
     /// With --fix: fix only the findings with these fingerprints (repeatable;
     /// prefixes of at least 7 characters allowed). With --unsafe-fixes it
-    /// applies the preview of each: a deterministic fix is made again, a
-    /// model's is taken from the answer kept when it was previewed, and a
-    /// file that changed since gives a conflict.
+    /// applies the preview of each as it was shown, kept by the run that made
+    /// it: a fix is never made again, a preview that is not kept is declined,
+    /// and a file that changed since gives a conflict.
     #[arg(long, requires = "fix", value_name = "FINGERPRINT")]
     pub fingerprint: Vec<String>,
     #[command(flatten)]

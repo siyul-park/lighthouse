@@ -1,6 +1,6 @@
 //! Fix previews over the toy language: the proposal applied in memory.
 
-use lighthouse_engine::FixPlan;
+use lighthouse_engine::{FixPlan, Needs};
 use lighthouse_model::Safety;
 use lighthouse_spec::Catalog;
 
@@ -13,7 +13,7 @@ fn engine_preview_fixes_shows_the_change_and_writes_nothing() {
     let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
     let findings: Vec<_> = outcome.diagnostics.iter().collect();
 
-    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Safe), &outcome, &findings);
+    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Safe), &findings);
 
     assert_eq!(previews.len(), 1);
     assert_eq!(previews[0].safety, Safety::Safe);
@@ -29,7 +29,7 @@ fn engine_preview_fixes_calls_a_fix_unsafe_when_writing_it_needs_permission() {
     let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
     let findings: Vec<_> = outcome.diagnostics.iter().collect();
 
-    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Unsafe), &outcome, &findings);
+    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Unsafe), &findings);
 
     assert_eq!(previews[0].safety, Safety::Unsafe);
 }
@@ -41,16 +41,16 @@ fn engine_preview_fixes_skips_what_cannot_be_proposed() {
     let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
     let findings: Vec<_> = outcome.diagnostics.iter().collect();
 
-    let none = engine.preview_fixes(&FixPlan::default(), &outcome, &findings);
+    let none = engine.preview_fixes(&FixPlan::default(), &findings);
     assert!(none.is_empty(), "a rule without a fix");
-    let unknown = engine.preview_fixes(&plan("fake/missing", Safety::Safe), &outcome, &findings);
+    let unknown = engine.preview_fixes(&plan("fake/missing", Safety::Safe), &findings);
     assert!(unknown.is_empty(), "a fixer that is not registered");
 }
 
 #[test]
-fn fix_plan_runs_command_only_for_fixers_that_run_a_program() {
+fn fix_plan_needs_a_program_only_for_fixers_that_run_one() {
     let plan = FixPlan::from_catalog(Catalog::bundled());
-    let runs = |rule: &str| plan.get(rule).map(|binding| binding.runs_command);
-    assert_eq!(runs("design/declaration-groups"), Some(false));
-    assert_eq!(runs("nope/nope"), None);
+    let needs = |rule: &str| plan.get(rule).map(|binding| binding.needs.clone());
+    assert_eq!(needs("design/declaration-groups"), Some(Needs::Nothing));
+    assert_eq!(needs("nope/nope"), None);
 }
