@@ -114,12 +114,12 @@ fn sarif_carries_no_fix() {
 }
 
 #[test]
-fn an_unsafe_fix_is_marked_with_its_approval_and_a_brief() {
+fn an_unsafe_fix_is_marked_with_whether_it_is_written_and_a_brief() {
     let dir = project(BANNER);
     let compact = report(&dir, &[]);
     let group = group(&compact, "design/comments");
     assert_eq!(group["fix"]["safety"], "unsafe", "{group}");
-    assert_eq!(group["fix"]["approval"], "ask", "{group}");
+    assert_eq!(group["fix"]["written"], false, "{group}");
     assert!(
         group["fix"]["tool"]["arguments"]
             .get("unsafeFixes")
@@ -148,7 +148,7 @@ fn a_finding_without_a_fix_has_a_brief() {
     );
 }
 
-const SHOUT: &str = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/shout\nspec:\n  title: Notes are upper case\n  context: Notes are read from far away.\n  scope:\n    subject: file\n  requirement: A note MUST be written in upper case.\n  severity: error\n  check:\n    type: cel\n    select: file\n    where: \"file.path.endsWith(\\\".txt\\\") && file.lines > 0\"\n    message: \"{{ file.path }} is not shouting\"\n    evidence:\n      path: file.path\n  fix:\n    safety: safe\n    type: command\n    argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]\n    output: text\n  examples:\n    - name: quiet\n      language: text\n      kind: invalid\n      files:\n        - path: a.txt\n          body: hello\n      expect:\n        - line: 1\n      fixed:\n        - path: a.txt\n          body: HELLO\n    - name: loud\n      language: text\n      kind: valid\n      files:\n        - path: a.txt\n          body: HELLO\n";
+const SHOUT: &str = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/shout\nspec:\n  title: Notes are upper case\n  context: Notes are read from far away.\n  scope:\n    subject: file\n  requirement: A note MUST be written in upper case.\n  severity: error\n  check:\n    type: cel\n    select: file\n    where: \"file.path.endsWith(\\\".txt\\\") && file.lines > 0\"\n    message: \"{{ file.path }} is not shouting\"\n    evidence:\n      path: file.path\n  fix:\n    safety: safe\n    type: command\n    command: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]\n    output: stdout\n  examples:\n    - name: quiet\n      language: text\n      kind: invalid\n      files:\n        - path: a.txt\n          body: hello\n      expect:\n        - line: 1\n      fixed:\n        - path: a.txt\n          body: HELLO\n    - name: loud\n      language: text\n      kind: valid\n      files:\n        - path: a.txt\n          body: HELLO\n";
 
 #[test]
 fn a_command_fix_says_why_it_does_not_run_untrusted() {

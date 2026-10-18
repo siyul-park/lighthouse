@@ -28,8 +28,8 @@ vocabulary!(Safety, "safety" {
 )]
 pub enum Unavailable {
     /// A model fix, and no agent that edits is bound to the decision.
-    #[serde(rename = "no edit binding")]
-    NoEditBinding,
+    #[serde(rename = "no agent binding")]
+    NoAgentBinding,
     /// The fix runs a program, and the user has not trusted the project.
     #[serde(rename = "untrusted project")]
     UntrustedProject,
@@ -48,7 +48,7 @@ pub enum Unavailable {
 }
 
 vocabulary!(Unavailable, "reason" {
-    NoEditBinding => "no edit binding",
+    NoAgentBinding => "no agent binding",
     UntrustedProject => "untrusted project",
     SandboxUnavailable => "sandbox unavailable",
     NoBudget => "no budget",

@@ -15,7 +15,7 @@ use crate::{Result, Selector, Session};
 pub enum Binding {
     /// `models.classification`: the model for decisions nothing else binds.
     Classification,
-    /// `models.edit`: the agent that fixes by changing files.
+    /// `models.agent`: the agent that fixes by changing files.
     Edit,
     /// A rule of the configuration names it for classification.
     #[serde(rename = "rule-classification")]
@@ -66,7 +66,7 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
         for model in &bound.classification {
             bind(model, None, Binding::Classification);
         }
-        for model in &bound.edit {
+        for model in &bound.agent {
             bind(model, None, Binding::Edit);
         }
     }
@@ -77,7 +77,7 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
             }
         }
     }
-    for (decision, models) in bound.edit_routes() {
+    for (decision, models) in bound.agent_routes() {
         if selector.matches(decision) {
             for model in models {
                 bind(model, Some(decision), Binding::RuleEdit);

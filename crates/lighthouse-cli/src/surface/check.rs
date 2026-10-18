@@ -119,7 +119,7 @@ fn apply(ctx: &Context, args: &FixArgs, store: bool, cache: bool) -> Result<Fixe
             rules: args.decision.clone(),
         },
         dry_run: args.options.dry_run,
-        unsafe_fixes: args.options.unsafe_fixes,
+        unsafe_fixes: args.options.unsafe_permission(),
         fixer: args.options.fixer.clone(),
         store,
         models: ModelOptions {

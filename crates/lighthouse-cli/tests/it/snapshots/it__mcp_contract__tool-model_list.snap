@@ -55,7 +55,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                 },
                 {
                   "const": "edit",
-                  "description": "`models.edit`: the agent that fixes by changing files.",
+                  "description": "`models.agent`: the agent that fixes by changing files.",
                   "type": "string"
                 },
                 {

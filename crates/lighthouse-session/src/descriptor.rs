@@ -3,12 +3,12 @@
 //! whoever makes them. Reports show it; the fix plan of the engine and its
 //! availability decide it, the same ones a fix run declines by.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_engine::{Availability, FixPlan, Needs};
 use lighthouse_model::Safety;
 use lighthouse_report::{Aim, Apply, CheckBy, CheckInfo, Descriptor, FixBy, FixInfo};
-use lighthouse_spec::{Approval, Catalog, CheckKind, Decision, Models, Task};
+use lighthouse_spec::{Catalog, CheckKind, Decision, Models, Task};
 
 use crate::{Result, Session, active_decisions, permit::permitted};
 
@@ -22,7 +22,8 @@ pub struct Fixing {
     trusted: bool,
     /// `[sandbox] enabled`: programs run in the sandbox, so it must work.
     sandboxed: bool,
-    approval: Approval,
+    /// `[fix] unsafe`: an `unsafe` fix is written unasked.
+    unsafe_fixes: bool,
 }
 
 impl Fixing {
@@ -34,7 +35,7 @@ impl Fixing {
             models: session.config.models(session.catalog.projects())?,
             trusted: session.trusted(),
             sandboxed: session.config.sandbox().enabled,
-            approval: session.config.fix().approval,
+            unsafe_fixes: session.config.fix().unsafe_fixes,
         })
     }
 
@@ -60,6 +61,7 @@ impl Fixing {
         let (by, needs) = match &decision.check.as_ref()?.kind {
             CheckKind::Builtin(_) => (CheckBy::Builtin, Needs::Nothing),
             CheckKind::Cel(_) => (CheckBy::Cel, Needs::Nothing),
+            CheckKind::Command(_) if decision.bundled() => (CheckBy::Command, Needs::Bundled),
             CheckKind::Command(_) => (CheckBy::Command, Needs::Program),
             CheckKind::Model(_) => (
                 CheckBy::Model,
@@ -77,7 +79,7 @@ impl Fixing {
                 safety: binding.cap,
                 runs: why.is_none(),
                 why,
-                approval: (binding.cap == Safety::Unsafe).then_some(self.approval),
+                written: (binding.cap == Safety::Unsafe).then_some(self.unsafe_fixes),
                 apply: Apply::of(aim, false),
             }
         });
@@ -99,7 +101,7 @@ impl Fixing {
 pub(crate) fn fix_by(needs: &Needs) -> FixBy {
     match needs {
         Needs::Nothing => FixBy::Ops,
-        Needs::Program => FixBy::Command,
+        Needs::Program | Needs::Bundled => FixBy::Command,
         Needs::Model { .. } => FixBy::Model,
         Needs::Unserved => FixBy::Rpc,
     }
@@ -111,9 +113,17 @@ pub(crate) fn fix_plan(session: &Session, active: &dyn Fn(&str) -> bool) -> Resu
     let catalog = &session.catalog;
     let granted = permitted(&session.config, catalog, active)?;
     let plan = FixPlan::from_catalog(catalog);
-    Ok(if granted.ids.is_empty() {
+    let plan = if granted.ids.is_empty() {
         plan
     } else {
         plan.with_model_fixes(catalog, &granted.ids, session.config.fix().scope)
-    })
+    };
+    let rules = session
+        .config
+        .resolve(Path::new(""), "", catalog.projects())?;
+    Ok(plan.with_safety(
+        rules
+            .iter()
+            .filter_map(|(id, rule)| Some((id.clone(), rule.safety?))),
+    ))
 }

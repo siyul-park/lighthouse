@@ -57,8 +57,8 @@ pub(crate) const FIX_OWN_FILE: &str = "prompt=$(cat)\nfile=$(printf '%s\\n' \"$p
 
 /// `models` and `fix` tables of a project that lists the decision, with
 /// `fix` among the lines of the `[fix]` table.
-pub(crate) fn listed(fix: &str, approval: &str) -> String {
-    format!("{approval}[fix]\ndecisions = [\"{BAN}\"]\n{fix}")
+pub(crate) fn listed(fix: &str, allow: &str) -> String {
+    format!("[fix]\n{allow}decisions = [\"{BAN}\"]\n{fix}")
 }
 
 /// A project that binds `edit` to `agent`, with `rest` after the `models`
@@ -73,7 +73,7 @@ pub(crate) fn agent_project(rules: &str, agent: &str, rest: &str) -> (TempDir, T
     write(scripts.path(), "agent.sh", agent);
     let script = scripts.path().join("agent.sh");
     let dir = project(&format!(
-        "{rules}[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{rest}",
+        "{rules}[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{rest}",
         script.to_str().unwrap()
     ));
     (dir, scripts)
@@ -89,7 +89,7 @@ pub(crate) fn read(dir: &TempDir, name: &str) -> String {
     fs::read_to_string(dir.path().join(name)).unwrap()
 }
 
-pub(crate) const ALLOW: &str = "[approval]\nfix = \"allow\"\n";
+pub(crate) const ALLOW: &str = "unsafe = true\n";
 
 #[test]
 fn nothing_binds_and_nothing_is_listed_so_a_fix_run_is_what_it_was() {
@@ -129,7 +129,7 @@ fn a_listed_decision_without_an_agent_is_left_for_review() {
 
     let reason = fixed["declined"][0]["reason"].as_str().unwrap();
     assert!(
-        reason.contains("no edit binding") && reason.contains("review show"),
+        reason.contains("no agent binding") && reason.contains("review show"),
         "{reason}"
     );
 }
@@ -163,8 +163,8 @@ fn a_change_outside_the_symbol_of_the_finding_is_out_of_scope() {
 #[test]
 fn a_change_inside_the_symbol_is_kept_under_allow_and_previewed_under_ask() {
     let lib = "pub fn bad_one() {}\npub fn fine() {}\n";
-    for (approval, applied) in [(ALLOW, true), ("", false)] {
-        let (dir, _agent) = with_agent(FIX_OWN_FILE, &listed("", approval));
+    for (allow, applied) in [(ALLOW, true), ("", false)] {
+        let (dir, _agent) = with_agent(FIX_OWN_FILE, &listed("", allow));
         write(dir.path(), "src/lib.rs", lib);
 
         let fixed = fix(&dir, json!({}));
@@ -173,11 +173,7 @@ fn a_change_inside_the_symbol_is_kept_under_allow_and_previewed_under_ask() {
         assert_eq!(counts["verified"], 1, "{fixed}");
         assert_eq!(counts["applied"], i32::from(applied), "{fixed}");
         assert_eq!(counts["previewed"], i32::from(!applied), "{fixed}");
-        assert_eq!(
-            read(&dir, "src/lib.rs") != lib,
-            applied,
-            "approval {approval:?}"
-        );
+        assert_eq!(read(&dir, "src/lib.rs") != lib, applied, "unsafe {allow:?}");
     }
 }
 
@@ -294,7 +290,7 @@ fn review_show_carries_the_brief_and_the_fix_of_a_finding_whose_fix_is_not_safe(
             "by": "model",
             "safety": "unsafe",
             "runs": true,
-            "approval": "ask",
+            "written": false,
             "apply": format!("lighthouse check --fix --fingerprint {}", listed_show["fingerprint"].as_str().unwrap()),
             "tool": {"name": "fix", "arguments": {
                 "fingerprints": [listed_show["fingerprint"]]

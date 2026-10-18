@@ -18,34 +18,6 @@ use lighthouse_spec::Config;
 use crate::support::*;
 
 #[test]
-fn an_untrusted_project_is_not_formatted_but_is_still_verified() {
-    let dir = project("TODO   here\n");
-    let formatter = "[languages.toy]\nformatter = [\"false\"]\n";
-    let unformatted = engine(&dir, formatter);
-
-    let report = unformatted
-        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
-        .unwrap();
-
-    assert_eq!(text(&dir), "DONE   here\n", "applied, unformatted");
-    assert!(
-        report.notes.iter().any(|n| n.contains("not formatted")),
-        "{:?}",
-        report.notes
-    );
-    let bad = project("TODO\n");
-    let verified = engine(&bad, "")
-        .fix(&plan("fake/to-bad", Safety::Safe), &FixRun::default())
-        .unwrap();
-    assert_eq!(
-        text(&bad),
-        "TODO\n",
-        "a fix that breaks things is still dropped"
-    );
-    assert!(verified.applied.is_empty());
-}
-
-#[test]
 fn a_dry_run_verifies_in_memory_and_leaves_the_disk_byte_identical() {
     let dir = project("fn a\nTODO here\n");
     let path = dir.path().join("a.toy");
@@ -162,40 +134,6 @@ fn a_file_that_changed_since_it_was_read_is_skipped_and_its_fix_is_declined() {
 }
 
 #[test]
-fn a_file_that_changes_while_verifying_is_not_written_over() {
-    let dir = project("TODO\n");
-    let path = dir.path().join("a.toy");
-    // The formatter of a trusted project runs mid-run and, as an editor
-    // saving would, changes the real file while the candidate is checked.
-    let formatter = format!(
-        "[languages.toy]\nformatter = [\"sh\", \"-c\", \"echo '// saved elsewhere' >> '{}'\"]\n[sandbox]\nenabled = false\n",
-        path.display()
-    );
-    let engine = engine(&dir, &formatter).with_trust(true);
-
-    let report = engine
-        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
-        .unwrap();
-
-    assert_eq!(
-        text(&dir),
-        "TODO\n// saved elsewhere\n",
-        "the newer file wins"
-    );
-    assert!(report.applied.is_empty() && report.changes.is_empty());
-    assert!(
-        report.declined[0].reason.contains("changed concurrently"),
-        "{:?}",
-        report.declined
-    );
-    assert!(
-        report.notes.iter().any(|n| n.contains("was not written")),
-        "{:?}",
-        report.notes
-    );
-}
-
-#[test]
 fn a_named_fixer_needs_the_rules_or_fingerprints_it_is_for() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
@@ -285,7 +223,7 @@ fn an_unsafe_fix_is_asked_for_in_every_run_to_be_shown() {
     );
 
     let run = FixRun {
-        unsafe_fixes: true,
+        unsafe_fixes: Some(true),
         ..FixRun::default()
     };
     engine.fix(&plan, &run).unwrap();

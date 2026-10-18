@@ -128,8 +128,8 @@ pub struct CheckCommand {
     /// safe fixes are written, whatever makes them (a rule, a command, a
     /// plugin); unsafe ones, which every fix by a model is, are shown as
     /// previews with how to apply them. Each
-    /// fix is verified (formatted, re-checked) and a file that gets worse is
-    /// rolled back. PATHS and --decision select which findings are fixed.
+    /// fix is verified (re-checked, with the safe fixes of what it introduced)
+    /// and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed.
     #[arg(long)]
     pub fix: bool,
     /// With --fix: fix only the findings with these fingerprints (repeatable;
@@ -351,7 +351,7 @@ pub enum ModelCommand {
 /// `config <verb>`.
 #[derive(Debug, Subcommand)]
 pub enum ConfigCommand {
-    /// Show the effective environment: models, providers, bindings, approval, sandbox.
+    /// Show the effective environment: models, providers, bindings, fix, sandbox.
     ///
     /// Meaning is the project's alone (`lighthouse.toml`); how this machine
     /// computes and applies is read from, in order, the bundled defaults, the

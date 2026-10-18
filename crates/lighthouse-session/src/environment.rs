@@ -30,7 +30,7 @@ pub(crate) struct Personal {
 impl Personal {
     /// What of the file trust covers, canonically: the providers that run a
     /// program, with the variables they are given and the hosts they reach,
-    /// the approval and the sandbox. A budget or a binding to a provider that
+    /// `[fix] unsafe` and the sandbox. A budget or a binding to a provider that
     /// is not a program is not. `None` when the file holds nothing of the
     /// kind.
     pub(crate) fn trusted(&self) -> Option<String> {
@@ -44,19 +44,18 @@ impl Personal {
                 let ran = json!({
                     "command": p.command,
                     "env": p.env,
-                    "keyEnv": p.key_env,
-                    "network": p.network,
+                    "sandbox": p.sandbox,
                 });
                 (name, ran)
             })
             .collect();
-        if programs.is_empty() && spec.approval.fix.is_none() && spec.sandbox.is_empty() {
+        if programs.is_empty() && spec.fix.unsafe_fixes.is_none() && spec.sandbox.is_empty() {
             return None;
         }
         Some(
             json!({
                 "providers": programs,
-                "approval": spec.approval.fix,
+                "unsafe": spec.fix.unsafe_fixes,
                 "sandbox": spec.sandbox,
             })
             .to_string(),

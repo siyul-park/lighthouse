@@ -34,7 +34,7 @@ judged is remembered with its reason and is not raised again.
    The loop:
    {{fix-loop}}
    A check shows no diff; `fix` does. Only `safe` fixes are written, whoever
-   makes them; an `unsafe` fix is shown as a preview with its diff, unless the project's `[approval] fix = "allow"`
+   makes them; an `unsafe` fix is shown as a preview with its diff, unless the project's `[fix] unsafe = true`
    or `unsafeFixes` says otherwise. Every fix is verified and rolled back if it
    makes the file worse. Review the diff like any other change. A run that
    reports `incomplete` did not check everything: it is not a pass.

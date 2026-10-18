@@ -89,10 +89,9 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
                     || "doc".to_owned(),
                     |s| authored_severity(s, Some(d)).to_string(),
                 );
-                let fixable = d
-                    .fix
-                    .as_ref()
-                    .map_or(String::new(), |_| format!(", fixable: {}", d.fix_safety()));
+                let fixable = d.fix.as_ref().map_or(String::new(), |_| {
+                    format!(", fixable: {}", d.fix_safety(None))
+                });
                 format!("- `{}` ({level}{fixable}) {}", d.id(), d.title)
             })
             .collect();

@@ -1,17 +1,21 @@
 //! The fix orchestrator: the only component that writes. A rule judges, a
 //! fixer proposes, the orchestrator executes: it asks the fixer the catalog
-//! names for each selected finding, lowers the proposals to text edits, drops
-//! overlapping ones, applies the rest, formats, re-indexes and re-checks, rolls
-//! back every file that got worse and repeats until nothing is left to do.
+//! names for each selected finding, lowers the proposals to text edits, orders
+//! them by priority and drops overlapping ones, applies the rest, re-indexes
+//! and re-checks, applies the safe fixes of the findings the change
+//! introduced, rolls back every file that got worse and repeats until nothing
+//! is left to do.
 
 mod batch;
 pub mod brief;
+mod command;
 mod edits;
 mod kept;
 mod lower;
 mod model;
 mod preview;
 mod propose;
+mod rewrite;
 mod run;
 mod scan;
 
@@ -20,9 +24,9 @@ use std::{
     path::PathBuf,
 };
 
-use lighthouse_model::{Fingerprint, Preview, Safety};
+use lighthouse_model::{Fingerprint, Preview, Safety, ucm::Capability};
 use lighthouse_plugin::FixDecision;
-use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Task};
+use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Program, Task};
 use serde::{Deserialize, Serialize};
 
 pub use edits::unified_diff;
@@ -40,7 +44,7 @@ pub const MAX_ROUNDS: usize = 5;
 pub enum FixedBy {
     /// The registered fixer with this id.
     Fixer(String),
-    /// The agent `[models] edit` binds.
+    /// The agent `[models] agent` binds.
     Model,
 }
 
@@ -50,7 +54,8 @@ pub struct FixBinding {
     /// What serves the rule.
     pub fixer: FixedBy,
     /// The effective safety of the fix at best, [`DecisionSpec::fix_safety`]: what
-    /// the fixer claims can only be as safe as this.
+    /// the fixer claims can only be as safe as this, unless the project gives
+    /// the rule a safety of its own (see [`FixPlan::with_safety`]).
     pub cap: Safety,
     /// The languages of the examples of the decision: where its fix is known
     /// to apply.
@@ -61,6 +66,19 @@ pub struct FixBinding {
     pub decision: FixDecision,
 }
 
+/// The fix by a command of a rule: the program the fix run itself runs for a
+/// finding, through the rewrite path it shares with an agent.
+#[derive(Debug, Clone)]
+pub(super) struct CommandFix {
+    program: Program,
+    /// How far its change may go.
+    scope: FixScope,
+    /// What the language of the file must provide for the fix to be made.
+    requires: Vec<Capability>,
+    /// What the fix does, in the words of the decision's title.
+    description: String,
+}
+
 /// The fixer of each rule, by rule id. Built from the catalog by the caller:
 /// the engine knows no decisions.
 #[derive(Debug, Clone, Default)]
@@ -69,12 +87,20 @@ pub struct FixPlan {
     /// What the rules whose fix is by a model add to the brief, and how far
     /// they may go.
     models: BTreeMap<String, ModelFix>,
+    /// The rules whose fix is a command the run runs itself.
+    commands: BTreeMap<String, CommandFix>,
+    /// The priority of the fix of the rules that set one: the higher goes
+    /// first when proposals of a round overlap.
+    priorities: BTreeMap<String, i32>,
+    /// The safety the project gives the fixes of a rule, whoever makes them.
+    configured: BTreeMap<String, Safety>,
 }
 
 impl FixPlan {
     /// The fixer of every rule whose decision has a `fix` that is not by a
-    /// model: the decision's id, under which its fixer is registered, with
-    /// the cap its `safety` puts on what the fixer may claim.
+    /// model: the decision's id, under which its fixer is registered (a
+    /// command is run by the fix run itself), with the cap its `safety` puts
+    /// on what the fixer may claim.
     pub fn from_catalog(catalog: &Catalog) -> Self {
         let mut plan = Self::default();
         for decision in catalog.decisions() {
@@ -86,9 +112,10 @@ impl FixPlan {
                 decision.id(),
                 FixBinding {
                     fixer: FixedBy::Fixer(decision.id().to_owned()),
-                    cap: decision.fix_safety(),
+                    cap: decision.fix_safety(None),
                     languages: languages_of(decision),
                     needs: match fix.kind {
+                        FixKind::Command(_) if decision.bundled() => Needs::Bundled,
                         FixKind::Command(_) => Needs::Program,
                         FixKind::Rpc { .. } => Needs::Unserved,
                         _ => Needs::Nothing,
@@ -96,6 +123,18 @@ impl FixPlan {
                     decision: decision_of(decision),
                 },
             );
+            plan.prioritize(decision.id(), fix.priority);
+            if let FixKind::Command(command) = &fix.kind {
+                plan.commands.insert(
+                    decision.id().to_owned(),
+                    CommandFix {
+                        program: command.program.clone(),
+                        scope: FixScope::of_fix(decision.fix.as_ref(), FixScope::Files),
+                        requires: fix.requires.clone(),
+                        description: decision.title.clone(),
+                    },
+                );
+            }
         }
         plan
     }
@@ -123,11 +162,11 @@ impl FixPlan {
                 decision.id(),
                 FixBinding {
                     fixer: FixedBy::Model,
-                    cap: decision.fix_safety(),
+                    cap: decision.fix_safety(None),
                     languages: Vec::new(),
                     needs: Needs::Model {
                         decision: decision.id().to_owned(),
-                        task: Task::Edit,
+                        task: Task::Agent,
                     },
                     decision: decision_of(decision),
                 },
@@ -136,8 +175,52 @@ impl FixPlan {
                 decision.id().to_owned(),
                 ModelFix::of(decision.fix.as_ref(), &decision.examples, cap),
             );
+            self.prioritize(
+                decision.id(),
+                decision.fix.as_ref().map_or(0, |f| f.priority),
+            );
         }
         self
+    }
+
+    /// Gives the fixes of the rules of `safety` the safety the project says,
+    /// whoever makes them and whatever the decision and the provider claim:
+    /// the last word of the effective safety of a fix.
+    #[must_use]
+    pub fn with_safety(mut self, safety: impl IntoIterator<Item = (String, Safety)>) -> Self {
+        for (rule, safe) in safety {
+            if let Some(binding) = self.bindings.get_mut(&rule) {
+                binding.cap = safe;
+            }
+            self.configured.insert(rule, safe);
+        }
+        self
+    }
+
+    fn prioritize(&mut self, rule: &str, priority: i32) {
+        if priority != 0 {
+            self.priorities.insert(rule.to_owned(), priority);
+        }
+    }
+
+    /// The priority of the fix of `rule`: the higher goes first.
+    pub(super) fn priority(&self, rule: &str) -> i32 {
+        self.priorities.get(rule).copied().unwrap_or_default()
+    }
+
+    /// The safety of a fix of `rule` that its fixer says is `claimed`, under
+    /// the `cap` of its decision: the project's word if it gave one, else the
+    /// less safe of the two.
+    pub(super) fn safety(&self, rule: &str, claimed: Safety, cap: Safety) -> Safety {
+        self.configured
+            .get(rule)
+            .copied()
+            .unwrap_or_else(|| claimed.max(cap))
+    }
+
+    /// The command the run itself runs to fix `rule`, if its fix is one.
+    pub(super) fn command(&self, rule: &str) -> Option<&CommandFix> {
+        self.commands.get(rule)
     }
 
     /// Names `binding` as the fix of `rule`.
@@ -169,8 +252,10 @@ pub struct FixRun {
     pub skip: BTreeSet<Fingerprint>,
     /// Do everything but leave the files as they were.
     pub dry_run: bool,
-    /// Also write `unsafe` fixes, as `[approval] fix = "allow"` does.
-    pub unsafe_fixes: bool,
+    /// Whether `unsafe` fixes are written: `Some(true)` as `--unsafe-fixes`
+    /// asks, `Some(false)` as `--no-unsafe-fixes` does, `None` as the
+    /// project's `[fix] unsafe` says.
+    pub unsafe_fixes: Option<bool>,
     /// Use this registered fixer for every selected finding instead of the
     /// catalog's; needs `rules` or `fingerprints`. Its proposals are
     /// `unsafe`.
@@ -248,9 +333,9 @@ pub struct FixReport {
     /// What the user should know: files rolled back, rounds exhausted.
     pub notes: Vec<String>,
     /// The `unsafe` fixes, by any provider, that the checks accepted and the
-    /// run left for a hand to apply: no `[approval] fix = "allow"` and no
-    /// `unsafe_fixes`, or a failing `[fix] verify` command, withheld them. With
-    /// `dry_run` they are the same.
+    /// run left for a hand to apply: no `[fix] unsafe` and no `unsafe_fixes`,
+    /// or a failing `[fix] verify` program, withheld them. With `dry_run` they
+    /// are the same.
     pub previews: Vec<PreviewedFix>,
     /// What became of the findings given to a model, by decision; empty when
     /// no model was asked.

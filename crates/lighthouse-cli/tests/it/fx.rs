@@ -1,6 +1,6 @@
 //! One experience for every fix, whatever provider makes it: an ops fix, a
 //! command, an agent that edits. The same words (`applied`, `previews`,
-//! `declined`), the same permission (`[approval] fix` and `--unsafe-fixes`),
+//! `declined`), the same permission (`[fix] unsafe` and `--unsafe-fixes`),
 //! the same way to apply what was previewed.
 
 use std::{fs, path::Path};
@@ -64,7 +64,7 @@ fn ops_fix(safety: &str) -> String {
 
 fn command_fix(safety: &str) -> String {
     format!(
-        "  fix:\n    safety: {safety}\n    type: command\n    argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{{file}}\"]\n    output: text\n"
+        "  fix:\n    safety: {safety}\n    type: command\n    command: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{{file}}\"]\n    output: stdout\n"
     )
 }
 
@@ -140,7 +140,7 @@ pub(crate) fn project(approval: &str) -> (TempDir, TempDir) {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n{rules}[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n[fix]\ndecisions = [\"local/model\"]\n{approval}{UNSANDBOXED}",
+            "plugins = [\"core\", \"local\"]\n[rules]\n{rules}[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n[fix]\ndecisions = [\"local/model\"]\n{approval}{UNSANDBOXED}",
             scripts.path().join("agent.sh").to_str().unwrap()
         )),
     );
@@ -261,7 +261,7 @@ fn every_provider_shows_a_preview_with_the_same_fields() {
 #[test]
 fn every_provider_writes_an_unsafe_fix_when_the_project_allows_it() {
     for provider in &PROVIDERS {
-        let (dir, _agent) = project("[approval]\nfix = \"allow\"\n");
+        let (dir, _agent) = project("unsafe = true\n");
 
         let done = fix(dir.path(), json!({"decision": [provider.id]}));
 
@@ -289,7 +289,7 @@ fn every_provider_writes_an_unsafe_fix_when_the_run_asks_for_unsafe_fixes() {
 
 #[test]
 fn a_dry_run_writes_nothing_and_says_what_each_provider_would_do() {
-    for (approval, unsafe_written) in [("", false), ("[approval]\nfix = \"allow\"\n", true)] {
+    for (approval, unsafe_written) in [("", false), ("unsafe = true\n", true)] {
         for provider in &PROVIDERS {
             let (dir, _agent) = project(approval);
 
@@ -528,7 +528,7 @@ fn call(id: &str) -> Value {
     })
 }
 
-/// The `fix` of a descriptor: `by`, `safety` and `approval` as given, and the
+/// The `fix` of a descriptor: `by`, `safety` and `written` as given, and the
 /// call that applies it.
 fn fix_json(by: &str, safety: &str, runs: bool, why: Option<&str>, id: &str) -> Value {
     let mut fix = json!({"by": by, "safety": safety, "runs": runs});
@@ -536,7 +536,7 @@ fn fix_json(by: &str, safety: &str, runs: bool, why: Option<&str>, id: &str) -> 
         fix["why"] = json!(why);
     }
     if safety == "unsafe" {
-        fix["approval"] = json!("ask");
+        fix["written"] = json!(false);
     }
     for (key, value) in call(id).as_object().unwrap() {
         fix[key] = value.clone();
@@ -591,7 +591,7 @@ fn an_untrusted_project_says_why_its_programs_do_not_run() {
 fn a_decision_a_model_may_fix_without_an_agent_bound_says_no_edit_binding() {
     let (dir, _agent) = project("");
     let toml = read(&dir, "lighthouse.toml");
-    let bare = toml.replace("\"edit\" = \"agent/m\", ", "");
+    let bare = toml.replace("\"agent\" = \"agent/m\", ", "");
     assert_ne!(bare, toml);
     write(dir.path(), "lighthouse.toml", &bare);
 
@@ -603,7 +603,7 @@ fn a_decision_a_model_may_fix_without_an_agent_bound_says_no_edit_binding() {
             "model",
             "unsafe",
             false,
-            Some("no edit binding"),
+            Some("no agent binding"),
             "local/model"
         )
     );
@@ -656,7 +656,7 @@ fn a_finding_of_a_decision_without_an_edit_agent_has_a_brief_and_no_running_fix(
     write(
         dir.path(),
         "lighthouse.toml",
-        &toml.replace("\"edit\" = \"agent/m\", ", ""),
+        &toml.replace("\"agent\" = \"agent/m\", ", ""),
     );
     let out = lighthouse(dir.path())
         .env("LIGHTHOUSE_TRUST", "1")
@@ -675,9 +675,9 @@ fn a_finding_of_a_decision_without_an_edit_agent_has_a_brief_and_no_running_fix(
         .unwrap();
 
     assert_eq!(group["fix"]["runs"], false, "{group}");
-    assert_eq!(group["fix"]["why"], "no edit binding");
+    assert_eq!(group["fix"]["why"], "no agent binding");
     assert_eq!(group["brief"], true);
-    assert_eq!(shown["fix"]["why"], "no edit binding");
+    assert_eq!(shown["fix"]["why"], "no agent binding");
     assert!(
         shown["brief"]
             .as_str()
@@ -819,7 +819,7 @@ fn a_preview_that_was_never_made_is_not_made_by_applying_it() {
 
 #[test]
 fn under_allow_a_fingerprint_names_what_to_fix_and_the_fix_is_written() {
-    let (dir, _agent) = project("[approval]\nfix = \"allow\"\n");
+    let (dir, _agent) = project("unsafe = true\n");
     let out = lighthouse(dir.path())
         .env("LIGHTHOUSE_TRUST", "1")
         .args([

@@ -43,10 +43,11 @@ pub struct Selection {
     pub targets: Targets,
     /// Do everything but leave the files as they were.
     pub dry_run: bool,
-    /// Also write `unsafe` fixes, as `[approval] fix = "allow"` does. With
-    /// fingerprints, it applies the previews of those findings, exactly as
-    /// they were shown.
-    pub unsafe_fixes: bool,
+    /// Whether to write `unsafe` fixes: `Some(true)` does (`--unsafe-fixes`),
+    /// `Some(false)` only previews them, `None` leaves it to `[fix] unsafe`.
+    /// With fingerprints, `Some(true)` applies the previews of those findings,
+    /// exactly as they were shown.
+    pub unsafe_fixes: Option<bool>,
     /// Use this registered fixer instead of the catalog's.
     pub fixer: Option<String>,
     /// Record the run and its fixes, and leave out what judgments hide.
@@ -70,7 +71,7 @@ pub struct Fixed {
     /// How many times fixing was repeated until nothing was left.
     pub rounds: usize,
     /// `unsafe` fixes, by any provider, that the checks accepted and that were
-    /// left for a hand to apply (`approval.fix = "ask"` without
+    /// left for a hand to apply (`[fix] unsafe = false` without
     /// `--unsafe-fixes`, or a failing `[fix] verify` command), each with its
     /// diff and how to apply it. Absent when there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

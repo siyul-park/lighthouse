@@ -168,15 +168,41 @@ pub struct FixOptions {
     /// Print the unified diff and leave every file as it was.
     #[arg(long, requires = "fix")]
     pub dry_run: bool,
-    /// Also write `unsafe` fixes, which are judgment calls, whatever makes
-    /// them; without it, or `[approval] fix = "allow"`, they are shown as
-    /// previews, and a preview is applied by naming its finding.
-    #[arg(long, requires = "fix")]
-    pub unsafe_fixes: bool,
+    /// Write `unsafe` fixes, which are judgment calls, whatever makes them
+    /// (`true`), or only preview them (`false`); unset, `[fix] unsafe`
+    /// decides. A preview is applied by naming its finding.
+    #[arg(skip)]
+    pub unsafe_fixes: Option<bool>,
+    /// Write `unsafe` fixes, as `unsafeFixes: true` does.
+    #[arg(
+        long = "unsafe-fixes",
+        requires = "fix",
+        overrides_with = "no_unsafe_fixes"
+    )]
+    #[serde(skip)]
+    pub allow_unsafe: bool,
+    /// Only preview `unsafe` fixes, whatever `[fix] unsafe` says.
+    #[arg(long, requires = "fix", overrides_with = "allow_unsafe")]
+    #[serde(skip)]
+    pub no_unsafe_fixes: bool,
     /// Use this registered fixer for the selected findings instead of the one
     /// their decision names. Its fixes are `unsafe`.
     #[arg(long, requires = "fix", value_name = "ID")]
     pub fixer: Option<String>,
+}
+
+impl FixOptions {
+    /// Whether the run writes `unsafe` fixes: as the flags or `unsafeFixes`
+    /// say, `None` leaving it to the project.
+    pub fn unsafe_permission(&self) -> Option<bool> {
+        if self.no_unsafe_fixes {
+            Some(false)
+        } else if self.allow_unsafe {
+            Some(true)
+        } else {
+            self.unsafe_fixes
+        }
+    }
 }
 
 /// `fix`, the tool of `check --fix`: which findings, and how to fix them.

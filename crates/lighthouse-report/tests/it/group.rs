@@ -10,7 +10,6 @@ use lighthouse_report::{
     Aim, Apply, Briefing, CheckBy, CheckInfo, Descriptor, Entry, FixBy, FixInfo, Format,
     GroupOptions, Grouped, render,
 };
-use lighthouse_spec::Approval;
 use serde_json::{Value, json};
 
 use crate::json_of;
@@ -278,18 +277,13 @@ fn a_finding_carries_no_fix_in_any_format() {
     assert!(!text.contains("\n    fix ["), "{text}");
 }
 
-fn fix_of(
-    by: FixBy,
-    safety: Safety,
-    why: Option<Unavailable>,
-    approval: Option<Approval>,
-) -> FixInfo {
+fn fix_of(by: FixBy, safety: Safety, why: Option<Unavailable>, written: Option<bool>) -> FixInfo {
     FixInfo {
         by,
         safety,
         runs: why.is_none(),
         why,
-        approval,
+        written,
         apply: Apply::of(Aim::Decision("acme/a"), false),
     }
 }
@@ -333,19 +327,19 @@ fn a_group_says_in_one_line_how_its_fix_is_made_and_applied() {
         "{text}"
     );
 
-    let asked = fix_of(FixBy::Model, Safety::Unsafe, None, Some(Approval::Ask));
+    let asked = fix_of(FixBy::Model, Safety::Unsafe, None, Some(false));
     let text = described(descriptor(Some(asked), true), false);
     assert!(
         text.contains(
-            "  fix: unsafe (model, previewed under ask; apply each preview by its fingerprint) \u{2014} lighthouse check --fix --decision acme/a\n"
+            "  fix: unsafe (model, previewed; apply each preview by its fingerprint) \u{2014} lighthouse check --fix --decision acme/a\n"
         ),
         "{text}"
     );
 
-    let allowed = fix_of(FixBy::Command, Safety::Unsafe, None, Some(Approval::Allow));
+    let allowed = fix_of(FixBy::Command, Safety::Unsafe, None, Some(true));
     let text = described(descriptor(Some(allowed), true), false);
     assert!(
-        text.contains("fix: unsafe (command, written under allow)"),
+        text.contains("fix: unsafe (command, written under `[fix] unsafe`)"),
         "{text}"
     );
 }
@@ -364,13 +358,13 @@ fn a_group_without_a_fix_or_with_one_that_does_not_run_points_to_the_brief() {
     let idle = fix_of(
         FixBy::Model,
         Safety::Unsafe,
-        Some(Unavailable::NoEditBinding),
-        Some(Approval::Ask),
+        Some(Unavailable::NoAgentBinding),
+        Some(false),
     );
     let text = described(descriptor(Some(idle), true), false);
     assert!(
         text.contains(&format!(
-            "  fix: unsafe (model, not running: no edit binding) \u{2014} lighthouse review show {} for a brief\n",
+            "  fix: unsafe (model, not running: no agent binding) \u{2014} lighthouse review show {} for a brief\n",
             spread(1)
         )),
         "{text}"

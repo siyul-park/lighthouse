@@ -6,7 +6,6 @@
 //! is told in.
 
 use lighthouse_model::{Safety, Unavailable};
-use lighthouse_spec::Approval;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -111,10 +110,10 @@ pub struct FixInfo {
     pub runs: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub why: Option<Unavailable>,
-    /// What becomes of an `unsafe` fix run without `--unsafe-fixes`: `ask`
-    /// previews it, `allow` writes it. Absent for a `safe` fix.
+    /// Whether an `unsafe` fix run without `--unsafe-fixes` is written
+    /// (`[fix] unsafe`) or previewed. Absent for a `safe` fix.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub approval: Option<Approval>,
+    pub written: Option<bool>,
     #[serde(flatten)]
     pub apply: Apply,
 }
@@ -146,12 +145,10 @@ impl Descriptor {
         let Some(fix) = &self.fix else {
             return format!("fix: none \u{2014} {brief}");
         };
-        let how = match (fix.why, fix.approval) {
+        let how = match (fix.why, fix.written) {
             (Some(why), _) => format!(", not running: {why}"),
-            (None, Some(Approval::Ask)) => {
-                ", previewed under ask; apply each preview by its fingerprint".to_owned()
-            }
-            (None, Some(Approval::Allow)) => ", written under allow".to_owned(),
+            (None, Some(false)) => ", previewed; apply each preview by its fingerprint".to_owned(),
+            (None, Some(true)) => ", written under `[fix] unsafe`".to_owned(),
             (None, None) => String::new(),
         };
         let next = match fix.why {

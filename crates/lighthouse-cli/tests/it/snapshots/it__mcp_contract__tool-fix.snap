@@ -9,7 +9,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": false
   },
-  "description": "Fix findings with the fixers the decisions name (`fix` in `decision_list`: who makes it, `safe` or `unsafe`, whether it runs). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only `safe` fixes are written, whatever makes them; an `unsafe` one is returned as a preview with its diff and the call that applies exactly it (`fingerprints` of every finding of its run, with `unsafeFixes`), unless `unsafeFixes` is set or the project's `[approval] fix` is `allow`. Applying a preview writes exactly the edit that was shown, kept by the run that made it: a file that changed since gives a conflict and writes nothing, and a preview that is not kept is declined. `noModels` asks no model. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes, the `previews` and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.",
+  "description": "Fix findings with the fixers the decisions name (`fix` in `decision_list`: who makes it, `safe` or `unsafe`, whether it runs). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed, applied, re-checked (the safe fixes of what it introduced follow it) and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only `safe` fixes are written, whatever makes them; an `unsafe` one is returned as a preview with its diff and the call that applies exactly it (`fingerprints` of every finding of its run, with `unsafeFixes`), unless `unsafeFixes` is true or, when it is not set, the project's `[fix] unsafe` is true; `unsafeFixes: false` only previews. Applying a preview writes exactly the edit that was shown, kept by the run that made it: a file that changed since gives a conflict and writes nothing, and a preview that is not kept is declined. `noModels` asks no model. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes, the `previews` and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`fix`, the tool of `check --fix`: which findings, and how to fix them.\nName at least one of `paths`, `decision` and `fingerprints`: a fix through\nMCP never defaults to the whole project.",
@@ -57,9 +57,12 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "type": "array"
       },
       "unsafeFixes": {
-        "default": false,
-        "description": "Also write `unsafe` fixes, which are judgment calls, whatever makes\nthem; without it, or `[approval] fix = \"allow\"`, they are shown as\npreviews, and a preview is applied by naming its finding.",
-        "type": "boolean"
+        "default": null,
+        "description": "Write `unsafe` fixes, which are judgment calls, whatever makes them\n(`true`), or only preview them (`false`); unset, `[fix] unsafe`\ndecides. A preview is applied by naming its finding.",
+        "type": [
+          "boolean",
+          "null"
+        ]
       }
     },
     "type": "object"
@@ -213,7 +216,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "type": "object"
       },
       "previews": {
-        "description": "`unsafe` fixes, by any provider, that the checks accepted and that were\nleft for a hand to apply (`approval.fix = \"ask\"` without\n`--unsafe-fixes`, or a failing `[fix] verify` command), each with its\ndiff and how to apply it. Absent when there are none.",
+        "description": "`unsafe` fixes, by any provider, that the checks accepted and that were\nleft for a hand to apply (`[fix] unsafe = false` without\n`--unsafe-fixes`, or a failing `[fix] verify` command), each with its\ndiff and how to apply it. Absent when there are none.",
         "items": {
           "description": "An `unsafe` fix that was left for a hand to apply.",
           "properties": {

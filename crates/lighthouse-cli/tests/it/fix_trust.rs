@@ -105,7 +105,7 @@ fn trust_lists_what_it_trusts_and_needs_a_terminal_or_yes() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n[languages.go]\nformatter = [\"gofmt\"]\n",
+            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n[fix]\nverify = [[\"make\", \"check\"]]\n",
         ),
     );
 
@@ -113,7 +113,7 @@ fn trust_lists_what_it_trusts_and_needs_a_terminal_or_yes() {
         .arg("trust")
         .assert()
         .code(2)
-        .stdout(predicate::str::contains("formatter for go: gofmt"))
+        .stdout(predicate::str::contains("fix verification: make check"))
         .stdout(predicate::str::contains(
             "fixer of local/shout: sh -c tr a-z A-Z",
         ))
@@ -139,8 +139,8 @@ fn a_program_inside_the_project_is_trusted_by_its_content() {
         "#!/bin/sh\ntr a-z A-Z < \"$1\"\n",
     );
     let rule = read(&dir, ".lighthouse/decisions/shout.yaml").replace(
-        "argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]",
-        "argv: [\"./tools/shout.sh\", \"{file}\"]",
+        "command: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]",
+        "command: [\"./tools/shout.sh\", \"{file}\"]",
     );
     write(dir.path(), ".lighthouse/decisions/shout.yaml", &rule);
     #[cfg(unix)]

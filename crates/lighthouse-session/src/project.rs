@@ -267,24 +267,20 @@ pub fn catalog_at(root: &Path) -> Result<Catalog> {
     layered(load_local(root)?.as_ref())
 }
 
-/// Every command the project would run: the formatters and the fix
+/// Every program the project would run: the programs of the fix
 /// verification of its configuration, its command model providers, and the
-/// command fixers and command checks of its catalog, and the plugins that come
-/// with the project.
+/// command fixes and command checks of its catalog that are not the bundled
+/// catalog's own, and the plugins that come with the project.
 fn commands(config: &Config, catalog: &Catalog, root: &Path) -> Result<Vec<Program>> {
     let mut found: Vec<Program> = config
-        .formatters()
-        .map(|(language, f)| Program {
-            what: format!("formatter for {language}: {}", f.argv.join(" ")),
-            argv: f.argv.clone(),
+        .fix()
+        .verify
+        .iter()
+        .map(|program| Program {
+            what: format!("fix verification: {}", program.command.join(" ")),
+            argv: program.command.clone(),
         })
         .collect();
-    for argv in &config.fix().verify {
-        found.push(Program {
-            what: format!("fix verification: {}", argv.join(" ")),
-            argv: argv.clone(),
-        });
-    }
     for local in lighthouse_rpc::local_plugins(config, root, &lighthouse_rpc::search_dirs(root)) {
         found.push(Program {
             what: format!("plugin {}: {}", local.id, local.argv.join(" ")),
@@ -292,28 +288,30 @@ fn commands(config: &Config, catalog: &Catalog, root: &Path) -> Result<Vec<Progr
         });
     }
     for (name, provider) in &config.models(catalog.projects())?.providers {
-        if let lighthouse_spec::ModelProvider::Command { argv, .. } = provider {
+        if let lighthouse_spec::ModelProvider::Command { program, .. } = provider {
             found.push(Program {
-                what: format!("model provider {name}: {}", argv.join(" ")),
-                argv: argv.clone(),
+                what: format!("model provider {name}: {}", program.command.join(" ")),
+                argv: program.command.clone(),
             });
         }
     }
-    for decision in catalog.decisions() {
+    for decision in catalog.decisions().filter(|d| !d.bundled()) {
         if let Some(check) = &decision.check
             && let CheckKind::Command(command) = &check.kind
         {
+            let argv = &command.program.command;
             found.push(Program {
-                what: format!("check of {}: {}", decision.id(), command.argv.join(" ")),
-                argv: command.argv.clone(),
+                what: format!("check of {}: {}", decision.id(), argv.join(" ")),
+                argv: argv.clone(),
             });
         }
         if let Some(fix) = &decision.fix
             && let FixKind::Command(command) = &fix.kind
         {
+            let argv = &command.program.command;
             found.push(Program {
-                what: format!("fixer of {}: {}", decision.id(), command.argv.join(" ")),
-                argv: command.argv.clone(),
+                what: format!("fixer of {}: {}", decision.id(), argv.join(" ")),
+                argv: argv.clone(),
             });
         }
     }

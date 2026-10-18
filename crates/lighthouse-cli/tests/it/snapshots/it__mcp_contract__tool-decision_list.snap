@@ -80,29 +80,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                   "description": "The command line.",
                   "type": "string"
                 },
-                "approval": {
-                  "anyOf": [
-                    {
-                      "description": "Whether a fix a model proposed and the checks accepted is written.",
-                      "oneOf": [
-                        {
-                          "const": "ask",
-                          "description": "Reported with its diff (previewed) and left for a hand to apply.",
-                          "type": "string"
-                        },
-                        {
-                          "const": "allow",
-                          "description": "Written (applied) like any other applied fix, without `--unsafe-fixes`.",
-                          "type": "string"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "What becomes of an `unsafe` fix run without `--unsafe-fixes`: `ask`\npreviews it, `allow` writes it. Absent for a `safe` fix."
-                },
                 "by": {
                   "description": "What makes the fix of a decision.",
                   "enum": [
@@ -152,7 +129,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                       "description": "Why the fix of a decision does not run, whoever would make it: one of a\nclosed set, said the same way for a rule, a command, a plugin and a model.",
                       "oneOf": [
                         {
-                          "const": "no edit binding",
+                          "const": "no agent binding",
                           "description": "A model fix, and no agent that edits is bound to the decision.",
                           "type": "string"
                         },
@@ -186,6 +163,13 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                     {
                       "type": "null"
                     }
+                  ]
+                },
+                "written": {
+                  "description": "Whether an `unsafe` fix run without `--unsafe-fixes` is written\n(`[fix] unsafe`) or previewed. Absent for a `safe` fix.",
+                  "type": [
+                    "boolean",
+                    "null"
                   ]
                 }
               },
