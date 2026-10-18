@@ -80,7 +80,7 @@ impl Proposer<'_> {
         });
         match stale {
             Some((file, _)) => Err(format!(
-                "`{}` is not as it was when the preview was made: fix again for a new one",
+                "`{}` is not as it was when the preview was made: apply the safe fixes first, or fix again for a new preview",
                 file.display()
             )),
             None => Ok(Some(proposal)),

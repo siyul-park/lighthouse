@@ -76,8 +76,6 @@ pub struct PreviewFile {
     /// The unified diff hunks (`@@ -l,n +l,n @@`, one line of context), no
     /// file headers.
     pub hunks: String,
-    /// Lines the hunks add or remove.
-    pub changed: usize,
     /// The replacements, as spans of the original text in UTF-16 columns.
     pub edits: Vec<PreviewEdit>,
 }

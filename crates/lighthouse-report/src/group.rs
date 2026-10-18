@@ -1,11 +1,6 @@
-use std::{
-    cmp::Reverse,
-    collections::{BTreeMap, BTreeSet},
-    fmt::Write,
-    path::Path,
-};
+use std::{cmp::Reverse, collections::BTreeMap, fmt::Write, path::Path};
 
-use lighthouse_model::{Fingerprint, Judgment, Preview, Severity, squash};
+use lighthouse_model::{Fingerprint, Judgment, Severity, squash};
 use lighthouse_spec::Catalog;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -14,7 +9,6 @@ use serde_json::{Map, Value, json};
 use crate::{
     descriptor::Descriptor,
     expected::{ExampleKey, expected},
-    fix::Shown,
     text::{bounded, evidence, pairs},
 };
 
@@ -67,7 +61,7 @@ pub struct Groups {
 /// One finding as the compact shape sees it, wherever it comes from: a fresh
 /// diagnostic or a remembered finding.
 #[derive(Debug, Clone)]
-pub struct Entry<'a> {
+pub struct Entry {
     pub decision: String,
     pub severity: Severity,
     /// The severity the decision authored; shown only when it differs.
@@ -88,8 +82,6 @@ pub struct Entry<'a> {
     /// Subject facts: `language`, `kind` and `visibility` pick the expected
     /// structure.
     pub facts: Option<Value>,
-    /// The fix proposed for the finding, when one was computed.
-    pub fix: Option<&'a Preview>,
 }
 
 /// What shapes the groups.
@@ -138,14 +130,12 @@ struct Group {
 /// One finding: where, what, which, and what sets it apart from the group.
 #[derive(Debug, Clone)]
 struct Instance {
-    full: String,
     line: u32,
     col: u32,
     message: String,
     fingerprint: String,
     evidence: Map<String, Value>,
     note: Option<String>,
-    fix: Option<Shown>,
     /// Asks for review; set only in a mixed group.
     review: bool,
 }
@@ -154,11 +144,11 @@ impl Grouped {
     /// The groups of `entries`: errors first, then the larger ones. At most
     /// `limit` findings are kept, in that order; what does not fit is counted.
     /// Fingerprint prefixes are unique among all `entries`, shown or not.
-    pub fn of(entries: Vec<Entry<'_>>, options: &GroupOptions) -> Self {
+    pub fn of(entries: Vec<Entry>, options: &GroupOptions) -> Self {
         let limit = options.limit;
         let fingerprints: Vec<&str> = entries.iter().map(|e| e.fingerprint.as_str()).collect();
         let widths = Fingerprint::prefix_widths(&fingerprints);
-        let mut buckets: BTreeMap<(Severity, &str), Vec<(&Entry<'_>, usize)>> = BTreeMap::new();
+        let mut buckets: BTreeMap<(Severity, &str), Vec<(&Entry, usize)>> = BTreeMap::new();
         for (entry, width) in entries.iter().zip(widths) {
             buckets
                 .entry((entry.severity, entry.decision.as_str()))
@@ -184,15 +174,6 @@ impl Grouped {
             }
         }
         grouped
-    }
-
-    /// The full fingerprints of the findings kept.
-    pub fn fingerprints(&self) -> BTreeSet<&str> {
-        self.groups
-            .iter()
-            .flat_map(|g| g.files.values().flatten())
-            .map(|i| i.full.as_str())
-            .collect()
     }
 
     /// Whether any shown finding asks for review.
@@ -234,7 +215,7 @@ impl Grouped {
 
 impl Group {
     /// The first `take` of `rows` by file and position.
-    fn build(mut rows: Vec<(&Entry<'_>, usize)>, take: usize, options: &GroupOptions) -> Self {
+    fn build(mut rows: Vec<(&Entry, usize)>, take: usize, options: &GroupOptions) -> Self {
         rows.sort_by(|(a, _), (b, _)| (&a.path, a.line, a.col).cmp(&(&b.path, b.line, b.col)));
         rows.truncate(take);
         let first = rows[0].0;
@@ -265,7 +246,6 @@ impl Group {
         for ((entry, width), mut attributes) in rows.into_iter().zip(attributes) {
             attributes.retain(|key, _| !shared.contains_key(key));
             files.entry(entry.path.clone()).or_default().push(Instance {
-                full: entry.fingerprint.clone(),
                 line: entry.line,
                 col: entry.col,
                 message: entry.message.clone(),
@@ -276,7 +256,6 @@ impl Group {
                     .to_owned(),
                 evidence: attributes,
                 note: entry.note.clone(),
-                fix: entry.fix.map(|fix| Shown::new(fix, &entry.path)),
                 review: mixed && entry.review,
             });
         }
@@ -403,9 +382,6 @@ impl Instance {
         if let Some(note) = &self.note {
             varying.insert("note".to_owned(), json!(note));
         }
-        if let Some(fix) = &self.fix {
-            varying.insert("fix".to_owned(), json!(fix));
-        }
         if self.review {
             varying.insert("review".to_owned(), json!(true));
         }
@@ -431,12 +407,6 @@ impl Instance {
             let _ = write!(out, " (note: {note})");
         }
         out.push('\n');
-        if let Some(fix) = &self.fix {
-            for line in fix.text("    ") {
-                out.push_str(&line);
-                out.push('\n');
-            }
-        }
     }
 }
 

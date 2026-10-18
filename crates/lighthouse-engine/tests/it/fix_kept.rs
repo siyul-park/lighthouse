@@ -148,16 +148,3 @@ fn a_preview_that_is_not_kept_is_declined_not_made_again() {
     let reason = &applied.declined[0].reason;
     assert!(reason.contains("the preview is not kept"), "{reason}");
 }
-
-#[test]
-fn the_preview_of_a_check_is_the_preview_of_a_fix_run() {
-    let dir = project("BAD\n");
-    let engine = engine(&dir, "");
-    let run = engine.check(&[], &[]).unwrap();
-    let findings: Vec<_> = run.diagnostics.iter().collect();
-
-    let shown = engine.preview_fixes(&stuck(), &findings);
-    let report = engine.fix(&stuck(), &FixRun::default()).unwrap();
-
-    assert_eq!(shown, [report.previews[0].preview.clone()]);
-}

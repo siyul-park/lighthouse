@@ -33,8 +33,8 @@ judged is remembered with its reason and is not raised again.
    decision whose findings you fix by hand with the brief of `review_show`.
    The loop:
    {{fix-loop}}
-   Only `safe` fixes are written, whoever makes them; an `unsafe` fix is shown
-   as a preview with its diff, unless the project's `[approval] fix = "allow"`
+   A check shows no diff; `fix` does. Only `safe` fixes are written, whoever
+   makes them; an `unsafe` fix is shown as a preview with its diff, unless the project's `[approval] fix = "allow"`
    or `unsafeFixes` says otherwise. Every fix is verified and rolled back if it
    makes the file worse. Review the diff like any other change. A run that
    reports `incomplete` did not check everything: it is not a pass.

@@ -1,0 +1,116 @@
+---
+source: crates/lighthouse-cli/tests/it/fx.rs
+expression: "serde_json::to_string_pretty(&results).unwrap()"
+---
+[
+  {
+    "fixes": [
+      {
+        "artifactChanges": [
+          {
+            "artifactLocation": {
+              "uri": "model.txt",
+              "uriBaseId": "%SRCROOT%"
+            },
+            "replacements": [
+              {
+                "deletedRegion": {
+                  "endColumn": 1,
+                  "endLine": 5,
+                  "startColumn": 1,
+                  "startLine": 1
+                },
+                "insertedContent": {
+                  "text": "x\n"
+                }
+              }
+            ]
+          }
+        ],
+        "description": {
+          "text": "model edit by `agent/m`"
+        }
+      }
+    ],
+    "level": "warning",
+    "locations": [
+      {
+        "physicalLocation": {
+          "artifactLocation": {
+            "uri": "model.txt",
+            "uriBaseId": "%SRCROOT%"
+          },
+          "region": {
+            "endColumn": 1,
+            "endLine": 1,
+            "startColumn": 1,
+            "startLine": 1
+          }
+        }
+      }
+    ],
+    "message": {
+      "text": "model.txt is too long"
+    },
+    "partialFingerprints": {
+      "lighthouse/v1": "243ae9d55493484a1c0dc96c19a67d963872150e286ac117db83ccf47b7edd9d"
+    },
+    "ruleId": "local/model",
+    "ruleIndex": 0
+  },
+  {
+    "fixes": [
+      {
+        "artifactChanges": [
+          {
+            "artifactLocation": {
+              "uri": "ops-unsafe.txt",
+              "uriBaseId": "%SRCROOT%"
+            },
+            "replacements": [
+              {
+                "deletedRegion": {
+                  "endColumn": 1,
+                  "endLine": 2,
+                  "startColumn": 1,
+                  "startLine": 1
+                },
+                "insertedContent": {
+                  "text": ""
+                }
+              }
+            ]
+          }
+        ],
+        "description": {
+          "text": "Notes stay short"
+        }
+      }
+    ],
+    "level": "error",
+    "locations": [
+      {
+        "physicalLocation": {
+          "artifactLocation": {
+            "uri": "ops-unsafe.txt",
+            "uriBaseId": "%SRCROOT%"
+          },
+          "region": {
+            "endColumn": 1,
+            "endLine": 1,
+            "startColumn": 1,
+            "startLine": 1
+          }
+        }
+      }
+    ],
+    "message": {
+      "text": "ops-unsafe.txt is too long"
+    },
+    "partialFingerprints": {
+      "lighthouse/v1": "8316f51022a22f1c55dbb0d8848f15af10e705ca32d179e60a02ad6d79739cda"
+    },
+    "ruleId": "local/ops-unsafe",
+    "ruleIndex": 1
+  }
+]

@@ -36,8 +36,8 @@ judged is remembered with its reason and is not raised again.
    2. `fix` the groups whose `fix` is `safe` and runs.
    3. For the others, `review_show` the finding, edit with its brief, `check` again.
    4. An `unsafe` fix that runs (every fix by a model is) is previewed first: `fix` the group, read the diffs, then run the `apply` of a preview to write exactly that fix. Passing `noModels` asks no model.
-   Only `safe` fixes are written, whoever makes them; an `unsafe` fix is shown
-   as a preview with its diff, unless the project's `[approval] fix = "allow"`
+   A check shows no diff; `fix` does. Only `safe` fixes are written, whoever
+   makes them; an `unsafe` fix is shown as a preview with its diff, unless the project's `[approval] fix = "allow"`
    or `unsafeFixes` says otherwise. Every fix is verified and rolled back if it
    makes the file worse. Review the diff like any other change. A run that
    reports `incomplete` did not check everything: it is not a pass.

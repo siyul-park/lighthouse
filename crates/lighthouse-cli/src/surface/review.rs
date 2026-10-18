@@ -220,7 +220,7 @@ fn resolved_text(recorded: &Recorded) -> String {
 /// A remembered finding as a compact entry: where the finding is in its life
 /// (`state` unless open, the latest `judgment`) and its `seen` time, which
 /// `review resolve` takes, ride along as evidence.
-fn entry(f: &FindingRecord) -> Entry<'_> {
+fn entry(f: &FindingRecord) -> Entry {
     let mut attributes = Map::new();
     attributes.insert("seen".to_owned(), json!(f.last_seen));
     let state = f.state.to_string();
@@ -245,7 +245,6 @@ fn entry(f: &FindingRecord) -> Entry<'_> {
         note: None,
         fingerprint: f.fingerprint.clone(),
         facts: Some(f.facts.clone()),
-        fix: None,
     }
 }
 

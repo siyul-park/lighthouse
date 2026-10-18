@@ -1,7 +1,6 @@
 mod descriptor;
 pub mod docs;
 mod expected;
-mod fix;
 mod group;
 mod report;
 mod sarif;
@@ -13,7 +12,7 @@ use lighthouse_model::{Diagnostic, Incomplete, Severity};
 
 pub use descriptor::{Aim, Apply, CheckBy, CheckInfo, Descriptor, FixBy, FixInfo, ToolCall};
 pub use group::{Entry, GroupOptions, Grouped, Groups, Judgments, Omitted};
-pub use report::{Briefing, Compact, Counts, Detail, Full, Gap, Report, Status, report, shown};
+pub use report::{Briefing, Compact, Counts, Detail, Full, Gap, Report, Status, report};
 
 /// Output format of [`render`]. The JSON report of a check is [`report`]; it
 /// is not rendered here.

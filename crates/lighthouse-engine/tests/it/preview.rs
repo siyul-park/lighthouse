@@ -1,50 +1,46 @@
-//! Fix previews over the toy language: the proposal applied in memory.
+//! Fix previews over the toy language: what a fix run leaves for a hand.
 
-use lighthouse_engine::{FixPlan, Needs};
+use lighthouse_engine::{FixPlan, FixRun, Needs};
 use lighthouse_model::Safety;
 use lighthouse_spec::Catalog;
 
 use crate::support::*;
 
 #[test]
-fn engine_preview_fixes_shows_the_change_and_writes_nothing() {
+fn a_dry_run_previews_an_unsafe_fix_and_writes_nothing() {
     let dir = project("fn a\nTODO here\n");
     let engine = engine(&dir, "");
-    let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
-    let findings: Vec<_> = outcome.diagnostics.iter().collect();
+    let run = FixRun {
+        dry_run: true,
+        ..FixRun::default()
+    };
 
-    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Safe), &findings);
+    let report = engine
+        .fix(&plan("fake/to-done", Safety::Unsafe), &run)
+        .unwrap();
 
-    assert_eq!(previews.len(), 1);
-    assert_eq!(previews[0].safety, Safety::Safe);
-    assert!(previews[0].files[0].hunks.contains("+DONE here"));
-    assert_eq!(previews[0].files[0].edits.len(), 1);
+    assert_eq!(report.previews.len(), 1, "{:?}", report.declined);
+    let preview = &report.previews[0].preview;
+    assert_eq!(preview.safety, Safety::Unsafe);
+    assert!(preview.files[0].hunks.contains("+DONE here"));
     assert_eq!(text(&dir), "fn a\nTODO here\n", "nothing was written");
 }
 
 #[test]
-fn engine_preview_fixes_calls_a_fix_unsafe_when_writing_it_needs_permission() {
+fn a_fix_that_cannot_be_proposed_has_no_preview() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
-    let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
-    let findings: Vec<_> = outcome.diagnostics.iter().collect();
+    let run = FixRun::default();
 
-    let previews = engine.preview_fixes(&plan("fake/to-done", Safety::Unsafe), &findings);
-
-    assert_eq!(previews[0].safety, Safety::Unsafe);
-}
-
-#[test]
-fn engine_preview_fixes_skips_what_cannot_be_proposed() {
-    let dir = project("TODO\n");
-    let engine = engine(&dir, "");
-    let outcome = engine.check(&[dir.path().to_path_buf()], &[]).unwrap();
-    let findings: Vec<_> = outcome.diagnostics.iter().collect();
-
-    let none = engine.preview_fixes(&FixPlan::default(), &findings);
-    assert!(none.is_empty(), "a rule without a fix");
-    let unknown = engine.preview_fixes(&plan("fake/missing", Safety::Safe), &findings);
-    assert!(unknown.is_empty(), "a fixer that is not registered");
+    let none = engine.fix(&FixPlan::default(), &run).unwrap();
+    assert!(none.previews.is_empty(), "a rule without a fix");
+    let unknown = engine
+        .fix(&plan("fake/missing", Safety::Unsafe), &run)
+        .unwrap();
+    assert!(
+        unknown.previews.is_empty(),
+        "a fixer that is not registered"
+    );
 }
 
 #[test]

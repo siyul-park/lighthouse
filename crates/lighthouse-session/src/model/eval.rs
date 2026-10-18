@@ -145,7 +145,7 @@ fn one(request: &EvalRequest, repo: &Repo, session: &Session, first: bool) -> Re
         layered || request.audit.is_some(),
     )?;
     let reference = decision.reference();
-    let models_of = |model: &str| checked.model(model);
+    let models_of = |model: &str| Ok(checked.engine.model(model)?);
     let layer = |model| Overlay {
         model,
         decision: &reference,

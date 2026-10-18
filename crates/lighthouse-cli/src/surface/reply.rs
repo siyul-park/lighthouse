@@ -48,7 +48,8 @@ pub enum CheckFormat {
     Text,
     /// Findings grouped by decision, as one JSON document on one line.
     Json,
-    /// SARIF 2.1.0.
+    /// SARIF 2.1.0. With `--fix`, the fixes the run left as previews, and in
+    /// a dry run every fix it would make, are the `fixes` of their findings.
     Sarif,
 }
 

@@ -38,11 +38,6 @@ impl Fixing {
         })
     }
 
-    /// The fix of each decision, as a fix run takes it.
-    pub fn plan(&self) -> &FixPlan {
-        &self.plan
-    }
-
     /// The descriptors of the decisions `ids` name that have a check, by
     /// decision id, each aimed at all the findings of its decision.
     pub fn all<'a>(

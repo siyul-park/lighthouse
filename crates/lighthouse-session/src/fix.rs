@@ -9,10 +9,10 @@ use std::{
 };
 
 use lighthouse_engine::{
-    AppliedFix, DeclinedFix, Engine, FixPlan, FixRun, ModelCounts, ModelOptions, PreviewedFix,
-    cache, unified_diff,
+    AppliedFix, DeclinedFix, Engine, FixPlan, FixRun, FixedBy, ModelCounts, ModelOptions,
+    PreviewedFix, cache, unified_diff,
 };
-use lighthouse_model::Fingerprint;
+use lighthouse_model::{Fingerprint, Preview};
 use lighthouse_report::{Aim, Apply, FixBy};
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
@@ -85,6 +85,10 @@ pub struct Fixed {
     pub usage: Option<Usage>,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
+    /// What every fix left as a preview changes, by fingerprint, and in a dry
+    /// run every fix that would be applied: the SARIF `fixes` of a report.
+    #[serde(skip)]
+    pub shown: BTreeMap<String, Preview>,
 }
 
 /// An `unsafe` fix that was left for a hand to apply.
@@ -288,11 +292,7 @@ impl Previewed {
         Self {
             fingerprint: fingerprint.to_owned(),
             decision: fix.rule_id.clone(),
-            fixer: plan
-                .get(&fix.rule_id)
-                .map_or(FixBy::Ops, |binding| fix_by(&binding.needs))
-                .as_str()
-                .to_owned(),
+            fixer: by(plan, &fix.rule_id, &fix.fixer),
             safety: preview.safety.to_string(),
             description: preview.description.clone(),
             files: preview.files.iter().map(|f| f.path.clone()).collect(),
@@ -302,12 +302,13 @@ impl Previewed {
     }
 }
 
-impl From<&AppliedFix> for Applied {
-    fn from(fix: &AppliedFix) -> Self {
+impl Applied {
+    /// The fix `fix` as reported; `plan` says who makes the fixes.
+    fn new(fix: &AppliedFix, plan: &FixPlan) -> Self {
         Self {
             fingerprint: fix.fingerprint.as_str().to_owned(),
             decision: fix.rule_id.clone(),
-            fixer: fix.fixer.to_string(),
+            fixer: by(plan, &fix.rule_id, &fix.fixer),
             safety: fix.safety.to_string(),
             description: fix.description.clone(),
             files: fix.files.iter().map(|f| slashed(f)).collect(),
@@ -361,7 +362,6 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         dry_run: request.dry_run,
         unsafe_fixes: request.unsafe_fixes,
         fixer: request.fixer.clone(),
-        no_models: false,
     };
     let mut report = engine.fix(&plan, &run)?;
     messages.extend(report.notes.iter().cloned());
@@ -375,10 +375,21 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         .map(|c| unified_diff(&c.path, &c.before, &c.after))
         .collect();
     let widths = shortest(&report);
+    let shown = report
+        .applied
+        .iter()
+        .filter_map(|fix| fix.preview.clone())
+        .chain(report.previews.iter().map(|fix| fix.preview.clone()))
+        .map(|preview| (preview.fingerprint.as_str().to_owned(), preview))
+        .collect();
     Ok(Fixed {
         dry_run: request.dry_run,
         diff,
-        applied: report.applied.iter().map(Applied::from).collect(),
+        applied: report
+            .applied
+            .iter()
+            .map(|fix| Applied::new(fix, &plan))
+            .collect(),
         declined: report.declined.iter().map(Declined::from).collect(),
         rounds: report.rounds,
         previews: report
@@ -400,7 +411,20 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
             }),
         }),
         messages,
+        shown,
     })
+}
+
+/// Who made a fix, in the words of the descriptor: `model`, else what the
+/// decision's fix is (`ops`, `command`, `rpc`), and `ops` for a fixer the run
+/// named itself.
+fn by(plan: &FixPlan, rule: &str, fixer: &FixedBy) -> String {
+    let word = match plan.get(rule) {
+        Some(binding) if binding.fixer == *fixer => fix_by(&binding.needs),
+        _ if *fixer == FixedBy::Model => FixBy::Model,
+        _ => FixBy::Ops,
+    };
+    word.as_str().to_owned()
 }
 
 /// How many characters of each fingerprint of the run and its previews tell it

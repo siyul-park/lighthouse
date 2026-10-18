@@ -1,5 +1,5 @@
-//! Fix previews in reports: the agent formats show the fix of a finding as a
-//! unified diff and SARIF as `fixes`, both computed without writing anything.
+//! What a check says of fixes: which decision is fixable, by whom and how to
+//! apply it. It computes none; a fix run shows the diff.
 
 use std::fs;
 
@@ -69,16 +69,11 @@ fn report(dir: &TempDir, extra: &[&str]) -> Value {
 }
 
 #[test]
-fn a_declaration_move_shows_its_diff_and_how_to_apply_it() {
+fn a_check_marks_what_is_fixable_and_computes_no_fix() {
     let dir = project(MISORDERED);
     let report = report(&dir, &[]);
     let group = group(&report, "design/declaration-groups");
-    let fix = &instance(&group)[3]["fix"];
-    assert_eq!(fix["safety"], "safe", "{group}");
-    let diff = fix["diff"].as_str().unwrap();
-    assert!(diff.starts_with("@@ -"), "{diff}");
-    assert!(diff.contains("+pub struct Store;"), "{diff}");
-    assert!(diff.lines().count() <= 12, "{diff}");
+    assert!(instance(&group).as_array().unwrap().len() == 3, "{group}");
     assert_eq!(
         group["fix"],
         json!({
@@ -105,84 +100,24 @@ fn a_declaration_move_shows_its_diff_and_how_to_apply_it() {
         .iter()
         .find(|r| r["decision"] == "design/declaration-groups")
         .unwrap();
-    assert!(record["fix"]["diff"].as_str().unwrap().starts_with("@@ -"));
+    assert!(record.get("fix").is_none(), "{record}");
+    let agent = check(&dir, &["--format", "agent"]);
+    assert!(!agent.contains("@@ -"), "{agent}");
 }
 
 #[test]
-fn a_long_fix_is_summarized_and_a_finding_without_a_fix_has_none() {
-    let funcs: String = (0..6)
-        .map(|i| format!("pub fn run{i}() -> u8 {{\n    {i}\n}}\n\n"))
-        .collect();
-    let types: String = (0..6).map(|i| format!("pub struct Store{i};\n")).collect();
-    let source = format!("{funcs}{types}");
-    let dir = project(&source);
-    let long = report(&dir, &[]);
-    let moved = group(&long, "design/declaration-groups");
-    let fix = &instance(&moved)[3]["fix"];
-    assert_eq!(fix["safety"], "safe");
-    assert!(fix.get("diff").is_none(), "{fix}");
-    assert!(fix["summary"].as_str().unwrap().contains("lines)"), "{fix}");
-
-    let dir = project(DOC);
-    let plain = report(&dir, &[]);
-    let undocumented = group(&plain, "design/exported-doc");
-    assert_eq!(instance(&undocumented).as_array().unwrap().len(), 3);
-    assert!(undocumented.get("fix").is_none());
-    assert_eq!(
-        undocumented["brief"], true,
-        "no fix: review_show has a brief"
-    );
-}
-
-#[test]
-fn sarif_carries_the_fix_as_replacements_of_regions() {
+fn sarif_carries_no_fix() {
     let dir = project(MISORDERED);
-    let sarif: Value = serde_json::from_str(&check(&dir, &["--format", "sarif"])).unwrap();
-    let results = sarif["runs"][0]["results"].as_array().unwrap();
-    let moved = results
-        .iter()
-        .find(|r| r["ruleId"] == "design/declaration-groups")
-        .unwrap();
-    let fix = &moved["fixes"][0];
-    assert!(fix["description"]["text"].is_string(), "{fix}");
-    let change = &fix["artifactChanges"][0];
-    assert_eq!(change["artifactLocation"]["uri"], "src/lib.rs");
-    let replacements = change["replacements"].as_array().unwrap();
-    assert!(replacements.len() >= 2, "{change}");
-    assert!(
-        replacements
-            .iter()
-            .all(|r| r["deletedRegion"]["startLine"].is_u64())
-    );
-    assert!(replacements.iter().any(|r| {
-        r["insertedContent"]["text"]
-            .as_str()
-            .unwrap()
-            .contains("pub struct Store;")
-    }));
-    let documented = results
-        .iter()
-        .find(|r| r["ruleId"] == "design/exported-doc");
-    assert!(documented.is_none_or(|r| r.get("fixes").is_none()));
+    let sarif = check(&dir, &["--format", "sarif"]);
+    assert!(sarif.contains("design/declaration-groups"), "{sarif}");
+    assert!(!sarif.contains("\"fixes\""), "{sarif}");
 }
 
 #[test]
-fn a_delete_fix_replaces_a_region_with_nothing() {
+fn an_unsafe_fix_is_marked_with_its_approval_and_a_brief() {
     let dir = project(BANNER);
-    let sarif: Value = serde_json::from_str(&check(&dir, &["--format", "sarif"])).unwrap();
-    let banner = sarif["runs"][0]["results"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|r| r["ruleId"] == "design/comments")
-        .unwrap_or_else(|| panic!("{sarif}"));
-    let replacement = &banner["fixes"][0]["artifactChanges"][0]["replacements"][0];
-    assert_eq!(replacement["insertedContent"]["text"], "");
-    assert_eq!(replacement["deletedRegion"]["startLine"], 1);
-
     let compact = report(&dir, &[]);
     let group = group(&compact, "design/comments");
-    assert_eq!(instance(&group)[3]["fix"]["safety"], "unsafe", "{group}");
     assert_eq!(group["fix"]["safety"], "unsafe", "{group}");
     assert_eq!(group["fix"]["approval"], "ask", "{group}");
     assert!(
@@ -197,18 +132,26 @@ fn a_delete_fix_replaces_a_region_with_nothing() {
             .starts_with("lighthouse check --fix --decision ")
     );
     assert_eq!(group["brief"], true, "an unsafe fix has a brief");
-    assert!(
-        instance(&group)[3]["fix"]["diff"]
-            .as_str()
-            .unwrap()
-            .contains("-// ===== Types =====")
+    assert_eq!(instance(&group).as_array().unwrap().len(), 3, "{group}");
+}
+
+#[test]
+fn a_finding_without_a_fix_has_a_brief() {
+    let dir = project(DOC);
+    let plain = report(&dir, &[]);
+    let undocumented = group(&plain, "design/exported-doc");
+    assert_eq!(instance(&undocumented).as_array().unwrap().len(), 3);
+    assert!(undocumented.get("fix").is_none());
+    assert_eq!(
+        undocumented["brief"], true,
+        "no fix: review_show has a brief"
     );
 }
 
 const SHOUT: &str = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/shout\nspec:\n  title: Notes are upper case\n  context: Notes are read from far away.\n  scope:\n    subject: file\n  requirement: A note MUST be written in upper case.\n  severity: error\n  check:\n    type: cel\n    select: file\n    where: \"file.path.endsWith(\\\".txt\\\") && file.lines > 0\"\n    message: \"{{ file.path }} is not shouting\"\n    evidence:\n      path: file.path\n  fix:\n    safety: safe\n    type: command\n    argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]\n    output: text\n  examples:\n    - name: quiet\n      language: text\n      kind: invalid\n      files:\n        - path: a.txt\n          body: hello\n      expect:\n        - line: 1\n      fixed:\n        - path: a.txt\n          body: HELLO\n    - name: loud\n      language: text\n      kind: valid\n      files:\n        - path: a.txt\n          body: HELLO\n";
 
 #[test]
-fn a_command_fix_is_not_previewed_and_says_why_it_does_not_run_untrusted() {
+fn a_command_fix_says_why_it_does_not_run_untrusted() {
     let dir = tempfile::tempdir().unwrap();
     let write = |name: &str, text: &str| {
         let path = dir.path().join(name);

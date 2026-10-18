@@ -80,7 +80,7 @@ Options:
           Possible values:
           - text:  `path:line:col: severity id: message`, one finding a line
           - json:  Findings grouped by decision, as one JSON document on one line
-          - sarif: SARIF 2.1.0
+          - sarif: SARIF 2.1.0. With `--fix`, the fixes the run left as previews, and in a dry run every fix it would make, are the `fixes` of their findings
           
           [default: text]
 

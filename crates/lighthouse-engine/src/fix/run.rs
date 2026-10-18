@@ -72,11 +72,7 @@ impl Engine {
         };
         let proposer = Proposer::new(self, plan, run).keeping(cache);
         let mut orchestrator = Orchestrator {
-            proposer: if run.no_models {
-                proposer
-            } else {
-                proposer.asking_models()
-            },
+            proposer: proposer.asking_models(),
             texts: Overlays::new(),
             original: BTreeMap::new(),
             states: BTreeSet::new(),

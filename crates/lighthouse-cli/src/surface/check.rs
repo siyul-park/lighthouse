@@ -1,7 +1,7 @@
 //! `check`, and `fix`: analyze the project, apply the fixes the catalog names,
 //! verified, and report.
 
-use std::time::Instant;
+use std::{collections::BTreeMap, time::Instant};
 
 use lighthouse_report::Format;
 use lighthouse_session::{
@@ -26,6 +26,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
         return Err("`changed` and `diff` are alternatives".into());
     }
     let mut messages = Vec::new();
+    let mut shown = BTreeMap::new();
     if command.fix {
         let selection = FixArgs {
             paths: args.paths.clone(),
@@ -36,7 +37,8 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
         };
         let done = apply(ctx, &selection, !args.no_store, !args.no_cache)?;
         messages = done.lines();
-        if command.options.dry_run && command.format != CheckFormat::Json {
+        shown = done.shown.clone();
+        if command.options.dry_run && command.format == CheckFormat::Text {
             return Ok(Reply::text(done.diff).with_messages(&messages));
         }
     }
@@ -46,7 +48,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
     let reporting = Instant::now();
     let mut reply = match command.format {
         CheckFormat::Json => Reply::json(&checked.report(args.detail.into(), args.limit))?,
-        CheckFormat::Sarif => Reply::text(checked.render(Format::Sarif, args.limit)),
+        CheckFormat::Sarif => Reply::text(checked.sarif_with_fixes(args.limit, &shown)),
         CheckFormat::Text => Reply::text(checked.render(Format::Text, args.limit)),
     }
     .with_messages(&checked.messages);

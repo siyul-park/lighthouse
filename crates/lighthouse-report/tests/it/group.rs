@@ -1,5 +1,4 @@
-//! The grouped shape of the agent formats, and what a finding's fix looks
-//! like in them and in SARIF.
+//! The grouped shape of the agent formats, and what a group says of its fix.
 
 use std::collections::BTreeMap;
 
@@ -37,13 +36,7 @@ fn unknown_rule() -> Diagnostic {
     )
 }
 
-fn entry(
-    rule: &str,
-    severity: Severity,
-    path: &str,
-    line: u32,
-    fingerprint: &str,
-) -> Entry<'static> {
+fn entry(rule: &str, severity: Severity, path: &str, line: u32, fingerprint: &str) -> Entry {
     Entry {
         decision: rule.to_owned(),
         severity,
@@ -59,7 +52,6 @@ fn entry(
         note: None,
         fingerprint: fingerprint.to_owned(),
         facts: None,
-        fix: None,
     }
 }
 
@@ -68,7 +60,7 @@ fn spread(n: u32) -> String {
     format!("{n:x}{}", "0".repeat(63))
 }
 
-fn grouped_entries() -> Vec<Entry<'static>> {
+fn grouped_entries() -> Vec<Entry> {
     let fingerprint = |n: u32| spread(n);
     vec![
         entry("acme/a", Severity::Warn, "x.go", 3, &fingerprint(1)),
@@ -120,19 +112,6 @@ fn grouped_asks_review_when_a_shown_finding_does() {
     assert!(Grouped::of(grouped_entries(), &GroupOptions::default()).asks_review());
     let only_error = vec![entry("acme/b", Severity::Error, "y.go", 9, &spread(3))];
     assert!(!Grouped::of(only_error, &GroupOptions::default()).asks_review());
-}
-
-#[test]
-fn grouped_fingerprints_are_the_full_ones_of_the_findings_kept() {
-    let cut = Grouped::of(
-        grouped_entries(),
-        &GroupOptions {
-            limit: Some(1),
-            ..GroupOptions::default()
-        },
-    );
-    let kept: Vec<_> = cut.fingerprints().into_iter().collect();
-    assert_eq!(kept, [spread(3)]);
 }
 
 #[test]
@@ -221,25 +200,8 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
         start: at(1, 7),
         end: at(1, 8),
     };
-    let fix = Preview {
-        fingerprint: d.fingerprint.clone(),
-        safety: lighthouse_model::Safety::Safe,
-        description: "rename".to_owned(),
-        files: vec![PreviewFile {
-            path: "a.go".to_owned(),
-            hunks: "@@ -1 +1 @@\n-é😀x := 1\n+é😀y := 1".to_owned(),
-            changed: 2,
-            edits: vec![PreviewEdit {
-                start: at(1, 4),
-                end: at(1, 5),
-                text: "y".to_owned(),
-            }],
-        }],
-    };
-    let fixes = BTreeMap::from([(d.fingerprint.as_str().to_owned(), fix)]);
     let sources = BTreeMap::from([("a.go".to_owned(), before)]);
     let briefing = Briefing {
-        fixes: Some(&fixes),
         sources: Some(&sources),
         ..Briefing::default()
     };
@@ -250,57 +212,70 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
         (region["startColumn"].as_u64(), region["endColumn"].as_u64()),
         (Some(4), Some(5))
     );
-    let deleted = &result["fixes"][0]["artifactChanges"][0]["replacements"][0]["deletedRegion"];
-    assert_eq!(
-        (
-            deleted["startColumn"].as_u64(),
-            deleted["endColumn"].as_u64()
-        ),
-        (Some(4), Some(5))
+    assert!(
+        result.get("fixes").is_none(),
+        "a check computes no fix: {result}"
     );
 }
 
 #[test]
-fn a_fix_diff_names_the_files_when_it_edits_one_besides_the_findings() {
-    let file = |path: &str| PreviewFile {
-        path: path.to_owned(),
-        hunks: "@@ -1,2 +1,2 @@\n a\n-b\n+c".to_owned(),
-        changed: 2,
-        edits: vec![PreviewEdit {
-            start: at(2, 1),
-            end: at(2, 2),
-            text: "c".to_owned(),
+fn sarif_carries_the_preview_of_a_fix_run_as_fixes_in_utf16_columns() {
+    let line = "é😀x := 1";
+    let mut d = unknown_rule();
+    d.file = "a.go".into();
+    d.span = Span {
+        start: at(1, 7),
+        end: at(1, 8),
+    };
+    let fix = Preview {
+        fingerprint: d.fingerprint.clone(),
+        safety: Safety::Unsafe,
+        description: "rename".to_owned(),
+        files: vec![PreviewFile {
+            path: "a.go".to_owned(),
+            hunks: String::new(),
+            edits: vec![PreviewEdit {
+                start: at(1, 4),
+                end: at(1, 5),
+                text: "y".to_owned(),
+            }],
         }],
     };
-    let fix = |files| Preview {
-        fingerprint: unknown_rule().fingerprint,
-        safety: lighthouse_model::Safety::Safe,
-        description: "edit".to_owned(),
-        files,
+    let fixes = BTreeMap::from([(d.fingerprint.as_str().to_owned(), fix)]);
+    let sources = BTreeMap::from([("a.go".to_owned(), format!("{line}\n"))]);
+    let briefing = Briefing {
+        fixes: Some(&fixes),
+        sources: Some(&sources),
+        ..Briefing::default()
     };
+
+    let sarif: Value = serde_json::from_str(&render(Format::Sarif, &[d], &[], &briefing)).unwrap();
+
+    let result = &sarif["runs"][0]["results"][0];
+    let change = &result["fixes"][0]["artifactChanges"][0];
+    assert_eq!(change["artifactLocation"]["uri"], "a.go");
+    assert_eq!(result["fixes"][0]["description"]["text"], "rename");
+    assert_eq!(change["replacements"][0]["insertedContent"]["text"], "y");
+    assert_eq!(change["replacements"][0]["deletedRegion"]["startColumn"], 4);
+}
+
+#[test]
+fn a_finding_carries_no_fix_in_any_format() {
     let findings = [unknown_rule()];
-    let render_fix = |fix: Preview| {
-        let fixes = BTreeMap::from([(findings[0].fingerprint.as_str().to_owned(), fix)]);
-        let briefing = Briefing {
-            fixes: Some(&fixes),
-            ..Briefing::default()
-        };
-        let out = crate::agent_json(&findings, &[], &briefing);
-        let report: Value = serde_json::from_str(&out).unwrap();
-        report["groups"][0]["files"]["a.txt"][0][3]["fix"]["diff"]
-            .as_str()
-            .unwrap()
-            .to_owned()
-    };
-    let own = render_fix(fix(vec![file("a.txt")]));
-    assert!(own.starts_with("@@ "), "{own}");
-    assert!(own.ends_with("+c"), "no trailing newline: {own:?}");
-    let other = render_fix(fix(vec![file("a.txt"), file("b.txt")]));
+    let briefing = Briefing::default();
+
+    let compact = crate::agent_json(&findings, &[], &briefing);
+    let sarif = render(Format::Sarif, &findings, &[], &briefing);
+    let text = render(Format::Agent, &findings, &[], &briefing);
+
+    let report: Value = serde_json::from_str(&compact).unwrap();
     assert!(
-        other.starts_with("--- a/a.txt\n+++ b/a.txt\n@@ "),
-        "{other}"
+        report["groups"][0]["files"]["a.txt"][0]
+            .get(3)
+            .is_none_or(|v| v.get("fix").is_none())
     );
-    assert!(other.contains("--- a/b.txt\n+++ b/b.txt\n"), "{other}");
+    assert!(!sarif.contains("\"fixes\""), "{sarif}");
+    assert!(!text.contains("\n    fix ["), "{text}");
 }
 
 fn fix_of(

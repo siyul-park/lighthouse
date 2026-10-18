@@ -167,7 +167,8 @@ impl Orchestrator<'_> {
     }
 
     /// Keeps what every standing fix changes, in case the run may not write it
-    /// and leaves it for a hand to apply, or why it has none. `bases` holds the
+    /// and leaves it for a hand to apply, or why it has none; in a dry run, of
+    /// every fix, because none is written. `bases` holds the
     /// texts the round changed; a file it left as it was has the text it
     /// stands in for.
     fn keep_previews(
@@ -180,7 +181,10 @@ impl Orchestrator<'_> {
         let standing: Vec<&Proposal> = kept
             .iter()
             .chain(merged.iter().map(|(p, _)| p))
-            .filter(|p| !p.files.iter().any(|f| rolled.contains_key(f)))
+            .filter(|p| {
+                (self.proposer.run.dry_run || !self.permits(p.safety))
+                    && !p.files.iter().any(|f| rolled.contains_key(f))
+            })
             .collect();
         for p in standing {
             let files = preview_files(p, |file| {
@@ -196,8 +200,6 @@ impl Orchestrator<'_> {
                     safety: p.safety,
                     files,
                 }),
-                // What is written needs no preview; what is not, is declined.
-                None if self.permits(p.safety) => continue,
                 None => Err(DeclinedFix {
                     fingerprint: p.fingerprint.clone(),
                     rule_id: p.rule_id.clone(),

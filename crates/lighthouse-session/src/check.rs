@@ -7,7 +7,7 @@ use std::{
     time::Instant,
 };
 
-use lighthouse_engine::{Engine, FixPlan, ModelOptions, Run, cache};
+use lighthouse_engine::{Engine, ModelOptions, Run, cache};
 use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed};
 use lighthouse_report::{
     Briefing, Compact, Descriptor, Detail, Format, Full, Report, render, report,
@@ -23,8 +23,6 @@ use crate::{
 
 /// The environment variable that sets the size limit of the cache, in MB.
 const CACHE_LIMIT_VAR: &str = "LIGHTHOUSE_CACHE_LIMIT_MB";
-/// Most findings of a SARIF report whose fix is previewed.
-const SARIF_FIXES: usize = 200;
 /// Findings of a JSON report when no limit is given.
 const JSON_LIMIT: usize = 25;
 
@@ -116,12 +114,9 @@ pub struct Checked {
     pub suppressions: Vec<Suppressed>,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
-    /// The engine that ran. A report asks for fix previews after the check,
-    /// when its limit has chosen the findings to show, and a preview needs the
-    /// engine's registry and workspace; the engine is not rebuilt for it.
-    engine: Engine,
-    /// How each decision is fixed, to preview the fixes.
-    plan: FixPlan,
+    /// The engine that ran, which builds the models the commands that train
+    /// and evaluate them ask for.
+    pub(crate) engine: Engine,
     /// The project root, to read the files SARIF columns are measured in.
     root: PathBuf,
     /// How the check and the fix of each decision with a finding run, by
@@ -130,11 +125,6 @@ pub struct Checked {
 }
 
 impl Checked {
-    /// The model `reference` (`<provider>/<model>`), from the engine that ran.
-    pub fn model(&self, reference: &str) -> Result<Box<dyn lighthouse_plugin::ModelClient + '_>> {
-        Ok(self.engine.model(reference)?)
-    }
-
     /// The status and counts of this run.
     pub fn summary(&self) -> Summary {
         let run = &self.run;
@@ -195,46 +185,57 @@ impl Checked {
                 &self.briefing(limit),
             ),
             Format::Sarif => {
-                let first: Vec<_> = run.diagnostics.iter().take(SARIF_FIXES).collect();
-                let fixes = self.fixes(&first);
                 let sources = self.sources();
                 render(
                     format,
                     &self.findings(),
                     &run.incomplete,
                     &Briefing {
-                        fixes: Some(&fixes),
                         sources: Some(&sources),
                         ..self.briefing(limit)
                     },
                 )
             }
-            Format::Agent => {
-                let fixes = self.shown_fixes(limit, Detail::default());
-                render(
-                    format,
-                    &run.diagnostics,
-                    &run.incomplete,
-                    &Briefing {
-                        fixes: Some(&fixes),
-                        tool_form: true,
-                        ..self.briefing(limit)
-                    },
-                )
-            }
+            Format::Agent => render(
+                format,
+                &run.diagnostics,
+                &run.incomplete,
+                &Briefing {
+                    tool_form: true,
+                    ..self.briefing(limit)
+                },
+            ),
         }
+    }
+
+    /// The run in SARIF with `fixes`, the previews of a fix run by
+    /// fingerprint, as the `fixes` of the findings they are for.
+    pub fn sarif_with_fixes(
+        &self,
+        limit: Option<usize>,
+        fixes: &BTreeMap<String, Preview>,
+    ) -> String {
+        let sources = self.sources();
+        render(
+            Format::Sarif,
+            &self.findings(),
+            &self.run.incomplete,
+            &Briefing {
+                fixes: Some(fixes),
+                sources: Some(&sources),
+                ..self.briefing(limit)
+            },
+        )
     }
 
     /// The run as a [`CheckReport`] at `detail`, at most `limit` findings.
     pub fn report(&self, detail: Detail, limit: Option<usize>) -> CheckReport {
         let limit = Some(limit.unwrap_or(JSON_LIMIT));
-        let fixes = self.shown_fixes(limit, detail);
         let report = report(
             &self.findings(),
             &self.run.incomplete,
             &Briefing {
                 detail,
-                fixes: Some(&fixes),
                 sources: None,
                 tool_form: true,
                 ..self.briefing(limit)
@@ -255,18 +256,6 @@ impl Checked {
         }
     }
 
-    /// The fixes proposed for `findings`, by fingerprint, computed in memory:
-    /// nothing is written, formatted or re-checked, and a finding whose fix
-    /// does not apply cleanly, runs a program or does not exist has none.
-    /// Applying a fix goes through a fix run, which verifies it.
-    pub fn fixes(&self, findings: &[&Diagnostic]) -> BTreeMap<String, Preview> {
-        self.engine
-            .preview_fixes(&self.plan, findings)
-            .into_iter()
-            .map(|preview| (preview.fingerprint.as_str().to_owned(), preview))
-            .collect()
-    }
-
     /// The text of the files that have findings and non-ASCII characters,
     /// by project-relative path: what SARIF needs to count columns in UTF-16
     /// code units. A file that cannot be read is left out.
@@ -285,18 +274,6 @@ impl Checked {
                 (!text.is_ascii()).then(|| (slashed(file), text))
             })
             .collect()
-    }
-
-    /// The fixes of the findings an agent format shows at `detail` under
-    /// `limit`, or of the first `cap` findings for a format that shows them
-    /// all.
-    pub fn shown_fixes(&self, limit: Option<usize>, detail: Detail) -> BTreeMap<String, Preview> {
-        let briefing = Briefing {
-            detail,
-            ..self.briefing(limit)
-        };
-        let shown = lighthouse_report::shown(&self.run.diagnostics, &briefing);
-        self.fixes(&shown)
     }
 
     /// The briefing the agent formats draw on. It always carries the
@@ -390,7 +367,6 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
         suppressions,
         messages,
         engine,
-        plan: fixing.plan().clone(),
         root,
         descriptors,
     })

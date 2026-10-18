@@ -45,7 +45,7 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
     let model = labelled
         .reference
         .as_deref()
-        .map(|r| labelled.checked.model(r))
+        .map(|r| labelled.checked.engine.model(r))
         .transpose()?;
     let fit = Fit {
         root: &labelled.store,
@@ -139,7 +139,7 @@ fn gather(
     )?;
     let decision_ref = found.reference();
     let teacher = from_model
-        .map(|teacher| checked.model(teacher))
+        .map(|teacher| checked.engine.model(teacher))
         .transpose()?;
     let rows = Rows::of(
         &labels,

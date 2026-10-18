@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Position, Severity, Span};
-use lighthouse_report::{Briefing, Detail, Format, render, shown};
+use lighthouse_report::{Briefing, Detail, Format, render};
 
 use crate::{json_of, plain};
 use lighthouse_spec::Catalog;
@@ -740,24 +740,6 @@ fn compact_output_is_at_most_forty_percent_of_the_full_output() {
 #[test]
 fn detail_is_compact_by_default() {
     assert_eq!(Detail::default(), Detail::Compact);
-}
-
-#[test]
-fn shown_is_what_the_limit_keeps() {
-    let findings = [helper(), coupling(), unknown_rule()];
-    let briefing = Briefing {
-        limit: Some(2),
-        ..Briefing::default()
-    };
-    let kept: Vec<_> = shown(&findings, &briefing)
-        .into_iter()
-        .map(|d| d.rule_id.as_str())
-        .collect();
-    assert_eq!(kept.len(), 2);
-    assert!(
-        kept.contains(&"acme/custom"),
-        "errors are kept first: {kept:?}"
-    );
 }
 
 #[test]

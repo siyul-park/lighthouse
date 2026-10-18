@@ -95,7 +95,7 @@ Findings are grouped by decision and severity, errors first, then larger groups:
 
 An instance is `[line:col, message, fingerprint prefix]` plus, when anything
 applies, a fourth object with separate slots: `evidence` (what varies within the
-group), `note` (why a judgment did not hide the finding), `fix` and `review`
+group), `note` (why a judgment did not hide the finding) and `review`
 (true on an instance that asks for review, only in a group where some do and
 some do not; the group's own `review` is true when any does). The prefix is the
 shortest unique one among the findings of the report, at least 7 characters;
@@ -110,36 +110,30 @@ findings (default 25 for `check`, 50 for `review_list`) and what is cut is in
 requirement`), `expected:` once, then `path:line:col message fingerprint` per
 finding, the gaps, `resolve:` and `reasons:` once, and the summary.
 
-### Fix previews
+### Fixes in a report
 
-A finding whose decision has a fix shows what the fix would change, computed on
-demand by a dry run of the same verified path that `fix` takes, whoever makes the
-fix (a rule, a command, a plugin): applied in memory, formatted, re-checked and
-judged, with nothing written. So a finding never shows two different diffs. Only
-fixes the checks accept are shown, and only for the findings the report shows
-after `limit`. A fix that runs a program needs the project's trust, and a fix by
-a model is not asked for here: their group carries only `fix`, which says why.
+A check marks what is fixable and computes no fix: it costs one analysis, and the
+diff of a fix belongs to the run that verifies it (`fix` with `dryRun`,
+`check --fix --dry-run`, or the previews a run leaves under `ask`), so a finding
+never shows two different diffs. No format of `check` carries a diff, and its
+SARIF has no `fixes`. `check --fix --format sarif` is the fix run's report: the
+findings of the project, and as `result.fixes` (`artifactChanges` with
+`replacements` of regions) the verified previews the run left, and in a
+`--dry-run` every fix it would make, from every provider; a fix that was written
+or declined has none.
 
-- `--format json` and the `check`/`fix` tools: an instance carries
-  `fix: {"safety": "safe"|"unsafe", "diff": "@@ -l,n +l,n @@ ..."}` in its
-  fourth element, a unified diff with one line of context, at most about 12
-  lines. A longer fix is `{"safety", "summary": "<description> (N lines)"}`.
-  `safety` is `unsafe` whenever applying needs unsafe fixes. `detail: full` has the same `fix`
-  object. In the text format the hunk is printed indented under the finding.
-- A group of a fixable decision has `fix`, which says who fixes, the safety,
-  whether it runs and `apply`: `lighthouse check --fix --decision <id>` or the
-  `fix` tool call `fix {"decision":["<id>"]}`. That step writes a `safe` fix and
-  previews an `unsafe` one, under `ask`; each preview then carries its own
+- A group of a fixable decision has `fix`, which says who fixes (`ops`,
+  `command`, `rpc`, `model`), the safety, whether it runs (and `why` when it
+  does not), the `approval` of an `unsafe` fix and `apply`:
+  `lighthouse check --fix --decision <id>` or the `fix` tool call
+  `fix {"decision":["<id>"]}`. That step writes a `safe` fix and previews an
+  `unsafe` one, under `ask`; each preview then carries its diff and its own
   `apply`, with `--unsafe-fixes` and the fingerprints of every finding the same
-  run of the fix was made for.
-- A diff gets `--- a/<path>` / `+++ b/<path>` headers when the fix edits a file
-  other than the finding's.
+  run of the fix was made for. A decision with no fix, an `unsafe` one or one that does not run
+  has `brief: true`: `review_show` has the brief to fix the finding by hand.
 - SARIF columns count UTF-16 code units, as SARIF defines them, so locations
-  and fix regions on lines with multibyte characters are converted from the
-  byte columns of the code model.
-- SARIF: `result.fixes[]` with the proposal's `description` and
-  `artifactChanges[{artifactLocation, replacements[{deletedRegion,
-  insertedContent}]}]`, for up to 200 findings.
+  on lines with multibyte characters are converted from the byte columns of
+  the code model.
 
 Prefer `check --fix` for safe fixes, and read the diff before applying
 unsafe ones: a preview is applied by its fingerprint (`check --fix

@@ -884,27 +884,72 @@ fn a_model_without_budget_says_so_in_the_descriptor() {
     assert_eq!(decisions["local/ops-safe"]["fix"]["runs"], true);
 }
 
-#[test]
-fn the_preview_of_a_check_is_the_preview_of_a_fix_run_for_a_command_too() {
-    let (dir, _agent) = project("");
+/// The `results` of the SARIF of `lighthouse check` with `args` over the
+/// decisions that are fixed by an ops fix and by the agent.
+fn sarif_results(dir: &TempDir, args: &[&str]) -> Value {
     let out = lighthouse(dir.path())
         .env("LIGHTHOUSE_TRUST", "1")
+        .args(["check", "--no-store", "--format", "sarif"])
         .args([
-            "check",
-            "--format",
-            "json",
             "--decision",
-            "local/command-unsafe",
+            "local/ops-unsafe",
+            "--decision",
+            "local/model",
         ])
+        .args(args)
         .output()
         .unwrap();
-    let report: Value = serde_json::from_slice(&out.stdout).unwrap();
-    let shown = report["groups"][0]["files"]["command-unsafe.txt"][0][3]["fix"].clone();
+    let sarif: Value = serde_json::from_slice(&out.stdout).unwrap();
+    sarif["runs"][0]["results"].clone()
+}
 
-    let done = fix(dir.path(), json!({"decision": ["local/command-unsafe"]}));
+#[test]
+fn a_dry_run_in_sarif_carries_every_verified_fix_as_fixes() {
+    let (dir, _agent) = project("");
 
-    assert_eq!(shown["safety"], "unsafe", "{report}");
-    let hunks = shown["diff"].as_str().unwrap();
-    let diff = done["previews"][0]["diff"].as_str().unwrap();
-    assert!(diff.contains(hunks), "{hunks}\n{diff}");
+    let results = sarif_results(&dir, &["--fix", "--dry-run"]);
+
+    insta::assert_snapshot!(serde_json::to_string_pretty(&results).unwrap());
+    assert_eq!(read(&dir, "model.txt"), LONG, "nothing was written");
+}
+
+#[test]
+fn a_fix_run_in_sarif_carries_the_fixes_it_left_as_previews_only() {
+    let (dir, _agent) = project("");
+
+    let results = sarif_results(&dir, &["--fix"]);
+
+    let fixed = |rule: &str| {
+        results
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["ruleId"] == rule)
+            .all(|r| r.get("fixes").is_some())
+    };
+    assert!(
+        fixed("local/ops-unsafe") && fixed("local/model"),
+        "{results}"
+    );
+    let (safe, _agent) = project("");
+    let applied = lighthouse(safe.path())
+        .env("LIGHTHOUSE_TRUST", "1")
+        .args(["check", "--no-store", "--format", "sarif", "--fix"])
+        .args(["--decision", "local/ops-safe"])
+        .output()
+        .unwrap();
+    let sarif: Value = serde_json::from_slice(&applied.stdout).unwrap();
+    assert!(
+        !sarif.to_string().contains("\"fixes\""),
+        "a written fix has no fixes: {sarif}"
+    );
+}
+
+#[test]
+fn a_check_in_sarif_without_fix_carries_no_fixes() {
+    let (dir, _agent) = project("");
+
+    let results = sarif_results(&dir, &[]);
+
+    assert!(!results.to_string().contains("\"fixes\""), "{results}");
 }

@@ -15,7 +15,6 @@ use serde_json::{Map, Value};
 use crate::{
     descriptor::Descriptor,
     expected::{ExampleKey, Expected, expected},
-    fix::Shown,
     group::{
         Entry, GroupOptions, Grouped, Groups, Judgments, judgments, judgments_line, resolve_command,
     },
@@ -52,17 +51,17 @@ pub struct Briefing<'a> {
     /// left out.
     pub limit: Option<usize>,
     pub detail: Detail,
-    /// The fixes proposed for findings, by fingerprint: shown with the
-    /// finding, and as `fixes` in SARIF.
+    /// The verified previews of a fix run, by fingerprint: the SARIF `fixes`
+    /// of the findings they are for. A check computes none.
     pub fixes: Option<&'a BTreeMap<String, Preview>>,
     /// The text of the files of findings, by project-relative path, for
     /// formats whose columns count characters and not bytes (SARIF).
     pub sources: Option<&'a BTreeMap<String, String>>,
     /// The report is data for a program: hints name tool calls
     /// (`fix {...}`), not command lines.
+    pub tool_form: bool,
     /// How the check and the fix of each decision run, by decision id.
     pub descriptors: Option<&'a BTreeMap<String, Descriptor>>,
-    pub tool_form: bool,
 }
 
 /// How much each finding carries.
@@ -218,8 +217,6 @@ struct Finding<'a> {
     note: Option<String>,
     fingerprint: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    fix: Option<Shown>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     resolve: Option<Resolve>,
 }
 
@@ -233,20 +230,6 @@ pub(crate) fn text(
         Detail::Compact => compact_text(diagnostics, incomplete, briefing),
         Detail::Full => full_text(diagnostics, incomplete, briefing),
     }
-}
-
-/// The findings the agent formats show under `briefing.limit`: what a fix
-/// preview is worth computing for.
-pub fn shown<'d>(diagnostics: &'d [Diagnostic], briefing: &Briefing) -> Vec<&'d Diagnostic> {
-    if briefing.detail == Detail::Full {
-        return select(diagnostics, briefing.limit).0;
-    }
-    let grouped = Grouped::of(entries(diagnostics, briefing), &briefing.group_options());
-    let kept = grouped.fingerprints();
-    diagnostics
-        .iter()
-        .filter(|d| kept.contains(d.fingerprint.as_str()))
-        .collect()
 }
 
 /// Builds the [`Report`]: the JSON report of a check.
@@ -308,7 +291,7 @@ fn compact_text(
 }
 
 /// The diagnostics as entries of the compact shape.
-fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry<'a>> {
+fn entries(diagnostics: &[Diagnostic], briefing: &Briefing<'_>) -> Vec<Entry> {
     diagnostics
         .iter()
         .map(|d| {
@@ -328,7 +311,6 @@ fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry
                 note: note_of(d, briefing),
                 fingerprint: d.fingerprint.as_str().to_owned(),
                 facts: briefing.facts.and_then(|f| f.get(&d.fingerprint)).cloned(),
-                fix: briefing.fixes.and_then(|f| f.get(d.fingerprint.as_str())),
             }
         })
         .collect()
@@ -479,10 +461,6 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         expected: decision.and_then(|d| expected(d, &key, &diagnostic.file)),
         note: note_of(diagnostic, briefing),
         fingerprint,
-        fix: briefing
-            .fixes
-            .and_then(|f| f.get(fingerprint))
-            .map(|fix| Shown::new(fix, &diagnostic.file.display().to_string())),
         resolve: briefing.needs_review(diagnostic).then(|| Resolve {
             command: resolve_command(prefix(fingerprint, width)),
         }),
@@ -537,9 +515,6 @@ fn fields(finding: &Finding, width: usize) -> Vec<(&'static str, String)> {
         fields.push(("expected:", lines.join("\n")));
     }
     fields.extend(finding.note.clone().map(|text| ("note:", text)));
-    if let Some(fix) = &finding.fix {
-        fields.push(("fix:", fix.block()));
-    }
     fields.push((
         "fingerprint:",
         prefix(finding.fingerprint, width).to_owned(),

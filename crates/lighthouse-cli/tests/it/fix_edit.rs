@@ -71,7 +71,7 @@ fn an_edit_that_fixes_the_finding_is_applied_when_the_project_approves() {
     assert_eq!(lib(&dir), format!("mod other;\n{FIXED}"));
     assert_eq!(fixed["applied"].as_array().unwrap().len(), 1, "{fixed}");
     let applied = &fixed["applied"][0];
-    assert_eq!(applied["fixer"], "lighthouse/model");
+    assert_eq!(applied["fixer"], "model");
     assert_eq!(applied["safety"], "unsafe");
     assert_eq!(applied["description"], "model edit by `agent/m`");
     assert_eq!(

@@ -17,7 +17,6 @@ mod scan;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
     path::PathBuf,
 };
 
@@ -43,15 +42,6 @@ pub enum FixedBy {
     Fixer(String),
     /// The agent `[models] edit` binds.
     Model,
-}
-
-impl fmt::Display for FixedBy {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Fixer(id) => f.write_str(id),
-            Self::Model => f.write_str("lighthouse/model"),
-        }
-    }
 }
 
 /// How one rule's findings are fixed, as the catalog says.
@@ -185,8 +175,6 @@ pub struct FixRun {
     /// catalog's; needs `rules` or `fingerprints`. Its proposals are
     /// `unsafe`.
     pub fixer: Option<String>,
-    /// Ask no agent that edits: what a model would fix is left to review.
-    pub no_models: bool,
 }
 
 /// A fix that was applied.
@@ -200,7 +188,7 @@ pub struct AppliedFix {
     /// Every file the fix changed.
     pub files: Vec<PathBuf>,
     pub round: usize,
-    /// What the fix changed, in the state of the files it was verified over;
+    /// What the fix changes, kept only in a dry run, where no fix is written:
     /// `None` when it could not be shown.
     pub preview: Option<Preview>,
 }

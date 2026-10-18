@@ -208,8 +208,9 @@ struct Region {
 /// invocation unsuccessful. A finding's rule is the decision it cites: with
 /// the `catalog` the rule carries the decision's title, requirement, default
 /// level and a `helpUri` to its entry in the generated docs; a result carries
-/// the fingerprint of the finding as a partial fingerprint, and the fix
-/// proposed for it (by fingerprint in `fixes`) as a SARIF `fix`.
+/// the fingerprint of the finding as a partial fingerprint. A check computes
+/// no fix; the previews of a fix run, by fingerprint in `fixes`, are the SARIF
+/// `fix` of the findings they are for.
 pub fn render(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
