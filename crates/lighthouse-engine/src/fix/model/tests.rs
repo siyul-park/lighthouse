@@ -11,6 +11,7 @@ use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Position, Safety, Severity, Span,
     ucm::{File, Fragment, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
+use lighthouse_process::Policy;
 use serde_json::json;
 
 use super::{Account, Class, Event, extent, scratch::run_verify, verify::judge};
@@ -285,6 +286,7 @@ fn the_verify_commands_run_over_a_copy_that_holds_the_fixed_texts() {
         &texts,
         &[sh("grep -q new a.txt"), sh("test ! -e skipped/b.txt")],
         limit,
+        &Policy::default(),
     );
     assert_eq!(passed, Ok(()));
     assert_eq!(
@@ -297,11 +299,12 @@ fn the_verify_commands_run_over_a_copy_that_holds_the_fixed_texts() {
         &texts,
         &[sh("echo one >&2; echo two >&2; exit 3"), sh("exit 0")],
         limit,
+        &Policy::default(),
     )
     .unwrap_err();
     assert!(failed.contains("exited 3"), "{failed}");
     assert!(failed.ends_with("one\ntwo"), "{failed}");
 
     let escaping = crate::Overlays::from([(PathBuf::from("../x"), String::new())]);
-    assert!(run_verify(root.path(), &escaping, &[], limit).is_err());
+    assert!(run_verify(root.path(), &escaping, &[], limit, &Policy::default()).is_err());
 }

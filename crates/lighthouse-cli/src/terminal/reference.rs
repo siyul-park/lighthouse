@@ -66,7 +66,10 @@ fn commands(command: &Command, out: &mut String) {
         command.get_bin_name().unwrap_or_else(|| command.get_name()),
         help.to_string().trim_end()
     );
-    for sub in command.get_subcommands().filter(|c| c.get_name() != "help") {
+    for sub in command
+        .get_subcommands()
+        .filter(|c| c.get_name() != "help" && !c.is_hide_set())
+    {
         commands(sub, out);
     }
 }

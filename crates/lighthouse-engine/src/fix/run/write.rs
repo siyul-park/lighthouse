@@ -302,6 +302,11 @@ impl Orchestrator<'_> {
             }
             return Ok(text);
         }
-        formatter.format(&self.proposer.engine.ws.root, file, &text)
+        formatter.format(
+            &self.proposer.engine.ws.root,
+            file,
+            &text,
+            &self.proposer.engine.ws.sandbox,
+        )
     }
 }

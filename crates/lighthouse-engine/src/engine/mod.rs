@@ -330,6 +330,7 @@ impl Engine {
                 .collect(),
             overlays: BTreeMap::new(),
             cache_dir: None,
+            sandbox: config.sandbox().clone(),
         };
         let enabled = active(&config, &projects)?;
         Ok(Self {

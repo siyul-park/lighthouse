@@ -8,7 +8,12 @@ use std::{fs, path::Path};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use crate::{cache_fixtures::write, mcp::Client, models::project, models_plugin::lighthouse};
+use crate::{
+    cache_fixtures::write,
+    mcp::Client,
+    models::{UNSANDBOXED, project},
+    models_plugin::lighthouse,
+};
 
 const LIB: &str = "pub fn bad_one() {}\npub fn fine() {}\n";
 const FIXED: &str = "pub fn fixed_one() {}\npub fn fine() {}\n";
@@ -78,6 +83,29 @@ fn an_edit_that_fixes_the_finding_is_applied_when_the_project_approves() {
 }
 
 #[test]
+fn an_agent_edits_in_its_scratch_copy_with_a_home_of_its_own_and_writes_nowhere_else() {
+    let outside = tempfile::tempdir().unwrap();
+    let agent = format!(
+        "{RENAME}echo \"// home=$HOME\" >> src/lib.rs\ntouch {:?} 2>/dev/null || true\n",
+        outside.path().join("escaped")
+    );
+    let (dir, _agent) = edited(&agent, "", ALLOWED);
+
+    let fixed = fix(dir.path(), json!({}));
+
+    assert_eq!(fixed["applied"].as_array().unwrap().len(), 1, "{fixed}");
+    let text = lib(&dir);
+    assert!(text.contains("fixed_one"), "{text}");
+    let home = text.split("// home=").nth(1).unwrap().trim();
+    assert_ne!(home, std::env::var("HOME").unwrap(), "the real home");
+    assert!(
+        !Path::new(home).exists(),
+        "its home is removed with the run"
+    );
+    assert!(!outside.path().join("escaped").exists(), "wrote outside");
+}
+
+#[test]
 fn without_approval_a_verified_edit_is_a_preview_and_the_files_are_left_alone() {
     let (dir, _agent) = edited(RENAME, "", LISTED);
 
@@ -143,7 +171,11 @@ fn an_agent_that_times_out_is_declined_and_its_scratch_copy_is_removed() {
     let marks = tempfile::tempdir().unwrap();
     let cwd = marks.path().join("cwd");
     let agent = format!("pwd > {:?}\nsleep 30\n", cwd.to_str().unwrap());
-    let (dir, _agent) = edited(&agent, "timeout = \"1s\"\n", ALLOWED);
+    let (dir, _agent) = edited(
+        &agent,
+        "timeout = \"1s\"\n",
+        &format!("{ALLOWED}{UNSANDBOXED}"),
+    );
 
     let fixed = fix(dir.path(), json!({}));
 
@@ -166,7 +198,7 @@ fn a_failing_agent_leaves_no_scratch_copy_either() {
     let marks = tempfile::tempdir().unwrap();
     let cwd = marks.path().join("cwd");
     let agent = format!("pwd > {:?}\nexit 3\n", cwd.to_str().unwrap());
-    let (dir, _agent) = edited(&agent, "", ALLOWED);
+    let (dir, _agent) = edited(&agent, "", &format!("{ALLOWED}{UNSANDBOXED}"));
 
     let fixed = fix(dir.path(), json!({}));
 
@@ -205,7 +237,7 @@ fn a_second_run_takes_the_edit_from_the_cache_and_runs_no_agent() {
     let marks = tempfile::tempdir().unwrap();
     let calls = marks.path().join("calls");
     let agent = format!("{RENAME}echo x >> {:?}\n", calls.to_str().unwrap());
-    let (dir, _agent) = edited(&agent, "", LISTED);
+    let (dir, _agent) = edited(&agent, "", &format!("{LISTED}{UNSANDBOXED}"));
 
     let first = fix(dir.path(), json!({}));
     assert_eq!(first["usage"]["calls"], 1, "{first}");

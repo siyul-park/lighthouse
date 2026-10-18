@@ -11,11 +11,13 @@ use std::{
     time::Duration,
 };
 
+use tempfile::TempDir;
+
 use lighthouse_plugin::{
     Answer, Capabilities, EditRequest, Error, Model, ModelClient, SystemOneRequest,
     SystemOneResponse,
 };
-use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
+use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT, Policy, Profile};
 use lighthouse_protocol::{
     canonical, hash,
     prompt::{json_in, noul_of},
@@ -38,15 +40,26 @@ pub struct CommandModel {
     argv: Vec<String>,
     pointer: Option<String>,
     dir: PathBuf,
-    env: Vec<(String, String)>,
+    declared: BTreeMap<String, String>,
+    key_env: Option<String>,
+    /// How the program runs: the project's `enabled`, and the `network` of
+    /// the provider.
+    policy: Policy,
     timeout: Duration,
     edit_timeout: Duration,
 }
 
 impl CommandModel {
     /// The model `model` of a `command` provider, named `name` (the whole
-    /// reference), run from `dir`; `None` for a provider of another kind.
-    pub fn new(dir: &Path, name: &str, model: &str, provider: &ModelProvider) -> Option<Self> {
+    /// reference), run from `dir` in the sandbox the project's `sandbox`
+    /// says; `None` for a provider of another kind.
+    pub fn new(
+        dir: &Path,
+        name: &str,
+        model: &str,
+        provider: &ModelProvider,
+        sandbox: &Policy,
+    ) -> Option<Self> {
         let ModelProvider::Command {
             protocol,
             argv,
@@ -55,7 +68,7 @@ impl CommandModel {
             timeout,
             env,
             key_env,
-            ..
+            network,
         } = provider
         else {
             return None;
@@ -79,6 +92,7 @@ impl CommandModel {
                         "pointer": pointer,
                         "env": env,
                         "keyEnv": key_env,
+                        "network": network,
                         "program": program_hash(dir, argv),
                     })),
                     6,
@@ -91,7 +105,12 @@ impl CommandModel {
             argv: argv.iter().map(|a| a.replace("{model}", model)).collect(),
             pointer: pointer.clone(),
             dir: dir.to_owned(),
-            env: command_env(env, key_env.as_deref()),
+            declared: env.clone(),
+            key_env: key_env.clone(),
+            policy: Policy {
+                enabled: sandbox.enabled,
+                network: network.clone(),
+            },
             timeout: timeout.map_or(MODEL_TIMEOUT, Limit::get),
             edit_timeout: timeout.map_or(EDIT_TIMEOUT, Limit::get),
         })
@@ -100,17 +119,42 @@ impl CommandModel {
 
 impl CommandModel {
     /// Runs the program in `dir` for at most `limit` over `input` and returns
-    /// what it printed.
-    fn run(&self, dir: &Path, limit: Duration, input: &[u8]) -> Result<Vec<u8>, Error> {
+    /// what it printed. Sandboxed, it keeps its own state in a home directory
+    /// of the run, and changes the files of `dir` only when it `edits`.
+    fn run(
+        &self,
+        dir: &Path,
+        limit: Duration,
+        input: &[u8],
+        edits: bool,
+    ) -> Result<Vec<u8>, Error> {
         let failed = |reason: String| Error::model(&self.manifest.id, reason);
+        let home = self
+            .policy
+            .enabled
+            .then(tempfile::tempdir)
+            .transpose()
+            .map_err(|e| failed(e.to_string()))?;
+        let env = command_env(&self.declared, self.key_env.as_deref(), home.as_ref());
+        let mut profile = Profile {
+            network: self.policy.network.clone(),
+            ..Profile::new(&self.dir)
+        };
+        profile
+            .writes
+            .extend(home.iter().map(|h| h.path().to_owned()));
+        if edits {
+            profile.writes.push(dir.to_owned());
+        }
         let output = lighthouse_process::run(&Invocation {
             argv: &self.argv,
             dir,
             stdin: input,
-            env: Some(&self.env),
+            env: Some(&env),
             limit,
             grace: GRACE,
             max_output: MAX_OUTPUT,
+            sandbox: self.policy.sandbox(&profile),
         })
         .map_err(failed)?;
         if !output.success {
@@ -136,7 +180,7 @@ impl ModelClient for CommandModel {
         let mut asked = params.clone();
         asked.model.clone_from(&self.model);
         let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
-        let stdout = self.run(&self.dir, self.timeout, &input)?;
+        let stdout = self.run(&self.dir, self.timeout, &input, false)?;
         let printed = printed_answer(&stdout, self.pointer.as_deref());
         let answers = params
             .questions
@@ -166,7 +210,12 @@ impl ModelClient for CommandModel {
         if self.protocol != CommandProtocol::PlainText {
             return Err(Error::model(&self.manifest.id, "it does not edit"));
         }
-        let stdout = self.run(request.dir, self.edit_timeout, request.prompt.as_bytes())?;
+        let stdout = self.run(
+            request.dir,
+            self.edit_timeout,
+            request.prompt.as_bytes(),
+            true,
+        )?;
         Ok(capped(String::from_utf8_lossy(&stdout).trim(), NOTES_BYTES))
     }
 }
@@ -197,18 +246,43 @@ fn program_hash(root: &Path, argv: &[String]) -> String {
 }
 
 /// The variables a command is given: the allowlist of the command contract,
-/// the declared `env` and the key variable.
+/// the key variable and the declared `env`. In the sandbox `HOME` and the XDG
+/// directories lie inside `home`, a directory of the run, unless `env` sets
+/// them; without it the program inherits `HOME` and `TMPDIR`.
 fn command_env(
     declared: &BTreeMap<String, String>,
     key_env: Option<&str>,
+    home: Option<&TempDir>,
 ) -> Vec<(String, String)> {
-    let mut env: Vec<(String, String)> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "TMPDIR"]
-        .into_iter()
+    let inherited: &[&str] = if home.is_some() {
+        &["PATH", "USER", "LOGNAME", "LANG"]
+    } else {
+        &["PATH", "HOME", "USER", "LOGNAME", "LANG", "TMPDIR"]
+    };
+    let mut env: Vec<(String, String)> = inherited
+        .iter()
+        .copied()
         .chain(key_env)
         .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_owned(), v)))
         .collect();
+    if let Some(home) = home {
+        env.extend(isolated(home.path()));
+    }
     env.extend(declared.iter().map(|(k, v)| (k.clone(), v.clone())));
     env
+}
+
+/// `HOME` and the XDG base directories of a program that keeps its state
+/// inside `home`.
+fn isolated(home: &Path) -> Vec<(String, String)> {
+    let at = |path: PathBuf| path.to_string_lossy().into_owned();
+    vec![
+        ("HOME".to_owned(), at(home.to_owned())),
+        ("XDG_CONFIG_HOME".to_owned(), at(home.join(".config"))),
+        ("XDG_DATA_HOME".to_owned(), at(home.join(".local/share"))),
+        ("XDG_STATE_HOME".to_owned(), at(home.join(".local/state"))),
+        ("XDG_CACHE_HOME".to_owned(), at(home.join(".cache"))),
+    ]
 }
 
 /// The answer in what a program printed: JSON, at the pointer if there is

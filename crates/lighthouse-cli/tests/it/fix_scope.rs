@@ -12,7 +12,7 @@ use tempfile::TempDir;
 use crate::{
     cache_fixtures::write,
     mcp::Client,
-    models::project,
+    models::{UNSANDBOXED, project},
     models_plugin::{fingerprints, lighthouse},
 };
 
@@ -109,7 +109,10 @@ fn nothing_binds_and_nothing_is_listed_so_a_fix_run_is_what_it_was() {
 fn an_agent_is_bound_but_the_decision_is_not_listed_so_no_agent_runs() {
     let marks = tempfile::tempdir().unwrap();
     let calls = marks.path().join("calls");
-    let (dir, _agent) = with_agent(&format!("echo x >> {:?}\n", calls.to_str().unwrap()), "");
+    let (dir, _agent) = with_agent(
+        &format!("echo x >> {:?}\n", calls.to_str().unwrap()),
+        UNSANDBOXED,
+    );
 
     let fixed = fix(&dir, json!({}));
 

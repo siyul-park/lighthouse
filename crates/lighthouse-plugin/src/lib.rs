@@ -15,7 +15,7 @@ use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Options, Reach, RunScope, Severity,
     ucm::{Applicability, Capability, File, Fragment, Project},
 };
-use lighthouse_process::Formatter;
+use lighthouse_process::{Formatter, Policy};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
@@ -100,6 +100,8 @@ pub struct Workspace {
     /// may keep its own under a directory named by its plugin. `None` when the
     /// run must not use a cache.
     pub cache_dir: Option<PathBuf>,
+    /// How the programs the project names run: the project's `[sandbox]`.
+    pub sandbox: Policy,
 }
 
 /// What the analyzers computed in one run, by analyzer id and scope key (the
@@ -145,6 +147,7 @@ impl Workspace {
             formatters: BTreeMap::new(),
             overlays: BTreeMap::new(),
             cache_dir: None,
+            sandbox: Policy::default(),
         }
     }
 

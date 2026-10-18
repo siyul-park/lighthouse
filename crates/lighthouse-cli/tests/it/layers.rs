@@ -212,13 +212,10 @@ fn two_agents() -> (TempDir, TempDir) {
         .replace("fixed_one", "fixed_two");
     write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
     write(dir.path(), ".lighthouse/decisions/ban2.yaml", &second);
-    let seen = scripts.path().join("seen");
     write(
         scripts.path(),
         "second.sh",
-        &format!(
-            "cp src/lib.rs {seen:?}\nsed 's/bad_two/fixed_two/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n"
-        ),
+        "grep -q fixed_one src/lib.rs || exit 1\nsed 's/bad_two/fixed_two/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n",
     );
     let script = scripts.path().join("second.sh");
     local(
@@ -238,7 +235,7 @@ fn two_agents() -> (TempDir, TempDir) {
 
 #[test]
 fn a_decision_bound_to_another_agent_is_fixed_by_a_run_of_its_own_over_what_the_first_left() {
-    let (dir, scripts) = two_agents();
+    let (dir, _scripts) = two_agents();
 
     let fixed = Client::trusting(dir.path())
         .tool("fix", json!({"decision": [BAN, BAN2]}))
@@ -251,16 +248,13 @@ fn a_decision_bound_to_another_agent_is_fixed_by_a_run_of_its_own_over_what_the_
     );
     assert_eq!(fixed["usage"]["edit"]["runs"], 2, "{fixed}");
     assert_eq!(fixed["applied"].as_array().unwrap().len(), 2, "{fixed}");
-    let seen = fs::read_to_string(scripts.path().join("seen")).unwrap();
-    assert_eq!(
-        seen, "pub fn fixed_one() {}\npub fn bad_two() {}\n",
-        "the second agent started from the first one's accepted text"
-    );
+    // The second agent fixes only a text that already holds the first one's
+    // accepted fix.
 }
 
 #[test]
 fn a_decision_is_fixed_by_the_project_agent_without_a_binding_of_its_own() {
-    let (dir, scripts) = two_agents();
+    let (dir, _scripts) = two_agents();
     fs::remove_file(dir.path().join(LOCAL_FILE)).unwrap();
 
     let fixed = Client::trusting(dir.path())
@@ -268,7 +262,6 @@ fn a_decision_is_fixed_by_the_project_agent_without_a_binding_of_its_own() {
         .unwrap();
 
     assert_eq!(fixed["usage"]["edit"]["runs"], 1, "{fixed}");
-    assert!(!scripts.path().join("seen").exists());
     assert_eq!(
         read(&dir, "src/lib.rs"),
         "pub fn fixed_one() {}\npub fn bad_two() {}\n"
@@ -401,10 +394,7 @@ fn unbound() -> (TempDir, TempDir) {
     write(
         scripts.path(),
         "agent.sh",
-        &format!(
-            "touch {:?}\nsed 's/bad_one/fixed_one/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n",
-            scripts.path().join("ran").to_str().unwrap()
-        ),
+        "sed 's/bad_one/fixed_one/' src/lib.rs > src/lib.rs.new && mv src/lib.rs.new src/lib.rs\n",
     );
     let dir = project(&listed("", ALLOW));
     write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
@@ -420,22 +410,26 @@ fn unbound() -> (TempDir, TempDir) {
 
 #[test]
 fn a_command_provider_declared_only_in_a_personal_file_runs_only_in_a_trusted_project() {
-    let (dir, scripts) = unbound();
-    let ran = scripts.path().join("ran");
+    let (dir, _scripts) = unbound();
 
     let refused = Client::start(dir.path())
         .tool("fix", json!({"decision": [BAN]}))
         .unwrap();
 
-    assert!(!ran.exists(), "the agent ran");
+    assert!(
+        read(&dir, "src/lib.rs").starts_with("pub fn bad_one() {}\n"),
+        "the agent ran"
+    );
     let reason = refused["declined"][0]["reason"].as_str().unwrap();
     assert!(reason.contains("lighthouse trust"), "{reason}");
 
     let fixed = Client::trusting(dir.path())
         .tool("fix", json!({"decision": [BAN]}))
         .unwrap();
-    assert!(ran.exists(), "{fixed}");
-    assert!(read(&dir, "src/lib.rs").starts_with("pub fn fixed_one() {}\n"));
+    assert!(
+        read(&dir, "src/lib.rs").starts_with("pub fn fixed_one() {}\n"),
+        "{fixed}"
+    );
 }
 
 /// What `args` print, stdout and stderr, in the project.

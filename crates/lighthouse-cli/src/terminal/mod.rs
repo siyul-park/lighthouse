@@ -9,7 +9,7 @@ use std::{
 };
 
 use clap::{CommandFactory, FromArgMatches};
-use command::{Agent, CacheCommand, Cli, Command, DocsCommand, SpecCommand};
+use command::{Agent, CacheCommand, Cli, Command, DocsCommand, InternalCommand, SpecCommand};
 
 use lighthouse_cli::surface::{
     Context, Reply,
@@ -71,6 +71,14 @@ fn run(cli: &Cli) -> Result<u8> {
         }
         Command::Init { agent } => project::init(config, *agent),
         Command::Trust { revoke, yes } => project::trust(config, *revoke, *yes),
+        Command::Internal {
+            command:
+                InternalCommand::Bridge {
+                    socket,
+                    port,
+                    command,
+                },
+        } => Ok(u8::try_from(lighthouse_process::bridge(socket, *port, command)?).unwrap_or(1)),
         Command::Mcp => {
             lighthouse_cli::mcp::serve()?;
             Ok(0)

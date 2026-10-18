@@ -222,7 +222,8 @@ impl Orchestrator<'_> {
     /// Whether the run may write the fixes by a model: `--unsafe-fixes`, or
     /// the approval of the project.
     fn permitted(&self) -> bool {
-        self.proposer.run.unsafe_fixes || self.proposer.engine.config.approval() == Approval::Allow
+        self.proposer.run.unsafe_fixes
+            || self.proposer.engine.config.fix().approval == Approval::Allow
     }
 
     /// Why the commands of `[fix] verify` do not pass over the texts of the
@@ -243,6 +244,7 @@ impl Orchestrator<'_> {
             &self.texts,
             commands,
             engine.config.fix().timeout,
+            &engine.ws.sandbox,
         )
         .err()
     }

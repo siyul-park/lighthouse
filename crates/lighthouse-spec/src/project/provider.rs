@@ -111,6 +111,12 @@ pub struct ProviderSpec {
     /// `command` only: variables the program is given besides the allowlist.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
+    /// `command` only: the hosts the program may reach, through the proxy of
+    /// the run: a name, or `*.suffix` for every host below it, either with
+    /// `:port`. The program runs in the OS sandbox, which reaches nothing
+    /// else. Default: none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub network: Vec<String>,
     /// `command` with `protocol = "typesafe"` only: RFC 6901 JSON Pointer to
     /// the response inside the printed JSON (stdout is one JSON value), when
     /// the program wraps it in an envelope.
@@ -149,6 +155,8 @@ pub enum ModelProvider {
         timeout: Option<Duration>,
         env: BTreeMap<String, String>,
         key_env: Option<String>,
+        /// The hosts the program may reach.
+        network: Vec<String>,
     },
 }
 
@@ -322,6 +330,7 @@ impl ProviderSpec {
             timeout: self.timeout,
             env: self.env.clone(),
             key_env: self.key_env.clone(),
+            network: self.network.clone(),
         })
     }
 
@@ -345,10 +354,11 @@ impl ProviderSpec {
     }
 
     /// The fields only a `command` has, and whether each is given.
-    fn command_only(&self) -> [(&'static str, bool); 2] {
+    fn command_only(&self) -> [(&'static str, bool); 3] {
         [
             ("env", !self.env.is_empty()),
             ("pointer", self.pointer.is_some()),
+            ("network", !self.network.is_empty()),
         ]
     }
 }

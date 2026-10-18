@@ -2,6 +2,8 @@
 //! reader says when it leaves something out: through the binary, with a fake
 //! tool.
 
+use std::fs;
+
 use serde_json::{Value, json};
 
 use super::checks::{lighthouse, project, trust, write};
@@ -110,6 +112,13 @@ fn a_file_the_reader_cannot_read_starts_its_columns_at_one_and_says_so() {
         ),
     );
     write(dir.path(), "src/gone.txt", "ab\ncdefghij\n");
+    // The check removes a file of the project, which the sandbox forbids.
+    let config = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &config.replacen("spec = {", "spec = { sandbox = { enabled = false },", 1),
+    );
     write(
         dir.path(),
         "tools/lint.sh",

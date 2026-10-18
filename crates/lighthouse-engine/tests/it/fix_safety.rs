@@ -173,7 +173,7 @@ fn a_file_that_changes_while_verifying_is_not_written_over() {
     // The formatter of a trusted project runs mid-run and, as an editor
     // saving would, changes the real file while the candidate is checked.
     let formatter = format!(
-        "[languages.toy]\nformatter = [\"sh\", \"-c\", \"echo '// saved elsewhere' >> '{}'\"]\n",
+        "[languages.toy]\nformatter = [\"sh\", \"-c\", \"echo '// saved elsewhere' >> '{}'\"]\n[sandbox]\nenabled = false\n",
         path.display()
     );
     let engine = engine(&dir, &formatter).with_trust(true);

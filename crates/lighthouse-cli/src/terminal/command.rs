@@ -110,6 +110,12 @@ pub enum Command {
     /// `SoftwareAgent` (the id is $LIGHTHOUSE_ATTRIBUTED_TO, else the client's
     /// name).
     Mcp,
+    /// What the sandbox starts inside its namespace; not for people.
+    #[command(hide = true)]
+    Internal {
+        #[command(subcommand)]
+        command: InternalCommand,
+    },
     /// Entry points for agent hooks. Reads the hook payload on stdin.
     ///
     /// For Claude Code, see docs/agents.md.
@@ -148,6 +154,18 @@ impl From<CompletionShell> for Shell {
             CompletionShell::Powershell => Self::PowerShell,
         }
     }
+}
+
+#[derive(Debug, Subcommand)]
+pub enum InternalCommand {
+    /// Forward a loopback port to the proxy socket of the sandbox, then run
+    /// the program with everything after `--`.
+    Bridge {
+        socket: PathBuf,
+        port: u16,
+        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]

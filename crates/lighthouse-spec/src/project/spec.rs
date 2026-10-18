@@ -14,6 +14,7 @@ use super::{
     formatter::FormatterSpec,
     models::ModelsSpec,
     rules::RuleSetting,
+    sandbox::SandboxSpec,
 };
 
 /// A project's configuration, and the shape of a shareable one: `extends`
@@ -48,6 +49,9 @@ pub struct ProjectSpec {
     /// What happens to a fix by a model without a person's hand.
     #[serde(default, skip_serializing_if = "ApprovalSpec::is_empty")]
     pub approval: ApprovalSpec,
+    /// The sandbox the programs of the project run in.
+    #[serde(default, skip_serializing_if = "SandboxSpec::is_empty")]
+    pub sandbox: SandboxSpec,
     /// How fixes by models are checked beyond the rules.
     #[serde(default, skip_serializing_if = "FixSpec::is_empty")]
     pub fix: FixSpec,

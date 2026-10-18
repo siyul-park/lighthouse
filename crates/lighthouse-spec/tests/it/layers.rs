@@ -154,8 +154,64 @@ fn a_provider_is_replaced_whole_by_the_later_layer_and_the_others_stay() {
 
 #[test]
 fn the_approval_is_the_later_layers() {
-    assert_eq!(layers(&[]).0.approval(), Approval::Ask);
-    assert_eq!(layers(&[(USER_FILE, USER)]).0.approval(), Approval::Allow);
+    assert_eq!(layers(&[]).0.fix().approval, Approval::Ask);
+    assert_eq!(
+        layers(&[(USER_FILE, USER)]).0.fix().approval,
+        Approval::Allow
+    );
+}
+
+#[test]
+fn the_sandbox_is_on_without_hosts_and_each_key_is_the_later_layers() {
+    let plain = layers(&[]).0;
+    assert!(plain.sandbox().enabled);
+    assert!(plain.sandbox().network.is_empty());
+
+    let hosts = layers(&[(
+        USER_FILE,
+        "[sandbox]\nnetwork = [\"a.test\", \"*.b.test:443\"]\n",
+    )])
+    .0;
+    assert!(hosts.sandbox().enabled);
+    assert_eq!(hosts.sandbox().network, ["a.test", "*.b.test:443"]);
+
+    let (off, stack) = layers(&[
+        (USER_FILE, "[sandbox]\nnetwork = [\"a.test\"]\n"),
+        (LOCAL_FILE, "[sandbox]\nenabled = false\n"),
+    ]);
+    assert!(!off.sandbox().enabled);
+    assert_eq!(off.sandbox().network, ["a.test"], "keys are not joined");
+    let keys: Vec<_> = stack
+        .entries()
+        .into_iter()
+        .filter(|entry| entry.key.starts_with("sandbox."))
+        .map(|entry| (entry.key, entry.value, entry.origin))
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            (
+                "sandbox.enabled".to_owned(),
+                json!(false),
+                LOCAL_FILE.to_owned()
+            ),
+            (
+                "sandbox.network".to_owned(),
+                json!(["a.test"]),
+                USER_FILE.to_owned()
+            ),
+        ]
+    );
+    assert!(
+        layers(&[])
+            .1
+            .entries()
+            .iter()
+            .any(|entry| entry.key == "sandbox.enabled"
+                && entry.value == json!(true)
+                && entry.origin == BUNDLED),
+        "the default is shown"
+    );
 }
 
 #[test]
@@ -220,7 +276,7 @@ fn without_personal_files_the_configuration_is_the_projects() {
         config.models(&projects).unwrap(),
         plain.models(&projects).unwrap()
     );
-    assert_eq!(config.approval(), plain.approval());
+    assert_eq!(config.fix().approval, plain.fix().approval);
     assert!(
         stack
             .entries()
@@ -294,7 +350,9 @@ fn the_defaults_are_the_bundled_layer() {
             "approval.fix",
             "models.budget",
             "models.explore",
-            "models.routing"
+            "models.routing",
+            "sandbox.enabled",
+            "sandbox.network"
         ]
     );
 }

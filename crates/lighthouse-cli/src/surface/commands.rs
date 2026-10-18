@@ -342,7 +342,7 @@ pub enum ModelCommand {
 /// `config <verb>`.
 #[derive(Debug, Subcommand)]
 pub enum ConfigCommand {
-    /// Show the effective environment: models, providers, bindings, approval.
+    /// Show the effective environment: models, providers, bindings, approval, sandbox.
     ///
     /// Meaning is the project's alone (`lighthouse.toml`); how this machine
     /// computes and applies is read from, in order, the bundled defaults, the

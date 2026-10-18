@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use lighthouse_plugin::{DecisionRef, EditRequest, ModelClient, Question, State, SystemOneRequest};
+use lighthouse_process::Policy;
 use lighthouse_rpc::CommandModel;
 use lighthouse_spec::Config;
 
@@ -50,7 +51,7 @@ fn command_new_runs_a_program_that_prints_the_answer() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "cat >/dev/null; printf '{\"noul\": 0.75}'"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
     let answer = command.classify(&request()).unwrap();
 
     assert_eq!(command.manifest().id, "p/m");
@@ -62,7 +63,7 @@ fn command_new_fails_a_program_that_exits_with_an_error() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "exit 3"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
 
     assert!(command.classify(&request()).is_err());
 }
@@ -78,7 +79,7 @@ fn command_new_is_none_for_a_provider_that_is_not_a_command() {
         .provider("p")
         .unwrap();
 
-    assert!(CommandModel::new(dir.path(), "p/m", "m", &provider).is_none());
+    assert!(CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).is_none());
 }
 
 #[test]
@@ -86,7 +87,7 @@ fn command_new_gives_the_program_the_login_variables_and_no_other_of_the_environ
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "env | cut -d= -f1 | tr '\\n' ' ' >&2; exit 1"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
     let failed = command.classify(&request()).unwrap_err().to_string();
 
     for name in ["PATH", "HOME", "USER", "LOGNAME"] {
@@ -104,7 +105,7 @@ fn a_command_without_a_protocol_serves_edit_and_neither_classifies_nor_chats() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider_of("", r#"["true"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
 
     assert!(command.manifest().capabilities.classification.is_none());
     assert!(
@@ -138,7 +139,8 @@ fn a_plain_text_command_edits_in_the_directory_it_is_given_and_keeps_what_it_sai
     let home = tempfile::tempdir().unwrap();
     let work = tempfile::tempdir().unwrap();
     let provider = provider_of("", r#"["sh", "-c", "cat > prompt.txt; echo fixed 1"]"#);
-    let command = CommandModel::new(home.path(), "p/m", "m", &provider).unwrap();
+    let command =
+        CommandModel::new(home.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
 
     let said = command
         .edit(&EditRequest {
@@ -166,11 +168,11 @@ fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
         dir: dir.path(),
     };
 
-    let said = CommandModel::new(dir.path(), "p/m", "m", &chatty)
+    let said = CommandModel::new(dir.path(), "p/m", "m", &chatty, &Policy::default())
         .unwrap()
         .edit(&asked)
         .unwrap();
-    let error = CommandModel::new(dir.path(), "p/m", "m", &failing)
+    let error = CommandModel::new(dir.path(), "p/m", "m", &failing, &Policy::default())
         .unwrap()
         .edit(&asked)
         .unwrap_err();
@@ -183,7 +185,7 @@ fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
 fn a_command_with_a_protocol_does_not_edit() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "true"]"#);
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
 
     let error = command
         .edit(&EditRequest {
@@ -193,4 +195,33 @@ fn a_command_with_a_protocol_does_not_edit() {
         .unwrap_err();
 
     assert!(error.to_string().contains("does not edit"), "{error}");
+}
+
+#[test]
+fn an_agent_runs_with_a_home_of_its_own_and_writes_only_in_its_directory() {
+    let work = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let script = format!(
+        "echo $HOME > home.txt; echo $XDG_CONFIG_HOME > xdg.txt; \
+         touch {}/escaped 2> denied.txt; true",
+        outside.path().display()
+    );
+    let provider = provider_of("", &serde_json::json!(["sh", "-c", script]).to_string());
+    let command =
+        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+
+    command
+        .edit(&EditRequest {
+            prompt: "go",
+            dir: work.path(),
+        })
+        .unwrap();
+
+    let home = std::fs::read_to_string(work.path().join("home.txt")).unwrap();
+    let xdg = std::fs::read_to_string(work.path().join("xdg.txt")).unwrap();
+    let real = std::env::var("HOME").unwrap();
+    assert_ne!(home.trim(), real, "the agent saw the real home");
+    assert!(xdg.trim().starts_with(home.trim()), "{xdg} under {home}");
+    assert!(!std::path::Path::new(home.trim()).exists(), "home removed");
+    assert!(!outside.path().join("escaped").exists(), "wrote outside");
 }

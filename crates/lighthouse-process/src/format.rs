@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, fs, path::Path, time::Duration};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{GRACE, Invocation, MAX_OUTPUT, Output, Stdin, run};
+use crate::{GRACE, Invocation, MAX_OUTPUT, Output, Policy, Profile, Stdin, run};
 
 /// Settings files of formatters that look for them upward from the file.
 const SETTINGS: [&str; 4] = [
@@ -43,9 +43,16 @@ impl Formatter {
     /// project's settings from there; `{path}` is the file's real path, for
     /// tools that take one. A formatter that works on a file gets a scratch
     /// copy of it, `{file}`, next to copies of the settings files found between
-    /// it and the root. A failure, a timeout and output that overflowed are
-    /// errors, never text.
-    pub fn format(&self, root: &Path, file: &Path, text: &str) -> Result<String, String> {
+    /// it and the root. It runs in the sandbox `policy` says, writing only the
+    /// scratch directory and reaching nothing. A failure, a timeout and output
+    /// that overflowed are errors, never text.
+    pub fn format(
+        &self,
+        root: &Path,
+        file: &Path,
+        text: &str,
+        policy: &Policy,
+    ) -> Result<String, String> {
         let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
         let copy = scratch.path().join(file);
         if let Some(dir) = copy.parent() {
@@ -78,6 +85,10 @@ impl Formatter {
             .collect();
         env.extend(self.env.iter().map(|(k, v)| (k.clone(), v.clone())));
         let name = self.argv.first().ok_or("the formatter has no program")?;
+        let profile = Profile {
+            writes: vec![scratch.path().to_owned()],
+            ..Profile::new(root)
+        };
         let output = run(&Invocation {
             argv: &command,
             dir: root,
@@ -86,6 +97,7 @@ impl Formatter {
             limit: LIMIT,
             grace: GRACE,
             max_output: MAX_OUTPUT,
+            sandbox: policy.sandbox(&profile),
         })
         .map_err(|e| format!("formatter `{name}`: {e}"))?;
         if !output.success {

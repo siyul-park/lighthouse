@@ -191,6 +191,13 @@
             "null"
           ]
         },
+        "network": {
+          "description": "`command` only: the hosts the program may reach, through the proxy of\nthe run: a name, or `*.suffix` for every host below it, either with\n`:port`. The program runs in the OS sandbox, which reaches nothing\nelse. Default: none.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "options": {
           "additionalProperties": true,
           "description": "`plugin` only: what the plugin is told besides the model.",
@@ -245,6 +252,30 @@
           "type": "string"
         }
       ]
+    },
+    "SandboxSpec": {
+      "additionalProperties": false,
+      "description": "The `sandbox` table of a project: every program Lighthouse runs for it\n(command checks, fixers, formatters, `[fix] verify`, agents and command\nproviders) runs under the OS sandbox. It reads everything but the secrets\nof the user and the project, writes only its scratch place, and reaches no\nnetwork but the hosts listed here and in its provider.",
+      "properties": {
+        "enabled": {
+          "description": "Whether programs run in the sandbox. Default: `true`. `false` is an\nerror unless the project is trusted (`lighthouse trust`), and every\nrun says that programs run with your full access.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "network": {
+          "description": "The hosts that command checks and `[fix] verify` commands may reach,\nthrough the proxy of the run: a name, or `*.suffix` for every host\nbelow it, either with `:port`. A provider lists its own. Default: none.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/environment.schema.json",
@@ -266,6 +297,10 @@
       },
       "description": "The model bindings of single decisions, by decision id; they override\nthe `models` binding of the same task for that decision.",
       "type": "object"
+    },
+    "sandbox": {
+      "$ref": "#/$defs/SandboxSpec",
+      "description": "The sandbox the programs run in, and the hosts checks may reach."
     }
   },
   "title": "Environment",

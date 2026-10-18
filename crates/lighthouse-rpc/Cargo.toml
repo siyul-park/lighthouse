@@ -12,6 +12,7 @@ doctest = false
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 lighthouse-spec.workspace = true
 lighthouse-model.workspace = true
@@ -21,6 +22,5 @@ lighthouse-protocol.workspace = true
 lighthouse-resource.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }

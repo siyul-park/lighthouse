@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lighthouse_process::{Invocation, run};
+use lighthouse_process::{Invocation, Sandbox, run};
 
 fn spec<'a>(argv: &'a [String], limit: Duration) -> Invocation<'a> {
     Invocation {
@@ -14,6 +14,7 @@ fn spec<'a>(argv: &'a [String], limit: Duration) -> Invocation<'a> {
         limit,
         grace: Duration::from_millis(300),
         max_output: 1024,
+        sandbox: Sandbox::Off,
     }
 }
 

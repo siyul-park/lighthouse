@@ -30,6 +30,7 @@ mod reply;
 mod review;
 mod review_agent;
 mod run;
+mod sandbox;
 mod sarif_places;
 mod skill;
 mod spec;

@@ -15,6 +15,7 @@ use super::{
     fixing::ApprovalSpec,
     models::{ModelsSpec, Names},
     rules::RuleSetting,
+    sandbox::SandboxSpec,
     spec::ProjectSpec,
 };
 use crate::Error;
@@ -57,6 +58,9 @@ pub struct EnvironmentSpec {
     /// What happens to a fix by a model without a person's hand.
     #[serde(default, skip_serializing_if = "ApprovalSpec::is_empty")]
     pub approval: ApprovalSpec,
+    /// The sandbox the programs run in, and the hosts checks may reach.
+    #[serde(default, skip_serializing_if = "SandboxSpec::is_empty")]
+    pub sandbox: SandboxSpec,
 }
 
 /// The bindings one decision has of its own. Its level, options and every
@@ -149,6 +153,7 @@ impl EnvironmentSpec {
             models: project.models.clone(),
             rules,
             approval: project.approval,
+            sandbox: project.sandbox.clone(),
         }
     }
 
@@ -167,6 +172,7 @@ impl EnvironmentSpec {
             rule.edit = next.edit.clone().or(rule.edit.take());
         }
         self.approval.fix = later.approval.fix.or(self.approval.fix);
+        self.sandbox.over(&later.sandbox);
     }
 }
 

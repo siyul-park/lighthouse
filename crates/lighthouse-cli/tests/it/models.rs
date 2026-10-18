@@ -38,6 +38,11 @@ spec:
 
 const LIB: &str = "pub fn bad_one() {}\npub fn maybe_bad() {}\npub fn maybe_good() {}\npub fn maybe_unsure() {}\npub fn fine() {}\n";
 
+/// The table of a project whose programs run without the sandbox: the test
+/// programs leave marks in their working directory, which the sandbox
+/// forbids, and the tests count them.
+pub(crate) const UNSANDBOXED: &str = "[sandbox]\nenabled = false\n";
+
 /// The `fake-model` binary, which is also a `command` provider.
 fn fake_model() -> String {
     let dir = lighthouse_test_support::fake_model();
@@ -47,7 +52,7 @@ fn fake_model() -> String {
 /// A project binding `fake/any` to the command provider in `mode`.
 pub(crate) fn provider(mode: &str) -> String {
     format!(
-        "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\nprotocol = \"typesafe\"\ncommand = [{:?}, {mode:?}]\n",
+        "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\nprotocol = \"typesafe\"\ncommand = [{:?}, {mode:?}]\n{UNSANDBOXED}",
         fake_model()
     )
 }
@@ -218,7 +223,7 @@ fn a_model_that_fails_leaves_its_subjects_to_review_and_the_run_complete() {
 
 #[test]
 fn a_command_model_is_not_run_until_the_project_is_trusted() {
-    let dir = project(&bound());
+    let dir = project(&bound().replace(UNSANDBOXED, ""));
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir.path())
@@ -302,6 +307,7 @@ fn route(models: &[(&str, &str)], routing: &str) -> String {
             fake_model()
         ));
     }
+    text.push_str(UNSANDBOXED);
     text
 }
 
@@ -376,7 +382,7 @@ fn an_abstaining_model_does_not_fall_back_to_the_next_of_its_route() {
     let models = format!(
         "[models]\nclassification = [\"weak/m\", \"good/m\"]\n\
          [models.providers.weak]\nprotocol = \"typesafe\"\ncommand = [{fake:?}, \"weak\"]\npointer = \"/result\"\n\
-         [models.providers.good]\nprotocol = \"typesafe\"\ncommand = [{fake:?}, \"command\", \"good-calls\"]\n",
+         [models.providers.good]\nprotocol = \"typesafe\"\ncommand = [{fake:?}, \"command\", \"good-calls\"]\n{UNSANDBOXED}",
         fake = fake_model()
     );
     let dir = project(&models);

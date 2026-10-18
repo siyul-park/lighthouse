@@ -350,7 +350,7 @@ fn edit_is_one_binding_of_the_project_and_fixes_are_asked_for_and_previewed_by_d
             (Task::Edit, "b/two")
         ]
     );
-    assert_eq!(config.approval(), Approval::Ask);
+    assert_eq!(config.fix().approval, Approval::Ask);
     assert!(config.fix().verify.is_empty());
     assert!(config.fix().decisions.is_empty(), "no decision is listed");
     assert_eq!(config.fix().scope, FixScope::Files);
@@ -384,7 +384,7 @@ fn approval_the_decisions_a_model_may_fix_and_the_commands_that_verify_them_are_
         "plugins = []\n[approval]\nfix = \"allow\"\n[fix]\ndecisions = [\"design/exported-doc\", \"testing/*\"]\nscope = \"symbol\"\nverify = [[\"cargo\", \"test\", \"-q\"]]\n",
     )
     .unwrap();
-    assert_eq!(config.approval(), Approval::Allow);
+    assert_eq!(config.fix().approval, Approval::Allow);
     assert_eq!(config.fix().decisions, ["design/exported-doc", "testing/*"]);
     assert_eq!(config.fix().scope, FixScope::Symbol);
     assert_eq!(config.fix().verify, [["cargo", "test", "-q"]]);
@@ -560,4 +560,39 @@ fn edit_routes_list_the_agents_rules_name() {
         routes,
         [("d/x", &["a/one".to_owned(), "b/two".to_owned()][..])]
     );
+}
+
+#[test]
+fn a_command_provider_lists_the_hosts_it_may_reach_and_no_other_reach_has_the_key() {
+    let config = Config::parse_inline(
+        "plugins = []\n[models.providers.p]\ncommand = [\"agent\"]\nnetwork = [\"api.test\", \"*.cdn.test\"]\n",
+    )
+    .unwrap();
+    let provider = config
+        .models(&lighthouse_spec::Projects::default())
+        .unwrap()
+        .provider("p")
+        .unwrap();
+    let ModelProvider::Command { network, .. } = provider else {
+        panic!("a command provider");
+    };
+    assert_eq!(network, ["api.test", "*.cdn.test"]);
+
+    for (reach, wanted) in [
+        (
+            "protocol = \"openai\"\nbaseUrl = \"http://127.0.0.1:9\"\n",
+            "a `baseUrl` provider has no `network`",
+        ),
+        ("plugin = \"x\"\n", "a `plugin` provider has no `network`"),
+    ] {
+        let error = Config::parse_inline(&format!(
+            "plugins = []\n[models.providers.p]\n{reach}network = [\"a.test\"]\n"
+        ))
+        .unwrap()
+        .models(&lighthouse_spec::Projects::default())
+        .unwrap()
+        .invalid["p"]
+            .clone();
+        assert!(error.contains(wanted), "{error}");
+    }
 }

@@ -1,11 +1,22 @@
-//! Running an external program under a time limit and an output cap. The
-//! program leads its own process group on unix, so a timeout takes
-//! everything it started down with it.
+//! Running an external program under a time limit and an output cap, inside
+//! an OS sandbox. The program leads its own process group on unix, so a
+//! timeout takes everything it started down with it.
+//!
+//! Every program Lighthouse starts through [`run`] is sandboxed, and every
+//! caller says how ([`Sandbox`]). Not covered: the long-lived plugin
+//! processes of `lighthouse-rpc` (Lighthouse's own binaries), the version
+//! control calls of `lighthouse-session`, and test support.
 
 mod format;
+mod sandbox;
 
 pub use format::Formatter;
+pub use sandbox::{
+    Bridge, DENIED, Denied, Plan, Policy, Profile, Proxy, Sandbox, Simulation, allows, bridge,
+    bwrap_argv, seatbelt_profile, secrets, simulate_unavailable,
+};
 
+use sandbox::{Started, runnable};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -81,6 +92,9 @@ pub struct Invocation<'a> {
     pub grace: Duration,
     /// The most each of stdout and stderr keeps; the rest is read and dropped.
     pub max_output: usize,
+    /// What the program may touch. A sandbox that cannot be had is an error,
+    /// never a program run without one.
+    pub sandbox: Sandbox<'a>,
 }
 
 /// What a reader thread has collected so far.
@@ -110,8 +124,21 @@ impl Captured {
 /// Runs the program of `invocation`. When it outlives `limit` its process group
 /// gets SIGTERM, then SIGKILL after `grace`; that is an error.
 pub fn run(invocation: &Invocation) -> Result<Ran, String> {
-    let (program, args) = invocation.argv.split_first().ok_or("no program")?;
-    let mut command = Command::new(program);
+    let program = invocation.argv.first().ok_or("no program")?;
+    let sandboxed = match invocation.sandbox {
+        Sandbox::On(profile) => Some(Started::new(profile)?),
+        Sandbox::Off => None,
+    };
+    if sandboxed.is_some() && !runnable(program, invocation.dir, invocation.env) {
+        return Err(format!(
+            "cannot start `{program}`: No such file or directory (os error 2)"
+        ));
+    }
+    let argv = sandboxed
+        .as_ref()
+        .map_or_else(|| invocation.argv.to_vec(), |s| s.wrap(invocation.argv));
+    let (launcher, args) = argv.split_first().ok_or("no program")?;
+    let mut command = Command::new(launcher);
     command
         .args(args)
         .current_dir(invocation.dir)
@@ -120,6 +147,9 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
         .stderr(Stdio::piped());
     if let Some(env) = invocation.env {
         command.env_clear().envs(env.iter().map(|(k, v)| (k, v)));
+    }
+    if let Some(sandboxed) = &sandboxed {
+        command.envs(sandboxed.env());
     }
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(&mut command, 0);
@@ -160,7 +190,10 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
     };
     let _ = writer.join();
     let (stdout, cut_out) = stdout.finish();
-    let (stderr, cut_err) = stderr.finish();
+    let (mut stderr, cut_err) = stderr.finish();
+    if let Some(sandboxed) = &sandboxed {
+        stderr.extend(refusals(&sandboxed.blocked()));
+    }
     Ok(Ran {
         success: status.success(),
         code: status.code(),
@@ -181,6 +214,19 @@ pub fn reap(child: &mut Child) {
     signal_group(child, true);
     let _ = child.kill();
     let _ = child.wait();
+}
+
+/// The note that tells why a request of a sandboxed program failed: the hosts
+/// the proxy refused.
+fn refusals(hosts: &[String]) -> Vec<u8> {
+    if hosts.is_empty() {
+        return Vec::new();
+    }
+    format!(
+        "lighthouse sandbox: refused network access to {}\n",
+        hosts.join(", ")
+    )
+    .into_bytes()
 }
 
 /// Asks the program's process group to stop, then kills the whole group after

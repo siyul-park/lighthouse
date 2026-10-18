@@ -16,7 +16,7 @@ use std::{
 
 use lighthouse_model::{Diagnostic, Position, RunScope, Span, squash, ucm::Project};
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
-use lighthouse_process::{GRACE, Stdin};
+use lighthouse_process::{GRACE, Profile, Stdin};
 use lighthouse_spec::{Batch, Check, CheckOutput, CommandCheck, DEFAULT_TIMEOUT};
 use serde_json::{Map, Value, json};
 
@@ -183,6 +183,11 @@ impl Invocation<'_> {
     fn invoke(&self, argv: &[String], stdin: &[u8]) -> Result<Ran, PluginError> {
         let shown = argv.join(" ");
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
+        let policy = &self.ctx.workspace.sandbox;
+        let profile = Profile {
+            network: policy.network.clone(),
+            ..Profile::new(&self.ctx.workspace.root).caching()
+        };
         let output = lighthouse_process::run(&lighthouse_process::Invocation {
             argv,
             dir: &self.ctx.workspace.root,
@@ -195,6 +200,7 @@ impl Invocation<'_> {
             limit: self.rule.timeout,
             grace: GRACE,
             max_output: lighthouse_process::MAX_OUTPUT,
+            sandbox: policy.sandbox(&profile),
         })
         .map_err(incomplete)?;
         let stderr = String::from_utf8_lossy(&output.stderr);

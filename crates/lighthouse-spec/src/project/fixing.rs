@@ -42,6 +42,8 @@ impl ApprovalSpec {
 /// with its defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixPolicy {
+    /// Whether a fix a model proposed and the checks accepted is written.
+    pub approval: Approval,
     /// The decisions a model may fix: ids or globs over them; none when the
     /// project lists none.
     pub decisions: Vec<String>,
@@ -53,9 +55,11 @@ pub struct FixPolicy {
     pub timeout: std::time::Duration,
 }
 
-impl From<FixSpec> for FixPolicy {
-    fn from(spec: FixSpec) -> Self {
+impl FixPolicy {
+    /// The policy of the `fix` and `approval` tables, with the defaults.
+    pub(super) fn new(spec: FixSpec, approval: ApprovalSpec) -> Self {
         Self {
+            approval: approval.fix.unwrap_or_default(),
             decisions: spec.decisions,
             scope: spec.scope.unwrap_or(FixScope::Files),
             verify: spec.verify,

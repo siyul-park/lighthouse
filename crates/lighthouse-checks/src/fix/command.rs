@@ -10,7 +10,7 @@ use std::{
 
 use lighthouse_model::{LineIndex, Span, ucm::EditOp};
 use lighthouse_plugin::{Error as PluginError, FixRequest};
-use lighthouse_process::{GRACE, Invocation, Output, Stdin};
+use lighthouse_process::{GRACE, Invocation, Output, Profile, Stdin};
 use lighthouse_spec::CommandSpec;
 use serde_json::json;
 
@@ -65,6 +65,10 @@ pub(crate) fn run(
         "evidence": finding.evidence,
     });
     let environment = contract::environment(&spec.env, &decision, request.options);
+    let profile = Profile {
+        writes: vec![scratch.path().to_owned()],
+        ..Profile::new(&request.workspace.root)
+    };
     let output = lighthouse_process::run(&Invocation {
         argv: &argv,
         dir: scratch.path(),
@@ -73,6 +77,7 @@ pub(crate) fn run(
         limit: spec.timeout.get(),
         grace: GRACE,
         max_output: lighthouse_process::MAX_OUTPUT,
+        sandbox: request.workspace.sandbox.sandbox(&profile),
     })
     .map_err(|reason| fail(format!("`{}`: {reason}", argv.join(" "))))?;
     interpret(id, spec, request, &argv, &target, output)

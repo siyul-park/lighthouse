@@ -26,7 +26,12 @@ pub(crate) fn check(meta: &RuleManifest, ctx: &Context) -> Result<Vec<Diagnostic
         return Ok(Vec::new());
     }
     let formatted = formatter
-        .format(&ctx.workspace.root, &file.path, text)
+        .format(
+            &ctx.workspace.root,
+            &file.path,
+            text,
+            &ctx.workspace.sandbox,
+        )
         .map_err(PluginError::Incomplete)?;
     if formatted == text {
         return Ok(Vec::new());

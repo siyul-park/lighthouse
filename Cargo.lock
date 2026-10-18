@@ -1687,6 +1687,7 @@ dependencies = [
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-report",
  "lighthouse-resource",

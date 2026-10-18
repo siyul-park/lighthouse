@@ -15,6 +15,7 @@ use super::{
     environment::EnvironmentSpec,
     models::{DEFAULT_BUDGET, DEFAULT_EXPLORE, ModelsSpec},
     parse_project,
+    sandbox::SandboxSpec,
 };
 use crate::Error;
 
@@ -83,6 +84,7 @@ impl Layers {
         let mut spec = project.spec;
         spec.models = merged.models;
         spec.approval = merged.approval;
+        spec.sandbox = merged.sandbox;
         let mut config = Config::from_resource(Resource::new(project.metadata, spec))?;
         config.environment = personal.rules;
         let project = Layer {
@@ -121,6 +123,10 @@ fn defaults() -> Layer {
             approval: ApprovalSpec {
                 fix: Some(Approval::default()),
             },
+            sandbox: SandboxSpec {
+                enabled: Some(true),
+                network: Some(Vec::new()),
+            },
             ..EnvironmentSpec::default()
         },
     }
@@ -152,6 +158,14 @@ fn flatten(env: &EnvironmentSpec) -> Vec<(String, Value)> {
             models.routing.and_then(to_value),
         ),
     ];
+    out.push((
+        "sandbox.enabled".to_owned(),
+        env.sandbox.enabled.and_then(to_value),
+    ));
+    out.push((
+        "sandbox.network".to_owned(),
+        env.sandbox.network.as_ref().and_then(to_value),
+    ));
     out.extend(
         models
             .providers

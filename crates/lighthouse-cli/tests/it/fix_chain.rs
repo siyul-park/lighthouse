@@ -12,6 +12,7 @@ use crate::{
     cache_fixtures::write,
     fix_scope::{ALLOW, BAN, FIX_OWN_FILE, WIDE, agent_project, fix, listed, read, with_agent},
     mcp::Client,
+    models::UNSANDBOXED,
 };
 
 const RUST_FORMATTER: &str = "[languages.rust]\nformatter = { argv = [\"rustfmt\", \"--edition\", \"2024\", \"--emit\", \"stdout\"], stdin = \"file\", output = \"text\" }\n";
@@ -191,10 +192,11 @@ fn reorder_project(approval: &str) -> (TempDir, TempDir, PathBuf) {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"design\", \"local\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n\"design/declaration-groups\" = \"error\"\n[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"design\", \"local\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n\"design/declaration-groups\" = \"error\"\n[models]\nedit = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}{}",
             plugin.to_str().unwrap(),
             script.to_str().unwrap(),
-            listed("", approval)
+            listed("", approval),
+            UNSANDBOXED
         )),
     );
     write(

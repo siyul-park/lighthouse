@@ -11,6 +11,7 @@ mod models;
 mod provider;
 mod resolved;
 mod rules;
+mod sandbox;
 mod spec;
 mod standard;
 
@@ -32,13 +33,14 @@ pub use fixing::{Approval, ApprovalSpec, FixPolicy, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
 pub use layers::{BUNDLED, Entry, Layer, Layers};
 use lighthouse_model::{Options, Severity};
-pub use lighthouse_process::Formatter;
+pub use lighthouse_process::{Formatter, Policy};
 use lighthouse_resource::{Duration, documents, resource};
 pub use lighthouse_resource::{Format, Metadata, Resource};
 pub use models::{Evaluation, Models, Routing};
 pub use provider::{CommandProtocol, ModelProvider, ProviderSpec, RESERVED_PROVIDERS, Task};
 use resolved::Resolved;
 pub use rules::{Level, RuleConfig, RuleSetting, Rules};
+pub use sandbox::SandboxSpec;
 use spec::PluginEntry;
 pub use spec::{GeneratedCheck, OverrideSpec, ProjectSpec};
 
@@ -171,7 +173,7 @@ pub struct Config {
     generated: Option<GlobSet>,
     generated_check: Option<GeneratedCheck>,
     models: Models,
-    approval: Approval,
+    sandbox: Policy,
     fix: FixPolicy,
     extends: Vec<String>,
     rules: Rules,
@@ -276,8 +278,8 @@ impl Config {
             generated: globs(&spec.generated.files)?,
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
-            approval: spec.approval.fix.unwrap_or_default(),
-            fix: spec.fix.into(),
+            sandbox: spec.sandbox.into(),
+            fix: FixPolicy::new(spec.fix, spec.approval),
             extends: spec.extends,
             rules: rules(spec.rules),
             environment: BTreeMap::new(),
@@ -387,13 +389,16 @@ impl Config {
         Ok(self.models.with_rules(rules))
     }
 
-    /// Whether a verified fix by a model is written or left as a preview.
-    pub fn approval(&self) -> Approval {
-        self.approval
+    /// How the programs of the project run: in the OS sandbox or, in a trusted
+    /// project that says so, with the user's full access; and the hosts its
+    /// checks and verification commands may reach.
+    pub fn sandbox(&self) -> &Policy {
+        &self.sandbox
     }
 
-    /// What the project allows of fixes by models: the decisions, the widest
-    /// change, and the commands that must pass after them.
+    /// What the project allows of fixes by models: whether a verified one is
+    /// written, the decisions, the widest change, and the commands that must
+    /// pass after them.
     pub fn fix(&self) -> &FixPolicy {
         &self.fix
     }

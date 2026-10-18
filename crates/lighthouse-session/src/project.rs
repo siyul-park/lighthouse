@@ -25,6 +25,9 @@ use crate::{
 /// What `init` writes and what a project without a config is checked with.
 pub const DEFAULT_CONFIG: &str = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Project\"\n\n[metadata]\nname = \"project\"\n\n[spec]\nplugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
 
+/// What every run says when the sandbox is off.
+const SANDBOX_OFF: &str = "sandbox off: programs run with your full access";
+
 /// A project as the frontends open it: its configuration, its root directory
 /// and its decisions.
 #[derive(Clone)]
@@ -173,10 +176,18 @@ impl Session {
     /// them had to say. It trusts what the user trusts and runs the models the
     /// project's providers name.
     pub fn engine(&self) -> Result<(Engine, Vec<String>)> {
+        let sandbox = self.config.sandbox().clone();
+        if !sandbox.enabled && !self.trusted() {
+            return Err(
+                "`[sandbox] enabled = false` needs a trusted project: programs would run with your full access (run `lighthouse trust`)"
+                    .into(),
+            );
+        }
         let (registry, plugins) = self.registry()?;
         let root = self.root.clone();
+        let policy = sandbox.clone();
         let commands: CommandModels = Arc::new(move |name, model, provider| {
-            CommandModel::new(&root, name, model, provider)
+            CommandModel::new(&root, name, model, provider, &policy)
                 .map(|command| Box::new(command) as Box<dyn ModelClient>)
         });
         let engine = Engine::new(registry, self.config.clone(), &self.catalog, &self.root)?
@@ -185,6 +196,9 @@ impl Session {
             .with_commands(commands);
         let listed = permitted(&self.config, &self.catalog, &|id| engine.active(id))?;
         let mut notices = plugins.notices;
+        if !sandbox.enabled {
+            notices.push(SANDBOX_OFF.to_owned());
+        }
         notices.extend(listed.warnings);
         Ok((engine, notices))
     }

@@ -141,7 +141,7 @@ fn when_one_file_of_a_fix_changed_concurrently_neither_is_written() {
     // The formatter of a trusted project saves `b.toy` elsewhere while the run
     // is verifying, only when it formats that file.
     let formatter = format!(
-        "[languages.toy]\nformatter = [\"sh\", \"-c\", \"case \\\"$0\\\" in *b.toy) echo '// saved elsewhere' >> '{}';; esac\"]\n",
+        "[languages.toy]\nformatter = [\"sh\", \"-c\", \"case \\\"$0\\\" in *b.toy) echo '// saved elsewhere' >> '{}';; esac\"]\n[sandbox]\nenabled = false\n",
         b.display()
     );
     let (engine, plan) = pair(&dir, &formatter);

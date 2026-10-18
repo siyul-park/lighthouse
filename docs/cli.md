@@ -766,7 +766,7 @@ Show the configuration of this machine
 Usage: lighthouse config <COMMAND>
 
 Commands:
-  show  Show the effective environment: models, providers, bindings, approval
+  show  Show the effective environment: models, providers, bindings, approval, sandbox
   help  Print this message or the help of the given subcommand(s)
 
 Options:
@@ -777,7 +777,7 @@ Options:
 ## `lighthouse config show`
 
 ```text
-Show the effective environment: models, providers, bindings, approval.
+Show the effective environment: models, providers, bindings, approval, sandbox.
 
 Meaning is the project's alone (`lighthouse.toml`); how this machine computes and applies is read from, in order, the bundled defaults, the project, your file (`$XDG_CONFIG_HOME/lighthouse/config.toml`, default `~/.config/lighthouse/config.toml`) and the repository-local `.lighthouse/local.toml`. A later layer wins key by key; a provider is replaced whole. Shows each key that has a value, sorted; --origin names the layer each value comes from, as `git config --show-origin` does. The values a provider passes to its program (`env`) are hidden.
 

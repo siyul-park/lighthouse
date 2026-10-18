@@ -29,9 +29,10 @@ pub(crate) struct Personal {
 
 impl Personal {
     /// What of the file trust covers, canonically: the providers that run a
-    /// program, with the variables they are given, and the approval. A budget
-    /// or a binding to a provider that is not a program is not. `None` when
-    /// the file holds nothing of the kind.
+    /// program, with the variables they are given and the hosts they reach,
+    /// the approval and the sandbox. A budget or a binding to a provider that
+    /// is not a program is not. `None` when the file holds nothing of the
+    /// kind.
     pub(crate) fn trusted(&self) -> Option<String> {
         let spec = &self.layer.spec;
         let programs: BTreeMap<&String, Value> = spec
@@ -40,14 +41,26 @@ impl Personal {
             .iter()
             .filter(|(_, provider)| provider.command.is_some())
             .map(|(name, p)| {
-                let ran = json!({ "command": p.command, "env": p.env, "keyEnv": p.key_env });
+                let ran = json!({
+                    "command": p.command,
+                    "env": p.env,
+                    "keyEnv": p.key_env,
+                    "network": p.network,
+                });
                 (name, ran)
             })
             .collect();
-        if programs.is_empty() && spec.approval.fix.is_none() {
+        if programs.is_empty() && spec.approval.fix.is_none() && spec.sandbox.is_empty() {
             return None;
         }
-        Some(json!({ "providers": programs, "approval": spec.approval.fix }).to_string())
+        Some(
+            json!({
+                "providers": programs,
+                "approval": spec.approval.fix,
+                "sandbox": spec.sandbox,
+            })
+            .to_string(),
+        )
     }
 }
 

@@ -11,7 +11,7 @@ use std::{
 };
 
 use ignore::WalkBuilder;
-use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
+use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT, Policy, Profile};
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 
@@ -108,9 +108,15 @@ pub(in crate::fix) fn run_verify(
     texts: &Overlays,
     commands: &[Vec<String>],
     limit: Duration,
+    policy: &Policy,
 ) -> Result<(), String> {
     let scratch = Scratch::new(root, texts)
         .map_err(|e| format!("the scratch copy of the project failed: {e}"))?;
+    let profile = Profile {
+        writes: vec![scratch.path().to_owned()],
+        network: policy.network.clone(),
+        ..Profile::new(root).caching()
+    };
     for argv in commands {
         let shown = argv.join(" ");
         let ran = lighthouse_process::run(&Invocation {
@@ -121,6 +127,7 @@ pub(in crate::fix) fn run_verify(
             limit,
             grace: GRACE,
             max_output: MAX_OUTPUT,
+            sandbox: policy.sandbox(&profile),
         })
         .map_err(|reason| format!("`{shown}`: {reason}"))?;
         if !ran.success {
