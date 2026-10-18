@@ -146,6 +146,16 @@ fn the_temporary_directory_of_a_run_is_its_own_and_is_gone_afterwards() {
 }
 
 #[test]
+fn a_program_killed_by_a_signal_has_no_exit_code_under_any_backend() {
+    let world = World::new();
+
+    let ran = world.run("kill -9 $$", &world.profile(&[]));
+
+    assert!(!ran.success);
+    assert_eq!(ran.code, None, "{ran:?}");
+}
+
+#[test]
 fn without_a_network_list_nothing_is_reached_not_even_a_local_server() {
     let world = World::new();
     let port = server();

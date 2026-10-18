@@ -194,9 +194,14 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
     if let Some(sandboxed) = &sandboxed {
         stderr.extend(refusals(&sandboxed.blocked()));
     }
+    let code = if sandboxed.is_some() {
+        Started::ended(status.code())
+    } else {
+        status.code()
+    };
     Ok(Ran {
         success: status.success(),
-        code: status.code(),
+        code,
         stdout,
         stderr,
         truncated: cut_out || cut_err,

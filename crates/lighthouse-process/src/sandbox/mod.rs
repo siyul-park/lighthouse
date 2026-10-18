@@ -167,6 +167,12 @@ impl Started {
         backend::wrap(&self.plan, argv)
     }
 
+    /// The exit code of the program, which the backend may have turned into
+    /// the code of a signal.
+    pub(crate) fn ended(code: Option<i32>) -> Option<i32> {
+        backend::ended(code)
+    }
+
     /// The variables the program is given on top of its own: where it may put
     /// temporary files, and the proxy that is its only way out.
     pub(crate) fn env(&self) -> Vec<(String, String)> {
