@@ -78,6 +78,10 @@ spec:
       symbol: symbol.id
     identity:
       subject: symbol.id
+  fix:
+    safety: unsafe
+    type: model
+    scope: symbol
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), ch. 4 Good comments"

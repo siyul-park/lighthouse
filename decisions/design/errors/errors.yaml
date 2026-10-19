@@ -104,6 +104,10 @@ spec:
       what: what
       detail: event.detail
       function: event.func.name
+  fix:
+    safety: unsafe
+    type: model
+    scope: files
   provenance:
     wasDerivedFrom:
     - 'go-errorlint comparison, asserts, errorf: https://github.com/polyfloyd/go-errorlint#readme'

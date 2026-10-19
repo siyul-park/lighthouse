@@ -97,6 +97,10 @@ spec:
       manual_assertions: func.manual_assertions
     identity:
       subject: func.id
+  fix:
+    safety: unsafe
+    type: model
+    scope: symbol
   provenance:
     wasDerivedFrom:
     - Meszaros, xUnit Test Patterns, Obscure Test

@@ -157,6 +157,10 @@ spec:
       uses: "misplaced ? envy.module_uses : []"
     identity:
       subject: func.id
+  fix:
+    safety: unsafe
+    type: model
+    scope: files
   provenance:
     wasDerivedFrom:
     - Fowler, Refactoring 2nd ed., Feature Envy

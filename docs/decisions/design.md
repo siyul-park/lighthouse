@@ -140,9 +140,9 @@ Function structure should make meaningful behavior reusable and readable, not me
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`design/complexity`](#a-function-is-small-enough-to-read-at-one-level) | A function is small enough to read at one level | warn · cel |  |  |
-| [`design/signature`](#a-signature-is-short-public-and-narrow) | A signature is short, public and narrow | warn · cel |  |  |
-| [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel |  |  |
-| [`design/symbols`](#every-symbol-earns-its-existence) | Every symbol earns its existence | warn · cel |  |  |
+| [`design/signature`](#a-signature-is-short-public-and-narrow) | A signature is short, public and narrow | warn · cel | unsafe |  |
+| [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel | unsafe |  |
+| [`design/symbols`](#every-symbol-earns-its-existence) | Every symbol earns its existence | warn · cel | unsafe |  |
 
 ### A function is small enough to read at one level
 
@@ -189,7 +189,7 @@ Also: rust
 
 ### A signature is short, public and narrow
 
-`design/signature` · symbol · warn · cel
+`design/signature` · symbol · warn · cel · fix: unsafe
 
 *A long parameter list usually hides a missing type, or a function that does several things (Martin, Clean Code ch. 3 and F1 Too Many Arguments), and a public signature is the contract callers build on. The limits measure the design, not its packaging: the remedy is a simpler signature or a type that is reused, never the same parameters moved into a struct or a function that only forwards (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Introduce Parameter Object, Middle Man). One finding is reported per function: the first kind that matched, in the order below, with all of them in the evidence. Kinds. `params`: each language uses its dominant linter's default: revive `argument-limit` allows 8 in Go, clippy `too_many_arguments` allows 7 in Rust. A constructor may take one more because it assembles a type. A function that implements an interface or trait method, an entrypoint and a test do not choose their signature, so they have no limit. Sonar S107 allows 7, detekt `LongParameterList` 5 (6 for a constructor) and ESLint `max-params` 3. The receiver is not counted. A struct that exists only for the function (nothing else takes it, and only the function and its callers touch it or its fields) is a parameter list in disguise, so its fields count instead of the struct. `results`: a function returns at most three results (none for a constructor, an implementation or a test); a Rust `Result` counts its ok value. `unexported` (Go only; the Rust compiler checks it): an exported function or a method of an exported type that takes or returns an unexported type of the project, which callers cannot name. Narrow inputs are judged: a public function that takes a project type is put to a model, with the requirement and the examples as the question.*
 
@@ -223,7 +223,7 @@ Also: rust
 
 ### Behavior lives with its owner
 
-`design/prefer-method` · symbol · warn · cel
+`design/prefer-method` · symbol · warn · cel · fix: unsafe
 
 *Where a function lives tells readers who owns the behavior (Martin, Clean Code G18 Inappropriate Static, G14 Feature Envy, G17 Misplaced Responsibility). Kind `method`: a private free function whose only callers are methods of one type, and which takes a value of that type or calls or references it or one of its members, is that type's behavior wearing another name. A function that does neither is a helper with no more to do with the owner than with any other type. Constructors, `main` and `init` are not reported. The other two kinds are review routes, off by default and on in the strict project, because their precision is low: a candidate is put to a model, not reported. `envy` is Fowler's Feature Envy (Refactoring, 2nd ed.) with the detection strategy of Lanza and Marinescu (2006): the function accesses more than a few foreign attributes (ATFD above FEW, which they put at 3) of one class only. Sonar has no rule for it, and PMD's design rules have a God Class but no feature-envy rule. `module` is Fowler's Move Function with the foreign-data measure of the same authors: a function whose every use lies in one other module is that module's code, kept here by accident of history. No tool checks it: Sonar and PMD judge coupling of a class, not where a function belongs.*
 
@@ -270,7 +270,7 @@ Also: rust
 
 ### Every symbol earns its existence
 
-`design/symbols` · symbol · warn · cel
+`design/symbols` · symbol · warn · cel · fix: unsafe
 
 *A symbol that earns nothing is indirection and noise (Martin, Clean Code G12 Clutter): a forwarding wrapper adds a name without adding meaning, a private helper with a single caller is part of that caller unless it names a concept, and every public knob has to be supported forever. The limits measure the design, not its packaging: the remedy is simpler code or a concept that is reused, never relocation (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man). Kind `wrapper`: a function or method whose whole body forwards to one other function with the arguments it was given, and that is called from one place, and not used as a value, from a test or as a trait method, is reported, since it can be inlined. One that adds an argument, or is needed as a function value, is not a wrapper. Kind `dead` (on by default; Rust is off through `deadKinds`): a private function, method or variable that nothing calls and nothing refers to, that does not implement an interface, is no test fixture and is not `main`, `init` or `_`: delete it (Martin, Clean Code G9 and F4). Members of an interface or trait are declarations, not code, and functions without a body are implemented elsewhere (Go assembly), so neither is reported. The option `deadKinds` names the kinds of symbol it reports; types are left out by default because a type used only in type positions has no reference edge, and constants because a constant group counts as used when any member is (staticcheck U1000) and iota sentinels are never referenced. One that only tests use is left to agent review. Rust leaves dead code to rustc's `dead_code` lint, which sees type positions and macro arguments the index does not, so `deadKinds` is empty there. Kind `interface` (off by default and on in the strict project): a private interface with members and exactly one implementing type, tests included: use the type directly until a second implementation exists. An exported interface with one implementation is left to agent review, since callers outside the project may implement it. Helpers that are not wrappers are judged: a private function or method with exactly one production caller is put to a model, with the requirement and the examples as the question.*
 
@@ -315,11 +315,11 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/naming`](#names-are-short-standard-and-say-what-they-mean) | Names are short, standard and say what they mean | warn · cel |  |  |
+| [`design/naming`](#names-are-short-standard-and-say-what-they-mean) | Names are short, standard and say what they mean | warn · cel | unsafe |  |
 
 ### Names are short, standard and say what they mean
 
-`design/naming` · symbol · warn · cel
+`design/naming` · symbol · warn · cel · fix: unsafe
 
 *Context already names the package, receiver, phase, or representation, and a longer name adds words, not meaning (Martin, Clean Code ch. 2 and N1-N7: descriptive, unambiguous names at the right level of abstraction, standard nomenclature, long names for long scopes, no encodings, names that describe side-effects; G20 Function Names Should Say What They Do). Kinds. `qualifier`: an exported top-level symbol whose name starts or ends with the name of its package or module (`parser.ParserConfig`, `config_config`) repeats what callers already write. A name equal to its package or module name (`provider.Provider`, `list.List`, `time.Time`) is the package's primary concept; repeating it has meaning and is never reported. `symbols` names the kinds of symbol that are checked; Rust, where a module path is part of every use, checks none by default. `words` (off by default and on in the strict project): a name has more words than `maxWords`, with the option name of ESLint's `max-lines` and `max-params`. Words are the parts of a name split at `_`, at a lower-to-upper change and at the end of an acronym: `parseHTTPRequest` and `parse_http_request` have three. `encoding` (off by default and on in the strict project): a name that carries its type or scope in a prefix, matched by the patterns of `encodings` (Hungarian notation `strName`, member prefix `m_name`, an `I` before the name of an interface), optionally limited to some kinds of symbol (Clean Code N6, ch. 2 Avoid Encodings). The rest is judged: whether a name is minimal, singular or plural, a predicate that states its form, an action verb that does not hide a query, a one-letter name that outlives a tiny scope, a standard abbreviation kept, and one term for one concept across packages need the meaning of a name. A function that returns a `bool`, and a one-letter name, are put to a model, with the requirement and the examples as the question.*
 
@@ -444,11 +444,11 @@ Errors are contracts: callers should be able to classify failures, preserve caus
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/errors`](#errors-keep-their-identity-and-are-returned-not-thrown) | Errors keep their identity and are returned, not thrown | warn · cel |  |  |
+| [`design/errors`](#errors-keep-their-identity-and-are-returned-not-thrown) | Errors keep their identity and are returned, not thrown | warn · cel | unsafe |  |
 
 ### Errors keep their identity and are returned, not thrown
 
-`design/errors` · symbol · warn · cel
+`design/errors` · symbol · warn · cel · fix: unsafe
 
 *Adding context must not hide the cause callers depend on, and a panic bypasses the caller's control flow (Martin, Clean Code ch. 7 and G26 Be Precise: use exceptions, not return codes, but keep what they carry). Error text and values are part of the public contract: callers classify failures by identity, not by message text. Kinds, one finding per event. `compare` (Go): an error compared with `==`, `!=` or a `switch`, which fails on a wrapped error (`errorlint` comparison, staticcheck): use `errors.Is`. `nil` and `io.EOF`-style sentinels returned unwrapped by contract are fine, and so is the body of an `Is` method. `assert` (Go): a type assertion or type switch on an error: use `errors.As`. `wrap` (Go): `fmt.Errorf` formatting an error without `%w`. Rust keeps identity through `?` and `From`, which the compiler checks, so these kinds leave it to review. Off by default and on in the strict project, as clippy's restriction lints and forbidigo are opt-in for the same reason: `panic` and `unwrap` report every place production code can panic, one finding each (forbidigo `^panic$`; clippy `panic`, `unwrap_used`, `expect_used`, `todo`, `unimplemented`, `unreachable`). Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros (`panic`) and any `.unwrap()`, `.expect(..)`, `.unwrap_err()` or `.expect_err(..)` call (`unwrap`; syntactically, on any receiver, as clippy does). The findings are candidates, not violations: impossible programmer errors, `Must*`-style APIs and documented hot-path invariants are allowed by the requirement and stay with review. Test code, entrypoints (`main`, `init`) and functions whose name starts with one of `allowPrefixes` are not reported. In Rust, a library that is not published and that only tests link in (no other package lists it in `[dependencies]`, and it has no binary) is test code. Categories, translation and state are judged: they need the meaning of an error, which no event carries, so the requirement and the examples are the question put to a model.*
 
@@ -562,12 +562,12 @@ Comments preserve facts that code cannot express; they should not narrate code t
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/exported-doc`](#exported-symbols-are-documented) | Exported symbols are documented | warn · cel |  |  |
+| [`design/exported-doc`](#exported-symbols-are-documented) | Exported symbols are documented | warn · cel | unsafe |  |
 | [`design/comments`](#a-comment-states-a-fact-the-code-cannot) | A comment states a fact the code cannot | warn · cel | unsafe |  |
 
 ### Exported symbols are documented
 
-`design/exported-doc` · symbol · warn · cel
+`design/exported-doc` · symbol · warn · cel · fix: unsafe
 
 *Public API changes need facts callers cannot read from the code. Go: Normal Go doc comments beginning with the symbol name. A method that implements an interface of the project or of a package the code can import is exempt (revive's `exported` rule, and golint before it, leave the well-known interface methods undocumented too): the interface fixes its name and contract. Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does, and a method of any trait impl is exempt. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.*
 

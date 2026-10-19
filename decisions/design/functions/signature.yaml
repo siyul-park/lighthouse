@@ -175,6 +175,10 @@ spec:
             implementation: -1
             entrypoint: -1
             test: -1
+  fix:
+    safety: unsafe
+    type: model
+    scope: files
   provenance:
     wasDerivedFrom:
     - 'revive argument-limit 8: https://revive.run/r#argument-limit'

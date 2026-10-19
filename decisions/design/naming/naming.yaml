@@ -149,6 +149,10 @@ spec:
       max: options.maxWords
     identity:
       subject: symbol.id
+  fix:
+    safety: unsafe
+    type: model
+    scope: files
   provenance:
     wasDerivedFrom:
     - Martin, Clean Code (2008), G20 Function Names Should Say What They Do

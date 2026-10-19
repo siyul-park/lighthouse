@@ -69,7 +69,11 @@ safety = "safe"                                    # trust the agent on this dec
   decision is a warning naming it. A listed decision without a `fix` block has `fix: {type: model}`;
   a decision may say `fix: {type: model, prompt: "...", scope: symbol | files}` to add an
   instruction and a scope. A decision that declares none imposes no limit of its own, so its scope is
-  `[fix] scope`; one that declares a scope is narrowed to `[fix] scope`, never widened by it.
+  `[fix] scope`; one that declares a scope is narrowed to `[fix] scope`, never widened by it. The
+  bundled decisions declare one where their fix has a natural reach: `symbol` for `design/exported-doc`,
+  `design/symbols` and `testing/cases`, `files` for `design/errors`, `design/signature`,
+  `design/prefer-method` and `design/naming`, whose callers change too. Listing them in `[fix] decisions`
+  is still what grants a model the fix.
 - **Agent or review, no router.** Where a finding gets a model fix it is made by the `agent`; with none bound
   it stays a review task that carries the brief (MCP `review_show` returns it as `brief`, `review
   show` prints it under `brief:`) for whoever drives the session, and Lighthouse re-checks when they

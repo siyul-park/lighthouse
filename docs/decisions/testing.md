@@ -11,7 +11,7 @@ Test structure should provide one obvious owner for each public contract and kee
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`testing/owner`](#every-public-symbol-has-exactly-one-owner-test) | Every public symbol has exactly one owner test | warn · cel |  |  |
-| [`testing/cases`](#cases-are-behaviors-written-simply-and-asserted-through-the-standard-library) | Cases are behaviors, written simply and asserted through the standard library | warn · cel |  |  |
+| [`testing/cases`](#cases-are-behaviors-written-simply-and-asserted-through-the-standard-library) | Cases are behaviors, written simply and asserted through the standard library | warn · cel | unsafe |  |
 | [`testing/file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | error · cel | safe |  |
 
 ### Every public symbol has exactly one owner test
@@ -76,7 +76,7 @@ Also: rust
 
 ### Cases are behaviors, written simply and asserted through the standard library
 
-`testing/cases` · test · warn · cel
+`testing/cases` · test · warn · cel · fix: unsafe
 
 *A case is one behavior with its target, input, operation and expected result visible (Martin, Clean Code ch. 9: clean tests, one concept per test), and the same behavior over many inputs is one table, different scenarios one case each, in one case style at one level, at most two levels deep. Kind `manual` is the one a fact tells apart; the rest is judged: the requirement and the examples are the question put to a model for each test function. A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output. The decision applies to a module whose files import one of the `libraries` somewhere: where no assertion library is in use, a plain compare-and-fail is the standard form and there is nothing to prefer. A benchmark (`Benchmark*`) is not judged: its loop checks a result without an assertion library's overhead. Go: The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion. Rust: Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.*
 

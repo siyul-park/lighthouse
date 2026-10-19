@@ -390,3 +390,23 @@ fn the_safety_a_project_gives_a_rule_replaces_every_other_in_the_last_place() {
     assert_eq!(warned.fix_safety(Some(Safety::Safe)), Safety::Safe);
     assert_eq!(model.fix_safety(Some(Safety::Safe)), Safety::Safe);
 }
+
+#[test]
+fn the_bundled_decisions_a_model_may_fix_declare_how_far_it_may_go() {
+    let bundled = Catalog::bundled();
+    let scope_of = |id: &str| match &bundled.decision(id).unwrap().fix.as_ref().unwrap().kind {
+        FixKind::Model { scope, .. } => *scope,
+        other => panic!("{id}: a model fix expected, found {other:?}"),
+    };
+    for id in ["design/exported-doc", "design/symbols", "testing/cases"] {
+        assert_eq!(scope_of(id), Some(FixScope::Symbol), "{id}");
+    }
+    for id in [
+        "design/errors",
+        "design/signature",
+        "design/prefer-method",
+        "design/naming",
+    ] {
+        assert_eq!(scope_of(id), Some(FixScope::Files), "{id}");
+    }
+}

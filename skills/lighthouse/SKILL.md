@@ -94,16 +94,16 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/responsibility` (info) One responsibility per symbol, and a boundary for every split
 - `design/layers` (warn) Dependencies point down the layers
 - `design/complexity` (warn) A function is small enough to read at one level
-- `design/signature` (warn) A signature is short, public and narrow
-- `design/prefer-method` (warn) Behavior lives with its owner
-- `design/symbols` (warn) Every symbol earns its existence
-- `design/naming` (warn) Names are short, standard and say what they mean
+- `design/signature` (warn, fixable: unsafe) A signature is short, public and narrow
+- `design/prefer-method` (warn, fixable: unsafe) Behavior lives with its owner
+- `design/symbols` (warn, fixable: unsafe) Every symbol earns its existence
+- `design/naming` (warn, fixable: unsafe) Names are short, standard and say what they mean
 - `design/ownership` (warn) State, generated code and platform code have one owner
 - `design/concurrency` (warn) Cancellation is explicit and tasks can be stopped
-- `design/errors` (warn) Errors keep their identity and are returned, not thrown
+- `design/errors` (warn, fixable: unsafe) Errors keep their identity and are returned, not thrown
 - `design/layout` (warn, fixable: unsafe) Declarations are laid out for reading
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
-- `design/exported-doc` (warn) Exported symbols are documented
+- `design/exported-doc` (warn, fixable: unsafe) Exported symbols are documented
 - `design/comments` (warn, fixable: unsafe) A comment states a fact the code cannot
 
 ### go
@@ -117,6 +117,6 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 ### testing
 
 - `testing/owner` (warn) Every public symbol has exactly one owner test
-- `testing/cases` (warn) Cases are behaviors, written simply and asserted through the standard library
+- `testing/cases` (warn, fixable: unsafe) Cases are behaviors, written simply and asserted through the standard library
 - `testing/file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers
 - `testing/public-boundary` (error) Contract tests live outside the target
