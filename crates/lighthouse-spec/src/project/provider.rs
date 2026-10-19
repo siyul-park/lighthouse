@@ -1,9 +1,9 @@
 //! A provider of models: how a project declares one, along two axes (the
 //! protocol it speaks, and the reach to it), and what the host runs.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, net::IpAddr};
 
-use lighthouse_process::variables;
+use lighthouse_process::{Policy, variables};
 use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -209,9 +209,10 @@ impl ModelProvider {
     }
 
     /// Whether asking this provider reaches a service outside the machine:
-    /// HTTP at a `url` that is not loopback, or a program whose `sandbox`
-    /// lists a host. What leaves the machine is what reaches a host.
-    pub fn remote(&self) -> bool {
+    /// HTTP at a `url` that is not loopback, or a program that may reach a
+    /// host, by its own `sandbox` or by the `project` policy it runs under.
+    /// What leaves the machine is what reaches a host.
+    pub fn remote(&self, project: &Policy) -> bool {
         match self {
             Self::Rpc {
                 plugin, options, ..
@@ -222,10 +223,7 @@ impl ModelProvider {
                         .and_then(Value::as_str)
                         .is_some_and(loopback)
             }
-            Self::Command { program, .. } => program
-                .sandbox
-                .as_ref()
-                .is_some_and(|sandbox| !sandbox.network.is_empty()),
+            Self::Command { program, .. } => !program.policy(project).network.is_empty(),
         }
     }
 }
@@ -418,7 +416,9 @@ fn given(fields: &[(&str, bool)]) -> Vec<String> {
         .collect()
 }
 
-/// Whether `url` names this machine: `localhost`, a `127.*` address or `::1`.
+/// Whether `url` names this machine: its host is exactly `localhost` or an IP
+/// address that is loopback (`127.0.0.0/8`, `::1`). A name that only starts
+/// like one (`127.attacker.example`) is not.
 fn loopback(url: &str) -> bool {
     let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
     let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
@@ -427,5 +427,6 @@ fn loopback(url: &str) -> bool {
         Some(inside) => inside.split(']').next().unwrap_or_default(),
         None => host.rsplit_once(':').map_or(host, |(name, _)| name),
     };
-    host.eq_ignore_ascii_case("localhost") || host == "::1" || host.starts_with("127.")
+    host.eq_ignore_ascii_case("localhost")
+        || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }

@@ -2,6 +2,7 @@
 //! evaluation policy; and the `model` check as the `cel` check it is.
 
 use lighthouse_model::{Safety, Severity};
+use lighthouse_process::Policy;
 use lighthouse_spec::{
     CommandProtocol, Config, Evaluation, Fix, FixKind, FixPolicy, FixScope, ModelCheck,
     ModelProvider, Models, Output, Point, Projects, Routing, Select, Subject, Task,
@@ -142,7 +143,12 @@ fn local_is_built_in_and_costs_nothing_and_cannot_be_declared() {
     assert_eq!(plugin, "model-local");
     assert!(options.is_empty());
     assert_eq!(cost, Some(0.0));
-    assert!(!binding().provider("local").unwrap().remote());
+    assert!(
+        !binding()
+            .provider("local")
+            .unwrap()
+            .remote(&lighthouse_process::Policy::default())
+    );
     assert!(lighthouse_spec::RESERVED_PROVIDERS.contains(&"local"));
 }
 
@@ -506,27 +512,63 @@ fn a_model_check_is_a_cel_check_that_never_fails_and_reviews_what_it_selects() {
 
 #[test]
 fn a_provider_is_remote_when_it_reaches_a_host_outside_the_machine() {
+    let none = Policy::default();
     let binding = binding();
     assert!(
-        binding.provider("openrouter").unwrap().remote(),
+        binding.provider("openrouter").unwrap().remote(&none),
         "a standard API is a service outside the machine"
     );
     assert!(
-        !binding.provider("script").unwrap().remote(),
+        !binding.provider("script").unwrap().remote(&none),
         "a program that reaches no host stays on the machine"
     );
     assert!(
-        !provider("protocol = \"openai\"\nurl = \"http://localhost:11434/v1\"\n").remote(),
+        !provider("protocol = \"openai\"\nurl = \"http://localhost:11434/v1\"\n").remote(&none),
         "a loopback url stays on the machine"
     );
     assert!(
-        provider("command = [\"agent\"]\nsandbox = { network = [\"api.test\"] }\n").remote(),
+        provider("command = [\"agent\"]\nsandbox = { network = [\"api.test\"] }\n").remote(&none),
         "a program whose sandbox lists a host leaves it"
     );
     assert!(
-        !provider("command = [\"agent\"]\nenv = { KEY = \"${KEY}\" }\n").remote(),
+        !provider("command = [\"agent\"]\nenv = { KEY = \"${KEY}\" }\n").remote(&none),
         "a key does not make a program remote"
     );
+    let project = Policy {
+        network: vec!["api.project.test".to_owned()],
+        ..Policy::default()
+    };
+    assert!(
+        provider("command = [\"agent\"]\n").remote(&project),
+        "a program under a project that lists a host may reach it"
+    );
+}
+
+#[test]
+fn only_a_loopback_address_or_localhost_is_this_machine() {
+    let none = Policy::default();
+    let at =
+        |url: &str| provider(&format!("protocol = \"openai\"\nurl = \"{url}\"\n")).remote(&none);
+    for local in [
+        "http://localhost:11434/v1",
+        "http://LOCALHOST/v1",
+        "http://127.0.0.1:8080",
+        "http://127.1.2.3/v1",
+        "http://[::1]:8000/v1",
+        "http://user:pw@127.0.0.1/v1",
+    ] {
+        assert!(!at(local), "{local} is on the machine");
+    }
+    for far in [
+        "http://127.attacker.example/v1",
+        "http://localhost.attacker.example/v1",
+        "http://127.0.0.1.attacker.example/v1",
+        "http://128.0.0.1/v1",
+        "http://[2001:db8::1]/v1",
+        "http://localhost@attacker.example/v1",
+    ] {
+        assert!(at(far), "{far} is remote");
+    }
 }
 
 #[test]

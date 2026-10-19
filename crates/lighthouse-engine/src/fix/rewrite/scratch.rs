@@ -198,17 +198,13 @@ fn tail(bytes: &[u8]) -> String {
 }
 
 /// Makes the directory a repository with one commit of everything in it. The
-/// settings of the user and of the machine are not read, so what the commit
-/// holds does not depend on them.
+/// settings of the user and of the machine are not read, and neither is any
+/// `GIT_*` variable of the process (`GIT_DIR` would put the commit into the
+/// user's own repository), so what the commit holds does not depend on them.
 fn commit(dir: &Path) -> io::Result<()> {
     let git = |args: &[&str]| -> io::Result<()> {
-        let ran = Command::new("git")
+        let ran = git_in(dir)
             .args(args)
-            .current_dir(dir)
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .stdin(Stdio::null())
             .output()
             .map_err(|e| io::Error::other(format!("git cannot be run: {e}")))?;
         if ran.status.success() {
@@ -239,4 +235,22 @@ fn commit(dir: &Path) -> io::Result<()> {
         "--message",
         "base",
     ])
+}
+
+/// A `git` run in `dir` (`-C dir`, so it names the directory itself) without
+/// any `GIT_*` variable of this process and without the system and global
+/// configuration.
+fn git_in(dir: &Path) -> Command {
+    let mut git = Command::new("git");
+    git.arg("-C").arg(dir).current_dir(dir);
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("GIT_") {
+            git.env_remove(name);
+        }
+    }
+    git.env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(Stdio::null());
+    git
 }

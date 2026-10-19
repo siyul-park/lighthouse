@@ -229,7 +229,7 @@ impl Proposer<'_> {
             Stdin::None => &[][..],
             Stdin::File => launch.text.as_bytes(),
         };
-        let ran = Job {
+        let job = Job {
             command: &command,
             dir,
             stdin,
@@ -237,8 +237,13 @@ impl Proposer<'_> {
             timeout: program.timeout(Point::Fix),
             policy: &policy,
             profile: &profile,
+        };
+        // A filter's stdout is the new text of a file, not something to read.
+        let ran = if program.output(Point::Fix) == Output::Stdout {
+            job.run_keeping_stdout()
+        } else {
+            job.run()
         }
-        .run()
         .map_err(|reason| fail(format!("`{shown}`: {reason}")))?;
         ran.exit(&program.success(Point::Fix))
             .map_err(|reason| fail(format!("`{shown}` {reason}")))?;

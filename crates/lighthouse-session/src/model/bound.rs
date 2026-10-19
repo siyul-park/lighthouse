@@ -16,13 +16,13 @@ pub enum Binding {
     /// `models.classification`: the model for decisions nothing else binds.
     Classification,
     /// `models.agent`: the agent that fixes by changing files.
-    Edit,
+    Agent,
     /// A rule of the configuration names it for classification.
     #[serde(rename = "rule-classification")]
     RuleClassification,
-    /// A rule of the configuration names it for the agent that edits.
-    #[serde(rename = "rule-edit")]
-    RuleEdit,
+    /// A rule of the configuration names it for the agent.
+    #[serde(rename = "rule-agent")]
+    RuleAgent,
     /// A trained model attached by an approved revision.
     Attached,
 }
@@ -32,7 +32,7 @@ pub enum Binding {
 pub struct BoundModel {
     /// `<provider>/<model>`.
     pub model: String,
-    /// The decision it judges; none for the classification and edit
+    /// The decision it judges; none for the classification and agent
     /// models.
     pub decision: Option<String>,
     pub binding: Binding,
@@ -51,7 +51,7 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
     let remote = |model: &str| {
         ModelRef::parse(model)
             .and_then(|model| bound.provider(model.provider))
-            .is_some_and(|provider| provider.remote())
+            .is_some_and(|provider| provider.remote(session.config.sandbox()))
     };
     let mut found = Vec::new();
     let mut bind = |model: &String, decision: Option<&str>, binding| {
@@ -67,7 +67,7 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
             bind(model, None, Binding::Classification);
         }
         for model in &bound.agent {
-            bind(model, None, Binding::Edit);
+            bind(model, None, Binding::Agent);
         }
     }
     for (decision, models) in bound.routes() {
@@ -80,7 +80,7 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
     for (decision, models) in bound.agent_routes() {
         if selector.matches(decision) {
             for model in models {
-                bind(model, Some(decision), Binding::RuleEdit);
+                bind(model, Some(decision), Binding::RuleAgent);
             }
         }
     }

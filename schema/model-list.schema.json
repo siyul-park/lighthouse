@@ -16,7 +16,7 @@
                 "type": "string"
               },
               {
-                "const": "edit",
+                "const": "agent",
                 "description": "`models.agent`: the agent that fixes by changing files.",
                 "type": "string"
               },
@@ -26,8 +26,8 @@
                 "type": "string"
               },
               {
-                "const": "rule-edit",
-                "description": "A rule of the configuration names it for the agent that edits.",
+                "const": "rule-agent",
+                "description": "A rule of the configuration names it for the agent.",
                 "type": "string"
               },
               {
@@ -38,7 +38,7 @@
             ]
           },
           "decision": {
-            "description": "The decision it judges; none for the classification and edit\nmodels.",
+            "description": "The decision it judges; none for the classification and agent\nmodels.",
             "type": [
               "string",
               "null"

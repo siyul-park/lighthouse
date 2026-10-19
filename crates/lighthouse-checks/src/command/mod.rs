@@ -289,7 +289,18 @@ impl Invocation<'_> {
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let program = &self.rule.program;
         match program.output(Point::Check) {
-            Output::Lines => Ok(self.findings(&printed.lines(), file)),
+            Output::Lines => {
+                let lines = printed.lines();
+                if lines.is_empty() && printed.code != 0 {
+                    return Err(PluginError::Incomplete(format!(
+                        "`{}` exited {} and reported nothing: {}",
+                        program.shown(),
+                        printed.code,
+                        printed.stderr
+                    )));
+                }
+                Ok(self.findings(&lines, file))
+            }
             Output::Status => Ok(self.failure(printed, file)),
             _ => {
                 let read = sarif::Reading {

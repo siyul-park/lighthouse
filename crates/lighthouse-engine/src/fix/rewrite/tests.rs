@@ -175,3 +175,87 @@ fn the_verify_programs_run_over_a_copy_that_holds_the_fixed_texts() {
     let escaping = crate::Overlays::from([(PathBuf::from("../x"), String::new())]);
     assert!(run_verify(root.path(), &escaping, &[], &Policy::default()).is_err());
 }
+
+/// Set in the child process the test below starts, with the `GIT_*`
+/// variables a user's shell may have.
+const DECOY: &str = "LIGHTHOUSE_SCRATCH_DECOY";
+
+#[test]
+fn a_git_directory_in_the_environment_never_receives_the_base_commit() {
+    if std::env::var_os(DECOY).is_some() {
+        // The child: GIT_DIR names a repository of the user.
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("a.txt"), "x\n").unwrap();
+        let scratch = Scratch::new(root.path(), &Overlays::new()).unwrap();
+        assert!(scratch.path().join(".git").exists(), "its own repository");
+        return;
+    }
+    let decoy = tempfile::tempdir().unwrap();
+    let ok = Command::new("git")
+        .args(["init", "--quiet", "--bare"])
+        .arg(decoy.path())
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok);
+    fs::create_dir(decoy.path().join("tree")).unwrap();
+    let before = fs::read_dir(decoy.path().join("objects")).unwrap().count();
+
+    let child = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "fix::rewrite::tests::a_git_directory_in_the_environment_never_receives_the_base_commit",
+        ])
+        .env(DECOY, "1")
+        .env("GIT_DIR", decoy.path())
+        .env("GIT_WORK_TREE", decoy.path().join("tree"))
+        .env("GIT_INDEX_FILE", decoy.path().join("index"))
+        .output()
+        .unwrap();
+
+    let said = String::from_utf8_lossy(&child.stdout);
+    assert!(
+        child.status.success(),
+        "{said}{}",
+        String::from_utf8_lossy(&child.stderr)
+    );
+    assert!(said.contains("1 passed"), "the child test ran: {said}");
+    assert_eq!(
+        fs::read_dir(decoy.path().join("objects")).unwrap().count(),
+        before,
+        "the repository of GIT_DIR is as it was"
+    );
+    assert!(!decoy.path().join("index").exists());
+}
+
+#[test]
+fn a_secret_a_verify_program_prints_is_not_in_the_note_of_its_failure() {
+    // SAFETY: this variable belongs to this test.
+    unsafe { std::env::set_var("LIGHTHOUSE_VERIFY_TEST_SECRET", "sk-in-a-note") };
+    let root = tempfile::tempdir().unwrap();
+    let mut program = Program::of(vec![
+        "sh".to_owned(),
+        "-c".to_owned(),
+        "echo \"key $TOKEN\"; echo \"stderr $TOKEN\" >&2; exit 3".to_owned(),
+    ]);
+    program.env = [(
+        "TOKEN".to_owned(),
+        "${LIGHTHOUSE_VERIFY_TEST_SECRET}".to_owned(),
+    )]
+    .into();
+    program.output = Some(lighthouse_spec::Output::Lines);
+
+    let failed = run_verify(
+        root.path(),
+        &Overlays::new(),
+        &[program],
+        &Policy::default(),
+    )
+    .unwrap_err();
+
+    assert!(
+        failed.contains("${LIGHTHOUSE_VERIFY_TEST_SECRET}"),
+        "{failed}"
+    );
+    assert!(!failed.contains("sk-in-a-note"), "{failed}");
+}

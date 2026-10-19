@@ -24,9 +24,10 @@ pub fn clone_file(from: &Path, to: &Path) -> io::Result<()> {
     fs::copy(from, to).map(drop)
 }
 
-/// Copies the files of the project that version control would keep, except
-/// its secrets (the copy is writable and its programs may read it), and
-/// writes `texts` over them. The paths of the files placed.
+/// Copies the files of the project that its own ignore files keep, not those
+/// of the user's machine (`core.excludesFile`), so the copy is the same on
+/// every machine; except its secrets (the copy is writable and its programs may
+/// read it). Writes `texts` over the files. The paths of the files placed.
 pub fn copy_project(
     root: &Path,
     into: &Path,
@@ -36,6 +37,7 @@ pub fn copy_project(
     let walk = WalkBuilder::new(root)
         .hidden(false)
         .require_git(false)
+        .git_global(false)
         .filter_entry(|entry| entry.file_name() != REPOSITORY)
         .build();
     for entry in walk {

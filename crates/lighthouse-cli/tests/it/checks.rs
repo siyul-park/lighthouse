@@ -135,7 +135,8 @@ fn checked_at(subject: &str, check: &str) -> (i32, String) {
 #[test]
 fn a_program_ends_as_its_exit_code_and_its_output_say_for_every_exit_class() {
     let table: [(&str, &str, i32, &str); 7] = [
-        // Findings by lines: exit 0 and 1 ran, whatever the code says.
+        // Findings by lines: exit 0 ran and found nothing; a code of `success` that
+        // reports nothing is an error, not clean.
         (
             "command: [sh, -c, \"exit 0\", sh, \"{file}\"]\n",
             "no codes",
@@ -145,8 +146,8 @@ fn a_program_ends_as_its_exit_code_and_its_output_say_for_every_exit_class() {
         (
             "command: [sh, -c, \"exit 1\", sh, \"{file}\"]\n",
             "1 prints nothing",
-            0,
-            "",
+            3,
+            "exited 1 and reported nothing",
         ),
         (
             "command: [sh, -c, \"echo \\\"$1:1: found\\\"; exit 1\", sh, \"{file}\"]\n",
@@ -222,6 +223,28 @@ fn a_line_that_is_only_a_path_places_the_finding_at_line_one_once_however_it_is_
         report.contains("Probe"),
         "the title is the message: {report}"
     );
+}
+
+#[test]
+fn a_secret_a_check_prints_never_reaches_a_finding() {
+    let rule = decision(
+        "  check:\n    type: command\n    command: [sh, -c, \"echo \\\"$1:1: key $TOKEN\\\"; exit 1\", sh, \"{file}\"]\n    env: { TOKEN: \"${LIGHTHOUSE_CHECK_TEST_SECRET}\" }\n",
+    );
+    let dir = project(&rule);
+    trust(dir.path());
+
+    let out = lighthouse(dir.path())
+        .env("LIGHTHOUSE_CHECK_TEST_SECRET", "sk-in-a-finding")
+        .args(["check", "--format", "json"])
+        .output()
+        .unwrap();
+
+    let report = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        report.contains("key ${LIGHTHOUSE_CHECK_TEST_SECRET}"),
+        "{report}"
+    );
+    assert!(!report.contains("sk-in-a-finding"), "{report}");
 }
 
 #[test]

@@ -145,8 +145,13 @@ fn a_variable_in_a_value_is_the_users_and_an_unset_one_names_itself() {
 
     let environment = Environment::new(&declared, Vec::new(), Home::User).unwrap();
 
-    let printed = ran("printf %s \"$TOKEN\"", &environment, Duration::from_secs(5));
-    assert_eq!(printed.stdout, b"Bearer sk-test-value");
+    // The program holds the value; what it prints of it is scrubbed.
+    let printed = ran(
+        "test \"$TOKEN\" = 'Bearer sk-test-value' && printf ok",
+        &environment,
+        Duration::from_secs(5),
+    );
+    assert_eq!(printed.stdout, b"ok");
     assert_eq!(
         environment.scrub("it said sk-test-value twice: sk-test-value"),
         "it said ${LIGHTHOUSE_PROGRAM_TEST_KEY} twice: ${LIGHTHOUSE_PROGRAM_TEST_KEY}"
@@ -187,6 +192,38 @@ fn a_value_a_program_echoes_on_stderr_is_scrubbed_from_what_the_error_shows() {
     assert!(
         error.contains("${LIGHTHOUSE_PROGRAM_TEST_SECRET}"),
         "{error}"
+    );
+}
+
+#[test]
+fn a_value_a_program_echoes_on_stdout_is_scrubbed_too_unless_stdout_is_data() {
+    // SAFETY: this variable belongs to this test.
+    unsafe { std::env::set_var("LIGHTHOUSE_PROGRAM_TEST_STDOUT", "sk-on-stdout") };
+    let declared = BTreeMap::from([(
+        "TOKEN".to_owned(),
+        "${LIGHTHOUSE_PROGRAM_TEST_STDOUT}".to_owned(),
+    )]);
+    let environment = Environment::new(&declared, Vec::new(), Home::User).unwrap();
+    let command = line(&["sh", "-c", "echo \"a/b.go:1: key $TOKEN\""]);
+    let policy = unsandboxed();
+    let profile = Profile::new(Path::new("."));
+    let job = Job {
+        command: &command,
+        dir: Path::new("."),
+        stdin: b"",
+        environment: &environment,
+        timeout: Duration::from_secs(5),
+        policy: &policy,
+        profile: &profile,
+    };
+
+    let read = String::from_utf8(job.run().unwrap().stdout).unwrap();
+    let data = String::from_utf8(job.run_keeping_stdout().unwrap().stdout).unwrap();
+
+    assert_eq!(read, "a/b.go:1: key ${LIGHTHOUSE_PROGRAM_TEST_STDOUT}\n");
+    assert!(
+        data.contains("sk-on-stdout"),
+        "stdout as data is as printed"
     );
 }
 

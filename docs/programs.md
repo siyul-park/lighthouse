@@ -42,7 +42,7 @@ A check adds `files`, globs of the project-relative paths the program is run for
 | changes | `files` | the files the program changed in its scratch copy of the project |
 | | `stdout` | stdout is the new text of `{file}`: a filter (`stdin: file`), which needs no copy of the project |
 
-A program that cannot start, outlives its timeout, exits with a code outside `success` or prints more than the output cap is an **error**: a check leaves the analysis incomplete (exit 3), a fix is declined with the tail of stderr as the reason, a verify program withdraws nothing it was not asked to. An empty set of changes is `unchanged`, with what the program said as the reason; that is how any fixer, a command or an agent, declines.
+A program that cannot start, outlives its timeout, exits with a code outside `success` or prints more than the output cap is an **error**: a check leaves the analysis incomplete (exit 3), a fix is declined with the tail of stderr as the reason, a verify program withdraws nothing it was not asked to. So is a check under `lines` or `sarif` that exits with a code in `success` other than `0` and reports nothing: a linter that exits 1 with no finding, as `rustfmt` does on a file it cannot parse, did not run clean. `status` is exempt, for its code is its result. An empty set of changes is `unchanged`, with what the program said as the reason; that is how any fixer, a command or an agent, declines.
 
 ## Where a program is bound
 
@@ -83,17 +83,17 @@ A key reaches a program in the channel of its reach, with one rule: `${NAME}` is
 
 - A program: `env = { NVIDIA_API_KEY = "${NVIDIA_API_KEY}" }`.
 - An HTTP provider: `headers = { Authorization = "Bearer ${OPENROUTER_API_KEY}" }`, any scheme (`x-api-key`, `api-key`), plus `body` merged into each request body. At the service a `protocol` names, the header has a default: `openai` sends `Authorization: Bearer ${OPENAI_API_KEY}`, `typesafe` `Bearer ${TYPESAFE_API_KEY}`.
-- `${NAME}` expands only in `env` and `headers` values, never in `command`, so a secret is in no argv. The expanded value is never written into a note, a log or a cache key: the key holds the name and a hash of the value, and what a program echoes is scrubbed to `${NAME}`. An unset variable is an error that names the variable.
+- `${NAME}` expands only in `env` and `headers` values, never in `command`, so a secret is in no argv. The expanded value is never written into a note, a log or a cache key: the key holds the name and a hash of the value, and what a program echoes, on stdout or stderr, is scrubbed to `${NAME}` before it becomes a finding, a note, a notice or an error. A fix that prints the new text of a file (`output: stdout`) is not scrubbed there: its stdout is data, not a message. An unset variable is an error that names the variable.
 
 ## Sandbox and the network
 
-Every program runs in the [OS sandbox](architecture.md#sandbox). It reads everything but secrets, writes only its own places, and reaches only the hosts listed. The project's `[sandbox] network` and `write` apply to every program; a program's own `sandbox` lists are added, so a provider's hosts do not widen a check's. A program is **remote** when its `sandbox.network` names a host, or its provider's `url` is not loopback: what leaves the machine is what reaches a host. A remote provider is the one a budget and routing apply to.
+Every program runs in the [OS sandbox](architecture.md#sandbox). It reads everything but secrets, writes only its own places, and reaches only the hosts listed. The project's `[sandbox] network` and `write` apply to every program; a program's own `sandbox` lists are added, so a provider's hosts do not widen a check's. A program is **remote** when the hosts it may reach, the project's `[sandbox] network` and its own `sandbox.network` together, are not empty, or its provider's `url` is not loopback: what leaves the machine is what reaches a host. A `url` is loopback when its host is exactly `localhost` or an IP address in `127.0.0.0/8` or `::1`; `127.attacker.example` is not. A remote provider is the one a budget and routing apply to.
 
 ## One path for a change
 
 A command fix and an agent change files by the same path.
 
-1. **A scratch copy** of the project, secrets excluded, with the fixed texts of the run in place of their files, as a repository with one commit of that state: a tool finds its root, `git diff` works, and an agent that refuses to run outside a repository runs. Clones are copy-on-write where the file system has them. A filter (`stdin: file`, `output: stdout`) needs no copy.
+1. **A scratch copy** of the project, secrets excluded, with the fixed texts of the run in place of their files, as a repository with one commit of that state: a tool finds its root, `git diff` works, and an agent that refuses to run outside a repository runs. The copy holds the files the project's own ignore files let through, not those of the user's global excludes, so it does not depend on one machine; git runs in it with every `GIT_*` variable cleared and `-C` the copy, so an inherited `GIT_DIR` never reaches the user's repository. Clones are copy-on-write where the file system has them. A filter (`stdin: file`, `output: stdout`) needs no copy.
 2. **One collection** of what changed in it against the texts it started from.
 3. **One scope check**, `file` (the finding's file; the default of a command fix), `symbol` or `files` ([fixer spec](fixer-spec.md)). A change outside it rejects the whole attempt.
 4. **One outcome mapping** to the classes `unchanged`, `out-of-scope`, `failed`, `timeout`, `introduced`, `conflict`.

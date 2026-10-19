@@ -105,9 +105,20 @@ pub struct Job<'a> {
 
 impl Job<'_> {
     /// Runs the program. A program that cannot start or outlives its timeout
-    /// is an error; whatever it exits with is not, see [`Ran::exit`]. Its
-    /// stderr has the secrets of the environment scrubbed.
+    /// is an error; whatever it exits with is not, see [`Ran::exit`]. What it
+    /// printed, on stdout and on stderr, has the secrets of the environment
+    /// scrubbed, so nothing it echoes becomes a finding, a note or an error
+    /// that holds one.
     pub fn run(&self) -> Result<Ran, String> {
+        let mut ran = self.run_keeping_stdout()?;
+        ran.stdout = self.scrubbed(&ran.stdout);
+        Ok(ran)
+    }
+
+    /// Runs the program like [`Job::run`] but leaves stdout as it printed it,
+    /// for a program whose stdout is data (the new text of a file) and not
+    /// something to read; its stderr is scrubbed.
+    pub fn run_keeping_stdout(&self) -> Result<Ran, String> {
         let mut ran = run(&Invocation {
             argv: self.command,
             dir: self.dir,
@@ -118,11 +129,19 @@ impl Job<'_> {
             max_output: MAX_OUTPUT,
             sandbox: self.policy.sandbox(self.profile),
         })?;
-        ran.stderr = self
-            .environment
-            .scrub(&String::from_utf8_lossy(&ran.stderr))
-            .into_bytes();
+        ran.stderr = self.scrubbed(&ran.stderr);
         Ok(ran)
+    }
+
+    /// `bytes` with the secrets scrubbed; untouched when it holds none.
+    fn scrubbed(&self, bytes: &[u8]) -> Vec<u8> {
+        let text = String::from_utf8_lossy(bytes);
+        let clean = self.environment.scrub(&text);
+        if clean == text {
+            bytes.to_vec()
+        } else {
+            clean.into_bytes()
+        }
     }
 }
 
