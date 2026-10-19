@@ -1,11 +1,11 @@
 //! The verdict on a fix by a model. A fix of a rule is a derivation from the
 //! rule; a model's rewrite is a guess, so it is kept only if the analysis of
 //! the rewritten file agrees: the finding is gone, nothing of error or warn
-//! severity is new in the file, and the file is still fully analyzed. An edit
-//! of files by an agent is kept when at least one of the findings it was asked
-//! about is gone; those still there are declined, one by one. Its files are
-//! judged together, with the files that use a symbol whose signature it
-//! changed: the edit stands or falls whole.
+//! severity is new in the file or in the files the change reaches (see
+//! [`reach`]), and the file is still fully analyzed. An edit of files by an
+//! agent is kept when at least one of the findings it was asked about is gone;
+//! those still there are declined, one by one. Its files are judged together:
+//! the edit stands or falls whole.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -155,7 +155,11 @@ fn flaw(
     {
         return Some((Class::Unresolved, UNRESOLVED.to_owned()));
     }
-    regression(&proposal.files, (before, after), known)
+    regression(
+        &reach(&proposal.files, before, after),
+        (before, after),
+        known,
+    )
 }
 
 /// The findings of the check `after` in `files` that were not there before.

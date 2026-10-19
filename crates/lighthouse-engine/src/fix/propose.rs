@@ -212,12 +212,7 @@ impl<'e> Proposer<'e> {
                 .command(self.run.fixer.as_deref().unwrap_or(&finding.rule_id))
             {
                 Some(command) => self
-                    .propose_command(
-                        outcome,
-                        finding,
-                        (&binding, command),
-                        (&sources, texts, &scopes),
-                    )
+                    .propose_command(outcome, finding, (&binding, command), (&sources, texts))
                     .map_err(|(_, reason)| reason),
                 None => self.propose_one(outcome, finding, &binding, &lowerer, &sources),
             };
@@ -229,7 +224,7 @@ impl<'e> Proposer<'e> {
         proposals.extend(self.propose_edits(
             outcome,
             texts,
-            (&sources, &scopes),
+            &sources,
             asked_to_edit,
             &mut decline,
         )?);

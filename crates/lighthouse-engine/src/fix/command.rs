@@ -23,7 +23,7 @@ use super::{
     propose::{Aim, Proposal, Proposer},
     rewrite::{Bounds, Change, Changes, Scratch, World, accept, collect},
 };
-use crate::{Overlays, Run, engine::Scopes};
+use crate::{Overlays, Run};
 
 /// How many characters of what a program said a reason carries.
 const SAID_SHOWN: usize = 400;
@@ -48,7 +48,7 @@ impl Proposer<'_> {
         outcome: &Run,
         finding: &Diagnostic,
         (binding, fix): (&FixBinding, &CommandFix),
-        (sources, texts, scopes): (&Sources, &Overlays, &Scopes),
+        (sources, texts): (&Sources, &Overlays),
     ) -> Result<Proposal, Failure> {
         let fail = |reason: String| (Class::Unanswered, reason);
         let engine = self.engine;
@@ -77,7 +77,7 @@ impl Proposer<'_> {
             .get(&finding.fingerprint)
             .cloned()
             .unwrap_or_default();
-        let world = World::new(&engine.ws.root, outcome, texts, scopes);
+        let world = World::new(&engine.ws.root, outcome, texts);
         let launch = Launch {
             fix,
             finding,

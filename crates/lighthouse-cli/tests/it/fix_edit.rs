@@ -133,9 +133,10 @@ fn without_approval_a_verified_edit_is_a_preview_and_the_files_are_left_alone() 
 }
 
 #[test]
-fn an_edit_outside_the_files_being_fixed_is_rejected_whole() {
+fn an_edit_outside_the_file_of_the_findings_is_rejected_whole_under_the_scope_file() {
     let agent = format!("{RENAME}echo 'pub fn extra() {{}}' >> src/other.rs\n");
-    let (dir, _agent) = edited(&agent, "", ALLOWED);
+    let narrow = "[fix]\nunsafe = true\nscope = \"file\"\ndecisions = [\"local/naming-ban\"]\n";
+    let (dir, _agent) = edited(&agent, "", narrow);
 
     let fixed = fix(dir.path(), json!({"paths": ["src/lib.rs"]}));
 
@@ -146,7 +147,7 @@ fn an_edit_outside_the_files_being_fixed_is_rejected_whole() {
     );
     let reason = fixed["declined"][0]["reason"].as_str().unwrap();
     assert!(
-        reason.contains("src/other.rs") && reason.contains("outside"),
+        reason.contains("src/other.rs") && reason.contains("scope `file`"),
         "{reason}"
     );
     assert_eq!(counts(&fixed)["declined"], json!({"out-of-scope": 1}));

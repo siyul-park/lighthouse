@@ -28,7 +28,7 @@ use super::{
     propose::{Aim, Proposal, Proposer},
     rewrite::World,
 };
-use crate::{Error, Overlays, Run, engine::Scopes};
+use crate::{Error, Overlays, Run};
 
 /// A finding given to a model, and the fix that is asked of it.
 type Asked<'o> = (&'o Diagnostic, FixBinding);
@@ -56,7 +56,7 @@ impl Proposer<'_> {
         &self,
         outcome: &Run,
         texts: &Overlays,
-        (sources, scope): (&Sources, &Scopes),
+        sources: &Sources,
         found: Vec<Asked<'o>>,
         decline: &mut dyn FnMut(&Diagnostic, String),
     ) -> Result<Vec<Proposal>, Error> {
@@ -77,7 +77,7 @@ impl Proposer<'_> {
                     ),
                 );
             }
-            let world = World::new(root, outcome, &standing, scope);
+            let world = World::new(root, outcome, &standing);
             let ran = self.run_on(models, &world, &file, &group, sources, decline);
             match ran {
                 Ok(Some(run)) => {

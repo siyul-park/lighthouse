@@ -30,7 +30,6 @@ use super::model::Class;
 use crate::{
     Overlays, Run,
     cache::{Digest, digest_of},
-    engine::Scopes,
 };
 
 /// What a program works over, which is also all it may read.
@@ -41,26 +40,18 @@ pub(in crate::fix) struct World<'a> {
     /// The texts that stand in for the files of the project: those of the
     /// rounds before, and every edit already accepted in this pass.
     pub(in crate::fix) texts: &'a Overlays,
-    /// Where the run fixes: the files it may change.
-    pub(in crate::fix) scope: &'a Scopes,
-    /// The files of the scope as they stand now, which an answer is kept
+    /// The files of the project as they stand now, which an answer is kept
     /// under: an edit made over other texts is another answer. Found when
     /// asked for.
     digest: OnceLock<Result<Digest, String>>,
 }
 
 impl<'a> World<'a> {
-    pub(in crate::fix) fn new(
-        root: &'a Path,
-        outcome: &'a Run,
-        texts: &'a Overlays,
-        scope: &'a Scopes,
-    ) -> Self {
+    pub(in crate::fix) fn new(root: &'a Path, outcome: &'a Run, texts: &'a Overlays) -> Self {
         Self {
             root,
             outcome,
             texts,
-            scope,
             digest: OnceLock::new(),
         }
     }
@@ -73,7 +64,7 @@ impl<'a> World<'a> {
         }
     }
 
-    /// The digest of the files of the scope as they stand.
+    /// The digest of the files of the project as they stand.
     pub(in crate::fix) fn digest(&self) -> Result<&Digest, String> {
         self.digest
             .get_or_init(|| {
@@ -82,7 +73,6 @@ impl<'a> World<'a> {
                     .project
                     .files
                     .iter()
-                    .filter(|file| self.scope.contains(&file.path))
                     .map(|file| (file.path.as_path(), self.stand(file)))
                     .collect();
                 files.sort_unstable();
@@ -164,17 +154,12 @@ pub(in crate::fix) fn accept(
 }
 
 /// What is wrong with the program having done `change` to `path`, if
-/// anything: it may change the indexed text files of the report scope, only
-/// the file of the findings under the scope `file`, and under the scope
-/// `symbol` only the extents of the findings in their file.
+/// anything: it may change the indexed text files of the project under the
+/// scope `files`, only the file of the findings under the scope `file`, and
+/// under the scope `symbol` only the extents of the findings in their file.
 fn offence(path: &Path, change: &Change, bounds: &Bounds<'_>, world: &World<'_>) -> Option<String> {
     let shown = path.display();
     let who = bounds.who;
-    if !world.scope.contains(path) {
-        return Some(format!(
-            "{who} changed `{shown}`, which is outside the files being fixed"
-        ));
-    }
     let Change::Text(text) = change else {
         return Some(match change {
             Change::Created => format!("{who} created `{shown}`"),

@@ -216,6 +216,20 @@ fn with_scope_files_the_function_and_its_caller_are_fixed_together() {
 }
 
 #[test]
+fn with_scope_files_a_caller_outside_the_paths_of_the_run_is_fixed_with_the_function() {
+    let (dir, _agent) = caller_project(RENAME_BOTH, "");
+
+    let fixed = fix(&dir, json!({"paths": ["src/lib.rs"]}));
+
+    assert!(read(&dir, "src/other.rs").contains("crate::fixed_one();"));
+    assert_eq!(fixed["applied"].as_array().unwrap().len(), 1, "{fixed}");
+    assert_eq!(
+        fixed["applied"][0]["files"],
+        json!(["src/lib.rs", "src/other.rs"])
+    );
+}
+
+#[test]
 fn a_caller_that_breaks_rolls_the_whole_change_back() {
     let agent = format!("{RENAME_BOTH}printf 'pub fn bad_one() {{}}\\n' >> src/other.rs\n");
     let (dir, _agent) = caller_project(&agent, "");

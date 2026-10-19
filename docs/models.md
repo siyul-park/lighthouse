@@ -84,10 +84,10 @@ safety = "safe"                                    # trust the agent on this dec
 - **Scope, checked by the verifier.** `symbol`: only the extent of each finding of the batch in its
   file (the symbol the finding is about, else the innermost around it, else the whole file when it has
   fewer than 400 lines, otherwise the finding is declined `no-extent`); a change outside the union of
-  the extents is declined `out-of-scope`, naming the first line. `files`: any indexed text file in
-  the run's scope; each changed file is one whole-file `Replace`, and the files are verified together
-  with every file that calls or refers to a symbol whose signature changed (a symbol with no signature
-  fact counts as changed); the change passes or is rolled back whole.
+  the extents is declined `out-of-scope`, naming the first line. `files`: any indexed text file of
+  the project, whatever paths the run reports; each changed file is one whole-file `Replace`, and the files are verified together
+  with every file that has a call or reference edge into or out of a symbol of a changed file, in the
+  code model before the edit and after it; the change passes or is rolled back whole.
 - **Safe fixes first.** Before an edit is judged, the safe fixes of the rules (`safety: safe`, the
   rounds of `check --fix`, whatever the run selected) are applied to the files it changed, to a
   fixpoint, so an order or layout rule such as `design/declaration-groups` does not condemn code an
@@ -97,7 +97,7 @@ safety = "safe"                                    # trust the agent on this dec
   after them.
 - **What keeps it.** The orchestrator applies the files in memory, formats, re-checks, and keeps the
   edit only if at least one targeted finding is gone, no decision has more findings of `warn` or `error` in
-  the changed and referencing files than before (counted by decision and file, so a renamed symbol's
+  the changed and reached files than before (counted by decision and file, so a renamed symbol's
   old findings are not new; "introduced <decision> at <line>"), and they are fully analyzed.
   Targeted findings still there are declined `unresolved`; the rest count as `verified`. Otherwise the
   files are rolled back and the findings declined with the reason.
@@ -135,7 +135,7 @@ safety = "safe"                                    # trust the agent on this dec
 - **Cost, trust, cache.** Requests count against `[models] budget` at the provider's `cost`; remote
   providers need the opt-in classification does; `command` providers need `lighthouse trust`; the
   edits are kept in the result cache under the model, its version, the digest of the brief and the
-  digests of the files in the report scope as they stand (`--no-cache` skips it, `--no-models` asks
+  digests of the files of the project as they stand (`--no-cache` skips it, `--no-models` asks
   no model).
 
 ## The agent that edits
@@ -218,8 +218,9 @@ machine that wrote this, so `-` rests on those docs alone.
   secrets (the user's credential files and the project's `.env` files, which the copy leaves out),
   and it reaches only the hosts the project's `[sandbox] network` and the provider's `sandbox.network` list. The copy is deleted when the run ends, on every path. stdout is kept for the notes only
   (2 KB).
-- **What it may change.** Under the scope, the indexed text files of the report scope. A change to a
-  file outside the report scope or one Lighthouse does not index, a file created or deleted, or a
+- **What it may change.** Under the scope, the indexed text files of the project (`files`), the file of the
+  finding (`file`) or its symbol (`symbol`). A change to a
+  file outside that or one Lighthouse does not index, a file created or deleted, or a
   non-text file rejects the whole attempt (class `out-of-scope`, the reason names the first path). A
   non-zero exit, a timeout or a signal is a model error: the route fails over, else the findings are
   declined `unanswered`.
