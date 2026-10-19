@@ -314,6 +314,48 @@ spec:
     options:
       kinds:
       - params
+  - name: params-single-use-struct-by-pointer-counts-its-fields
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type request struct{ A, B, C int }
+
+        func build(a, b, c, d, e, f int, r *request) int {
+            return a + r.A
+        }
+
+        func run() int {
+            return build(1, 2, 3, 4, 5, 6, &request{A: 1})
+        }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - params
+  - name: params-struct-by-pointer-shared-by-two-functions
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type request struct{ A, B, C int }
+
+        func build(a, b, c, d, e, f int, r *request) int {
+            return a + r.A
+        }
+
+        func other(r *request) int {
+            return r.B
+        }
+    options:
+      kinds:
+      - params
   - name: params-single-use-struct-counts-once-per-parameter
     language: go
     kind: invalid
