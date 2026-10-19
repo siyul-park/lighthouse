@@ -16,8 +16,14 @@ spec:
     decision wins an overlap and the formatting follows it as a safe follow-up
     of the change. The check is run once over the project because rustfmt
     formats the files a `mod` declares along with the file it is given, so
-    what it finds in one file depends on others. The programs are the bundled
-    catalog's own, so they run in a project nobody trusted.
+    what it finds in one file depends on others. rustfmt does not read
+    `Cargo.toml`, and the edition decides what it accepts and how it writes
+    some items, so both programs pass it the edition of the crate that holds
+    the file: the nearest `Cargo.toml` that sets one, in its package or in the
+    workspace it inherits from, else the latest. `cargo fmt` does the same,
+    but it needs a manifest at the root of the project and cannot be a filter
+    over one file. The programs are the bundled catalog's own, so they run in
+    a project nobody trusted.
   scope:
     subject: project
     generated: false
@@ -27,14 +33,62 @@ spec:
   severity: error
   check:
     type: command
-    command: [rustfmt, --edition, "2024", --check, -l, "{files}"]
+    command:
+    - sh
+    - -c
+    - |
+      edition() {
+        d=$(dirname "$1")
+        while :; do
+          if [ -f "$d/Cargo.toml" ]; then
+            e=$(awk '/^\[/ { p = ($0 ~ /^\[(workspace\.)?package\]/) } p && /^edition[ \t]*=[ \t]*"/ { split($0, a, "\""); print a[2]; exit }' "$d/Cargo.toml")
+            if [ -n "$e" ]; then echo "$e"; return; fi
+          fi
+          if [ "$d" = . ] || [ "$d" = / ]; then break; fi
+          d=$(dirname "$d")
+        done
+        echo 2024
+      }
+      list=$(for f in "$@"; do printf '%s %s\n' "$(edition "$f")" "$f"; done)
+      status=0
+      IFS='
+      '
+      set -f
+      for e in $(printf '%s\n' "$list" | cut -d' ' -f1 | sort -u); do
+        set --
+        for line in $list; do
+          if [ "${line%% *}" = "$e" ]; then set -- "$@" "${line#* }"; fi
+        done
+        rustfmt --edition "$e" --check -l "$@" || status=$?
+      done
+      exit $status
+    - sh
+    - "{files}"
     output: lines
     files: ["**/*.rs"]
   fix:
     type: command
     safety: safe
     priority: -100
-    command: [rustfmt, --edition, "2024", --emit, stdout]
+    command:
+    - sh
+    - -c
+    - |
+      edition() {
+        d=$(dirname "$1")
+        while :; do
+          if [ -f "$d/Cargo.toml" ]; then
+            e=$(awk '/^\[/ { p = ($0 ~ /^\[(workspace\.)?package\]/) } p && /^edition[ \t]*=[ \t]*"/ { split($0, a, "\""); print a[2]; exit }' "$d/Cargo.toml")
+            if [ -n "$e" ]; then echo "$e"; return; fi
+          fi
+          if [ "$d" = . ] || [ "$d" = / ]; then break; fi
+          d=$(dirname "$d")
+        done
+        echo 2024
+      }
+      exec rustfmt --edition "$(edition "$1")" --emit stdout
+    - sh
+    - "{file}"
     stdin: file
     output: stdout
   provenance:
@@ -60,6 +114,19 @@ spec:
         pub fn run() -> i32 {
             1
         }
+  - name: edition-of-the-crate
+    language: rust
+    kind: valid
+    files:
+    - path: Cargo.toml
+      body: |
+        [package]
+        name = "demo"
+        version = "0.1.0"
+        edition = "2021"
+    - path: src/lib.rs
+      body: |
+        use std::{b, A};
   - name: formatted
     language: rust
     kind: valid

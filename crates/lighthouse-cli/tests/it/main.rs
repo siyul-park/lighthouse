@@ -34,6 +34,7 @@ mod reply;
 mod review;
 mod review_agent;
 mod rewrite;
+mod rust_edition;
 mod run;
 mod sandbox;
 mod sarif_places;
