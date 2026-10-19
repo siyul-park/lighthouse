@@ -12,6 +12,7 @@ use std::{
 
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{Plugin, Registry};
+use lighthouse_resource::STATE_DIR;
 use lighthouse_spec::{Config, PluginRef};
 use thiserror::Error;
 
@@ -147,13 +148,15 @@ pub fn register(
     Ok(registered)
 }
 
-/// The listed plugins that live inside the project at `root`
-/// (`.lighthouse/plugins`, or a `path` below it): code the repository brought,
-/// which runs only in a project the user trusts. Those installed for the user
-/// or next to the executable are not among them.
+/// The listed plugins the project brings: those in its `.lighthouse/plugins`
+/// and those its file names by a `path`, wherever it points. They are code the
+/// repository chose, which runs only in a project the user trusts. Those found
+/// in the user's plugin directory or next to the executable are not among
+/// them.
 pub fn local_plugins(config: &Config, root: &Path, search: &[PathBuf]) -> Vec<LocalPlugin> {
     let found = discover(search).map(|d| d.found).unwrap_or_default();
-    let root = root.canonicalize().unwrap_or_else(|_| root.to_owned());
+    let own = canonical(&root.join(STATE_DIR).join("plugins"));
+    let root = canonical(root);
     config
         .plugins()
         .iter()
@@ -162,18 +165,22 @@ pub fn local_plugins(config: &Config, root: &Path, search: &[PathBuf]) -> Vec<Lo
                 .ok()?
                 .into_iter()
                 .next()?;
-            one.dir
-                .canonicalize()
-                .ok()?
-                .starts_with(&root)
-                .then(|| LocalPlugin {
-                    id: one.id().to_owned(),
-                    argv: std::iter::once(one.command_path().to_string_lossy().into_owned())
-                        .chain(one.resource.spec.runtime.args.iter().cloned())
-                        .collect(),
-                })
+            // The directory a plugin sits in is resolved, the plugin's own
+            // directory is not: one that links elsewhere is still the project's.
+            let sits_in_project = one.dir.parent().is_some_and(|dir| canonical(dir) == own);
+            (listed.path.is_some() || sits_in_project).then(|| LocalPlugin {
+                id: one.id().to_owned(),
+                argv: std::iter::once(one.command_path().to_string_lossy().into_owned())
+                    .chain(one.resource.spec.runtime.args.iter().cloned())
+                    .collect(),
+            })
         })
         .collect()
+}
+
+/// `path` with its links resolved, else as it is.
+fn canonical(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_owned())
 }
 
 /// A broken manifest of a listed plugin is an error; any other is a notice.

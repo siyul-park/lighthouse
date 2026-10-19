@@ -171,7 +171,7 @@ fn lighthouse_builtin_stub() -> Registry {
 }
 
 #[test]
-fn a_listed_plugin_that_lives_in_the_project_is_local_with_the_program_it_runs() {
+fn a_listed_plugin_the_project_brings_is_local_with_the_program_it_runs() {
     let root = tempfile::tempdir().unwrap();
     let elsewhere = tempfile::tempdir().unwrap();
     manifest(
@@ -220,8 +220,31 @@ fn a_listed_plugin_that_lives_in_the_project_is_local_with_the_program_it_runs()
                 ]
             ),
             ("named", vec!["bin".to_owned()]),
+            ("outside", vec!["x".to_owned(), "--flag".to_owned()]),
         ]
     );
+}
+
+#[test]
+fn a_plugin_of_the_project_is_local_whichever_way_the_root_and_the_search_name_it() {
+    let real = tempfile::tempdir().unwrap();
+    let links = tempfile::tempdir().unwrap();
+    let link = links.path().join("project");
+    std::os::unix::fs::symlink(real.path(), &link).unwrap();
+    manifest(&real.path().join(".lighthouse/plugins/found"), "found", "x");
+    let toml = config("[\"found\"]");
+    let ids = |root: &Path, search: &[PathBuf]| -> Vec<String> {
+        local_plugins(&toml, root, search)
+            .into_iter()
+            .map(|l| l.id)
+            .collect()
+    };
+    let own = |root: &Path| vec![root.join(".lighthouse/plugins")];
+    let canonical = real.path().canonicalize().unwrap();
+
+    assert_eq!(ids(&canonical, &own(&link)), ["found"]);
+    assert_eq!(ids(&link, &own(&canonical)), ["found"]);
+    assert_eq!(ids(&link, &own(&link)), ["found"]);
 }
 
 #[test]

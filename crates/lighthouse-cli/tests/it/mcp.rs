@@ -38,6 +38,7 @@ impl Client {
             .arg("mcp")
             .current_dir(dir)
             .env("XDG_CONFIG_HOME", dir.join(".home"))
+            .env("XDG_DATA_HOME", dir.join(".home"))
             .env_remove("LIGHTHOUSE_ATTRIBUTED_TO")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -121,13 +122,15 @@ impl Drop for Client {
 
 pub(crate) fn rust_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_test_support::lang_rust();
+    lighthouse_test_support::installed(
+        &dir.path().join(".home"),
+        &lighthouse_test_support::lang_rust(),
+    );
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n",
-            plugin.to_str().unwrap()
-        )),
+        lighthouse_test_support::project(
+            "plugins = [\"lang-rust\", \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n",
+        ),
     )
     .unwrap();
     fs::write(

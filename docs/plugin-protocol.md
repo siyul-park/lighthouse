@@ -454,7 +454,10 @@ is named after a listed id. A bare id is looked up in
 `~/.local/share/lighthouse/plugins/*/`) and `<executable
 dir>/plugins/*/`; an entry `{ id = "lang-go", path = "plugins/lang-go",
 timeout = "120s" }` names the directory itself (relative to the config) and is how
-a development checkout is used. The same id in more than one place, an in-process
+a development checkout is used. A plugin the project names by a `path`, and one in
+`./.lighthouse/plugins`, is code the repository brings and starts only in a trusted
+project ([architecture](architecture.md#sandbox)); one in the user's plugin directory or
+next to the executable needs no trust. The same id in more than one place, an in-process
 plugin included, is an error: there is no shadowing.
 
 ## Trust model

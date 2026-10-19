@@ -704,8 +704,8 @@ reordering a Rust file cannot move one: such findings are declined and fixed by 
 Every external program Lighthouse runs through `lighthouse_process::run` runs in an OS sandbox
 that no configuration of the program can loosen: Seatbelt (`sandbox-exec`) on macOS, bubblewrap
 on Linux. Plugin processes (`rpc`), the version-control calls of `session` and test support are
-outside it; a plugin the project brings (`.lighthouse/plugins`, or a `path` inside it) starts only in a
-trusted project, and its program is part of the trust. The policy has the shape of Anthropic's
+outside it; a plugin the project brings (`.lighthouse/plugins`, or a `path` its `lighthouse.toml` names, wherever
+it points) starts only in a trusted project, and its program is part of the trust. The policy has the shape of Anthropic's
 sandbox-runtime:
 
 - **Reads** are allowed everywhere except a fixed list of secrets: `~/.ssh`, `~/.gnupg`, `~/.aws`,

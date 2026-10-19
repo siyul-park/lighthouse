@@ -64,13 +64,15 @@ pub(crate) fn bound() -> String {
 
 pub(crate) fn project(models: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_test_support::lang_rust();
+    lighthouse_test_support::installed(
+        &dir.path().join(".home"),
+        &lighthouse_test_support::lang_rust(),
+    );
     write(
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"local\", \"rust\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n{models}",
-            plugin.to_str().unwrap()
+            "plugins = [\"lang-rust\", \"core\", \"local\", \"rust\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n{models}"
         )),
     );
     write(

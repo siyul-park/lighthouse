@@ -76,6 +76,17 @@ pub fn model_http() -> PathBuf {
         .clone()
 }
 
+/// Puts the plugin in the directory `plugin` into the plugin directory of the
+/// data home `home`, as a user installs one: a project then lists it by its
+/// id, and the project needs no trust for it.
+pub fn installed(home: &Path, plugin: &Path) {
+    let plugins = home.join("lighthouse/plugins");
+    fs::create_dir_all(&plugins).expect("create plugin dir");
+    let name = plugin.file_name().expect("a plugin directory name");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(plugin, plugins.join(name)).expect("link plugin");
+}
+
 /// `value` as TOML on one line.
 fn inline(value: &toml::Value) -> String {
     match value {

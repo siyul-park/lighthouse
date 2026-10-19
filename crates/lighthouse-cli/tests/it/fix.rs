@@ -53,6 +53,7 @@ fn go_project_in(files: &[(&str, &str)], extra: &str, pack: &str) -> Option<Temp
     };
     let plugin = lighthouse_test_support::lang_go()?;
     let dir = tempfile::tempdir().unwrap();
+    lighthouse_test_support::installed(&dir.path().join(".home"), &plugin);
     let local = if files
         .iter()
         .any(|(name, _)| name.starts_with(".lighthouse"))
@@ -65,8 +66,7 @@ fn go_project_in(files: &[(&str, &str)], extra: &str, pack: &str) -> Option<Temp
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"design\", \"testing\", {plugin_of}{local}{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"{extends_of}]\n{extra}",
-            plugin.to_str().unwrap()
+            "plugins = [\"core\", \"design\", \"testing\", {plugin_of}{local}\"lang-go\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"{extends_of}]\n{extra}"
         )),
     );
     write(dir.path(), "go.mod", "module example.com/demo\n\ngo 1.26\n");
@@ -93,7 +93,10 @@ fn rust_project_in(source: &str, extra: &str, pack: &str) -> TempDir {
         (format!("\"{pack}\", "), format!(", \"{pack}/recommended\""))
     };
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_test_support::lang_rust();
+    lighthouse_test_support::installed(
+        &dir.path().join(".home"),
+        &lighthouse_test_support::lang_rust(),
+    );
     let local = if extra.contains("local/") {
         "\"local\", "
     } else {
@@ -103,8 +106,7 @@ fn rust_project_in(source: &str, extra: &str, pack: &str) -> TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"design\", {plugin_of}{local}{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"{extends_of}]\n{extra}",
-            plugin.to_str().unwrap()
+            "plugins = [\"core\", \"design\", {plugin_of}{local}\"lang-rust\"]\nextends = [\"design/recommended\"{extends_of}]\n{extra}"
         )),
     );
     write(
