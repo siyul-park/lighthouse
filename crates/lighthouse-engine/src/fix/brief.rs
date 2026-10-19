@@ -1,5 +1,5 @@
 //! The brief: what an agent is told to fix findings. One builder writes it for
-//! every hand-over: the prompt of an agent that `edit` runs, and the text a
+//! every hand-over: the prompt of an agent run, and the text a
 //! review task carries for whoever drives the session. The same inputs always
 //! write the same text, so that a run can be kept under its digest.
 

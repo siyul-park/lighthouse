@@ -62,7 +62,7 @@ impl ModelFix {
 }
 
 /// The fixer of the findings given to a model: asks the agent each decision
-/// is bound to (`[models] agent`, or its own `edit`) and counts what happens.
+/// is bound to (`[models] agent`, or its own `agent`) and counts what happens.
 pub(super) struct ModelFixer<'e> {
     route: Route<'e>,
     fixes: &'e BTreeMap<String, ModelFix>,

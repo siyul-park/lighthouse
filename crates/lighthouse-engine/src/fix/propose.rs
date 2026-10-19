@@ -119,7 +119,7 @@ impl<'e> Proposer<'e> {
         self
     }
 
-    /// The same, asking the agents the project binds for `edit`.
+    /// The same, asking the agents the project binds.
     #[must_use]
     pub(super) fn asking_models(mut self) -> Self {
         self.models = ModelFixer::new(self.engine, &self.plan.models);

@@ -4,9 +4,9 @@ expression: "printed(dir.path(), &args)"
 ---
 Trust this project to run the commands it names.
 
-Command fixers and the formatters of `lighthouse.toml`. Trust is yours, kept in `$XDG_CONFIG_HOME/lighthouse/trust.toml` (default `~/.config/lighthouse/trust.toml`) for this root and the exact `lighthouse.toml`, `.lighthouse/decisions` and personal config files (`config.toml`, `.lighthouse/local.toml`) you have read; a change to any of them withdraws it. `LIGHTHOUSE_TRUST=1` trusts every project, for CI. Without trust a command fix is declined and formatting is skipped; checks and the verification of fixes still run.
+The programs the project names: the command checks and fixes of its own decisions, its command models, `[fix] verify` and its plugins. Trust is yours, kept in `$XDG_CONFIG_HOME/lighthouse/trust.toml` (default `~/.config/lighthouse/trust.toml`) for this root and the exact `lighthouse.toml`, `.lighthouse/decisions` and personal config files (`config.toml`, `.lighthouse/local.toml`) you have read; a change to any of them withdraws it. `LIGHTHOUSE_TRUST=1` trusts every project, for CI. Without trust none of them runs: a command fix is declined, a command check is unavailable and `[fix] verify` fails; the bundled checks still run.
 
-It lists the formatters and fixer commands it would trust and asks for confirmation on the terminal; without a terminal it refuses unless `--yes` says you have read the list.
+It lists the programs it would trust and asks for confirmation on the terminal; without a terminal it refuses unless `--yes` says you have read the list.
 
 Usage: lighthouse trust [OPTIONS]
 

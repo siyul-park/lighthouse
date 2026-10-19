@@ -21,7 +21,7 @@ use crate::Error;
 /// clears a subject.
 pub const FAIL_AT: f64 = 0.9;
 
-/// The task `edit`: an agent changes the files of a directory as a prompt
+/// The task `agent`: an agent changes the files of a directory as a prompt
 /// says. It has no wire form; only a program the host runs there serves it.
 #[derive(Debug, Clone, Copy)]
 pub struct EditRequest<'a> {

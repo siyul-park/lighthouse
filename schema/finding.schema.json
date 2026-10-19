@@ -24,7 +24,7 @@
       ]
     },
     "brief": {
-      "description": "What the fix of this finding is told, written as the prompt of an\n`edit` run is: the decision, the finding, its scope and how the result\nis checked. Present when the descriptor of its decision says `brief`.",
+      "description": "What the fix of this finding is told, written as the prompt of an\n`agent` run is: the decision, the finding, its scope and how the result\nis checked. Present when the descriptor of its decision says `brief`.",
       "type": [
         "string",
         "null"

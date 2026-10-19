@@ -1,13 +1,13 @@
 //! Trust in a project, decided by the user and not by the repository: running
-//! the commands a project names (command fixers, formatters) needs the user to
-//! have said so, for exactly the configuration (the personal files over it
+//! the programs a project names (its command checks and fixes, its command
+//! models, its plugins) needs the user to have said so, for exactly the configuration (the personal files over it
 //! too), rules and in-project programs they were shown. A file the repository carries cannot grant it, and a change
 //! to any of them withdraws it.
 //!
 //! The digest is computed from the very bytes the session loaded the
 //! configuration and the rules from, so what is trusted is what runs. A program
 //! that resolves inside the project is part of the digest by content; a program
-//! outside it (`gofmt`, `rustfmt`) is trusted by its command line only.
+//! outside it (`gofmt`, `sh`) is trusted by its command line only.
 
 use std::{
     collections::BTreeMap,
@@ -34,7 +34,7 @@ struct Table {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Basis {
     pub(crate) digest: String,
-    /// One line per formatter and command fixer, as shown to the user.
+    /// One line per program, as shown to the user.
     pub commands: Vec<String>,
 }
 

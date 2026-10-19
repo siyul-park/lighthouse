@@ -1,4 +1,4 @@
-//! The route of a task: the models `[models]` and the rules bind to `edit`,
+//! The route of a task: the models `[models]` and the rules bind to `agent`,
 //! asked to generate (the fix of a finding). A request names the binding it
 //! is for, and goes to the models of it in turn until one answers: a failure
 //! or a spent budget moves it on, a kept answer is reused without a call. The

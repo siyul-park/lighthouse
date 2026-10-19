@@ -1,6 +1,6 @@
 //! A model that is any program, declared as a `command` provider. With
 //! `protocol = "typesafe"` it reads TypeSafe's System One request on stdin and
-//! prints the response (classification); without a protocol it serves `edit`:
+//! prints the response (classification); without a protocol it serves `agent`:
 //! it reads the prompt as text on stdin and changes the files of the directory
 //! it is run in. The program runs under the process contract of every
 //! program, so a trusted project is the only one that builds it.

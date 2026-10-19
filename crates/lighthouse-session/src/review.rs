@@ -69,7 +69,7 @@ pub struct Shown {
     #[serde(flatten)]
     pub finding: FindingRecord,
     /// What the fix of this finding is told, written as the prompt of an
-    /// `edit` run is: the decision, the finding, its scope and how the result
+    /// `agent` run is: the decision, the finding, its scope and how the result
     /// is checked. Present when the descriptor of its decision says `brief`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brief: Option<String>,

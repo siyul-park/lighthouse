@@ -201,28 +201,32 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
     }
     out.push_str(
         "\n## Commands\n\n\
-         The `command` type is the simple text contract: a program, without a shell, on a \
-         scratch copy of the finding's file. Structured data goes through `rpc`, not through \
-         commands.\n\n\
-         ```yaml\nfix:\n  safety: unsafe\n  type: command\n  argv: [\"gofmt\", \"-s\", \"-w\", \"{file}\"]\n  output: in-place   # in-place | text\n  stdin: none        # none | file\n  env: {}            # extra variables\n  timeout: 30s\n  scope: file\n```\n\n\
-         - **Exit codes:** `0` succeeds, with the result per `output`; an empty result changes \
-         nothing. `1` declines, with the reason from stderr. `2` and above, a signal or a \
-         timeout is an error: nothing is applied and the capped stderr goes into the notice.\n\
-         - **Output:** `in-place` diffs the scratch copy against the original; `text` takes the \
-         new text of the file from stdout, which carries only that. stderr is for people and \
-         is never parsed.\n\
+         The `command` type is a program like the others ([programs](../programs.md)): its \
+         shape, environment, exit codes and trust are the same everywhere, and it runs without \
+         a shell. Structured data goes through `rpc`, not through commands.\n\n\
+         ```yaml\nfix:\n  safety: unsafe\n  type: command\n  command: [\"gofmt\", \"-s\", \"-w\", \"{file}\"]\n  output: files   # files | stdout\n  stdin: none     # none | file\n  env: {}         # extra variables\n  timeout: 30s\n  scope: file\n```\n\n\
+         - **Exit codes:** a code in `success` (default `[0]`) means it ran; an empty result \
+         changes nothing and is `unchanged`, with what the program said as the reason. Any other \
+         code, a signal or a timeout is an error: nothing is applied and the tail of stderr is \
+         the reason.\n\
+         - **Output:** `files` (default) diffs a scratch copy of the project, a repository with \
+         one commit of the base, against the original; `stdout` takes the new text of the file \
+         from stdout, which carries only that (`stdin: file`, no copy). stderr is for people \
+         and is never parsed.\n\
          - **stdin:** `none` (default) or `file`, the content of the target file.\n\
-         - **Argv:** `{file}` (the scratch copy), `{line}`, `{symbol}` and `{rule}` fill a whole \
-         argument each (`--out={file}` is refused, and so is a value that starts with `-`). The \
-         program runs with the scratch directory as its working directory.\n\
-         - **Environment:** cleared to `PATH`, `HOME`, `LANG` and `TMPDIR`, plus the declared \
-         `env`, plus `LIGHTHOUSE_DECISION` (the finding as JSON: decision, file, line, symbol, \
-         fingerprint, evidence), `LIGHTHOUSE_OPTIONS` (the rule's options as JSON) and \
-         `LIGHTHOUSE_API_VERSION`.\n\
+         - **Command line:** `{file}` (in the scratch copy), `{line}`, `{symbol}` and \
+         `{decision}` fill a whole argument each (`--out={file}` is refused, and so is a value \
+         that starts with `-`). The program runs with the scratch directory as its working \
+         directory.\n\
+         - **Environment:** cleared to `PATH`, `USER`, `LOGNAME`, `LANG`, `HOME` and `TMPDIR`, \
+         plus the declared `env`, plus `LIGHTHOUSE_DECISION` (the finding as JSON: decision, \
+         file, line, symbol, fingerprint, evidence), `LIGHTHOUSE_OPTIONS` (the rule's options as \
+         JSON) and `LIGHTHOUSE_API_VERSION`.\n\
          - **Limits:** the timeout sends SIGTERM to the process group, then SIGKILL after a \
          grace period; stdout and stderr are capped.\n\
-         - **Trust:** a command runs only in a project the user trusts (`lighthouse trust`), \
-         whoever wrote it; the repository cannot grant trust itself.\n\n\
+         - **Trust:** a command of the project runs only in a project the user trusts \
+         (`lighthouse trust`); the repository cannot grant trust itself. The programs of the \
+         bundled decisions need none.\n\n\
          The `rpc` type, a language plugin's own fix method, is reserved: it loads, and the \
          findings of its rule are declined as not yet supported.\n",
     );
