@@ -4,7 +4,7 @@ use std::{
     path::Path,
     process::{Child, Command, Stdio},
     sync::{
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
         mpsc::{self, Receiver, RecvTimeoutError, Sender},
     },
     thread,
@@ -23,6 +23,11 @@ const STDERR_LINE_BYTES: usize = 2048;
 const EVENT_QUEUE: usize = 16;
 const EXIT_GRACE: Duration = Duration::from_secs(2);
 const POLL: Duration = Duration::from_millis(10);
+/// The most a plugin that is gone is waited for to close its stderr. It ends
+/// when the pipe does, which is as soon as the process group is dead; this
+/// only keeps a process of another group that holds the pipe open from hanging
+/// the call.
+const STDERR_HANG_GUARD: Duration = Duration::from_secs(5);
 
 /// Why a call failed: the plugin answered with an error and stays usable, or
 /// the stream is broken and the plugin is gone.
@@ -49,7 +54,12 @@ struct Session {
 struct Stderr {
     lines: VecDeque<String>,
     dropped: usize,
+    /// The plugin closed its stderr: no line is still to come.
+    ended: bool,
 }
+
+/// What a plugin wrote to stderr, and the signal that it wrote all of it.
+type Captured = (Mutex<Stderr>, Condvar);
 
 /// A running plugin process spoken to over stdio. Calls are serialized; once
 /// the process crashes, times out or sends something malformed its whole
@@ -58,7 +68,7 @@ pub(crate) struct Client {
     plugin: String,
     timeout: Duration,
     session: Mutex<Result<Session, String>>,
-    stderr: Arc<Mutex<Stderr>>,
+    stderr: Arc<Captured>,
 }
 
 impl Client {
@@ -83,9 +93,15 @@ impl Client {
         let writer = spawn_writer(stdin);
         let events = spawn_reader(stdout);
 
-        let stderr = Arc::new(Mutex::new(Stderr::default()));
+        let stderr = Arc::new(Captured::default());
         let sink = Arc::clone(&stderr);
-        thread::spawn(move || collect_stderr(BufReader::new(stderr_pipe), &sink));
+        thread::spawn(move || {
+            collect_stderr(BufReader::new(stderr_pipe), &sink.0);
+            if let Ok(mut state) = sink.0.lock() {
+                state.ended = true;
+            }
+            sink.1.notify_all();
+        });
 
         Ok(Self {
             plugin: found.id().to_owned(),
@@ -124,6 +140,9 @@ impl Client {
                 if let Ok(mut dead) = std::mem::replace(&mut *guard, Err(reason.clone())) {
                     lighthouse_process::reap(&mut dead.child);
                 }
+                // The session guard is held while it waits: the plugin is gone
+                // and every later call fails with `reason` without using it.
+                self.await_stderr();
                 Err(reason)
             }
         }
@@ -204,13 +223,27 @@ impl Client {
         }
     }
 
+    /// Waits until a plugin that is gone has closed its stderr, so that the
+    /// lines it wrote last, which explain it, are in the notices.
+    fn await_stderr(&self) {
+        let (state, ended) = &*self.stderr;
+        if let Ok(state) = state.lock() {
+            drop(ended.wait_timeout_while(state, STDERR_HANG_GUARD, |state| !state.ended));
+        }
+    }
+
     /// The most recent stderr lines since the last call, as notices, with a
     /// count of what the bounded buffer dropped.
     pub(crate) fn drain_stderr(&self) -> Vec<String> {
         let taken = self
             .stderr
+            .0
             .lock()
-            .map(|mut s| std::mem::take(&mut *s))
+            .map(|mut s| Stderr {
+                lines: std::mem::take(&mut s.lines),
+                dropped: std::mem::take(&mut s.dropped),
+                ended: s.ended,
+            })
             .unwrap_or_default();
         let mut notices = Vec::new();
         if taken.dropped > 0 {
