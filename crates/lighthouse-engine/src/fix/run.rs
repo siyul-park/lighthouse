@@ -197,17 +197,31 @@ impl Orchestrator<'_> {
     }
 
     /// The round that gives the findings the rules left to a model: its
-    /// edits are kept only if the checks accept them, and then written only if
-    /// the run may (`--unsafe-fixes`, or `[fix] unsafe`) and the programs of
-    /// `[fix] verify` pass over them. Otherwise they are
-    /// withdrawn to previews; when a command fails, the runs of the chain are
-    /// rolled back newest first until they pass, and their findings are
-    /// declined. The run of the last check.
+    /// edits are kept only if the checks accept them. Those the run may write
+    /// (a `safe` fix, `--unsafe-fixes`, or `[fix] unsafe`) are written if the
+    /// programs of `[fix] verify` pass over them; when a command fails, the
+    /// runs of the chain are rolled back newest first until they pass, and
+    /// their findings are declined. The others are verified over what is
+    /// written and withdrawn to previews. The run of the last check.
     fn model_round(&mut self, outcome: Run) -> Result<Run, Error> {
         let (proposals, declined) =
             self.proposer
                 .propose(&outcome, &self.texts, Phase::Models, Taking::Selected)?;
         self.declined.extend(declined);
+        let (written, withheld): (Vec<_>, Vec<_>) =
+            proposals.into_iter().partition(|p| self.permits(p.safety));
+        let outcome = self.write_models(outcome, written)?;
+        if !withheld.is_empty() {
+            let start = self.mark();
+            self.apply_chain(&outcome, withheld, start.rounds + 1)?;
+            self.withdraw(start);
+        }
+        Ok(outcome)
+    }
+
+    /// Applies the `proposals` of a model the run may write, and keeps those
+    /// the programs of `[fix] verify` pass over. The run of the last check.
+    fn write_models(&mut self, outcome: Run, proposals: Vec<Proposal>) -> Result<Run, Error> {
         if proposals.is_empty() {
             return Ok(outcome);
         }
@@ -219,10 +233,6 @@ impl Orchestrator<'_> {
         let start = self.mark();
         let (marks, current) = self.apply_chain(&outcome, proposals, start.rounds + 1)?;
         if !self.has_model_fix() {
-            return Ok(outcome);
-        }
-        if !self.permits(Safety::Unsafe) {
-            self.withdraw(start);
             return Ok(outcome);
         }
         let mut rolled = false;

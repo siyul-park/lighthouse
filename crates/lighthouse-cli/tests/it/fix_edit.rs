@@ -340,3 +340,43 @@ fn the_recipes_of_the_docs_skip_no_permission_check() {
         );
     }
 }
+
+/// The project says the fix of the decision is `safe`: the agent is trusted
+/// here, whatever `[fix] unsafe` says.
+fn trusted_agent(rest: &str) -> (TempDir, TempDir) {
+    let (dir, scripts) = edited(RENAME, "", rest);
+    let config = dir.path().join("lighthouse.toml");
+    let text = fs::read_to_string(&config).unwrap();
+    let text = text.replace(
+        "\"local/naming-ban\" = \"warn\"",
+        "\"local/naming-ban\" = { level = \"warn\", safety = \"safe\" }",
+    );
+    fs::write(&config, text).unwrap();
+    (dir, scripts)
+}
+
+#[test]
+fn an_edit_the_project_made_safe_is_written_without_unsafe_fixes() {
+    let (dir, _agent) = trusted_agent(LISTED);
+
+    let fixed = fix(dir.path(), json!({}));
+
+    assert_eq!(lib(&dir), format!("mod other;\n{FIXED}"), "{fixed}");
+    assert_eq!(fixed["applied"].as_array().unwrap().len(), 1, "{fixed}");
+    assert_eq!(fixed["applied"][0]["safety"], "safe", "{fixed}");
+    assert!(fixed["previews"].is_null(), "{fixed}");
+}
+
+#[test]
+fn an_edit_made_safe_that_the_checks_of_the_project_reject_is_not_reported_applied() {
+    let verify = "verify = [[\"sh\", \"-c\", \"! grep -q fixed_one src/lib.rs\"]]\n";
+    let (dir, _agent) = trusted_agent(&format!(
+        "[fix]\ndecisions = [\"local/naming-ban\"]\n{verify}"
+    ));
+
+    let fixed = fix(dir.path(), json!({}));
+
+    assert_eq!(lib(&dir), format!("mod other;\n{LIB}"), "{fixed}");
+    assert!(fixed["applied"].as_array().unwrap().is_empty(), "{fixed}");
+    assert_eq!(fixed["declined"].as_array().unwrap().len(), 1, "{fixed}");
+}

@@ -153,16 +153,14 @@ impl Orchestrator<'_> {
     }
 
     /// Puts the run back as it was at `mark`, before the fixes the run may not
-    /// write, and moves those fixes from applied to previews. A fix of which
-    /// no preview could be made is declined: a fix that was verified is
-    /// applied, previewed or declined, never lost.
+    /// write, and moves every fix applied since from applied to previews: the
+    /// texts that made them applied are gone. A fix of which no preview could
+    /// be made is declined: a fix that was verified is applied, previewed or
+    /// declined, never lost, and never applied over texts that are not there.
     pub(super) fn withdraw(&mut self, mark: Mark) {
         self.forget_follow_ups(mark.applied);
         (self.texts, self.original, self.rounds) = (mark.texts, mark.original, mark.rounds);
-        let (withheld, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
-            .into_iter()
-            .partition(|a| !self.permits(a.safety));
-        self.applied = rest;
+        let withheld = self.applied.split_off(mark.applied);
         for fix in withheld {
             let model = fix.fixer == FixedBy::Model;
             match self.previewable.remove(&fix.fingerprint) {
@@ -192,7 +190,18 @@ impl Orchestrator<'_> {
                     }
                     self.declined.insert(declined.fingerprint.clone(), declined);
                 }
-                None => {}
+                None => {
+                    self.declined.insert(
+                        fix.fingerprint.clone(),
+                        DeclinedFix {
+                            fingerprint: fix.fingerprint,
+                            rule_id: fix.rule_id,
+                            file: fix.files.first().cloned().unwrap_or_default(),
+                            line: 0,
+                            reason: "left for review: the run does not write it".to_owned(),
+                        },
+                    );
+                }
             }
         }
     }

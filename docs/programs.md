@@ -51,7 +51,7 @@ A program that cannot start, outlives its timeout, exits with a code outside `su
 | decision `check: {type: command}` | findings | the decision | once per file (`{file}`), per batch of files (`{files}`), or once over the project |
 | decision `fix: {type: command}` | changes | the decision | per finding, in a fix round |
 | decision `fix: {type: model}` | changes | the project binds the agent: `[models] agent`, `rules."<id>".agent` | per batch of findings of a file, in a fix round |
-| `[fix] verify = [program, …]` | findings (`lines` or `status`) | the project | once per fix run, after the rounds; a finding withdraws the run's unsafe fixes to previews |
+| `[fix] verify = [program, …]` | findings (`lines` or `status`) | the project | once per fix run, after the rounds; a failure rolls the newest run of an agent back, and the next, until it passes; their findings are declined |
 | `[models.providers.<n>] command` | an answer (a `protocol`), or changes (an agent: no `protocol`) | the project or the user | per classification request, or per fix |
 
 The decision says *what* runs it (`check` and `fix` have the same types: `cel`, `builtin`, `command`, `rpc`, `model`); the project binds *which* model or agent. A bundled decision cannot name the user's agent, model or credentials.
