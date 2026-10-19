@@ -2,6 +2,7 @@
 
 mod agent;
 mod attach;
+mod attribution;
 mod cache;
 mod cache_fixtures;
 mod checks;

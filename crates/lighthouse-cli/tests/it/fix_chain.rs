@@ -40,7 +40,7 @@ fn a_later_run_starts_from_what_the_earlier_ones_were_accepted_with() {
         "// log\n// run\n// run\n",
         "the second run saw what the first wrote"
     );
-    assert_eq!(fixed["usage"]["edit"]["runs"], 2, "{fixed}");
+    assert_eq!(fixed["usage"]["agent"]["runs"], 2, "{fixed}");
     assert_eq!(fixed["applied"].as_array().unwrap().len(), 2, "{fixed}");
 }
 
@@ -109,7 +109,7 @@ fn findings_of_two_scopes_in_one_file_are_two_runs_each_with_its_own_scope() {
         "pub fn fixed_one() {}\npub fn fixed_two() {}\n",
         "{fixed}"
     );
-    assert_eq!(fixed["usage"]["edit"]["runs"], 2, "{fixed}");
+    assert_eq!(fixed["usage"]["agent"]["runs"], 2, "{fixed}");
     assert_eq!(fixed["applied"].as_array().unwrap().len(), 2, "{fixed}");
 }
 

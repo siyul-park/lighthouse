@@ -17,6 +17,7 @@ use super::{
     rewrite::run_verify,
 };
 use chain::{Links, Mark};
+use rollback::apart;
 
 use crate::{Engine, Error, Overlays, Run};
 
@@ -183,14 +184,15 @@ impl Orchestrator<'_> {
 
     /// Verifies the `withheld` fixes the run may not write, over the state the
     /// rounds left, and reports those the checks accept as previews. The texts
-    /// are left as they were.
+    /// are left as they were. A fix is applied later by itself, so those that
+    /// edit the same file are verified in rounds of their own: each preview
+    /// carries the safe fixes of its own change.
     fn preview(&mut self, outcome: &Run, withheld: Vec<Proposal>) -> Result<(), Error> {
-        if withheld.is_empty() {
-            return Ok(());
+        for batch in apart(withheld) {
+            let start = self.mark();
+            self.apply_round(outcome, batch, self.rounds + 1)?;
+            self.withdraw(start);
         }
-        let start = self.mark();
-        self.apply_round(outcome, withheld, self.rounds + 1)?;
-        self.withdraw(start);
         Ok(())
     }
 
@@ -215,7 +217,7 @@ impl Orchestrator<'_> {
             .map(|p| (p.fingerprint.clone(), p.chain))
             .collect();
         let start = self.mark();
-        let (marks, current) = self.apply_chain(&outcome, proposals, start.2 + 1)?;
+        let (marks, current) = self.apply_chain(&outcome, proposals, start.rounds + 1)?;
         if !self.has_model_fix() {
             return Ok(outcome);
         }
@@ -231,7 +233,7 @@ impl Orchestrator<'_> {
             rolled = true;
         }
         if !self.has_model_fix() {
-            self.rounds = start.2;
+            self.rounds = start.rounds;
             return Ok(outcome);
         }
         match current {
@@ -263,7 +265,7 @@ impl Orchestrator<'_> {
             let mark = self.mark();
             let before = current.as_ref().unwrap_or(outcome);
             let checked = self.apply_round(before, link, round)?;
-            let changed = self.texts != mark.0;
+            let changed = self.texts != mark.texts;
             marks.insert(number, mark);
             if changed {
                 current = Some(match checked {

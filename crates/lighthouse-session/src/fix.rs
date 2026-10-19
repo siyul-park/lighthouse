@@ -52,7 +52,7 @@ pub struct Selection {
     pub fixer: Option<String>,
     /// Record the run and its fixes, and leave out what judgments hide.
     pub store: bool,
-    /// What models may do. Fixes by a model ask the project's `edit` agent
+    /// What models may do. Fixes by a model ask the project's `[models] agent`
     /// unless `off`.
     pub models: ModelOptions,
     /// Keep the answers of models in `.lighthouse/cache` and reuse them.
@@ -134,14 +134,14 @@ pub struct Usage {
     /// from earlier runs are not counted.
     pub calls: usize,
     pub cost: f64,
-    /// Present when the model is an agent that edits.
+    /// Present when the model is an agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edit: Option<Edits>,
+    pub agent: Option<Runs>,
 }
 
-/// What the runs of an agent that edits took.
+/// What the runs of an agent took.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct Edits {
+pub struct Runs {
     /// Runs of the agent; answers kept from earlier runs are not counted.
     pub runs: usize,
     pub seconds: f64,
@@ -156,6 +156,11 @@ pub struct Applied {
     pub safety: String,
     pub description: String,
     pub files: Vec<String>,
+    /// A safe fix of what the change of other fixes introduced, in a file they
+    /// all edited: the part of the change that is not theirs. In a file one fix
+    /// edited it is part of that fix.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub follow_up: bool,
 }
 
 /// A finding that was left as it was, and why.
@@ -176,8 +181,9 @@ impl Fixed {
         let mut lines = self.messages.clone();
         let verb = if self.dry_run { "would fix" } else { "fixed" };
         for fix in &self.applied {
+            let follow = if fix.follow_up { " (follow-up)" } else { "" };
             lines.push(format!(
-                "{verb} {} [{}] {} ({}): {}",
+                "{verb} {} [{}] {} ({}): {}{follow}",
                 fix.decision,
                 fix.safety,
                 fix.files.join(", "),
@@ -208,8 +214,8 @@ impl Fixed {
                 .map(|(decision, counts)| counts.line(decision)),
         );
         if let Some(usage) = &self.usage {
-            let runs = usage.edit.as_ref().map_or(String::new(), |edit| {
-                format!(", {} run(s) in {:.1}s", edit.runs, edit.seconds)
+            let runs = usage.agent.as_ref().map_or(String::new(), |agent| {
+                format!(", {} run(s) in {:.1}s", agent.runs, agent.seconds)
             });
             lines.push(format!(
                 "models: {} request(s), cost {}{runs}",
@@ -313,6 +319,7 @@ impl Applied {
             safety: fix.safety.to_string(),
             description: fix.description.clone(),
             files: fix.files.iter().map(|f| slashed(f)).collect(),
+            follow_up: fix.follow_up,
         }
     }
 }
@@ -406,9 +413,9 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         usage: (!report.models.is_empty()).then_some(Usage {
             calls: report.model_calls,
             cost: report.model_cost,
-            edit: report.model_edits.map(|edit| Edits {
-                runs: edit.runs,
-                seconds: edit.seconds,
+            agent: report.model_edits.map(|agent| Runs {
+                runs: agent.runs,
+                seconds: agent.seconds,
             }),
         }),
         messages,

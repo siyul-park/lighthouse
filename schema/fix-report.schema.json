@@ -25,6 +25,10 @@
           "fixer": {
             "type": "string"
           },
+          "follow_up": {
+            "description": "A safe fix of what the change of other fixes introduced, in a file they\nall edited: the part of the change that is not theirs. In a file one fix\nedited it is part of that fix.",
+            "type": "boolean"
+          },
           "safety": {
             "type": "string"
           }
@@ -218,18 +222,8 @@
     "usage": {
       "description": "The requests that went to a model this run, and what they cost.\nAbsent when no model was asked.",
       "properties": {
-        "calls": {
-          "description": "Requests that went to a model (a run of an agent is one); answers kept\nfrom earlier runs are not counted.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "cost": {
-          "format": "double",
-          "type": "number"
-        },
-        "edit": {
-          "description": "Present when the model is an agent that edits.",
+        "agent": {
+          "description": "Present when the model is an agent.",
           "properties": {
             "runs": {
               "description": "Runs of the agent; answers kept from earlier runs are not counted.",
@@ -250,6 +244,16 @@
             "object",
             "null"
           ]
+        },
+        "calls": {
+          "description": "Requests that went to a model (a run of an agent is one); answers kept\nfrom earlier runs are not counted.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cost": {
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [

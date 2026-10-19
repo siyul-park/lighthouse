@@ -249,7 +249,7 @@ fn a_decision_bound_to_another_agent_is_fixed_by_a_run_of_its_own_over_what_the_
         "pub fn fixed_one() {}\npub fn fixed_two() {}\n",
         "{fixed}"
     );
-    assert_eq!(fixed["usage"]["edit"]["runs"], 2, "{fixed}");
+    assert_eq!(fixed["usage"]["agent"]["runs"], 2, "{fixed}");
     assert_eq!(fixed["applied"].as_array().unwrap().len(), 2, "{fixed}");
     // The second agent fixes only a text that already holds the first one's
     // accepted fix.
@@ -264,7 +264,7 @@ fn a_decision_is_fixed_by_the_project_agent_without_a_binding_of_its_own() {
         .tool("fix", json!({"decision": [BAN, BAN2]}))
         .unwrap();
 
-    assert_eq!(fixed["usage"]["edit"]["runs"], 1, "{fixed}");
+    assert_eq!(fixed["usage"]["agent"]["runs"], 1, "{fixed}");
     assert_eq!(
         read(&dir, "src/lib.rs"),
         "pub fn fixed_one() {}\npub fn bad_two() {}\n"

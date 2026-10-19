@@ -22,15 +22,25 @@ use super::{
 use crate::{Overlays, Run};
 
 /// The state of a run at a point: its texts, the first text of every file it
-/// changed, and its rounds.
-pub(super) type Mark = (Overlays, BTreeMap<PathBuf, (String, String)>, usize);
+/// changed, its rounds and how many fixes it had applied.
+pub(super) struct Mark {
+    pub(super) texts: Overlays,
+    pub(super) original: BTreeMap<PathBuf, (String, String)>,
+    pub(super) rounds: usize,
+    applied: usize,
+}
 
 /// The fixes of a pass by the link of the chain that made them.
 pub(super) type Links = BTreeMap<Fingerprint, usize>;
 
 impl Orchestrator<'_> {
     pub(super) fn mark(&self) -> Mark {
-        (self.texts.clone(), self.original.clone(), self.rounds)
+        Mark {
+            texts: self.texts.clone(),
+            original: self.original.clone(),
+            rounds: self.rounds,
+            applied: self.applied.len(),
+        }
     }
 
     /// Whether a fix by a model stands.
@@ -91,11 +101,13 @@ impl Orchestrator<'_> {
         let Some((newest, mark)) = newest.and_then(|n| Some((n, marks.get(&n)?))) else {
             return false;
         };
-        (self.texts, self.original, _) = mark.clone();
+        self.texts.clone_from(&mark.texts);
+        self.original.clone_from(&mark.original);
         let (undone, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
             .into_iter()
             .partition(|a| a.fixer == FixedBy::Model && links.get(&a.fingerprint) == Some(&newest));
         self.applied = rest;
+        self.forget_follow_ups(mark.applied);
         let reason = format!("rolled back: {why}");
         for fix in &undone {
             self.previewable.remove(&fix.fingerprint);
@@ -130,12 +142,23 @@ impl Orchestrator<'_> {
         true
     }
 
+    /// Drops the follow-ups reported after the first `applied` fixes: the
+    /// texts they were made over are put back.
+    fn forget_follow_ups(&mut self, applied: usize) {
+        let mut at = 0;
+        self.applied.retain(|a| {
+            at += 1;
+            at <= applied || !a.follow_up
+        });
+    }
+
     /// Puts the run back as it was at `mark`, before the fixes the run may not
     /// write, and moves those fixes from applied to previews. A fix of which
     /// no preview could be made is declined: a fix that was verified is
     /// applied, previewed or declined, never lost.
     pub(super) fn withdraw(&mut self, mark: Mark) {
-        (self.texts, self.original, self.rounds) = mark;
+        self.forget_follow_ups(mark.applied);
+        (self.texts, self.original, self.rounds) = (mark.texts, mark.original, mark.rounds);
         let (withheld, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
             .into_iter()
             .partition(|a| !self.permits(a.safety));

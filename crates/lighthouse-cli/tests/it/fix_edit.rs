@@ -78,8 +78,8 @@ fn an_edit_that_fixes_the_finding_is_applied_when_the_project_approves() {
         &json!({"asked": 1, "answered": 1, "verified": 1, "applied": 1, "previewed": 0, "declined": {}})
     );
     assert_eq!(fixed["usage"]["calls"], 1, "{fixed}");
-    assert_eq!(fixed["usage"]["edit"]["runs"], 1, "{fixed}");
-    assert!(fixed["usage"]["edit"]["seconds"].is_number(), "{fixed}");
+    assert_eq!(fixed["usage"]["agent"]["runs"], 1, "{fixed}");
+    assert!(fixed["usage"]["agent"]["seconds"].is_number(), "{fixed}");
 }
 
 #[test]
@@ -237,7 +237,7 @@ fn a_partial_fix_keeps_what_was_fixed_and_declines_what_is_left() {
         counts(&fixed),
         &json!({"asked": 2, "answered": 2, "verified": 1, "applied": 1, "previewed": 0, "declined": {"unresolved": 1}})
     );
-    assert_eq!(fixed["usage"]["edit"]["runs"], 1, "one run for the file");
+    assert_eq!(fixed["usage"]["agent"]["runs"], 1, "one run for the file");
 }
 
 #[test]
@@ -254,7 +254,7 @@ fn a_second_run_takes_the_edit_from_the_cache_and_runs_no_agent() {
     let second = fix(dir.path(), json!({}));
 
     assert_eq!(second["usage"]["calls"], 0, "{second}");
-    assert_eq!(second["usage"]["edit"]["runs"], 0, "{second}");
+    assert_eq!(second["usage"]["agent"]["runs"], 0, "{second}");
     assert_eq!(
         fs::read_to_string(&calls).unwrap().lines().count(),
         1,

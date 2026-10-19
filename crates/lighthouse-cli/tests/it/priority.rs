@@ -12,7 +12,7 @@ use crate::{cache_fixtures::write, mcp::Client};
 
 /// A decision that flags `a.txt` while it says `start`, and whose fix writes
 /// `letter` in its place. `priority` is a line of the fix, or empty.
-fn decision(name: &str, letter: &str, priority: &str) -> String {
+fn decision(name: &str, letter: &str, priority: &str, safety: &str) -> String {
     format!(
         r#"apiVersion: lighthouse/v1alpha1
 kind: Decision
@@ -30,7 +30,7 @@ spec:
     command: [sh, -c, "grep -q start \"$1\" && echo \"$1:1: says start\"; exit 0", sh, "{{file}}"]
   fix:
     type: command
-    safety: safe
+    safety: {safety}
 {priority}    command: [sed, "s/start/{letter}/"]
     stdin: file
     output: stdout
@@ -56,8 +56,18 @@ spec:
     )
 }
 
-/// A project whose note is flagged by the decisions `(name, letter, priority)`.
+/// A project whose note is flagged by the decisions `(name, letter, priority)`,
+/// all with a safe fix.
 fn notes(decisions: &[(&str, &str, i32)]) -> TempDir {
+    let decisions: Vec<_> = decisions
+        .iter()
+        .map(|(name, letter, priority)| (*name, *letter, *priority, "safe"))
+        .collect();
+    notes_of(&decisions, "")
+}
+
+/// The same with the safety of each fix, and `fix` among the lines of `[fix]`.
+fn notes_of(decisions: &[(&str, &str, i32, &str)], fix: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let rules: String = decisions
         .iter()
@@ -67,10 +77,10 @@ fn notes(decisions: &[(&str, &str, i32)]) -> TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n{rules}"
+            "plugins = [\"core\", \"local\"]\n[rules]\n{rules}[fix]\n{fix}"
         )),
     );
-    for (name, letter, priority) in decisions {
+    for (name, letter, priority, safety) in decisions {
         let line = if *priority == 0 {
             String::new()
         } else {
@@ -79,7 +89,7 @@ fn notes(decisions: &[(&str, &str, i32)]) -> TempDir {
         write(
             dir.path(),
             &format!(".lighthouse/decisions/{name}.yaml"),
-            &decision(name, letter, &line),
+            &decision(name, letter, &line, safety),
         );
     }
     write(dir.path(), "a.txt", "start\n");
@@ -126,6 +136,38 @@ fn the_fix_of_the_higher_priority_is_taken_first_whatever_the_order_of_the_findi
 }
 
 #[test]
+fn a_fix_that_is_only_previewed_takes_no_span_from_one_that_is_written() {
+    // The content fix is unsafe and has the higher priority, but the run may
+    // not write it: the safe fix that overlaps it is written, and the preview
+    // is made over what it left.
+    let dir = notes_of(
+        &[("content", "A", 0, "unsafe"), ("format", "B", -100, "safe")],
+        "",
+    );
+
+    let fixed = fix(&dir, "a.txt");
+
+    assert_eq!(note(&dir), "B\n", "{fixed}");
+    assert_eq!(fixed["applied"][0]["decision"], "local/format", "{fixed}");
+}
+
+#[test]
+fn once_both_are_written_priority_alone_orders_them() {
+    let dir = notes_of(
+        &[("content", "A", 0, "unsafe"), ("format", "B", -100, "safe")],
+        "unsafe = true\n",
+    );
+
+    let fixed = fix(&dir, "a.txt");
+
+    assert_eq!(
+        note(&dir),
+        "A\n",
+        "the safe fix is not first for being safe: {fixed}"
+    );
+}
+
+#[test]
 fn a_fix_that_overlaps_the_formatter_wins_and_the_formatting_follows_it() {
     let dir = tempfile::tempdir().unwrap();
     let plugin = lighthouse_test_support::lang_rust();
@@ -142,7 +184,7 @@ fn a_fix_that_overlaps_the_formatter_wins_and_the_formatting_follows_it() {
         "Cargo.toml",
         "[package]\nname = \"demo\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
     );
-    let rename = decision("rename", "x", "")
+    let rename = decision("rename", "x", "", "safe")
         .replace("grep -q start", "grep -q bad_one")
         .replace("s/start/x/", "s/bad_one/good_one/")
         .replace("language: text", "language: rust")

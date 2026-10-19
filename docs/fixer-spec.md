@@ -85,18 +85,25 @@ fix:
   registered fixer, that every `reorder` key is registered and that the `requires` list
   covers what the operations need.
 - **Priority.** When fixes overlap in a round, the one with the higher `priority` is taken and the
-  others are proposed again in the next round; a tie goes by the order of the findings. Content fixes
-  have the default `0`; the formatters have `-100`, so they never win an overlap and formatting
-  follows the fix that won.
+  others are proposed again in the next round; a tie goes by the order of the findings. Safety is no
+  key: a fix the run may not write takes no span, so it never blocks one that is written. Content
+  fixes have the default `0`; the formatters have `-100`, so they never win an overlap and
+  formatting follows the fix that won.
 - **Safe follow-ups.** Whoever makes a fix, a rule, a command or an agent, it is judged on its change
   plus the safe fixes of the findings that change introduced in its files, applied in priority order
   in at most two passes. Those fixes become part of the fix and its preview, so unformatted output of a
   reorder or an agent is formatted and not declined as `introduced`; the rule holds for any safe
-  cleanup. A finding no safe fix clears still counts against the change. A run that names its own
+  cleanup. In a file that several fixes of a round edit they cannot be told apart, and each is
+  reported as an applied fix of its own decision (`follow_up: true`, `(follow-up)` in the text), so
+  that every change written belongs to exactly one fix. A preview is made in a round of its own
+  where another would edit its file, so it carries the follow-ups of its own change. A finding no safe fix clears still counts against the change. A run that names its own
   `--fixer` settles nothing.
 - **The formatter is a decision.** `go/formatted` and `rust/formatted` (severity `error`) check with the
   tool's list mode (`gofmt -l`, `rustfmt --check -l`) and fix with the tool as a filter
-  (`stdin: file`, `output: stdout`, `safe`, `priority: -100`). They are in the recommended sets of
+  (`stdin: file`, `output: stdout`, `safe`, `priority: -100`), `rust/formatted` with the edition
+  of the crate that holds each file (the nearest `Cargo.toml` that sets one, in its package or in
+  the workspace it inherits from; `cargo fmt` does the same but needs a manifest at the root and is
+  no filter over one file). They are in the recommended sets of
   the language packs and need no trust. To use another formatter, switch the decision off and add a
   decision of the project that names it.
 - **Testing:** an invalid example may carry `fixed:`, the new text of each file that

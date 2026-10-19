@@ -34,10 +34,10 @@ impl Orchestrator<'_> {
         mut proposals: Vec<Proposal>,
         round: usize,
     ) -> Result<Option<Run>, Error> {
-        // Safe fixes win a collision, so the ones that apply unasked are not
-        // shut out by an unsafe one; of one safety the higher priority wins,
-        // and the order of the findings breaks a tie.
-        proposals.sort_by_key(|p| (p.safety, Reverse(p.priority)));
+        // The higher priority wins a collision, and the order of the findings
+        // breaks a tie (the sort is stable). Safety is no key: what the run
+        // may not write was set apart before, and takes no span.
+        proposals.sort_by_key(|p| Reverse(p.priority));
         let (mut kept, mut merged, dropped) = kept_proposals(proposals);
         self.decline_dropped(&dropped);
         let mut candidates = self.round(&kept, before);
@@ -54,9 +54,11 @@ impl Orchestrator<'_> {
         } else {
             Some(self.proposer.engine.check_overlaid(&[], &[], &self.texts)?)
         };
+        let mut followed = Vec::new();
         let after = match after {
             Some(run) => {
-                let settled = self.settle(before, run, &changed)?;
+                let settled;
+                (settled, followed) = self.settle(before, run, &changed)?;
                 fold(&mut kept, &mut merged, &self.texts, &candidates.bases);
                 Some(settled)
             }
@@ -100,6 +102,7 @@ impl Orchestrator<'_> {
         ) {
             self.rounds = round;
         }
+        self.report_follow_ups(followed, &kept, &rolled, round);
         Ok(if rolled.is_empty() { after } else { None })
     }
 
@@ -162,6 +165,7 @@ impl Orchestrator<'_> {
                     files: files.clone(),
                     round,
                     preview,
+                    follow_up: false,
                 });
             }
         }
@@ -256,6 +260,25 @@ impl Orchestrator<'_> {
             },
         );
     }
+}
+
+/// `proposals` in order, in batches in which none edits a file another of the
+/// batch does: a fix is judged and shown with the safe fixes of its own change,
+/// which are told apart only where it is the one fix of a file.
+pub(super) fn apart(proposals: Vec<Proposal>) -> Vec<Vec<Proposal>> {
+    let mut batches: Vec<Vec<Proposal>> = Vec::new();
+    for p in proposals {
+        let free = batches.iter().position(|batch| {
+            !batch
+                .iter()
+                .any(|q| q.files.iter().any(|f| p.files.contains(f)))
+        });
+        match free {
+            Some(at) => batches[at].push(p),
+            None => batches.push(vec![p]),
+        }
+    }
+    batches
 }
 
 /// Proposals in order, dropping the ones that collide with an earlier one. A

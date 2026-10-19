@@ -651,9 +651,10 @@ at most five:
    analysis is incomplete, because a fix that rests on a partial analysis is a guess;
 2. select the findings (paths, rules, fingerprints; never those a judgment hides),
    ask each one's fixer for a proposal, lower it, and keep the proposals that do not
-   collide (safe ones first, then the higher `fix.priority`, then report order; a proposal
-   with exactly the edits of a kept one is covered by it; one that lost an overlap is
-   proposed again in the next round);
+   collide (the higher `fix.priority` first, then report order, and safety is no key: a fix
+   the run may not write is set apart before and takes no span; a proposal with exactly the
+   edits of a kept one is covered by it; one that lost an overlap is proposed again in the
+   next round);
 3. apply the edits to the texts **in memory** (a proposal whose own edits overlap is
    declined; an out-of-range or overlapping edit is an error, never a panic);
 4. re-index and re-check **over overlays**: the engine reads the project with the
@@ -662,7 +663,12 @@ at most five:
    providers; a program that reads files is run in a copy of the project that holds the texts.
 5. take the **safe follow-ups**: the safe fixes of the findings the change introduced in its files
    (the formatter's among them, `go/formatted` and `rust/formatted`), in priority order, at most
-   two passes, and check again. They become part of the fix, and so of its preview.
+   two passes, and check again. They become part of the fix, and so of its preview, when the
+   fix is the only one that edits the file; in a file that several fixes of the round edit they
+   cannot be told apart, and are reported as applied fixes of their own decision, marked
+   `follow_up`, so that every change written belongs to one fix reported. The fixes the run
+   may not write are verified in rounds in which none shares a file with another, so that a
+   preview carries the follow-ups of its own change.
    A changed file is dropped, back to its text
    before the round, when its check got worse: more findings of error or warn severity for
    some rule in the file (counted per file and decision, as a model fix's verdict is), or a new

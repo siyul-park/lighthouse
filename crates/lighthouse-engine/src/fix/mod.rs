@@ -276,6 +276,10 @@ pub struct AppliedFix {
     /// What the fix changes, kept only in a dry run, where no fix is written:
     /// `None` when it could not be shown.
     pub preview: Option<Preview>,
+    /// Whether it is a safe fix of what the change of others introduced, in a
+    /// file several of them edited: what it writes belongs to no one of them.
+    /// In a file one fix edited it is part of that fix.
+    pub follow_up: bool,
 }
 
 /// A finding that was left as it was, and why.

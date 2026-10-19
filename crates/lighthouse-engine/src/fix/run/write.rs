@@ -112,7 +112,8 @@ impl Orchestrator<'_> {
             outcome.diagnostics.iter().map(|d| &d.fingerprint).collect();
         self.declined
             .retain(|fingerprint, _| still.contains(fingerprint));
-        for fix in undone {
+        // A follow-up is not for a finding of the user: nothing is left to decline.
+        for fix in undone.into_iter().filter(|a| !a.follow_up) {
             let why = fix
                 .files
                 .iter()
