@@ -52,7 +52,8 @@ pub struct Briefing<'a> {
     pub limit: Option<usize>,
     pub detail: Detail,
     /// The verified previews of a fix run, by fingerprint: the SARIF `fixes`
-    /// of the findings they are for. A check computes none.
+    /// of the findings they are for, each relative to the original text. A
+    /// check computes none.
     pub fixes: Option<&'a BTreeMap<String, Preview>>,
     /// The text of the files of findings, by project-relative path, for
     /// formats whose columns count characters and not bytes (SARIF).

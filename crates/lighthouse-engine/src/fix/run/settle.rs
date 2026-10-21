@@ -8,8 +8,12 @@
 //! its edits say the text each of its files ends with, so that a preview shows
 //! what the run would write. In a file that several fixes edited they cannot
 //! be told apart, so they are reported as fixes of their own, each of its
-//! decision. A finding that no safe fix clears still counts against the
-//! change. The scope of the fix is checked on the program's own
+//! decision, and in a dry run each comes with its preview, over the text the
+//! change left. A follow-up that changes none of those files has nothing to
+//! report and is not applied. In a dry run its preview is relative to the text
+//! the files had before any fix, the difference to what they end with, so that
+//! it applies alone as SARIF reads it. A finding that no safe fix clears still
+//! counts against the change. The scope of the fix is checked on the program's own
 //! diff, before this, so these edits are not held to it.
 
 use std::{
@@ -18,10 +22,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Fingerprint, Safety};
+use lighthouse_model::{Fingerprint, Preview, Safety};
 
 use super::{
     super::edits::{TextEdit, apply, replace_changed},
+    super::preview::preview_of,
     super::propose::{Phase, Proposal, Taking},
     super::{AppliedFix, FixedBy},
     Orchestrator,
@@ -32,6 +37,11 @@ use crate::{Error, Overlays, Run};
 /// How many times the safe fixes of the findings a change introduced are
 /// applied: the findings those fixes introduce get one more.
 const PASSES: usize = 2;
+
+/// A safe fix that followed a change.
+pub(super) struct Followed {
+    proposal: Proposal,
+}
 
 /// Makes the edits of the fixes among `kept` and `merged` say the text each
 /// of their files ends with in `texts`, when the safe fixes that followed the
@@ -102,13 +112,17 @@ impl Orchestrator<'_> {
     /// of their priority, pass after pass; the check of the resulting state.
     /// A pass that makes a file worse, or returns to a state seen, is undone
     /// and ends it. A run that names its own fixer settles nothing. The fixes
-    /// that stay applied come with the files each changed.
+    /// that stay applied come with the files each changed. `fixes` are the
+    /// fixes of the round that made the change: a follow-up in a file several
+    /// of them edit is reported, so one that changes none of them is not
+    /// applied.
     pub(super) fn settle(
         &mut self,
         before: &Run,
         mut after: Run,
         changed: &[PathBuf],
-    ) -> Result<(Run, Vec<Proposal>), Error> {
+        fixes: &[Proposal],
+    ) -> Result<(Run, Vec<Followed>), Error> {
         let mut followed = Vec::new();
         if self.proposer.run.fixer.is_some() || changed.is_empty() {
             return Ok((after, followed));
@@ -138,12 +152,13 @@ impl Orchestrator<'_> {
                 .filter(|p| p.safety == Safety::Safe && p.files.iter().all(|f| changed.contains(f)))
                 .collect();
             safe.sort_by_key(|p| Reverse(p.priority));
+            let safe = Self::reportable(safe, fixes, |file| self.standing_text(file));
             let (kept, merged, _) = kept_proposals(safe);
             let round = self.round(&kept, &after);
             if round.texts.is_empty() {
                 break;
             }
-            let made: Vec<Proposal> = kept
+            let made: Vec<Followed> = kept
                 .iter()
                 .chain(merged.iter().map(|(p, _)| p))
                 .map(|p| Proposal {
@@ -156,6 +171,7 @@ impl Orchestrator<'_> {
                     ..p.clone()
                 })
                 .filter(|p| !p.files.is_empty())
+                .map(|proposal| Followed { proposal })
                 .collect();
             let prior: Vec<(PathBuf, Option<String>)> = round
                 .texts
@@ -179,26 +195,61 @@ impl Orchestrator<'_> {
         Ok((after, followed))
     }
 
+    /// The `safe` fixes that change something in each file that several of
+    /// `fixes` edit, over the text `standing` gives: one that changes none of them
+    /// has nothing to report there, and what it wrote would stay unreported.
+    fn reportable(
+        safe: Vec<Proposal>,
+        fixes: &[Proposal],
+        standing: impl Fn(&Path) -> Option<String>,
+    ) -> Vec<Proposal> {
+        safe.into_iter()
+            .filter(|p| {
+                let shared: Vec<PathBuf> = p
+                    .files
+                    .iter()
+                    .filter(|f| editors(fixes, f) > 1)
+                    .cloned()
+                    .collect();
+                shared.is_empty()
+                    || preview_of(
+                        &Proposal {
+                            files: shared,
+                            ..p.clone()
+                        },
+                        &standing,
+                    )
+                    .is_some()
+            })
+            .collect()
+    }
+
     /// Reports the safe fixes `followed` that stay applied in the files that
     /// several of the `kept` fixes of the round edit, and are not rolled back:
     /// what they wrote there belongs to no one of those fixes, so each is an
     /// applied fix of its own decision, marked as a follow-up.
     pub(super) fn report_follow_ups(
         &mut self,
-        followed: Vec<Proposal>,
+        followed: Vec<Followed>,
         kept: &[Proposal],
         rolled: &BTreeMap<PathBuf, String>,
         round: usize,
     ) {
-        for p in followed {
+        for Followed { proposal: p } in followed {
             let files: Vec<PathBuf> = p
                 .files
-                .into_iter()
-                .filter(|f| editors(kept, f) > 1 && !rolled.contains_key(f))
+                .iter()
+                .filter(|f| editors(kept, f) > 1 && !rolled.contains_key(*f))
+                .cloned()
                 .collect();
             if files.is_empty() {
                 continue;
             }
+            let preview = if self.proposer.run.dry_run {
+                self.composed_preview(&p, &files)
+            } else {
+                None
+            };
             self.applied.push(AppliedFix {
                 fingerprint: p.fingerprint,
                 rule_id: p.rule_id,
@@ -207,9 +258,96 @@ impl Orchestrator<'_> {
                 safety: p.safety,
                 files,
                 round,
-                preview: None,
+                preview,
                 follow_up: true,
             });
         }
+    }
+
+    /// What the follow-up `p` makes of `files`, relative to the text they had
+    /// before any fix: the difference to what they have now. `None` when they
+    /// are as they were.
+    fn composed_preview(&self, p: &Proposal, files: &[PathBuf]) -> Option<Preview> {
+        let edits: Vec<TextEdit> = files
+            .iter()
+            .filter_map(|file| {
+                let (base, _) = self.original.get(file)?;
+                replace_changed(file, base, self.texts.get(file)?)
+            })
+            .collect();
+        let whole = Proposal {
+            files: files.to_vec(),
+            edits,
+            ..p.clone()
+        };
+        preview_of(&whole, |file| {
+            self.original.get(file).map(|(base, _)| base.clone())
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use lighthouse_model::{Fingerprint, Safety};
+
+    use super::*;
+    use crate::fix::propose::Aim;
+
+    fn proposal(file: &str, edits: Vec<TextEdit>) -> Proposal {
+        Proposal {
+            fingerprint: Fingerprint::new("r", file, "k"),
+            rule_id: "r".to_owned(),
+            file: file.into(),
+            line: 1,
+            fixer: FixedBy::Fixer("tidy".to_owned()),
+            description: "tidy".to_owned(),
+            safety: Safety::Safe,
+            priority: 0,
+            edits,
+            files: vec![file.into()],
+            aim: Aim::Finding,
+            chain: 0,
+            bases: BTreeMap::new(),
+            batch: Vec::new(),
+        }
+    }
+
+    fn replace(file: &str, range: std::ops::Range<usize>, text: &str) -> TextEdit {
+        TextEdit {
+            file: file.into(),
+            range,
+            text: text.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_follow_up_with_nothing_to_report_in_a_shared_file_is_not_applied() {
+        // Both `a.txt` and `b.txt` are edited by two fixes; `c.txt` by one.
+        let edits = |file: &str| proposal(file, vec![replace(file, 0..1, "x")]);
+        let fixes = [
+            edits("a.txt"),
+            edits("a.txt"),
+            edits("b.txt"),
+            edits("b.txt"),
+        ];
+        let standing = |_: &Path| Some("one\n".to_owned());
+        let safe = vec![
+            // Changes a shared file.
+            proposal("a.txt", vec![replace("a.txt", 0..3, "ONE")]),
+            // Changes it to what it is: nothing to report.
+            proposal("a.txt", vec![replace("a.txt", 0..3, "one")]),
+            // Its edit does not apply to the text that stands.
+            proposal("b.txt", vec![replace("b.txt", 40..43, "x")]),
+            // Changes a file one fix edited: part of that fix.
+            proposal("c.txt", vec![replace("c.txt", 40..43, "x")]),
+        ];
+
+        let kept = Orchestrator::reportable(safe, &fixes, standing);
+
+        let files: Vec<&Path> = kept.iter().map(|p| p.file.as_path()).collect();
+        assert_eq!(files, [Path::new("a.txt"), Path::new("c.txt")]);
+        assert_eq!(kept[0].edits[0].text, "ONE");
     }
 }

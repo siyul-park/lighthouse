@@ -87,7 +87,9 @@ pub struct Fixed {
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
     /// What every fix left as a preview changes, by fingerprint, and in a dry
-    /// run every fix that would be applied: the SARIF `fixes` of a report.
+    /// run every fix that would be applied: the SARIF `fixes` of a report. Each
+    /// is relative to the original text, so that it applies alone; the one
+    /// made last for a fingerprint stands for all of them.
     #[serde(skip)]
     pub shown: BTreeMap<String, Preview>,
 }
@@ -227,9 +229,15 @@ impl Fixed {
         } else {
             format!(", {} awaiting a hand", self.previews.len())
         };
+        let follow_ups = self.applied.iter().filter(|fix| fix.follow_up).count();
+        let tidied = if follow_ups == 0 {
+            String::new()
+        } else {
+            format!(" and {follow_ups} follow-up(s)")
+        };
         lines.push(format!(
-            "{} fix(es) {}, {} left alone{waiting}",
-            self.applied.len(),
+            "{} fix(es){tidied} {}, {} left alone{waiting}",
+            self.applied.len() - follow_ups,
             if self.dry_run { "proposed" } else { "applied" },
             self.declined.len()
         ));

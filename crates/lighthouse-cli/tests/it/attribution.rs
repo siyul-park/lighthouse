@@ -8,7 +8,13 @@ use std::fs;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use crate::{cache_fixtures::write, mcp::Client};
+use lighthouse_session::{
+    Session,
+    fix::{self, Selection, Targets},
+    trust,
+};
+
+use crate::{cache_fixtures::write, checks::UserHome, mcp::Client};
 
 /// A decision that flags the lines of `a.txt` that match `pattern`, and whose
 /// fix is the `sed` script; `invalid` is an example it flags and `fixed` what
@@ -214,4 +220,76 @@ fn a_preview_carries_the_follow_ups_of_its_own_change() {
             "a preview holds only its own change: {diff}"
         );
     }
+}
+
+#[test]
+fn a_dry_run_shows_the_follow_up_with_the_preview_of_its_own_change() {
+    let dir = notes(&["one", "two"], "safe");
+    let _user = UserHome::at(&dir.path().join(".home"));
+    let session = Session::find_in(dir.path()).unwrap().unwrap();
+    trust(&session.root, &session.basis).unwrap();
+
+    let fixed = fix::run(
+        &session,
+        &Selection {
+            targets: Targets {
+                paths: vec![dir.path().join("a.txt")],
+                ..Targets::default()
+            },
+            dry_run: true,
+            ..Selection::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(note(&dir), "alpha\nbeta\n", "nothing was written");
+    let shown = |decision: &str| {
+        let fix = fixed.applied.iter().find(|a| a.decision == decision);
+        fixed.shown[&fix.unwrap().fingerprint].files[0]
+            .hunks
+            .clone()
+    };
+    assert!(shown("local/one").contains("+ONE "), "{fixed:?}");
+    assert!(shown("local/two").contains("+TWO "), "{fixed:?}");
+    let follow = fixed.applied.iter().find(|a| a.follow_up).unwrap();
+    let composed = &fixed.shown[&follow.fingerprint].files[0];
+    assert_eq!(
+        composed.hunks, "@@ -1,2 +1,2 @@\n-alpha\n-beta\n+ONE\n+TWO",
+        "relative to the text before any fix, so that it applies alone: {fixed:?}"
+    );
+    assert_eq!(
+        applied_to("alpha\nbeta\n", &composed.edits),
+        "ONE\nTWO\n",
+        "the follow-up alone on the original is the final text"
+    );
+    let follow_ups = fixed.applied.iter().filter(|a| a.follow_up).count();
+    let count = format!(
+        "{} fix(es) and {follow_ups} follow-up(s) proposed",
+        fixed.applied.len() - follow_ups
+    );
+    assert!(
+        fixed.lines().iter().any(|l| l.starts_with(&count)),
+        "{:?}",
+        fixed.lines()
+    );
+}
+
+/// `text` with the edits of a preview made over it, the positions being lines
+/// and columns of an ASCII text.
+fn applied_to(text: &str, edits: &[lighthouse_model::PreviewEdit]) -> String {
+    let offset = |at: lighthouse_model::Position| {
+        let line_start: usize = text
+            .split_inclusive('\n')
+            .take(at.line as usize - 1)
+            .map(str::len)
+            .sum();
+        line_start + at.col as usize - 1
+    };
+    let mut made = text.to_owned();
+    let mut ordered: Vec<_> = edits.iter().collect();
+    ordered.sort_by_key(|e| std::cmp::Reverse(offset(e.start)));
+    for edit in ordered {
+        made.replace_range(offset(edit.start)..offset(edit.end), &edit.text);
+    }
+    made
 }

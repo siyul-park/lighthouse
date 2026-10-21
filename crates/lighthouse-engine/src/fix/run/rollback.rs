@@ -8,14 +8,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Fingerprint, Preview};
+use lighthouse_model::Fingerprint;
 
 use lighthouse_protocol::hash;
 
 use super::{
     super::edits::overlap,
     super::model::{Class, Event, Verdict, judge},
-    super::preview::preview_files,
+    super::preview::preview_of,
     super::propose::Proposal,
     super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator, Standing,
@@ -58,7 +58,7 @@ impl Orchestrator<'_> {
         let after = match after {
             Some(run) => {
                 let settled;
-                (settled, followed) = self.settle(before, run, &changed)?;
+                (settled, followed) = self.settle(before, run, &changed, &kept)?;
                 fold(&mut kept, &mut merged, &self.texts, &candidates.bases);
                 Some(settled)
             }
@@ -193,28 +193,19 @@ impl Orchestrator<'_> {
             })
             .collect();
         for p in standing {
-            let files = preview_files(p, |file| {
+            let shown = preview_of(p, |file| {
                 bases
                     .get(file)
                     .cloned()
                     .or_else(|| self.standing_text(file))
+            })
+            .ok_or_else(|| DeclinedFix {
+                fingerprint: p.fingerprint.clone(),
+                rule_id: p.rule_id.clone(),
+                file: p.file.clone(),
+                line: p.line,
+                reason: "left for review: its change could not be shown as a preview".to_owned(),
             });
-            let shown = match files {
-                Some(files) => Ok(Preview {
-                    fingerprint: p.fingerprint.clone(),
-                    description: p.description.clone(),
-                    safety: p.safety,
-                    files,
-                }),
-                None => Err(DeclinedFix {
-                    fingerprint: p.fingerprint.clone(),
-                    rule_id: p.rule_id.clone(),
-                    file: p.file.clone(),
-                    line: p.line,
-                    reason: "left for review: its change could not be shown as a preview"
-                        .to_owned(),
-                }),
-            };
             self.previewable.insert(
                 p.fingerprint.clone(),
                 Standing {
@@ -240,7 +231,7 @@ impl Orchestrator<'_> {
 
     /// The text `file` has now: the one that stands in for it, else the
     /// one on disk.
-    fn standing_text(&self, file: &Path) -> Option<String> {
+    pub(super) fn standing_text(&self, file: &Path) -> Option<String> {
         let root = &self.proposer.engine.ws.root;
         self.texts
             .get(file)

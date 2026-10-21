@@ -2,6 +2,8 @@
 //! over a text project with project-local decisions.
 
 use std::{
+    env,
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
 };
@@ -15,6 +17,37 @@ use tempfile::TempDir;
 /// home (the user's trust and `config.toml`, plugins and caches).
 pub(crate) fn home(dir: &Path) -> [(&'static str, PathBuf); 3] {
     ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"].map(|name| (name, dir.join(".home")))
+}
+
+/// The user-level directories a session reads in this process (the user's
+/// file, trust and plugins), moved into `home` while the guard lives, so that a
+/// test that opens a session never reads the real ones.
+pub(crate) struct UserHome(Vec<(&'static str, Option<OsString>)>);
+
+impl UserHome {
+    const NAMES: [&'static str; 2] = ["XDG_CONFIG_HOME", "XDG_DATA_HOME"];
+
+    pub(crate) fn at(home: &Path) -> Self {
+        let saved = Self::NAMES.map(|name| (name, env::var_os(name)));
+        for name in Self::NAMES {
+            // SAFETY: the other tests of this binary give the programs they
+            // start user-level directories of their own.
+            unsafe { env::set_var(name, home) };
+        }
+        Self(saved.into())
+    }
+}
+
+impl Drop for UserHome {
+    fn drop(&mut self) {
+        for (name, value) in &self.0 {
+            // SAFETY: as in `at`.
+            match value {
+                Some(value) => unsafe { env::set_var(name, value) },
+                None => unsafe { env::remove_var(name) },
+            }
+        }
+    }
 }
 
 /// The binary in `dir`, with the user-level directories inside it and no CI
