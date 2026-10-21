@@ -533,6 +533,7 @@ fn the_bytes_and_ids_of_records_are_what_they_always_were() {
         decision_uid: None,
         meaning_version: None,
         check_revision: None,
+        model_version: None,
         decision_hash: None,
         catalog_version: None,
         lighthouse_version: None,

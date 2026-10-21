@@ -176,7 +176,9 @@ fn weak() -> ExitCode {
 
 /// P(violation) of a subject by its text.
 fn noul_by_text(text: &str) -> f64 {
-    if text.contains("maybe_bad") {
+    if text.contains("pretty_sure") {
+        0.99
+    } else if text.contains("maybe_bad") {
         0.95
     } else if text.contains("maybe_good") {
         0.05

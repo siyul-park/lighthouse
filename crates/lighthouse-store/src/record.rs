@@ -38,6 +38,9 @@ pub struct Observed {
     /// Hash of how the decision is checked. Recorded, never compared to
     /// expire a judgment.
     pub check_revision: Option<String>,
+    /// The model that decided the finding and the version of its program
+    /// (`provider/model@hash`). Recorded, never compared to expire a judgment.
+    pub model_version: Option<String>,
     /// Hash of the whole decision definition, wording and examples included.
     pub decision_hash: Option<String>,
 }
@@ -62,6 +65,7 @@ impl Observed {
             options: json!({}),
             meaning_version: None,
             check_revision: None,
+            model_version: diagnostic.model_version.clone(),
             decision_hash: None,
         }
     }
@@ -286,6 +290,10 @@ pub struct FindingRecord {
     pub lighthouse_version: Option<String>,
     pub catalog_version: Option<String>,
     pub meaning_version: Option<String>,
+    /// The model that decided the finding at its last sighting, with the
+    /// version of its program.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_version: Option<String>,
     /// The latest judgment, if the finding was judged.
     pub judgment: Option<Judgment>,
     /// What that judgment does to the finding now.

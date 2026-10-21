@@ -388,7 +388,7 @@ fn record_model_labels(root: &Path, run: &Run) -> Vec<String> {
         .diagnostics
         .iter()
         .filter_map(|d| {
-            let model = d.evidence.get("model").and_then(|v| v.as_str())?;
+            let model = d.model_version.as_deref()?;
             let confidence = d
                 .evidence
                 .get("confidence")

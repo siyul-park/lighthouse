@@ -22,6 +22,7 @@ pub fn observed(fingerprint: &str, rule: &str, path: &str) -> Observed {
         options: json!({ "max": 3 }),
         meaning_version: Some("sem1".to_owned()),
         check_revision: None,
+        model_version: None,
         decision_hash: Some("full1".to_owned()),
     }
 }

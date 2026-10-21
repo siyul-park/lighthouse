@@ -121,11 +121,9 @@ fn a_layer_below_that_decides_carries_what_the_explored_model_said() {
         .filter(|f| f["decision"] == DECISION && f["evidence"]["explored"].is_object())
         .collect();
     assert_eq!(explored.len(), 1, "{report}");
-    let said = explored[0]["evidence"]["explored"]["model"]
-        .as_str()
-        .unwrap();
-    assert!(said.starts_with(MODEL), "{said}");
     assert!(explored[0]["evidence"]["explored"]["confidence"].is_number());
-    let by = explored[0]["evidence"]["model"].as_str().unwrap();
+    assert!(explored[0]["evidence"]["explored"]["model"].is_null());
+    assert!(explored[0]["evidence"]["model"].is_null());
+    let by = explored[0]["modelVersion"].as_str().unwrap();
     assert!(by.starts_with("fake/any@"), "{by}");
 }

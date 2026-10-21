@@ -175,8 +175,8 @@ impl Abstain {
 }
 
 /// What the models' answer makes of a candidate: the finding it confirms,
-/// with the model and its confidence as the evidence; a review task for a
-/// subject left undecided.
+/// with the confidence as the evidence and the model as its version; a review
+/// task for a subject left undecided.
 fn outcome(answered: Answered, candidate: Candidate, decision: &DecisionRef) -> Diagnostic {
     let mut diagnostic = candidate.diagnostic;
     if diagnostic.message.is_empty() {
@@ -184,15 +184,10 @@ fn outcome(answered: Answered, candidate: Candidate, decision: &DecisionRef) -> 
     }
     match answered {
         Answered::Decided(decided) => {
-            diagnostic.evidence = json!({
-                "model": decided.model,
-                "confidence": decided.confidence,
-            });
+            diagnostic.evidence = json!({ "confidence": decided.confidence });
+            diagnostic.model_version = Some(decided.model);
             if let Some(explored) = decided.explored {
-                diagnostic.evidence["explored"] = json!({
-                    "model": explored.model,
-                    "confidence": explored.confidence,
-                });
+                diagnostic.evidence["explored"] = json!({ "confidence": explored.confidence });
             }
         }
         Answered::Abstained(abstained) => diagnostic.review = Some(abstained.to_string()),

@@ -39,14 +39,14 @@ fn store_opens_a_cache_and_builds_one_of_another_version_again_from_the_log() {
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
     let mut first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 10);
+    assert_eq!(first.schema_version().unwrap(), 11);
     first
         .record(&run(vec![observed("f1", "design/a", "a.go")]))
         .unwrap();
     judge(&mut first, "f1", Judgment::Pass);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 10);
+    assert_eq!(again.schema_version().unwrap(), 11);
     assert_eq!(again.finding("f1").unwrap().judgment, Some(Judgment::Pass));
     drop(again);
 
@@ -56,7 +56,7 @@ fn store_opens_a_cache_and_builds_one_of_another_version_again_from_the_log() {
             .pragma_update(None, "user_version", version)
             .unwrap();
         let rebuilt = Store::open(dir.path()).unwrap();
-        assert_eq!(rebuilt.schema_version().unwrap(), 10, "from {version}");
+        assert_eq!(rebuilt.schema_version().unwrap(), 11, "from {version}");
         assert!(
             matches!(rebuilt.finding("f1"), Err(Error::UnknownFinding(_))),
             "the sightings of a cache of another version are gone"
@@ -98,7 +98,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 10);
+        assert_eq!(handle.join().unwrap(), 11);
     }
 }
 
@@ -701,6 +701,37 @@ fn changing_only_how_a_decision_is_checked_keeps_its_judgments_and_changing_what
 }
 
 #[test]
+fn the_model_that_decided_a_finding_is_recorded_with_the_finding_and_the_judgment_and_never_compared()
+ {
+    let mut decided = observed("f1", "design/a", "a.go");
+    decided.model_version = Some("fake/any@111".to_owned());
+    let mut store = memory_with(&[decided]);
+    judge(&mut store, "f1", Judgment::Pass);
+    assert_eq!(
+        store.finding("f1").unwrap().model_version.as_deref(),
+        Some("fake/any@111")
+    );
+    assert_eq!(
+        store.history("f1").unwrap()[0]
+            .spec
+            .model_version
+            .as_deref(),
+        Some("fake/any@111")
+    );
+
+    // Another version of the model, the same evidence: the judgment stands,
+    // and the finding records the version it was last decided by.
+    let mut again = observed("f1", "design/a", "a.go");
+    again.model_version = Some("fake/any@222".to_owned());
+    store.record(&run(vec![again])).unwrap();
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+    assert_eq!(
+        store.finding("f1").unwrap().model_version.as_deref(),
+        Some("fake/any@222")
+    );
+}
+
+#[test]
 fn a_standing_stands_while_it_neither_expired_nor_was_refused() {
     assert!(Standing::Suppressed.stands());
     assert!(Standing::Judged.stands());
@@ -810,7 +841,7 @@ fn a_cache_with_tables_and_no_version_is_built_again_from_the_log() {
 
     let rebuilt = Store::open(dir.path()).unwrap();
 
-    assert_eq!(rebuilt.schema_version().unwrap(), 10);
+    assert_eq!(rebuilt.schema_version().unwrap(), 11);
     assert_eq!(rebuilt.history("f1").unwrap().len(), 1, "from the log");
     assert!(rebuilt.list(&all()).unwrap().is_empty());
 }

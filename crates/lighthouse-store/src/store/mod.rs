@@ -35,7 +35,7 @@ const OPEN_PAUSE: Duration = Duration::from_millis(20);
 const SNAPSHOT_VERSION: u32 = 2;
 
 const JUDGMENT_COLUMNS: &str = "judgment_id, fingerprint, decision, decision_uid, meaning_version, \
-     check_revision, decision_hash, catalog_version, lighthouse_version, judgment, reason, \
+     check_revision, model_version, decision_hash, catalog_version, lighthouse_version, judgment, reason, \
      agent_type, agent_id, agent_role, language, scope, evidence_digest, feature_snapshot, git_commit, \
      generated_at";
 
@@ -377,10 +377,10 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
         "INSERT INTO findings (fingerprint, decision, decision_uid, severity, authored_severity, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
              last_commit, last_dirty, lighthouse_version, catalog_version, meaning_version, \
-             check_revision, decision_hash, evidence_digest) \
+             check_revision, model_version, decision_hash, evidence_digest) \
          VALUES (:fingerprint, :decision, :decision_uid, :severity, :authored, :path, :locator, :symbol, :now, :now, \
              :message, :evidence, :facts, :options, :commit, :dirty, :version, :catalog, \
-             :meaning_version, :check_revision, :decision_hash, :digest) \
+             :meaning_version, :check_revision, :model_version, :decision_hash, :digest) \
          ON CONFLICT (fingerprint) DO UPDATE SET \
              decision = excluded.decision, \
              decision_uid = COALESCE(excluded.decision_uid, decision_uid), \
@@ -393,7 +393,7 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
              last_options = excluded.last_options, last_commit = excluded.last_commit, \
              last_dirty = excluded.last_dirty, lighthouse_version = excluded.lighthouse_version, \
              catalog_version = excluded.catalog_version, meaning_version = excluded.meaning_version, \
-             check_revision = excluded.check_revision, \
+             check_revision = excluded.check_revision, model_version = excluded.model_version, \
              decision_hash = excluded.decision_hash, evidence_digest = excluded.evidence_digest",
     )?
     .execute(
@@ -417,6 +417,7 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
             ":catalog": run.catalog_version,
             ":meaning_version": observed.meaning_version,
             ":check_revision": observed.check_revision,
+            ":model_version": observed.model_version,
             ":decision_hash": observed.decision_hash,
             ":digest": observed.evidence_digest(),
         },

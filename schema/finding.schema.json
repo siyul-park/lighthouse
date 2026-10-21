@@ -240,6 +240,13 @@
     "message": {
       "type": "string"
     },
+    "modelVersion": {
+      "description": "The model that decided the finding at its last sighting, with the\nversion of its program.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "narrowing": {
       "description": "The judgment said the decision does not apply here.",
       "type": "boolean"

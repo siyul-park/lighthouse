@@ -153,6 +153,7 @@ pub(super) fn event_of(
             .or_else(|| finding.decision_uid.clone()),
         meaning_version: versions.meaning_version,
         check_revision: versions.check_revision,
+        model_version: finding.model_version.clone(),
         decision_hash: versions.decision_hash,
         catalog_version: versions.catalog_version,
         lighthouse_version: Some(review.lighthouse_version.clone()),
@@ -177,10 +178,10 @@ pub(super) fn insert_judgment(tx: &Transaction, event: &JudgmentEvent) -> Result
     let spec = &event.spec;
     tx.execute(
         "INSERT OR IGNORE INTO judgments (judgment_id, fingerprint, decision, decision_uid, \
-             meaning_version, check_revision, decision_hash, catalog_version, lighthouse_version, \
+             meaning_version, check_revision, model_version, decision_hash, catalog_version, lighthouse_version, \
              judgment, reason, agent_type, agent_id, agent_role, language, scope, evidence_digest, \
              feature_snapshot, git_commit, generated_at) \
-         VALUES (:id, :fingerprint, :decision, :decision_uid, :meaning_version, :check_revision, \
+         VALUES (:id, :fingerprint, :decision, :decision_uid, :meaning_version, :check_revision, :model_version, \
              :decision_hash, :catalog, :version, :judgment, :reason, :agent_type, :agent_id, :agent_role, \
              :language, :scope, :digest, :snapshot, :commit, :generated_at)",
         named_params! {
@@ -190,6 +191,7 @@ pub(super) fn insert_judgment(tx: &Transaction, event: &JudgmentEvent) -> Result
             ":decision_uid": spec.decision_uid,
             ":meaning_version": spec.meaning_version,
             ":check_revision": spec.check_revision,
+            ":model_version": spec.model_version,
             ":decision_hash": spec.decision_hash,
             ":catalog": spec.catalog_version,
             ":version": spec.lighthouse_version,
@@ -275,6 +277,7 @@ pub(super) fn finding_record(row: &Row, standings: &Standings) -> rusqlite::Resu
         lighthouse_version: row.get("lighthouse_version")?,
         catalog_version: row.get("catalog_version")?,
         meaning_version: subject.meaning_version,
+        model_version: row.get("model_version")?,
         judgment: ruling.as_ref().map(|r| r.judgment),
         standing,
         justification: ruling.as_ref().and_then(|r| r.justification.clone()),
@@ -300,6 +303,7 @@ fn judgment_event(row: &Row) -> rusqlite::Result<JudgmentEvent> {
             decision_uid: row.get("decision_uid")?,
             meaning_version: row.get("meaning_version")?,
             check_revision: row.get("check_revision")?,
+            model_version: row.get("model_version")?,
             decision_hash: row.get("decision_hash")?,
             catalog_version: row.get("catalog_version")?,
             lighthouse_version: row.get("lighthouse_version")?,

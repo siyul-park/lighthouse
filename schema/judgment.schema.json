@@ -136,6 +136,13 @@
             "null"
           ]
         },
+        "modelVersion": {
+          "description": "The model that decided the finding judged, with its version\n(`provider/model@hash`); recorded, never compared.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "reason": {
           "description": "Why, written for the next reader.",
           "type": [

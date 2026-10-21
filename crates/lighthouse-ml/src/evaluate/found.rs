@@ -57,7 +57,7 @@ impl Found {
             let fp = d.fingerprint.as_str().to_owned();
             if result == Outcome::Review {
                 found.usage.reviews += 1;
-            } else if d.evidence.get("model").is_some() {
+            } else if d.model_version.is_some() {
                 found.usage.model_decided += 1;
             }
             found.by_fingerprint.insert(fp.clone(), result);

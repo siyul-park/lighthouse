@@ -61,6 +61,10 @@ pub struct JudgmentSpec {
     pub meaning_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_revision: Option<String>,
+    /// The model that decided the finding judged, with its version
+    /// (`provider/model@hash`); recorded, never compared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -10,7 +10,7 @@ use lighthouse_model::{
 use lighthouse_spec::{Catalog, authored_severity};
 use schemars::JsonSchema;
 use serde::Serialize;
-use serde_json::{Map, Value};
+use serde_json::{Value, json};
 
 use crate::{
     descriptor::Descriptor,
@@ -212,6 +212,10 @@ struct Finding<'a> {
     context: Option<String>,
     #[serde(skip_serializing_if = "Value::is_null")]
     evidence: Value,
+    /// The model that decided the finding, with its version; evidence of
+    /// nothing, so apart from it.
+    #[serde(rename = "modelVersion", skip_serializing_if = "Option::is_none")]
+    model_version: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     expected: Option<Expected>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -308,7 +312,11 @@ fn entries(diagnostics: &[Diagnostic], briefing: &Briefing<'_>) -> Vec<Entry> {
                 message: d.message.clone(),
                 symbol: d.symbol.clone(),
                 evidence: d.evidence.clone(),
-                attributes: Map::new(),
+                attributes: d
+                    .model_version
+                    .iter()
+                    .map(|model| ("modelVersion".to_owned(), json!(model)))
+                    .collect(),
                 note: note_of(d, briefing),
                 fingerprint: d.fingerprint.as_str().to_owned(),
                 facts: briefing.facts.and_then(|f| f.get(&d.fingerprint)).cloned(),
@@ -459,6 +467,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         requirement: decision.map(|d| squash(&d.requirement)),
         context: decision.map(|d| squash(&d.context)),
         evidence: evidence(&diagnostic.evidence, diagnostic.symbol.as_deref()),
+        model_version: diagnostic.model_version.as_deref(),
         expected: decision.and_then(|d| expected(d, &key, &diagnostic.file)),
         note: note_of(diagnostic, briefing),
         fingerprint,

@@ -129,6 +129,13 @@ pub struct Diagnostic {
     pub symbol: Option<String>,
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub evidence: Value,
+    /// The model that decided the finding, with the version of the program
+    /// behind it (`provider/model@hash`). Recorded for reproducibility, never
+    /// part of the evidence a judgment is compared with: the version moves with
+    /// the binary and the environment a run finds, and says nothing of the
+    /// finding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fix: Option<String>,
     /// Why no check decided the subject: the diagnostic is a candidate for
@@ -161,6 +168,7 @@ impl Diagnostic {
             fingerprint,
             symbol: None,
             evidence: Value::Null,
+            model_version: None,
             fix: None,
             review: None,
             suppression: None,

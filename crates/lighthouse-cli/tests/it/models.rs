@@ -366,7 +366,7 @@ fn a_request_moves_to_the_next_model_of_a_route_when_a_model_fails_and_a_failing
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|f| f["evidence"]["model"].as_str())
+        .filter_map(|f| f["modelVersion"].as_str())
         .collect();
     assert_eq!(decided.len(), 1, "{report}");
     assert!(decided[0].starts_with("good/m@"), "{decided:?}");
@@ -393,4 +393,150 @@ fn an_abstaining_model_does_not_fall_back_to_the_next_of_its_route() {
     assert_eq!(count(&found, "fail"), 1, "{found:?}");
     assert_eq!(count(&found, "review"), 3, "{found:?}");
     assert_eq!(marks(dir.path(), "good"), 0);
+}
+
+/// What `lighthouse` prints for `args` in `dir`, trusted.
+fn printed(dir: &Path, args: &[&str]) -> String {
+    let out = Command::cargo_bin("lighthouse")
+        .unwrap()
+        .current_dir(dir)
+        .envs(home(dir))
+        .env("LIGHTHOUSE_TRUST", "1")
+        .args(args)
+        .output()
+        .unwrap();
+    String::from_utf8(out.stdout).unwrap()
+}
+
+fn commit(dir: &Path, args: &[&str]) {
+    let status = std::process::Command::new("git")
+        .current_dir(dir)
+        .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+        .args(args)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?}");
+}
+
+/// Whether `maybe_bad` is still reported by a run, a run over the changed
+/// files and the `check` tool.
+fn still_reported(dir: &Path) -> [bool; 3] {
+    let named = |text: &str| text.contains("maybe_bad is banned");
+    let run = ["check", "--format", "json", "--no-cache"];
+    let changed = ["check", "--format", "json", "--no-cache", "--changed"];
+    let tool = crate::mcp::Client::trusting(dir)
+        .tool("check", serde_json::json!({"detail": "full"}))
+        .unwrap();
+    [
+        named(&printed(dir, &run)),
+        named(&printed(dir, &changed)),
+        named(&tool.to_string()),
+    ]
+}
+
+#[test]
+fn a_pass_judgment_on_a_model_finding_stands_when_only_the_model_version_moved() {
+    let dir = project(&bound());
+    commit(dir.path(), &["init", "-q"]);
+    commit(dir.path(), &["add", "-A"]);
+    commit(dir.path(), &["commit", "-q", "-m", "first"]);
+    let seen = printed(
+        dir.path(),
+        &["check", "--format", "json", "--detail", "full"],
+    );
+    let report: Value = serde_json::from_str(&seen).unwrap();
+    let found = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["message"] == "maybe_bad is banned")
+        .unwrap();
+    let fingerprint = found["fingerprint"].as_str().unwrap();
+    printed(
+        dir.path(),
+        &["review", "resolve", fingerprint, "--judgment", "pass"],
+    );
+    assert_eq!(still_reported(dir.path()), [false; 3], "judged");
+
+    // An unrelated change above it, committed; and the same model under
+    // another version, as a hook that finds another binary gets.
+    let copy = dir.path().join("model-copy");
+    fs::copy(fake_model(), &copy).unwrap();
+    let config = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        config.replace(&fake_model(), copy.to_str().unwrap()),
+    )
+    .unwrap();
+    let lib = fs::read_to_string(dir.path().join("src/lib.rs")).unwrap();
+    fs::write(dir.path().join("src/lib.rs"), format!("// note\n{lib}")).unwrap();
+    commit(dir.path(), &["add", "-A"]);
+    commit(dir.path(), &["commit", "-q", "-m", "unrelated"]);
+
+    assert_eq!(
+        still_reported(dir.path()),
+        [false; 3],
+        "the evidence says the same thing"
+    );
+}
+
+#[test]
+fn a_pass_judgment_on_a_model_finding_expires_when_the_model_is_surer_of_it() {
+    let dir = project(&bound());
+    commit(dir.path(), &["init", "-q"]);
+    commit(dir.path(), &["add", "-A"]);
+    commit(dir.path(), &["commit", "-q", "-m", "first"]);
+    let found = |dir: &Path| -> Value {
+        let report: Value = serde_json::from_str(&printed(
+            dir,
+            &[
+                "check",
+                "--format",
+                "json",
+                "--detail",
+                "full",
+                "--no-cache",
+            ],
+        ))
+        .unwrap();
+        report["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["message"] == "maybe_bad is banned")
+            .cloned()
+            .unwrap_or(Value::Null)
+    };
+    let before = found(dir.path());
+    let fingerprint = before["fingerprint"].as_str().unwrap();
+    printed(
+        dir.path(),
+        &["review", "resolve", fingerprint, "--judgment", "pass"],
+    );
+    assert_eq!(still_reported(dir.path()), [false; 3], "judged");
+
+    let lib = fs::read_to_string(dir.path().join("src/lib.rs")).unwrap();
+    fs::write(
+        dir.path().join("src/lib.rs"),
+        lib.replace("maybe_bad() {}", "maybe_bad() { /* pretty_sure */ }"),
+    )
+    .unwrap();
+    commit(dir.path(), &["add", "-A"]);
+    commit(dir.path(), &["commit", "-q", "-m", "the model is surer"]);
+
+    let after = found(dir.path());
+    assert_eq!(after["fingerprint"], before["fingerprint"], "{after}");
+    assert_ne!(
+        after["evidence"]["confidence"],
+        before["evidence"]["confidence"]
+    );
+    assert!(
+        after["note"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("evidence changed"),
+        "{after}"
+    );
+    let reported = still_reported(dir.path());
+    assert!(reported[0] && reported[2], "{reported:?}");
 }

@@ -394,7 +394,8 @@ apply here, a hint to narrow it). The first two label the check's conformance pa
 last its applicability part, and they are never mixed in metrics. A record holds the
 finding's fingerprint, the decision's name then (kept to be read) and `decisionUid` (what
 identifies it), `meaningVersion`, `checkRevision` (a hash of the `check`, recorded for
-evaluation and never compared to expire a judgment), `decisionHash` (the whole decision
+evaluation and never compared to expire a judgment), `modelVersion` (the model that decided the
+finding and its program version, recorded the same way), `decisionHash` (the whole decision
 definition), `catalogVersion`, the Lighthouse version, the judgment, a free-text `reason`,
 `wasAttributedTo` (`{type: Person | SoftwareAgent, id}`), `generatedAtTime`, language,
 scope, a digest of the evidence, a **snapshot** frozen at judgment time, and the commit.
