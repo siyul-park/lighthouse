@@ -1,6 +1,6 @@
 use std::{
     io::{Read, Write},
-    net::TcpStream,
+    net::{TcpListener, TcpStream},
 };
 
 use lighthouse_process::{Proxy, allows};
@@ -178,4 +178,82 @@ fn clients_past_the_limit_are_turned_away_while_the_others_wait() {
 
     assert!(answer.starts_with("HTTP/1.1 503"), "{answer}");
     drop(held);
+}
+
+/// Answers a request with `size` bytes after reading its head, and closes.
+fn big_server(size: usize) -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for mut connection in listener.incoming().flatten() {
+            std::thread::spawn(move || {
+                let mut seen = Vec::new();
+                let mut chunk = [0u8; 1024];
+                while !seen.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match connection.read(&mut chunk) {
+                        Ok(0) | Err(_) => return,
+                        Ok(n) => seen.extend_from_slice(&chunk[..n]),
+                    }
+                }
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {size}\r\nConnection: close\r\n\r\n"
+                );
+                let _ = connection.write_all(head.as_bytes());
+                let _ = connection.write_all(&vec![b'x'; size]);
+            });
+        }
+    });
+    port
+}
+
+/// The length of what follows the first blank line of `answer` after `skip`
+/// bytes.
+fn body_after(answer: &[u8], skip: usize) -> Option<usize> {
+    let at = answer[skip..].windows(4).position(|w| w == b"\r\n\r\n")?;
+    Some(answer.len() - skip - at - 4)
+}
+
+#[test]
+fn a_tunnel_carries_a_large_answer_to_a_client_that_has_finished_writing() {
+    const SIZE: usize = 8 * 1024 * 1024;
+    let port = big_server(SIZE);
+    let proxy = Proxy::start(&names(&[&format!("127.0.0.1:{port}")])).unwrap();
+    let mut connection = TcpStream::connect(("127.0.0.1", proxy.port())).unwrap();
+
+    connection
+        .write_all(
+            format!(
+                "CONNECT 127.0.0.1:{port} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nProxy-Connection: Keep-Alive\r\n\r\nGET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    connection.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut answer = Vec::new();
+    connection.read_to_end(&mut answer).unwrap();
+
+    let established = b"HTTP/1.1 200 Connection Established\r\n\r\n".len();
+    assert_eq!(body_after(&answer, established), Some(SIZE));
+}
+
+#[test]
+fn a_plain_request_with_upgrade_headers_gets_its_large_answer_whole() {
+    const SIZE: usize = 8 * 1024 * 1024;
+    let port = big_server(SIZE);
+    let proxy = Proxy::start(&names(&[&format!("127.0.0.1:{port}")])).unwrap();
+    let mut connection = TcpStream::connect(("127.0.0.1", proxy.port())).unwrap();
+
+    connection
+        .write_all(
+            format!(
+                "GET http://127.0.0.1:{port}/api.json HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAccept: */*\r\nConnection: Upgrade, HTTP2-Settings\r\nUpgrade: h2c\r\nHTTP2-Settings: AAMAAABkAAQAoAAAAAIAAAAA\r\n\r\n"
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    let mut answer = Vec::new();
+    connection.read_to_end(&mut answer).unwrap();
+
+    assert!(answer.starts_with(b"HTTP/1.1 200 OK"));
+    assert_eq!(body_after(&answer, 0), Some(SIZE));
 }

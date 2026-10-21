@@ -87,7 +87,7 @@ A key reaches a program in the channel of its reach, with one rule: `${NAME}` is
 
 ## Sandbox and the network
 
-Every program runs in the [OS sandbox](architecture.md#sandbox). It reads everything but secrets, writes only its own places, and reaches only the hosts listed. The project's `[sandbox] network` and `write` apply to every program; a program's own `sandbox` lists are added, so a provider's hosts do not widen a check's. A program is **remote** when the hosts it may reach, the project's `[sandbox] network` and its own `sandbox.network` together, are not empty, or its provider's `url` is not loopback: what leaves the machine is what reaches a host. A `url` is loopback when its host is exactly `localhost` or an IP address in `127.0.0.0/8` or `::1`; `127.attacker.example` is not. A remote provider is the one a budget and routing apply to.
+Every program runs in the [OS sandbox](architecture.md#sandbox). It reads everything but secrets, writes only its own places, and reaches only the hosts listed. The project's `[sandbox] network` and `write` apply to every program; a program's own `sandbox` lists are added, so a provider's hosts do not widen a check's. A program is **remote** when the hosts it may reach, the project's `[sandbox] network` and its own `sandbox.network` together, are not empty, or its provider's `url` is not loopback: what leaves the machine is what reaches a host. A `url` is loopback when its host is exactly `localhost` or an IP address in `127.0.0.0/8` or `::1`; `127.attacker.example` is not. A remote provider is the one a budget and routing apply to. On macOS, Seatbelt blocks FSEvents, so the file watchers inside agents fail harmlessly.
 
 ## One path for a change
 
