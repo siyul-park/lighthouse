@@ -621,7 +621,7 @@ Derived from: Martin, Clean Code (2008), C1 Inappropriate Information; Martin, C
 | `kinds` | `["banner","code"]` | What to report. |
 | `labels` | `["MARK:","#region","#endregion"]` | Line prefixes that label a section on their own. |
 | `minRun` | `3` | Rule characters in a row that make a banner line. |
-| `ruleChars` | `"-=*~_+"` | Characters a banner rule is drawn with. |
+| `ruleChars` | `"-=*~_+"` | Characters a banner rule is drawn with, as the body of a regular-expression character class (escape `]`, `\\` and `^`). |
 | `todoKeywords` | `["TODO","FIXME","BUG","HACK","XXX"]` | Words that start a comment that defers work. |
 
 ```diff

@@ -48,12 +48,12 @@ spec:
     type: cel
     select: symbol
     where: >-
-      symbol.kind == "var" && symbol.owner == "" && symbol.visibility != "private"
+      symbol.kind == "var" && symbol.owner == null && symbol.visibility != "private"
       && symbol.lang == "go" && !symbol.name.startsWith("Err")
     abstain: >-
       !symbol.test && !symbol.generated
-      && ((symbol.kind == 'var' && symbol.owner == '')
-          || (symbol.kind == 'type' && symbol.members > 0 && !symbol.data_only))
+      && ((symbol.kind == 'var' && symbol.owner == null)
+          || (symbol.kind == 'type' && size(symbol.members) > 0 && !symbol.data_only))
     message: >-
       exported variable {{ symbol.name }} is mutable package state anyone can assign;
       keep it private and expose it through its owner

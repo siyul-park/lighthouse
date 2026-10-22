@@ -114,22 +114,22 @@ spec:
       - name: from
         expression: >-
           edge.kind == 'imports' && edge.to.kind == 'module'
-          ? layerOf(edge.from.module, options.layers) : -1
+          ? edge.from.module.layerIndex(options.layers) : -1
       - name: to
         expression: >-
           edge.kind == 'imports' && edge.to.kind == 'module'
-          ? layerOf(edge.to.module, options.layers) : -1
+          ? edge.to.module.layerIndex(options.layers) : -1
       - name: contract
         expression: >-
           edge.kind != 'imports' || edge.to.kind != 'module' ? ''
-          : options.ignore.exists(i, globMatch(edge.from.module, i.from)
-              && globMatch(edge.to.module, i.to)) ? ''
-          : options.forbidden.exists(f, globMatch(edge.from.module, f.from)
-              && globMatch(edge.to.module, f.to)) ? 'forbidden'
+          : options.ignore.exists(i, edge.from.module.matchesGlob(i.from)
+              && edge.to.module.matchesGlob(i.to)) ? ''
+          : options.forbidden.exists(f, edge.from.module.matchesGlob(f.from)
+              && edge.to.module.matchesGlob(f.to)) ? 'forbidden'
           : from >= 0 && to >= 0 && to < from ? 'layers'
           : options.independent && from >= 0 && to == from
-              && !options.layers[from].exists(g, globMatch(edge.from.module, g)
-                  && globMatch(edge.to.module, g)) ? 'independence'
+              && !options.layers[from].exists(g, edge.from.module.matchesGlob(g)
+                  && edge.to.module.matchesGlob(g)) ? 'independence'
           : ''
     where: contract != ''
     message: >-

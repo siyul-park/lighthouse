@@ -62,7 +62,7 @@ impl CelRule {
     /// against what the check selects when the catalog was validated.
     pub(crate) fn new(decision: &Decision, check: &CelCheck) -> Result<Self, Error> {
         let id = decision.id();
-        let mut sources: Vec<&str> = vec![&check.condition, &check.message];
+        let mut sources: Vec<&str> = vec![&check.condition];
         sources.extend(check.variables.iter().map(|v| v.expression.as_str()));
         sources.extend(check.evidence.values().map(String::as_str));
         if let Some(at) = &check.at {
@@ -118,7 +118,7 @@ impl CelRule {
                     })
                 })
                 .transpose()?,
-            needs: Needs::of(sources),
+            needs: Needs::of(sources, [check.message.as_str()]),
             library: library::context().map_err(|e| Error::invalid(id, e))?,
         })
     }
@@ -130,7 +130,7 @@ impl CelRule {
 
     /// The analyzers whose facts the expressions read.
     pub(crate) fn analyzers(&self) -> Vec<String> {
-        if self.needs.function("metrics") {
+        if self.needs.field("metrics") {
             vec![MEASURES.to_owned()]
         } else {
             Vec::new()

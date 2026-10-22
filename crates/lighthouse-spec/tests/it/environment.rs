@@ -1,5 +1,5 @@
 //! The one CEL environment: the standard library with the extensions the
-//! `cel` crate ships, and nothing of our own.
+//! `cel` crate ships, and the official ones it lacks (see `ext`).
 
 use cel::Value;
 use lighthouse_spec::{compile, context, environment};

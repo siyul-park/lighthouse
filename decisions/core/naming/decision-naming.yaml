@@ -32,8 +32,10 @@ spec:
     variables:
       - name: shape
         expression: decision.name.matches('^[a-z][a-z0-9]*/[a-z][a-z0-9]*(-[a-z0-9]+)*$')
+      - name: leaf
+        expression: "regex.replace(decision.name, '^.*/', '')"
       - name: parts
-        expression: words(decision.name)
+        expression: "regex.extractAll(leaf, '[A-Za-z0-9]+')"
       - name: counted
         expression: >-
           size(parts) - (size(parts) > 0 && parts[0] in ['no', 'max', 'prefer'] ? 1 : 0)
@@ -41,8 +43,9 @@ spec:
         expression: parts.filter(w, w in ['is', 'are', 'be', 'should', 'must', 'when', 'not'])
       - name: echoes
         expression: >-
-          parts.filter(w, trimSuffixes(w, 's') == decision.pack
-            || (size(trimSuffixes(w, 's')) >= 4 && decision.pack.startsWith(trimSuffixes(w, 's'))))
+          parts.filter(w, regex.replace(w, 's+$', '') == decision.pack
+            || (size(regex.replace(w, 's+$', '')) >= 4
+                && decision.pack.startsWith(regex.replace(w, 's+$', ''))))
       - name: problems
         expression: >-
           (shape ? '' : ' is not kebab-case;')
@@ -50,7 +53,7 @@ spec:
           + (size(banned) > 0 ? ' uses `' + banned[0] + '`;' : '')
           + (size(echoes) > 0 ? ' repeats its pack in `' + echoes[0] + '`;' : '')
     where: size(problems) > 0
-    message: "decision name `{{ decision.name }}`{{ trimRight(problems, ';') }}"
+    message: "decision name `{{ decision.name }}`{{ regex.replace(problems, ';+$', '') }}"
     evidence:
       name: decision.name
       words: string(size(parts))

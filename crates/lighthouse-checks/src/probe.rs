@@ -9,7 +9,7 @@ use crate::{builder::Builder, facts, library::Needs};
 
 /// The value of `fact` of `symbol`, as an expression that mentions it sees it.
 pub fn symbol_fact(ctx: &Context, symbol: &Symbol, fact: &'static str) -> Result<Value, Error> {
-    let needs = Needs::of([fact]);
+    let needs = Needs::of([format!("x.{fact}").as_str()], []);
     let options = Map::new();
     let builder = Builder::new(ctx, &needs, &options, "probe")?;
     Ok(builder.symbol(symbol)[fact].clone())
@@ -22,7 +22,7 @@ pub fn file_fact(
     text: &str,
     fact: &'static str,
 ) -> Result<Value, Error> {
-    let needs = Needs::of([fact]);
+    let needs = Needs::of([format!("x.{fact}").as_str()], []);
     let options = Map::new();
     let builder = Builder::new(ctx, &needs, &options, "probe")?;
     Ok(builder.file(file, text)[fact].clone())

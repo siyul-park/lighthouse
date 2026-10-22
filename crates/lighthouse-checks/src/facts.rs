@@ -42,7 +42,6 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
         "name": s.name,
         "kind": s.kind.as_str(),
         "visibility": visibility(s.visibility),
-        "owner": s.owner.as_ref().map_or("", |o| o.as_str()),
         "owner_kind": owner.map_or("", |o| o.kind.as_str()),
         "file": path(&s.file),
         "line": s.span.start.line,
@@ -95,10 +94,6 @@ pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
         } else {
             json!([])
         },
-        "callers": project.callers(&s.id).len(),
-        "callees": project.callees(&s.id).len(),
-        "references": project.references(&s.id).len(),
-        "members": project.members(&s.id).len(),
         }),
     )
 }
@@ -112,8 +107,6 @@ pub(crate) fn function(project: &Project, s: &Symbol) -> Option<Value> {
         json!({
         "statements": summary.statements,
         "top_level": summary.top_level,
-        "params": summary.params,
-        "returns": summary.returns,
         "max_nesting": summary.max_nesting,
         "tokens": summary.tokens,
         "branches": summary.flow.len(),
@@ -179,7 +172,6 @@ pub(crate) fn module(m: &Module, declared: &Declared) -> Value {
         "name": m.name.clone().unwrap_or_else(|| m.path.clone()),
         "test_of": m.test_of.clone().unwrap_or_default(),
         "files": declared.files.len(),
-        "symbols": declared.symbols,
         "lines": declared.lines,
         "dependents": declared.dependents,
         "declares": declared.declares,

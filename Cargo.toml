@@ -22,6 +22,7 @@ jsonschema = "0.58"
 rayon = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
+regex = "1"
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 schemars = { version = "1", default-features = false, features = ["derive", "std"] }

@@ -11,6 +11,7 @@ doctest = false
 [dependencies]
 cel.workspace = true
 globset.workspace = true
+regex.workspace = true
 include_dir.workspace = true
 schemars.workspace = true
 serde.workspace = true

@@ -18,7 +18,7 @@ pub(super) struct Flags {
 
 impl Builder<'_> {
     /// `constructor_named`, `role` and `built`, for the expressions that
-    /// mention them (`limit` and `counted` read `role` and `built`).
+    /// mention them.
     pub(super) fn role_facts(
         &self,
         map: &mut Map<String, Value>,
@@ -26,20 +26,16 @@ impl Builder<'_> {
         summary: Option<&FunctionSummary>,
     ) {
         let needs = self.needs;
-        if needs.fact("constructor_named") {
+        if needs.field("constructor_named") {
             map.insert(
                 "constructor_named".to_owned(),
                 json!(self.constructor_named(symbol)),
             );
         }
-        if needs.fact("effective") {
+        if needs.field("effective") {
             map.insert("effective".to_owned(), self.effective(symbol, summary));
         }
-        if needs.fact("role")
-            || needs.fact("built")
-            || needs.calls("limit")
-            || needs.calls("counted")
-        {
+        if needs.field("role") || needs.field("built") {
             map.insert("role".to_owned(), json!(self.role(symbol, summary)));
             map.insert("built".to_owned(), json!(self.built(symbol)));
         }

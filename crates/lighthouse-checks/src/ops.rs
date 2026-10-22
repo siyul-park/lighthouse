@@ -54,9 +54,10 @@ impl OrderRule {
             return Err(Error::invalid(id, "not an order check"));
         };
         let mut sources: Vec<&str> = Vec::new();
+        let mut templates: Vec<&str> = Vec::new();
         let mut compiled = Vec::new();
         for clause in clauses {
-            sources.push(&clause.message);
+            templates.push(&clause.message);
             sources.extend(clause.when.as_deref());
             sources.extend(clause.evidence.values().map(String::as_str));
             compiled.push(Clause {
@@ -74,7 +75,7 @@ impl OrderRule {
         }
         Ok(Self {
             clauses: compiled,
-            needs: Needs::of(sources),
+            needs: Needs::of(sources, templates),
             library: library::context().map_err(|e| Error::invalid(id, e))?,
         })
     }

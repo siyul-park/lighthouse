@@ -57,7 +57,7 @@ fn symbols_are_selected_with_their_facts() {
 fn functions_carry_their_summary_and_callers() {
     let plugin = local(
         "symbol",
-        "select: function\nwhere: 'func.statements > 5 && func.callers == 0'\nmessage: 'dead and long: {{ func.name }}'",
+        "select: function\nwhere: 'func.statements > 5 && size(func.callers) == 0'\nmessage: 'dead and long: {{ func.name }}'",
     )
     .unwrap();
     let mut w = World::default();
@@ -91,7 +91,7 @@ fn edges_are_judged_once_over_the_project() {
 fn modules_and_files_are_selected_too() {
     let modules = local(
         "project",
-        "select: module\nwhere: 'module.symbols > 1'\nmessage: '{{ module.path }} has {{ module.symbols }}'",
+        "select: module\nwhere: 'size(module.symbols) > 1'\nmessage: '{{ module.path }} has {{ size(module.symbols) }}'",
     )
     .unwrap();
     let mut w = World::default();
@@ -250,4 +250,60 @@ fn a_module_of_test_code_is_a_subject_only_as_the_scope_says() {
     assert_eq!(at("{ subject: module }"), ["prod/a.ucm"]);
     assert_eq!(at("{ subject: module, tests: only }"), ["prod_tests/a.ucm"]);
     assert_eq!(at("{ subject: module, tests: include }").len(), 2);
+}
+
+#[test]
+fn a_related_node_is_the_same_kind_of_value() {
+    let plugin = local(
+        "symbol",
+        "select: function\nwhere: 'func.callers.exists(c, c.doc == \"\" && c.span.start.line > 0 && c.kind == \"function\")'\nmessage: '{{ func.name }} has an undocumented caller'",
+    )
+    .unwrap();
+    let mut w = World::default();
+    let used = w.func("m", "used", "m/a.ucm");
+    let caller = w.func("m", "caller", "m/a.ucm");
+    w.func("m", "alone", "m/a.ucm");
+    w.edge(EdgeKind::Calls, &caller, &used);
+
+    assert_eq!(w.names(&found(&plugin, &w)), ["used"]);
+}
+
+#[test]
+#[should_panic(expected = "callers")]
+fn a_relation_of_a_related_node_is_an_error_not_a_missing_value() {
+    let plugin = local(
+        "symbol",
+        "select: function\nwhere: 'func.callers.exists(c, size(c.callers) == 0)'\nmessage: '{{ func.name }}'",
+    )
+    .unwrap();
+    let mut w = World::default();
+    let used = w.func("m", "used", "m/a.ucm");
+    let caller = w.func("m", "caller", "m/a.ucm");
+    w.edge(EdgeKind::Calls, &caller, &used);
+
+    found(&plugin, &w);
+}
+
+#[test]
+fn a_method_without_an_owner_is_not_hidden_by_it() {
+    // What `design/signature` asks: a method is reachable unless its owner is
+    // private. With no owner there is nothing to hide it, as it was when the
+    // owner of a node without one had an empty visibility.
+    let plugin = local(
+        "symbol",
+        "select: function\nwhere: 'func.kind == \"method\" && (func.owner == null || func.owner.visibility != \"private\")'\nmessage: '{{ func.name }} is reachable'",
+    )
+    .unwrap();
+    let mut w = World::default();
+    let orphan = w.symbol("m", "orphan", SymbolKind::Method, "m/a.ucm");
+    w.summarize(&orphan, 1, &[]);
+    let hidden_owner = w.symbol("m", "Hidden", SymbolKind::Type, "m/a.ucm");
+    w.private(&hidden_owner);
+    let hidden = w.member(&hidden_owner, "hidden", SymbolKind::Method, "m/a.ucm");
+    w.summarize(&hidden, 1, &[]);
+    let open_owner = w.symbol("m", "Open", SymbolKind::Type, "m/a.ucm");
+    let open = w.member(&open_owner, "open", SymbolKind::Method, "m/a.ucm");
+    w.summarize(&open, 1, &[]);
+
+    assert_eq!(w.names(&found(&plugin, &w)), ["orphan", "open"]);
 }

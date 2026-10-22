@@ -6,6 +6,7 @@ mod decision;
 mod environment;
 mod error;
 mod expression;
+mod ext;
 mod fix;
 mod model;
 mod model_check;

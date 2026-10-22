@@ -64,11 +64,13 @@ spec:
     type: cel
     variables:
       - name: owner
-        expression: owner(symbol)
+        expression: symbol.owner
+      - name: visible
+        expression: "options.includeInternal ? ['public', 'internal'] : ['public']"
     where: >-
       options.kinds.exists(k, k == symbol.kind)
-      && exposed(symbol, options.includeInternal)
-      && (owner.kind == '' || (exposed(owner, options.includeInternal) && owner.kind != 'interface'))
+      && symbol.visibility in visible
+      && (owner == null || (owner.visibility in visible && owner.kind != 'interface'))
       && !(symbol.kind == 'method'
            && (options.exemptMethods.exists(m, m == symbol.name)
                || (options.exemptInterfaceMethods && symbol.role == 'implementation')))

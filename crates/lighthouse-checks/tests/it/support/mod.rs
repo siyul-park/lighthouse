@@ -278,6 +278,14 @@ impl World {
             .collect()
     }
 
+    /// Like [`World::messages`], for a rule of `subject`.
+    pub fn messages_in(&self, subject: &Subject, rule: &str, options: Value) -> Vec<String> {
+        self.diagnose_in(subject, rule, options)
+            .into_iter()
+            .map(|d| d.message)
+            .collect()
+    }
+
     /// The fingerprints of what `rule` reports, in report order.
     pub fn fingerprints(&self, rule: &str, options: Value) -> Vec<String> {
         let design = Checks::new("design", Catalog::bundled()).unwrap();

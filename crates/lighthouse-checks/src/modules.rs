@@ -13,8 +13,6 @@ pub(crate) struct Declared<'p> {
     /// The symbol that sorts first by file and position; the findings of a
     /// project decision about the module are reported there.
     pub anchor: &'p Symbol,
-    /// The symbols it declares.
-    pub symbols: usize,
     /// The files that declare a symbol of it.
     pub files: BTreeSet<&'p Path>,
     /// Lines from the first to the last declaration, summed over the module's
@@ -41,13 +39,11 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
         *last = (*last).max(span.end.line);
         let module = modules.entry(path).or_insert_with(|| Declared {
             anchor: symbol,
-            symbols: 0,
             files: BTreeSet::new(),
             lines: 0,
             dependents: BTreeSet::new(),
             declares: 0,
         });
-        module.symbols += 1;
         module.files.insert(symbol.file.as_path());
         if (&symbol.file, symbol.span.start) < (&module.anchor.file, module.anchor.span.start) {
             module.anchor = symbol;

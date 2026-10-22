@@ -38,5 +38,7 @@ fn build() -> Result<Arc<Env>, String> {
         env.add_extension(install)
             .map_err(|e| format!("the CEL `{name}` extension: {e}"))?;
     }
+    crate::ext::lists::install(&mut env).map_err(|e| format!("the CEL lists additions: {e}"))?;
+    crate::ext::regex::install(&mut env).map_err(|e| format!("the CEL regex extension: {e}"))?;
     Ok(Arc::new(env))
 }

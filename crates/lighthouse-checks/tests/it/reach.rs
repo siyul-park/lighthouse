@@ -4,7 +4,7 @@
 
 use std::{collections::BTreeSet, fs, path::Path};
 
-use lighthouse_checks::caching::{FACTS, FUNCTIONS};
+use lighthouse_checks::caching::FACTS;
 use lighthouse_model::Reach;
 
 fn source(relative: &str) -> String {
@@ -46,7 +46,7 @@ fn builder_text() -> String {
 #[test]
 fn every_fact_the_builder_derives_declares_its_reach() {
     let declared: BTreeSet<&str> = FACTS.iter().map(|(word, _)| *word).collect();
-    let mentioned = literals(&builder_text(), ".fact(\"");
+    let mentioned = literals(&builder_text(), ".field(\"");
     assert!(mentioned.len() > 15, "{mentioned:?}");
     let undeclared: Vec<_> = mentioned
         .iter()
@@ -55,37 +55,6 @@ fn every_fact_the_builder_derives_declares_its_reach() {
     assert!(
         undeclared.is_empty(),
         "facts without a reach: {undeclared:?}"
-    );
-}
-
-#[test]
-fn every_function_of_the_library_declares_its_reach() {
-    let declared: BTreeSet<&str> = FUNCTIONS.iter().map(|(name, _)| *name).collect();
-    let library = source("library/mod.rs") + &source("library/limits.rs");
-    let mut defined: BTreeSet<String> = BTreeSet::new();
-    for call in ["declare(", "builtin("] {
-        for (at, _) in library.match_indices(call) {
-            // The name is the first string literal after the context.
-            let rest = &library[at + call.len()..];
-            let Some(start) = rest.find('"') else {
-                continue;
-            };
-            let name = rest[start + 1..].split('"').next().unwrap_or_default();
-            if !name.is_empty() && name.chars().all(char::is_alphanumeric) {
-                defined.insert(name.to_owned());
-            }
-        }
-    }
-    let table = library.split("FUNCTIONS: [(&str, &str); ").nth(1).unwrap();
-    defined.extend(literals(table.split("];").next().unwrap(), "    (\""));
-    assert!(defined.len() > 15, "{defined:?}");
-    let undeclared: Vec<_> = defined
-        .iter()
-        .filter(|name| !declared.contains(name.as_str()))
-        .collect();
-    assert!(
-        undeclared.is_empty(),
-        "functions without a reach: {undeclared:?}"
     );
 }
 

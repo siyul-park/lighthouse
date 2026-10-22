@@ -62,7 +62,9 @@ spec:
       ruleChars:
         type: string
         default: "-=*~_+"
-        description: Characters a banner rule is drawn with.
+        description: >-
+          Characters a banner rule is drawn with, as the body of a regular-expression
+          character class (escape `]`, `\\` and `^`).
       labels:
         type: array
         default: ["MARK:", "#region", "#endregion"]
@@ -93,20 +95,26 @@ spec:
     variables:
       - name: documentation
         expression: >-
-          lines(comment.text).exists(l,
+          comment.text.split("\n").exists(l,
             (l.trim().startsWith('///') && !l.trim().startsWith('////'))
             || l.trim().startsWith('//!'))
+      - name: rule
+        expression: "'[' + options.ruleChars + ']'"
       - name: bodies
         expression: >-
-          lines(comment.text)
-            .map(l, trimLeft(trimSuffixes(trimPrefixes(trimPrefixes(l.trim(), '//'), '/*'), '*/'), '#').trim())
+          comment.text.split("\n")
+            .map(l, l.trim())
+            .map(l, regex.replace(l, '^(//)+', ''))
+            .map(l, l.startsWith('/*') ? l.substring(2) : l)
+            .map(l, l.endsWith('*/') ? l.substring(0, size(l) - 2) : l)
+            .map(l, regex.replace(l, '^#+', '').trim())
             .filter(b, b != '')
       - name: texts
         expression: >-
           bodies.map(b,
             options.labels.exists(m, b.startsWith(m))
-            ? drop(b, size(options.labels.filter(m, b.startsWith(m))[0])).trim()
-            : trimRight(drop(b, leadingRun(b, options.ruleChars)).trim(), options.ruleChars).trim())
+            ? b.substring(size(options.labels.filter(m, b.startsWith(m))[0])).trim()
+            : regex.replace(regex.replace(b, '^' + rule + '+', '').trim(), rule + '+$', '').trim())
       - name: named
         expression: texts.filter(t, t != '')
       - name: directive
@@ -121,7 +129,7 @@ spec:
         expression: >-
           ('banner' in options.kinds && comment.standalone && !documentation && size(bodies) > 0
             && bodies.all(b, options.labels.exists(m, b.startsWith(m))
-                             || leadingRun(b, options.ruleChars) >= options.minRun)
+                             || b.matches('^' + rule + '{' + string(options.minRun) + ',}'))
             ? ['banner'] : [])
           + ('code' in options.kinds && prose && comment.standalone && !comment.attached && size(bodies) >= 1
             && bodies.all(b, options.codePatterns.exists(p, b.matches(p)))

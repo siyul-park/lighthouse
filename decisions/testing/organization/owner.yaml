@@ -134,18 +134,20 @@ spec:
     select: symbol
     variables:
       - name: owner
-        expression: owner(symbol)
+        expression: symbol.owner
+      - name: visible
+        expression: "options.includeInternal ? ['public', 'internal'] : ['public']"
       - name: owners
-        expression: tests(symbol)
+        expression: symbol.tests
       - name: missing
         expression: >-
           'missing' in options.kinds
           && (symbol.kind == 'method'
-              ? (owner.kind == 'type' && exposed(owner, options.includeInternal))
-              : owner.kind == '')
+              ? (owner != null && owner.kind == 'type' && owner.visibility in visible)
+              : owner == null)
           && !symbol.implementation
           && (options.includeDataTypes || !symbol.data_only)
-          && exposed(symbol, options.includeInternal)
+          && symbol.visibility in visible
           && options.symbols.exists(k, k == symbol.kind)
           && !(symbol.kind == 'method' && options.exemptMethods.exists(m, m == symbol.name))
           && symbol.module_tested
@@ -153,7 +155,7 @@ spec:
       - name: duplicate
         expression: >-
           'duplicate' in options.kinds
-          && exposed(symbol, options.includeInternal)
+          && symbol.visibility in visible
           && (symbol.kind == 'function' || symbol.kind == 'method'
               || symbol.kind == 'type' || symbol.kind == 'interface')
           && size(owners) >= 2
@@ -167,7 +169,7 @@ spec:
       kind: "missing ? 'missing' : 'duplicate'"
       kinds: "(missing ? ['missing'] : []) + (duplicate ? ['duplicate'] : [])"
       symbol: symbol.id
-      owner_tests: owners.map(t, t.symbol)
+      owner_tests: owners.map(t, t.id)
     identity:
       subject: symbol.id
   provenance:

@@ -1,4 +1,4 @@
-//! How far the facts and functions of a check reach, so that the host can tell
+//! How far the facts of a check reach, so that the host can tell
 //! what a stored result of a rule depends on. A rule's reach is the greatest
 //! of what its expressions mention: a fact or function not listed here is
 //! local, and a test fails when the builder or the library has one that is not
@@ -30,14 +30,30 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("constructor_named", Reach::Local),
     ("built", Reach::Local),
     ("role", Reach::Local),
-    ("signature", Reach::Local),
-    ("type_ref", Reach::Local),
+    ("params", Reach::Local),
+    ("results", Reach::Local),
+    ("type", Reach::Local),
+    ("metrics", Reach::Local),
+    ("span", Reach::Local),
+    ("words", Reach::Local),
+    ("prev", Reach::Local),
+    ("next", Reach::Local),
+    ("owner", Reach::Neighbors),
+    ("uses", Reach::Neighbors),
+    ("tests", Reach::Global),
+    // A function with the single-use helpers it calls, transitively; how far a
+    // symbol reaches the others through what the symbols use.
+    ("unit", Reach::Global),
+    ("reach", Reach::Global),
     ("file_first_test", Reach::Local),
     // The declarations of the subject's own file between it and the previous
     // method of its owner; and the function fact a symbol carries as `func`.
     ("gap", Reach::Local),
     ("func", Reach::Local),
     ("line_widths", Reach::Local),
+    // The declaration group of the default order, which only the symbol's own
+    // file and owner decide.
+    ("group", Reach::Local),
     ("data_only", Reach::Neighbors),
     ("helper_user", Reach::Neighbors),
     ("receiver_affinity", Reach::Neighbors),
@@ -69,56 +85,21 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("stability", Reach::Global),
 ];
 
-/// The functions of the library, by name.
-pub const FUNCTIONS: &[(&str, Reach)] = &[
-    ("metrics", Reach::Local),
-    ("callers", Reach::Neighbors),
-    ("owner", Reach::Neighbors),
-    ("tests", Reach::Global),
-    // A function with the single-use helpers it calls, transitively.
-    ("unit", Reach::Global),
-    // How far a symbol reaches the others through what the symbols use.
-    ("reach", Reach::Global),
-    // The order keys of this crate rank a declaration by its own file and
-    // owner.
-    ("rank", Reach::Local),
-    ("limit", Reach::Local),
-    ("counted", Reach::Local),
-    ("exposed", Reach::Local),
-    ("globMatch", Reach::Local),
-    ("layerOf", Reach::Local),
-    ("lines", Reach::Local),
-    ("trimPrefixes", Reach::Local),
-    ("trimSuffixes", Reach::Local),
-    ("trimLeft", Reach::Local),
-    ("trimRight", Reach::Local),
-    ("leadingRun", Reach::Local),
-    ("words", Reach::Local),
-    ("drop", Reach::Local),
-];
-
 /// The fields that say where in its file a value is. The neighbors digest
 /// leaves them out, so a check that mentions them is keyed on the digest that
 /// has them.
 const POSITIONS: [&str; 4] = ["line", "col", "pos", "end_line"];
 
-/// Whether `word` is a fact with a declared reach. A fact the builder derives
-/// without a declaration reaches the whole project.
-pub(crate) fn fact_declared(word: &str) -> bool {
-    FACTS.iter().any(|(declared, _)| *declared == word)
-}
-
 /// The reach of the expressions, and whether they read the place of
 /// neighbors: the greatest reach of the facts they mention and the functions
 /// they call.
 pub(crate) fn reach(needs: &Needs) -> (Reach, bool) {
-    let facts = FACTS.iter().filter(|(word, _)| needs.mentions(word));
-    let functions = FUNCTIONS.iter().filter(|(name, _)| needs.calls(name));
-    let reach = facts
-        .chain(functions)
+    let reach = FACTS
+        .iter()
+        .filter(|(word, _)| needs.field(word))
         .map(|(_, reach)| *reach)
         .max()
         .unwrap_or(Reach::Local);
-    let positions = reach == Reach::Neighbors && POSITIONS.iter().any(|word| needs.mentions(word));
+    let positions = reach == Reach::Neighbors && POSITIONS.iter().any(|word| needs.field(word));
     (reach, positions)
 }

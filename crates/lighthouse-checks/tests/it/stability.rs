@@ -228,7 +228,7 @@ fn reach_of_a_test_function_is_not_measured() {
         &w,
         "function",
         ", tests: include",
-        "!reach(func).measured",
+        "!func.reach.measured",
         &json!({}),
     );
     assert_eq!(w.names(&found.into_iter().collect::<Vec<_>>()), ["check"]);
@@ -243,13 +243,13 @@ fn reach_reads_the_symbol_graph_across_modules() {
             .collect();
         w.names(&found)
     };
-    assert_eq!(names("reach(func).vfi == 2"), ["c"]);
-    assert_eq!(names("reach(func).vfo == 2 && reach(func).measured"), ["a"]);
+    assert_eq!(names("func.reach.vfi == 2"), ["c"]);
+    assert_eq!(names("func.reach.vfo == 2 && func.reach.measured"), ["a"]);
     assert_eq!(
-        names("reach(func).ca == 1 && reach(func).ce == 1 && reach(func).cyclic == 1"),
+        names("func.reach.ca == 1 && func.reach.ce == 1 && func.reach.cyclic == 1"),
         ["b"]
     );
-    assert_eq!(names("reach(func).vfi_share == 0.6667"), ["c"]);
+    assert_eq!(names("func.reach.vfi_share == 0.6667"), ["c"]);
 }
 
 #[test]
@@ -259,7 +259,7 @@ fn reach_of_a_symbol_that_is_no_node_is_not_measured() {
     let found = flagged(
         &w,
         "symbol",
-        "!reach(symbol).measured && reach(symbol).vfi == 0 && reach(symbol).cyclic == 0",
+        "!symbol.reach.measured && symbol.reach.vfi == 0 && symbol.reach.cyclic == 0",
         &json!({}),
     );
     assert_eq!(found.len(), 1);

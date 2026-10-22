@@ -1,4 +1,4 @@
-//! The `unit(func)` of a function (its own measures and those of its
+//! The `func.unit` of a function (its own measures and those of its
 //! single-use helpers) and the `parent` of a module (what it shares with the
 //! module that holds it), read by cel checks over synthetic projects.
 
@@ -36,22 +36,22 @@ fn a_unit_adds_the_helpers_of_the_helpers() {
     let h2 = helper(&mut w, "h2", 4, 0);
     calls(&mut w, &f, &h1);
     calls(&mut w, &h1, &h2);
-    let sums = "unit(func).lines == 3 && unit(func).statements == 9 && unit(func).cyclomatic == 4 && unit(func).cognitive == 3";
+    let sums = "func.unit.lines == 3 && func.unit.statements == 9 && func.unit.cyclomatic == 4 && func.unit.cognitive == 3";
     assert_eq!(functions(&w, &format!("func.name == 'f' && {sums}")), ["f"]);
     assert_eq!(
-        functions(&w, "unit(func).helpers.map(h, h.name) == ['h1', 'h2']"),
+        functions(&w, "func.unit.helpers.map(h, h.name) == ['h1', 'h2']"),
         ["f"]
     );
-    assert_eq!(functions(&w, "unit(func).helpers.size() == 1"), ["h1"]);
+    assert_eq!(functions(&w, "func.unit.helpers.size() == 1"), ["h1"]);
     assert_eq!(
         functions(
             &w,
-            "unit(func).caller != null && unit(func).caller.name == 'f'"
+            "func.unit.caller != null && func.unit.caller.name == 'f'"
         ),
         ["h1"]
     );
     assert_eq!(
-        functions(&w, "unit(func).caller != null"),
+        functions(&w, "func.unit.caller != null"),
         ["h1", "h2"],
         "f is no helper"
     );
@@ -61,9 +61,9 @@ fn a_unit_adds_the_helpers_of_the_helpers() {
 fn a_unit_without_helpers_measures_the_function_alone() {
     let mut w = World::default();
     let f = helper(&mut w, "f", 3, 2);
-    let metrics = "metrics(func).statements == unit(func).statements && metrics(func).cyclomatic == unit(func).cyclomatic && metrics(func).cognitive == unit(func).cognitive && metrics(func).lines == unit(func).lines";
+    let metrics = "func.metrics.statements == func.unit.statements && func.metrics.cyclomatic == func.unit.cyclomatic && func.metrics.cognitive == func.unit.cognitive && func.metrics.lines == func.unit.lines";
     assert_eq!(
-        functions(&w, &format!("{metrics} && unit(func).helpers == []")),
+        functions(&w, &format!("{metrics} && func.unit.helpers == []")),
         [f.name.as_str()]
     );
 }
@@ -73,7 +73,7 @@ fn a_function_called_as_a_method_is_computed_too() {
     let mut w = World::default();
     let f = helper(&mut w, "f", 3, 2);
     assert_eq!(
-        functions(&w, "func.metrics().statements == 3"),
+        functions(&w, "func.metrics.statements == 3"),
         [f.name.as_str()]
     );
 }
@@ -86,8 +86,8 @@ fn a_helper_with_two_callers_is_not_folded() {
     let h = helper(&mut w, "h", 5, 0);
     calls(&mut w, &f, &h);
     calls(&mut w, &g, &h);
-    assert!(functions(&w, "unit(func).helpers.size() > 0").is_empty());
-    assert!(functions(&w, "unit(func).caller != null").is_empty());
+    assert!(functions(&w, "func.unit.helpers.size() > 0").is_empty());
+    assert!(functions(&w, "func.unit.caller != null").is_empty());
 }
 
 #[test]
@@ -97,7 +97,7 @@ fn a_helper_used_as_a_value_is_not_folded() {
     let h = helper(&mut w, "h", 5, 0);
     calls(&mut w, &f, &h);
     w.edge(EdgeKind::References, &f, &h);
-    assert!(functions(&w, "unit(func).helpers.size() > 0").is_empty());
+    assert!(functions(&w, "func.unit.helpers.size() > 0").is_empty());
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn a_public_function_is_not_a_helper() {
     let f = helper(&mut w, "f", 1, 0);
     let h = w.func("m", "H", "m/a.ucm");
     calls(&mut w, &f, &h);
-    assert!(functions(&w, "unit(func).helpers.size() > 0").is_empty());
+    assert!(functions(&w, "func.unit.helpers.size() > 0").is_empty());
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn a_recursive_helper_is_not_folded() {
     let h = helper(&mut w, "h", 5, 0);
     calls(&mut w, &f, &h);
     calls(&mut w, &h, &h);
-    assert!(functions(&w, "unit(func).helpers.size() > 0").is_empty());
+    assert!(functions(&w, "func.unit.helpers.size() > 0").is_empty());
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn helpers_that_call_each_other_are_folded_once() {
     calls(&mut w, &h1, &h2);
     calls(&mut w, &h2, &h1);
     assert!(
-        functions(&w, "func.name == 'f' && unit(func).helpers.size() > 0").is_empty(),
+        functions(&w, "func.name == 'f' && func.unit.helpers.size() > 0").is_empty(),
         "h1 has two callers"
     );
 
@@ -141,7 +141,7 @@ fn helpers_that_call_each_other_are_folded_once() {
     assert_eq!(
         functions(
             &pair,
-            "unit(func).statements == 3 && unit(func).helpers.size() == 1"
+            "func.unit.statements == 3 && func.unit.helpers.size() == 1"
         ),
         ["a", "b"],
         "the walk ends at the root"
@@ -154,12 +154,12 @@ fn a_helper_of_tests_only_has_no_production_caller() {
     let t = w.func("m", "check", "m/a_test.ucm");
     let h = helper(&mut w, "h", 5, 0);
     calls(&mut w, &t, &h);
-    assert!(functions(&w, "unit(func).caller != null").is_empty());
+    assert!(functions(&w, "func.unit.caller != null").is_empty());
 
     let f = helper(&mut w, "f", 1, 0);
     calls(&mut w, &f, &h);
     assert_eq!(
-        functions(&w, "unit(func).helpers.size() == 1"),
+        functions(&w, "func.unit.helpers.size() == 1"),
         ["f"],
         "a test calling it too does not count"
     );

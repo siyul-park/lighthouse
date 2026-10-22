@@ -1929,6 +1929,7 @@ dependencies = [
  "lighthouse-protocol",
  "lighthouse-resource",
  "lighthouse-test-support",
+ "regex",
  "schemars",
  "serde",
  "serde_json",

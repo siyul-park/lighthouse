@@ -1,5 +1,5 @@
-//! The facts about the types a declaration is written with (`signature` of a
-//! function, `type_ref` of a field) and the body events of a function, which a
+//! The facts about the types a declaration is written with (`params` and
+//! `results` of a function, `type` of a field) and the body events of a function, which a
 //! `select: event` check takes one finding each.
 
 use lighthouse_model::{
@@ -21,14 +21,14 @@ pub(crate) struct EventFact {
 }
 
 impl Builder<'_> {
-    /// `signature` and `type_ref`, for the expressions that mention them.
+    /// `params`, `results` and `type`, for the expressions that mention them.
     pub(super) fn api_facts(
         &self,
         map: &mut Map<String, Value>,
         symbol: &Symbol,
         summary: Option<&FunctionSummary>,
     ) {
-        if self.needs.fact("signature") {
+        if self.needs.field("params") || self.needs.field("results") {
             let signature = summary.map(|s| &s.signature);
             let list = |types: Option<&[TypeRef]>| {
                 types
@@ -39,15 +39,16 @@ impl Builder<'_> {
                     .collect::<Vec<_>>()
             };
             map.insert(
-                "signature".to_owned(),
-                json!({
-                    "params": list(signature.map(|s| s.params.as_slice())),
-                    "results": list(signature.map(|s| s.results.as_slice())),
-                }),
+                "params".to_owned(),
+                json!(list(signature.map(|s| s.params.as_slice()))),
+            );
+            map.insert(
+                "results".to_owned(),
+                json!(list(signature.map(|s| s.results.as_slice()))),
             );
         }
-        if self.needs.fact("type_ref") {
-            map.insert("type_ref".to_owned(), type_ref(symbol.type_ref.as_ref(), 0));
+        if self.needs.field("type") {
+            map.insert("type".to_owned(), type_ref(symbol.type_ref.as_ref(), 0));
         }
     }
 

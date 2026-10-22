@@ -91,24 +91,24 @@ spec:
           ('wrapper' in options.kinds && callable && symbol.func.forwards_only ? ['wrapper'] : [])
           + ('dead' in options.kinds && symbol.visibility == 'private'
               && symbol.kind in options.deadKinds && !declared
-              && symbol.callers == 0 && symbol.references == 0 && !symbol.implementation
+              && size(symbol.callers) == 0 && size(symbol.references) == 0 && !symbol.implementation
               && symbol.test_role == '' && !(symbol.name in ['main', 'init', '_'])
              ? ['dead'] : [])
           + ('interface' in options.kinds && symbol.kind == 'interface'
-              && symbol.visibility == 'private' && symbol.members > 0
+              && symbol.visibility == 'private' && size(symbol.members) > 0
               && size(symbol.implementers) == 1
              ? ['interface'] : [])
     where: size(matched) > 0
     abstain: >-
       ('wrapper' in options.kinds && callable
         && symbol.visibility == 'private' && symbol.name != 'main' && symbol.name != 'init'
-        && !symbol.implementation && size(callers(symbol.func).filter(c, !c.test)) == 1)
+        && !symbol.implementation && size(symbol.func.callers.filter(c, !c.test)) == 1)
       || ('dead' in options.kinds && symbol.visibility == 'private'
           && symbol.kind in options.deadKinds && !declared
-          && size(callers(symbol).filter(c, !c.test)) == 0 && symbol.callers > 0
-          && symbol.references == 0)
+          && size(symbol.callers.filter(c, !c.test)) == 0 && size(symbol.callers) > 0
+          && size(symbol.references) == 0)
       || ('interface' in options.kinds && symbol.kind == 'interface'
-          && symbol.visibility != 'private' && symbol.members > 0
+          && symbol.visibility != 'private' && size(symbol.members) > 0
           && size(symbol.implementers) == 1)
     message: >-
       {{ size(matched) == 0 ? ''
@@ -122,9 +122,9 @@ spec:
       kind: "size(matched) > 0 ? matched[0] : ''"
       kinds: matched
       callee: "'wrapper' in matched ? symbol.func.forward_target : null"
-      callers: "'wrapper' in matched ? symbol.func.callers : null"
+      callers: "'wrapper' in matched ? size(symbol.func.callers) : null"
       implementer: "'interface' in matched ? symbol.implementers[0].id : null"
-      stateless: "'interface' in matched ? symbol.implementers[0].stateless : null"
+      stateless: "'interface' in matched ? symbol.implementers[0].members.filter(m, m.kind == 'field').size() == 0 : null"
     identity:
       subject: symbol.id
   fix:

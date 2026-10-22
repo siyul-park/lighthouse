@@ -5,24 +5,28 @@
 //! check over a file, and only when an expression asks for them.
 
 use std::{
-    cell::OnceCell,
+    cell::{OnceCell, RefCell},
     collections::{BTreeMap, BTreeSet},
+    path::{Path, PathBuf},
+    rc::Rc,
     sync::{Arc, OnceLock},
 };
 
 use crate::metrics::{MEASURES, Measures, propagation::System};
-use lighthouse_model::ucm::{
-    Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility,
+use lighthouse_model::{
+    Span,
+    ucm::{Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
-use lighthouse_plugin::{Context, Error, KeyContext, OrderKey, Workspace};
+use lighthouse_plugin::{Context, Error, KeyContext, OrderKey as _, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
     eval::{Fact, cel_fact, with_entries, with_fact},
     facts,
-    layout::contains,
+    layout::{self, contains},
     library::Needs,
     naming::{Naming, Tests},
+    order,
     table::Table,
 };
 
@@ -61,12 +65,12 @@ pub(crate) struct Builder<'a> {
     rule: &'a str,
     language: String,
     naming: Option<Tests<'a>>,
-    keys: Vec<(String, &'a dyn OrderKey)>,
     measures: Option<BTreeMap<SymbolId, Measures>>,
     table: Arc<Table>,
     indexes: Arc<Indexes>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
+    declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
 }
 
 impl<'a> Builder<'a> {
@@ -76,16 +80,11 @@ impl<'a> Builder<'a> {
         options: &'a Map<String, Value>,
         rule: &'a str,
     ) -> Result<Self, Error> {
-        let measures = if needs.function("metrics") {
+        let measures = if needs.field("metrics") {
             Some(ctx.fact(MEASURES)?)
         } else {
             None
         };
-        let keys = needs
-            .keys()
-            .into_iter()
-            .filter_map(|id| Some((id.clone(), ctx.keys.key(&id)?)))
-            .collect();
         Ok(Self {
             project: ctx.project,
             ws: ctx.workspace,
@@ -96,12 +95,12 @@ impl<'a> Builder<'a> {
                 .map_or_else(String::new, |(file, _)| file.lang.clone()),
             naming: Naming::from_options(options)
                 .map(|naming| Tests::new(naming, ctx.project, ctx.memo.slot())),
-            keys,
             measures,
             table: ctx.memo.slot(),
             indexes: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
+            declared: RefCell::default(),
         })
     }
 
@@ -156,7 +155,7 @@ impl<'a> Builder<'a> {
                 with_entries(base.as_ref(), &extras)
             })
             .unwrap_or_else(|| cel_fact(&Value::Null));
-        if !self.needs.fact("func") {
+        if !self.needs.field("func") {
             return fact;
         }
         let func = self
@@ -192,13 +191,23 @@ impl<'a> Builder<'a> {
         declared: &crate::modules::Declared,
     ) -> Value {
         let mut value = facts::module(module, declared);
-        if self.needs.fact("types") {
+        if self.needs.field("symbols") {
+            let mut symbols: Vec<&Symbol> = self
+                .project
+                .symbols
+                .iter()
+                .filter(|s| s.id.module() == module.path)
+                .collect();
+            symbols.sort_by_key(|s| (&s.file, s.span.start, &s.id));
+            value["symbols"] = Value::Array(symbols.into_iter().map(|s| self.related(s)).collect());
+        }
+        if self.needs.field("types") {
             value["types"] = self.module_types(&module.path);
         }
-        if self.needs.fact("parent") {
+        if self.needs.field("parent") {
             value["parent"] = self.module_parent(module);
         }
-        if self.needs.fact("stability") {
+        if self.needs.field("stability") {
             value["stability"] = self.module_stability(module);
         }
         value
@@ -210,10 +219,10 @@ impl<'a> Builder<'a> {
         // Whether a file is generated is what the merged model says, not what
         // the run read from disk.
         value["generated"] = json!(self.project.file(&file.path).is_none_or(|f| f.generated));
-        if self.needs.fact("line_widths") {
+        if self.needs.field("line_widths") {
             value["line_widths"] = widths::line_widths(text);
         }
-        if self.needs.fact("private_reach") {
+        if self.needs.field("private_reach") {
             value["private_reach"] = self.private_reach(file);
             value["module"] = json!(self.file_module(file).unwrap_or_default());
             value["module_known"] = json!(
@@ -239,33 +248,37 @@ impl<'a> Builder<'a> {
     /// The fields on top of the base fields of a symbol, which only the
     /// expressions of this check ask for.
     fn extras(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Map<String, Value> {
+        let mut extras = self.fields(symbol, summary);
+        self.relations(&mut extras, symbol);
+        extras
+    }
+
+    /// The extra fields that are no relation to other nodes: what a node
+    /// related to another one has, as the node itself.
+    fn fields(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Map<String, Value> {
         let mut extras = Map::new();
         let map = &mut extras;
-        let project = self.project;
         let needs = self.needs;
-        if needs.function("metrics") {
-            map.insert("__metrics".to_owned(), self.metrics(symbol));
+        if needs.field("metrics") {
+            map.insert("metrics".to_owned(), self.metrics(symbol, summary));
         }
-        if needs.function("callers") {
-            map.insert(
-                "__callers".to_owned(),
-                self.nodes(project.callers(&symbol.id)),
-            );
+        if needs.field("unit") {
+            map.insert("unit".to_owned(), self.unit(symbol, summary));
         }
-        if needs.function("unit") {
-            map.insert("__unit".to_owned(), self.unit(symbol, summary));
+        if needs.field("reach") {
+            map.insert("reach".to_owned(), self.reach(symbol));
         }
-        if needs.function("reach") {
-            map.insert("__reach".to_owned(), self.reach(symbol));
+        if needs.field("tests") {
+            map.insert("tests".to_owned(), self.tests(symbol));
         }
-        if needs.function("owner") {
-            map.insert("__owner".to_owned(), self.owner(symbol));
+        if needs.field("span") {
+            map.insert("span".to_owned(), span(&symbol.file, symbol.span));
         }
-        if needs.function("tests") {
-            map.insert("__tests".to_owned(), self.tests(symbol));
+        if needs.field("group") {
+            map.insert("group".to_owned(), json!(self.group(symbol)));
         }
-        if !self.keys.is_empty() {
-            map.insert("__ranks".to_owned(), self.ranks(symbol));
+        if needs.field("words") {
+            map.insert("words".to_owned(), json!(crate::text::words(&symbol.name)));
         }
         self.facts(map, symbol, summary);
         extras
@@ -279,7 +292,7 @@ impl<'a> Builder<'a> {
     ) {
         let needs = self.needs;
         let project = self.project;
-        if needs.fact("forwards_only") || needs.fact("forward_target") {
+        if needs.field("forwards_only") || needs.field("forward_target") {
             let target = summary.and_then(|_| forwarded(project, symbol));
             map.insert("forwards_only".to_owned(), json!(target.is_some()));
             map.insert(
@@ -287,7 +300,7 @@ impl<'a> Builder<'a> {
                 json!(target.map_or("", |t| t.as_str())),
             );
         }
-        if needs.fact("receiver_affinity") {
+        if needs.field("receiver_affinity") {
             map.insert(
                 "receiver_affinity".to_owned(),
                 self.receiver_affinity(symbol),
@@ -296,54 +309,42 @@ impl<'a> Builder<'a> {
         self.placement_facts(map, symbol);
         self.api_facts(map, symbol, summary);
         self.role_facts(map, symbol, summary);
-        if needs.fact("local_callers") {
+        if needs.field("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));
         }
-        if needs.fact("touched_by_tests") {
+        if needs.field("touched_by_tests") {
             map.insert(
                 "touched_by_tests".to_owned(),
                 json!(touched_by_tests(project, symbol)),
             );
         }
-        if needs.fact("implementers") {
+        if needs.field("implementers") {
             let types = if symbol.kind == SymbolKind::Interface {
                 project.implementers(&symbol.id)
             } else {
                 &[]
             };
-            let found: Vec<Value> = types
-                .iter()
-                .filter_map(|id| project.symbol(id))
-                .map(|ty| {
-                    let stateless = !project.members(&ty.id).iter().any(|m| {
-                        project
-                            .symbol(m)
-                            .is_some_and(|m| m.kind == SymbolKind::Field)
-                    });
-                    json!({ "id": ty.id.as_str(), "name": ty.name, "stateless": stateless })
-                })
-                .collect();
-            map.insert("implementers".to_owned(), json!(found));
+            map.insert("implementers".to_owned(), self.nodes(types));
         }
-        if needs.fact("data_only") {
+        if needs.field("data_only") {
             map.insert("data_only".to_owned(), json!(data_only(project, symbol)));
         }
-        if needs.fact("module_tested") {
+        if needs.field("module_tested") {
             map.insert(
                 "module_tested".to_owned(),
                 json!(module_tested(project, symbol.id.module())),
             );
         }
-        if needs.fact("file_first_test") {
+        if needs.field("file_first_test") {
             map.insert(
                 "file_first_test".to_owned(),
                 self.first_test(symbol).unwrap_or_else(|| json!({})),
             );
         }
-        if needs.fact("gap") {
+        if needs.field("gap") {
             map.insert("gap".to_owned(), self.gap(symbol));
         }
-        if needs.fact("helper_user") {
+        if needs.field("helper_user") {
             map.insert("helper_user".to_owned(), self.helper_user(symbol));
         }
     }
@@ -352,34 +353,144 @@ impl<'a> Builder<'a> {
     /// of the project.
     fn placement_facts(&self, map: &mut Map<String, Value>, symbol: &Symbol) {
         let needs = self.needs;
-        if needs.fact("envy") {
+        if needs.field("envy") {
             map.insert("envy".to_owned(), self.envy(symbol));
         }
-        if needs.fact("owner_home") {
+        if needs.field("owner_home") {
             map.insert("owner_home".to_owned(), self.owner_home(symbol));
         }
-        if needs.fact("module_imports") {
+        if needs.field("module_imports") {
             map.insert("module_imports".to_owned(), self.module_imports(symbol));
         }
     }
 
+    /// The related nodes the expressions ask for: each one the same kind of
+    /// value as the node it hangs from, with its own owner and members.
+    fn relations(&self, map: &mut Map<String, Value>, symbol: &Symbol) {
+        let project = self.project;
+        let lists: [(&str, &[SymbolId]); 5] = [
+            ("callers", project.callers(&symbol.id)),
+            ("callees", project.callees(&symbol.id)),
+            ("references", project.references(&symbol.id)),
+            ("uses", project.uses(&symbol.id)),
+            ("members", project.members(&symbol.id)),
+        ];
+        for (name, ids) in lists {
+            if self.needs.field(name) {
+                map.insert(name.to_owned(), self.nodes(ids));
+            }
+        }
+        if self.needs.field("owner") {
+            map.insert("owner".to_owned(), self.owner(symbol));
+        }
+        if self.needs.field("prev") || self.needs.field("next") {
+            let (prev, next) = self.siblings(symbol);
+            map.insert("prev".to_owned(), prev);
+            map.insert("next".to_owned(), next);
+        }
+    }
+
+    /// Related nodes, in the order of the ids.
     fn nodes(&self, ids: &[SymbolId]) -> Value {
         Value::Array(
             ids.iter()
                 .filter_map(|id| self.project.symbol(id))
-                .map(|s| self.node(s))
+                .map(|s| self.related(s))
                 .collect(),
         )
     }
 
+    /// A node as another node relates to it: the same value as the node, with
+    /// every field the expressions read except its relations to other nodes,
+    /// which stay one level deep. Its owner and members are the nodes of the
+    /// base fields; reading any other relation is an error.
+    fn related(&self, symbol: &Symbol) -> Value {
+        let summary = self.project.function(&symbol.id);
+        let mut value = facts::symbol(self.project, symbol);
+        let mut fields = self.fields(symbol, summary);
+        if self.needs.field("func") {
+            let mut func = facts::function(self.project, symbol).unwrap_or(Value::Null);
+            if let Some(map) = func.as_object_mut() {
+                map.extend(self.fields(symbol, summary));
+            }
+            fields.insert("func".to_owned(), func);
+        }
+        if self.needs.field("owner") {
+            fields.insert("owner".to_owned(), self.owner(symbol));
+        }
+        if self.needs.field("members") {
+            let members = self.project.members(&symbol.id);
+            fields.insert(
+                "members".to_owned(),
+                Value::Array(
+                    members
+                        .iter()
+                        .filter_map(|id| self.project.symbol(id))
+                        .map(|s| self.node(s))
+                        .collect(),
+                ),
+            );
+        }
+        if let Some(map) = value.as_object_mut() {
+            map.extend(fields);
+        }
+        value
+    }
+
+    /// The owner of a symbol as a node of the base fields, null for a
+    /// declaration that has none.
     fn owner(&self, symbol: &Symbol) -> Value {
         symbol
             .owner
             .as_ref()
             .and_then(|o| self.project.symbol(o))
-            .map_or_else(|| json!({ "visibility": "", "kind": "" }), |o| self.node(o))
+            .map_or(Value::Null, |o| self.node(o))
     }
 
+    /// The declarations of a file, grouped as they sit, found once per file.
+    fn declarations(&self, path: &Path) -> Rc<Vec<Vec<&'a Symbol>>> {
+        let mut declared = self.declared.borrow_mut();
+        if let Some(found) = declared.get(path) {
+            return Rc::clone(found);
+        }
+        let found = Rc::new(
+            self.project
+                .file(path)
+                .map(|file| layout::declarations_in(self.project, file))
+                .unwrap_or_default(),
+        );
+        declared.insert(path.to_owned(), Rc::clone(&found));
+        found
+    }
+
+    /// The declarations next to a symbol in its file, before and after it.
+    fn siblings(&self, symbol: &Symbol) -> (Value, Value) {
+        let project = self.project;
+        let mut peers: Vec<&Symbol> = if layout::is_declaration(project, symbol) {
+            self.declarations(&symbol.file)
+                .iter()
+                .find(|list| list.iter().any(|s| s.id == symbol.id))
+                .cloned()
+                .unwrap_or_default()
+        } else {
+            project
+                .symbols_in(&symbol.file)
+                .filter(|s| s.owner == symbol.owner)
+                .collect()
+        };
+        peers.sort_by_key(|s| (s.span.start, &s.id));
+        let Some(at) = peers.iter().position(|s| s.id == symbol.id) else {
+            return (Value::Null, Value::Null);
+        };
+        let node = |s: Option<&&Symbol>| s.map_or(Value::Null, |s| self.related(s));
+        (
+            node(at.checked_sub(1).and_then(|i| peers.get(i))),
+            node(peers.get(at + 1)),
+        )
+    }
+
+    /// The credited tests of a symbol, each a node with the way its name
+    /// matched.
     fn tests(&self, symbol: &Symbol) -> Value {
         let Some(naming) = &self.naming else {
             return json!([]);
@@ -388,18 +499,18 @@ impl<'a> Builder<'a> {
             naming
                 .credited_tests(symbol)
                 .into_iter()
-                .map(|(case, kind)| {
-                    json!({
-                        "symbol": case.symbol.as_str(),
-                        "name": case.symbol.as_str().rsplit_once('#').map_or("", |(head, _)| head.rsplit("::").next().unwrap_or("")),
-                        "match": kind.as_str(),
-                    })
+                .filter_map(|(case, kind)| {
+                    let mut value = self.node(self.project.symbol(&case.symbol)?);
+                    value["match"] = json!(kind.as_str());
+                    Some(value)
                 })
                 .collect(),
         )
     }
 
-    fn ranks(&self, symbol: &Symbol) -> Value {
+    /// The index of the declaration group the symbol is in under the default
+    /// order of `design/declaration-groups`, -1 when the order does not place it.
+    fn group(&self, symbol: &Symbol) -> i64 {
         let empty = Map::new();
         let language = self
             .project
@@ -412,27 +523,33 @@ impl<'a> Builder<'a> {
             options: &empty,
             constructors: self.ws.constructor_prefixes(language),
         };
-        let ranks: BTreeMap<&str, i64> = self
-            .keys
-            .iter()
-            .map(|(id, key)| {
-                let rank = key
-                    .rank(&ctx, symbol)
-                    .ok()
-                    .flatten()
-                    .and_then(|r| i64::try_from(r).ok())
-                    .unwrap_or(-1);
-                (id.as_str(), rank)
-            })
-            .collect();
-        json!(ranks)
+        order::GroupKey
+            .rank(&ctx, symbol)
+            .ok()
+            .flatten()
+            .and_then(|rank| i64::try_from(rank).ok())
+            .unwrap_or(-1)
     }
 
-    fn metrics(&self, symbol: &Symbol) -> Value {
+    /// What is measured of a function, the numbers of its signature among them;
+    /// `measured` says whether the analyzer measured it.
+    fn metrics(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Value {
         let found = self.measures.as_ref().and_then(|m| m.get(&symbol.id));
-        let mut value = json!(found.copied().unwrap_or_default());
-        value["measured"] = json!(found.is_some());
-        value
+        let measures = found.copied().unwrap_or_default();
+        json!({
+            "lines": measures.lines,
+            "statements": measures.statements,
+            "cyclomatic": measures.cyclomatic,
+            "cognitive": measures.cognitive,
+            "depth": measures.nesting,
+            "params": summary.map_or(0, |s| s.params),
+            "results": summary.map_or(0, |s| s.returns),
+            "fan_in": measures.fan_in,
+            "fan_out": measures.fan_out,
+            "dispatcher": measures.dispatcher,
+            "flat_dispatch": measures.flat_dispatch,
+            "measured": found.is_some(),
+        })
     }
 
     /// The first test of the symbol's file, by position.
@@ -496,18 +613,7 @@ impl<'a> Builder<'a> {
             return json!([]);
         }
         callers.sort_by_key(|s| (s.span.start, &s.id));
-        Value::Array(callers.into_iter().map(|s| self.ranked(s)).collect())
-    }
-
-    /// A node with the ranks of the order keys the expressions name.
-    fn ranked(&self, symbol: &Symbol) -> Value {
-        let mut value = self.node(symbol);
-        if !self.keys.is_empty()
-            && let Some(map) = value.as_object_mut()
-        {
-            map.insert("__ranks".to_owned(), self.ranks(symbol));
-        }
-        value
+        Value::Array(callers.into_iter().map(|s| self.related(s)).collect())
     }
 
     fn file_module(&self, file: &lighthouse_model::ucm::File) -> Option<String> {
@@ -551,6 +657,15 @@ impl<'a> Builder<'a> {
             "first": at.map_or("", |s| s.id.as_str()),
         })
     }
+}
+
+/// A span as an expression sees it: where it is, in which file.
+pub(crate) fn span(file: &Path, span: Span) -> Value {
+    json!({
+        "file": file.to_string_lossy(),
+        "start": { "line": span.start.line, "col": span.start.col },
+        "end": { "line": span.end.line, "col": span.end.col },
+    })
 }
 
 /// The strings of an option that is a list of them; empty when it is not.

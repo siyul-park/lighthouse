@@ -1,0 +1,108 @@
+//! The extension libraries the `cel` crate lacks, against their upstream
+//! documentation: cel-go's `ext.Regex()` (the README examples of its `regex`
+//! section) and the list functions of the Kubernetes CEL library.
+
+use cel::Value;
+use lighthouse_spec::{compile, context};
+
+fn eval(source: &str) -> Result<Value, String> {
+    compile(source)
+        .unwrap()
+        .execute(&context().unwrap())
+        .map_err(|e| e.to_string())
+}
+
+fn is(source: &str, expected: &str) {
+    assert_eq!(eval(source), eval(expected), "{source}");
+}
+
+fn fails(source: &str, why: &str) {
+    let error = eval(source).unwrap_err();
+    assert!(error.contains(why), "{source}: {error}");
+}
+
+#[test]
+fn regex_replace_replaces_every_match_or_the_first_count_of_them() {
+    is(
+        "regex.replace('hello world hello', 'hello', 'hi')",
+        "'hi world hi'",
+    );
+    is("regex.replace('banana', 'a', 'x', 0)", "'banana'");
+    is("regex.replace('banana', 'a', 'x', 1)", "'bxnana'");
+    is("regex.replace('banana', 'a', 'x', 2)", "'bxnxna'");
+    is("regex.replace('banana', 'a', 'x', -12)", "'bxnxnx'");
+}
+
+#[test]
+fn regex_replace_refers_to_groups_as_backslash_digits() {
+    is(
+        "regex.replace('foo bar', '(fo)o (ba)r', '\\\\2 \\\\1')",
+        "'ba fo'",
+    );
+    is("regex.replace('abc', 'b', '[\\\\0]')", "'a[b]c'");
+    is("regex.replace('a.b', '\\\\.', '\\\\\\\\')", "'a\\\\b'");
+}
+
+#[test]
+fn regex_replace_refuses_a_bad_replacement_or_pattern() {
+    fails(
+        "regex.replace('test', '(.)', '$2')",
+        "invalid replace string",
+    );
+    fails("regex.replace('test', '(.)', '\\\\2')", "no group 2");
+    fails(
+        "regex.replace('id=123', 'id=(?P<value>\\\\d+)', 'value: \\\\values')",
+        "invalid replace string",
+    );
+    fails(
+        "regex.replace('foo bar', '(', '$2 $1')",
+        "invalid regex string",
+    );
+}
+
+#[test]
+fn regex_extract_is_the_first_match_as_an_optional() {
+    is(
+        "regex.extract('hello world', 'hello(.*)')",
+        "optional.of(' world')",
+    );
+    is(
+        "regex.extract('item-A, item-B', 'item-(\\\\w+)')",
+        "optional.of('A')",
+    );
+    is("regex.extract('HELLO', 'hello')", "optional.none()");
+    is("regex.extract('abc', 'b')", "optional.of('b')");
+    fails(
+        "regex.extract('testuser@testdomain', '(.*)@([^.]*)')",
+        "multiple capture groups",
+    );
+}
+
+#[test]
+fn regex_extract_all_lists_every_match() {
+    is(
+        "regex.extractAll('id:123, id:456', 'id:\\\\d+')",
+        "['id:123', 'id:456']",
+    );
+    is("regex.extractAll('id:123, id:456', 'assa')", "[]");
+    is("regex.extractAll('a1 b22', '[a-z](\\\\d+)')", "['1', '22']");
+    fails(
+        "regex.extractAll('testuser@testdomain', '(.*)@([^.]*)')",
+        "multiple capture groups",
+    );
+}
+
+#[test]
+fn a_list_knows_the_index_of_an_element() {
+    is("['a', 'b', 'a'].indexOf('a')", "0");
+    is("['a', 'b', 'a'].lastIndexOf('a')", "2");
+    is("['a', 'b'].indexOf('z')", "-1");
+    is("['a', 'b'].lastIndexOf('z')", "-1");
+    is("[1, 2, 3].indexOf(2.0)", "1");
+    is("[].indexOf(1)", "-1");
+}
+
+#[test]
+fn the_string_indexof_is_still_the_strings_one() {
+    is("'tacocat'.indexOf('cat')", "4");
+}

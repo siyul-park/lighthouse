@@ -49,13 +49,13 @@ spec:
     variables:
       - name: params
         expression: >-
-          symbol.lang == 'go' && symbol.func != null ? symbol.func.signature.params : []
+          symbol.lang == 'go' && symbol.func != null ? symbol.func.params : []
       - name: matched
         expression: >-
           (params.exists(c, c.text == 'context.Context' && c.index > 0
             && params.exists(b, b.index < c.index && !(b.text in options.allowTypesBefore)))
             ? ['context-first'] : [])
-          + (symbol.kind == 'field' && symbol.lang == 'go' && symbol.type_ref.text == 'context.Context'
+          + (symbol.kind == 'field' && symbol.lang == 'go' && symbol.type.text == 'context.Context'
             ? ['stored-context'] : [])
       - name: found
         expression: matched.filter(k, k in options.kinds)
