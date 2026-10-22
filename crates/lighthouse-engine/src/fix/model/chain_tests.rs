@@ -349,7 +349,7 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
     let reason = fixer.edit(&batch, &world()).err().expect("a conflict");
 
     assert!(reason.contains("not as the agent found it"), "{reason}");
-    assert_eq!(fixer.scope_of("r"), FixScope::Files);
+    assert_eq!(fixer.scope_of("r"), FixScope::References);
     let counts = &fixer.account.counts()["r"];
     assert_eq!(counts.declined["conflict"], 1, "{counts:?}");
     assert_eq!(counts.asked, 2);

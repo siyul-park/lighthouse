@@ -127,18 +127,11 @@ spec:
       subject: func.id
   fix:
     safety: unsafe
-    requires:
-      - extent
-    type: ops
-    ops:
-      - op: move
-        when: finding.evidence.kind == 'callers-first'
-        node: finding.evidence.callee
-        after: finding.evidence.caller
-      - op: move
-        when: finding.evidence.kind == 'gap'
-        node: finding.evidence.symbols[2]
-        after: finding.evidence.symbols[0]
+    type: cel
+    edits: >-
+      size(matched) == 0 ? []
+      : matched[0] == 'callers-first' ? [move(func, after(anchor))]
+      : [move(func, after(func.gap.previous))]
   provenance:
     wasDerivedFrom:
     - Martin, Clean Code (2008), G10 Vertical Separation

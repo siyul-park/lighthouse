@@ -91,17 +91,6 @@ pub(crate) fn overlap(a: &Range<usize>, b: &Range<usize>) -> bool {
     }
 }
 
-/// The dominant line ending of a text: CRLF when most of its lines end in it.
-pub(crate) fn eol_of(text: &str) -> &'static str {
-    let crlf = text.matches("\r\n").count();
-    let lf = text.matches('\n').count();
-    if lf > 0 && crlf * 2 > lf {
-        "\r\n"
-    } else {
-        "\n"
-    }
-}
-
 /// Applies edits of one file to its text. Edits at the same offset apply in
 /// the order given. Ranges that are out of bounds, inside a character, or
 /// that overlap are an error: nothing here panics.

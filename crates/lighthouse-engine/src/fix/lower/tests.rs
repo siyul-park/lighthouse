@@ -4,10 +4,10 @@ use std::fs;
 
 use lighthouse_model::{
     Position, Span,
-    ucm::{Edge, File, Fragment, SymbolKind, Visibility},
+    ucm::{Edge, EdgeKind, File, Fragment, Resolution, SymbolKind, Target, Visibility},
 };
 
-use super::*;
+use super::{rename::name_in, *};
 use crate::fix::edits::apply;
 
 const FILE: &str = "a.src";
@@ -207,6 +207,46 @@ fn a_member_of_a_parenthesized_group_never_moves() {
     let why = case.run(&[after("a", "b")]).unwrap_err();
 
     assert!(why.contains("parenthesized group"), "{why}");
+}
+
+#[test]
+fn deleting_a_spec_of_an_iota_group_keeps_the_place_of_the_specs_after_it() {
+    let text = "const (\na = iota\nb\nc\n)\n";
+    let case = case(text, &[("a", 2, 2), ("b", 3, 3), ("c", 4, 4)], vec![]);
+
+    let deleted = case.run(&[EditOp::Delete { node: id("a") }]).unwrap();
+
+    assert_eq!(deleted, "const (\n_ = iota\nb\nc\n)\n");
+}
+
+#[test]
+fn deleting_a_middle_spec_of_an_iota_group_keeps_its_place_as_the_blank_identifier() {
+    let text = "const (\na = iota\nb\nc\n)\n";
+    let case = case(text, &[("a", 2, 2), ("b", 3, 3), ("c", 4, 4)], vec![]);
+
+    let deleted = case.run(&[EditOp::Delete { node: id("b") }]).unwrap();
+
+    assert_eq!(deleted, "const (\na = iota\n_\nc\n)\n");
+}
+
+#[test]
+fn deleting_the_last_spec_of_an_iota_group_changes_nothing_after_it() {
+    let text = "const (\na = iota\nb\nc\n)\n";
+    let case = case(text, &[("a", 2, 2), ("b", 3, 3), ("c", 4, 4)], vec![]);
+
+    let deleted = case.run(&[EditOp::Delete { node: id("c") }]).unwrap();
+
+    assert_eq!(deleted, "const (\na = iota\nb\n)\n");
+}
+
+#[test]
+fn deleting_a_spec_with_a_value_of_its_own_deletes_the_line() {
+    let text = "const (\na = 1\nb = 2\nc = 3\n)\n";
+    let case = case(text, &[("a", 2, 2), ("b", 3, 3), ("c", 4, 4)], vec![]);
+
+    let deleted = case.run(&[EditOp::Delete { node: id("b") }]).unwrap();
+
+    assert_eq!(deleted, "const (\na = 1\nc = 3\n)\n");
 }
 
 #[test]
@@ -682,4 +722,82 @@ fn rename_needs_complete_references_a_private_symbol_and_a_free_name() {
         let why = renamed(Visibility::Private, bad, true).unwrap_err();
         assert!(why.contains("not a usable identifier"), "{bad}: {why}");
     }
+}
+
+fn site_edges(sites: &[((u32, u32), (u32, u32))]) -> Vec<Edge> {
+    sites
+        .iter()
+        .map(|(from, to)| reference("user", "old", Some(span(*from, *to)), Resolution::Semantic))
+        .collect()
+}
+
+#[test]
+fn rename_is_refused_when_a_caller_has_a_local_of_the_new_name() {
+    let text = "fn old() {}\n\nfn user() { let fresh = 1; old(); old() }\n";
+    let edges = site_edges(&[((3, 28), (3, 31)), ((3, 35), (3, 38))]);
+    let case = case(text, &[("old", 1, 1), ("user", 3, 3)], edges);
+
+    let why = case.run(&[rename("fresh")]).unwrap_err();
+
+    assert!(why.contains("capture or shadow"), "{why}");
+    assert!(case.run(&[rename("other")]).is_ok(), "a free name is fine");
+}
+
+#[test]
+fn rename_is_refused_when_the_new_name_is_declared_where_a_site_is() {
+    let text = "fn old() {}\n\nfn fresh() {}\n\nfn user() { old() }\n";
+    let edges = site_edges(&[((5, 13), (5, 16))]);
+    let case = case(
+        text,
+        &[("old", 1, 1), ("fresh", 3, 3), ("user", 5, 5)],
+        edges,
+    );
+
+    let why = case.run(&[rename("fresh")]).unwrap_err();
+
+    assert!(why.contains("fresh"), "{why}");
+}
+
+#[test]
+fn a_trailing_comment_does_not_make_a_spec_look_like_it_has_a_value() {
+    let text = "const (\na = iota\nb // is 1 = one\nc\n)\n";
+    let case = case(text, &[("a", 2, 2), ("b", 3, 3), ("c", 4, 4)], vec![]);
+
+    let deleted = case.run(&[EditOp::Delete { node: id("a") }]).unwrap();
+
+    assert_eq!(deleted, "const (\n_ = iota\nb // is 1 = one\nc\n)\n");
+}
+
+#[test]
+fn iota_before_the_spec_does_not_keep_it_when_the_specs_after_it_give_their_own_values() {
+    let text = "const (\na = iota\nb\nc = 5\nd = 6\n)\n";
+    let case = case(
+        text,
+        &[("a", 2, 2), ("b", 3, 3), ("c", 4, 4), ("d", 5, 5)],
+        vec![],
+    );
+
+    let deleted = case.run(&[EditOp::Delete { node: id("c") }]).unwrap();
+
+    assert_eq!(deleted, "const (\na = iota\nb\nd = 6\n)\n");
+}
+
+#[test]
+fn a_spec_that_repeats_the_expression_of_the_removed_one_keeps_its_place() {
+    let text = "const (\na = 7\nb\nc = 9\n)\n";
+    let case = case(text, &[("a", 2, 2), ("b", 3, 3), ("c", 4, 4)], vec![]);
+
+    let deleted = case.run(&[EditOp::Delete { node: id("a") }]).unwrap();
+
+    assert_eq!(deleted, "const (\n_ = 7\nb\nc = 9\n)\n");
+}
+
+#[test]
+fn a_spec_named_by_a_later_spec_cannot_be_removed() {
+    let text = "const (\na = 1\nb = a + 1\n)\n";
+    let case = case(text, &[("a", 2, 2), ("b", 3, 3)], vec![]);
+
+    let why = case.run(&[EditOp::Delete { node: id("a") }]).unwrap_err();
+
+    assert!(why.contains("named by a spec after it"), "{why}");
 }

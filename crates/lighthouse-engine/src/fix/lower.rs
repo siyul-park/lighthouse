@@ -13,77 +13,18 @@ use std::{
 };
 
 use lighthouse_model::{
-    LineIndex,
-    ucm::{
-        Anchor, EdgeKind, EditOp, Node, Owner, Project, Resolution, Symbol, SymbolId, Target,
-        Visibility,
-    },
+    LineIndex, Position, Span, eol_of,
+    ucm::{Anchor, EditOp, Node, Owner, Project, Symbol, SymbolId},
 };
 
 use crate::Overlays;
 
 use super::{
-    edits::{TextEdit, eol_of, whole_lines, with_blank},
+    edits::{TextEdit, whole_lines, with_blank},
     scan::Containers,
 };
 
-/// Words no identifier may be, in the languages with providers.
-const KEYWORDS: &[&str] = &[
-    "as",
-    "async",
-    "await",
-    "break",
-    "case",
-    "chan",
-    "const",
-    "continue",
-    "crate",
-    "default",
-    "defer",
-    "dyn",
-    "else",
-    "enum",
-    "extern",
-    "fallthrough",
-    "false",
-    "fn",
-    "for",
-    "func",
-    "go",
-    "goto",
-    "if",
-    "impl",
-    "import",
-    "in",
-    "interface",
-    "let",
-    "loop",
-    "map",
-    "match",
-    "mod",
-    "move",
-    "mut",
-    "package",
-    "pub",
-    "range",
-    "ref",
-    "return",
-    "select",
-    "self",
-    "Self",
-    "static",
-    "struct",
-    "super",
-    "switch",
-    "trait",
-    "true",
-    "type",
-    "unsafe",
-    "use",
-    "var",
-    "where",
-    "while",
-];
+mod rename;
 
 impl<'a> Sources<'a> {
     pub(crate) fn new(root: &Path, project: &'a Project, overlays: &'a Overlays) -> Self {
@@ -189,12 +130,7 @@ impl<'a> Lowerer<'a> {
     pub(crate) fn lower(&self, op: &EditOp) -> Result<Vec<TextEdit>, String> {
         match op {
             EditOp::Move { node, anchor } => self.relocate(node, anchor),
-            EditOp::Delete { node } => {
-                let block = self.block(node)?;
-                let text = self.sources.text(&block.symbol.file)?;
-                let range = with_blank(&text, block.lines.clone());
-                Ok(vec![TextEdit::delete(block.symbol.file, range)])
-            }
+            EditOp::Delete { node } => self.delete(node),
             EditOp::Reorder { owner, order } => self.reorder(owner, order),
             EditOp::Rename { symbol, name } => self.rename(symbol, name),
             EditOp::DeleteRange { file, span } => {
@@ -220,38 +156,67 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn block(&self, node: &Node) -> Result<Block, String> {
-        let Node::Symbol(id) = node else {
-            return Err("only symbols can be moved or deleted, not modules".to_owned());
-        };
-        let symbol = self
-            .project
-            .symbol(id)
-            .ok_or_else(|| format!("`{}` is not in the project", id.as_str()))?;
-        let extent = symbol.extent.ok_or_else(|| {
-            format!(
-                "`{}` has no extent: its language provider does not report declaration extents",
-                symbol.name
-            )
-        })?;
-        let text = self.sources.text(&symbol.file)?;
-        let range = LineIndex::new(&text)
-            .range(extent)
-            .filter(|r| !r.is_empty())
-            .ok_or_else(|| format!("the extent of `{}` is outside its file", symbol.name))?;
-        let lines = lines_of(&text, &range).ok_or_else(|| {
-            format!(
-                "`{}` shares its lines with other code, so it cannot be moved on its own",
-                symbol.name
-            )
-        })?;
-        let container = self.sources.containers(&symbol.file)?.at(range.start);
-        Ok(Block {
-            symbol: symbol.clone(),
-            lines,
-            container: container.open,
-            group: container.group,
-        })
+    /// Removes a declaration. One spec of a parenthesized `const` group that a
+    /// later spec depends on for its value (`iota`, or the expression it
+    /// repeats) keeps its place as `_`, so that the specs after it keep their
+    /// values; a spec that a later spec names cannot be removed.
+    fn delete(&self, node: &Node) -> Result<Vec<TextEdit>, String> {
+        let block = self.block(node)?;
+        let file = block.symbol.file.clone();
+        let text = self.sources.text(&file)?;
+        if let (Some(open), Some(close)) = (block.container, block.group)
+            && let Some(later) = const_later(&text, open, close, &block)
+        {
+            match later {
+                Later::Independent => {}
+                Later::Positional => return self.blank(&block, &text),
+                Later::Named => {
+                    return Err(format!(
+                        "`{}` is named by a spec after it in its `const` group",
+                        block.symbol.name
+                    ));
+                }
+            }
+        }
+        let range = with_blank(&text, block.lines.clone());
+        Ok(vec![TextEdit::delete(file, range)])
+    }
+
+    /// The edits that leave the spec of `block` in its place with the blank
+    /// identifier for a name, and its leading comments gone.
+    fn blank(&self, block: &Block, text: &str) -> Result<Vec<TextEdit>, String> {
+        let symbol = &block.symbol;
+        let name = LineIndex::new(text)
+            .range(Span {
+                start: symbol.span.start,
+                end: Position {
+                    line: symbol.span.start.line,
+                    col: symbol.span.start.col + u32::try_from(symbol.name.len()).unwrap_or(0),
+                },
+            })
+            .filter(|range| text.get(range.clone()) == Some(symbol.name.as_str()))
+            .ok_or_else(|| {
+                format!(
+                    "the name of `{}` is not where the provider says",
+                    symbol.name
+                )
+            })?;
+        let mut edits = Vec::new();
+        if block.lines.start < name.start {
+            let own_line = text[..name.start].rfind('\n').map_or(0, |n| n + 1);
+            if block.lines.start < own_line {
+                edits.push(TextEdit::delete(
+                    symbol.file.clone(),
+                    block.lines.start..own_line,
+                ));
+            }
+        }
+        edits.push(TextEdit {
+            file: symbol.file.clone(),
+            range: name,
+            text: "_".to_owned(),
+        });
+        Ok(edits)
     }
 
     fn relocate(&self, node: &Node, anchor: &Anchor) -> Result<Vec<TextEdit>, String> {
@@ -437,125 +402,38 @@ impl<'a> Lowerer<'a> {
         })
     }
 
-    fn rename(&self, id: &SymbolId, name: &str) -> Result<Vec<TextEdit>, String> {
+    fn block(&self, node: &Node) -> Result<Block, String> {
+        let Node::Symbol(id) = node else {
+            return Err("only symbols can be moved or deleted, not modules".to_owned());
+        };
         let symbol = self
             .project
             .symbol(id)
             .ok_or_else(|| format!("`{}` is not in the project", id.as_str()))?;
-        self.rename_allowed(symbol, name)?;
-        let blocked = self.project.edges.iter().find(|e| {
-            e.kind != EdgeKind::Contains
-                && e.to == Target::Resolved(Node::Symbol(id.clone()))
-                && (e.resolution != Resolution::Semantic || e.site.is_none())
-        });
-        if let Some(edge) = blocked {
-            return Err(format!(
-                "a {:?} edge to `{}` is {}, so its references cannot all be found",
-                edge.kind,
-                symbol.name,
-                if edge.resolution == Resolution::Semantic {
-                    "without a site"
-                } else {
-                    "not semantic"
-                }
-            ));
-        }
-        let mut edits = Vec::new();
+        let extent = symbol.extent.ok_or_else(|| {
+            format!(
+                "`{}` has no extent: its language provider does not report declaration extents",
+                symbol.name
+            )
+        })?;
         let text = self.sources.text(&symbol.file)?;
-        let index = LineIndex::new(&text);
-        let declaration = index
-            .range(symbol.span)
-            .ok_or_else(|| "the declaration is outside its file".to_owned())?;
-        let at = name_in(&text[declaration.clone()], &symbol.name)
-            .ok_or_else(|| format!("cannot find `{}` in its declaration", symbol.name))?;
-        let start = declaration.start + at;
-        edits.push(TextEdit {
-            file: symbol.file.clone(),
-            range: start..start + symbol.name.len(),
-            text: name.to_owned(),
-        });
-        // Where the lines start in each file with a site, found once.
-        let sites: Vec<_> = self
-            .project
-            .sites(id)
-            .iter()
-            .filter(|site| site.kind != EdgeKind::Contains)
-            .collect();
-        let texts = sites
-            .iter()
-            .map(|site| Ok((site.file.as_path(), self.sources.text(&site.file)?)))
-            .collect::<Result<BTreeMap<_, _>, String>>()?;
-        let indexes: BTreeMap<&Path, LineIndex> = texts
-            .iter()
-            .map(|(&file, text)| (file, LineIndex::new(text)))
-            .collect();
-        for site in sites {
-            let text = &texts[site.file.as_path()];
-            let range = indexes[site.file.as_path()]
-                .range(site.span)
-                .filter(|r| text[r.clone()] == symbol.name)
-                .ok_or_else(|| {
-                    format!(
-                        "a reference site in {} does not spell `{}`",
-                        site.file.display(),
-                        symbol.name
-                    )
-                })?;
-            edits.push(TextEdit {
-                file: site.file.clone(),
-                range,
-                text: name.to_owned(),
-            });
-        }
-        edits.sort_by(|a, b| (&a.file, a.range.start).cmp(&(&b.file, b.range.start)));
-        edits.dedup();
-        Ok(edits)
-    }
-
-    /// Why `symbol` may not be renamed to `name`, if it may not: the provider
-    /// must know every reference, the symbol must be private to its unit, and
-    /// the name must be a free identifier that is no keyword.
-    fn rename_allowed(&self, symbol: &Symbol, name: &str) -> Result<(), String> {
-        let language = self
-            .project
-            .file(&symbol.file)
-            .map_or("", |f| f.lang.as_str());
-        if !(self.complete)(language) {
-            return Err(format!(
-                "the provider of `{language}` does not declare `complete-references`, so every reference to `{}` cannot be known",
+        let range = LineIndex::new(&text)
+            .range(extent)
+            .filter(|r| !r.is_empty())
+            .ok_or_else(|| format!("the extent of `{}` is outside its file", symbol.name))?;
+        let lines = lines_of(&text, &range).ok_or_else(|| {
+            format!(
+                "`{}` shares its lines with other code, so it cannot be moved on its own",
                 symbol.name
-            ));
-        }
-        if symbol.visibility != Visibility::Private {
-            return Err(format!(
-                "`{}` is visible outside its unit, so code this project cannot see may use it",
-                symbol.name
-            ));
-        }
-        let identifier = name
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_alphabetic() || c == '_')
-            && name.chars().all(|c| c.is_alphanumeric() || c == '_');
-        if !identifier || KEYWORDS.contains(&name) {
-            return Err(format!("`{name}` is not a usable identifier"));
-        }
-        if name == symbol.name {
-            return Err("the new name is the old one".to_owned());
-        }
-        let taken = self.project.symbols.iter().any(|other| {
-            other.id != symbol.id
-                && other.name == name
-                && other.id.module() == symbol.id.module()
-                && other.owner == symbol.owner
-        });
-        if taken {
-            return Err(format!(
-                "`{name}` is already declared next to `{}`",
-                symbol.name
-            ));
-        }
-        Ok(())
+            )
+        })?;
+        let container = self.sources.containers(&symbol.file)?.at(range.start);
+        Ok(Block {
+            symbol: symbol.clone(),
+            lines,
+            container: container.open,
+            group: container.group,
+        })
     }
 }
 
@@ -622,27 +500,75 @@ fn trimmed_back(text: &str, range: Range<usize>) -> Range<usize> {
     kept..range.end
 }
 
-/// Where a symbol's name is first written as a whole word in its declaration,
-/// not counting a Go receiver, which comes before the name.
-fn name_in(declaration: &str, name: &str) -> Option<usize> {
-    let skip = declaration
-        .strip_prefix("func")
-        .map(str::trim_start)
-        .filter(|rest| rest.starts_with('('))
-        .and_then(|rest| {
-            rest.find(')')
-                .map(|n| declaration.len() - rest.len() + n + 1)
-        })
-        .unwrap_or(0);
-    let bytes = declaration.as_bytes();
-    let word = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
-    declaration[skip..].match_indices(name).find_map(|(at, _)| {
-        let at = skip + at;
-        let before = at.checked_sub(1).map(|i| bytes[i]);
-        let after = bytes.get(at + name.len()).copied();
-        (!before.is_some_and(word) && !after.is_some_and(word)).then_some(at)
-    })
-}
-
 #[cfg(test)]
 mod tests;
+
+/// What the specs of a `const` group after one that is removed need of it.
+enum Later {
+    /// Nothing: they give their own values.
+    Independent,
+    /// Its place, for the `iota` they count with or the expression they repeat.
+    Positional,
+    /// Its name, which they spell.
+    Named,
+}
+
+/// What the specs after the spec of `removed` in its `const` group need of it;
+/// `None` for a group that is not a `const` group or has no spec after it. A
+/// spec after it depends on its place when `iota` is in the expression it
+/// gives or repeats, and on the spec itself when it repeats the expression
+/// that one gives.
+fn const_later(text: &str, open: usize, close: usize, removed: &Block) -> Option<Later> {
+    if !text[..open].trim_end().ends_with("const") {
+        return None;
+    }
+    let specs = |from: usize, to: usize| -> Vec<&str> {
+        text.get(from..to)
+            .into_iter()
+            .flat_map(str::lines)
+            .map(|line| line.split("//").next().unwrap_or_default().trim())
+            .filter(|line| !line.is_empty() && !line.starts_with("/*") && !line.starts_with('*'))
+            .collect()
+    };
+    let before = specs(open + 1, removed.lines.start);
+    let own = specs(removed.lines.start, removed.lines.end);
+    let later = specs(removed.lines.end, close);
+    if later.is_empty() {
+        return None;
+    }
+    if later
+        .iter()
+        .any(|spec| has_word(spec, &removed.symbol.name))
+    {
+        return Some(Later::Named);
+    }
+    // The expression a spec gives or repeats, with whether it has `iota` and
+    // whether the removed spec gives it.
+    let expression = |spec: &str| spec.split_once('=').map(|(_, rhs)| has_word(rhs, "iota"));
+    let mut governing = (false, false);
+    for spec in &before {
+        if let Some(iota) = expression(spec) {
+            governing = (iota, false);
+        }
+    }
+    if let Some(iota) = own.first().and_then(|spec| expression(spec)) {
+        governing = (iota, true);
+    }
+    for spec in &later {
+        match expression(spec) {
+            Some(iota) => governing = (iota, false),
+            None if governing.1 => return Some(Later::Positional),
+            None => {}
+        }
+        if governing.0 {
+            return Some(Later::Positional);
+        }
+    }
+    Some(Later::Independent)
+}
+
+/// Whether `word` occurs in `text` as a whole word.
+fn has_word(text: &str, word: &str) -> bool {
+    text.split(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .any(|found| found == word)
+}

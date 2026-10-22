@@ -2,17 +2,54 @@
 
 # Fix operations
 
-A decision's `fix:` block says how the findings of its rule are fixed. Its `type` is one of `ops`, `command` and `rpc`; it carries a `safety` cap, and may list the provider capabilities it `requires`:
+A decision's `fix:` block says how the findings of its rule are fixed. Its `type` is one of `cel`, `command`, `model` and `rpc`; it carries a `safety` cap, and may list the provider capabilities it `requires`:
 
 ```yaml
 fix:
   safety: safe        # safe | unsafe
-  requires: [extent]  # optional
-  type: ops           # ops | command | rpc
-  ops: [...]
+  type: cel           # cel | command | model | rpc
+  edits: "[...]"
 ```
 
-The `ops` type is a list of the generic operations below. Operations state edits over code-model nodes; the orchestrator lowers them to text edits with the spans the language provider reports, formats, re-checks and rolls back what gets worse. Expressions are CEL over `finding` (`decision`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options` (the options the rule ran with). Every operation also takes `when` (CEL bool): the operation is skipped when it is false.
+The `cel` type is one CEL expression, `edits`, that returns a list of edits (an empty list proposes none), as a Kubernetes MutatingAdmissionPolicy returns patches. CEL never mutates: the constructors below build values that state edits over code-model nodes; the orchestrator lowers them to text edits with the spans the language provider reports, formats, re-checks and rolls back what gets worse. The expression sees `finding` (`decision`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `node` (the finding's subject, with the fields of the code model), `file` (its file, with `symbols` and `comments`), `options` (the options the rule ran with) and the `variables` of the decision's check, so a fix never redefines what its check computed. `requires` follows from the constructors it calls: `move`, `reorder`, `before` and `after` need `extent`, `rename` needs `complete-references`; what `remove` and `replace` need depends on their target, so the fix says it.
+
+## `remove`
+
+Removes a declaration with its extent, or a range of text such as a comment. A range that fills whole lines takes the lines, and one blank line when that would leave two. One spec of a parenthesized `const` group whose values depend on their place (`iota`, or specs that repeat the one before) keeps its place as the blank identifier `_`, so that the specs after it keep their values.
+
+| param | type | meaning |
+| --- | --- | --- |
+| `target` | node, symbol id or span, required | A node or its id, or `{start: {line, col}, end: {line, col}}` (1-based, columns in bytes, end exclusive) with an optional `file`, else the finding's file. |
+
+```yaml
+edits: "[remove(finding.span)]"
+```
+
+## `add`
+
+Inserts text at an anchor. At `before(node)` and `after(node)` it goes at the start of the line of the node's extent, or of the line after it, so the text is whole lines; `start(file)` and `end(file)` are the two ends of the finding's file.
+
+| param | type | meaning |
+| --- | --- | --- |
+| `anchor` | `before(node)`, `after(node)`, `start(file)` or `end(file)`, required | Where the text goes. |
+| `text` | string, required | The text, computed with CEL's strings. |
+
+```yaml
+edits: "[add(before(node), '// ' + node.name + ' is documented.\n')]"
+```
+
+## `replace`
+
+Replaces a range of text, or the extent of a declaration.
+
+| param | type | meaning |
+| --- | --- | --- |
+| `target` | node, symbol id or span, required | What is replaced. |
+| `text` | string, required | The new text. |
+
+```yaml
+edits: "[replace(finding.span, '// ' + finding.decision)]"
+```
 
 ## `move`
 
@@ -20,45 +57,11 @@ Relocates a declaration, with its leading doc comments and attributes, next to a
 
 | param | type | meaning |
 | --- | --- | --- |
-| `node` | CEL symbol id, required | The declaration to move. |
-| `before` | CEL symbol id | Place the declaration right before this one. Exactly one of `before` and `after`. |
-| `after` | CEL symbol id | Place the declaration right after this one. |
+| `node` | node or symbol id, required | The declaration to move. |
+| `anchor` | `before(node)` or `after(node)`, required | The declaration it goes next to. |
 
 ```yaml
-- op: move
-  node: finding.evidence.callee
-  after: finding.evidence.caller
-```
-
-## `reorder`
-
-Sorts the declarations of a container by order keys, stably: a declaration moves only as far as the keys demand, and declarations a key does not order stay in the place they occupy. The first key decides, the next ones break ties.
-
-| param | type | meaning |
-| --- | --- | --- |
-| `scope` | `file` or `owner`, required | `file`: every declaration of the finding's file; each container (the file level, an `impl` or class body) is sorted on its own. `owner`: only the members of the finding symbol's owner. |
-| `by` | list of order keys, required | Registered keys, `plugin/name`; the table below lists them. |
-
-```yaml
-- op: reorder
-  scope: file
-  by: [design/group]
-```
-
-## `delete`
-
-Removes a declaration with its extent, or a range of text such as a comment. A range that fills whole lines takes the lines, and one blank line when that would leave two.
-
-| param | type | meaning |
-| --- | --- | --- |
-| `node` | CEL symbol id | The declaration to remove. Either `node`, or `file` and `span`. |
-| `file` | CEL string | Project-relative path of the range's file. |
-| `span` | CEL span | `{start: {line, col}, end: {line, col}}`, 1-based, columns in bytes, end exclusive. |
-
-```yaml
-- op: delete
-  file: finding.file
-  span: finding.span
+edits: "[move(node, after(finding.evidence.caller))]"
 ```
 
 ## `rename`
@@ -67,35 +70,28 @@ Renames a symbol at its declaration and at every reference site. Declined unless
 
 | param | type | meaning |
 | --- | --- | --- |
-| `symbol` | CEL symbol id, required | The symbol to rename. |
-| `name` | template, required | The new name; `{{ cel }}` holes are replaced. |
+| `symbol` | node or symbol id, required | The symbol to rename. |
+| `name` | string, required | The new name. |
 
 ```yaml
-- op: rename
-  symbol: finding.symbol
-  name: '{{ symbol.name }}Value'
+edits: "[rename(node, node.name + 'Value')]"
 ```
 
-## `replace`
+## `reorder`
 
-Replaces a range of text; an empty range inserts. The escape hatch for what the other operations do not state.
+Puts sibling declarations in the order of the list, in the places they hold. Nothing changes when they already are in it. Each container (the file level, an `impl` or class body) is permuted on its own.
 
 | param | type | meaning |
 | --- | --- | --- |
-| `file` | CEL string, required | Project-relative path. |
-| `span` | CEL span, required | The range to replace. |
-| `text` | template, required | The new text; `{{ cel }}` holes are replaced. |
+| `nodes` | list of nodes or symbol ids, required | The declarations, in the order they must have. |
 
 ```yaml
-- op: replace
-  file: finding.file
-  span: finding.span
-  text: '// {{ finding.evidence.label }}'
+edits: "[reorder(file.symbols.filter(s, s.group >= 0).sortBy(s, s.group))]"
 ```
 
 ## Order keys
 
-Keys for `reorder.by`, registered by plugins.
+Registered by plugins; the `group` field of a node reads `design/group`.
 
 | key | orders by |
 | --- | --- |

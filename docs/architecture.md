@@ -107,7 +107,7 @@ meaning. `scope` is `{subject, generated, tests}` (`generated: true` makes gener
 Schema object (`type`, `default`, `description` per property, closed with
 `additionalProperties: false`); `languages.<id>` holds the option values and the
 wording of one language. `check` and `fix` choose a provider by `type`: `check` is
-`builtin`, `cel`, `command` or `model`; `fix` is `ops`, `command` or `rpc`, with the fields of its type
+`builtin`, `cel`, `command` or `model`; `fix` is `cel`, `command`, `model` or `rpc`, with the fields of its type
 next to `safety` and `requires`, and no others.
 
 The JSON Schema (2020-12) of each kind is generated from the Rust types into
@@ -618,7 +618,7 @@ catalog that uses `rename` must list `complete-references` in `requires`.
 normalized (no `..`, not absolute), a non-generated file of the analyzed project, and
 reached through no symlink; anything else is declined before any text is read.
 
-**Safety.** A fix is `safe` or `unsafe`, whatever provider makes it (ops, command, rpc or
+**Safety.** A fix is `safe` or `unsafe`, whatever provider makes it (cel, command, rpc or
 a model), and one function, `DecisionSpec::fix_safety`, says which: `safe` only for a
 deterministic fix of a decision that authors `error`; a model's fix, and any fix of a
 `warn` or `info` decision, is `unsafe`. A fixer may claim less than that, never more. The project

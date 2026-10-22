@@ -119,17 +119,11 @@ spec:
           before: earlier.id
   fix:
     safety: safe
-    requires: [extent]
-    type: ops
-    ops:
-      - op: move
-        when: "finding.evidence.before != ''"
-        node: finding.evidence.declaration
-        before: finding.evidence.before
-      - op: reorder
-        when: "finding.evidence.before == ''"
-        scope: file
-        by: [design/group]
+    type: cel
+    edits: >-
+      finding.evidence.before != ''
+      ? [move(finding.evidence.declaration, before(finding.evidence.before))]
+      : [reorder(file.symbols.filter(s, s.declaration && s.group >= 0).sortBy(s, s.group))]
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), G24 Follow Standard Conventions"

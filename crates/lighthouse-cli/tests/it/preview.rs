@@ -77,7 +77,7 @@ fn a_check_marks_what_is_fixable_and_computes_no_fix() {
     assert_eq!(
         group["fix"],
         json!({
-            "by": "ops",
+            "by": "cel",
             "safety": "safe",
             "runs": true,
             "apply": "lighthouse check --fix --decision design/declaration-groups",

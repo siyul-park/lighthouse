@@ -315,15 +315,15 @@ fn descriptor(fix: Option<FixInfo>, brief: bool) -> Descriptor {
 
 #[test]
 fn a_group_says_in_one_line_how_its_fix_is_made_and_applied() {
-    let safe = descriptor(Some(fix_of(FixBy::Ops, Safety::Safe, None, None)), false);
+    let safe = descriptor(Some(fix_of(FixBy::Cel, Safety::Safe, None, None)), false);
     let text = described(safe.clone(), false);
     assert!(
-        text.contains("  fix: safe (ops) \u{2014} lighthouse check --fix --decision acme/a\n"),
+        text.contains("  fix: safe (cel) \u{2014} lighthouse check --fix --decision acme/a\n"),
         "{text}"
     );
     let text = described(safe, true);
     assert!(
-        text.contains("  fix: safe (ops) \u{2014} fix {\"decision\":[\"acme/a\"]}\n"),
+        text.contains("  fix: safe (cel) \u{2014} fix {\"decision\":[\"acme/a\"]}\n"),
         "{text}"
     );
 

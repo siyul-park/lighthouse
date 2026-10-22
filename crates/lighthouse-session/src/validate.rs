@@ -16,7 +16,7 @@ use lighthouse_engine::Engine;
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
-use lighthouse_spec::{BuiltinCheck, BuiltinOp, Catalog, CheckKind, Decision, FixKind, OpSpec};
+use lighthouse_spec::{BuiltinCheck, BuiltinOp, Catalog, CheckKind, Decision};
 use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
@@ -317,7 +317,6 @@ fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut
                 ),
             ));
         }
-        order_keys(decision, &keys, path, problems);
         if let Some(CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind) {
             named_rule(decision, builtin, registry, path, problems);
             if let BuiltinCheck::Op(BuiltinOp::Order { clauses }) = builtin {
@@ -363,19 +362,5 @@ fn unknown_keys(
             path,
             format!("{}: {what} names unknown order key `{key}`", decision.id()),
         ));
-    }
-}
-
-fn order_keys(decision: &Decision, keys: &BTreeSet<&str>, path: &str, problems: &mut Vec<Problem>) {
-    let Some(fix) = &decision.fix else {
-        return;
-    };
-    let FixKind::Ops { ops } = &fix.kind else {
-        return;
-    };
-    for op in ops {
-        if let OpSpec::Reorder { by, .. } = op {
-            unknown_keys(decision, "reorder", by, keys, path, problems);
-        }
     }
 }

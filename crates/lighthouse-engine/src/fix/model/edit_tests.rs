@@ -93,7 +93,7 @@ fn the_brief_lists_the_findings_of_the_file_with_their_decisions_and_asks_for_a_
     let text = brief(&targets, &[], None);
 
     let want = "You are fixing findings of design rules in the files of this directory. Change only what the findings need, keep behaviour and style, stay within the scope of each finding, and do not run commands that change anything outside this directory.
-Scope `symbol`: change only the symbol the finding is in (the whole file when it is short and no symbol holds it) and touch no other file. Scope `files`: change any file of this directory the fix needs, such as the callers of a signature you change.
+Scope `symbol`: change only the symbol the finding is in (the whole file when it is short and no symbol holds it) and touch no other file. Scope `file`: change only the file of the finding. Scope `references`: change the file of the finding and the files that refer to what you change, such as the callers of a signature you change, and theirs when their own signature changes. Scope `files`: change any file of this directory the fix needs.
 
 Finding 1
 Decision: design/short-names

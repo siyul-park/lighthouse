@@ -173,7 +173,7 @@ pub(super) fn localize(
             localized.uses.push(item.text);
         }
     }
-    if scope == FixScope::Files {
+    if scope >= FixScope::References {
         let reached = reached(project, &anchors, file, &spans, &mut budget, &mut texts);
         localized.briefed.extend(reached.shown);
         localized.sites = reached.sites;

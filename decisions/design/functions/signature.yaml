@@ -182,7 +182,6 @@ spec:
   fix:
     safety: unsafe
     type: model
-    scope: files
   provenance:
     wasDerivedFrom:
     - 'revive argument-limit 8: https://revive.run/r#argument-limit'

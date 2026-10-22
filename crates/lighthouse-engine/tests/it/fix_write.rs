@@ -13,6 +13,7 @@ use lighthouse_plugin::{
     PluginManifest, Registry, Rule,
 };
 use lighthouse_spec::Config;
+use lighthouse_spec::FixScope;
 
 use crate::support::*;
 
@@ -111,7 +112,7 @@ fn pair(dir: &tempfile::TempDir, extra: &str) -> (Engine, FixPlan) {
     );
     (
         Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap(),
-        plan,
+        plan.with_scope("pair/todo", FixScope::Files),
     )
 }
 
@@ -251,6 +252,8 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
             needs: Needs::Nothing,
         },
     );
+
+    let plan = plan.with_scope("nested/todo", FixScope::Files);
 
     let report = engine.fix(&plan, &FixRun::default()).unwrap();
 

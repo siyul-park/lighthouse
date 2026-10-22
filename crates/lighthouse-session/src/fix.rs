@@ -523,13 +523,13 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
 }
 
 /// Who made a fix, in the words of the descriptor: `model`, else what the
-/// decision's fix is (`ops`, `command`, `rpc`), and `ops` for a fixer the run
+/// decision's fix is (`cel`, `command`, `rpc`), and `cel` for a fixer the run
 /// named itself.
 fn by(plan: &FixPlan, rule: &str, fixer: &FixedBy) -> String {
     let word = match plan.get(rule) {
         Some(binding) if binding.fixer == *fixer => fix_by(&binding.needs),
         _ if *fixer == FixedBy::Model => FixBy::Model,
-        _ => FixBy::Ops,
+        _ => FixBy::Cel,
     };
     word.as_str().to_owned()
 }

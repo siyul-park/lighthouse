@@ -526,10 +526,9 @@ impl CelCheck {
             if !valid {
                 return Some(format!("check variables: `{name}` is not a usable name"));
             }
-            if let Some(problem) = compile_problem(
-                &format!("check variable `{name}`"),
-                &variable.expression,
-            ) {
+            if let Some(problem) =
+                compile_problem(&format!("check variable `{name}`"), &variable.expression)
+            {
                 return Some(problem);
             }
         }

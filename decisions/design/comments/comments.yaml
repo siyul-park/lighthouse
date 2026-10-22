@@ -169,12 +169,8 @@ spec:
       snippet: comment.text
   fix:
     safety: unsafe
-    type: ops
-    ops:
-      - op: delete
-        when: finding.evidence.kind in ['banner', 'code']
-        file: finding.file
-        span: finding.span
+    type: cel
+    edits: "finding.evidence.kind in ['banner', 'code'] ? [remove(finding.span)] : []"
   provenance:
     wasDerivedFrom:
     - Martin, Clean Code (2008), C1 Inappropriate Information

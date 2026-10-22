@@ -760,13 +760,10 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Generic operations over the code model, evaluated with CEL.",
+          "description": "One CEL expression that returns a list of edits, built with `remove`,\n`add`, `replace`, `move`, `rename` and `reorder`. It sees `finding`,\n`node` (the finding's symbol), `file`, `options` and the check's\n`variables`. An empty list proposes no edit.",
           "properties": {
-            "ops": {
-              "items": {
-                "$ref": "#/$defs/OpSpec"
-              },
-              "type": "array"
+            "edits": {
+              "type": "string"
             },
             "priority": {
               "description": "Which fix wins when several of one round overlap: higher first.\nTies go by the order of the findings. Default: `0`. A fix that only\nrestates what others decided, such as a formatter's, is negative, so\nthat fixes of content win and formatting follows them.",
@@ -784,14 +781,25 @@
               "$ref": "#/$defs/Safety",
               "description": "Caps what the fixer may claim: a `safe` proposal under an `unsafe`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
+            "scope": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FixScope"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "How far the edits may go; see [`FixScope`]. Default: `references`."
+            },
             "type": {
-              "const": "ops",
+              "const": "cel",
               "type": "string"
             }
           },
           "required": [
             "type",
-            "ops",
+            "edits",
             "safety"
           ],
           "type": "object"
@@ -937,7 +945,7 @@
       "type": "object"
     },
     "FixScope": {
-      "description": "How far the change of a fix may go, which the verifier checks. Ordered\nfrom the narrowest.",
+      "description": "How far the change of a fix may go, which the verifier checks. Ordered\nfrom the narrowest. One model for every type of fix: a fix by CEL, by a\ncommand and by a model are held to it the same way.",
       "oneOf": [
         {
           "const": "symbol",
@@ -950,8 +958,13 @@
           "type": "string"
         },
         {
+          "const": "references",
+          "description": "The file of the finding and the files it reaches: a file may change\nwhen it holds a reference site (a call, a use, an import) of a symbol\nchanged in a file that may change, transitively. A signature changes\nwith its callers, and a caller whose own signature changes, with its\ncallers. What a fix by CEL or by a model has when it declares no scope.",
+          "type": "string"
+        },
+        {
           "const": "files",
-          "description": "Any file the analysis indexes in the run's scope. No limit of its own:\nwhat a fix by a model that declares no scope has.",
+          "description": "Any file the analysis indexes in the run's scope, for a change that\nis not about references, such as the consistency of a doc and a spec.",
           "type": "string"
         }
       ]
@@ -1034,171 +1047,6 @@
         "id"
       ],
       "type": "object"
-    },
-    "OpSpec": {
-      "description": "One operation of an `ops` fix. Every parameter but `scope` and `by` is a\nCEL expression over the finding (`finding`, `symbol`, `options`) or, for\n`text` and `name`, a template with `{{ cel }}` holes. A `when` expression\nthat is false skips the operation.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "after": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "before": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "node": {
-              "type": "string"
-            },
-            "op": {
-              "const": "move",
-              "type": "string"
-            },
-            "when": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "op",
-            "node"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "by": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "op": {
-              "const": "reorder",
-              "type": "string"
-            },
-            "scope": {
-              "$ref": "#/$defs/OrderScope"
-            },
-            "when": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "op",
-            "scope",
-            "by"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "file": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "node": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "op": {
-              "const": "delete",
-              "type": "string"
-            },
-            "span": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "when": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "op"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "op": {
-              "const": "rename",
-              "type": "string"
-            },
-            "symbol": {
-              "type": "string"
-            },
-            "when": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "op",
-            "symbol",
-            "name"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "file": {
-              "type": "string"
-            },
-            "op": {
-              "const": "replace",
-              "type": "string"
-            },
-            "span": {
-              "type": "string"
-            },
-            "text": {
-              "type": "string"
-            },
-            "when": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "op",
-            "file",
-            "span",
-            "text"
-          ],
-          "type": "object"
-        }
-      ]
     },
     "OptionSchema": {
       "additionalProperties": true,

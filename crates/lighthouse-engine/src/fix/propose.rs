@@ -12,15 +12,17 @@ use lighthouse_model::{
 };
 use lighthouse_plugin::{FixDecision, FixRequest, Fixer};
 use lighthouse_protocol::hash;
+use lighthouse_spec::FixScope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{
     DeclinedFix, FixBinding, FixPlan, FixRun, FixedBy,
-    edits::{TextEdit, self_overlap},
+    edits::{TextEdit, apply, self_overlap},
     kept::NOT_KEPT,
     lower::{Lowerer, Sources},
-    model::{Event, ModelFixer},
+    model::{Event, ModelFixer, choose_extent},
+    rewrite::{Bounds, Change, Changes, World, accept},
 };
 use crate::{Engine, Error, Needs, Overlays, Run, cache::Cache, engine::Scopes};
 
@@ -214,7 +216,7 @@ impl<'e> Proposer<'e> {
                 Some(command) => self
                     .propose_command(outcome, finding, (&binding, command), (&sources, texts))
                     .map_err(|(_, reason)| reason),
-                None => self.propose_one(outcome, finding, &binding, &lowerer, &sources),
+                None => self.propose_one(outcome, finding, &binding, (&lowerer, &sources, texts)),
             };
             match made {
                 Ok(proposal) => proposals.push(proposal),
@@ -306,8 +308,7 @@ impl<'e> Proposer<'e> {
         outcome: &Run,
         finding: &Diagnostic,
         binding: &FixBinding,
-        lowerer: &Lowerer,
-        sources: &Sources,
+        (lowerer, sources, texts): (&Lowerer, &Sources, &Overlays),
     ) -> Result<Proposal, String> {
         let engine = self.engine;
         let FixedBy::Fixer(id) = &binding.fixer else {
@@ -371,6 +372,8 @@ impl<'e> Proposer<'e> {
                     return Err(NOT_KEPT.to_owned());
                 }
                 let (edits, bases) = lowered(&ops, lowerer, sources)?;
+                let scope = self.plan.scope(&finding.rule_id);
+                self.within(scope, outcome, finding, &edits, (sources, texts))?;
                 Ok(Proposal {
                     fingerprint: finding.fingerprint.clone(),
                     rule_id: finding.rule_id.clone(),
@@ -389,6 +392,48 @@ impl<'e> Proposer<'e> {
                 })
             }
         }
+    }
+}
+
+impl Proposer<'_> {
+    /// Whether the edits of a fix stay within its scope, else why they do not:
+    /// the same check as for the files a command or an agent changed.
+    fn within(
+        &self,
+        scope: FixScope,
+        outcome: &Run,
+        finding: &Diagnostic,
+        edits: &[TextEdit],
+        (sources, texts): (&Sources, &Overlays),
+    ) -> Result<(), String> {
+        if scope == FixScope::Files {
+            return Ok(());
+        }
+        let mut changes = Changes::new();
+        for file in edits.iter().map(|e| &e.file).collect::<BTreeSet<_>>() {
+            let old = sources.text(file)?;
+            let of_file: Vec<&TextEdit> = edits.iter().filter(|e| &e.file == file).collect();
+            changes.insert(file.clone(), Change::Text(apply(&old, &of_file)?));
+        }
+        let extents = if scope == FixScope::Symbol {
+            vec![choose_extent(
+                &outcome.project,
+                finding,
+                sources.text(&finding.file)?.as_str(),
+            )?]
+        } else {
+            Vec::new()
+        };
+        let bounds = Bounds {
+            who: "the fix",
+            scope,
+            file: &finding.file,
+            extents: &extents,
+        };
+        let world = World::new(&self.engine.ws.root, outcome, texts);
+        accept(changes, &bounds, &world)
+            .map(|_| ())
+            .map_err(|(_, why)| why)
     }
 }
 

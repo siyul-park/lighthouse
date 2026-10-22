@@ -104,7 +104,7 @@ fn modules_and_files_are_selected_too() {
 
     let files = local(
         "symbol",
-        "select: file\nwhere: 'file.symbols > 1 && !file.test'\nmessage: '{{ file.path }}'",
+        "select: file\nwhere: 'size(file.symbols) > 1 && !file.test'\nmessage: '{{ file.path }}'",
     )
     .unwrap();
     assert_eq!(found(&files, &w), [("big/a.ucm".to_owned(), 1)]);

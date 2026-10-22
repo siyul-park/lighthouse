@@ -1,7 +1,40 @@
 //! The CEL expressions and `{{ cel }}` templates a decision's check and fix
 //! carry: split once, and described when they do not hold.
 
+use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr};
+
 use crate::environment::compile;
+
+fn entries(entries: &[IdedEntryExpr]) -> Vec<&IdedExpr> {
+    entries
+        .iter()
+        .flat_map(|entry| match &entry.expr {
+            EntryExpr::StructField(field) => vec![&field.value],
+            EntryExpr::MapEntry(entry) => vec![&entry.key, &entry.value],
+        })
+        .collect()
+}
+
+/// The expressions directly inside `expr`: the operands of a call or a
+/// selection, the parts of a comprehension, the elements and the entries of a
+/// literal.
+pub fn children(expr: &IdedExpr) -> Vec<&IdedExpr> {
+    match &expr.expr {
+        Expr::Select(select) => vec![&select.operand],
+        Expr::Call(call) => call.target.iter().map(|t| &**t).chain(&call.args).collect(),
+        Expr::Comprehension(c) => vec![
+            &c.iter_range,
+            &c.accu_init,
+            &c.loop_cond,
+            &c.loop_step,
+            &c.result,
+        ],
+        Expr::List(list) => list.elements.iter().collect(),
+        Expr::Map(map) => entries(&map.entries),
+        Expr::Struct(structure) => entries(&structure.entries),
+        Expr::Ident(_) | Expr::Literal(_) | Expr::Unspecified => Vec::new(),
+    }
+}
 
 /// One part of a `{{ cel }}` template: literal text, or the source of a hole.
 #[derive(Debug, Clone, PartialEq, Eq)]

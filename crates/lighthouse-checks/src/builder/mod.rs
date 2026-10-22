@@ -63,6 +63,7 @@ pub(crate) struct Builder<'a> {
     ws: &'a Workspace,
     needs: &'a Needs,
     rule: &'a str,
+    options: &'a Map<String, Value>,
     language: String,
     naming: Option<Tests<'a>>,
     measures: Option<BTreeMap<SymbolId, Measures>>,
@@ -90,6 +91,7 @@ impl<'a> Builder<'a> {
             ws: ctx.workspace,
             needs,
             rule,
+            options,
             language: ctx
                 .file
                 .map_or_else(String::new, |(file, _)| file.lang.clone()),
@@ -102,6 +104,34 @@ impl<'a> Builder<'a> {
             first_test: OnceCell::new(),
             declared: RefCell::default(),
         })
+    }
+
+    /// A builder outside a run of checks, for a fix: it has no analyzer facts
+    /// (`metrics` reads as not measured) and shares no cache with other rules.
+    pub(crate) fn standalone(
+        project: &'a Project,
+        ws: &'a Workspace,
+        needs: &'a Needs,
+        options: &'a Map<String, Value>,
+        rule: &'a str,
+        language: &str,
+    ) -> Self {
+        Self {
+            project,
+            ws,
+            needs,
+            rule,
+            options,
+            language: language.to_owned(),
+            naming: Naming::from_options(options)
+                .map(|naming| Tests::new(naming, project, Arc::default())),
+            measures: None,
+            table: Arc::default(),
+            indexes: Arc::default(),
+            allow_suffixes: strings(options.get("allowSuffixes")),
+            first_test: OnceCell::new(),
+            declared: RefCell::default(),
+        }
     }
 
     pub(crate) fn project(&self) -> &'a Project {
@@ -133,6 +163,7 @@ impl<'a> Builder<'a> {
             "before": before,
             "generated": self.project.file(&comment.file).is_none_or(|f| f.generated),
             "attached": comment.attached_to.is_some(),
+            "span": span(&comment.file, comment.span),
         })
     }
 
@@ -219,6 +250,20 @@ impl<'a> Builder<'a> {
         // Whether a file is generated is what the merged model says, not what
         // the run read from disk.
         value["generated"] = json!(self.project.file(&file.path).is_none_or(|f| f.generated));
+        if self.needs.field("symbols") {
+            let mut symbols: Vec<&Symbol> = self.project.symbols_in(&file.path).collect();
+            symbols.sort_by_key(|s| (s.span.start, &s.id));
+            value["symbols"] = Value::Array(symbols.into_iter().map(|s| self.related(s)).collect());
+        }
+        if self.needs.field("comments") {
+            value["comments"] = Value::Array(
+                self.project
+                    .comments_in(&file.path)
+                    .iter()
+                    .map(|comment| self.comment(comment, text))
+                    .collect(),
+            );
+        }
         if self.needs.field("line_widths") {
             value["line_widths"] = widths::line_widths(text);
         }
@@ -511,7 +556,6 @@ impl<'a> Builder<'a> {
     /// The index of the declaration group the symbol is in under the default
     /// order of `design/declaration-groups`, -1 when the order does not place it.
     fn group(&self, symbol: &Symbol) -> i64 {
-        let empty = Map::new();
         let language = self
             .project
             .file(&symbol.file)
@@ -520,7 +564,7 @@ impl<'a> Builder<'a> {
             project: self.project,
             language,
             rule: self.rule,
-            options: &empty,
+            options: self.options,
             constructors: self.ws.constructor_prefixes(language),
         };
         order::GroupKey

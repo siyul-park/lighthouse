@@ -1,9 +1,7 @@
 //! The `fix:` block of a decision: what a catalog accepts and what it refuses.
 
 use lighthouse_model::{Safety, Severity, ucm::Capability};
-use lighthouse_spec::{
-    Catalog, CommandSpec, DecisionSpec, Fix, FixKind, FixScope, OpSpec, OrderScope, Point,
-};
+use lighthouse_spec::{Catalog, CommandSpec, DecisionSpec, Fix, FixKind, FixScope, Point};
 use lighthouse_test_support::catalog::*;
 
 fn rejected(files: Files, needle: &str) {
@@ -33,30 +31,17 @@ fn fixable(fix: &str) -> Files {
 
 const MOVE: &str = "  fix:
     safety: safe
-    requires: [extent, complete-references]
-    type: ops
-    ops:
-      - op: move
-        node: finding.evidence.callee
-        after: finding.evidence.caller
-      - op: reorder
-        scope: owner
-        by: [design/group]
-        when: finding.symbol != ''
-      - op: delete
-        file: finding.file
-        span: finding.span
-      - op: rename
-        symbol: finding.symbol
-        name: '{{ symbol.name }}Value'
-      - op: replace
-        file: finding.file
-        span: finding.span
-        text: '// {{ finding.decision }}'
+    requires: [complete-references]
+    type: cel
+    edits: >-
+      [move(finding.evidence.callee, after(finding.evidence.caller)),
+       reorder(file.symbols), remove(finding.span),
+       rename(finding.symbol, symbol.name + 'Value'),
+       replace(finding.span, '// ' + finding.decision)]
 ";
 
 #[test]
-fn a_fix_of_every_operation_loads_and_is_readable() {
+fn a_cel_fix_loads_and_its_requirements_follow_from_its_constructors() {
     let catalog = Catalog::from_files(fixable(MOVE)).unwrap();
 
     let fix: &Fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
@@ -64,29 +49,61 @@ fn a_fix_of_every_operation_loads_and_is_readable() {
     assert_eq!(fix.safety, Safety::Safe);
     assert_eq!(
         fix.requires,
-        [Capability::Extent, Capability::CompleteReferences]
+        [Capability::CompleteReferences, Capability::Extent]
     );
-    let FixKind::Ops { ops } = &fix.kind else {
-        panic!("ops expected");
-    };
-    let names: Vec<_> = ops.iter().map(OpSpec::name).collect();
-    assert_eq!(names, ["move", "reorder", "delete", "rename", "replace"]);
+    assert!(matches!(&fix.kind, FixKind::Cel { edits, .. } if edits.contains("move(")));
+}
+
+#[test]
+fn a_cel_fix_may_declare_how_far_its_edits_go() {
+    let fix = "  fix:\n    safety: unsafe\n    type: cel\n    edits: '[remove(finding.span)]'\n    scope: files\n";
+    let catalog = Catalog::from_files(fixable(fix)).unwrap();
+
+    let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
+
     assert!(matches!(
-        &ops[1],
-        OpSpec::Reorder { scope: OrderScope::Owner, by, .. } if by == &["design/group"]
+        &fix.kind,
+        FixKind::Cel {
+            scope: Some(FixScope::Files),
+            ..
+        }
     ));
 }
 
 #[test]
+fn a_removal_of_a_span_needs_no_extent() {
+    let fix = "  fix:\n    safety: unsafe\n    type: cel\n    edits: '[remove(finding.span)]'\n";
+    let catalog = Catalog::from_files(fixable(fix)).unwrap();
+
+    let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
+
+    assert!(fix.requires.is_empty());
+}
+
+#[test]
+fn removing_or_replacing_a_declaration_needs_its_extent() {
+    for edits in ["[remove(finding.symbol)]", "[replace(node, 'x')]"] {
+        let fix = format!("  fix:\n    safety: unsafe\n    type: cel\n    edits: \"{edits}\"\n");
+        let catalog = Catalog::from_files(fixable(&fix)).unwrap();
+
+        let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
+
+        assert_eq!(fix.requires, [Capability::Extent], "{edits}");
+    }
+}
+
+#[test]
 fn a_fix_names_its_type_and_the_type_decides_its_fields() {
-    let untyped = "  fix:\n    safety: unsafe\n    ops: [{ op: delete, node: x }]\n";
+    let untyped = "  fix:\n    safety: unsafe\n    edits: '[]'\n";
     rejected(fixable(untyped), "type");
-    let none = "  fix:\n    safety: unsafe\n    type: ops\n";
-    rejected(fixable(none), "ops");
-    let stray = "  fix:\n    safety: unsafe\n    type: ops\n    ops: [{ op: delete, node: x }]\n    argv: [x]\n";
+    let none = "  fix:\n    safety: unsafe\n    type: cel\n";
+    rejected(fixable(none), "edits");
+    let stray = "  fix:\n    safety: unsafe\n    type: cel\n    edits: '[]'\n    argv: [x]\n";
     rejected(fixable(stray), "argv");
     let unknown = "  fix:\n    safety: unsafe\n    type: wasm\n";
     rejected(fixable(unknown), "wasm");
+    let ops = "  fix:\n    safety: unsafe\n    type: ops\n    ops: []\n";
+    rejected(fixable(ops), "ops");
 }
 
 #[test]
@@ -100,67 +117,15 @@ fn the_rpc_type_is_kept_without_failing_the_pack() {
 }
 
 #[test]
-fn an_unknown_operation_or_parameter_is_refused() {
-    let op = "  fix:\n    safety: unsafe\n    type: ops\n    ops: [{ op: shuffle }]\n";
-    rejected(fixable(op), "shuffle");
-    let param = "  fix:\n    safety: unsafe\n    type: ops\n    ops: [{ op: delete, node: x, colour: red }]\n";
-    rejected(fixable(param), "colour");
-}
-
-fn ops(list: &str) -> String {
-    format!("  fix:\n    safety: unsafe\n    type: ops\n    ops: {list}\n")
-}
-
-#[test]
-fn operation_parameters_are_checked() {
-    rejected(
-        fixable(&ops("[{ op: move, node: x, before: y, after: z }]")),
-        "exactly one of `before` or `after`",
-    );
-    rejected(
-        fixable(&ops("[{ op: move, node: x }]")),
-        "exactly one of `before` or `after`",
-    );
-    rejected(
-        fixable(&ops("[{ op: delete, file: x }]")),
-        "delete needs `node`, or `file` and `span`",
-    );
-    rejected(
-        fixable(&ops("[{ op: reorder, scope: file, by: [group] }]")),
-        "qualified `plugin/name`",
-    );
-    rejected(
-        fixable(&ops("[{ op: reorder, scope: world, by: [a/b] }]")),
-        "world",
-    );
-}
-
-#[test]
-fn expressions_must_compile() {
-    rejected(
-        fixable(&ops("[{ op: delete, node: 'finding..x(' }]")),
-        "delete `node`",
-    );
-    rejected(
-        fixable(&ops("[{ op: delete, node: x, when: '1 +' }]")),
-        "`when`",
-    );
-    rejected(
-        fixable(&ops(
-            "[{ op: replace, file: x, span: y, text: '{{ 1 + }}' }]",
-        )),
-        "replace `text`",
-    );
-    rejected(
-        fixable(&ops("[{ op: replace, file: x, span: y, text: '{{ x' }]")),
-        "never closed",
-    );
+fn edits_must_compile() {
+    let broken = "  fix:\n    safety: unsafe\n    type: cel\n    edits: 'remove(finding..x('\n";
+    rejected(fixable(broken), "fix edits");
 }
 
 #[test]
 fn safe_is_reserved_for_error_decisions() {
     let heuristic =
-        fixable("  fix:\n    safety: safe\n    type: ops\n    ops: [{ op: delete, node: x }]\n")
+        fixable("  fix:\n    safety: safe\n    type: cel\n    edits: '[remove(finding.span)]'\n")
             .into_iter()
             .map(|(k, v)| (k, v.replace("severity: error", "severity: warn")))
             .collect();
@@ -169,7 +134,7 @@ fn safe_is_reserved_for_error_decisions() {
 
 #[test]
 fn a_fix_belongs_to_a_checked_decision_with_a_fixed_example() {
-    let fix = "  fix:\n    safety: safe\n    type: ops\n    ops: [{ op: delete, node: x }]\n";
+    let fix = "  fix:\n    safety: safe\n    type: cel\n    edits: '[remove(finding.span)]'\n";
     rejected(
         decision_with(&format!("{fix}{EXAMPLES}")),
         "no findings to fix",
@@ -183,7 +148,7 @@ fn a_fix_belongs_to_a_checked_decision_with_a_fixed_example() {
 
 #[test]
 fn fixed_examples_must_name_files_of_an_invalid_example() {
-    let fix = "  fix:\n    safety: safe\n    type: ops\n    ops: [{ op: delete, node: x }]\n";
+    let fix = "  fix:\n    safety: safe\n    type: cel\n    edits: '[remove(finding.span)]'\n";
     let elsewhere = EXAMPLES.replace("fixed: [{ path: a.go,", "fixed: [{ path: b.go,");
     rejected(
         decision_with(&format!("{CHECKED}{fix}{elsewhere}")),
@@ -315,20 +280,6 @@ fn a_fix_is_part_of_the_decision_version_but_not_of_what_it_means() {
 }
 
 #[test]
-fn an_operations_guard_is_readable() {
-    let guarded = ops(
-        "\n      - { op: delete, node: finding.symbol, when: \"finding.evidence.role == 'x'\" }\n      - { op: delete, node: finding.symbol }",
-    );
-    let catalog = Catalog::from_files(fixable(&guarded)).unwrap();
-    let FixKind::Ops { ops } = &catalog.decision("p/a").unwrap().fix.as_ref().unwrap().kind else {
-        panic!("ops expected");
-    };
-
-    assert_eq!(ops[0].when(), Some("finding.evidence.role == 'x'"));
-    assert_eq!(ops[1].when(), None);
-}
-
-#[test]
 fn the_effective_safety_of_a_fix_is_decided_in_one_place() {
     let load = |fix: &str| {
         Catalog::from_files(fixable(fix))
@@ -392,7 +343,7 @@ fn the_safety_a_project_gives_a_rule_replaces_every_other_in_the_last_place() {
 }
 
 #[test]
-fn the_bundled_decisions_a_model_may_fix_declare_how_far_it_may_go() {
+fn the_bundled_decisions_a_model_may_fix_declare_how_far_it_may_go_or_take_references() {
     let bundled = Catalog::bundled();
     let scope_of = |id: &str| match &bundled.decision(id).unwrap().fix.as_ref().unwrap().kind {
         FixKind::Model { scope, .. } => *scope,
@@ -407,6 +358,6 @@ fn the_bundled_decisions_a_model_may_fix_declare_how_far_it_may_go() {
         "design/prefer-method",
         "design/naming",
     ] {
-        assert_eq!(scope_of(id), Some(FixScope::Files), "{id}");
+        assert_eq!(scope_of(id), None, "{id}: the default, `references`");
     }
 }

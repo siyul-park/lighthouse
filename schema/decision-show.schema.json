@@ -41,7 +41,7 @@
         "by": {
           "description": "What makes the fix of a decision.",
           "enum": [
-            "ops",
+            "cel",
             "command",
             "model",
             "rpc"

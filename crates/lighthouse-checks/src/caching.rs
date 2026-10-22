@@ -30,6 +30,8 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("constructor_named", Reach::Local),
     ("built", Reach::Local),
     ("role", Reach::Local),
+    ("symbols", Reach::Local),
+    ("comments", Reach::Local),
     ("params", Reach::Local),
     ("results", Reach::Local),
     ("type", Reach::Local),

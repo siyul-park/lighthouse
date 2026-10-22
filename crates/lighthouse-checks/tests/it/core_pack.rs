@@ -180,8 +180,7 @@ fn registered_rules_are_exactly_the_automated_catalog_decisions() {
 
 #[test]
 fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
-    use lighthouse_model::ucm::Capability;
-    use lighthouse_spec::{FixKind, OpSpec};
+    use lighthouse_spec::FixKind;
 
     let registry = lighthouse_checks::registry();
     let catalog = lighthouse_spec::Catalog::bundled();
@@ -189,7 +188,7 @@ fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
     for decision in catalog.decisions() {
         let Some(fix) = &decision.fix else { continue };
         // A command fix is run by the fix run itself, which registers no fixer.
-        if !matches!(fix.kind, FixKind::Ops { .. }) {
+        if !matches!(fix.kind, FixKind::Cel { .. }) {
             continue;
         }
         let id = &decision.id().to_owned();
@@ -200,32 +199,6 @@ fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
             .unwrap_or_else(|| panic!("{id} has a fix but no registered fixer"));
         assert_eq!(&fixer.manifest().id, id);
         assert_eq!(fixer.manifest().requires, fix.requires, "{id}");
-        let FixKind::Ops { ops } = &fix.kind else {
-            continue;
-        };
-        for op in ops {
-            match op {
-                OpSpec::Reorder { by, .. } => {
-                    for key in by {
-                        assert!(
-                            registry.order_keys().any(|k| k.manifest().id == *key),
-                            "{id} orders by unregistered key {key}"
-                        );
-                    }
-                    assert!(fix.requires.contains(&Capability::Extent), "{id}");
-                }
-                OpSpec::Move { .. } => {
-                    assert!(fix.requires.contains(&Capability::Extent), "{id}");
-                }
-                OpSpec::Rename { .. } => {
-                    assert!(fix.requires.contains(&Capability::ReferenceSites), "{id}");
-                }
-                OpSpec::Delete { node: Some(_), .. } => {
-                    assert!(fix.requires.contains(&Capability::Extent), "{id}");
-                }
-                OpSpec::Delete { .. } | OpSpec::Replace { .. } => {}
-            }
-        }
     }
     let registered: std::collections::BTreeSet<_> =
         registry.fixers().map(|f| f.manifest().id.clone()).collect();

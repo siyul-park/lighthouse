@@ -616,6 +616,27 @@ fn fix_scope_of_fix_is_the_projects_cap_unless_the_decision_declares_a_narrower_
     );
     assert_eq!(
         FixScope::of_fix(Some(&model(None)), FixScope::Files),
+        FixScope::References
+    );
+    assert_eq!(
+        FixScope::of_fix(Some(&model(None)), FixScope::File),
+        FixScope::File
+    );
+    let cel = |scope| Fix {
+        safety: Safety::Unsafe,
+        requires: Vec::new(),
+        priority: 0,
+        kind: FixKind::Cel {
+            edits: "[]".to_owned(),
+            scope,
+        },
+    };
+    assert_eq!(
+        FixScope::of_fix(Some(&cel(None)), FixScope::Files),
+        FixScope::References
+    );
+    assert_eq!(
+        FixScope::of_fix(Some(&cel(Some(FixScope::Files))), FixScope::Files),
         FixScope::Files
     );
     assert_eq!(

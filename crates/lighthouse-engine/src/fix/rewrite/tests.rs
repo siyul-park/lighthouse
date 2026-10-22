@@ -7,12 +7,18 @@ use std::{
     process::Command,
 };
 
-use lighthouse_model::{Position, Span};
+use lighthouse_model::{
+    Position, Span,
+    ucm::{
+        Edge, EdgeKind, File, Fragment, Node, Project, Resolution, Symbol, SymbolId, SymbolKind,
+        Target, Visibility,
+    },
+};
 use lighthouse_process::Policy;
-use lighthouse_spec::Program;
+use lighthouse_spec::{FixScope, Program};
 
-use super::{Change, Scratch, run_verify, scope::first_outside};
-use crate::Overlays;
+use super::{Bounds, Change, Changes, Scratch, World, accept, run_verify, scope::first_outside};
+use crate::{Overlays, Run};
 
 fn span(from: (u32, u32), to: (u32, u32)) -> Span {
     Span {
@@ -258,4 +264,140 @@ fn a_secret_a_verify_program_prints_is_not_in_the_note_of_its_failure() {
         "{failed}"
     );
     assert!(!failed.contains("sk-in-a-note"), "{failed}");
+}
+
+// The scope `references`, over a project of five files: `f` in a.go, called by
+// `g` in b.go and `h` in c.go; `g` called by `k` in e.go; `x` in d.go refers
+// to nothing.
+
+fn declared(name: &str, file: &str) -> Symbol {
+    let span = span((1, 1), (1, 40));
+    Symbol {
+        id: SymbolId::new("m", &[], name, SymbolKind::Function),
+        kind: SymbolKind::Function,
+        visibility: Visibility::Public,
+        owner: None,
+        file: file.into(),
+        span,
+        extent: Some(span),
+        doc: None,
+        name: name.to_owned(),
+        role: None,
+        optional: false,
+        type_ref: None,
+    }
+}
+
+fn call(from: &Symbol, to: &Symbol) -> Edge {
+    Edge {
+        kind: EdgeKind::Calls,
+        from: Node::Symbol(from.id.clone()),
+        to: Target::Resolved(Node::Symbol(to.id.clone())),
+        resolution: Resolution::Semantic,
+        site: Some(span((1, 20), (1, 30))),
+    }
+}
+
+fn world_run() -> Run {
+    let files = ["a.go", "b.go", "c.go", "d.go", "e.go"];
+    let [f, g, h, x, k] = files.map(|file| declared(&file.replace(".go", ""), file));
+    let edges = vec![call(&g, &f), call(&h, &f), call(&k, &g)];
+    Run {
+        project: Project::merge([Fragment {
+            files: files
+                .iter()
+                .map(|path| File {
+                    path: (*path).into(),
+                    lang: "go".to_owned(),
+                    hash: String::new(),
+                    generated: false,
+                    test: false,
+                })
+                .collect(),
+            symbols: vec![f, g, h, x, k],
+            edges,
+            ..Fragment::default()
+        }]),
+        ..Run::default()
+    }
+}
+
+const BEFORE: [(&str, &str); 5] = [
+    ("a.go", "func a(n int) {}\n"),
+    ("b.go", "func b(n int) { a(n) }\n"),
+    ("c.go", "func c(n int) { a(n) }\n"),
+    ("d.go", "func d(n int) {}\n"),
+    ("e.go", "func e(n int) { b(n) }\n"),
+];
+
+/// Whether the scope accepts the files in `changed`, each rewritten.
+fn accepted(scope: FixScope, changed: &[&str]) -> Result<(), String> {
+    let run = world_run();
+    let texts: Overlays = BEFORE
+        .iter()
+        .map(|(path, text)| (PathBuf::from(path), (*text).to_owned()))
+        .collect();
+    let changes: Changes = changed
+        .iter()
+        .map(|path| {
+            let old = &texts[Path::new(path)];
+            (
+                PathBuf::from(path),
+                Change::Text(old.replace("n int", "n, m int")),
+            )
+        })
+        .collect();
+    let bounds = Bounds {
+        who: "the agent",
+        scope,
+        file: Path::new("a.go"),
+        extents: &[],
+    };
+    accept(changes, &bounds, &World::new(Path::new("."), &run, &texts))
+        .map(|_| ())
+        .map_err(|(_, why)| why)
+}
+
+#[test]
+fn a_signature_changes_with_its_callers_in_other_files_under_references() {
+    assert_eq!(
+        accepted(FixScope::References, &["a.go", "b.go", "c.go"]),
+        Ok(())
+    );
+}
+
+#[test]
+fn a_caller_whose_own_signature_changes_brings_its_callers_in_transitively() {
+    assert_eq!(
+        accepted(FixScope::References, &["a.go", "b.go", "e.go"]),
+        Ok(())
+    );
+}
+
+#[test]
+fn a_caller_of_what_was_not_changed_is_out_of_reach() {
+    let why = accepted(FixScope::References, &["a.go", "e.go"]).unwrap_err();
+
+    assert!(
+        why.contains("`e.go`") && why.contains("references"),
+        "{why}"
+    );
+}
+
+#[test]
+fn a_file_that_refers_to_nothing_changed_is_out_of_reach_unless_the_scope_is_files() {
+    let why = accepted(FixScope::References, &["a.go", "d.go"]).unwrap_err();
+
+    assert!(why.contains("`d.go`"), "{why}");
+    assert_eq!(accepted(FixScope::Files, &["a.go", "d.go"]), Ok(()));
+}
+
+#[test]
+fn the_scope_file_declines_an_edit_of_a_caller() {
+    let why = accepted(FixScope::File, &["a.go", "b.go"]).unwrap_err();
+
+    assert!(
+        why.contains("`b.go`") && why.contains("scope `file`"),
+        "{why}"
+    );
 }

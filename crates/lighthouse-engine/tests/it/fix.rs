@@ -454,3 +454,72 @@ fn model_fixes_are_given_only_to_the_listed_rules_that_have_a_check_and_no_fix_o
         "a rule nobody listed has no model fix"
     );
 }
+
+#[test]
+fn a_fix_changes_a_declaration_and_its_callers_in_other_files_by_default() {
+    let dir = callers();
+    let engine = engine(&dir, "");
+
+    let report = engine
+        .fix(&plan("fake/callers", Safety::Safe), &FixRun::default())
+        .unwrap();
+
+    assert!(report.declined.is_empty(), "{:?}", report.declined);
+    assert_eq!(read(&dir, "a.toy"), "fn a 2\nDONE here\n");
+    assert_eq!(read(&dir, "b.toy"), "fn b\ncall a 2\n");
+    assert_eq!(read(&dir, "c.toy"), "fn c\ncall a 2\n");
+}
+
+#[test]
+fn a_caller_whose_own_declaration_changes_brings_its_callers_in() {
+    let dir = callers();
+    let engine = engine(&dir, "");
+
+    let report = engine
+        .fix(&plan("fake/transitive", Safety::Safe), &FixRun::default())
+        .unwrap();
+
+    assert!(report.declined.is_empty(), "{:?}", report.declined);
+    assert_eq!(read(&dir, "b.toy"), "fn b 2\ncall a\n");
+    assert_eq!(read(&dir, "e.toy"), "fn e\ncall b 2\n");
+}
+
+#[test]
+fn a_file_that_refers_to_nothing_changed_is_declined_unless_the_scope_is_files() {
+    let dir = callers();
+    let engine = engine(&dir, "");
+
+    let declined = engine
+        .fix(&plan("fake/unrelated", Safety::Safe), &FixRun::default())
+        .unwrap();
+
+    assert!(
+        declined.declined[0].reason.contains("`d.toy`"),
+        "{:?}",
+        declined.declined
+    );
+    assert_eq!(read(&dir, "d.toy"), "fn d\n");
+    assert_eq!(read(&dir, "a.toy"), "fn a\nTODO here\n");
+
+    let wide = plan("fake/unrelated", Safety::Safe).with_scope("fake/todo", FixScope::Files);
+    let applied = engine.fix(&wide, &FixRun::default()).unwrap();
+
+    assert!(applied.declined.is_empty(), "{:?}", applied.declined);
+    assert_eq!(read(&dir, "d.toy"), "fn d 2\n");
+}
+
+#[test]
+fn the_scope_file_declines_an_edit_of_a_caller() {
+    let dir = callers();
+    let engine = engine(&dir, "");
+    let narrow = plan("fake/callers", Safety::Safe).with_scope("fake/todo", FixScope::File);
+
+    let report = engine.fix(&narrow, &FixRun::default()).unwrap();
+
+    assert!(
+        report.declined[0].reason.contains("scope `file`"),
+        "{:?}",
+        report.declined
+    );
+    assert_eq!(read(&dir, "b.toy"), "fn b\ncall a\n");
+}

@@ -90,6 +90,8 @@ pub struct FixPlan {
     models: BTreeMap<String, ModelFix>,
     /// The rules whose fix is a command the run runs itself.
     commands: BTreeMap<String, CommandFix>,
+    /// How far the edits of the fixes by CEL may go, by rule.
+    scopes: BTreeMap<String, FixScope>,
     /// The priority of the fix of the rules that set one: the higher goes
     /// first when proposals of a round overlap.
     priorities: BTreeMap<String, i32>,
@@ -125,6 +127,12 @@ impl FixPlan {
                 },
             );
             plan.prioritize(decision.id(), fix.priority);
+            if matches!(fix.kind, FixKind::Cel { .. }) {
+                plan.scopes.insert(
+                    decision.id().to_owned(),
+                    FixScope::of_fix(decision.fix.as_ref(), FixScope::Files),
+                );
+            }
             if let FixKind::Command(command) = &fix.kind {
                 plan.commands.insert(
                     decision.id().to_owned(),
@@ -184,6 +192,13 @@ impl FixPlan {
         self
     }
 
+    /// Limits how far the edits of the fix of `rule` may go.
+    #[must_use]
+    pub fn with_scope(mut self, rule: &str, scope: FixScope) -> Self {
+        self.scopes.insert(rule.to_owned(), scope);
+        self
+    }
+
     /// Gives the fixes of the rules of `safety` the safety the project says,
     /// whoever makes them and whatever the decision and the provider claim:
     /// the last word of the effective safety of a fix.
@@ -217,6 +232,12 @@ impl FixPlan {
             .get(rule)
             .copied()
             .unwrap_or_else(|| claimed.max(cap))
+    }
+
+    /// How far the edits of the fix of `rule` may go: what a CEL fix declares
+    /// or `references`, as for any fixer that declares nothing.
+    pub(super) fn scope(&self, rule: &str) -> FixScope {
+        self.scopes.get(rule).copied().unwrap_or_default()
     }
 
     /// The command the run itself runs to fix `rule`, if its fix is one.

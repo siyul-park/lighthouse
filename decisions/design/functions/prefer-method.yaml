@@ -160,7 +160,6 @@ spec:
   fix:
     safety: unsafe
     type: model
-    scope: files
   provenance:
     wasDerivedFrom:
     - Fowler, Refactoring 2nd ed., Feature Envy

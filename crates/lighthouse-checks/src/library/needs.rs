@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use cel::{
     Program,
     common::ast::{
-        EntryExpr, Expr, IdedExpr, LiteralValue,
+        Expr, IdedExpr, LiteralValue,
         operators::{INDEX, OPT_INDEX, OPT_SELECT},
     },
 };
@@ -73,33 +73,9 @@ impl Needs {
                     _ => operands.for_each(|operand| self.walk(operand)),
                 }
             }
-            Expr::Comprehension(comprehension) => {
-                for part in [
-                    &comprehension.iter_range,
-                    &comprehension.accu_init,
-                    &comprehension.loop_cond,
-                    &comprehension.loop_step,
-                    &comprehension.result,
-                ] {
-                    self.walk(part);
-                }
-            }
-            Expr::List(list) => list.elements.iter().for_each(|e| self.walk(e)),
-            Expr::Map(map) => self.entries(&map.entries),
-            Expr::Struct(structure) => self.entries(&structure.entries),
-            Expr::Ident(_) | Expr::Literal(_) | Expr::Unspecified => {}
-        }
-    }
-
-    fn entries(&mut self, entries: &[cel::common::ast::IdedEntryExpr]) {
-        for entry in entries {
-            match &entry.expr {
-                EntryExpr::StructField(field) => self.walk(&field.value),
-                EntryExpr::MapEntry(entry) => {
-                    self.walk(&entry.key);
-                    self.walk(&entry.value);
-                }
-            }
+            _ => lighthouse_spec::children(expr)
+                .into_iter()
+                .for_each(|child| self.walk(child)),
         }
     }
 

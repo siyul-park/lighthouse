@@ -20,8 +20,10 @@ const SYSTEM: &str = "You are fixing findings of design rules in the files of th
 Change only what the findings need, keep behaviour and style, stay within the scope of each \
 finding, and do not run commands that change anything outside this directory.
 Scope `symbol`: change only the symbol the finding is in (the whole file when it is short and no \
-symbol holds it) and touch no other file. Scope `files`: change any file of this directory the \
-fix needs, such as the callers of a signature you change.";
+symbol holds it) and touch no other file. Scope `file`: change only the file of the finding. \
+Scope `references`: change the file of the finding and the files that refer to what you change, such \
+as the callers of a signature you change, and theirs when their own signature changes. Scope \
+`files`: change any file of this directory the fix needs.";
 
 const TOOLS: &str = "The project's tools fix these after you; follow them when placing code:";
 
@@ -30,8 +32,8 @@ must be gone, and nothing new of warning or error severity may appear in the fil
 in the files that use a symbol you change.";
 
 const LOCALIZED: &str = "The code above is what Lighthouse knows this fix needs: the code of the \
-findings, the signatures of what it uses and, for scope `files`, every place that refers to what \
-you may change. Start from it, and open further files only when you cannot finish without them. \
+findings, the signatures of what it uses and, for scopes `references` and `files`, every place that refers to \
+what you may change. Start from it, and open further files only when you cannot finish without them. \
 Open the specific file or symbol you need, not a listing or search of the whole directory.";
 
 const CLOSING: &str =
@@ -75,8 +77,8 @@ pub struct Localized {
     pub uses: Vec<String>,
     /// What the file imports.
     pub imports: Vec<String>,
-    /// The places that refer to the symbols the fix may change (scope
-    /// `files`), each with the symbol that holds it.
+    /// The places that refer to the symbols the fix may change (scopes
+    /// `references` and `files`), each with the symbol that holds it.
     pub sites: Vec<String>,
     /// The files that hold those places, which the fix may change.
     pub files: Vec<String>,

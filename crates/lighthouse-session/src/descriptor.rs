@@ -100,7 +100,7 @@ impl Fixing {
 /// Who makes a fix that needs `needs`.
 pub(crate) fn fix_by(needs: &Needs) -> FixBy {
     match needs {
-        Needs::Nothing => FixBy::Ops,
+        Needs::Nothing => FixBy::Cel,
         Needs::Program | Needs::Bundled => FixBy::Command,
         Needs::Model { .. } => FixBy::Model,
         Needs::Unserved => FixBy::Rpc,

@@ -24,11 +24,8 @@ spec:
     id: core/no-unused-allow
   fix:
     safety: unsafe
-    type: ops
-    ops:
-      - op: delete
-        file: finding.file
-        span: finding.evidence.annotation
+    type: cel
+    edits: "[remove(finding.evidence.annotation)]"
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), G4 Overridden Safeties"

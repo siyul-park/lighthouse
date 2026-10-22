@@ -13,7 +13,7 @@ mod scratch;
 mod tests;
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     sync::OnceLock,
@@ -23,7 +23,7 @@ use lighthouse_model::{Span, ucm::File};
 use lighthouse_protocol::hash;
 use lighthouse_spec::FixScope;
 
-use scope::first_outside;
+use scope::{first_outside, reached};
 pub(in crate::fix) use scratch::{Change, Changes, Scratch, run_verify};
 
 use super::model::Class;
@@ -134,9 +134,19 @@ pub(in crate::fix) fn accept(
     bounds: &Bounds<'_>,
     world: &World<'_>,
 ) -> Result<BTreeMap<PathBuf, String>, (Class, String)> {
+    let reach = (bounds.scope == FixScope::References).then(|| {
+        let texts: BTreeMap<PathBuf, (String, String)> = changes
+            .iter()
+            .filter_map(|(path, change)| match change {
+                Change::Text(new) => Some((path.clone(), (world.text(path)?, new.clone()))),
+                _ => None,
+            })
+            .collect();
+        reached(&world.outcome.project, bounds.file, &texts)
+    });
     if let Some(offence) = changes
         .iter()
-        .find_map(|(path, change)| offence(path, change, bounds, world))
+        .find_map(|(path, change)| offence(path, change, (bounds, reach.as_ref()), world))
     {
         return Err((Class::OutOfScope, offence));
     }
@@ -155,9 +165,15 @@ pub(in crate::fix) fn accept(
 
 /// What is wrong with the program having done `change` to `path`, if
 /// anything: it may change the indexed text files of the project under the
-/// scope `files`, only the file of the findings under the scope `file`, and
-/// under the scope `symbol` only the extents of the findings in their file.
-fn offence(path: &Path, change: &Change, bounds: &Bounds<'_>, world: &World<'_>) -> Option<String> {
+/// scope `files`, those that `reach` holds under `references`, only the file of
+/// the findings under the scope `file`, and under the scope `symbol` only the
+/// extents of the findings in their file.
+fn offence(
+    path: &Path,
+    change: &Change,
+    (bounds, reach): (&Bounds<'_>, Option<&BTreeSet<PathBuf>>),
+    world: &World<'_>,
+) -> Option<String> {
     let shown = path.display();
     let who = bounds.who;
     let Change::Text(text) = change else {
@@ -175,6 +191,13 @@ fn offence(path: &Path, change: &Change, bounds: &Bounds<'_>, world: &World<'_>)
     let scope = bounds.scope;
     if scope == FixScope::Files {
         return None;
+    }
+    if let Some(reach) = reach {
+        return (!reach.contains(path)).then(|| {
+            format!(
+                "{who} changed `{shown}`, which refers to nothing changed in the file of the findings or in the files it reaches (scope `references`)"
+            )
+        });
     }
     if path != bounds.file {
         return Some(format!(

@@ -331,11 +331,8 @@ fn rule_tester_check() {
 
 const FIX: &str = "fix:
   safety: unsafe
-  type: ops
-  ops:
-    - op: delete
-      file: finding.file
-      span: finding.span
+  type: cel
+  edits: '[remove(finding.span)]'
 ";
 
 fn fixing(fixed: &str, again: &str) -> Catalog {

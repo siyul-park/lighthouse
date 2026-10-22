@@ -1,19 +1,71 @@
-//! The reference of the fix operations, generated into the docs from the same
-//! table that documents the schema: what each operation takes and means.
+//! The reference of the edit constructors, generated into the docs from the
+//! same table that documents the schema: what each takes and means.
 
 use std::fmt::Write;
 
 use super::decision::NOTICE;
 
-const WHEN: Param = Param {
-    name: "when",
-    ty: "CEL bool",
-    required: false,
-    description: "Skips the operation when false.",
-};
-
-/// The operations a `fix: { ops: [...] }` may list.
+/// The constructors an `edits` expression builds its list from.
 pub const OPERATIONS: &[Operation] = &[
+    Operation {
+        name: "remove",
+        summary: "Removes a declaration with its extent, or a range of text such as a \
+                  comment. A range that fills whole lines takes the lines, and one \
+                  blank line when that would leave two. One spec of a parenthesized \
+                  `const` group whose values depend on their place (`iota`, or specs \
+                  that repeat the one before) keeps its place as the blank identifier \
+                  `_`, so that the specs after it keep their values.",
+        params: &[Param {
+            name: "target",
+            ty: "node, symbol id or span",
+            required: true,
+            description: "A node or its id, or `{start: {line, col}, end: {line, col}}` \
+                          (1-based, columns in bytes, end exclusive) with an optional \
+                          `file`, else the finding's file.",
+        }],
+        example: "edits: \"[remove(finding.span)]\"",
+    },
+    Operation {
+        name: "add",
+        summary: "Inserts text at an anchor. At `before(node)` and `after(node)` it goes \
+                  at the start of the line of the node's extent, or of the line after \
+                  it, so the text is whole lines; `start(file)` and `end(file)` are the \
+                  two ends of the finding's file.",
+        params: &[
+            Param {
+                name: "anchor",
+                ty: "`before(node)`, `after(node)`, `start(file)` or `end(file)`",
+                required: true,
+                description: "Where the text goes.",
+            },
+            Param {
+                name: "text",
+                ty: "string",
+                required: true,
+                description: "The text, computed with CEL's strings.",
+            },
+        ],
+        example: "edits: \"[add(before(node), '// ' + node.name + ' is documented.\\n')]\"",
+    },
+    Operation {
+        name: "replace",
+        summary: "Replaces a range of text, or the extent of a declaration.",
+        params: &[
+            Param {
+                name: "target",
+                ty: "node, symbol id or span",
+                required: true,
+                description: "What is replaced.",
+            },
+            Param {
+                name: "text",
+                ty: "string",
+                required: true,
+                description: "The new text.",
+            },
+        ],
+        example: "edits: \"[replace(finding.span, '// ' + finding.decision)]\"",
+    },
     Operation {
         name: "move",
         summary: "Relocates a declaration, with its leading doc comments and attributes, \
@@ -23,76 +75,18 @@ pub const OPERATIONS: &[Operation] = &[
         params: &[
             Param {
                 name: "node",
-                ty: "CEL symbol id",
+                ty: "node or symbol id",
                 required: true,
                 description: "The declaration to move.",
             },
             Param {
-                name: "before",
-                ty: "CEL symbol id",
-                required: false,
-                description: "Place the declaration right before this one. Exactly one of `before` and `after`.",
-            },
-            Param {
-                name: "after",
-                ty: "CEL symbol id",
-                required: false,
-                description: "Place the declaration right after this one.",
-            },
-            WHEN,
-        ],
-        example: "- op: move\n  node: finding.evidence.callee\n  after: finding.evidence.caller",
-    },
-    Operation {
-        name: "reorder",
-        summary: "Sorts the declarations of a container by order keys, stably: a \
-                  declaration moves only as far as the keys demand, and declarations \
-                  a key does not order stay in the place they occupy. The first key \
-                  decides, the next ones break ties.",
-        params: &[
-            Param {
-                name: "scope",
-                ty: "`file` or `owner`",
+                name: "anchor",
+                ty: "`before(node)` or `after(node)`",
                 required: true,
-                description: "`file`: every declaration of the finding's file; each container (the file level, an `impl` or class body) is sorted on its own. `owner`: only the members of the finding symbol's owner.",
+                description: "The declaration it goes next to.",
             },
-            Param {
-                name: "by",
-                ty: "list of order keys",
-                required: true,
-                description: "Registered keys, `plugin/name`; the table below lists them.",
-            },
-            WHEN,
         ],
-        example: "- op: reorder\n  scope: file\n  by: [design/group]",
-    },
-    Operation {
-        name: "delete",
-        summary: "Removes a declaration with its extent, or a range of text such as a \
-                  comment. A range that fills whole lines takes the lines, and one \
-                  blank line when that would leave two.",
-        params: &[
-            Param {
-                name: "node",
-                ty: "CEL symbol id",
-                required: false,
-                description: "The declaration to remove. Either `node`, or `file` and `span`.",
-            },
-            Param {
-                name: "file",
-                ty: "CEL string",
-                required: false,
-                description: "Project-relative path of the range's file.",
-            },
-            Param {
-                name: "span",
-                ty: "CEL span",
-                required: false,
-                description: "`{start: {line, col}, end: {line, col}}`, 1-based, columns in bytes, end exclusive.",
-            },
-            WHEN,
-        ],
-        example: "- op: delete\n  file: finding.file\n  span: finding.span",
+        example: "edits: \"[move(node, after(finding.evidence.caller))]\"",
     },
     Operation {
         name: "rename",
@@ -102,50 +96,36 @@ pub const OPERATIONS: &[Operation] = &[
         params: &[
             Param {
                 name: "symbol",
-                ty: "CEL symbol id",
+                ty: "node or symbol id",
                 required: true,
                 description: "The symbol to rename.",
             },
             Param {
                 name: "name",
-                ty: "template",
+                ty: "string",
                 required: true,
-                description: "The new name; `{{ cel }}` holes are replaced.",
+                description: "The new name.",
             },
-            WHEN,
         ],
-        example: "- op: rename\n  symbol: finding.symbol\n  name: '{{ symbol.name }}Value'",
+        example: "edits: \"[rename(node, node.name + 'Value')]\"",
     },
     Operation {
-        name: "replace",
-        summary: "Replaces a range of text; an empty range inserts. The escape hatch \
-                  for what the other operations do not state.",
-        params: &[
-            Param {
-                name: "file",
-                ty: "CEL string",
-                required: true,
-                description: "Project-relative path.",
-            },
-            Param {
-                name: "span",
-                ty: "CEL span",
-                required: true,
-                description: "The range to replace.",
-            },
-            Param {
-                name: "text",
-                ty: "template",
-                required: true,
-                description: "The new text; `{{ cel }}` holes are replaced.",
-            },
-            WHEN,
-        ],
-        example: "- op: replace\n  file: finding.file\n  span: finding.span\n  text: '// {{ finding.evidence.label }}'",
+        name: "reorder",
+        summary: "Puts sibling declarations in the order of the list, in the places \
+                  they hold. Nothing changes when they already are in it. Each \
+                  container (the file level, an `impl` or class body) is permuted on \
+                  its own.",
+        params: &[Param {
+            name: "nodes",
+            ty: "list of nodes or symbol ids",
+            required: true,
+            description: "The declarations, in the order they must have.",
+        }],
+        example: "edits: \"[reorder(file.symbols.filter(s, s.group >= 0).sortBy(s, s.group))]\"",
     },
 ];
 
-/// One parameter of a fix operation.
+/// One parameter of an edit constructor.
 pub struct Param {
     pub name: &'static str,
     pub ty: &'static str,
@@ -153,7 +133,7 @@ pub struct Param {
     pub description: &'static str,
 }
 
-/// One generic fix operation.
+/// One edit constructor.
 pub struct Operation {
     pub name: &'static str,
     pub summary: &'static str,
@@ -167,23 +147,29 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
     let mut out = format!(
         "{NOTICE}\n\n# Fix operations\n\n\
          A decision's `fix:` block says how the findings of its rule are fixed. Its \
-         `type` is one of `ops`, `command` and `rpc`; it carries a `safety` cap, and \
-         may list the provider capabilities it `requires`:\n\n\
-         ```yaml\nfix:\n  safety: safe        # safe | unsafe\n  requires: [extent]  # optional\n  type: ops           # ops | command | rpc\n  ops: [...]\n```\n\n\
-         The `ops` type is a list of the generic operations below. Operations state \
+         `type` is one of `cel`, `command`, `model` and `rpc`; it carries a `safety` \
+         cap, and may list the provider capabilities it `requires`:\n\n\
+         ```yaml\nfix:\n  safety: safe        # safe | unsafe\n  type: cel           # cel | command | model | rpc\n  edits: \"[...]\"\n```\n\n\
+         The `cel` type is one CEL expression, `edits`, that returns a list of edits \
+         (an empty list proposes none), as a Kubernetes MutatingAdmissionPolicy returns \
+         patches. CEL never mutates: the constructors below build values that state \
          edits over code-model nodes; the orchestrator lowers them to text edits with \
          the spans the language provider reports, formats, re-checks and rolls back \
-         what gets worse. Expressions are CEL over `finding` (`decision`, `message`, \
-         `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the \
-         finding's symbol, as in declarative rules) and `options` (the options the \
-         rule ran with). Every operation also takes `when` (CEL bool): the \
-         operation is skipped when it is false.\n\n"
+         what gets worse. The expression sees `finding` (`decision`, `message`, `file`, \
+         `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `node` (the finding's \
+         subject, with the fields of the code model), `file` (its file, with \
+         `symbols` and `comments`), `options` (the options the rule ran with) and the \
+         `variables` of the decision's check, so a fix never redefines what its check \
+         computed. `requires` follows from the constructors it calls: `move`, \
+         `reorder`, `before` and `after` need `extent`, `rename` needs \
+         `complete-references`; what `remove` and `replace` need depends on their \
+         target, so the fix says it.\n\n"
     );
     for op in OPERATIONS {
         let _ = write!(out, "## `{}`\n\n{}\n\n", op.name, op.summary);
         let _ = writeln!(out, "| param | type | meaning |");
         let _ = writeln!(out, "| --- | --- | --- |");
-        for p in op.params.iter().filter(|p| p.name != WHEN.name) {
+        for p in op.params {
             let required = if p.required { ", required" } else { "" };
             let _ = writeln!(
                 out,
@@ -193,7 +179,7 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
         }
         let _ = write!(out, "\n```yaml\n{}\n```\n\n", op.example);
     }
-    out.push_str("## Order keys\n\nKeys for `reorder.by`, registered by plugins.\n\n");
+    out.push_str("## Order keys\n\nRegistered by plugins; the `group` field of a node reads `design/group`.\n\n");
     let _ = writeln!(out, "| key | orders by |");
     let _ = writeln!(out, "| --- | --- |");
     for (id, description) in keys {

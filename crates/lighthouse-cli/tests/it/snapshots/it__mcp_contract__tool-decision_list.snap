@@ -83,7 +83,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                 "by": {
                   "description": "What makes the fix of a decision.",
                   "enum": [
-                    "ops",
+                    "cel",
                     "command",
                     "model",
                     "rpc"

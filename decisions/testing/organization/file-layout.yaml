@@ -65,17 +65,11 @@ spec:
       subject: symbol.id
   fix:
     safety: safe
-    requires: [extent]
-    type: ops
-    ops:
-      - op: move
-        when: "finding.evidence.role == 'fixture'"
-        node: finding.evidence.symbol
-        before: finding.evidence.before
-      - op: move
-        when: "finding.evidence.role == 'test-helper'"
-        node: finding.evidence.symbol
-        after: finding.evidence.after
+    type: cel
+    edits: >-
+      misplaced_fixture ? [move(symbol, before(first))]
+      : misplaced_helper ? [move(symbol, after(user))]
+      : []
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), ch. 5 Vertical size and ordering"

@@ -4,16 +4,14 @@
 //! model) and every type compiles into a provider of the one `Fixer`
 //! interface.
 
-use std::collections::BTreeSet;
-
 use lighthouse_model::{Safety, Severity, ucm::Capability};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
-    DecisionSpec, OrderScope, Point, Program,
-    expression::{compile_problem, template_problem},
+    DecisionSpec, Point, Program,
+    expression::compile_problem,
     union::{refuse_strays, stray_field},
 };
 
@@ -61,15 +59,15 @@ impl<'de> Deserialize<'de> for Fix {
             .ok_or_else(|| D::Error::custom("a fix is a table"))?;
         let command = command_fields();
         let own: &[&str] = match table.get("type").and_then(Value::as_str) {
-            Some("ops") => &["ops"],
+            Some("cel") => &["edits", "scope"],
             Some("command") => &command,
             Some("model") => &["prompt", "scope"],
             Some("rpc") => &["params"],
             other => {
                 return Err(D::Error::custom(match other {
-                    None => "a fix needs a `type`: ops, command, model or rpc".to_owned(),
+                    None => "a fix needs a `type`: cel, command, model or rpc".to_owned(),
                     Some(found) => {
-                        format!("fix `type` is `{found}`, expected ops, command, model or rpc")
+                        format!("fix `type` is `{found}`, expected cel, command, model or rpc")
                     }
                 }));
             }
@@ -83,6 +81,10 @@ impl<'de> Deserialize<'de> for Fix {
             priority,
             kind,
         } = serde_json::from_value(value).map_err(D::Error::custom)?;
+        let requires = match &kind {
+            FixKind::Cel { edits, .. } => with_derived(requires, edits),
+            _ => requires,
+        };
         Ok(Self {
             safety,
             requires,
@@ -104,14 +106,7 @@ impl Fix {
             );
         }
         match &self.kind {
-            FixKind::Ops { ops } if ops.is_empty() => Some("`ops` is empty".to_owned()),
-            FixKind::Ops { ops } => {
-                let renames = ops.iter().any(|op| matches!(op, OpSpec::Rename { .. }));
-                if renames && !self.requires.contains(&Capability::CompleteReferences) {
-                    return Some("`rename` needs `complete-references` in `requires`".to_owned());
-                }
-                ops.iter().find_map(OpSpec::problem)
-            }
+            FixKind::Cel { edits, .. } => compile_problem("fix edits", edits),
             FixKind::Command(command) => command.problem(),
             FixKind::Model { .. } if self.safety == Safety::Safe => {
                 Some("a fix by a model is never `safe`; use `unsafe`".to_owned())
@@ -132,7 +127,8 @@ impl Fix {
 }
 
 /// How far the change of a fix may go, which the verifier checks. Ordered
-/// from the narrowest.
+/// from the narrowest. One model for every type of fix: a fix by CEL, by a
+/// command and by a model are held to it the same way.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
@@ -144,24 +140,29 @@ pub enum FixScope {
     /// Only the file of the finding. What a fix by a command has when it
     /// declares no scope.
     File,
-    /// Any file the analysis indexes in the run's scope. No limit of its own:
-    /// what a fix by a model that declares no scope has.
+    /// The file of the finding and the files it reaches: a file may change
+    /// when it holds a reference site (a call, a use, an import) of a symbol
+    /// changed in a file that may change, transitively. A signature changes
+    /// with its callers, and a caller whose own signature changes, with its
+    /// callers. What a fix by CEL or by a model has when it declares no scope.
     #[default]
+    References,
+    /// Any file the analysis indexes in the run's scope, for a change that
+    /// is not about references, such as the consistency of a doc and a spec.
     Files,
 }
 
 impl FixScope {
     /// The scope of the fix of a decision whose `fix` is `fix`: the narrower
     /// of the `cap` of the project and what the decision declares, which for
-    /// a command is its `scope`, else `file`, and for a model its `scope`,
-    /// else no limit of its own. Nobody widens. The project's cap is for
-    /// fixes by a model: callers ask for a command with the widest cap.
+    /// a command is its `scope`, else `file`, and for CEL and a model its
+    /// `scope`, else `references`. Nobody widens. The project's cap is for
+    /// fixes by a model: callers ask for the others with the widest cap.
     pub fn of_fix(fix: Option<&Fix>, cap: Self) -> Self {
         match fix.map(|f| &f.kind) {
-            Some(FixKind::Model {
-                scope: Some(declared),
-                ..
-            }) => (*declared).min(cap),
+            Some(FixKind::Model { scope, .. } | FixKind::Cel { scope, .. }) => {
+                scope.unwrap_or(Self::References).min(cap)
+            }
             Some(FixKind::Command(command)) => command.scope.unwrap_or(Self::File).min(cap),
             _ => cap,
         }
@@ -173,6 +174,7 @@ impl std::fmt::Display for FixScope {
         f.write_str(match self {
             Self::Symbol => "symbol",
             Self::File => "file",
+            Self::References => "references",
             Self::Files => "files",
         })
     }
@@ -182,8 +184,16 @@ impl std::fmt::Display for FixScope {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum FixKind {
-    /// Generic operations over the code model, evaluated with CEL.
-    Ops { ops: Vec<OpSpec> },
+    /// One CEL expression that returns a list of edits, built with `remove`,
+    /// `add`, `replace`, `move`, `rename` and `reorder`. It sees `finding`,
+    /// `node` (the finding's symbol), `file`, `options` and the check's
+    /// `variables`. An empty list proposes no edit.
+    Cel {
+        edits: String,
+        /// How far the edits may go; see [`FixScope`]. Default: `references`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        scope: Option<FixScope>,
+    },
     /// An external program on a scratch copy of the files.
     Command(CommandSpec),
     /// An agent that edits fixes the finding, and the checks accept the
@@ -206,127 +216,6 @@ pub enum FixKind {
         #[serde(default, skip_serializing_if = "Map::is_empty")]
         params: Map<String, Value>,
     },
-}
-
-/// One operation of an `ops` fix. Every parameter but `scope` and `by` is a
-/// CEL expression over the finding (`finding`, `symbol`, `options`) or, for
-/// `text` and `name`, a template with `{{ cel }}` holes. A `when` expression
-/// that is false skips the operation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "op", rename_all = "kebab-case", deny_unknown_fields)]
-pub enum OpSpec {
-    Move {
-        node: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        before: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        after: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        when: Option<String>,
-    },
-    Reorder {
-        scope: OrderScope,
-        by: Vec<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        when: Option<String>,
-    },
-    Delete {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        node: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        file: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        span: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        when: Option<String>,
-    },
-    Rename {
-        symbol: String,
-        name: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        when: Option<String>,
-    },
-    Replace {
-        file: String,
-        span: String,
-        text: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        when: Option<String>,
-    },
-}
-
-impl OpSpec {
-    /// The operation's name in a rule file.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Move { .. } => "move",
-            Self::Reorder { .. } => "reorder",
-            Self::Delete { .. } => "delete",
-            Self::Rename { .. } => "rename",
-            Self::Replace { .. } => "replace",
-        }
-    }
-
-    /// The `when` guard, if any.
-    pub fn when(&self) -> Option<&str> {
-        match self {
-            Self::Move { when, .. }
-            | Self::Reorder { when, .. }
-            | Self::Delete { when, .. }
-            | Self::Rename { when, .. }
-            | Self::Replace { when, .. } => when.as_deref(),
-        }
-    }
-
-    /// Why the operation cannot run as written.
-    fn problem(&self) -> Option<String> {
-        let at = |what: &str| format!("{} `{what}`", self.name());
-        let cel = |what: &str, source: &str| compile_problem(&at(what), source);
-        let template = |what: &str, text: &str| template_problem(&at(what), text);
-        if let Some(problem) = self.when().and_then(|when| cel("when", when)) {
-            return Some(problem);
-        }
-        match self {
-            Self::Move {
-                node,
-                before,
-                after,
-                ..
-            } => cel("node", node).or_else(|| match (before, after) {
-                (Some(target), None) => cel("before", target),
-                (None, Some(target)) => cel("after", target),
-                _ => Some("move needs exactly one of `before` or `after`".to_owned()),
-            }),
-            Self::Reorder { by, .. } => {
-                let mut seen = BTreeSet::new();
-                if by.is_empty() {
-                    return Some("reorder needs at least one key in `by`".to_owned());
-                }
-                by.iter()
-                    .find(|key| !key.contains('/') || !seen.insert(*key))
-                    .map(|key| {
-                        format!(
-                            "reorder key `{key}` must be a qualified `plugin/name` and listed once"
-                        )
-                    })
-            }
-            Self::Delete {
-                node, file, span, ..
-            } => match (node, file, span) {
-                (Some(node), None, None) => cel("node", node),
-                (None, Some(file), Some(span)) => cel("file", file).or_else(|| cel("span", span)),
-                _ => Some("delete needs `node`, or `file` and `span`".to_owned()),
-            },
-            Self::Rename { symbol, name, .. } => {
-                cel("symbol", symbol).or_else(|| template("name", name))
-            }
-            Self::Replace {
-                file, span, text, ..
-            } => cel("file", file)
-                .or_else(|| cel("span", span))
-                .or_else(|| template("text", text)),
-        }
-    }
 }
 
 /// An external program that fixes a finding, by the process contract. Its
@@ -356,6 +245,54 @@ impl CommandSpec {
                 "`output: stdout` is the new text of one file: its `scope` is `file`".to_owned()
             })
         })
+    }
+}
+
+/// `requires` with what the edit constructors `edits` calls need: a node that
+/// is removed, replaced, moved, reordered or that anchors an insertion needs its
+/// extent, and a rename needs every reference of the symbol. A removal or a
+/// replacement needs the extent when it names the node itself (`node`,
+/// `finding.symbol`): a range of text held in the evidence is for the fix to
+/// declare, and the edit declines when the extent is missing.
+fn with_derived(mut requires: Vec<Capability>, edits: &str) -> Vec<Capability> {
+    let mut calls = Vec::new();
+    if let Ok(program) = crate::environment::compile(edits) {
+        collect(program.expression(), &mut calls);
+    }
+    let on_node = |(name, node): &&(String, bool)| match name.as_str() {
+        "move" | "reorder" | "before" | "after" => true,
+        "remove" | "replace" => *node,
+        _ => false,
+    };
+    let derived = [
+        (Capability::Extent, calls.iter().any(|c| on_node(&c))),
+        (
+            Capability::CompleteReferences,
+            calls.iter().any(|(name, _)| name == "rename"),
+        ),
+    ];
+    for (capability, needed) in derived {
+        if needed && !requires.contains(&capability) {
+            requires.push(capability);
+        }
+    }
+    requires
+}
+
+/// The calls in `expr`, each with whether its first argument is a node: a
+/// variable (`node`, `func`) or the `symbol` of the finding.
+fn collect(expr: &cel::common::ast::IdedExpr, calls: &mut Vec<(String, bool)>) {
+    use cel::common::ast::Expr;
+    if let Expr::Call(call) = &expr.expr {
+        let node = call.args.first().is_some_and(|first| match &first.expr {
+            Expr::Ident(_) => true,
+            Expr::Select(select) => select.field == "symbol",
+            _ => false,
+        });
+        calls.push((call.func_name.clone(), node));
+    }
+    for child in crate::children(expr) {
+        collect(child, calls);
     }
 }
 

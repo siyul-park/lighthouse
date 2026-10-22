@@ -14,6 +14,17 @@ pub struct Span {
     pub end: Position,
 }
 
+/// The dominant line ending of a text: CRLF when most of its lines end in it.
+pub fn eol_of(text: &str) -> &'static str {
+    let crlf = text.matches("\r\n").count();
+    let lf = text.matches('\n').count();
+    if lf > 0 && crlf * 2 > lf {
+        "\r\n"
+    } else {
+        "\n"
+    }
+}
+
 /// Converts between byte offsets of a text and the 1-based line and byte
 /// column positions spans use.
 #[derive(Debug, Clone)]

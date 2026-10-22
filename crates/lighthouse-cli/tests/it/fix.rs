@@ -368,11 +368,8 @@ spec:
   fix:
     safety: safe
     requires: [reference-sites, complete-references]
-    type: ops
-    ops:
-      - op: rename
-        symbol: finding.symbol
-        name: "{{ symbol.name }}New"
+    type: cel
+    edits: "[rename(finding.symbol, node.name + 'New')]"
   examples:
     - name: old
       language: go
@@ -605,13 +602,8 @@ spec:
       name: func.name
   fix:
     safety: safe
-    type: ops
-    ops:
-      - op: replace
-        file: finding.file
-        span: "{\"start\": finding.span.start, \"end\": finding.span.start}"
-        text: |
-          // {{ symbol.name }} is documented.
+    type: cel
+    edits: "[add(before(node), '// ' + node.name + ' is documented.\\n')]"
   examples:
     - name: bare
       language: go
@@ -685,7 +677,7 @@ fn a_replace_inserts_a_doc_line_in_rust() {
     write(
         dir.path(),
         ".lighthouse/decisions/doc.yaml",
-        &DOCUMENT_RULE.replace("// {{ symbol.name }}", "/// {{ symbol.name }}"),
+        &DOCUMENT_RULE.replace("'// '", "'/// '"),
     );
 
     lighthouse(dir.path())

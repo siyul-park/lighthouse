@@ -56,7 +56,7 @@ binding an agent enables nothing by itself.
 agent = "claude/sonnet"                            # the agent, below
 [fix]
 decisions = ["design/exported-doc", "testing/*"]   # ids or globs; default none
-scope = "files"                                    # widest change: symbol | files; default files
+scope = "files"                                    # widest change: symbol | file | references | files; default files
 verify = [["cargo", "test", "-q"]]                 # programs that must pass over the fixes of a run
 context = 4000                                     # tokens of code around the findings in an agent's brief; default 4000
 unsafe = false                                     # default; true writes a verified model fix
@@ -65,14 +65,13 @@ safety = "safe"                                    # trust the agent on this dec
 ```
 
 - **Who gets a model fix.** A finding does if its decision matches `[fix] decisions`, has a check
-  and no fix of its own (`ops`, `command`), and `[models] agent` is bound. An entry is an id or a glob
+  and no fix of its own (`cel`, `command`), and `[models] agent` is bound. An entry is an id or a glob
   (`*` within one segment of an id, matched against the whole id); one that matches no active
   decision is a warning naming it. A listed decision without a `fix` block has `fix: {type: model}`;
-  a decision may say `fix: {type: model, prompt: "...", scope: symbol | files}` to add an
-  instruction and a scope. A decision that declares none imposes no limit of its own, so its scope is
-  `[fix] scope`; one that declares a scope is narrowed to `[fix] scope`, never widened by it. The
+  a decision may say `fix: {type: model, prompt: "...", scope: symbol | file | references | files}` to add an
+  instruction and a scope (see [fixer spec](fixer-spec.md)); it has `references` when it declares none, and is narrowed to `[fix] scope`, never widened by it. The
   bundled decisions declare one where their fix has a natural reach: `symbol` for `design/exported-doc`,
-  `design/symbols` and `testing/cases`, `files` for `design/errors`, `design/signature`,
+  `design/symbols` and `testing/cases`, and `references` (the default) for `design/errors`, `design/signature`,
   `design/prefer-method` and `design/naming`, whose callers change too. Listing them in `[fix] decisions`
   is still what grants a model the fix.
 - **Agent or review, no router.** Where a finding gets a model fix it is made by the `agent`; with none bound
@@ -82,15 +81,15 @@ safety = "safe"                                    # trust the agent on this dec
   listed decision.
 - **The brief.** One builder writes it, for the `agent` prompt and for the review task: the system part
   (change only what the findings need, within the scope of each: `symbol` is the symbol of the
-  finding, `files` any file the fix needs), for each finding the decision (requirement, context,
+  finding, `file` its file, `references` its file and the files that refer to what changes, `files` any file the fix needs), for each finding the decision (requirement, context,
   `prompt`), message, evidence, `path:line:col` and scope, up to two before and after examples per
   decision, how the result is checked, and a closing line asking for `fixed` or `left` per finding.
   The reply is a note, never a verdict. The prompt of an agent also carries what the code model
   already knows, so that it need not search the directory (Agentless, Xia et al. 2024: localize
   first, hand the repair the code it needs): the code of each finding's extent with line numbers,
   the declarations (with the first line of their doc) of the project symbols it uses, the imports of
-  the file and, for scope `files`, every place that refers to the symbols it may change with the
-  declaration that holds it, and the files they are in. The agent is told to start from it and open
+  the file and, beyond `symbol` and `file`, every place that refers to the symbols it may change with the
+  declaration that holds it, and the files they are in (for `references`, the files of the closure). The agent is told to start from it and open
   further files only when it cannot finish without them, a specific file or symbol and not a listing
   or search of the directory. `[fix] context` is the budget in tokens (four characters each) of all
   of it but the code of the findings; over it, the places and declarations farthest from the
@@ -99,7 +98,7 @@ safety = "safe"                                    # trust the agent on this dec
 - **Scope, checked by the verifier.** `symbol`: only the extent of each finding of the batch in its
   file (the symbol the finding is about, else the innermost around it, else the whole file when it has
   fewer than 400 lines, otherwise the finding is declined `no-extent`); a change outside the union of
-  the extents is declined `out-of-scope`, naming the first line. `files`: any indexed text file of
+  the extents is declined `out-of-scope`, naming the first line. `file`: the file of the finding. `references`: the file and the files that refer to the symbols changed in it, transitively. `files`: any indexed text file of
   the project, whatever paths the run reports; each changed file is one whole-file `Replace`, and the files are verified together
   with every file that has a call or reference edge into or out of a symbol of a changed file, in the
   code model before the edit and after it; the change passes or is rolled back whole.

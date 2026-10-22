@@ -39,7 +39,7 @@ languages and editors are added.
 | Self-enforcement | layout, test and declarative (CEL) rules; Lighthouse lints itself in `make lint` |
 | Decision memory | SQLite history, committed `decisions.jsonl`, `lighthouse-disable-next-line` directives, expiring judgments, evidence snapshots, `--format json` |
 | Agent loop | MCP server, Claude Code hooks, generated skill, `init --agent`; compact grouped agent output that says how each decision is fixed |
-| Autofix | one canonical fix per decision (`ops`, `command`), in-memory verification, rollback, atomic writes, user-level trust |
+| Autofix | one canonical fix per decision (`cel`, `command`), in-memory verification, rollback, atomic writes, user-level trust |
 | Resource model | `apiVersion`/`kind`/`metadata`/`spec` for every spec, JSON Schema per kind, `spec validate`, SARIF, `pattern` renamed to `decision`, severity `error`/`warn`/`info` |
 | Check providers | `check:` as `builtin` (standard ops `order`, `cycle`), `cel` with a standard library, `command`, `rpc` (reserved) or `model` (served by agent review tasks); every bundled decision re-expressed with identical findings; `severity` replaces `enforcement`; meaning version separate from check revision; ADR `status`, `supersedes`, `consequences` |
 | Speed | per-run fact memo, parallel rule and provider runs (rayon), concurrent Go modules, `--timings` |

@@ -95,7 +95,7 @@ A command fix and an agent change files by the same path.
 
 1. **A scratch copy** of the project, secrets excluded, with the fixed texts of the run in place of their files, as a repository with one commit of that state: a tool finds its root, `git diff` works, and an agent that refuses to run outside a repository runs. The copy holds the files the project's own ignore files let through, not those of the user's global excludes, so it does not depend on one machine; git runs in it with every `GIT_*` variable cleared and `-C` the copy, so an inherited `GIT_DIR` never reaches the user's repository. Clones are copy-on-write where the file system has them. A filter (`stdin: file`, `output: stdout`) needs no copy.
 2. **One collection** of what changed in it against the texts it started from.
-3. **One scope check**, `file` (the finding's file; the default of a command fix), `symbol` or `files` ([fixer spec](fixer-spec.md)). A change outside it rejects the whole attempt.
+3. **One scope check**, `file` (the finding's file; the default of a command fix), `symbol`, `references` or `files` ([fixer spec](fixer-spec.md)). A change outside it rejects the whole attempt.
 4. **One outcome mapping** to the classes `unchanged`, `out-of-scope`, `failed`, `timeout`, `introduced`, `conflict`.
 
 Then the orchestrator applies the change in memory, re-checks it, adds the safe fixes of what it introduced, and writes only what the checks accept ([architecture](architecture.md#fixing)).

@@ -122,7 +122,7 @@ findings of the project, and as `result.fixes` (`artifactChanges` with
 `--dry-run` every fix it would make, from every provider; a fix that was written
 or declined has none.
 
-- A group of a fixable decision has `fix`, which says who fixes (`ops`,
+- A group of a fixable decision has `fix`, which says who fixes (`cel`,
   `command`, `rpc`, `model`), the safety, whether it runs (and `why` when it
   does not), whether an `unsafe` fix is `written` or only previewed, and `apply`:
   `lighthouse check --fix --decision <id>` or the `fix` tool call

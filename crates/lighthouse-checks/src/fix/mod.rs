@@ -1,10 +1,11 @@
 //! Fixes as data: a decision's `fix:` block compiled into a provider of the
 //! single `Fixer` interface, the way a declarative check compiles into a
-//! `Rule`. `ops` evaluates generic operations with CEL. A `command` fix is
-//! run by the fix run itself, through the one rewrite path it shares with an
-//! agent.
+//! `Rule`. A `cel` fix evaluates one expression that returns edits, lowered
+//! to the edit IR. A `command` fix is run by the fix run itself, through the
+//! one rewrite path it shares with an agent.
 
-mod ops;
+mod cel;
+mod edits;
 
 use std::sync::Arc;
 
@@ -14,13 +15,16 @@ use lighthouse_spec::{Decision, FixKind};
 
 use crate::Error;
 
+/// The reason a fix gives when its expression returns no edit.
+const NO_EDIT: &str = "the fix proposes no edit";
+
 /// A fixer built from a decision's `fix:` block.
 #[derive(Clone)]
 pub(crate) struct Fixer {
     meta: FixerManifest,
     description: String,
     safety: Safety,
-    steps: Arc<ops::Steps>,
+    fix: Arc<cel::CelFix>,
 }
 
 impl Fixer {
@@ -30,8 +34,8 @@ impl Fixer {
         let Some(fix) = &decision.fix else {
             return Ok(None);
         };
-        let steps = match &fix.kind {
-            FixKind::Ops { ops: list } => ops::Steps::compile(decision.id(), list)?,
+        let compiled = match &fix.kind {
+            FixKind::Cel { edits, .. } => cel::CelFix::new(decision, edits)?,
             // The fix run itself serves a command and a model.
             FixKind::Command(_) | FixKind::Model { .. } => return Ok(None),
             // Not supported yet: the decision keeps its fix, no fixer is built, and
@@ -46,7 +50,7 @@ impl Fixer {
             },
             description: decision.title.clone(),
             safety: fix.safety,
-            steps: Arc::new(steps),
+            fix: Arc::new(compiled),
         }))
     }
 }
@@ -57,8 +61,8 @@ impl lighthouse_plugin::Fixer for Fixer {
     }
 
     fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
-        let evaluated = self.steps.evaluate(&self.meta.id, request)?;
-        Ok(match evaluated {
+        Ok(match self.fix.lower(&self.meta.id, request)? {
+            Ok(ops) if ops.is_empty() => FixOutcome::declined(NO_EDIT),
             Ok(ops) => FixOutcome::Proposed {
                 description: self.description.clone(),
                 ops,

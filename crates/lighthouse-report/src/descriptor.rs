@@ -24,7 +24,7 @@ pub enum CheckBy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum FixBy {
-    Ops,
+    Cel,
     Command,
     Model,
     Rpc,
@@ -180,7 +180,7 @@ impl FixBy {
     /// The word the descriptor and the agent text call the provider by.
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Ops => "ops",
+            Self::Cel => "cel",
             Self::Command => "command",
             Self::Model => "model",
             Self::Rpc => "rpc",

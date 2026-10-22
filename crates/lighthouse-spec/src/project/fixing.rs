@@ -57,7 +57,7 @@ pub struct FixSpec {
     pub unsafe_fixes: Option<bool>,
     /// The decisions a model may fix, as ids or globs over them (`*` within
     /// one segment of an id): `["design/exported-doc", "testing/*"]`. Only a
-    /// decision with a check and no fix of its own (`ops`, `command`) is
+    /// decision with a check and no fix of its own (`cel`, `command`) is
     /// fixed, and only by the agent `[models] agent` binds; binding a model
     /// enables nothing by itself. Default: none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -1,5 +1,5 @@
-//! Fixes compiled from decisions: the generic operations evaluated over a
-//! finding. A command fix is run by the fix run itself, which the engine tests.
+//! Fixes compiled from decisions: the edits a CEL expression returns for a
+//! finding, lowered to the edit IR. A command fix is run by the fix run itself, which the engine tests.
 
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -39,6 +39,11 @@ fn id(name: &str) -> SymbolId {
 
 /// Functions `names`, one line each, in that order.
 fn project(names: &[&str]) -> Project {
+    declared(names, true)
+}
+
+/// The same, with the extents of the declarations when `extents`.
+fn declared(names: &[&str], extents: bool) -> Project {
     let symbols = names
         .iter()
         .enumerate()
@@ -54,7 +59,7 @@ fn project(names: &[&str]) -> Project {
                 owner: None,
                 file: FILE.into(),
                 span: at,
-                extent: Some(at),
+                extent: extents.then_some(at),
                 doc: None,
                 name: (*name).to_owned(),
                 role: None,
@@ -224,7 +229,7 @@ fn evaluate(fix: &str, finding: &Diagnostic) -> Result<FixOutcome, Error> {
 
 #[test]
 fn a_move_takes_its_node_and_anchor_from_the_finding() {
-    let fix = "safety: unsafe\ntype: ops\nops:\n  - op: move\n    node: finding.evidence.callee\n    after: finding.evidence.caller";
+    let fix = "safety: unsafe\ntype: cel\nedits: '[move(finding.evidence.callee, after(finding.evidence.caller))]'";
     let evidence = json!({ "callee": id("a").as_str(), "caller": id("c").as_str() });
 
     let outcome = evaluate(fix, &finding(Some("a"), evidence)).unwrap();
@@ -250,7 +255,8 @@ fn a_move_takes_its_node_and_anchor_from_the_finding() {
 
 #[test]
 fn a_move_before_is_a_before_anchor() {
-    let fix = "safety: safe\ntype: ops\nops:\n  - op: move\n    node: finding.symbol\n    before: finding.evidence.first";
+    let fix =
+        "safety: safe\ntype: cel\nedits: '[move(finding.symbol, before(finding.evidence.first))]'";
     let evidence = json!({ "first": id("b").as_str() });
 
     let got = ops(evaluate(fix, &finding(Some("a"), evidence)).unwrap());
@@ -265,8 +271,8 @@ fn a_move_before_is_a_before_anchor() {
 }
 
 #[test]
-fn guards_choose_which_operations_apply() {
-    let fix = "safety: safe\ntype: ops\nops:\n  - op: move\n    when: finding.evidence.role == 'fixture'\n    node: finding.symbol\n    before: finding.evidence.at\n  - op: move\n    when: finding.evidence.role == 'helper'\n    node: finding.symbol\n    after: finding.evidence.at";
+fn the_expression_chooses_which_edits_apply() {
+    let fix = "safety: safe\ntype: cel\nedits: >-\n  finding.evidence.role == 'fixture' ? [move(finding.symbol, before(finding.evidence.at))]\n  : finding.evidence.role == 'helper' ? [move(finding.symbol, after(finding.evidence.at))]\n  : []";
     let at = id("c").as_str().to_owned();
 
     let fixture = ops(evaluate(
@@ -296,35 +302,34 @@ fn guards_choose_which_operations_apply() {
             ..
         }]
     ));
-    assert!(
-        neither.contains("no operation of the fix applies"),
-        "{neither}"
-    );
+    assert_eq!(neither, "the fix proposes no edit");
 }
 
 #[test]
-fn delete_names_a_node_or_a_range() {
-    let node_fix = "safety: unsafe\ntype: ops\nops: [{ op: delete, node: finding.symbol }]";
-    let range_fix =
-        "safety: unsafe\ntype: ops\nops: [{ op: delete, file: finding.file, span: finding.span }]";
+fn remove_names_a_node_or_a_span() {
+    let node_fix = "safety: unsafe\ntype: cel\nedits: '[remove(finding.symbol)]'";
+    let range_fix = "safety: unsafe\ntype: cel\nedits: '[remove(finding.span)]'";
+    let bare_fix = "safety: unsafe\ntype: cel\nedits: '[remove({\"start\": finding.span.start, \"end\": finding.span.end})]'";
 
     let by_node = ops(evaluate(node_fix, &finding(Some("b"), json!({}))).unwrap());
     let by_range = ops(evaluate(range_fix, &finding(None, json!({}))).unwrap());
+    let by_bare = ops(evaluate(bare_fix, &finding(None, json!({}))).unwrap());
 
     assert_eq!(by_node, [EditOp::Delete { node: node("b") }]);
-    assert_eq!(
-        by_range,
-        [EditOp::DeleteRange {
-            file: PathBuf::from(FILE),
-            span: span((2, 3), (2, 8))
-        }]
-    );
+    let range = [EditOp::DeleteRange {
+        file: PathBuf::from(FILE),
+        span: span((2, 3), (2, 8)),
+    }];
+    assert_eq!(by_range, range);
+    assert_eq!(by_bare, range, "a span without a file is in the finding's");
 }
 
 #[test]
-fn rename_and_replace_fill_their_templates() {
-    let rename = "safety: unsafe\nrequires: [complete-references]\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: '{{ symbol.name }}New{{ 1 + 1 }}' }]";
-    let replace = "safety: unsafe\ntype: ops\nops: [{ op: replace, file: finding.file, span: finding.span, text: '// {{ finding.decision }}: {{ symbol.kind }}' }]";
+fn rename_and_replace_take_their_text_from_cel() {
+    let rename =
+        "safety: unsafe\ntype: cel\nedits: \"[rename(finding.symbol, 'aNew' + string(1 + 1))]\"";
+    let replace =
+        "safety: unsafe\ntype: cel\nedits: \"[replace(finding.span, '// ' + finding.decision)]\"";
 
     let renamed = ops(evaluate(rename, &finding(Some("a"), json!({}))).unwrap());
     let replaced = ops(evaluate(replace, &finding(Some("a"), json!({}))).unwrap());
@@ -341,14 +346,87 @@ fn rename_and_replace_fill_their_templates() {
         [EditOp::Replace {
             file: PathBuf::from(FILE),
             span: span((2, 3), (2, 8)),
-            text: "// local/probe: function".to_owned()
+            text: "// local/probe".to_owned()
         }]
     );
 }
 
 #[test]
+fn add_inserts_text_at_an_anchor() {
+    let text = "one\ntwo\n";
+    let at = |anchor: &str| {
+        let fix = format!("safety: unsafe\ntype: cel\nedits: \"[add({anchor}, 'x')]\"");
+        let outcome = run(
+            local(&fix).as_ref(),
+            &project(&["a", "b", "c"]),
+            &finding(Some("b"), json!({})),
+            text,
+            &keys(&[]),
+            false,
+        )
+        .unwrap();
+        ops(outcome)
+    };
+    let inserted = |line: u32, col: u32| {
+        let at = Position { line, col };
+        [EditOp::Replace {
+            file: PathBuf::from(FILE),
+            span: Span { start: at, end: at },
+            text: "x\n".to_owned(),
+        }]
+    };
+
+    assert_eq!(at("before(finding.symbol)"), inserted(2, 1));
+    assert_eq!(at("after(finding.symbol)"), inserted(3, 1));
+    assert_eq!(at("start(finding.file)"), inserted(1, 1));
+    assert_eq!(at("end(finding.file)"), inserted(3, 1));
+}
+
+#[test]
+fn add_ends_its_text_with_the_line_ending_of_the_file() {
+    let fix = "safety: unsafe\ntype: cel\nedits: \"[add(start(finding.file), 'x'), add(end(finding.file), 'y\\\\n')]\"";
+
+    let crlf = ops(run(
+        local(fix).as_ref(),
+        &project(&["a"]),
+        &finding(Some("a"), json!({})),
+        "one\r\ntwo\r\n",
+        &keys(&[]),
+        false,
+    )
+    .unwrap());
+
+    let texts: Vec<&str> = crlf
+        .iter()
+        .map(|op| match op {
+            EditOp::Replace { text, .. } => text.as_str(),
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(texts, ["x\r\n", "y\n"], "terminated only when it was not");
+}
+
+#[test]
+fn replacing_a_symbol_whose_provider_reports_no_extent_declines() {
+    let fix = "safety: unsafe\ntype: cel\nedits: \"[replace(finding.symbol, 'x')]\"";
+    let bare = declared(&["a"], false);
+
+    let outcome = run(
+        local(fix).as_ref(),
+        &bare,
+        &finding(Some("a"), json!({})),
+        "",
+        &keys(&[]),
+        false,
+    )
+    .unwrap();
+
+    assert!(reason(outcome).contains("has no extent"));
+}
+
+#[test]
 fn an_expression_that_fails_is_an_error_naming_the_fix() {
-    let fix = "safety: unsafe\ntype: ops\nops: [{ op: delete, node: finding.evidence.missing }]";
+    let fix = "safety: unsafe\ntype: cel\nedits: '[remove(finding.evidence.missing)]'";
 
     let error = evaluate(fix, &finding(None, json!({}))).unwrap_err();
 
@@ -356,22 +434,33 @@ fn an_expression_that_fails_is_an_error_naming_the_fix() {
 }
 
 #[test]
-fn a_node_that_is_not_a_symbol_id_is_an_error() {
-    let fix = "safety: unsafe\ntype: ops\nops: [{ op: delete, node: \"'nope'\" }]";
+fn edits_that_are_not_a_list_are_an_error() {
+    let fix = "safety: unsafe\ntype: cel\nedits: remove(finding.span)";
 
     let error = evaluate(fix, &finding(None, json!({}))).unwrap_err();
 
-    assert!(error.to_string().contains("not a symbol id"), "{error}");
+    assert!(error.to_string().contains("not a list"), "{error}");
 }
 
-fn reorder(table: &[(&'static str, u64)], names: &[&str]) -> FixOutcome {
-    let fix = "safety: safe\ntype: ops\nops: [{ op: reorder, scope: file, by: [t/rank] }]";
+#[test]
+fn a_node_that_is_not_a_symbol_id_declines() {
+    let fix = "safety: unsafe\ntype: cel\nedits: \"[remove('nope')]\"";
+
+    let why = reason(evaluate(fix, &finding(None, json!({}))).unwrap());
+
+    assert!(why.contains("not a symbol id"), "{why}");
+}
+
+const BY_RANK: &str = "safety: safe\ntype: cel\nedits: \"[reorder(file.symbols.filter(s, s.name in ranks).sortBy(s, ranks[s.name]))]\"";
+
+fn reorder(table: &str, names: &[&str]) -> FixOutcome {
+    let fix = BY_RANK.replace("ranks", table);
     run(
-        local(fix).as_ref(),
+        local(&fix).as_ref(),
         &project(names),
         &finding(Some(names[0]), json!({})),
         "",
-        &keys(table),
+        &keys(&[]),
         false,
     )
     .unwrap()
@@ -379,9 +468,10 @@ fn reorder(table: &[(&'static str, u64)], names: &[&str]) -> FixOutcome {
 
 #[test]
 fn reorder_lists_the_ordered_declarations_by_rank_and_keeps_ties_in_source_order() {
-    let table = [("a", 2), ("b", 0), ("c", 1), ("d", 0)];
-
-    let got = ops(reorder(&table, &["a", "b", "c", "d"]));
+    let got = ops(reorder(
+        "{'a': 2, 'b': 0, 'c': 1, 'd': 0}",
+        &["a", "b", "c", "d"],
+    ));
 
     assert_eq!(
         got,
@@ -393,10 +483,8 @@ fn reorder_lists_the_ordered_declarations_by_rank_and_keeps_ties_in_source_order
 }
 
 #[test]
-fn reorder_leaves_out_what_the_key_does_not_order() {
-    let table = [("a", 1), ("c", 0)];
-
-    let got = ops(reorder(&table, &["a", "b", "c"]));
+fn reorder_leaves_out_what_the_expression_leaves_out() {
+    let got = ops(reorder("{'a': 1, 'c': 0}", &["a", "b", "c"]));
 
     assert_eq!(
         got,
@@ -408,44 +496,15 @@ fn reorder_leaves_out_what_the_key_does_not_order() {
 }
 
 #[test]
-fn reorder_declines_when_nothing_would_move() {
-    let table = [("a", 0), ("b", 1)];
+fn reorder_proposes_no_edit_when_nothing_would_move() {
+    let why = reason(reorder("{'a': 0, 'b': 1}", &["a", "b"]));
 
-    let why = reason(reorder(&table, &["a", "b"]));
-
-    assert!(why.contains("already in the order"), "{why}");
-}
-
-#[test]
-fn reorder_declines_with_fewer_than_two_ordered_declarations() {
-    let why = reason(reorder(&[("a", 0)], &["a", "b"]));
-
-    assert!(why.contains("fewer than two"), "{why}");
-}
-
-#[test]
-fn reorder_by_an_unregistered_key_is_an_error() {
-    let fix = "safety: safe\ntype: ops\nops: [{ op: reorder, scope: file, by: [t/missing] }]";
-
-    let error = run(
-        local(fix).as_ref(),
-        &project(&["a", "b"]),
-        &finding(Some("a"), json!({})),
-        "",
-        &keys(&[]),
-        false,
-    )
-    .unwrap_err();
-
-    assert!(
-        error.to_string().contains("unknown order key `t/missing`"),
-        "{error}"
-    );
+    assert_eq!(why, "the fix proposes no edit");
 }
 
 #[test]
 fn the_fixer_carries_the_capabilities_the_fix_requires() {
-    let fix = "safety: safe\nrequires: [extent, reference-sites]\ntype: ops\nops: [{ op: delete, node: finding.symbol }]";
+    let fix = "safety: safe\nrequires: [extent, reference-sites]\ntype: cel\nedits: '[remove(finding.symbol)]'";
 
     let fixer = local(fix);
 
@@ -457,6 +516,28 @@ fn the_fixer_carries_the_capabilities_the_fix_requires() {
         ]
     );
     assert_eq!(fixer.manifest().id, "local/probe");
+}
+
+#[test]
+fn the_constructors_a_fix_calls_say_what_it_requires() {
+    use lighthouse_model::ucm::Capability::{CompleteReferences, Extent};
+    let requires = |edits: &str| {
+        local(&format!("safety: unsafe\ntype: cel\nedits: \"{edits}\""))
+            .manifest()
+            .requires
+            .clone()
+    };
+
+    assert_eq!(
+        requires("[rename(finding.symbol, 'x')]"),
+        [CompleteReferences]
+    );
+    assert_eq!(
+        requires("[move(finding.symbol, after(finding.symbol))]"),
+        [Extent]
+    );
+    assert_eq!(requires("[reorder([])]"), [Extent]);
+    assert!(requires("[remove(finding.span)]").is_empty());
 }
 
 #[test]
@@ -483,13 +564,4 @@ fn the_bundled_fixers_of_a_pack_are_those_of_its_decisions_with_a_fix() {
         .collect();
 
     assert_eq!(ids, ["testing/file-layout"]);
-}
-
-#[test]
-fn a_rename_must_declare_that_it_needs_complete_references() {
-    let fix = "safety: unsafe\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: x }]";
-
-    let error = local_layer(fix).unwrap_err();
-
-    assert!(error.to_string().contains("complete-references"), "{error}");
 }

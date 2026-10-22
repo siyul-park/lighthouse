@@ -12,31 +12,42 @@ fix:
   priority: 0             # higher goes first when fixes overlap; default 0
   requires: [extent]      # optional provider capabilities; absent means declined
   # exactly one of:
-  ops:                    # CEL over the finding and the code model
-    - op: move
-      node: finding.evidence.callee
-      after: finding.evidence.caller
+  type: cel               # cel | command | model | rpc
+  edits: >-               # CEL that returns a list of edits
+    [move(node, after(finding.evidence.caller))]
   command: [gofmt, -s, -w, "{file}"]   # a program (programs.md): no shell
   output: files           # files (the default: what it changed in a scratch copy) | stdout (the new text)
   stdin: none             # none | file; also env, timeout, success, sandbox
-  scope: file             # file (default) | symbol | files: where it may change files
+  scope: file             # symbol | file | references | files: how far it may change files (a command: file by default; cel and model: references)
   model:                  # an agent rewrites the extent of the finding; see models.md
     prompt: "Rename, do not delete."   # optional: added to the fix prompt
   rpc: {}                 # reserved: a language plugin's own fix method; not yet supported
 ```
 
-- **`ops`** is a list of generic operations: `move`, `reorder`, `delete`, `rename`,
-  `replace`. Each takes typed parameters, validated by the catalog; expressions are CEL over
-  `finding` (`rule`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`,
-  `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options`, and an
-  optional `when` skips an operation. `text` and `name` are templates with `{{ cel }}`
-  holes. The operations, their parameters and the registered order keys of `reorder` are
-  generated into [decisions/fix-operations.md](decisions/fix-operations.md). Semantics that
-  need Rust (`reorder` sorting by a key such as `design/group`, registered by a plugin
-  through `Plugin::order_keys()`) live in the operation, not in per-rule code.
+- **`cel`** is one CEL expression, `edits`, that returns a list of edits, as a Kubernetes
+  MutatingAdmissionPolicy returns patches; an empty list proposes none. CEL never mutates: the
+  six constructors `remove`, `add`, `replace`, `move`, `rename` and `reorder` (with the
+  anchors `before`, `after`, `start` and `end`) build values that state edits over code-model
+  nodes. The expression sees `finding` (`rule`, `message`, `file`, `span`, `symbol`, `evidence`,
+  `fingerprint`, `facts`), `node` (the finding's subject, with the fields of the code model),
+  `file`, `options` and the `variables` of the decision's check, so a fix never redefines what
+  its check computed. Text is computed with CEL's strings. `requires` follows from the
+  constructors called (`move`, `reorder`, `before` and `after` need `extent`; `rename` needs
+  `complete-references`). The constructors and their parameters are generated into
+  [decisions/fix-operations.md](decisions/fix-operations.md); what each means over the code
+  model (the extent a move takes along, the group a removed `const` spec belongs to) lives in
+  the lowering, not in per-rule code. `replace(symbol, ...)` and `remove(symbol)` need `extent`
+  and are declined without it; `add` appends the end of line of the file it writes to.
+- **Scope** is one value for a `cel` and a `model` fix: `symbol` (the extent of the finding),
+  `file` (its file), `references` (the default: its file and the files that refer to the symbols
+  the change touches, transitively, so a changed signature comes with its callers, and a caller
+  whose own signature changes with its callers) or `files` (any indexed file). A decision
+  narrows `[fix] scope`, the project never widens it. A change outside the scope is declined
+  `out-of-scope`, naming the file and the reason; the re-check covers the changed files and the
+  files that refer to them.
 - **`model`** is a fix by an agent that edits, not a derivation. A decision has one when it is
   listed in `[fix] decisions` and `[models] agent` is bound, whether it says `fix: {type: model}`
-  (optionally with `prompt` and `scope: symbol | files`; undeclared, the decision limits nothing and `[fix] scope` decides) or has a check and no
+  (optionally with `prompt` and a `scope`) or has a check and no
   fix of its own. Without an `agent` binding the finding stays a review task carrying the brief.
   The agent runs in a scratch copy of the project, once per file; each changed file is a
   whole-file `Replace`, `unsafe` unless the project says `[rules."<id>"] safety = "safe"` for the decision
@@ -52,7 +63,7 @@ fix:
   `output: stdout` with `stdin: file` makes it a filter, which writes the new text of `{file}` and
   needs no copy. It goes the way an agent's change goes: one scratch copy, one collection of what
   changed, one scope check and one mapping to the classes (`scope` is `file` unless the decision
-  says `symbol` or `files`; a filter is always `file`). A change that stays within the scope is the
+  says otherwise; a filter is always `file`). A change that stays within the scope is the
   proposal; a run that changed no file declines the finding with what the program said (stderr) as the
   reason; an exit code outside `success`, a signal or a timeout fails it. `{file}`, `{line}`,
   `{symbol}` and `{decision}` fill whole arguments; the finding is in `LIGHTHOUSE_DECISION` as JSON and the

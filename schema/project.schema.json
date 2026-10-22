@@ -83,7 +83,7 @@
       "type": "object"
     },
     "FixScope": {
-      "description": "How far the change of a fix may go, which the verifier checks. Ordered\nfrom the narrowest.",
+      "description": "How far the change of a fix may go, which the verifier checks. Ordered\nfrom the narrowest. One model for every type of fix: a fix by CEL, by a\ncommand and by a model are held to it the same way.",
       "oneOf": [
         {
           "const": "symbol",
@@ -96,8 +96,13 @@
           "type": "string"
         },
         {
+          "const": "references",
+          "description": "The file of the finding and the files it reaches: a file may change\nwhen it holds a reference site (a call, a use, an import) of a symbol\nchanged in a file that may change, transitively. A signature changes\nwith its callers, and a caller whose own signature changes, with its\ncallers. What a fix by CEL or by a model has when it declares no scope.",
+          "type": "string"
+        },
+        {
           "const": "files",
-          "description": "Any file the analysis indexes in the run's scope. No limit of its own:\nwhat a fix by a model that declares no scope has.",
+          "description": "Any file the analysis indexes in the run's scope, for a change that\nis not about references, such as the consistency of a doc and a spec.",
           "type": "string"
         }
       ]
@@ -116,7 +121,7 @@
           ]
         },
         "decisions": {
-          "description": "The decisions a model may fix, as ids or globs over them (`*` within\none segment of an id): `[\"design/exported-doc\", \"testing/*\"]`. Only a\ndecision with a check and no fix of its own (`ops`, `command`) is\nfixed, and only by the agent `[models] agent` binds; binding a model\nenables nothing by itself. Default: none.",
+          "description": "The decisions a model may fix, as ids or globs over them (`*` within\none segment of an id): `[\"design/exported-doc\", \"testing/*\"]`. Only a\ndecision with a check and no fix of its own (`cel`, `command`) is\nfixed, and only by the agent `[models] agent` binds; binding a model\nenables nothing by itself. Default: none.",
           "items": {
             "type": "string"
           },

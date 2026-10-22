@@ -58,7 +58,7 @@ spec:
 
 fn ops_fix(safety: &str) -> String {
     format!(
-        "  fix:\n    safety: {safety}\n    type: ops\n    ops:\n      - op: replace\n        file: finding.file\n        span: \"{{\\\"start\\\": {{\\\"line\\\": 1, \\\"col\\\": 1}}, \\\"end\\\": {{\\\"line\\\": 2, \\\"col\\\": 1}}}}\"\n        text: \"\"\n"
+        "  fix:\n    safety: {safety}\n    type: cel\n    edits: \"[replace({{'start': {{'line': 1, 'col': 1}}, 'end': {{'line': 2, 'col': 1}}}}, '')]\"\n"
     )
 }
 
@@ -88,14 +88,14 @@ const LONG: &str = "a\nb\nc\nd\n";
 
 const PROVIDERS: [Provider; 5] = [
     Provider {
-        kind: "ops",
+        kind: "cel",
         id: "local/ops-safe",
         file: "ops-safe.txt",
         safety: "safe",
         fixed: "b\nc\nd\n",
     },
     Provider {
-        kind: "ops",
+        kind: "cel",
         id: "local/ops-unsafe",
         file: "ops-unsafe.txt",
         safety: "unsafe",
@@ -552,8 +552,8 @@ fn the_decision_list_describes_every_provider_the_same_way() {
 
     let cel = json!({"by": "cel", "runs": true});
     for (id, by, safety) in [
-        ("local/ops-safe", "ops", "safe"),
-        ("local/ops-unsafe", "ops", "unsafe"),
+        ("local/ops-safe", "cel", "safe"),
+        ("local/ops-unsafe", "cel", "unsafe"),
         ("local/command-safe", "command", "safe"),
         ("local/command-unsafe", "command", "unsafe"),
         ("local/model", "model", "unsafe"),
@@ -622,7 +622,7 @@ fn a_decision_listed_for_a_model_without_a_fix_of_its_own_gets_one_only_when_lis
     let decisions = listed(&mut Client::trusting(dir.path()));
 
     assert!(decisions["local/model"].get("fix").is_none());
-    assert_eq!(decisions["local/ops-safe"]["fix"]["by"], "ops");
+    assert_eq!(decisions["local/ops-safe"]["fix"]["by"], "cel");
 }
 
 #[test]
@@ -640,7 +640,7 @@ fn decision_show_gives_the_whole_descriptor() {
     assert_eq!(safe["check"], json!({"by": "cel", "runs": true}));
     assert_eq!(
         safe["fix"],
-        fix_json("ops", "safe", true, None, "local/ops-safe")
+        fix_json("cel", "safe", true, None, "local/ops-safe")
     );
     assert!(
         safe.get("brief").is_none(),

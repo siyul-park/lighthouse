@@ -1,6 +1,7 @@
 //! The one CEL environment of the tool: the standard library of CEL with the
 //! extensions `cel` ships (strings, lists, math, base64 encoders) and the
-//! optional syntax, exactly as that crate provides them. The checks, the fixes
+//! optional syntax, exactly as that crate provides them, and the edit
+//! constructors of a fix. The checks, the fixes
 //! and the event mappings of the providers all compile and run in it.
 
 use std::sync::{Arc, OnceLock};
@@ -40,5 +41,6 @@ fn build() -> Result<Arc<Env>, String> {
     }
     crate::ext::lists::install(&mut env).map_err(|e| format!("the CEL lists additions: {e}"))?;
     crate::ext::regex::install(&mut env).map_err(|e| format!("the CEL regex extension: {e}"))?;
+    crate::edit::install(&mut env).map_err(|e| format!("the CEL edit constructors: {e}"))?;
     Ok(Arc::new(env))
 }
