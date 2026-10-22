@@ -34,20 +34,23 @@ fn evaluated(expression: &str) -> String {
 }
 
 #[test]
-fn matches_glob_matches_module_paths_by_segment() {
-    assert_eq!(evaluated("'app/http'.matchesGlob('app/*')"), "true");
-    assert_eq!(evaluated("'app/http/x'.matchesGlob('app/*')"), "false");
-    assert_eq!(evaluated("'app'.matchesGlob('app/**')"), "true");
+fn glob_matches_matches_module_paths_by_segment() {
+    assert_eq!(evaluated("glob.matches('app/http', 'app/*')"), "true");
+    assert_eq!(evaluated("glob.matches('app/http/x', 'app/*')"), "false");
+    assert_eq!(evaluated("glob.matches('app', 'app/**')"), "true");
+    assert_eq!(evaluated("glob.matches('app::http', 'app/*')"), "true");
 }
 
 #[test]
-fn layer_index_is_the_index_of_the_first_layer_with_a_matching_glob() {
+fn the_first_layer_with_a_matching_glob_is_written_with_the_standard_functions() {
     let layers = "[['app/**'], ['domain/**', 'core']]";
-    assert_eq!(
-        evaluated(&format!("'domain/order'.layerIndex({layers})")),
-        "1"
-    );
-    assert_eq!(evaluated(&format!("'infra'.layerIndex({layers})")), "-1");
+    let layer = |module: &str| {
+        evaluated(&format!(
+            "(lists.range(size({layers})).filter(i, {layers}[i].exists(g, glob.matches('{module}', g))) + [-1])[0]"
+        ))
+    };
+    assert_eq!(layer("domain/order"), "1");
+    assert_eq!(layer("infra"), "-1");
 }
 
 #[test]

@@ -117,12 +117,43 @@ fn cel_bind_names_a_value_computed_once() {
 }
 
 #[test]
+fn matches() {
+    is("glob.matches('app/http', 'app/*')", "true");
+    is("glob.matches('app/http/x', 'app/*')", "false");
+    is("glob.matches('app', 'app/**')", "true");
+    is("glob.matches('app::http::x', 'app/**')", "true");
+    is("glob.matches('web/app', 'app/**')", "false");
+}
+
+#[test]
 fn program_identifiers() {
     let program = compile("regex.extract(a.b, c) + size(d)").unwrap();
     let names = lighthouse_spec::program_identifiers(&program);
     for name in ["a", "c", "d", "size", "regex"] {
         assert!(names.contains(name), "{name}: {names:?}");
     }
+}
+
+#[test]
+fn free_variables() {
+    let free = |source: &str| {
+        let program = compile(source).unwrap();
+        lighthouse_spec::free_variables(&program)
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(free("x.exists(e, e > y)"), ["x", "y"]);
+    assert_eq!(free("cel.bind(a, b, a + c)"), ["b", "c"]);
+    assert_eq!(free("glob.matches(m, g)"), ["g", "m"]);
+}
+
+#[test]
+fn matches_does_not_backtrack_on_a_run_of_double_stars() {
+    let path = ["a"; 40].join("/") + "/z";
+    let pattern = ["**"; 30].join("/") + "/b";
+    let started = std::time::Instant::now();
+    is(&format!("glob.matches('{path}', '{pattern}')"), "false");
+    assert!(started.elapsed().as_secs() < 2, "{:?}", started.elapsed());
 }
 
 #[test]

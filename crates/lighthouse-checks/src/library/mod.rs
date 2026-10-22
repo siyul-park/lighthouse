@@ -1,7 +1,4 @@
 //! The functions of CEL expressions that the model needs besides the standard
-//! library and the official extensions (see `lighthouse_spec`'s `ext`): the
-//! module path helpers `path.matchesGlob(pattern)` and
-//! `module.layerIndex(layers)`. What the code model says is a field of a
 //! library and the official extensions (see `lighthouse_spec`'s `ext`):
 //! `list.misplaced()` and `list.anchors()`. What the code model says is a field of a
 //! node, built only for the expressions that read it; see [`Needs`].
@@ -13,8 +10,6 @@ use cel::{
     extractors::{IntoFunction, This},
 };
 
-use crate::glob;
-
 mod functions;
 mod needs;
 mod variables;
@@ -25,12 +20,6 @@ pub(crate) use variables::{check_scope, declare as declare_variables};
 /// A context of the shared CEL environment with the library installed.
 pub(crate) fn context() -> Result<Context<'static, 'static>, String> {
     let mut context = lighthouse_spec::context()?;
-    declare(
-        &mut context,
-        "matchesGlob",
-        |This(path): This<Arc<String>>, pattern: Arc<String>| glob::matches(&path, &pattern),
-    )?;
-    declare(&mut context, "layerIndex", layer_index)?;
     declare(&mut context, "misplaced", misplaced)?;
     declare(&mut context, "anchors", anchors)?;
     Ok(context)
@@ -50,21 +39,6 @@ where
         .map_err(|e| format!("the CEL function `{name}`: {e}"))
 }
 
-/// `module.layerIndex(layers)`: the index of the first of the layers, each a
-/// list of module globs, that holds a glob matching the module; -1 when none.
-fn layer_index(This(module): This<Arc<String>>, layers: Arc<Vec<Value>>) -> i64 {
-    let globs: Vec<Vec<String>> = layers.iter().map(strings).collect();
-    glob::layer_of(
-        &module,
-        globs.iter().map(|layer| layer.iter().map(String::as_str)),
-    )
-}
-
-/// `ranks.longestNondecreasing()`: the indexes of a longest non-decreasing
-/// subsequence of a list of ints, in order; the first of the longest ones (the
-/// one that ends at the lowest index, and at each step the earliest
-/// predecessor), so the answer is the same from run to run. What the list
-/// leaves out is the fewest elements that, moved, put it in order.
 /// `keys.misplaced()`: the indexes of the elements of a list of ints that
 /// must move for the list to be in order, with the fewest moves: the ones a
 /// longest run already in order leaves out. The run kept is the first of the
@@ -165,18 +139,4 @@ fn kept_run(ranks: &[i64]) -> Vec<usize> {
     }
     kept.reverse();
     kept
-}
-
-/// The strings of a list value; anything else in it is skipped.
-fn strings(value: &Value) -> Vec<String> {
-    match value {
-        Value::List(items) => items
-            .iter()
-            .filter_map(|item| match item {
-                Value::String(s) => Some(s.to_string()),
-                _ => None,
-            })
-            .collect(),
-        _ => Vec::new(),
-    }
 }

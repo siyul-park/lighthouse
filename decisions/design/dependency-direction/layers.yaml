@@ -111,25 +111,32 @@ spec:
     type: cel
     select: edge
     variables:
+      # The index of the first layer, top to bottom, that holds a glob matching
+      # the module; -1 when none does.
+      - name: layer
+        params: [m]
+        expression: >-
+          (lists.range(size(options.layers)).filter(i, options.layers[i].exists(g, glob.matches(m, g)))
+            + [-1])[0]
       - name: from
         expression: >-
           edge.kind == 'imports' && edge.to.kind == 'module'
-          ? edge.from.module.layerIndex(options.layers) : -1
+          ? layer(edge.from.module) : -1
       - name: to
         expression: >-
           edge.kind == 'imports' && edge.to.kind == 'module'
-          ? edge.to.module.layerIndex(options.layers) : -1
+          ? layer(edge.to.module) : -1
       - name: contract
         expression: >-
           edge.kind != 'imports' || edge.to.kind != 'module' ? ''
-          : options.ignore.exists(i, edge.from.module.matchesGlob(i.from)
-              && edge.to.module.matchesGlob(i.to)) ? ''
-          : options.forbidden.exists(f, edge.from.module.matchesGlob(f.from)
-              && edge.to.module.matchesGlob(f.to)) ? 'forbidden'
+          : options.ignore.exists(i, glob.matches(edge.from.module, i.from)
+              && glob.matches(edge.to.module, i.to)) ? ''
+          : options.forbidden.exists(f, glob.matches(edge.from.module, f.from)
+              && glob.matches(edge.to.module, f.to)) ? 'forbidden'
           : from >= 0 && to >= 0 && to < from ? 'layers'
           : options.independent && from >= 0 && to == from
-              && !options.layers[from].exists(g, edge.from.module.matchesGlob(g)
-                  && edge.to.module.matchesGlob(g)) ? 'independence'
+              && !options.layers[from].exists(g, glob.matches(edge.from.module, g)
+                  && glob.matches(edge.to.module, g)) ? 'independence'
           : ''
     where: contract != ''
     message: >-

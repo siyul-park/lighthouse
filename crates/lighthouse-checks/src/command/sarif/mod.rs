@@ -22,7 +22,6 @@ use self::{
     log::{Log, Run, SarifResult, VERSION},
     tally::Tally,
 };
-use crate::glob;
 
 /// What a result with no `level` has, in SARIF.
 const DEFAULT_LEVEL: &str = "warning";
@@ -90,7 +89,11 @@ impl Reading<'_> {
         };
         let id = rule_id(run, result);
         let level = result.level.as_deref().unwrap_or(DEFAULT_LEVEL);
-        let by_rule = sarif.rules.is_empty() || sarif.rules.iter().any(|g| glob::matches(&id, g));
+        let by_rule = sarif.rules.is_empty()
+            || sarif
+                .rules
+                .iter()
+                .any(|g| lighthouse_spec::glob_matches(&id, g));
         let by_level = sarif.levels.is_empty() || sarif.levels.iter().any(|l| l == level);
         by_rule && by_level
     }

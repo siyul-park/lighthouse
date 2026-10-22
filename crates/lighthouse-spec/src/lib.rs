@@ -36,6 +36,7 @@ pub use expression::{
     Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, parse_template,
     program_calls, program_identifiers,
 };
+pub use ext::glob::matches as glob_matches;
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
 pub use model::{DecisionStatus, Example, ExampleFile, ExampleKind, Expect, Scope, Subject};
 pub use model_check::ModelCheck;

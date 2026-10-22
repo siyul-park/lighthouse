@@ -70,6 +70,7 @@ fn build() -> Result<Arc<Env>, String> {
     }
     crate::ext::bindings::install(&mut env)
         .map_err(|e| format!("the CEL bindings extension: {e}"))?;
+    crate::ext::glob::install(&mut env).map_err(|e| format!("the CEL glob extension: {e}"))?;
     crate::ext::lists::install(&mut env).map_err(|e| format!("the CEL lists additions: {e}"))?;
     crate::ext::regex::install(&mut env).map_err(|e| format!("the CEL regex extension: {e}"))?;
     crate::edit::install(&mut env).map_err(|e| format!("the CEL edit constructors: {e}"))?;
