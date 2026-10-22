@@ -29,22 +29,22 @@ spec:
   severity: warn
   check:
     type: cel
-    with:
+    variables:
       - name: shape
-        expr: decision.name.matches('^[a-z][a-z0-9]*/[a-z][a-z0-9]*(-[a-z0-9]+)*$')
+        expression: decision.name.matches('^[a-z][a-z0-9]*/[a-z][a-z0-9]*(-[a-z0-9]+)*$')
       - name: parts
-        expr: words(decision.name)
+        expression: words(decision.name)
       - name: counted
-        expr: >-
+        expression: >-
           size(parts) - (size(parts) > 0 && parts[0] in ['no', 'max', 'prefer'] ? 1 : 0)
       - name: banned
-        expr: parts.filter(w, w in ['is', 'are', 'be', 'should', 'must', 'when', 'not'])
+        expression: parts.filter(w, w in ['is', 'are', 'be', 'should', 'must', 'when', 'not'])
       - name: echoes
-        expr: >-
+        expression: >-
           parts.filter(w, trimSuffixes(w, 's') == decision.pack
             || (size(trimSuffixes(w, 's')) >= 4 && decision.pack.startsWith(trimSuffixes(w, 's'))))
       - name: problems
-        expr: >-
+        expression: >-
           (shape ? '' : ' is not kebab-case;')
           + (counted > 3 ? ' has ' + string(counted) + ' words, at most 3;' : '')
           + (size(banned) > 0 ? ' uses `' + banned[0] + '`;' : '')

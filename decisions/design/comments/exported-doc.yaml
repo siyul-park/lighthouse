@@ -62,9 +62,9 @@ spec:
     additionalProperties: false
   check:
     type: cel
-    with:
+    variables:
       - name: owner
-        expr: owner(symbol)
+        expression: owner(symbol)
     where: >-
       options.kinds.exists(k, k == symbol.kind)
       && exposed(symbol, options.includeInternal)

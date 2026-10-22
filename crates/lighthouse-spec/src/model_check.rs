@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     CelCheck, Select, Subject,
-    check::{Binding, Identity},
+    check::{Identity, Variable},
     expression::compile_problem,
 };
 
@@ -24,8 +24,8 @@ pub struct ModelCheck {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub over: Option<Select>,
     /// Named intermediate values for `select`, evaluated in order.
-    #[serde(default, rename = "with", skip_serializing_if = "Vec::is_empty")]
-    pub bindings: Vec<Binding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<Variable>,
     /// CEL over the ranged value that picks the subjects worth asking about;
     /// aim for recall. Default: every subject that matches the decision's scope.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -46,7 +46,7 @@ impl ModelCheck {
         let over = self.over.or_else(|| Select::of(subject))?;
         Some(CelCheck {
             select: Some(over),
-            bindings: self.bindings.clone(),
+            variables: self.variables.clone(),
             condition: "false".to_owned(),
             message: String::new(),
             evidence: BTreeMap::new(),

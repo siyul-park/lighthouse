@@ -81,13 +81,13 @@ spec:
   check:
     type: cel
     select: symbol
-    with:
+    variables:
       - name: callable
-        expr: "symbol.func != null && (symbol.kind == 'function' || symbol.kind == 'method')"
+        expression: "symbol.func != null && (symbol.kind == 'function' || symbol.kind == 'method')"
       - name: declared
-        expr: "symbol.owner_kind == 'interface' || (symbol.func == null && symbol.kind in ['function', 'method'])"
+        expression: "symbol.owner_kind == 'interface' || (symbol.func == null && symbol.kind in ['function', 'method'])"
       - name: matched
-        expr: >-
+        expression: >-
           ('wrapper' in options.kinds && callable && symbol.func.forwards_only ? ['wrapper'] : [])
           + ('dead' in options.kinds && symbol.visibility == 'private'
               && symbol.kind in options.deadKinds && !declared

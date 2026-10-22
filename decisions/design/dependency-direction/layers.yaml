@@ -110,17 +110,17 @@ spec:
   check:
     type: cel
     select: edge
-    with:
+    variables:
       - name: from
-        expr: >-
+        expression: >-
           edge.kind == 'imports' && edge.to.kind == 'module'
           ? layerOf(edge.from.module, options.layers) : -1
       - name: to
-        expr: >-
+        expression: >-
           edge.kind == 'imports' && edge.to.kind == 'module'
           ? layerOf(edge.to.module, options.layers) : -1
       - name: contract
-        expr: >-
+        expression: >-
           edge.kind != 'imports' || edge.to.kind != 'module' ? ''
           : options.ignore.exists(i, globMatch(edge.from.module, i.from)
               && globMatch(edge.to.module, i.to)) ? ''

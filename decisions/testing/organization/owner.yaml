@@ -132,13 +132,13 @@ spec:
   check:
     type: cel
     select: symbol
-    with:
+    variables:
       - name: owner
-        expr: owner(symbol)
+        expression: owner(symbol)
       - name: owners
-        expr: tests(symbol)
+        expression: tests(symbol)
       - name: missing
-        expr: >-
+        expression: >-
           'missing' in options.kinds
           && (symbol.kind == 'method'
               ? (owner.kind == 'type' && exposed(owner, options.includeInternal))
@@ -151,7 +151,7 @@ spec:
           && symbol.module_tested
           && size(owners) == 0 && !symbol.touched_by_tests
       - name: duplicate
-        expr: >-
+        expression: >-
           'duplicate' in options.kinds
           && exposed(symbol, options.includeInternal)
           && (symbol.kind == 'function' || symbol.kind == 'method'

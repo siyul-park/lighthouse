@@ -68,23 +68,23 @@ spec:
   check:
     type: cel
     select: module
-    with:
+    variables:
       - name: crowded
-        expr: >-
+        expression: >-
           'members' in options.kinds
           ? module.types.filter(t, t.public_methods > options.maxMembers)
           : []
       - name: split
-        expr: >-
+        expression: >-
           'cohesion' in options.kinds
           ? module.types.filter(t, t.methods >= options.minMethods && t.lcom4 > 1)
           : []
       - name: tied
-        expr: >-
+        expression: >-
           'conjoined' in options.kinds && module.parent != null && module.parent.sole_user
           && module.parent.called && size(module.parent.reaches) > 0
       - name: more
-        expr: >-
+        expression: >-
           size(crowded) + size(split.filter(t, !crowded.exists(c, c.id == t.id))) - 1
     where: size(crowded) + size(split) > 0
     # Recall-oriented: modules under 600 lines with a single dependent or

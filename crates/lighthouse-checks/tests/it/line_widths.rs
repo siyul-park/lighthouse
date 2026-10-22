@@ -19,9 +19,9 @@ spec:
   check:
     type: cel
     select: file
-    with:
+    variables:
       - name: wide
-        expr: file.line_widths.filter(l, l.width > 5 && !l.exempt)
+        expression: file.line_widths.filter(l, l.width > 5 && !l.exempt)
     where: size(wide) > 0
     message: "line {{ wide[0].line }} is {{ wide[0].width }} wide"
     at:

@@ -24,7 +24,7 @@ pub use catalog::Catalog;
 pub use catalog::load::{load_local, local_dir, local_files};
 pub use check::{
     BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, NamedRule, OrderReport,
-    OrderScope, Select,
+    OrderScope, Select, Variable,
 };
 pub use command::CommandCheck;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};

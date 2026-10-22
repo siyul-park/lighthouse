@@ -107,17 +107,17 @@ spec:
   check:
     type: cel
     select: symbol
-    with:
+    variables:
       - name: repeated
-        expr: >-
+        expression: >-
           'qualifier' in options.kinds
           ? symbol.module_forms.filter(f, f.key != ''
               && (symbol.name_key.startsWith(f.key + '_') || symbol.name_key.endsWith('_' + f.key)))
           : []
       - name: word_count
-        expr: "'words' in options.kinds ? size(words(symbol.name)) : 0"
+        expression: "'words' in options.kinds ? size(words(symbol.name)) : 0"
       - name: matched
-        expr: >-
+        expression: >-
           ('qualifier' in options.kinds && symbol.owner == '' && symbol.visibility != 'private'
             && options.symbols.exists(k, k == symbol.kind)
             && !(symbol.kind == 'function' && symbol.name == 'main') && size(repeated) > 0

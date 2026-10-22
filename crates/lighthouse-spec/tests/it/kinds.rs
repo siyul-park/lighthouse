@@ -116,7 +116,7 @@ fn select_of() {
 fn cel_check_selects() {
     let check = |select: Option<Select>| CelCheck {
         select,
-        bindings: Vec::new(),
+        variables: Vec::new(),
         condition: "true".to_owned(),
         message: "m".to_owned(),
         evidence: BTreeMap::new(),

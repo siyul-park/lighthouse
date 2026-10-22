@@ -28,25 +28,6 @@
       },
       "type": "object"
     },
-    "Binding": {
-      "additionalProperties": false,
-      "description": "A named CEL value.",
-      "properties": {
-        "expr": {
-          "description": "CEL.",
-          "type": "string"
-        },
-        "name": {
-          "description": "A lower-case identifier that no expression variable already uses.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "expr"
-      ],
-      "type": "object"
-    },
     "BuiltinCheck": {
       "anyOf": [
         {
@@ -234,16 +215,16 @@
               "const": "cel",
               "type": "string"
             },
+            "variables": {
+              "description": "Named intermediate values, evaluated in order before `where`; each\nexpression sees the ones before it.",
+              "items": {
+                "$ref": "#/$defs/Variable"
+              },
+              "type": "array"
+            },
             "where": {
               "description": "CEL; true for a violation.",
               "type": "string"
-            },
-            "with": {
-              "description": "Named intermediate values, evaluated in order before `where`; each\nexpression sees the ones before it.",
-              "items": {
-                "$ref": "#/$defs/Binding"
-              },
-              "type": "array"
             }
           },
           "required": [
@@ -326,10 +307,10 @@
               "const": "model",
               "type": "string"
             },
-            "with": {
+            "variables": {
               "description": "Named intermediate values for `select`, evaluated in order.",
               "items": {
-                "$ref": "#/$defs/Binding"
+                "$ref": "#/$defs/Variable"
               },
               "type": "array"
             }
@@ -1581,6 +1562,25 @@
           "type": "string"
         }
       ]
+    },
+    "Variable": {
+      "additionalProperties": false,
+      "description": "A named CEL value: an intermediate result the check, its message, its\nevidence and its fix all see by name.",
+      "properties": {
+        "expression": {
+          "description": "CEL.",
+          "type": "string"
+        },
+        "name": {
+          "description": "A lower-case identifier that no expression variable already uses.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "expression"
+      ],
+      "type": "object"
     },
     "limit": {
       "oneOf": [

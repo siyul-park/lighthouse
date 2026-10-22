@@ -103,35 +103,35 @@ spec:
   check:
     type: cel
     select: function
-    with:
+    variables:
       - name: m
-        expr: metrics(func)
+        expression: metrics(func)
       - name: caps
-        expr: >-
+        expression: >-
           {'params': limit(func, options.limits.params),
            'results': limit(func, options.limits.results)}
       - name: eff
-        expr: func.effective
+        expression: func.effective
       - name: hidden
-        expr: eff.hidden
+        expression: eff.hidden
       - name: note
-        expr: >-
+        expression: >-
           size(hidden) == 0 ? ''
           : ' (' + hidden.map(h, string(h.fields) + ' in ' + h.struct).join(', ')
             + ' counted from structs used only here)'
       - name: reachable
-        expr: >-
+        expression: >-
           func.lang == 'go' && func.visibility != 'private'
           && (func.kind == 'function'
               || (func.kind == 'method' && owner(func).visibility != 'private'))
       - name: exposed
-        expr: >-
+        expression: >-
           reachable
           ? (func.signature.params + func.signature.results)
               .filter(t, t.symbol != '' && !t.exported)
           : []
       - name: found
-        expr: >-
+        expression: >-
           (m.measured && 'params' in options.kinds && caps.params >= 0 && eff.params > caps.params
             ? [{'kind': 'params', 'value': eff.params, 'max': caps.params, 'what': 'parameters',
                 'hint': func.role == 'constructor' ? 'split ' + func.built : 'split by responsibility'}] : [])
@@ -141,7 +141,7 @@ spec:
           + ('unexported' in options.kinds && size(exposed) > 0
             ? [{'kind': 'unexported', 'value': size(exposed), 'max': 0, 'what': 'unexported types', 'hint': ''}] : [])
       - name: first
-        expr: >-
+        expression: >-
           size(found) > 0 ? found[0]
           : {'kind': '', 'value': 0, 'max': 0, 'what': '', 'hint': ''}
     where: size(found) > 0

@@ -41,15 +41,15 @@ spec:
   check:
     type: cel
     select: symbol
-    with:
+    variables:
       - name: first
-        expr: symbol.file_first_test
+        expression: symbol.file_first_test
       - name: user
-        expr: symbol.helper_user
+        expression: symbol.helper_user
       - name: misplaced_fixture
-        expr: symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
+        expression: symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
       - name: misplaced_helper
-        expr: symbol.test_role == 'test-helper' && size(user) > 0
+        expression: symbol.test_role == 'test-helper' && size(user) > 0
     where: >-
       (misplaced_fixture || misplaced_helper)
     message: >-

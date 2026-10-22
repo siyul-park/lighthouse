@@ -76,11 +76,18 @@ impl<'de> Deserialize<'de> for Check {
                 }
             },
             Some("cel") => &[
-                "select", "with", "where", "message", "evidence", "at", "identity", "abstain",
+                "select",
+                "variables",
+                "where",
+                "message",
+                "evidence",
+                "at",
+                "identity",
+                "abstain",
                 "prompt",
             ],
             Some("command") => &command,
-            Some("model") => &["over", "with", "select", "prompt", "identity"],
+            Some("model") => &["over", "variables", "select", "prompt", "identity"],
             other => {
                 return Err(D::Error::custom(match other {
                     None => "a check needs a `type`: builtin, cel, command or model".to_owned(),
@@ -430,8 +437,8 @@ pub struct CelCheck {
     pub select: Option<Select>,
     /// Named intermediate values, evaluated in order before `where`; each
     /// expression sees the ones before it.
-    #[serde(default, rename = "with", skip_serializing_if = "Vec::is_empty")]
-    pub bindings: Vec<Binding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<Variable>,
     /// CEL; true for a violation.
     #[serde(rename = "where")]
     pub condition: String,
@@ -462,14 +469,15 @@ pub struct CelCheck {
     pub prompt: Option<String>,
 }
 
-/// A named CEL value.
+/// A named CEL value: an intermediate result the check, its message, its
+/// evidence and its fix all see by name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct Binding {
+pub struct Variable {
     /// A lower-case identifier that no expression variable already uses.
     pub name: String,
     /// CEL.
-    pub expr: String,
+    pub expression: String,
 }
 
 /// Where a finding is reported. Every field is a CEL expression.
@@ -507,8 +515,8 @@ impl CelCheck {
 
     /// The first expression that does not compile, described.
     pub(crate) fn problem(&self) -> Option<String> {
-        for binding in &self.bindings {
-            let name = binding.name.as_str();
+        for variable in &self.variables {
+            let name = variable.name.as_str();
             let valid = !name.is_empty()
                 && name
                     .chars()
@@ -516,9 +524,12 @@ impl CelCheck {
                 && name != "options"
                 && !Select::ALL.iter().any(|s| s.variable() == name);
             if !valid {
-                return Some(format!("check with: `{name}` is not a usable name"));
+                return Some(format!("check variables: `{name}` is not a usable name"));
             }
-            if let Some(problem) = compile_problem(&format!("check with `{name}`"), &binding.expr) {
+            if let Some(problem) = compile_problem(
+                &format!("check variable `{name}`"),
+                &variable.expression,
+            ) {
                 return Some(problem);
             }
         }

@@ -77,9 +77,9 @@ spec:
   check:
     type: cel
     select: function
-    with:
+    variables:
       - name: manual
-        expr: >-
+        expression: >-
           'manual' in options.kinds && func.manual_assertions > 0
           && !func.name.startsWith('Benchmark')
           && func.module_imports.exists(i, options.libraries.exists(l, i == l || i.startsWith(l + '/')))

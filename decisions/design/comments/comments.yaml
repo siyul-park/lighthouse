@@ -90,35 +90,35 @@ spec:
   check:
     type: cel
     select: comment
-    with:
+    variables:
       - name: documentation
-        expr: >-
+        expression: >-
           lines(comment.text).exists(l,
             (l.trim().startsWith('///') && !l.trim().startsWith('////'))
             || l.trim().startsWith('//!'))
       - name: bodies
-        expr: >-
+        expression: >-
           lines(comment.text)
             .map(l, trimLeft(trimSuffixes(trimPrefixes(trimPrefixes(l.trim(), '//'), '/*'), '*/'), '#').trim())
             .filter(b, b != '')
       - name: texts
-        expr: >-
+        expression: >-
           bodies.map(b,
             options.labels.exists(m, b.startsWith(m))
             ? drop(b, size(options.labels.filter(m, b.startsWith(m))[0])).trim()
             : trimRight(drop(b, leadingRun(b, options.ruleChars)).trim(), options.ruleChars).trim())
       - name: named
-        expr: texts.filter(t, t != '')
+        expression: texts.filter(t, t != '')
       - name: directive
-        expr: >-
+        expression: >-
           size(bodies) > 0
           && (['go:', '+build', 'nolint', 'lint:', 'lighthouse-', '#[', 'SAFETY:', 'noqa']
                 .exists(p, bodies[0].startsWith(p))
               || bodies[0].matches('^[a-z]+:[a-z]'))
       - name: prose
-        expr: "!documentation && !comment.text.contains('```') && !directive"
+        expression: "!documentation && !comment.text.contains('```') && !directive"
       - name: matched
-        expr: >-
+        expression: >-
           ('banner' in options.kinds && comment.standalone && !documentation && size(bodies) > 0
             && bodies.all(b, options.labels.exists(m, b.startsWith(m))
                              || leadingRun(b, options.ruleChars) >= options.minRun)

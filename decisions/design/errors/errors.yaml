@@ -74,22 +74,22 @@ spec:
   check:
     type: cel
     select: event
-    with:
+    variables:
       - name: what
-        expr: "event.detail != '' ? event.detail : event.kind"
+        expression: "event.detail != '' ? event.detail : event.kind"
       - name: production
-        expr: >-
+        expression: >-
           event.func.role != 'test' && event.func.role != 'entrypoint'
           && !options.allowPrefixes.exists(p, event.func.name.startsWith(p))
       - name: matched
-        expr: >-
+        expression: >-
           (event.func.lang == 'go' && event.kind == 'error-compare' ? ['compare'] : [])
           + (event.func.lang == 'go' && event.kind == 'error-assert' ? ['assert'] : [])
           + (event.func.lang == 'go' && event.kind == 'errorf-unwrapped' ? ['wrap'] : [])
           + (production && event.kind == 'panic' ? ['panic'] : [])
           + (production && event.kind == 'unwrap' ? ['unwrap'] : [])
       - name: found
-        expr: matched.filter(k, k in options.kinds)
+        expression: matched.filter(k, k in options.kinds)
     where: size(found) > 0
     message: >-
       {{ size(found) == 0 ? ''

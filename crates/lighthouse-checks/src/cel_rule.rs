@@ -27,7 +27,7 @@ use crate::{
 /// A CEL check with every expression compiled.
 pub(crate) struct CelRule {
     select: Select,
-    bindings: Vec<(String, Program)>,
+    variables: Vec<(String, Program)>,
     condition: Program,
     message: Template,
     evidence: Vec<(String, Program)>,
@@ -63,7 +63,7 @@ impl CelRule {
     pub(crate) fn new(decision: &Decision, check: &CelCheck) -> Result<Self, Error> {
         let id = decision.id();
         let mut sources: Vec<&str> = vec![&check.condition, &check.message];
-        sources.extend(check.bindings.iter().map(|b| b.expr.as_str()));
+        sources.extend(check.variables.iter().map(|v| v.expression.as_str()));
         sources.extend(check.evidence.values().map(String::as_str));
         if let Some(at) = &check.at {
             for source in [&at.symbol, &at.line, &at.end_line] {
@@ -84,13 +84,13 @@ impl CelRule {
         Ok(Self {
             select,
             abstain: Abstain::new(decision, check, select)?,
-            bindings: check
-                .bindings
+            variables: check
+                .variables
                 .iter()
-                .map(|b| {
+                .map(|v| {
                     Ok((
-                        b.name.clone(),
-                        compile(id, &format!("with `{}`", b.name), &b.expr)?,
+                        v.name.clone(),
+                        compile(id, &format!("variable `{}`", v.name), &v.expression)?,
                     ))
                 })
                 .collect::<Result<_, Error>>()?,
@@ -357,7 +357,7 @@ impl Evaluation<'_> {
         let mut frame = Frame::new(&self.meta.id, &rule.library);
         frame.set_fact(rule.select.variable(), value);
         frame.set_fact("options", self.options.clone_as_boxed());
-        for (name, program) in &rule.bindings {
+        for (name, program) in &rule.variables {
             let bound = frame.run(program)?;
             frame.set_cel(name, bound);
         }

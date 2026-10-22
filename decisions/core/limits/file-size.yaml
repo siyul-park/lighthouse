@@ -52,14 +52,14 @@ spec:
     additionalProperties: false
   check:
     type: cel
-    with:
+    variables:
       - name: wide
-        expr: >-
+        expression: >-
           'width' in options.kinds && file.lang != 'text'
           ? file.line_widths.filter(l, l.width > options.maxWidth && !l.exempt)
           : []
       - name: matched
-        expr: >-
+        expression: >-
           ('lines' in options.kinds && file.lines > options.max ? ['lines'] : [])
           + (size(wide) > 0 ? ['width'] : [])
     where: size(matched) > 0

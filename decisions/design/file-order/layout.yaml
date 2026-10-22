@@ -75,15 +75,15 @@ spec:
   check:
     type: cel
     select: function
-    with:
+    variables:
       - name: local
-        expr: func.local_callers
+        expression: func.local_callers
       - name: anchor
-        expr: >-
+        expression: >-
           size(local) == 0 ? func
           : options.sharedAfterLastCaller ? local[size(local) - 1] : local[0]
       - name: separators
-        expr: >-
+        expression: >-
           func.kind == 'method' && func.gap.previous != null
           ? func.gap.between.filter(b, b.kind != 'method'
               || (b.owner_key != func.owner_key
@@ -91,7 +91,7 @@ spec:
                       || (b.visibility != 'private') == (func.visibility != 'private'))))
           : []
       - name: callee_first
-        expr: >-
+        expression: >-
           'callers-first' in options.kinds
           && (func.kind == 'function' || func.kind == 'method') && size(local) > 0
           && func.pos <= anchor.pos
@@ -100,9 +100,9 @@ spec:
           && !(func.lang == 'rust' && func.kind == 'method' && !func.implementation
                && anchor.kind == 'method' && anchor.implementation)
       - name: separated
-        expr: "'gap' in options.kinds && size(separators) > 0"
+        expression: "'gap' in options.kinds && size(separators) > 0"
       - name: matched
-        expr: "(callee_first ? ['callers-first'] : []) + (separated ? ['gap'] : [])"
+        expression: "(callee_first ? ['callers-first'] : []) + (separated ? ['gap'] : [])"
     where: size(matched) > 0
     abstain: >-
       size(matched) == 0 && !func.test && !func.generated

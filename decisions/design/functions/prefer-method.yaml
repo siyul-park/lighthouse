@@ -99,22 +99,22 @@ spec:
   check:
     type: cel
     select: function
-    with:
+    variables:
       - name: affinity
-        expr: func.receiver_affinity
+        expression: func.receiver_affinity
       - name: envy
-        expr: "('envy' in options.kinds || 'module' in options.kinds) ? func.envy : {}"
+        expression: "('envy' in options.kinds || 'module' in options.kinds) ? func.envy : {}"
       - name: free
-        expr: func.kind == 'function' && func.name != 'main' && func.name != 'init'
+        expression: func.kind == 'function' && func.name != 'main' && func.name != 'init'
       - name: method
-        expr: >-
+        expression: >-
           'method' in options.kinds
           && free && func.visibility == 'private' && !func.constructor_named
           && func.references == 0 && size(affinity) > 0
           && (affinity.takes_owner_param || affinity.uses_owner)
           && !(options.requireOwnerParam && !affinity.takes_owner_param)
       - name: envied
-        expr: >-
+        expression: >-
           'envy' in options.kinds
           && free && (func.visibility == 'private' || options.envy.includeExported)
           && func.role != 'constructor' && func.references == 0
@@ -122,14 +122,14 @@ spec:
           && size(envy) > 0 && !envy.entry && envy.count >= options.envy.minMembers
           && size(envy.others) == 0 && envy.same_module
       - name: misplaced
-        expr: >-
+        expression: >-
           'module' in options.kinds
           && free && (func.visibility == 'private' || options.module.includeExported)
           && func.references == 0 && func.statements >= options.module.minStatements
           && size(envy) > 0 && !envy.entry && size(envy.module_target) > 0
           && size(envy.module_uses) >= options.module.minUses && envy.own_uses == 0
       - name: matched
-        expr: >-
+        expression: >-
           (method ? ['method'] : []) + (envied ? ['envy'] : []) + (misplaced ? ['module'] : [])
     where: method
     abstain: envied || misplaced

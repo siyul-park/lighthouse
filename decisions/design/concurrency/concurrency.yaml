@@ -46,19 +46,19 @@ spec:
   check:
     type: cel
     select: symbol
-    with:
+    variables:
       - name: params
-        expr: >-
+        expression: >-
           symbol.lang == 'go' && symbol.func != null ? symbol.func.signature.params : []
       - name: matched
-        expr: >-
+        expression: >-
           (params.exists(c, c.text == 'context.Context' && c.index > 0
             && params.exists(b, b.index < c.index && !(b.text in options.allowTypesBefore)))
             ? ['context-first'] : [])
           + (symbol.kind == 'field' && symbol.lang == 'go' && symbol.type_ref.text == 'context.Context'
             ? ['stored-context'] : [])
       - name: found
-        expr: matched.filter(k, k in options.kinds)
+        expression: matched.filter(k, k in options.kinds)
     where: size(found) > 0
     message: >-
       {{ size(found) == 0 ? ''
