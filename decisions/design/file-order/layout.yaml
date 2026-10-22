@@ -16,14 +16,13 @@ spec:
     private function or method is declared before its caller (the first
     caller in the file, or with `sharedAfterLastCaller` the last one), so the
     caller must come first. The fix moves the callee after the caller. A
-    function in a method group the layout orders by visibility is left as it
-    is, and so is a Rust trait method before its implementation: those
-    orders are decided by `design/declaration-groups`. `gap`: a method is
-    separated from the previous method of its type by another declaration
-    (a function, a type, or a method of another type; with
-    `visibilityGroups`, a method of another type in the other visibility
-    group is not a separation), so the methods of one owner are kept
-    together. The fix moves the method after the previous one.
+    function that the order of `design/declaration-groups` places before its
+    caller is left as it is, and so is a Rust trait method before its
+    implementation: those orders are decided by `design/declaration-groups`.
+    `gap`: a method is separated from the previous method of its type by
+    another declaration (a function, a type, or a method of another type), so
+    the methods of one owner are kept together. The fix moves the method
+    after the previous one.
 
     Ordering never justifies splits: these rules MUST NOT justify artificial
     file splits, wrappers or duplicated helpers. Reading order within a
@@ -58,20 +57,7 @@ spec:
         type: boolean
         default: false
         description: Require a helper used by several functions of its file to follow all of them, not only the first.
-      visibilityGroups:
-        type: boolean
-        default: true
-        description: >-
-          The layout groups methods by visibility (public methods of all
-          types, then private ones), so a method of another owner in the
-          other visibility group does not separate an owner's methods. Set to
-          false when a file puts every owner's methods together, as impl
-          blocks do.
     additionalProperties: false
-  languages:
-    rust:
-      options:
-        visibilityGroups: false
   check:
     type: cel
     select: function
@@ -85,10 +71,7 @@ spec:
       - name: separators
         expression: >-
           func.kind == 'method' && func.gap.previous != null
-          ? func.gap.between.filter(b, b.kind != 'method'
-              || (b.owner_key != func.owner_key
-                  && (!options.visibilityGroups
-                      || (b.visibility != 'private') == (func.visibility != 'private'))))
+          ? func.gap.between.filter(b, b.kind != 'method' || b.owner_key != func.owner_key)
           : []
       - name: callee_first
         expression: >-
@@ -475,9 +458,9 @@ spec:
 
         func (a A) Two() int { return 2 }
 
-        func (b B) One() int { return 1 }
-
         func (a A) hidden() int { return 3 }
+
+        func (b B) One() int { return 1 }
     options:
       kinds:
       - gap

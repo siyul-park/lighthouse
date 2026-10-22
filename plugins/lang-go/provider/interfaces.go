@@ -25,10 +25,6 @@ type methodIndex struct {
 	seen   map[*types.Interface]bool
 }
 
-func newMethodIndex() *methodIndex {
-	return &methodIndex{byName: map[string][]*types.Interface{}, seen: map[*types.Interface]bool{}}
-}
-
 func (m *methodIndex) add(list ...*types.Interface) {
 	for _, iface := range list {
 		if m.seen[iface] {
@@ -60,6 +56,10 @@ func (r *resolver) widerInterfaces(pkg *packages.Package) map[string][]*types.In
 		found.add(cached.([]*types.Interface)...)
 	})
 	return found.byName
+}
+
+func newMethodIndex() *methodIndex {
+	return &methodIndex{byName: map[string][]*types.Interface{}, seen: map[*types.Interface]bool{}}
 }
 
 // interfacesIn lists the interfaces declared at the top level of a package:

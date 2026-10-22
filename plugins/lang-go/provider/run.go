@@ -74,29 +74,6 @@ const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledG
 // syntheticModule names the module assumed for Go files with no go.mod.
 const syntheticModule = "lighthouse.invalid/workspace"
 
-func newRun(params sdk.IndexParams, opts options) *run {
-	r := &run{
-		root:          params.Project.Root,
-		opts:          opts,
-		overlays:      map[string][]byte{},
-		requested:     map[string]sdk.FileRef{},
-		fragments:     map[string]*sdk.Fragment{},
-		claimed:       map[string]bool{},
-		problems:      map[string]string{},
-		excludedFiles: map[string]bool{},
-		failed:        map[string]int{},
-		encoded:       map[string]json.RawMessage{},
-		result:        emptyResult(),
-	}
-	for _, f := range params.Files {
-		r.requested[f.Path] = f
-	}
-	for _, o := range params.Context.Overlays {
-		r.overlays[filepath.Join(r.root, filepath.FromSlash(o.Path))] = []byte(o.Text)
-	}
-	return r
-}
-
 func (r *run) index() {
 	var candidates []string
 	for rel := range r.requested {
@@ -470,17 +447,6 @@ func (r *run) isRequested(rel string) bool {
 	return ok
 }
 
-// next waits for the load of the next batch in order and frees its slot.
-func (l *loader) next() loaded {
-	got := <-l.ready[l.read]
-	l.read++
-	select {
-	case <-l.slots:
-	default: // loaded up front, no slot was taken
-	}
-	return got
-}
-
 // patterns are the package directories of b's files, relative to its go.mod.
 func (b *batch) patterns(root string) []string {
 	dirs := map[string]bool{}
@@ -500,6 +466,40 @@ func (b *batch) patterns(root string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// next waits for the load of the next batch in order and frees its slot.
+func (l *loader) next() loaded {
+	got := <-l.ready[l.read]
+	l.read++
+	select {
+	case <-l.slots:
+	default: // loaded up front, no slot was taken
+	}
+	return got
+}
+
+func newRun(params sdk.IndexParams, opts options) *run {
+	r := &run{
+		root:          params.Project.Root,
+		opts:          opts,
+		overlays:      map[string][]byte{},
+		requested:     map[string]sdk.FileRef{},
+		fragments:     map[string]*sdk.Fragment{},
+		claimed:       map[string]bool{},
+		problems:      map[string]string{},
+		excludedFiles: map[string]bool{},
+		failed:        map[string]int{},
+		encoded:       map[string]json.RawMessage{},
+		result:        emptyResult(),
+	}
+	for _, f := range params.Files {
+		r.requested[f.Path] = f
+	}
+	for _, o := range params.Context.Overlays {
+		r.overlays[filepath.Join(r.root, filepath.FromSlash(o.Path))] = []byte(o.Text)
+	}
+	return r
 }
 
 func nearestModule(dir string, cache map[string]string) (string, bool) {

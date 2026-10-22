@@ -19,11 +19,26 @@ spec:
       expression: >-
         n.declaration && !n.generated
         && (n.file_test ? n.test_role == 'fixture' : !n.test)
-    # The declaration group of a node, as `design/declaration-groups` orders
-    # them: the index in `options.groups` of the first of the node's candidate
-    # groups that the order names, -1 when none (or the node is no declaration
-    # that is judged). A decision that has no `groups` option, such as
-    # `design/layout`, reads the default order of its language.
+    # The types a file declares, and the owners its methods name, in the order
+    # the owner blocks follow each other: the types in declaration order, then
+    # the owners of types declared elsewhere in the order of their methods.
+    - name: owner_types
+      expression: >-
+        file.symbols.filter(s, is_placed(s) && (s.kind == 'type' || s.kind == 'interface'))
+          .map(s, {'id': s.id, 'name': s.name, 'module': s.module})
+    - name: owners
+      expression: >-
+        (owner_types.map(t, t.id)
+          + file.symbols.filter(s, is_placed(s) && s.kind == 'method' && s.owner_key != '')
+              .map(s, s.owner_key)).distinct()
+    # The place of a node in the order of `design/declaration-groups`, a number
+    # to compare: the index in `options.groups` of the first of the node's
+    # candidate groups that the order names, times a million, plus, in the
+    # group `method`, the rank of the node in the block of its owner: 4 per
+    # owner block, and in the block its constructors, its exported methods, its
+    # hooks, its unexported methods. -1 when no group names the node (or it is
+    # no declaration that is judged). A decision that has no `groups` option,
+    # such as `design/layout`, reads the default order of its language.
     - name: declaration_group
       params: [n]
       expression: >-
@@ -33,12 +48,21 @@ spec:
               : n.lang == 'rust'
               ? ['const', 'var', 'type', 'public-function', 'private-function']
               : ['public-type', 'private-type', 'public-const', 'private-const', 'var', 'init',
-                 'public-function', 'constructor', 'public-method', 'hook', 'private-function'],
+                 'method', 'public-function', 'private-function'],
           cel.bind(hooks, has(options.hookNames) ? options.hookNames
               : n.lang == 'rust' ? []
               : ['Clone', 'String', 'GoString', 'Error', 'Unwrap', 'MarshalJSON', 'UnmarshalJSON',
                  'MarshalText', 'UnmarshalText', 'MarshalBinary', 'UnmarshalBinary'],
-          cel.bind(found, (
+          cel.bind(owner, n.kind == 'method' ? n.owner_key
+              : n.kind == 'type' || n.kind == 'interface' ? n.id
+              : n.kind == 'function' && open && n.constructor_named
+              ? (owner_types.filter(t, t.name == n.built && t.module == n.module).map(t, t.id) + [''])[0]
+              : '',
+          cel.bind(inner,
+              open && n.constructor_named ? 0
+              : open && n.kind == 'method' && n.name in hooks ? 2
+              : open ? 1 : 3,
+          cel.bind(chosen, (
               n.kind == 'type' || n.kind == 'interface'
               ? [open ? 'public-type' : 'private-type', 'type']
               : n.kind == 'const'
@@ -46,14 +70,16 @@ spec:
               : n.kind == 'var' ? ['var']
               : n.kind == 'function'
               ? (n.name == 'init' ? ['init'] : [])
-                + (open && n.constructor_named ? ['constructor'] : [])
+                + (owner != '' ? ['method'] : [])
                 + [open ? 'public-function' : 'private-function']
-              : n.kind == 'method'
-              ? ['type'] + (open && n.name in hooks ? ['hook'] : [])
-                + [open ? 'public-method' : 'private-function']
+              : n.kind == 'method' ? ['type', 'method']
               : []
-            ).map(c, order.indexOf(c)).filter(i, i >= 0),
-            size(found) > 0 ? found[0] : -1))))
+            ).filter(c, c in order),
+            size(chosen) == 0 ? -1
+            : order.indexOf(chosen[0]) * 1000000
+              + (chosen[0] == 'method'
+                 ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 4 + inner
+                 : 0)))))))
   sections:
     - name: principles
       title: Principles

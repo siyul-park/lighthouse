@@ -148,22 +148,22 @@ func (r *run) candidates() (candidates, ignored []string) {
 	return candidates, ignored
 }
 
-// unitAPIKey is the key of u under base without the bodies of its functions:
-// its own API and the API of everything it imports.
-func unitAPIKey(base string, u *cacheUnit) string {
-	parts := []string{base, u.rel, u.api}
-	for _, d := range closure(u) {
-		parts = append(parts, d.rel, d.api)
-	}
-	return digest(parts...)
-}
-
 // interfaceDigest digests the interface declarations of every unit that is
 // analyzed: a type's `implements` edges depend on all of them.
 func (pl *planner) interfaceDigest() string {
 	var parts []string
 	for _, u := range pl.requestedUnits {
 		parts = append(parts, u.rel, u.ifaces)
+	}
+	return digest(parts...)
+}
+
+// unitAPIKey is the key of u under base without the bodies of its functions:
+// its own API and the API of everything it imports.
+func unitAPIKey(base string, u *cacheUnit) string {
+	parts := []string{base, u.rel, u.api}
+	for _, d := range closure(u) {
+		parts = append(parts, d.rel, d.api)
 	}
 	return digest(parts...)
 }

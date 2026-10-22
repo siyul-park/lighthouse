@@ -82,16 +82,17 @@ fn groups_accept_a_file_in_order_and_ignore_unlisted_groups() {
 }
 
 #[test]
-fn groups_put_init_before_functions_and_constructors_after_them() {
+fn groups_put_the_constructor_of_a_type_in_its_block_before_the_functions() {
     let mut w = World::default();
+    w.symbol("m", "Thing", SymbolKind::Type, "m/a.ucm");
     w.func("m", "Run", "m/a.ucm");
     w.func("m", "NewThing", "m/a.ucm");
     w.func("m", "Open", "m/a.ucm");
     let found = w.check(GROUPS, json!({}));
     assert_eq!(
         w.names(&found),
-        ["Open"],
-        "Open is a function and follows no constructor"
+        ["NewThing"],
+        "NewThing belongs to the block of Thing; Open follows no type"
     );
 }
 
@@ -107,22 +108,6 @@ fn groups_skip_test_files_members_of_interfaces_and_nested_functions() {
     let inner = w.member(&outer, "inner", SymbolKind::Function, "n/a.ucm");
     w.private(&inner);
     assert!(w.check(GROUPS, json!({})).is_empty());
-}
-
-#[test]
-fn constructors_come_first_within_a_type_when_asked() {
-    let mut w = World::default();
-    let ty = w.symbol("m", "A", SymbolKind::Type, "m/a.ucm");
-    w.member(&ty, "get", SymbolKind::Method, "m/a.ucm");
-    w.member(&ty, "new", SymbolKind::Method, "m/a.ucm");
-    let options = json!({
-        "groups": ["type"],
-        "constructorsFirst": true,
-    });
-    let found = w.check(GROUPS, options);
-    assert_eq!(w.names(&found), ["new"]);
-    let relaxed = json!({ "groups": ["type"] });
-    assert!(w.check(GROUPS, relaxed).is_empty());
 }
 
 #[test]
@@ -148,7 +133,7 @@ fn close_flags_a_free_function_between_methods() {
 }
 
 #[test]
-fn close_tolerates_other_visibility_groups_unless_told_not_to() {
+fn close_flags_a_private_method_of_another_owner_between_methods() {
     let mut w = World::default();
     let a = w.symbol("m", "A", SymbolKind::Type, "m/a.ucm");
     let b = w.symbol("m", "B", SymbolKind::Type, "m/a.ucm");
@@ -156,12 +141,8 @@ fn close_tolerates_other_visibility_groups_unless_told_not_to() {
     let hidden = w.member(&b, "hidden", SymbolKind::Method, "m/a.ucm");
     w.private(&hidden);
     w.member(&a, "Two", SymbolKind::Method, "m/a.ucm");
-    assert!(
-        w.check(CLOSE, json!({})).is_empty(),
-        "a private method of B is in B's group"
-    );
-    let strict = w.check(CLOSE, json!({ "visibilityGroups": false }));
-    assert_eq!(w.names(&strict), ["Two"]);
+    let found = w.check(CLOSE, json!({}));
+    assert_eq!(w.names(&found), ["Two"]);
 }
 
 #[test]

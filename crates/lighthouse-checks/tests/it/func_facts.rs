@@ -13,7 +13,8 @@ const CLOSE: &str = "design/layout";
 
 /// the cel check of a function that the `gap` kind of `design/layout`
 /// stands for.
-const CONTIGUITY_AS_CEL: &str = "func.gap.between.exists(b, b.kind != 'method' || (b.owner_key != func.owner_key && (!options.visibilityGroups || (b.visibility != 'private') == (func.visibility != 'private'))))";
+const CONTIGUITY_AS_CEL: &str =
+    "func.gap.between.exists(b, b.kind != 'method' || b.owner_key != func.owner_key)";
 
 const EXAMPLES: &str = "  examples:
     - name: bad
@@ -49,7 +50,7 @@ pub(crate) fn flagged_in(
 ) -> BTreeSet<(String, u32)> {
     let subject = if select == "module" { "module" } else { "file" };
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/facts\nspec:\n  title: Facts\n  context: A check.\n  scope: {{ subject: {subject}{extra} }}\n  requirement: A check MUST hold.\n  severity: warn\n  options:\n    properties:\n      visibilityGroups: {{ type: boolean, default: true, description: Groups by visibility. }}\n    additionalProperties: false\n  check:\n    type: cel\n    select: {select}\n    where: {}\n    message: \"{{{{ {} }}}}\"\n{EXAMPLES}",
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/facts\nspec:\n  title: Facts\n  context: A check.\n  scope: {{ subject: {subject}{extra} }}\n  requirement: A check MUST hold.\n  severity: warn\n  check:\n    type: cel\n    select: {select}\n    where: {}\n    message: \"{{{{ {} }}}}\"\n{EXAMPLES}",
         serde_json::to_string(condition).unwrap(),
         match select {
             "function" => "func.name",
@@ -106,27 +107,11 @@ fn crowded() -> World {
 }
 
 #[test]
-fn gap_stands_for_the_layout_separator_with_visibility_groups() {
+fn gap_stands_for_the_layout_separator() {
     let w = crowded();
-    let options = json!({ "visibilityGroups": true });
+    let options = json!({});
     let expected = contiguity(&w, &options);
     assert!(!expected.is_empty(), "the world has separated methods");
-    assert_eq!(
-        flagged(&w, "function", CONTIGUITY_AS_CEL, &options),
-        expected
-    );
-}
-
-#[test]
-fn gap_stands_for_the_layout_separator_without_visibility_groups() {
-    let w = crowded();
-    let options = json!({ "visibilityGroups": false });
-    let expected = contiguity(&w, &options);
-    assert_ne!(
-        expected,
-        contiguity(&w, &json!({ "visibilityGroups": true })),
-        "the option changes what is flagged"
-    );
     assert_eq!(
         flagged(&w, "function", CONTIGUITY_AS_CEL, &options),
         expected
@@ -141,11 +126,9 @@ fn gap_stands_for_the_layout_separator_on_adjacent_methods() {
     w.member(&a, "One", SymbolKind::Method, "m/a.ucm");
     w.member(&a, "Two", SymbolKind::Method, "m/a.ucm");
     w.member(&b, "One", SymbolKind::Method, "m/a.ucm");
-    for groups in [true, false] {
-        let options = json!({ "visibilityGroups": groups });
-        assert!(contiguity(&w, &options).is_empty());
-        assert!(flagged(&w, "function", CONTIGUITY_AS_CEL, &options).is_empty());
-    }
+    let options = json!({});
+    assert!(contiguity(&w, &options).is_empty());
+    assert!(flagged(&w, "function", CONTIGUITY_AS_CEL, &options).is_empty());
 }
 
 #[test]
@@ -154,7 +137,7 @@ fn gap_is_empty_for_the_first_method_of_an_owner_and_for_a_free_function() {
     let a = w.symbol("m", "A", SymbolKind::Type, "m/a.ucm");
     let free = w.func("m", "Free", "m/a.ucm");
     let one = w.member(&a, "One", SymbolKind::Method, "m/a.ucm");
-    let options = json!({ "visibilityGroups": true });
+    let options = json!({});
     let empty = "func.gap.previous == null && func.gap.between.size() == 0";
     let found = flagged(&w, "function", empty, &options);
     let lines: BTreeSet<u32> = found.iter().map(|(_, line)| *line).collect();
@@ -210,8 +193,8 @@ fn symbol_func_is_the_function_fact_of_a_function_and_null_of_a_type() {
 #[test]
 fn symbol_func_reads_the_same_facts_as_a_function_select() {
     let w = crowded();
-    let options = json!({ "visibilityGroups": true });
-    let by_symbol = "symbol.func != null && symbol.func.gap.between.exists(b, b.kind != 'method' || (b.owner_key != symbol.func.owner_key && (!options.visibilityGroups || (b.visibility != 'private') == (symbol.func.visibility != 'private'))))";
+    let options = json!({});
+    let by_symbol = "symbol.func != null && symbol.func.gap.between.exists(b, b.kind != 'method' || b.owner_key != symbol.func.owner_key)";
     assert_eq!(
         flagged(&w, "symbol", by_symbol, &options),
         flagged(&w, "function", CONTIGUITY_AS_CEL, &options)

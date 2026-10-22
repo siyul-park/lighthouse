@@ -9,22 +9,27 @@ spec:
   context: >-
     A fixed group order makes every file predictable.
 
-    Go: Fixtures of a test file (its types, constants, variables and
-    functions that take no testing handle) follow the same order; tests
-    and test helpers are placed by `testing/file-layout`. Order:
-    public types; private types; public constants; private constants;
-    variables; all `init` functions; public options and functions; public
-    constructors; public methods; clone, conversion and interface hooks;
-    private functions and methods.
+    Go: types first, then methods grouped by owner, as `golangci-lint`
+    `funcorder` and the Uber Go style guide (Function Grouping and Ordering:
+    group by receiver, constructors before the other methods) ask. The type
+    declarations stay together, a deliberate difference from the Uber example,
+    which puts each type's methods right after the type. Fixtures of a test
+    file (its types, constants, variables and functions that take no testing
+    handle) follow the same order; tests and test helpers are placed by
+    `testing/file-layout`. Order: public types; private types; public
+    constants; private constants; variables; all `init` functions; one block
+    per type, in the order the types are declared, each with the constructors
+    of the type (functions named like `NewType`), then its exported methods,
+    then its clone, conversion and interface hooks, then its unexported
+    methods; public functions; private functions.
 
     Rust: The same principle, from the concepts to the machinery, with a
     type kept next to its impl blocks because that is how Rust code reads.
     Order: constants; statics; types, traits and their impl blocks (types
     and impls are one group, `owner-contiguity` keeps an owner's impls
-    together); public free functions; private free functions. Associated
-    functions named `new` come before the other methods of their type.
-    Items of `#[cfg(test)]` modules are not ordered. Visibility counts as
-    public when it is `pub` or `pub(crate)`.
+    together); public free functions; private free functions. The order of an
+    owner's own members is left to `design/layout`. Items of `#[cfg(test)]` modules are
+    not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.
   scope:
     subject: file
     generated: true
@@ -32,8 +37,9 @@ spec:
   requirement: >-
     Top-level declarations in a file MUST follow the language's ownership-group
     order, from public contract to private mechanics. Initializers MUST stay
-    together and MUST precede non-initializer functions and methods. Within one
-    type, constructors MUST precede other behavior.
+    together and MUST precede non-initializer functions and methods. Where
+    methods are grouped by owner, a type's constructors MUST precede its
+    exported methods, and those MUST precede its unexported ones.
   severity: error
   options:
     properties:
@@ -46,19 +52,19 @@ spec:
           - private-const
           - var
           - init
+          - method
           - public-function
-          - constructor
-          - public-method
-          - hook
           - private-function
         description: >-
           The group order of a file, first to last. A declaration belongs to the
           first of its candidate groups that this list names; one the list does
           not name is not ordered. Groups: `public-type`, `private-type`, `type`
-          (types and the members of a type together), `public-const`,
-          `private-const`, `const`, `var`, `init`, `public-function`,
-          `constructor`, `public-method`, `hook`, `private-function` (private
-          functions and, where `type` is not listed, private methods).
+          (types and the members of a type together, in the order they are
+          written), `public-const`,
+          `private-const`, `const`, `var`, `init`, `method` (the members of the
+          types, one block per type, in the order the types are declared, each
+          in the order of `type`: constructors, exported methods, hooks,
+          unexported methods), `public-function`, `private-function`.
       hookNames:
         type: array
         default:
@@ -74,23 +80,15 @@ spec:
           - MarshalBinary
           - UnmarshalBinary
         description: >-
-          Public methods that implement clone, conversion or interface hooks;
-          they follow the other public methods. Names are kept to ones that are
-          never ordinary behavior.
-      constructorsFirst:
-        type: boolean
-        default: false
-        description: >-
-          A constructor method (a public method named like a constructor) must
-          precede the other methods of its type in the file. Go constructors are
-          functions, ordered by the `constructor` group instead.
+          Exported methods that implement clone, conversion or interface hooks;
+          they follow the other exported methods of their type. Names are kept
+          to ones that are never ordinary behavior.
     additionalProperties: false
   languages:
     rust:
       options:
         groups: [const, var, type, public-function, private-function]
         hookNames: []
-        constructorsFirst: true
   check:
     type: cel
     select: symbol
@@ -98,77 +96,48 @@ spec:
       # The declarations the order places, in file order; one value per file.
       - name: placed
         expression: >-
-          file.symbols.filter(s, s.declaration && !s.generated).map(s, {'id': s.id, 'module': s.module, 'name': s.name, 'group': declaration_group(s)})
-            .filter(p, p.group >= 0)
+          file.symbols.filter(s, s.declaration && !s.generated).map(s, {'id': s.id, 'module': s.module, 'name': s.name, 'key': declaration_group(s)})
+            .filter(p, p.key >= 0)
       # Per module, the placed declarations that are not in a longest run
       # already in order: the fewest that, moved, put the module in order.
-      # Each is to follow the first later declaration of an earlier group that
+      # Each is to follow the first later declaration of an earlier place that
       # stays in place, else the first such declaration.
       - name: displaced
         expression: >-
           placed.map(s, s.module).distinct().map(m,
             cel.bind(l, placed.filter(s, s.module == m),
-            cel.bind(g, l.map(s, s.group),
+            cel.bind(g, l.map(s, s.key),
             cel.bind(kept, lists.range(size(g)).filter(i, !(i in g.misplaced())),
               lists.range(size(l)).filter(i, !(i in kept)).map(i,
-                {'id': l[i].id, 'late': false, 'group': g[i], 'before': '',
+                {'id': l[i].id, 'group': g[i] / 1000000,
                  'after': (
                    lists.range(size(l)).filter(j, j > i && g[j] < g[i] && j in kept).map(j, l[j].name)
                    + lists.range(size(l)).filter(j, j > i && g[j] < g[i]).map(j, l[j].name)
                    + [''])[0]}))))).flatten()
-      # The methods of the owners, in file order; one value per file.
-      - name: methods
-        expression: file.symbols.filter(s, is_placed(s) && s.kind == 'method' && s.owner_key != '')
-      # A constructor method of a type that follows another method of its type.
-      - name: late
-        expression: >-
-          !options.constructorsFirst ? [] :
-          lists.range(size(methods))
-            .filter(i, methods[i].visibility != 'private' && methods[i].constructor_named
-              && lists.range(i).exists(j, methods[j].owner_key == methods[i].owner_key
-                && methods[j].module == methods[i].module
-                && !(methods[j].visibility != 'private' && methods[j].constructor_named)))
-            .map(i, {'id': methods[i].id, 'late': true, 'group': -1,
-              'before': (lists.range(i).filter(j, methods[j].owner_key == methods[i].owner_key
-                  && methods[j].module == methods[i].module
-                  && !(methods[j].visibility != 'private' && methods[j].constructor_named))
-                .map(j, methods[j].id))[0],
-              'after': (lists.range(i).filter(j, methods[j].owner_key == methods[i].owner_key
-                  && methods[j].module == methods[i].module
-                  && !(methods[j].visibility != 'private' && methods[j].constructor_named))
-                .map(j, methods[j].name))[0]})
-      - name: reported
-        expression: displaced + late
       - name: report
-        expression: reported.filter(d, d.id == symbol.id)
+        expression: displaced.filter(d, d.id == symbol.id)
     where: size(report) > 0
     message: >-
-      {{ report[0].late
-         ? 'constructor ' + symbol.name + ' must precede the other methods of its type, such as '
-           + report[0].after
-         : symbol.kind + ' ' + symbol.name + ' belongs to the `' + options.groups[report[0].group]
-           + '` group and must '
-           + (report[0].after != '' ? 'follow ' + report[0].after
-              : 'come before the declarations above it') }}
+      {{ symbol.kind + ' ' + symbol.name + ' belongs to the `' + options.groups[report[0].group]
+         + '` group and must '
+         + (report[0].after != '' ? 'follow ' + report[0].after
+            : 'come before the declarations above it') }}
     evidence:
       declaration: symbol.id
-      group: "report[0].late ? 'constructor' : options.groups[report[0].group]"
-      expected_after: "!report[0].late && report[0].after != '' ? report[0].after : null"
-      before: report[0].before
+      group: options.groups[report[0].group]
+      expected_after: "report[0].after != '' ? report[0].after : null"
     identity:
       subject: symbol.id
-      snippet: "report[0].late ? 'clause 1' : ''"
   fix:
     safety: safe
     type: cel
-    edits: >-
-      finding.evidence.before != ''
-      ? [move(finding.evidence.declaration, before(finding.evidence.before))]
-      : [reorder(placed.sortBy(s, s.group))]
+    edits: "[reorder(placed.sortBy(s, s.key))]"
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), G24 Follow Standard Conventions"
       - "Martin, Clean Code (2008), ch. 10 Class organization"
+      - "Uber Go Style Guide, Function Grouping and Ordering"
+      - "golangci-lint, funcorder"
   examples:
     - name: invalid
       language: go
@@ -279,8 +248,6 @@ spec:
 
             func init() { ready = true }
 
-            func Open() *Service { return NewService() }
-
             func NewService() *Service { return &Service{ok: true} }
 
             func (s *Service) Run() int { return floor + int(state(Limit)) }
@@ -288,6 +255,62 @@ spec:
             func (s *Service) String() string { return "service" }
 
             func (s *Service) check() bool { return s.ok }
+
+            func Open() *Service { return NewService() }
+    - name: owner-blocks
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Service struct{}
+
+            type Client struct{}
+
+            func (s *Service) Run() int { return 1 }
+
+            func (c *Client) Do() int { return 1 }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Service struct{}
+
+            func (s *Service) Run() int { return 1 }
+
+            type Client struct{}
+
+            func (c *Client) Do() int { return 1 }
+      expect:
+        - line: 7
+    - name: constructor-after-methods
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Service struct{}
+
+            func NewService() *Service { return &Service{} }
+
+            func (s *Service) Run() int { return 1 }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Service struct{}
+
+            func (s *Service) Run() int { return 1 }
+
+            func NewService() *Service { return &Service{} }
+      expect:
+        - line: 7
     - name: rust-invalid
       language: rust
       kind: invalid
@@ -337,39 +360,6 @@ spec:
             fn helper() -> u8 {
                 1
             }
-    - name: rust-constructor-after-behavior
-      language: rust
-      kind: invalid
-      fixed:
-        - path: src/lib.rs
-          body: |-
-            pub struct Store;
-
-            impl Store {
-                pub fn new() -> Self {
-                    Store
-                }
-
-                pub fn get(&self) -> u8 {
-                    1
-                }
-            }
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Store;
-
-            impl Store {
-                pub fn get(&self) -> u8 {
-                    1
-                }
-
-                pub fn new() -> Self {
-                    Store
-                }
-            }
-      expect:
-        - line: 8
     - name: test-fixtures-out-of-order
       language: go
       kind: invalid

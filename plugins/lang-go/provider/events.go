@@ -36,25 +36,6 @@ var errorType = types.Universe.Lookup("error").Type()
 // not follow that flow and lets the comparison be.
 var allowedSentinels = map[string]string{"io": "EOF", "database/sql": "ErrNoRows"}
 
-// events are the places a body panics or handles an error in a way that
-// stops working once the error is wrapped, as go-errorlint reads them: an
-// error compared with == or != (or switched on), an assertion or type switch
-// on an error, and a fmt.Errorf that formats an error without %w.
-func (u *unit) events(d *ast.FuncDecl) []sdk.Event {
-	if d.Body == nil {
-		return nil
-	}
-	w := &eventWalker{unit: u, inIs: isErrorIs(d, u.info())}
-	ast.Inspect(d.Body, w.visit)
-	slices.SortStableFunc(w.found, func(a, b sdk.Event) int {
-		if a.Span.Start.Line != b.Span.Start.Line {
-			return a.Span.Start.Line - b.Span.Start.Line
-		}
-		return a.Span.Start.Col - b.Span.Start.Col
-	})
-	return w.found
-}
-
 func (w *eventWalker) visit(n ast.Node) bool {
 	switch n := n.(type) {
 	case *ast.CallExpr:
@@ -185,6 +166,25 @@ func (w *eventWalker) text(n ast.Node) string {
 		return ""
 	}
 	return string(w.src[start:end])
+}
+
+// events are the places a body panics or handles an error in a way that
+// stops working once the error is wrapped, as go-errorlint reads them: an
+// error compared with == or != (or switched on), an assertion or type switch
+// on an error, and a fmt.Errorf that formats an error without %w.
+func (u *unit) events(d *ast.FuncDecl) []sdk.Event {
+	if d.Body == nil {
+		return nil
+	}
+	w := &eventWalker{unit: u, inIs: isErrorIs(d, u.info())}
+	ast.Inspect(d.Body, w.visit)
+	slices.SortStableFunc(w.found, func(a, b sdk.Event) int {
+		if a.Span.Start.Line != b.Span.Start.Line {
+			return a.Span.Start.Line - b.Span.Start.Line
+		}
+		return a.Span.Start.Col - b.Span.Start.Col
+	})
+	return w.found
 }
 
 // hasErrorMethod reports whether the type has the method `Error() string`.

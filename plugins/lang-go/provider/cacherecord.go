@@ -24,22 +24,6 @@ type recordFile struct {
 	Fragment json.RawMessage `json:"fragment"`
 }
 
-// reuseImplements puts the `implements` edges of the replaced records where the
-// analysis, which saw only the missed units, found some of its own. The
-// declarations of the unit and of everything it imports are unchanged, so
-// the old edges are the ones a full analysis would give.
-func reuseImplements(sub *run, plan *cachePlan) {
-	for _, u := range plan.misses {
-		old := plan.previous[u].implementsOf()
-		for _, rel := range u.requested {
-			if frag := sub.fragments[rel]; frag != nil {
-				edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
-				frag.Edges = append(edges, old[rel]...)
-			}
-		}
-	}
-}
-
 // implementsOf decodes the `implements` edges of each file of the record.
 func (rec unitRecord) implementsOf() map[string][]sdk.Edge {
 	out := map[string][]sdk.Edge{}
@@ -66,6 +50,49 @@ func (rec unitRecord) covers(u *cacheUnit) bool {
 		}
 	}
 	return true
+}
+
+// record stores the units the analysis completed without a problem, and drops
+// what the cache holds of units that changed or are gone.
+func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
+	current := map[string]string{}
+	for _, u := range plan.units {
+		current[unitStem(u.rel)] = u.key
+	}
+	for _, u := range plan.misses {
+		if rec, ok := recordOf(u, sub); ok {
+			store.write(unitName(u.rel, u.key), rec)
+		}
+	}
+	store.sweep(current)
+}
+
+func (plan *cachePlan) stats() RunStats {
+	var s RunStats
+	for _, u := range plan.units {
+		if _, hit := plan.hits[u]; hit {
+			s.Hits = append(s.Hits, u.rel)
+		} else {
+			s.Misses = append(s.Misses, u.rel)
+		}
+	}
+	return s
+}
+
+// reuseImplements puts the `implements` edges of the replaced records where the
+// analysis, which saw only the missed units, found some of its own. The
+// declarations of the unit and of everything it imports are unchanged, so
+// the old edges are the ones a full analysis would give.
+func reuseImplements(sub *run, plan *cachePlan) {
+	for _, u := range plan.misses {
+		old := plan.previous[u].implementsOf()
+		for _, rel := range u.requested {
+			if frag := sub.fragments[rel]; frag != nil {
+				edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
+				frag.Edges = append(edges, old[rel]...)
+			}
+		}
+	}
 }
 
 // install puts the cached fragments and the analysis of the misses into r.
@@ -95,21 +122,6 @@ func install(r *run, plan *cachePlan, sub *run) {
 	}
 }
 
-// record stores the units the analysis completed without a problem, and drops
-// what the cache holds of units that changed or are gone.
-func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
-	current := map[string]string{}
-	for _, u := range plan.units {
-		current[unitStem(u.rel)] = u.key
-	}
-	for _, u := range plan.misses {
-		if rec, ok := recordOf(u, sub); ok {
-			store.write(unitName(u.rel, u.key), rec)
-		}
-	}
-	store.sweep(current)
-}
-
 // recordOf is the record of an analyzed unit; none when any of its files had a
 // problem, as only complete results are cached.
 func recordOf(u *cacheUnit, sub *run) (unitRecord, bool) {
@@ -132,16 +144,4 @@ func recordOf(u *cacheUnit, sub *run) (unitRecord, bool) {
 		}
 	}
 	return rec, true
-}
-
-func (plan *cachePlan) stats() RunStats {
-	var s RunStats
-	for _, u := range plan.units {
-		if _, hit := plan.hits[u]; hit {
-			s.Hits = append(s.Hits, u.rel)
-		} else {
-			s.Misses = append(s.Misses, u.rel)
-		}
-	}
-	return s
 }

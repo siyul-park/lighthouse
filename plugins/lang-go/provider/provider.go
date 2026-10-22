@@ -14,9 +14,6 @@ type Provider struct {
 
 const language = "go"
 
-// New returns a Go provider that identifies itself as id and version.
-func New(id, version string) *Provider { return &Provider{id: id, version: version} }
-
 // Initialize describes the Go language.
 func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error) {
 	return sdk.InitializeResult{
@@ -53,3 +50,6 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 // it analyzed; both are empty when the request ran without the cache. Tests
 // use it to assert what an edit re-indexes.
 func (p *Provider) Stats() RunStats { return p.last }
+
+// New returns a Go provider that identifies itself as id and version.
+func New(id, version string) *Provider { return &Provider{id: id, version: version} }

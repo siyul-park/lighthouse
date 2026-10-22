@@ -106,25 +106,54 @@ fn findings(dir: &tempfile::TempDir, decision: &str) -> usize {
 }
 
 #[test]
-fn a_real_file_with_a_layout_warning_that_moves_with_the_group_order_converges() {
+fn the_group_order_and_the_layout_agree_on_a_real_file_and_reach_a_fixpoint() {
     let Some(dir) = go_project(&[("decls.go", DECLS)], LAYOUT) else {
         return;
     };
-    let layout = findings(&dir, "design/layout");
-    assert_eq!(layout, 1, "Size is separated from ID by bound");
-
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--decision", "design/declaration-groups"])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("rolled back").not())
-        .stderr(predicate::str::contains("not fixed").not());
-
-    assert_eq!(findings(&dir, "design/declaration-groups"), 0);
     assert_eq!(
         findings(&dir, "design/layout"),
-        layout,
-        "bounded is now the method that is separated, from Size"
+        1,
+        "Size is separated from ID by bound"
+    );
+
+    for decision in ["design/declaration-groups", "design/layout"] {
+        lighthouse(dir.path())
+            .args(["check", "--fix", "--decision", decision])
+            .assert()
+            .success()
+            .stderr(predicate::str::contains("rolled back").not())
+            .stderr(predicate::str::contains("not fixed").not());
+    }
+    let fixed = read(&dir, "decls.go");
+    assert_eq!(findings(&dir, "design/declaration-groups"), 0);
+    assert_eq!(findings(&dir, "design/layout"), 0);
+
+    for decision in ["design/layout", "design/declaration-groups"] {
+        lighthouse(dir.path())
+            .args(["check", "--fix", "--decision", decision])
+            .assert()
+            .success();
+    }
+    assert_eq!(
+        read(&dir, "decls.go"),
+        fixed,
+        "the fixes do not undo each other"
+    );
+    let owners: Vec<&str> = fixed
+        .lines()
+        .filter(|line| line.starts_with("func "))
+        .collect();
+    assert_eq!(
+        owners,
+        [
+            "func (o *Overload) ID() int { return o.n }",
+            "func (o *Overload) Size() int { return o.n }",
+            "func (o *Overload) bounded() int { return o.n + 1 }",
+            "func NewFunction() *Function { return &Function{} }",
+            "func (f *Function) Count() int { return len(f.overloads) }",
+            "func bound(n int) int { return min(max(n, limitLow), limitHigh) }",
+        ],
+        "types first, then one block per type in declaration order, then the free functions"
     );
 }
 
