@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{GRACE, Invocation, MAX_OUTPUT, Policy, Profile, Ran, run};
+use crate::{GRACE, Invocation, Lines, MAX_OUTPUT, Policy, Profile, Ran, run, run_lines};
 
 /// What a program inherits from its caller, besides what it declares.
 const INHERITED: [&str; 4] = ["PATH", "USER", "LOGNAME", "LANG"];
@@ -119,7 +119,23 @@ impl Job<'_> {
     /// for a program whose stdout is data (the new text of a file) and not
     /// something to read; its stderr is scrubbed.
     pub fn run_keeping_stdout(&self) -> Result<Ran, String> {
-        let mut ran = run(&Invocation {
+        let mut ran = run(&self.invocation())?;
+        ran.stderr = self.scrubbed(&ran.stderr);
+        Ok(ran)
+    }
+
+    /// Runs the program like [`Job::run`], with each line of stdout handed to
+    /// `lines` as it is printed instead of kept, as [`run_lines`] does. The
+    /// lines are as the program printed them: scrubbing them is up to `lines`,
+    /// which has [`Environment::scrub`] for it.
+    pub fn run_lines(&self, lines: Lines) -> Result<Ran, String> {
+        let mut ran = run_lines(&self.invocation(), lines)?;
+        ran.stderr = self.scrubbed(&ran.stderr);
+        Ok(ran)
+    }
+
+    fn invocation(&self) -> Invocation<'_> {
+        Invocation {
             argv: self.command,
             dir: self.dir,
             stdin: self.stdin,
@@ -128,9 +144,7 @@ impl Job<'_> {
             grace: GRACE,
             max_output: MAX_OUTPUT,
             sandbox: self.policy.sandbox(self.profile),
-        })?;
-        ran.stderr = self.scrubbed(&ran.stderr);
-        Ok(ran)
+        }
     }
 
     /// `bytes` with the secrets scrubbed; untouched when it holds none.

@@ -1,7 +1,6 @@
-//! The Seatbelt profile (SBPL) of macOS. The base is the one of OpenAI Codex,
-//! `seatbelt_base_policy.sbpl` (Apache-2.0), itself taken from Chromium's
-//! sandbox, cut to what the programs Lighthouse runs need; the reads, writes
-//! and network are Anthropic sandbox-runtime's.
+//! The Seatbelt profile (SBPL) of macOS: a base policy cut to what the
+//! programs Lighthouse runs need, with the reads, writes and network of a
+//! sandbox runtime. What it was taken from is credited in `docs/NOTICE`.
 
 use std::path::Path;
 
@@ -11,8 +10,8 @@ use super::Plan;
 /// and notifications, the per-user directories, and certificate validation.
 /// Not the keychain (`com.apple.SecurityServer`), Launch Services, the
 /// pasteboard, preferences or the network daemons: a program has no need of
-/// them, and each is a way out of the sandbox or to a secret. (Codex's base
-/// policy allows far more.)
+/// them, and each is a way out of the sandbox or to a secret. (The base policy
+/// this was cut from allows far more.)
 const SERVICES: [&str; 6] = [
     "com.apple.system.opendirectoryd.libinfo",
     "com.apple.system.opendirectoryd.membership",

@@ -3,10 +3,10 @@
 
 use std::{io::Write, net::TcpListener, os::unix::net::UnixListener, thread};
 
-use lighthouse_process::bridge;
+use lighthouse_process::{bridge, bridge_on};
 
 #[test]
-fn bridge_forwards_a_local_port_to_the_socket_and_returns_the_exit_code_of_the_program() {
+fn bridge_on_forwards_a_bound_listener_to_the_socket_and_returns_the_exit_code_of_the_program() {
     let dir = tempfile::tempdir().unwrap();
     let socket = dir.path().join("proxy.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -14,11 +14,10 @@ fn bridge_forwards_a_local_port_to_the_socket_and_returns_the_exit_code_of_the_p
         let (mut connection, _) = listener.accept().unwrap();
         connection.write_all(b"from-the-socket\n").unwrap();
     });
-    let port = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
+    // The port is the system's and the listener is bound before the program
+    // runs: no other test or process can take it in between.
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
     let program = [
         "bash".to_owned(),
         "-c".to_owned(),
@@ -26,7 +25,7 @@ fn bridge_forwards_a_local_port_to_the_socket_and_returns_the_exit_code_of_the_p
         port.to_string(),
     ];
 
-    let code = bridge(&socket, port, &program).unwrap();
+    let code = bridge_on(listener, &socket, &program).unwrap();
 
     assert_eq!(code, 7);
 }

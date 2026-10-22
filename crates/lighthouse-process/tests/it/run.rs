@@ -1,9 +1,10 @@
 use std::{
     path::Path,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
-use lighthouse_process::{Invocation, Sandbox, run};
+use lighthouse_process::{Invocation, Sandbox, run, run_lines};
 
 fn spec<'a>(argv: &'a [String], limit: Duration) -> Invocation<'a> {
     Invocation {
@@ -42,6 +43,67 @@ fn output_within_the_cap_is_not_truncated() {
     let out = run(&spec(&line, Duration::from_secs(5))).unwrap();
 
     assert!(!out.truncated);
+}
+
+#[test]
+fn run_lines_hands_over_every_line_of_an_output_larger_than_the_cap() {
+    // 3000 lines of 1 KiB each, three times what `max_output` keeps.
+    let line = argv(&[
+        "sh",
+        "-c",
+        "yes \"$(head -c 1023 /dev/zero | tr '\\0' x)\" | head -n 3000",
+    ]);
+    let seen = Arc::new(Mutex::new((0usize, 0usize)));
+    let sink = Arc::clone(&seen);
+
+    let out = run_lines(
+        &spec(&line, Duration::from_secs(20)),
+        Arc::new(move |line: &[u8]| {
+            let mut seen = sink.lock().unwrap();
+            seen.0 += 1;
+            seen.1 += line.len();
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(*seen.lock().unwrap(), (3000, 3000 * 1023));
+    assert!(out.stdout.is_empty(), "the lines are not kept");
+    assert!(!out.truncated);
+}
+
+#[test]
+fn run_lines_ends_a_last_line_that_has_no_line_break() {
+    let line = argv(&["sh", "-c", "printf 'a\\nb'"]);
+    let seen = Arc::new(Mutex::new(Vec::<Vec<u8>>::new()));
+    let sink = Arc::clone(&seen);
+
+    run_lines(
+        &spec(&line, Duration::from_secs(5)),
+        Arc::new(move |line: &[u8]| sink.lock().unwrap().push(line.to_vec())),
+    )
+    .unwrap();
+
+    assert_eq!(*seen.lock().unwrap(), [b"a".to_vec(), b"b".to_vec()]);
+}
+
+#[test]
+fn run_lines_drops_a_line_longer_than_the_limit_and_says_so() {
+    let line = argv(&[
+        "sh",
+        "-c",
+        "head -c 9000000 /dev/zero | tr '\\0' x; echo; echo ok",
+    ]);
+    let seen = Arc::new(Mutex::new(Vec::<Vec<u8>>::new()));
+    let sink = Arc::clone(&seen);
+
+    let out = run_lines(
+        &spec(&line, Duration::from_secs(20)),
+        Arc::new(move |line: &[u8]| sink.lock().unwrap().push(line.to_vec())),
+    )
+    .unwrap();
+
+    assert_eq!(*seen.lock().unwrap(), [b"ok".to_vec()]);
+    assert!(out.truncated);
 }
 
 #[test]
@@ -141,4 +203,36 @@ fn a_timeout_kills_the_whole_group_even_when_the_leader_obeys_sigterm() {
 
     assert!(error.contains("timed out"), "{error}");
     assert!(started.elapsed() < Duration::from_secs(3));
+}
+
+#[cfg(unix)]
+fn alive(pid: &str) -> bool {
+    std::process::Command::new("kill")
+        .args(["-0", pid])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap()
+        .success()
+}
+
+#[cfg(unix)]
+#[test]
+fn a_timeout_kills_the_group_when_the_leader_exits_within_the_grace_period() {
+    let dir = tempfile::tempdir().unwrap();
+    let pid = dir.path().join("pid");
+    let script = format!(
+        "trap 'exit 0' TERM; (trap '' TERM; exec sh -c 'echo $$ > {}; exec sleep 30') & wait",
+        pid.display()
+    );
+    let line = argv(&["sh", "-c", &script]);
+
+    let error = run(&spec(&line, Duration::from_millis(500))).unwrap_err();
+
+    assert!(error.contains("timed out"), "{error}");
+    let pid = std::fs::read_to_string(&pid).unwrap().trim().to_owned();
+    let gone = (0..40).any(|_| {
+        std::thread::sleep(Duration::from_millis(50));
+        !alive(&pid)
+    });
+    assert!(gone, "the grandchild {pid} outlived the run");
 }

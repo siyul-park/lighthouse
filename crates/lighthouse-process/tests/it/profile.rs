@@ -34,6 +34,7 @@ fn command_check() -> Plan {
         port: Some(40000),
         bridge: None,
         mask: Vec::new(),
+        reads: Vec::new(),
     }
 }
 
@@ -45,6 +46,7 @@ fn scratch_only() -> Plan {
         port: None,
         bridge: None,
         mask: vec![path("/run"), path("/var/run"), path("/tmp")],
+        reads: Vec::new(),
     }
 }
 
@@ -60,6 +62,7 @@ fn edit_agent() -> Plan {
             socket: path("/tmp/run-3/proxy.sock"),
         }),
         mask: vec![path("/run"), path("/var/run")],
+        reads: Vec::new(),
     }
 }
 
@@ -116,6 +119,35 @@ fn bubblewrap_binds_the_host_read_only_and_covers_the_secrets() {
         "bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /run --tmpfs /var/run --tmpfs /tmp \
          --tmpfs /home/u/.ssh --bind /tmp/run-2 /tmp/run-2 --bind /tmp/scratch /tmp/scratch \
          --unshare-all --die-with-parent --new-session -- fmt -x"
+    );
+}
+
+#[test]
+fn bubblewrap_binds_what_the_run_needs_in_tmp_after_the_tmpfs_that_covers_it() {
+    let plan = Plan {
+        writes: vec![path("/tmp/run-4"), path("/tmp/home")],
+        mask: vec![path("/tmp")],
+        reads: vec![path("/tmp/project")],
+        ..Plan::default()
+    };
+
+    let argv = bwrap_argv(&plan, &["true".to_owned()]).join(" ");
+
+    let at = |needle: &str| {
+        argv.find(needle)
+            .unwrap_or_else(|| panic!("{needle}: {argv}"))
+    };
+    let tmpfs = at("--tmpfs /tmp");
+    for bound in [
+        "--ro-bind /tmp/project /tmp/project",
+        "--bind /tmp/run-4 /tmp/run-4",
+        "--bind /tmp/home /tmp/home",
+    ] {
+        assert!(tmpfs < at(bound), "{argv}");
+    }
+    assert!(
+        at("--ro-bind /tmp/project") < at("--bind /tmp/run-4"),
+        "{argv}"
     );
 }
 

@@ -26,7 +26,7 @@ use tempfile::TempDir;
 
 pub(crate) use backend::{ended, wrap};
 use bridge::Uplink;
-pub use bridge::bridge;
+pub use bridge::{bridge, bridge_on};
 pub use bubblewrap::argv as bwrap_argv;
 pub use entries::{check_host, check_write};
 pub use plan::{Bridge, Denied, Plan};

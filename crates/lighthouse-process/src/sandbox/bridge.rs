@@ -48,13 +48,31 @@ impl Uplink {
     }
 }
 
-/// Runs `command` with the loopback port `port` forwarded to the Unix socket
-/// `socket`, and returns its exit code. This is what the `lighthouse internal
-/// bridge` command does inside a namespace without a network.
+/// Listens on `127.0.0.1:port`, passes each connection to the Unix socket
+/// `socket`, and runs `command` until it exits, returning its exit code. This
+/// is what the `lighthouse internal bridge` command does inside a namespace
+/// without a network.
 #[cfg(unix)]
 pub fn bridge(socket: &Path, port: u16, command: &[String]) -> io::Result<i32> {
+    use std::net::TcpListener;
+
+    if command.is_empty() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "no program"));
+    }
+    bridge_on(TcpListener::bind(("127.0.0.1", port))?, socket, command)
+}
+
+/// Like [`bridge`], on a listener that is already bound: a caller that wants
+/// the port the system gives (port 0) binds it itself and reads it, so that
+/// no other process can take the port between choosing and listening.
+#[cfg(unix)]
+pub fn bridge_on(
+    listener: std::net::TcpListener,
+    socket: &Path,
+    command: &[String],
+) -> io::Result<i32> {
     use std::{
-        net::{TcpListener, TcpStream},
+        net::TcpStream,
         os::unix::{net::UnixStream, process::ExitStatusExt},
         process::Command,
     };
@@ -64,7 +82,6 @@ pub fn bridge(socket: &Path, port: u16, command: &[String]) -> io::Result<i32> {
     let (program, args) = command
         .split_first()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no program"))?;
-    let listener = TcpListener::bind(("127.0.0.1", port))?;
     listener.set_nonblocking(true)?;
     let socket = socket.to_owned();
     let _server = Server::spawn(
@@ -89,5 +106,15 @@ pub fn bridge(socket: &Path, port: u16, command: &[String]) -> io::Result<i32> {
 /// There are no Unix sockets here: no namespace to bridge into.
 #[cfg(not(unix))]
 pub fn bridge(_socket: &Path, _port: u16, _command: &[String]) -> io::Result<i32> {
+    Err(io::ErrorKind::Unsupported.into())
+}
+
+/// There are no Unix sockets here: no namespace to bridge into.
+#[cfg(not(unix))]
+pub fn bridge_on(
+    _listener: std::net::TcpListener,
+    _socket: &Path,
+    _command: &[String],
+) -> io::Result<i32> {
     Err(io::ErrorKind::Unsupported.into())
 }

@@ -1,7 +1,12 @@
 //! The contract every program runs under: one environment, one command line
 //! and one reading of the exit code, whatever the program is run for.
 
-use std::{collections::BTreeMap, path::Path, time::Duration};
+use std::{
+    collections::BTreeMap,
+    path::Path,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use lighthouse_process::{
     Environment, Home, Job, Policy, Profile, context, expand, expand_value, referenced, variables,
@@ -289,4 +294,34 @@ fn a_programs_own_hosts_and_places_are_added_to_the_projects() {
     );
     let profile = own.profile(Path::new("/proj"), Path::new("/tmp/run"));
     assert_eq!(profile.network, ["api.project.test", "api.own.test"]);
+}
+
+#[test]
+fn run_lines_hands_the_lines_over_and_scrubs_only_stderr() {
+    let environment = Environment::new(&BTreeMap::new(), Vec::new(), Home::User).unwrap();
+    let command = line(&["sh", "-c", "echo one; echo two; echo err >&2"]);
+    let policy = unsandboxed();
+    let profile = Profile::new(Path::new("."));
+    let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+    let sink = Arc::clone(&seen);
+
+    let ran = Job {
+        command: &command,
+        dir: Path::new("."),
+        stdin: b"",
+        environment: &environment,
+        timeout: Duration::from_secs(5),
+        policy: &policy,
+        profile: &profile,
+    }
+    .run_lines(Arc::new(move |line: &[u8]| {
+        sink.lock()
+            .unwrap()
+            .push(String::from_utf8_lossy(line).into_owned());
+    }))
+    .unwrap();
+
+    assert_eq!(*seen.lock().unwrap(), ["one", "two"]);
+    assert!(ran.stdout.is_empty());
+    assert_eq!(ran.stderr, b"err\n");
 }

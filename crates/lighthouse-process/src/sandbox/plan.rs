@@ -37,8 +37,12 @@ pub struct Plan {
     /// Set where the program lives in a namespace of its own.
     pub bridge: Option<Bridge>,
     /// Directories the program sees empty: where other programs of the user
-    /// leave their sockets (`/run`, and `/tmp` when the run needs nothing in it).
+    /// leave their sockets (`/run` and `/tmp`). What the run needs below them
+    /// is bound again after the mask.
     pub mask: Vec<PathBuf>,
+    /// What the program may read below a masked directory: its working
+    /// directory, when that is not already writable.
+    pub reads: Vec<PathBuf>,
 }
 
 impl Plan {
@@ -52,16 +56,13 @@ impl Plan {
         port: Option<u16>,
     ) -> Result<Self, String> {
         let writes: Vec<PathBuf> = profile.writes.iter().filter_map(|w| prepared(w)).collect();
-        let needs_tmp = [dir.canonicalize().unwrap_or_else(|_| dir.to_owned())]
-            .iter()
-            .chain(&writes)
-            .any(|path| path.starts_with("/tmp"));
-        let mask = ["/run", "/var/run", "/tmp"]
+        let mask: Vec<PathBuf> = ["/run", "/var/run", "/tmp"]
             .into_iter()
-            .filter(|place| *place != "/tmp" || !needs_tmp)
             .map(PathBuf::from)
             .filter(|place| place.is_dir() && !place.is_symlink())
             .collect();
+        let cwd = dir.canonicalize().unwrap_or_else(|_| dir.to_owned());
+        let reads = exposed(&cwd, &writes, &mask);
         let agent = env::var_os("SSH_AUTH_SOCK")
             .map(PathBuf::from)
             .and_then(|socket| socket.parent().map(Path::to_owned));
@@ -87,7 +88,20 @@ impl Plan {
             port,
             bridge,
             mask,
+            reads,
         })
+    }
+}
+
+/// `cwd` as a path to read again, when a mask covers it and nothing the
+/// program may write does.
+fn exposed(cwd: &Path, writes: &[PathBuf], mask: &[PathBuf]) -> Vec<PathBuf> {
+    let masked = mask.iter().any(|place| cwd.starts_with(place));
+    let written = writes.iter().any(|path| cwd.starts_with(path));
+    if masked && !written {
+        vec![cwd.to_owned()]
+    } else {
+        Vec::new()
     }
 }
 
@@ -104,4 +118,25 @@ fn hidden(path: &Path) -> Option<Denied> {
         dir: path.is_dir(),
         path,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn paths(texts: &[&str]) -> Vec<PathBuf> {
+        texts.iter().map(PathBuf::from).collect()
+    }
+
+    #[test]
+    fn a_directory_below_a_mask_is_read_again_unless_it_is_written() {
+        let mask = paths(&["/run", "/tmp"]);
+
+        assert_eq!(
+            exposed(Path::new("/tmp/p"), &paths(&["/tmp/s"]), &mask),
+            paths(&["/tmp/p"])
+        );
+        assert!(exposed(Path::new("/tmp/p/src"), &paths(&["/tmp/p"]), &mask).is_empty());
+        assert!(exposed(Path::new("/home/u/p"), &[], &mask).is_empty());
+    }
 }

@@ -17,7 +17,7 @@ pub use program::{Environment, Home, Job, context, expand, expand_value, referen
 pub use sandbox::available as sandbox_available;
 pub use sandbox::{
     Bridge, DENIED, Denied, Plan, Policy, Profile, Proxy, Sandbox, Simulation, allows, bridge,
-    bwrap_argv, check_host, check_write, is_project_secret, seatbelt_profile, secrets,
+    bridge_on, bwrap_argv, check_host, check_write, is_project_secret, seatbelt_profile, secrets,
     simulate_unavailable,
 };
 
@@ -41,9 +41,16 @@ const DRAIN: Duration = Duration::from_millis(500);
 
 /// What a program may print on each of stdout and stderr.
 pub const MAX_OUTPUT: usize = 1 << 20;
+/// The longest line of stdout a [`Lines`] receives; a longer one is dropped,
+/// and the run is [`Ran::truncated`].
+pub const MAX_LINE: usize = 8 << 20;
 /// How long a program that was asked to stop may take to do so before it is
 /// killed, unless the caller says otherwise.
 pub const GRACE: Duration = Duration::from_secs(2);
+
+/// Receives each line a program prints on stdout, without its line break, as
+/// it is printed, on the thread that reads the pipe.
+pub type Lines = Arc<dyn Fn(&[u8]) + Send + Sync>;
 
 /// What a finished program left behind.
 #[derive(Debug)]
@@ -53,8 +60,9 @@ pub struct Ran {
     pub code: Option<i32>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
-    /// More was printed than `max_output` keeps: the rest was dropped, so
-    /// what is here is not everything the program said.
+    /// More was printed than `max_output` keeps (or, when the lines went to a
+    /// [`Lines`], a line was longer than [`MAX_LINE`]): the rest was dropped,
+    /// so what was kept is not everything the program said.
     pub truncated: bool,
 }
 
@@ -102,9 +110,86 @@ impl Captured {
     }
 }
 
+/// The line being read from the chunks of a pipe.
+#[derive(Default)]
+struct LineBuffer {
+    line: Vec<u8>,
+    /// The line passed [`MAX_LINE`]: the rest of it is skipped.
+    dropping: bool,
+}
+
+impl LineBuffer {
+    /// Takes a chunk and hands `lines` each line it ends; says whether a line
+    /// passed the limit.
+    fn push(&mut self, chunk: &[u8], lines: &Lines) -> bool {
+        let mut passed = false;
+        for piece in chunk.split_inclusive(|b| *b == b'\n') {
+            passed |= self.take(piece.strip_suffix(b"\n").unwrap_or(piece));
+            if piece.ends_with(b"\n") {
+                self.end(lines);
+            }
+        }
+        passed
+    }
+
+    /// Adds `body` to the line; true when that makes the line too long.
+    fn take(&mut self, body: &[u8]) -> bool {
+        if self.dropping {
+            return false;
+        }
+        if self.line.len() + body.len() > MAX_LINE {
+            self.dropping = true;
+            self.line.clear();
+            return true;
+        }
+        self.line.extend_from_slice(body);
+        false
+    }
+
+    fn end(&mut self, lines: &Lines) {
+        if !self.dropping {
+            lines(&self.line);
+        }
+        self.line.clear();
+        self.dropping = false;
+    }
+
+    /// Hands over a last line that has no line break.
+    fn finish(&mut self, lines: &Lines) {
+        if !self.dropping && !self.line.is_empty() {
+            self.end(lines);
+        }
+    }
+}
+
 /// Runs the program of `invocation`. When it outlives `limit` its process group
 /// gets SIGTERM, then SIGKILL after `grace`; that is an error.
 pub fn run(invocation: &Invocation) -> Result<Ran, String> {
+    run_with(invocation, None)
+}
+
+/// Runs the program like [`run`], but hands each line of its stdout to `lines`
+/// as it is printed instead of keeping it: stdout of the result is empty, so
+/// a program whose output is a long stream of events is read all the way
+/// through, whatever its size.
+pub fn run_lines(invocation: &Invocation, lines: Lines) -> Result<Ran, String> {
+    run_with(invocation, Some(lines))
+}
+
+/// Kills a program that is still running together with its process group,
+/// then collects it. A program that already exited is only collected: its
+/// group id may have been reused.
+pub fn reap(child: &mut Child) {
+    if !matches!(child.try_wait(), Ok(None)) {
+        let _ = child.wait();
+        return;
+    }
+    signal_group(child, true);
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+fn run_with(invocation: &Invocation, lines: Option<Lines>) -> Result<Ran, String> {
     let program = invocation.argv.first().ok_or("no program")?;
     let sandboxed = match invocation.sandbox {
         Sandbox::On(profile) => Some(Started::new(profile, invocation.dir)?),
@@ -145,7 +230,10 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
     let writer = thread::spawn(move || {
         let _ = input.write_all(&payload);
     });
-    let stdout = capture(child.stdout.take(), invocation.max_output);
+    let stdout = match lines {
+        Some(lines) => capture_lines(child.stdout.take(), lines),
+        None => capture(child.stdout.take(), invocation.max_output),
+    };
     let stderr = capture(child.stderr.take(), invocation.max_output);
     let started = Instant::now();
     let status = loop {
@@ -190,19 +278,6 @@ pub fn run(invocation: &Invocation) -> Result<Ran, String> {
         stderr,
         truncated: cut_out || cut_err,
     })
-}
-
-/// Kills a program that is still running together with its process group,
-/// then collects it. A program that already exited is only collected: its
-/// group id may have been reused.
-pub fn reap(child: &mut Child) {
-    if !matches!(child.try_wait(), Ok(None)) {
-        let _ = child.wait();
-        return;
-    }
-    signal_group(child, true);
-    let _ = child.kill();
-    let _ = child.wait();
 }
 
 /// The note that tells why a request of a sandboxed program failed: the hosts
@@ -255,6 +330,9 @@ fn stop(child: &mut Child, grace: Duration) {
         }
         thread::sleep(POLL);
     }
+    // Whether or not the leader obeyed, what it left running is killed: `reap`
+    // skips a leader that has already exited.
+    signal_group(child, true);
     reap(child);
 }
 
@@ -301,6 +379,34 @@ fn exited(child: &mut Child) -> std::io::Result<Option<()>> {
     #[cfg(not(unix))]
     {
         child.try_wait().map(|s| s.map(drop))
+    }
+}
+
+/// Reads the pipe a line at a time into `lines`; a line longer than
+/// [`MAX_LINE`] is read to its end and dropped.
+fn capture_lines<R: Read + Send + 'static>(pipe: Option<R>, lines: Lines) -> Captured {
+    let overflowed = Arc::new(AtomicBool::new(false));
+    let overflow = Arc::clone(&overflowed);
+    let reader = thread::spawn(move || {
+        let Some(mut pipe) = pipe else {
+            return;
+        };
+        let mut buffer = LineBuffer::default();
+        let mut chunk = [0u8; 8192];
+        while let Ok(n) = pipe.read(&mut chunk) {
+            if n == 0 {
+                break;
+            }
+            if buffer.push(&chunk[..n], &lines) {
+                overflow.store(true, Ordering::Relaxed);
+            }
+        }
+        buffer.finish(&lines);
+    });
+    Captured {
+        bytes: Arc::default(),
+        overflowed,
+        reader,
     }
 }
 

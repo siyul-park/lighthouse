@@ -1,6 +1,7 @@
 //! The bubblewrap command line of Linux: the namespaces Docker uses, with the
 //! host's files read-only, the secrets and the places where programs leave
-//! their sockets (`/run`, and `/tmp` when nothing is needed there) covered, and the writable places bound.
+//! their sockets (`/run` and `/tmp`) covered, and what the run needs below them
+//! bound again after the cover.
 
 use super::Plan;
 
@@ -20,6 +21,10 @@ pub fn argv(plan: &Plan, program: &[String]) -> Vec<String> {
     ]);
     for place in &plan.mask {
         args.extend(["--tmpfs".to_owned(), place.to_string_lossy().into_owned()]);
+    }
+    for path in &plan.reads {
+        let path = path.to_string_lossy().into_owned();
+        args.extend(["--ro-bind".to_owned(), path.clone(), path]);
     }
     for denied in &plan.deny {
         let path = denied.path.to_string_lossy().into_owned();
