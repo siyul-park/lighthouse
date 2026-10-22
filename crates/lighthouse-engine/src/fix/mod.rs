@@ -9,6 +9,7 @@
 mod batch;
 pub mod brief;
 mod command;
+mod context;
 mod edits;
 mod kept;
 mod lower;

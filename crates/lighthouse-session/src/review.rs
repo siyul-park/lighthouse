@@ -242,7 +242,7 @@ fn brief_of(session: &Session, decision: &Decision, finding: &FindingRecord) -> 
         .into_iter()
         .filter(|id| active.contains(*id))
         .collect();
-    Ok(brief::brief(&[target], &tools))
+    Ok(brief::brief(&[target], &tools, None))
 }
 
 /// Whether a finding is a task of a listing: among the open ones, those that

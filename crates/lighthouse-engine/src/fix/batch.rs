@@ -150,7 +150,7 @@ impl Proposer<'_> {
         }
         let edit = models
             .edit(
-                &models.batch(file, &targets, self.tools(world, file)),
+                &models.batch(world, file, &targets, self.tools(world, file)),
                 world,
             )
             .map_err(fail)?;

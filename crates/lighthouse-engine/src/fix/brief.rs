@@ -29,6 +29,11 @@ const CHECKED: &str = "Lighthouse checks the result by analyzing the files again
 must be gone, and nothing new of warning or error severity may appear in the files you change or \
 in the files that use a symbol you change.";
 
+const LOCALIZED: &str = "The code above is what Lighthouse knows this fix needs: the code of the \
+findings, the signatures of what it uses and, for scope `files`, every place that refers to what \
+you may change. Start from it, and open further files only when you cannot finish without them. \
+Open the specific file or symbol you need, not a listing or search of the whole directory.";
+
 const CLOSING: &str =
     "When done, reply with one line per finding: its number and `fixed` or `left` with a reason.";
 
@@ -47,6 +52,38 @@ pub struct Target<'a> {
     pub place: String,
 }
 
+/// The code of one extent a finding is in, as the agent is given it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Code {
+    pub path: String,
+    pub language: String,
+    /// The first line of `text`, from 1.
+    pub first: u32,
+    /// The lines of the extent.
+    pub text: String,
+}
+
+/// What the engine knows from the code model that the fix needs, so that the
+/// agent does not have to look for it: the code of the findings and, as far as
+/// a budget allows, what surrounds it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Localized {
+    /// The code each finding is in, once, in the order of the lines.
+    pub code: Vec<Code>,
+    /// The declarations, with the first line of their doc, of the symbols of
+    /// the project the code uses.
+    pub uses: Vec<String>,
+    /// What the file imports.
+    pub imports: Vec<String>,
+    /// The places that refer to the symbols the fix may change (scope
+    /// `files`), each with the symbol that holds it.
+    pub sites: Vec<String>,
+    /// The files that hold those places, which the fix may change.
+    pub files: Vec<String>,
+    /// How many items did not fit the budget and are not here.
+    pub left_out: usize,
+}
+
 /// The decisions whose safe fixes the project applies to what an agent
 /// leaves in files of `language` (of every language when `None`), in the
 /// order of their ids: the tools the agent places code for.
@@ -62,8 +99,9 @@ pub fn safe_fixes<'p>(plan: &'p FixPlan, language: Option<&str>) -> Vec<&'p str>
 /// The brief for `targets`, the findings of one file in the order of their
 /// lines. The examples of a decision come with its first finding. `tools` are
 /// the decisions whose safe fixes the project applies to the result, which
-/// the agent places code for.
-pub fn brief(targets: &[Target<'_>], tools: &[&str]) -> String {
+/// the agent places code for. `localized` is the code around them, when the
+/// engine has it.
+pub fn brief(targets: &[Target<'_>], tools: &[&str], localized: Option<&Localized>) -> String {
     let mut text = format!("{SYSTEM}\n");
     for (n, target) in targets.iter().enumerate() {
         let first = !targets[..n]
@@ -76,6 +114,9 @@ pub fn brief(targets: &[Target<'_>], tools: &[&str]) -> String {
                 write_example(&mut text, shown + 1, example);
             }
         }
+    }
+    if let Some(localized) = localized {
+        write_localized(&mut text, localized);
     }
     if !tools.is_empty() {
         let _ = write!(text, "\n{TOOLS} {}.\n", tools.join(", "));
@@ -92,6 +133,55 @@ pub fn examples_for(examples: &[Example]) -> Vec<Example> {
         .filter(|e| e.kind == ExampleKind::Invalid && !e.fixed.is_empty())
         .take(MAX_EXAMPLES)
         .cloned()
+        .collect()
+}
+
+/// Appends what the engine knows around the findings, then what the agent
+/// should do with it.
+fn write_localized(text: &mut String, localized: &Localized) {
+    for code in &localized.code {
+        let last = code.first as usize + code.text.lines().count().saturating_sub(1);
+        let _ = write!(
+            text,
+            "\nCode ({} lines {}-{last}):\n",
+            code.path, code.first
+        );
+        fenced(text, &code.language, &numbered(code));
+    }
+    let lists = [
+        ("Signatures of what it uses:", &localized.uses),
+        ("The file imports:", &localized.imports),
+        (
+            "Places that refer to what you may change:",
+            &localized.sites,
+        ),
+        ("Files you may have to change:", &localized.files),
+    ];
+    for (title, items) in lists {
+        if items.is_empty() {
+            continue;
+        }
+        let _ = write!(text, "\n{title}\n");
+        for item in items {
+            let _ = writeln!(text, "- {item}");
+        }
+    }
+    if localized.left_out > 0 {
+        let _ = write!(
+            text,
+            "\n{} more items were left out to keep this short.\n",
+            localized.left_out
+        );
+    }
+    let _ = write!(text, "\n{LOCALIZED}\n");
+}
+
+/// The lines of `code`, each after its number.
+fn numbered(code: &Code) -> String {
+    code.text
+        .lines()
+        .zip(code.first..)
+        .map(|(line, number)| format!("{number:>4}  {line}\n"))
         .collect()
 }
 

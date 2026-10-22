@@ -321,6 +321,7 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
         fixes: &fixes,
         account: Account::default(),
         said: Mutex::default(),
+        context: 4000,
     };
     let finding = finding("r", 1, Severity::Warn, "a");
     let decision = FixDecision {
@@ -328,12 +329,13 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
         requirement: String::new(),
         context: String::new(),
     };
+    let world = || World::new(root.path(), &outcome, &texts);
     let batch = fixer.batch(
+        &world(),
         std::path::Path::new(FILE),
         &[(&finding, &decision, None)],
         Vec::new(),
     );
-    let world = || World::new(root.path(), &outcome, &texts);
 
     let first = fixer.edit(&batch, &world()).unwrap();
     assert_eq!(first.texts[std::path::Path::new(FILE)], "agent\n");

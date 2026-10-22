@@ -45,6 +45,15 @@
       "additionalProperties": false,
       "description": "The `fix` table of a project.",
       "properties": {
+        "context": {
+          "description": "The most code, in tokens (four characters each), that the brief of one\nrun of an agent carries around the findings: the signatures of what\nthe code uses, its imports and, for the scope `files`, the places that\nrefer to what may change. The code of the findings is always given. When\nthe rest is over this, what is farthest from the findings is left out\nfirst, and the brief says how many items were. Default: `4000`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "decisions": {
           "description": "The decisions a model may fix, as ids or globs over them (`*` within\none segment of an id): `[\"design/exported-doc\", \"testing/*\"]`. Only a\ndecision with a check and no fix of its own (`ops`, `command`) is\nfixed, and only by the agent `[models] agent` binds; binding a model\nenables nothing by itself. Default: none.",
           "items": {

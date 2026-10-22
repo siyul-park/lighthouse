@@ -58,6 +58,7 @@ agent = "claude/sonnet"                            # the agent, below
 decisions = ["design/exported-doc", "testing/*"]   # ids or globs; default none
 scope = "files"                                    # widest change: symbol | files; default files
 verify = [["cargo", "test", "-q"]]                 # programs that must pass over the fixes of a run
+context = 4000                                     # tokens of code around the findings in an agent's brief; default 4000
 unsafe = false                                     # default; true writes a verified model fix
 [rules."design/exported-doc"]
 safety = "safe"                                    # trust the agent on this decision: written without --unsafe-fixes
@@ -84,7 +85,17 @@ safety = "safe"                                    # trust the agent on this dec
   finding, `files` any file the fix needs), for each finding the decision (requirement, context,
   `prompt`), message, evidence, `path:line:col` and scope, up to two before and after examples per
   decision, how the result is checked, and a closing line asking for `fixed` or `left` per finding.
-  The reply is a note, never a verdict.
+  The reply is a note, never a verdict. The prompt of an agent also carries what the code model
+  already knows, so that it need not search the directory (Agentless, Xia et al. 2024: localize
+  first, hand the repair the code it needs): the code of each finding's extent with line numbers,
+  the declarations (with the first line of their doc) of the project symbols it uses, the imports of
+  the file and, for scope `files`, every place that refers to the symbols it may change with the
+  declaration that holds it, and the files they are in. The agent is told to start from it and open
+  further files only when it cannot finish without them, a specific file or symbol and not a listing
+  or search of the directory. `[fix] context` is the budget in tokens (four characters each) of all
+  of it but the code of the findings; over it, the places and declarations farthest from the
+  findings are left out first and the brief counts them. The same inputs write the same brief, so
+  the run is kept under its digest.
 - **Scope, checked by the verifier.** `symbol`: only the extent of each finding of the batch in its
   file (the symbol the finding is about, else the innermost around it, else the whole file when it has
   fewer than 400 lines, otherwise the finding is declined `no-extent`); a change outside the union of

@@ -69,6 +69,8 @@ pub(super) struct ModelFixer<'e> {
     pub(super) account: Account,
     /// What the agents said, for the notes of the run.
     said: Mutex<Vec<String>>,
+    /// The tokens of context a brief may carry around the findings.
+    context: usize,
 }
 
 impl<'e> ModelFixer<'e> {
@@ -83,6 +85,7 @@ impl<'e> ModelFixer<'e> {
             fixes,
             account: Account::default(),
             said: Mutex::default(),
+            context: engine.config.fix().context,
         })
     }
 

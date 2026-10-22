@@ -229,6 +229,159 @@ fn with_scope_files_a_caller_outside_the_paths_of_the_run_is_fixed_with_the_func
     );
 }
 
+/// The prompt an agent was given for `fix`, a table of the `[fix]` section.
+fn prompt_given(fix: &str) -> String {
+    let log = tempfile::tempdir().unwrap();
+    let prompt = log.path().join("prompt");
+    let agent = format!("cat > {:?}\n{RENAME_BOTH}", prompt.to_str().unwrap());
+    let (dir, scripts) = agent_project("", &agent, &format!("{}{UNSANDBOXED}", listed(fix, ALLOW)));
+    write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
+    write(
+        dir.path(),
+        "src/lib.rs",
+        "mod other;\npub fn bad_one() {}\n",
+    );
+    write(
+        dir.path(),
+        "src/other.rs",
+        "pub fn caller() {\n    crate::bad_one();\n}\n",
+    );
+    fix_run(&dir);
+    drop(scripts);
+    fs::read_to_string(prompt).unwrap()
+}
+
+fn fix_run(dir: &TempDir) -> Value {
+    fix(dir, json!({}))
+}
+
+#[test]
+fn the_brief_of_a_files_finding_carries_its_code_and_the_sites_that_refer_to_it() {
+    let prompt = prompt_given("");
+
+    assert!(
+        prompt.contains("Code (src/lib.rs lines 2-2):\n```rust\n   2  pub fn bad_one() {}\n```"),
+        "{prompt}"
+    );
+    assert!(
+        prompt.contains("Places that refer to what you may change:\n- src/other.rs:2  crate::bad_one();  in pub fn caller()"),
+        "{prompt}"
+    );
+    assert!(
+        prompt.contains("Files you may have to change:\n- src/other.rs\n"),
+        "{prompt}"
+    );
+    assert!(prompt.contains("open further files only when you cannot finish without them"));
+}
+
+const GO_BAN: &str = r#"apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/naming-ban
+spec:
+  title: Ban
+  context: A function named by a ban word is a violation.
+  scope: { subject: symbol }
+  requirement: A function MUST NOT be named like a ban word.
+  severity: warn
+  check:
+    type: cel
+    where: symbol.kind == "function" && symbol.name == "BadOne"
+    message: "{{ symbol.name }} is banned"
+  fix:
+    type: model
+    safety: unsafe
+    scope: files
+    prompt: Rename it; update the callers.
+  examples:
+    - name: bad
+      language: go
+      kind: invalid
+      files: [{ path: main.go, body: "package m\n\nfunc BadOne() {}\n" }]
+      fixed: [{ path: main.go, body: "package m\n\nfunc FixedOne() {}\n" }]
+      expect: [{ line: 3 }]
+    - name: good
+      language: go
+      kind: valid
+      files: [{ path: main.go, body: "package m\n\nfunc Fine() {}\n" }]
+"#;
+
+#[test]
+fn the_brief_of_a_go_finding_carries_its_code_its_imports_and_its_callers() {
+    let log = tempfile::tempdir().unwrap();
+    let prompt = log.path().join("prompt");
+    let scripts = tempfile::tempdir().unwrap();
+    write(
+        scripts.path(),
+        "agent.sh",
+        &format!("cat > {:?}\n", prompt.to_str().unwrap()),
+    );
+    let extra = format!(
+        "[rules]\n\"{BAN}\" = \"warn\"\n[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}{UNSANDBOXED}",
+        scripts.path().join("agent.sh").to_str().unwrap(),
+        listed("", ALLOW)
+    );
+    let Some(dir) = crate::fix::go_project(
+        &[
+            (".lighthouse/decisions/ban.yaml", GO_BAN),
+            (
+                "main.go",
+                "package m\n\nimport \"strings\"\n\nfunc BadOne() string { return strings.ToUpper(\"x\") }\n",
+            ),
+            (
+                "other.go",
+                "package m\n\nfunc Caller() string {\n\treturn BadOne()\n}\n",
+            ),
+        ],
+        &extra,
+    ) else {
+        return;
+    };
+
+    fix(&dir, json!({}));
+
+    let prompt = fs::read_to_string(prompt).unwrap();
+    assert!(
+        prompt.contains("Code (main.go lines 5-5):\n```go\n   5  func BadOne() string { return strings.ToUpper(\"x\") }\n```"),
+        "{prompt}"
+    );
+    assert!(
+        prompt.contains("The file imports:\n- strings\n"),
+        "{prompt}"
+    );
+    assert!(
+        prompt.contains("- other.go:4  return BadOne()  in func Caller() string"),
+        "{prompt}"
+    );
+    assert!(
+        prompt.contains("Files you may have to change:\n- other.go\n"),
+        "{prompt}"
+    );
+}
+
+#[test]
+fn the_brief_of_a_symbol_finding_has_its_code_and_no_other_file() {
+    let prompt = prompt_given("scope = \"symbol\"\n");
+
+    assert!(prompt.contains("Code (src/lib.rs lines 2-2):"), "{prompt}");
+    assert!(
+        !prompt.contains("Places that refer to") && !prompt.contains("src/other.rs"),
+        "{prompt}"
+    );
+}
+
+#[test]
+fn a_context_of_no_tokens_leaves_out_what_surrounds_the_code_and_says_how_much() {
+    let prompt = prompt_given("context = 0\n");
+
+    assert!(prompt.contains("Code (src/lib.rs lines 2-2):"), "{prompt}");
+    assert!(!prompt.contains("Places that refer to"), "{prompt}");
+    assert!(
+        prompt.contains("more items were left out to keep this short."),
+        "{prompt}"
+    );
+}
+
 #[test]
 fn a_caller_that_breaks_rolls_the_whole_change_back() {
     let agent = format!("{RENAME_BOTH}printf 'pub fn bad_one() {{}}\\n' >> src/other.rs\n");

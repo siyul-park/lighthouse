@@ -21,7 +21,8 @@ use crate::{
     cache::{Digest, KeyBuilder, digest_of},
     engine::{Member, Refusal},
     fix::{
-        brief::{Target, brief},
+        brief::{Localized, Target, brief},
+        context::localize,
         rewrite::{Bounds, Changes, Scratch, World, accept, collect},
     },
 };
@@ -41,6 +42,8 @@ pub(in crate::fix) struct Batch<'a> {
     /// Where the agent may change `file` under the scope `symbol`: the extent
     /// of each finding.
     extents: Vec<Span>,
+    /// What the code model knows around the findings, for the brief.
+    localized: Localized,
 }
 
 /// The new texts of the files an agent changed, by path, and who made them.
@@ -65,6 +68,7 @@ impl ModelFixer<'_> {
     /// and, for the scope `symbol`, its extent.
     pub(in crate::fix) fn batch<'a>(
         &'a self,
+        world: &World<'_>,
         file: &'a Path,
         findings: &[(&'a Diagnostic, &'a FixDecision, Option<Span>)],
         tools: Vec<String>,
@@ -94,6 +98,16 @@ impl ModelFixer<'_> {
                 }
             })
             .collect();
+        let localized = localize(
+            world,
+            file,
+            &findings
+                .iter()
+                .map(|&(finding, _, span)| (finding, span))
+                .collect::<Vec<_>>(),
+            scope,
+            self.context,
+        );
         let binding = findings
             .first()
             .map(|(_, decision, _)| self.agent_for(&decision.id).to_vec())
@@ -103,6 +117,7 @@ impl ModelFixer<'_> {
             binding,
             scope,
             extents: findings.iter().filter_map(|&(_, _, span)| span).collect(),
+            localized,
             targets,
             tools,
         }
@@ -117,7 +132,7 @@ impl ModelFixer<'_> {
     ) -> Result<Edit, String> {
         self.count(batch, Event::Asked);
         let tools: Vec<&str> = batch.tools.iter().map(String::as_str).collect();
-        let prompt = brief(&batch.targets, &tools);
+        let prompt = brief(&batch.targets, &tools, Some(&batch.localized));
         let prompt_digest = match digest_of(&prompt) {
             Ok(digest) => digest,
             Err(e) => {

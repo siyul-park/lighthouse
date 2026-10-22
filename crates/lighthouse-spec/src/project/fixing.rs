@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{FixScope, Point, Program, ProgramSpec};
 
+/// The default of [`FixPolicy::context`]: a few screens of signatures.
+const DEFAULT_CONTEXT: usize = 4000;
+
 /// What a project allows of fixes, as it resolves: the `fix` table with its
 /// defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +24,9 @@ pub struct FixPolicy {
     pub scope: FixScope,
     /// The programs that must pass with the fixes by models in place.
     pub verify: Vec<Program>,
+    /// The most code, in tokens, that the brief of one run of an agent carries
+    /// around the findings: signatures, imports and reference sites.
+    pub context: usize,
 }
 
 impl FixPolicy {
@@ -31,6 +37,9 @@ impl FixPolicy {
             decisions: spec.decisions,
             scope: spec.scope.unwrap_or(FixScope::Files),
             verify: spec.verify.into_iter().map(Program::from).collect(),
+            context: spec
+                .context
+                .map_or(DEFAULT_CONTEXT, |tokens| tokens as usize),
         }
     }
 }
@@ -67,6 +76,14 @@ pub struct FixSpec {
     /// run to a preview.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub verify: Vec<ProgramSpec>,
+    /// The most code, in tokens (four characters each), that the brief of one
+    /// run of an agent carries around the findings: the signatures of what
+    /// the code uses, its imports and, for the scope `files`, the places that
+    /// refer to what may change. The code of the findings is always given. When
+    /// the rest is over this, what is farthest from the findings is left out
+    /// first, and the brief says how many items were. Default: `4000`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<u32>,
 }
 
 impl FixSpec {
@@ -76,6 +93,7 @@ impl FixSpec {
             && self.decisions.is_empty()
             && self.scope.is_none()
             && self.verify.is_empty()
+            && self.context.is_none()
     }
 
     /// The first problem with a verification program, named by its place.
