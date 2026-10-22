@@ -1,4 +1,4 @@
-use crate::{CLASSIFY, EXIT, INDEX, INITIALIZE, SHUTDOWN, TRAIN};
+use crate::{CLASSIFY, EDIT, EXIT, INDEX, INITIALIZE, SHUTDOWN, TRAIN};
 
 /// TypeSafe's System One: the twin of [`CLASSIFY`].
 pub const SYSTEM_ONE: Http = Http {
@@ -15,7 +15,7 @@ pub const FINE_TUNING_JOBS: Http = Http {
 /// Every method of the protocol, in the order docs/plugin-protocol.md lists
 /// them. Both transports read it: the stdio loop dispatches these names, and a
 /// provider that forwards to an HTTP server posts to these paths.
-pub const ROUTES: [Route; 6] = [
+pub const ROUTES: [Route; 7] = [
     Route {
         method: INITIALIZE,
         http: None,
@@ -31,6 +31,10 @@ pub const ROUTES: [Route; 6] = [
     Route {
         method: TRAIN,
         http: Some(FINE_TUNING_JOBS),
+    },
+    Route {
+        method: EDIT,
+        http: None,
     },
     Route {
         method: SHUTDOWN,

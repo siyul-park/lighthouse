@@ -2,7 +2,7 @@
 //! `metrics(n)`, `callers(n)`, `owner(n)`, `tests(n)`, `rank(n, key)`, `exposed(n, internal)`,
 //! `unit(func)`, `reach(n)`, `limit(n, max)` and `counted(n, count, what)`,
 //! the module path helpers `globMatch(path, glob)` and
-//! `layerOf(module, layers)`, and the text helpers `join`, `lines`, `trim`,
+//! `layerOf(module, layers)`, and the text helpers `lines`,
 //! `trimPrefixes`, `trimSuffixes`, `trimLeft`, `trimRight`, `leadingRun`,
 //! `drop` and `words`.
 //!
@@ -22,7 +22,7 @@ use cel::{
         types::{CelBool, CelMap, CelMapKey, CelString},
         value::Val,
     },
-    extractors::This,
+    extractors::IntoFunction,
     objects::Map,
 };
 
@@ -113,25 +113,52 @@ impl Needs {
 /// A library function as the runtime calls it, over arguments it has already
 /// resolved. Reading a field of the node argument in place spares converting
 /// the whole node, with its lists of related nodes, on every call.
-pub(super) type Builtin = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + Sync>;
+pub(super) type Builtin = Box<dyn Fn(&FunctionContext) -> ResolveResult + Send + Sync>;
 
-/// A context with the library installed.
-pub(crate) fn context() -> Context<'static> {
-    let mut context = Context::default();
+/// A context of the shared CEL environment with the library installed. The
+/// text and list functions of that environment (`cel`'s own extensions) are not
+/// redefined here.
+pub(crate) fn context() -> Result<Context<'static, 'static>, String> {
+    let mut context = lighthouse_spec::context()?;
     for (name, field) in FUNCTIONS {
         if name != "rank" {
-            context.add_function(name, field_reader(name, field));
+            builtin(&mut context, name, field_reader(name, field))?;
         }
     }
-    context.add_function("rank", rank());
-    context.add_function("exposed", exposed());
-    limits::install(&mut context);
-    context.add_function("globMatch", |path: Arc<String>, glob: Arc<String>| {
-        glob::matches(&path, &glob)
-    });
-    context.add_function("layerOf", layer_of);
-    text_helpers(&mut context);
+    builtin(&mut context, "rank", rank())?;
+    builtin(&mut context, "exposed", exposed())?;
+    limits::install(&mut context)?;
+    declare(
+        &mut context,
+        "globMatch",
+        |path: Arc<String>, glob: Arc<String>| glob::matches(&path, &glob),
+    )?;
+    declare(&mut context, "layerOf", layer_of)?;
+    text_helpers(&mut context)?;
+    Ok(context)
+}
+
+/// Declares `function` as `name`, or says why the environment refuses it.
+pub(super) fn declare<T: 'static, F>(
+    context: &mut Context<'static, 'static>,
+    name: &str,
+    function: F,
+) -> Result<(), String>
+where
+    F: IntoFunction<T> + 'static + Send + Sync,
+{
     context
+        .add_function(name, function)
+        .map_err(|e| format!("the CEL function `{name}`: {e}"))
+}
+
+/// Declares the library function `function` as `name`.
+pub(super) fn builtin(
+    context: &mut Context<'static, 'static>,
+    name: &str,
+    function: Builtin,
+) -> Result<(), String> {
+    declare(context, name, move |ftx: &FunctionContext| function(ftx))
 }
 
 /// The `N` arguments of a call, the receiver of a method call first.
@@ -152,7 +179,7 @@ pub(super) fn arguments<'a, const N: usize>(
 /// an error when it is no node.
 pub(super) fn member<'a>(
     node: &'a dyn Val,
-    field: &str,
+    field: &'a str,
     function: &str,
 ) -> Result<Option<&'a dyn Val>, ExecutionError> {
     let map = node
@@ -258,27 +285,16 @@ fn occurrences<'a>(source: &'a str, word: &'a str) -> impl Iterator<Item = &'a s
     })
 }
 
-/// The text helpers: what CEL's standard strings lack for reading a comment.
-fn text_helpers(context: &mut Context<'static>) {
-    context.add_function("lines", |s: Arc<String>| {
+/// The text helpers that CEL's extensions lack for reading a comment.
+fn text_helpers(context: &mut Context<'static, 'static>) -> Result<(), String> {
+    declare(context, "lines", |s: Arc<String>| {
         Arc::new(
             s.lines()
                 .map(|l| Value::String(Arc::new(l.to_owned())))
                 .collect::<Vec<_>>(),
         )
-    });
-    context.add_function("trim", |s: Arc<String>| s.trim().to_owned());
-    context.add_function(
-        "join",
-        |This(items): This<Arc<Vec<Value>>>, separator: Arc<String>| {
-            items
-                .iter()
-                .map(text)
-                .collect::<Vec<_>>()
-                .join(separator.as_str())
-        },
-    );
-    context.add_function("trimPrefixes", |s: Arc<String>, p: Arc<String>| {
+    })?;
+    declare(context, "trimPrefixes", |s: Arc<String>, p: Arc<String>| {
         let mut rest = s.as_str();
         while !p.is_empty() {
             let Some(next) = rest.strip_prefix(p.as_str()) else {
@@ -287,8 +303,8 @@ fn text_helpers(context: &mut Context<'static>) {
             rest = next;
         }
         rest.to_owned()
-    });
-    context.add_function("trimSuffixes", |s: Arc<String>, p: Arc<String>| {
+    })?;
+    declare(context, "trimSuffixes", |s: Arc<String>, p: Arc<String>| {
         let mut rest = s.as_str();
         while !p.is_empty() {
             let Some(next) = rest.strip_suffix(p.as_str()) else {
@@ -297,19 +313,25 @@ fn text_helpers(context: &mut Context<'static>) {
             rest = next;
         }
         rest.to_owned()
-    });
-    context.add_function("trimLeft", |s: Arc<String>, chars: Arc<String>| {
+    })?;
+    declare(context, "trimLeft", |s: Arc<String>, chars: Arc<String>| {
         s.trim_start_matches(|c| chars.contains(c)).to_owned()
-    });
-    context.add_function("trimRight", |s: Arc<String>, chars: Arc<String>| {
-        s.trim_end_matches(|c| chars.contains(c)).to_owned()
-    });
-    context.add_function("leadingRun", |s: Arc<String>, chars: Arc<String>| {
-        s.chars().take_while(|c| chars.contains(*c)).count() as i64
-    });
+    })?;
+    declare(
+        context,
+        "trimRight",
+        |s: Arc<String>, chars: Arc<String>| s.trim_end_matches(|c| chars.contains(c)).to_owned(),
+    )?;
+    declare(
+        context,
+        "leadingRun",
+        |s: Arc<String>, chars: Arc<String>| {
+            s.chars().take_while(|c| chars.contains(*c)).count() as i64
+        },
+    )?;
     // The words of a name: of an identifier, or of the part of a decision id
     // after its pack.
-    context.add_function("words", |s: Arc<String>| {
+    declare(context, "words", |s: Arc<String>| {
         let name = s.rsplit('/').next().unwrap_or_default();
         Arc::new(
             crate::text::words(name)
@@ -317,12 +339,13 @@ fn text_helpers(context: &mut Context<'static>) {
                 .map(|w| Value::String(Arc::new(w)))
                 .collect::<Vec<_>>(),
         )
-    });
-    context.add_function("drop", |s: Arc<String>, n: i64| {
+    })?;
+    declare(context, "drop", |s: Arc<String>, n: i64| {
         s.chars()
             .skip(usize::try_from(n).unwrap_or(0))
             .collect::<String>()
-    });
+    })?;
+    Ok(())
 }
 
 fn empty() -> Value {

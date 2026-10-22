@@ -155,11 +155,12 @@ safety = "safe"                                    # trust the agent on this dec
 
 ## The agent that edits
 
-Only a `command` without a `protocol` serves `agent`: running the program in a scratch copy of the
-project, with the brief as plain text on stdin, is what makes it an agent. HTTP and plugin providers do
-not, and binding one is a configuration error ("provider `x` does not serve `agent`: only a command
-without a protocol does"); a `command` with `protocol = "openai"` is no provider at all ("a `command`
-speaks `typesafe` (classification) or plain text (agent)"). `[models] agent` is one reference or a
+A `command` without a `protocol` serves `agent`: running the program in a scratch copy of the
+project, with the brief as plain text on stdin, is what makes it an agent. So does a plugin whose
+handshake says `agent` for a model (`lighthouse/edit`, see [plugin-protocol.md](plugin-protocol.md)). HTTP
+providers do not, and binding one is a configuration error ("provider `x` does not serve `agent`: only a
+command without a protocol, or a plugin that offers agents, does"); a `command` with `protocol = "openai"`
+is no provider at all ("a `command` speaks `typesafe` (classification) or plain text (agent)"). `[models] agent` is one reference or a
 route list that fails over on error; `rules."<id>".agent` binds another one for that decision, in the
 project file or in a user or local file ([architecture.md](architecture.md#configuration-layers)).
 The findings of a file are fixed by one run for each scope and agent, one run after another, each
@@ -223,6 +224,8 @@ against the Claude Code headless docs (<https://code.claude.com/docs/en/headless
 formerly `developers.openai.com/codex/noninteractive`); `codex exec --help` could not be run on the
 machine that wrote this, so `-` rests on those docs alone.
 
+- **What it did.** The report says what each run read, searched, listed, edited and ran, from the
+  harness's own event stream, so the agent never has to report it. See [What an agent did](#what-an-agent-did).
 - **Workspace.** A scratch copy of the project (what version control keeps, with the run's accepted
   texts in place; the same copy `[fix] verify` uses), itself a repository of one commit, so the agent
   finds its root and `git diff` works. The command runs with it as its working
@@ -232,7 +235,7 @@ machine that wrote this, so `-` rests on those docs alone.
   (with `XDG_*`) of its own, which `env` may override, it reads everything but the sandbox's list of
   secrets (the user's credential files and the project's `.env` files, which the copy leaves out),
   and it reaches only the hosts the project's `[sandbox] network` and the provider's `sandbox.network` list. The copy is deleted when the run ends, on every path. stdout is kept for the notes only
-  (2 KB).
+  (2 KB), unless the provider maps it to [events](#what-an-agent-did).
 - **What it may change.** Under the scope, the indexed text files of the project (`files`), the file of the
   finding (`file`) or its symbol (`symbol`). A change to a
   file outside that or one Lighthouse does not index, a file created or deleted, or a
@@ -243,6 +246,86 @@ machine that wrote this, so `-` rests on those docs alone.
   process, and the agent's own configuration decides where code is sent. Lighthouse writes nothing
   outside the scratch copy; the files are written by the fix run after verification, as for any fix.
   An agent that logs in through a file in the home of the user does not find it in the home of its own: give it the key in `env`.
+
+## What an agent did
+
+A fix report says, for each run of an agent (the findings of one file), which files it opened that
+the brief did not show or name, what it searched and listed, and how many calls of each tool it made
+(`usage.agent.batches` in the JSON report; the same object is the `agent` property of the SARIF run
+of `check --fix --format sarif`). It is a measurement: no fix is declined for it. A run kept from
+the cache did nothing now and has no entry; a provider that says nothing of its events has none.
+
+The brief shows the code of the findings, the declarations of what it uses and the places that refer
+to what may change, as far as its budget goes, and names the files the fix may have to change; those
+are the files "the brief gave". A path outside the scratch copy never reaches the report: it is one
+entry in `reads`, `(outside the project)`, and an event marked `outside` with no path. So is a path that
+passes through a symbolic link of the copy, which may lead anywhere, and a search `pattern` that is an
+absolute path of the machine (the pattern is then dropped and the event marked). Whatever the agent
+printed, secrets of the environment are hidden in the decoded values as well as in the raw line. When the
+events are not all of what the agent did (output that was cut, events past the 10 000 kept, lines far
+past that limit, which are read for what the agent said only, events the host did not understand) the batch says `incomplete: true` with a `note`.
+
+The host knows one event, `{tool: read | search | list | edit | run, path?, outside?, pattern?, command?}`
+(`ToolEvent` in the [protocol](plugin-protocol.md) schema; `path` is relative to the scratch copy), and
+two generic ways to get it. It knows no harness.
+
+- **A plugin** that serves `agent` returns `events` with its `lighthouse/edit` result. The agent runs in
+  a process of its own, started for that request under the sandbox of a `command` agent, never in the
+  long-lived process of the plugin; the host reads its events leniently, so an event of an unknown tool
+  or a malformed one is skipped and counted, not a failure of the plugin.
+- **A `command` agent** declares `events` under its provider: a mapping in CEL (the language of checks,
+  in the one environment the checks use too: the standard library with the strings, lists, math and
+  encoders extensions of the `cel` crate and the optional syntax `a.?b.orValue("")`, and
+  `commands(text)` below) over each JSON line of its stdout,
+  read as the program prints it, so a stream of any size is read to its end. A line that is no JSON is
+  skipped.
+
+| Key | Meaning |
+|---|---|
+| `select` | bool: the line holds tool calls |
+| `each` | optional list: one event for each element, seen as `item` by the keys below (a shell command with a pipe, a change of several files) |
+| `tool` | `read`, `search`, `list`, `edit` or `run`, usually `tools[line.…]`; a call with no tool (a harness tool the table lacks, or a failure) is not an event |
+| `path` | what the call is about: a string, or a list of strings for one event each; a failure or `""` is none |
+| `pattern`, `command` | what a search looks for, or the command line of a run; a failure or `""` is none |
+| `said` | optional string, read from every line: what the agent said, for the notes of the fix (its `fixed` or `left` reply); the pieces are joined by line breaks and the last 2 KB are kept |
+| `tools` | the harness's tool names, each with its tool; a table to look up (`tools[name]`, `name in tools`) |
+
+The expressions see `line`, `tools` and, with `each`, `item`; they are compiled when the configuration
+is read, and an error names the key. `commands(text)` reads a shell command line as a list of the
+commands it runs (a pipe, `&&`, `||` and `;` separate them, a script given to `sh -c` is read in its
+turn, assignments and redirections are not words), each a map of `word` (the program), `args`,
+`operands` (the arguments that do not start with `-`), `rest` (the operands after the first) and
+`text`. Without `said`, a mapped agent says nothing: its stdout is data, not speech.
+
+Which paths are real is decided by the host, after the run, for every source alike: the path of a
+`read` counts only when it names an existing file under the directory the agent ran in, the path of
+a `search` an existing file or directory (both folded lexically, so `a/../b` is `b`); any other
+path, such as a `sed` expression, an option value or a file the agent never made, is dropped. A call
+left with no path is one event without a path, so the counts stay exact. Paths marked outside the
+directory are never checked.
+
+**Recipes.** What belongs to a harness is configuration, in the repository's `recipes` directory,
+one directory each: `recipe.toml`, a fixture stream, the events it must give and the words it must say
+(a golden test maps the stream through the generic path). The recipes are configuration layers: copy
+one into `~/.config/lighthouse/config.toml` or `.lighthouse/local.toml`, or paste the provider into
+`lighthouse.toml`. They are not Projects to `extends`: an extended Project contributes `rules` and
+`overrides` only, and `models` is the environment of the machine, which comes from the project file
+and the user and local layers (see [architecture.md](architecture.md#configuration-layers)). A plugin's
+catalog layer holds decisions, packs and Projects, so it cannot carry providers either. Each recipe
+records the sources its flags and event shapes were checked against.
+
+| Recipe | Harness | Stream |
+|---|---|---|
+| `opencode` | opencode | `--format json` |
+| `claude-code` | Claude Code | `--output-format stream-json --verbose` |
+| `codex` | Codex CLI | `exec --json` |
+| `gemini-cli` | Gemini CLI | `--output-format stream-json` |
+
+Codex reads and searches through the shell, so its recipe reads each command of a command line with
+`commands` and classifies it by its program alone, looked up in `tools` (a program that is not there
+is a `run`): a read is of every operand, a search looks for the first operand in the others, a list
+is of its operands. To add a harness, or to fix a shape that changed, write or
+edit the keys; nothing is built or released.
 
 ## Providers
 

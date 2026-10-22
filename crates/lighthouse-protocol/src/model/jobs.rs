@@ -200,15 +200,24 @@ pub struct Capabilities {
     pub embedding: Option<Supports>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub training: Option<Supports>,
+    /// Runs as an agent that edits files (`lighthouse/edit`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<Supports>,
 }
 
 impl Capabilities {
+    /// Whether the model can run as an agent.
+    pub fn edits(&self) -> bool {
+        self.agent.is_some_and(|capability| capability.supported)
+    }
+
     /// A classifier, which learns from labels when `trains`.
     pub fn classifier(trains: bool) -> Self {
         Self {
             classification: Some(Supports { supported: true }),
             embedding: None,
             training: trains.then_some(Supports { supported: true }),
+            agent: None,
         }
     }
 

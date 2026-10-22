@@ -1,9 +1,12 @@
+mod agent;
 mod client;
 mod command;
 mod convert;
+mod events;
 mod manifest;
 mod model;
 mod plugin;
+mod shell;
 
 use std::{
     path::{Path, PathBuf},
@@ -120,7 +123,7 @@ pub fn register(
             store
         };
         let registration = match RpcPlugin::connect(one, at, timeout) {
-            Ok(plugin) => registry.register(&plugin),
+            Ok(plugin) => registry.register(&plugin.confined(config.sandbox(), root)),
             Err(Error::Unavailable {
                 id,
                 reason,

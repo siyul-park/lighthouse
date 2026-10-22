@@ -1,0 +1,13 @@
+{"type":"init","timestamp":"2026-10-22T09:00:00.000Z","session_id":"g1","model":"gemini-3-pro"}
+{"type":"message","timestamp":"2026-10-22T09:00:01.000Z","role":"assistant","content":"Reading.","delta":true}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:02.000Z","tool_name":"read_file","tool_id":"read_file-1","parameters":{"file_path":"@ROOT@/pkg/a.go"}}
+{"type":"tool_result","timestamp":"2026-10-22T09:00:02.500Z","tool_id":"read_file-1","status":"success","output":"package pkg"}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:03.000Z","tool_name":"grep_search","tool_id":"grep_search-2","parameters":{"pattern":"func Parse","path":"@ROOT@"}}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:04.000Z","tool_name":"glob","tool_id":"glob-3","parameters":{"pattern":"**/*.go"}}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:05.000Z","tool_name":"list_directory","tool_id":"list_directory-4","parameters":{"dir_path":"@ROOT@/pkg"}}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:06.000Z","tool_name":"read_file","tool_id":"read_file-5","parameters":{"file_path":"@ROOT@/pkg/b.go"}}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:07.000Z","tool_name":"save_memory","tool_id":"save_memory-6","parameters":{"fact":"x"}}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:08.000Z","tool_name":"replace","tool_id":"replace-7","parameters":{"file_path":"@ROOT@/pkg/a.go","old_string":"a","new_string":"b"}}
+{"type":"tool_use","timestamp":"2026-10-22T09:00:09.000Z","tool_name":"run_shell_command","tool_id":"run_shell_command-8","parameters":{"command":"go vet ./pkg"}}
+{"type":"message","timestamp":"2026-10-22T09:00:09.500Z","role":"assistant","content":"1 fixed","delta":false}
+{"type":"result","timestamp":"2026-10-22T09:00:10.000Z","status":"success","stats":{"total_tokens":100}}

@@ -11,9 +11,10 @@ use super::frame::{
     INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, PARSE_ERROR, SERVER_NOT_INITIALIZED,
 };
 use crate::{
-    CLASSIFY, CreateFineTuningJobRequest, EXIT, ErrorObject, FineTuningJob, FrameError, INDEX,
-    INITIALIZE, IndexParams, IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN,
-    SystemOneRequest, SystemOneResponse, TRAIN, VERSION, read_message, write_message,
+    CLASSIFY, CreateFineTuningJobRequest, EDIT, EXIT, EditParams, EditResult, ErrorObject,
+    FineTuningJob, FrameError, INDEX, INITIALIZE, IndexParams, IndexResult, InitializeParams,
+    InitializeResult, Message, SHUTDOWN, SystemOneRequest, SystemOneResponse, TRAIN, VERSION,
+    read_message, write_message,
 };
 
 /// The methods of a plugin. An `Err` becomes a failed-request response; the
@@ -34,6 +35,10 @@ pub trait Handler {
     /// Puts subjects to a model; a language plugin offers no model.
     fn classify(&mut self, _params: SystemOneRequest) -> Result<SystemOneResponse, ErrorObject> {
         Err("this plugin offers no model".into())
+    }
+    /// Runs an agent in a directory; only a model that edits files offers it.
+    fn edit(&mut self, _params: EditParams) -> Result<EditResult, ErrorObject> {
+        Err("this plugin runs no agent".into())
     }
     /// Fits a model; only a model that learns from labels offers it.
     fn train(&mut self, _params: CreateFineTuningJobRequest) -> Result<FineTuningJob, ErrorObject> {
@@ -125,6 +130,7 @@ fn dispatch(
         INDEX => call(message, |p| handler.index(p)),
         CLASSIFY => call(message, |p| handler.classify(p)),
         TRAIN => call(message, |p| handler.train(p)),
+        EDIT => call(message, |p| handler.edit(p)),
         SHUTDOWN => {
             session.shutdown = true;
             Ok(Value::Null)

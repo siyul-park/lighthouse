@@ -1,0 +1,12 @@
+{"type":"system","subtype":"init","cwd":"@ROOT@","session_id":"s1","tools":["Read","Grep","Glob","Edit","Write","Bash"],"model":"claude-sonnet-5-5"}
+{"type":"assistant","message":{"id":"msg_1","role":"assistant","content":[{"type":"text","text":"Reading the file."}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_1","role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"@ROOT@/pkg/a.go"}}]},"session_id":"s1"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"package pkg"}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_2","role":"assistant","content":[{"type":"tool_use","id":"toolu_2","name":"Grep","input":{"pattern":"func Parse","path":"@ROOT@"}}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_3","role":"assistant","content":[{"type":"tool_use","id":"toolu_3","name":"Glob","input":{"pattern":"**/*.go"}}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_4","role":"assistant","content":[{"type":"tool_use","id":"toolu_4","name":"Read","input":{"file_path":"@ROOT@/pkg/b.go","offset":10,"limit":50}}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_5","role":"assistant","content":[{"type":"tool_use","id":"toolu_5","name":"TodoWrite","input":{"todos":[]}}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_6","role":"assistant","content":[{"type":"tool_use","id":"toolu_6","name":"Edit","input":{"file_path":"@ROOT@/pkg/a.go","old_string":"a","new_string":"b"}}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_7","role":"assistant","content":[{"type":"tool_use","id":"toolu_7","name":"Bash","input":{"command":"go vet ./pkg","description":"vet"}}]},"session_id":"s1"}
+{"type":"assistant","message":{"id":"msg_8","role":"assistant","content":[{"type":"text","text":"1 fixed"}]},"session_id":"s1"}
+{"type":"result","subtype":"success","is_error":false,"result":"1 fixed","session_id":"s1"}

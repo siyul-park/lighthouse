@@ -163,6 +163,7 @@ impl Orchestrator<'_> {
                 let edits = Some(EditUsage {
                     runs: usage.calls,
                     seconds: usage.time.as_secs_f64(),
+                    batches: models.traces(),
                 });
                 (models.account.counts(), usage.calls, usage.cost, edits)
             }

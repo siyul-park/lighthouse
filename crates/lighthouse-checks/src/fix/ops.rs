@@ -56,7 +56,8 @@ pub(crate) struct Steps(Vec<(Option<Program>, Step)>);
 impl Steps {
     pub(crate) fn compile(id: &str, list: &[OpSpec]) -> Result<Self, Error> {
         let program = |what: &str, source: &str| {
-            Program::compile(source).map_err(|e| Error::invalid(id, format!("fix {what}: {e}")))
+            lighthouse_spec::compile(source)
+                .map_err(|e| Error::invalid(id, format!("fix {what}: {e}")))
         };
         let mut steps = Vec::new();
         for op in list {
@@ -150,7 +151,7 @@ impl Steps {
 /// What expressions see: the finding, its symbol and the rule's options.
 struct Env<'a> {
     id: &'a str,
-    context: Context<'static>,
+    context: Context<'static, 'static>,
 }
 
 impl<'a> Env<'a> {
@@ -177,7 +178,8 @@ impl<'a> Env<'a> {
             .and_then(SymbolId::parse)
             .and_then(|id| request.project.symbol(&id))
             .map_or_else(|| json!({}), |s| facts::symbol(request.project, s));
-        let mut context = Context::default();
+        let mut context = lighthouse_spec::context()
+            .map_err(|e| PluginError::Failed(format!("{id}: fix: {e}")))?;
         for (name, value) in [
             ("finding", &value),
             ("symbol", &symbol),

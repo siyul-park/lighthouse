@@ -362,6 +362,62 @@ fn the_brief_of_a_files_finding_lists_the_places_that_call_what_may_change() {
 }
 
 #[test]
+fn the_briefed_files_are_those_the_brief_shows_or_names_and_no_other() {
+    for fixture in fixtures() {
+        let own = fixture.own.0.to_owned();
+        let other = fixture.other.0.to_owned();
+
+        let symbol = fixture.localized(FixScope::Symbol, BIG, false);
+        let files = fixture.localized(FixScope::Files, BIG, false);
+        let spent = fixture.localized(FixScope::Files, 0, false);
+
+        assert_eq!(symbol.briefed, [own.clone()].into(), "{}", fixture.language);
+        assert_eq!(
+            files.briefed,
+            [own.clone(), other.clone()].into(),
+            "the place and its file are shown"
+        );
+        assert_eq!(
+            spent.briefed,
+            [own, other].into(),
+            "the file of a place that did not fit is still named in the list of files"
+        );
+    }
+}
+
+#[test]
+fn a_used_symbol_of_another_file_makes_that_file_briefed_only_while_it_fits() {
+    let fixture = &GO;
+    let greet = symbol("a.go", fixture.own_symbols[0]);
+    // The helper the finding uses is declared in a file of its own.
+    let helper = symbol("h.go", ("helper", 1, 1, None));
+    let project = Project::merge(vec![
+        Fragment {
+            files: vec![file("a.go", "go")],
+            modules: vec![Module {
+                path: "m".to_owned(),
+                name: None,
+                test_of: None,
+            }],
+            edges: vec![calls(&greet, &helper, fixture.inside.0)],
+            symbols: vec![greet],
+            ..Fragment::default()
+        },
+        Fragment {
+            files: vec![file("h.go", "go")],
+            symbols: vec![helper],
+            ..Fragment::default()
+        },
+    ]);
+
+    let fits = fixture.localized_in(project.clone(), FixScope::Symbol, BIG);
+    let spent = fixture.localized_in(project, FixScope::Symbol, 0);
+
+    assert_eq!(fits.briefed, ["a.go".to_owned(), "h.go".to_owned()].into());
+    assert_eq!(spent.briefed, ["a.go".to_owned()].into());
+}
+
+#[test]
 fn what_does_not_fit_the_budget_is_left_out_farthest_first_and_counted() {
     for fixture in fixtures() {
         let all = fixture.localized(FixScope::Files, BIG, false);

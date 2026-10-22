@@ -11,7 +11,9 @@ use lighthouse_model::{
         Symbol, Target, TypeRef,
     },
 };
-use lighthouse_plugin::{Capabilities, EditRequest, Error, FixDecision, Model, ModelClient};
+use lighthouse_plugin::{
+    Capabilities, EditRequest, Edited, Error, FixDecision, Model, ModelClient,
+};
 use lighthouse_protocol::hash;
 use lighthouse_spec::{FixScope, Models};
 
@@ -264,9 +266,9 @@ impl ModelClient for Agent {
         &self.0
     }
 
-    fn edit(&self, request: &EditRequest<'_>) -> Result<String, Error> {
+    fn edit(&self, request: &EditRequest<'_>) -> Result<Edited, Error> {
         fs::write(request.dir.join(FILE), "agent\n").map_err(|e| Error::Failed(e.to_string()))?;
-        Ok(String::new())
+        Ok(Edited::default())
     }
 }
 
@@ -321,6 +323,7 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
         fixes: &fixes,
         account: Account::default(),
         said: Mutex::default(),
+        traces: Mutex::default(),
         context: 4000,
     };
     let finding = finding("r", 1, Severity::Warn, "a");

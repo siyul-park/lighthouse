@@ -7,8 +7,8 @@ pub use lighthouse_protocol::{
     Answer, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, Example,
     FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod,
     FineTuningJob, FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, Neighbor,
-    Question, State, Subject, Supports, SystemOneRequest, SystemOneResponse, TrainingLine,
-    artifact_path, dataset_path,
+    Question, State, Subject, Supports, SystemOneRequest, SystemOneResponse, Tool, ToolEvent,
+    TrainingLine, artifact_path, dataset_path,
 };
 
 use std::path::Path;
@@ -22,13 +22,33 @@ use crate::Error;
 pub const FAIL_AT: f64 = 0.9;
 
 /// The task `agent`: an agent changes the files of a directory as a prompt
-/// says. It has no wire form; only a program the host runs there serves it.
+/// says. A program the host runs there serves it, or a plugin over
+/// `lighthouse/edit`.
 #[derive(Debug, Clone, Copy)]
 pub struct EditRequest<'a> {
     /// What the agent is asked to do, as plain text.
     pub prompt: &'a str,
     /// The directory it runs in and may change.
     pub dir: &'a Path,
+    /// The model part of the reference, for a plugin that serves several; the
+    /// client that wraps a plugin's model fills it in, so a caller leaves it
+    /// empty.
+    pub model: &'a str,
+}
+
+/// What an agent that edited a directory leaves besides the files.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Edited {
+    /// What the agent said about it, cut to a few kilobytes.
+    pub said: String,
+    /// What it read, searched, listed, edited and ran, when its harness can
+    /// tell; paths are relative to the directory it ran in, and one outside it
+    /// is only marked `outside`.
+    pub events: Vec<ToolEvent>,
+    /// Why the events are not all of what the agent did, when they are not:
+    /// output that was cut, events past the count kept, events that were
+    /// malformed. A note for the report, never a reason to decline.
+    pub incomplete: Option<String>,
 }
 
 /// A model offered by a plugin: one method per task, each refusing unless the
@@ -41,8 +61,9 @@ pub trait ModelClient: Send + Sync {
         Err(Error::model(&self.manifest().id, "does not classify"))
     }
     /// Changes the files of a directory as the prompt says, and returns what
-    /// the agent said about it; only a program run by the host there does.
-    fn edit(&self, _request: &EditRequest<'_>) -> Result<String, Error> {
+    /// the agent said and did; a program run by the host there, or a plugin
+    /// whose manifest supports `agent`, does.
+    fn edit(&self, _request: &EditRequest<'_>) -> Result<Edited, Error> {
         Err(Error::model(&self.manifest().id, "does not edit"))
     }
     /// Runs a fine-tuning job; only a model whose manifest supports `training` does.

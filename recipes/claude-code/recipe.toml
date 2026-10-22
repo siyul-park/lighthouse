@@ -1,0 +1,27 @@
+# Claude Code as an agent. A configuration layer: copy it into
+# `$XDG_CONFIG_HOME/lighthouse/config.toml` or `.lighthouse/local.toml`, or
+# paste the table into `lighthouse.toml`; then bind it with
+# `[models] agent = "claude-code/<model>"`.
+#
+# Sources (checked 2026-10-22):
+# - `claude --help`, Claude Code 2.1.304: `-p/--print` (prompt from stdin), `--output-format stream-json`
+#   (needs `--verbose`), `--permission-mode`, `--allowedTools`, `--model`, `--no-session-persistence`.
+# - Context7 /websites/code_claude (best-practices): `stream-json` prints one JSON object per line, starting
+#   with an init event; (agent-sdk/streaming-output): an assistant message is emitted for each content block
+#   and "each carries only its own content block", so `message.content[0]` is the call.
+# - Context7 /websites/code_claude (tools-reference): tool names Read, Grep, Glob, Edit, Write, NotebookEdit,
+#   Bash; `tool_use.input` holds `file_path`, `path`, `pattern`, `command`.
+# Credentials are the user's: log in with `claude`, or add the key to `env`.
+
+[models.providers.claude-code]
+command = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--no-session-persistence", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Grep,Glob,Edit,Write", "--model", "{model}"]
+timeout = "20m"
+
+[models.providers.claude-code.events]
+select = 'line.type == "assistant" && line.message.content[0].type == "tool_use"'
+tool = 'tools[line.message.content[0].name]'
+path = 'line.message.content[0].input.?file_path.orValue(line.message.content[0].input.?path.orValue(""))'
+pattern = 'line.message.content[0].input.?pattern.orValue("")'
+command = 'line.message.content[0].input.?command.orValue("")'
+said = 'line.type == "result" ? line.?result.orValue("") : ""'
+tools = { Read = "read", Grep = "search", Glob = "search", Edit = "edit", Write = "edit", NotebookEdit = "edit", Bash = "run" }

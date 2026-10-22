@@ -19,10 +19,10 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    Answer, Capabilities, CreateFineTuningJobRequest, ErrorObject, FineTuningJob,
-    FineTuningJobStatus, Handler, InitializeParams, InitializeResult, Model, NOUL,
-    SystemOneRequest, SystemOneResponse, artifact_path, canonical, dataset_path, hash::sha256,
-    serve,
+    Answer, Capabilities, CreateFineTuningJobRequest, EditParams, EditResult, ErrorObject,
+    FineTuningJob, FineTuningJobStatus, Handler, InitializeParams, InitializeResult, Model, NOUL,
+    Supports, SystemOneRequest, SystemOneResponse, Tool, ToolEvent, artifact_path, canonical,
+    dataset_path, hash::sha256, serve,
 };
 use serde_json::{Value, json};
 
@@ -35,7 +35,14 @@ impl Handler for Fake {
         let model = Model {
             deterministic: true,
             abstains: true,
-            ..Model::new(ID, "1", Capabilities::classifier(true))
+            ..Model::new(
+                ID,
+                "1",
+                Capabilities {
+                    agent: Some(Supports { supported: true }),
+                    ..Capabilities::classifier(true)
+                },
+            )
         };
         Ok(InitializeResult::new(ID, "1", Vec::new(), vec![model]))
     }
@@ -46,6 +53,59 @@ impl Handler for Fake {
             model: params.model,
             answers: answers(params.questions.keys(), noul),
             usage: Value::Null,
+        })
+    }
+
+    /// An agent that writes `edited.txt` with its prompt, and reports what it
+    /// did as the events of a harness: it read, searched, listed, edited, ran.
+    ///
+    /// A prompt of `outside:<path>` makes it write that path instead and say
+    /// whether it could, and `absolute` makes it report paths as a harness
+    /// that prints absolute ones does: one inside the directory, one that
+    /// folds into it, one outside.
+    fn edit(&mut self, params: EditParams) -> Result<EditResult, ErrorObject> {
+        let event =
+            |tool, path: Option<&str>, pattern: Option<&str>, command: Option<&str>| ToolEvent {
+                tool,
+                path: path.map(str::to_owned),
+                outside: false,
+                pattern: pattern.map(str::to_owned),
+                command: command.map(str::to_owned),
+            };
+        if let Some(path) = params.prompt.strip_prefix("outside:") {
+            let said = match fs::write(path, "escaped") {
+                Ok(()) => "outside: wrote".to_owned(),
+                Err(e) => format!("outside: denied ({e})"),
+            };
+            return Ok(EditResult {
+                said,
+                events: Vec::new(),
+            });
+        }
+        if params.prompt == "absolute" {
+            let dir = &params.dir;
+            return Ok(EditResult {
+                said: String::new(),
+                events: vec![
+                    event(Tool::Read, Some(&format!("{dir}/src/lib.rs")), None, None),
+                    event(Tool::Read, Some("./src//lib.rs"), None, None),
+                    event(Tool::Read, Some("/etc/hosts"), None, None),
+                    event(Tool::Read, Some("../elsewhere.rs"), None, None),
+                ],
+            });
+        }
+        fs::write(Path::new(&params.dir).join("edited.txt"), &params.prompt)
+            .map_err(|e| e.to_string())?;
+        Ok(EditResult {
+            said: format!("{} edited", params.model),
+            events: vec![
+                event(Tool::Read, Some("src/lib.rs"), None, None),
+                event(Tool::Read, Some("other.go"), None, None),
+                event(Tool::Search, Some("."), Some("func Parse"), None),
+                event(Tool::List, Some("pkg"), None, None),
+                event(Tool::Edit, Some("edited.txt"), None, None),
+                event(Tool::Run, None, None, Some("go vet ./...")),
+            ],
         })
     }
 

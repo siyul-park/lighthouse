@@ -29,6 +29,67 @@
       },
       "type": "object"
     },
+    "EventsSpec": {
+      "additionalProperties": false,
+      "description": "The mapping of the lines of an agent's stdout to the events of a report.\nEach expression sees `line`, the JSON value of one stdout line (a line\nthat is not JSON is skipped), and `tools`, the table below; the keys that\ndescribe one event also see `item` when `each` is set. The functions are\nthose of the one CEL environment (its strings, lists, math and encoders\nextensions, and the optional syntax `line.?name.orValue(\"\")`, since the\nlines of a harness are as free in shape as they come) and `commands(text)`,\nwhich reads a shell command line.",
+      "properties": {
+        "command": {
+          "description": "The command line of a `run`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "each": {
+          "description": "A list: one event for each of its elements, each seen as `item` by the\nkeys below, for a line that holds several calls (a shell command with\na pipe, a change of several files). Without it a line is one event. A\nfailure is no event.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "The file or directory the call is about, or a list of them for one\nevent each (a call without any is one event without a path); a path\ninside the directory the agent ran in is made relative to it, and one\noutside it is kept apart as `outside`. A failure is no path.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pattern": {
+          "description": "What a `search` looks for, or the glob of a `list`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "said": {
+          "description": "A string: what the agent said in the line, for the notes of the fix\n(its reply of what is fixed and what is left). Read from every line,\nselected or not; the pieces are joined by line breaks, and the last\nfew kilobytes are kept. Without it an agent whose output is mapped\nsays nothing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "select": {
+          "description": "A bool: whether the line holds tool calls. A line it is false or\nfails for is skipped.",
+          "type": "string"
+        },
+        "tool": {
+          "description": "The tool of the call: `read`, `search`, `list`, `edit` or `run`,\nusually `tools[line.<name of the harness's tool>]`. A call whose tool\nis none of them, or that fails here (a harness tool the table lacks),\nis not an event.",
+          "type": "string"
+        },
+        "tools": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The harness's tool names, each with the tool it is: a table to look up\nwith `tools[name]` or `name in tools`, not one to search.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "select",
+        "tool"
+      ],
+      "type": "object"
+    },
     "FixEnvironment": {
       "additionalProperties": false,
       "description": "The `fix` table of a user's or repository-local file: the one key of it\nthat is about this machine.",
@@ -157,6 +218,17 @@
           },
           "description": "`command` only: variables the program is given besides the allowlist;\na value may hold `${NAME}` (see `headers`), which is how a key reaches\nthe program.",
           "type": "object"
+        },
+        "events": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EventsSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`command` without a `protocol` only: how the JSON lines of the\nagent's stdout become the tool events of the fix report, in CEL (see\n`EventsSpec`). Without it the report holds no events of this agent."
         },
         "headers": {
           "additionalProperties": {

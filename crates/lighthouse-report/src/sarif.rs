@@ -11,6 +11,7 @@ use lighthouse_spec::{Catalog, Decision};
 
 use crate::docs::help_path;
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
 const FINGERPRINT_KEY: &str = "lighthouse/v1";
@@ -34,6 +35,8 @@ struct Run<'a> {
     original_uri_base_ids: BTreeMap<&'static str, BaseId>,
     invocations: [Invocation<'a>; 1],
     results: Vec<SarifResult<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    properties: Option<&'a Map<String, Value>>,
 }
 
 #[derive(Serialize)]
@@ -218,6 +221,7 @@ pub fn render(
     fixes: Option<&BTreeMap<String, Preview>>,
     suppressed: &[Suppressed],
     sources: Option<&BTreeMap<String, String>>,
+    properties: Option<&Map<String, Value>>,
 ) -> String {
     let ids: BTreeSet<&str> = diagnostics
         .iter()
@@ -262,6 +266,7 @@ pub fn render(
                         result(&s.diagnostic, &rules, None, Some(&s.suppression), sources)
                     }))
                     .collect(),
+                properties,
             }],
         };
     let mut out = serde_json::to_string_pretty(&log).expect("sarif serializes");

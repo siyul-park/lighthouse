@@ -3,17 +3,19 @@
 use std::sync::Arc;
 
 use lighthouse_plugin::{
-    CreateFineTuningJobRequest, Error, FineTuningJob, Model as ModelInfo, ModelClient,
-    SystemOneRequest, SystemOneResponse,
+    CreateFineTuningJobRequest, EditRequest, Edited, Error, FineTuningJob, Model as ModelInfo,
+    ModelClient, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_protocol::{self as wire, FineTuningJobStatus};
 
-use crate::client::Client;
+use crate::{agent::Agent, client::Client};
 
 /// A model that answers over the connection of its plugin.
 pub(crate) struct Remote {
     pub(crate) manifest: ModelInfo,
     pub(crate) client: Arc<Client>,
+    /// How its agent runs, when it is one: in a process of its own.
+    pub(crate) agent: Agent,
 }
 
 impl ModelClient for Remote {
@@ -38,6 +40,15 @@ impl ModelClient for Remote {
             ));
         }
         Ok(result)
+    }
+
+    /// Runs the agent of the plugin in the directory of the request, in a
+    /// process started for it and sandboxed, never in the long-lived one.
+    fn edit(&self, request: &EditRequest<'_>) -> Result<Edited, Error> {
+        if !self.manifest.capabilities.edits() {
+            return Err(Error::model(&self.manifest.id, "it does not edit"));
+        }
+        self.agent.edit(request)
     }
 
     /// Asks for the fine-tuning job; the answer is final, `succeeded` or

@@ -26,6 +26,7 @@ fn an_agent_is_refused_when_the_sandbox_is_unavailable_and_never_runs_without_it
         .edit(&EditRequest {
             prompt: "fix it",
             dir: dir.path(),
+            model: "",
         })
         .unwrap_err()
         .to_string();

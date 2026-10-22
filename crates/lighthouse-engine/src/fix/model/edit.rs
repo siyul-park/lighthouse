@@ -5,18 +5,20 @@
 //! for a verdict: the checks judge the result, as for any fix by a model.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::PoisonError,
 };
 
 use lighthouse_model::{Diagnostic, Span, Unavailable};
-use lighthouse_plugin::{EditRequest, FixDecision};
+use lighthouse_plugin::{EditRequest, Edited, FixDecision};
+use lighthouse_protocol::ToolEvent;
 use lighthouse_protocol::hash;
+use lighthouse_resource::slashed;
 use lighthouse_spec::FixScope;
 use serde::{Deserialize, Serialize};
 
-use super::{Class, Event, ModelFixer};
+use super::{BatchTrace, Class, Event, ModelFixer};
 use crate::{
     cache::{Digest, KeyBuilder, digest_of},
     engine::{Member, Refusal},
@@ -61,6 +63,13 @@ struct Attempt {
     bases: BTreeMap<PathBuf, String>,
     /// What the agent said, cut to a few kilobytes.
     said: String,
+    /// What it did, from its harness. Not kept: an answer kept from an
+    /// earlier run did nothing in this one.
+    #[serde(skip)]
+    events: Vec<ToolEvent>,
+    /// Why `events` is not all it did, when it is not. Not kept either.
+    #[serde(skip)]
+    incomplete: Option<String>,
 }
 
 impl ModelFixer<'_> {
@@ -158,6 +167,18 @@ impl ModelFixer<'_> {
             }
         };
         self.count(batch, Event::Answered);
+        if !attempt.events.is_empty() || attempt.incomplete.is_some() {
+            let trace = BatchTrace::of(
+                batch.file.to_owned(),
+                &batch.briefed(),
+                &attempt.events,
+                attempt.incomplete.clone(),
+            );
+            self.traces
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(trace);
+        }
         if !attempt.said.is_empty() {
             let said = format!("{model} on {}: {}", batch.file.display(), attempt.said);
             self.said
@@ -193,6 +214,16 @@ impl ModelFixer<'_> {
     }
 }
 
+impl Batch<'_> {
+    /// The files the brief shows or names: the one the findings are in, and
+    /// what the engine localized around them that fit the brief.
+    fn briefed(&self) -> BTreeSet<String> {
+        let mut briefed = self.localized.briefed.clone();
+        briefed.insert(slashed(self.file));
+        briefed
+    }
+}
+
 /// Why the edit cannot be accepted, if a file it changed no longer has the
 /// digest it was made over (compare and swap). Edits are never merged: the
 /// findings go to review and a later run starts again from what stands.
@@ -216,11 +247,16 @@ pub(in crate::fix) fn conflict(
 fn run(member: &Member<'_>, prompt: &str, world: &World<'_>) -> Result<Attempt, String> {
     let scratch = Scratch::new(world.root, world.texts)
         .map_err(|e| format!("the scratch copy of the project failed: {e}"))?;
-    let said = member
+    let Edited {
+        said,
+        events,
+        incomplete,
+    } = member
         .client
         .edit(&EditRequest {
             prompt,
             dir: scratch.path(),
+            model: "",
         })
         .map_err(|e| e.to_string())?;
     let (changes, bases) = collect(&scratch, world)?;
@@ -228,6 +264,8 @@ fn run(member: &Member<'_>, prompt: &str, world: &World<'_>) -> Result<Attempt, 
         changes,
         bases,
         said,
+        events,
+        incomplete,
     })
 }
 

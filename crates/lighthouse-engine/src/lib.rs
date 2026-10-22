@@ -13,8 +13,8 @@ pub use engine::{
     Overlays, Run, active,
 };
 pub use fix::{
-    AppliedFix, DeclinedFix, EditUsage, FileChange, FixBinding, FixPlan, FixReport, FixRun,
-    FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, brief, unified_diff,
+    AppliedFix, BatchTrace, DeclinedFix, EditUsage, FileChange, FixBinding, FixPlan, FixReport,
+    FixRun, FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, ToolCounts, brief, unified_diff,
 };
 pub use tester::{ExampleRun, RuleTester};
 pub use timings::Timings;

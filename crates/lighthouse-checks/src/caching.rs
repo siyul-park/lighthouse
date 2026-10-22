@@ -88,8 +88,6 @@ pub const FUNCTIONS: &[(&str, Reach)] = &[
     ("globMatch", Reach::Local),
     ("layerOf", Reach::Local),
     ("lines", Reach::Local),
-    ("trim", Reach::Local),
-    ("join", Reach::Local),
     ("trimPrefixes", Reach::Local),
     ("trimSuffixes", Reach::Local),
     ("trimLeft", Reach::Local),

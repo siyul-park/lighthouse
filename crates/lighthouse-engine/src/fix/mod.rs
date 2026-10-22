@@ -31,8 +31,8 @@ use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Program, Task};
 use serde::{Deserialize, Serialize};
 
 pub use edits::unified_diff;
-pub use model::ModelCounts;
 use model::ModelFix;
+pub use model::{BatchTrace, ModelCounts, ToolCounts};
 
 use crate::{Needs, Run};
 
@@ -317,12 +317,14 @@ pub struct PreviewedFix {
     pub batch: Vec<Fingerprint>,
 }
 
-/// What the runs of an agent that edits took.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// What the runs of an agent that edits took, and did.
+#[derive(Debug, Clone, PartialEq)]
 pub struct EditUsage {
     /// Runs of the agent; answers kept from earlier runs are not counted.
     pub runs: usize,
     pub seconds: f64,
+    /// What each run did, when its harness reported it.
+    pub batches: Vec<BatchTrace>,
 }
 
 /// What a fix run did.

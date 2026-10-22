@@ -1,0 +1,7 @@
+Lighthouse adapts the work of others. What it took, and from whom:
+
+The Seatbelt profile of macOS (crates/lighthouse-process/src/sandbox/seatbelt.rs)
+  Its base policy is the one of OpenAI Codex, `seatbelt_base_policy.sbpl`
+  (Apache-2.0), itself taken from Chromium's sandbox, cut to what the programs
+  Lighthouse runs need. Its reads, writes and network follow Anthropic's
+  sandbox-runtime.

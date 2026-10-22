@@ -28,11 +28,12 @@ pub use lighthouse_protocol::Conventions;
 pub use memo::Memo;
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
-    Decided, DecisionRef, EditRequest, Example, Explored, FAIL_AT, FineTuneJobError,
+    Decided, DecisionRef, EditRequest, Edited, Example, Explored, FAIL_AT, FineTuneJobError,
     FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
     FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, ModelClient, Models,
     Neighbor, NoModels, Question, Settle, State, Subject, Supports, SystemOneRequest,
-    SystemOneResponse, TrainingLine, artifact_path, dataset_path, fails, request_of,
+    SystemOneResponse, Tool, ToolEvent, TrainingLine, artifact_path, dataset_path, fails,
+    request_of,
 };
 pub use notices::Notices;
 pub use registry::{Language, Registry, plugin_of};

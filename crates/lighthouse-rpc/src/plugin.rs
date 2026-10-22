@@ -6,11 +6,12 @@ use lighthouse_plugin::{
     Error, Indexed, LanguageProvider, ModelClient, Plugin, PluginManifest, ProviderManifest,
     Source, Workspace,
 };
+use lighthouse_process::Policy;
 use lighthouse_protocol as wire;
 use lighthouse_protocol::hash;
 use serde_json::Value;
 
-use crate::{client::Client, convert, manifest::Found, model::Remote};
+use crate::{agent::Agent, client::Client, convert, manifest::Found, model::Remote};
 
 /// Characters of the binary digest that name a plugin's cache directory.
 const DIGEST_CHARS: usize = 16;
@@ -25,6 +26,8 @@ pub struct RpcPlugin {
     /// Digest of the binary the process runs, which keys its cache directory:
     /// a rebuilt plugin never reads what an older build kept.
     digest: String,
+    /// How its models that edit are run.
+    agent: Agent,
 }
 
 impl RpcPlugin {
@@ -88,7 +91,28 @@ impl RpcPlugin {
             models,
             client: Arc::new(client),
             digest,
+            agent: Agent::new(
+                id,
+                std::iter::once(found.command_path().to_string_lossy().into_owned())
+                    .chain(found.resource.spec.runtime.args.iter().cloned())
+                    .collect(),
+                &Policy::default(),
+                root,
+                timeout,
+            ),
         })
+    }
+
+    /// The plugin with its agents run under the `[sandbox]` of the project at
+    /// `root`: the hosts they may reach and the places they may write besides
+    /// the directory they are given. Until it is said, an agent runs
+    /// sandboxed with no network and no place of its own.
+    #[must_use]
+    pub fn confined(self, sandbox: &Policy, root: &Path) -> Self {
+        Self {
+            agent: self.agent.confined(sandbox, root),
+            ..self
+        }
     }
 }
 
@@ -101,6 +125,7 @@ impl Plugin for RpcPlugin {
                 Box::new(Remote {
                     manifest: manifest.clone(),
                     client: Arc::clone(&self.client),
+                    agent: self.agent.clone(),
                 }) as Box<dyn ModelClient>
             })
             .collect()
@@ -238,7 +263,7 @@ impl Provider {
 }
 
 /// The workspace folder of a project root, which may be relative.
-fn folder(root: &Path) -> Result<wire::WorkspaceFolder, String> {
+pub(crate) fn folder(root: &Path) -> Result<wire::WorkspaceFolder, String> {
     let root = std::path::absolute(root).map_err(|e| format!("cannot absolutize the root: {e}"))?;
     wire::WorkspaceFolder::at(&root)
 }

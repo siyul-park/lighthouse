@@ -19,6 +19,7 @@ pub use language::{
     },
 };
 pub use model::{
+    agent::{EditParams, EditResult, Tool, ToolEvent},
     jobs::{
         Capabilities, ChatMessage, CreateFineTuningJobRequest, FineTuneJobError, FineTuneMethod,
         FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
@@ -44,6 +45,8 @@ pub const INDEX: &str = "lighthouse/index";
 pub const CLASSIFY: &str = "lighthouse/classify";
 /// Request: fit a model on labelled subjects.
 pub const TRAIN: &str = "lighthouse/train";
+/// Request: run an agent that changes the files of a directory.
+pub const EDIT: &str = "lighthouse/edit";
 /// Request: stop accepting work; answered, then followed by [`EXIT`].
 pub const SHUTDOWN: &str = "shutdown";
 /// Notification: end the process; valid only after [`SHUTDOWN`] was answered.

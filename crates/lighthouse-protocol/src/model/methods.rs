@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{Call, CreateFineTuningJobRequest, FineTuningJob};
+use crate::{Call, CreateFineTuningJobRequest, EditParams, EditResult, FineTuningJob};
 
 /// The `type` of a question and of its answer: System One's `noul`, the
 /// probability of yes.
@@ -22,6 +22,8 @@ pub struct ModelMethods {
     pub classify: Call<SystemOneRequest, SystemOneResponse>,
     #[serde(rename = "lighthouse/train")]
     pub train: Call<CreateFineTuningJobRequest, FineTuningJob>,
+    #[serde(rename = "lighthouse/edit")]
+    pub edit: Call<EditParams, EditResult>,
 }
 
 /// One valid or invalid example of a decision.

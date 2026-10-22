@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use super::models::Names;
+use super::{events::EventsSpec, models::Names};
 use crate::{Point, Program, Sandbox};
 
 /// The protocols a provider may speak over HTTP, and the service and key each
@@ -127,6 +127,11 @@ pub struct ProviderSpec {
     /// the program wraps it in an envelope.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pointer: Option<String>,
+    /// `command` without a `protocol` only: how the JSON lines of the
+    /// agent's stdout become the tool events of the fix report, in CEL (see
+    /// `EventsSpec`). Without it the report holds no events of this agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub events: Option<EventsSpec>,
     /// `plugin` only: what the plugin is told besides the model.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub options: Map<String, Value>,
@@ -156,6 +161,8 @@ pub enum ModelProvider {
         /// reference.
         program: Program,
         pointer: Option<String>,
+        /// What an agent's stdout means, when the project says.
+        events: Option<Box<EventsSpec>>,
         cost: f64,
     },
 }
@@ -182,7 +189,7 @@ impl ModelProvider {
     }
 
     /// Whether its protocol serves `task`; `None` when only the handshake of
-    /// the plugin behind it can say. A plugin never serves `agent`.
+    /// the plugin behind it can say.
     pub fn serves(&self, task: Task) -> Option<bool> {
         match self {
             Self::Command { protocol, .. } => Some(match task {
@@ -204,7 +211,7 @@ impl ModelProvider {
                     Task::Agent => false,
                 })
             }
-            Self::Rpc { .. } => (task == Task::Agent).then_some(false),
+            Self::Rpc { .. } => None,
         }
     }
 
@@ -345,6 +352,16 @@ impl ProviderSpec {
                 ));
             }
         };
+        if let Some(events) = &self.events {
+            if protocol != CommandProtocol::PlainText {
+                return Err(
+                    "only a `command` without a `protocol`, an agent, has `events`".to_owned(),
+                );
+            }
+            if let Some(why) = events.problem() {
+                return Err(why);
+            }
+        }
         let point = match protocol {
             CommandProtocol::TypeSafe => Point::Provider,
             CommandProtocol::PlainText => Point::Agent,
@@ -363,6 +380,7 @@ impl ProviderSpec {
             protocol,
             program,
             pointer: self.pointer.clone(),
+            events: self.events.clone().map(Box::new),
             cost: self.cost.unwrap_or(DEFAULT_COST),
         })
     }
@@ -387,10 +405,11 @@ impl ProviderSpec {
     }
 
     /// The fields only a `command` has, and whether each is given.
-    fn command_only(&self) -> [(&'static str, bool); 3] {
+    fn command_only(&self) -> [(&'static str, bool); 4] {
         [
             ("env", !self.env.is_empty()),
             ("pointer", self.pointer.is_some()),
+            ("events", self.events.is_some()),
             ("sandbox", self.sandbox.is_some()),
         ]
     }

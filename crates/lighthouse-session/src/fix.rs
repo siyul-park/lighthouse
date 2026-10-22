@@ -9,10 +9,11 @@ use std::{
 };
 
 use lighthouse_engine::{
-    AppliedFix, DeclinedFix, Engine, FixPlan, FixRun, FixedBy, ModelCounts, ModelOptions,
-    PreviewedFix, cache, unified_diff,
+    AppliedFix, BatchTrace, DeclinedFix, Engine, FixPlan, FixRun, FixedBy, ModelCounts,
+    ModelOptions, PreviewedFix, cache, unified_diff,
 };
 use lighthouse_model::{Fingerprint, Preview};
+use lighthouse_protocol::ToolEvent;
 use lighthouse_report::{Aim, Apply, FixBy};
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
@@ -147,6 +148,63 @@ pub struct Runs {
     /// Runs of the agent; answers kept from earlier runs are not counted.
     pub runs: usize,
     pub seconds: f64,
+    /// What each run did, from the events its harness reported; absent when
+    /// the provider declares none. A run that was kept from an earlier one has
+    /// no entry.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub batches: Vec<Batch>,
+}
+
+/// What an agent did for the findings of one file. A measurement: it never
+/// decides a fix.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Batch {
+    /// The file the findings are in.
+    pub file: String,
+    /// Files it read that the brief did not include, in the order it opened
+    /// them, each once; every file outside the project is one entry,
+    /// `(outside the project)`.
+    pub reads: Vec<String>,
+    /// What it searched, and the listings it made, in order.
+    pub searches: Vec<ToolEvent>,
+    /// How many calls of each tool it made.
+    pub calls: Calls,
+    /// This is not all the agent did: `note` says what is missing.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub incomplete: bool,
+    /// What is missing from this, when `incomplete`: output that was cut,
+    /// events past the count kept, events that were not understood.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// Calls of each tool.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Calls {
+    pub read: usize,
+    pub search: usize,
+    pub list: usize,
+    pub edit: usize,
+    pub run: usize,
+}
+
+impl From<&BatchTrace> for Batch {
+    fn from(trace: &BatchTrace) -> Self {
+        Self {
+            file: slashed(&trace.file),
+            reads: trace.reads.clone(),
+            searches: trace.searches.clone(),
+            calls: Calls {
+                read: trace.counts.read,
+                search: trace.counts.search,
+                list: trace.counts.list,
+                edit: trace.counts.edit,
+                run: trace.counts.run,
+            },
+            incomplete: trace.incomplete.is_some(),
+            note: trace.incomplete.clone(),
+        }
+    }
 }
 
 /// A fix that was applied.
@@ -176,6 +234,16 @@ pub struct Declined {
 }
 
 impl Fixed {
+    /// The property bag a SARIF log of the run carries: what the agent did,
+    /// under `agent`. Empty when no agent ran.
+    pub fn properties(&self) -> serde_json::Map<String, serde_json::Value> {
+        let agent = self.usage.as_ref().and_then(|usage| usage.agent.as_ref());
+        agent
+            .and_then(|agent| serde_json::to_value(agent).ok())
+            .map(|agent| serde_json::Map::from_iter([("agent".to_owned(), agent)]))
+            .unwrap_or_default()
+    }
+
     /// What a person is told about the run, a line each: the messages, every
     /// fix applied (or that would be) and every finding left alone, and the
     /// count.
@@ -219,6 +287,28 @@ impl Fixed {
             let runs = usage.agent.as_ref().map_or(String::new(), |agent| {
                 format!(", {} run(s) in {:.1}s", agent.runs, agent.seconds)
             });
+            let reads: usize = usage
+                .agent
+                .iter()
+                .flat_map(|agent| &agent.batches)
+                .map(|batch| batch.reads.len())
+                .sum();
+            let runs = if reads == 0 {
+                runs
+            } else {
+                format!("{runs}, {reads} file(s) read beyond the brief")
+            };
+            let cut = usage
+                .agent
+                .iter()
+                .flat_map(|agent| &agent.batches)
+                .filter(|batch| batch.incomplete)
+                .count();
+            let runs = if cut == 0 {
+                runs
+            } else {
+                format!("{runs}, what the agent did is incomplete for {cut} batch(es)")
+            };
             lines.push(format!(
                 "models: {} request(s), cost {}{runs}",
                 usage.calls, usage.cost
@@ -421,9 +511,10 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         usage: (!report.models.is_empty()).then_some(Usage {
             calls: report.model_calls,
             cost: report.model_cost,
-            agent: report.model_edits.map(|agent| Runs {
+            agent: report.model_edits.as_ref().map(|agent| Runs {
                 runs: agent.runs,
                 seconds: agent.seconds,
+                batches: agent.batches.iter().map(Batch::from).collect(),
             }),
         }),
         messages,

@@ -98,6 +98,7 @@ fn openai_model_shapes_round_trip_and_strip_lighthouse_fields() {
             classification: Some(Supports { supported: true }),
             embedding: None,
             training: Some(Supports { supported: true }),
+            agent: None,
         },
         version: "v1".to_owned(),
         cost: 2.0,

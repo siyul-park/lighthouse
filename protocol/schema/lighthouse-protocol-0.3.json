@@ -64,9 +64,36 @@
       ],
       "type": "object"
     },
+    "Call3": {
+      "description": "Params and result types of one method.",
+      "properties": {
+        "params": {
+          "$ref": "#/$defs/EditParams"
+        },
+        "result": {
+          "$ref": "#/$defs/EditResult"
+        }
+      },
+      "required": [
+        "params",
+        "result"
+      ],
+      "type": "object"
+    },
     "Capabilities": {
       "description": "The capabilities of a model.",
       "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Supports"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Runs as an agent that edits files (`lighthouse/edit`)."
+        },
         "classification": {
           "anyOf": [
             {
@@ -311,6 +338,47 @@
         "accesses-private"
       ],
       "type": "string"
+    },
+    "EditParams": {
+      "description": "Params of `lighthouse/edit`: the agent changes the files of `dir` as the\nprompt says.",
+      "properties": {
+        "dir": {
+          "description": "The directory it runs in and may change.",
+          "type": "string"
+        },
+        "model": {
+          "description": "The agent asked: the part of the reference after the provider.",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "What the agent is asked to do, as plain text.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "prompt",
+        "dir"
+      ],
+      "type": "object"
+    },
+    "EditResult": {
+      "description": "Result of `lighthouse/edit`.",
+      "properties": {
+        "events": {
+          "description": "What the agent read, searched, listed, edited and ran, when the plugin\ncan tell.",
+          "items": {
+            "$ref": "#/$defs/ToolEvent"
+          },
+          "type": "array"
+        },
+        "said": {
+          "default": "",
+          "description": "What the agent said about it.",
+          "type": "string"
+        }
+      },
+      "type": "object"
     },
     "Event": {
       "description": "One body event and where it is.",
@@ -1561,6 +1629,73 @@
       ],
       "type": "string"
     },
+    "Tool": {
+      "description": "What an agent did with a tool: the kinds of its work that a fix report\ntells apart.",
+      "oneOf": [
+        {
+          "const": "read",
+          "description": "Opened a file.",
+          "type": "string"
+        },
+        {
+          "const": "search",
+          "description": "Searched file contents for a pattern.",
+          "type": "string"
+        },
+        {
+          "const": "list",
+          "description": "Listed files or a directory.",
+          "type": "string"
+        },
+        {
+          "const": "edit",
+          "description": "Wrote or changed a file.",
+          "type": "string"
+        },
+        {
+          "const": "run",
+          "description": "Ran a command.",
+          "type": "string"
+        }
+      ]
+    },
+    "ToolEvent": {
+      "description": "One thing an agent did, as its harness reported it.",
+      "properties": {
+        "command": {
+          "description": "The command line of a `run`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outside": {
+          "description": "It was about a path outside the directory the agent ran in. The host\nsets this and drops the path, so that no path of the machine reaches a\nreport; a plugin leaves it out.",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "The file or directory it was about, relative to the directory the\nagent ran in, as the host normalizes it. A plugin may send it absolute\nor relative to that directory.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pattern": {
+          "description": "What a `search` looked for, or the glob of a `list`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool": {
+          "$ref": "#/$defs/Tool"
+        }
+      },
+      "required": [
+        "tool"
+      ],
+      "type": "object"
+    },
     "TypeRef": {
       "description": "A type as a signature or a field writes it.",
       "properties": {
@@ -1624,6 +1759,9 @@
     },
     "lighthouse/classify": {
       "$ref": "#/$defs/Call"
+    },
+    "lighthouse/edit": {
+      "$ref": "#/$defs/Call3"
     },
     "lighthouse/index": {
       "$ref": "#/$defs/Call2"

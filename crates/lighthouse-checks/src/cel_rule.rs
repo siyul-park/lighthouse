@@ -35,7 +35,7 @@ pub(crate) struct CelRule {
     identity: Option<Identity>,
     abstain: Option<Abstain>,
     needs: Needs,
-    library: cel::Context<'static>,
+    library: cel::Context<'static, 'static>,
 }
 
 struct At {
@@ -119,7 +119,7 @@ impl CelRule {
                 })
                 .transpose()?,
             needs: Needs::of(sources),
-            library: library::context(),
+            library: library::context().map_err(|e| Error::invalid(id, e))?,
         })
     }
 

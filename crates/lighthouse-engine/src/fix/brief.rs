@@ -3,7 +3,7 @@
 //! review task carries for whoever drives the session. The same inputs always
 //! write the same text, so that a run can be kept under its digest.
 
-use std::fmt::Write;
+use std::{collections::BTreeSet, fmt::Write};
 
 use lighthouse_model::Safety;
 use lighthouse_plugin::FixDecision;
@@ -82,6 +82,10 @@ pub struct Localized {
     pub files: Vec<String>,
     /// How many items did not fit the budget and are not here.
     pub left_out: usize,
+    /// The files the brief shows or names: those of the code, of the symbols
+    /// it uses and of the places that fit the budget, and the files it lists.
+    /// What an agent opens besides these is what it went looking for.
+    pub briefed: BTreeSet<String>,
 }
 
 /// The decisions whose safe fixes the project applies to what an agent

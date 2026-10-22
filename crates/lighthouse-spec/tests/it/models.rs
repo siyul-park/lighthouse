@@ -350,8 +350,8 @@ fn a_provider_serves_the_tasks_its_protocol_covers() {
     );
     assert_eq!(
         serves("plugin = \"model-local\"\n"),
-        (None, Some(false)),
-        "only the handshake of a plugin says what it classifies, and it never serves an agent"
+        (None, None),
+        "only the handshake of a plugin says what it classifies and whether it runs an agent"
     );
 }
 

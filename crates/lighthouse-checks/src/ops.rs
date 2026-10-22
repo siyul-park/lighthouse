@@ -30,7 +30,7 @@ use crate::{
 pub(crate) struct OrderRule {
     clauses: Vec<Clause>,
     needs: Needs,
-    library: cel::Context<'static>,
+    library: cel::Context<'static, 'static>,
 }
 
 struct Clause {
@@ -75,7 +75,7 @@ impl OrderRule {
         Ok(Self {
             clauses: compiled,
             needs: Needs::of(sources),
-            library: library::context(),
+            library: library::context().map_err(|e| Error::invalid(id, e))?,
         })
     }
 
@@ -147,7 +147,7 @@ impl Clause {
         meta: &RuleManifest,
         ctx: &Context,
         builder: &Builder,
-        base: &cel::Context<'static>,
+        base: &cel::Context<'static, 'static>,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let keys = self.keys(ctx, &meta.id)?;

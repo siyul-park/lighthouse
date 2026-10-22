@@ -225,6 +225,150 @@
         "agent": {
           "description": "Present when the model is an agent.",
           "properties": {
+            "batches": {
+              "description": "What each run did, from the events its harness reported; absent when\nthe provider declares none. A run that was kept from an earlier one has\nno entry.",
+              "items": {
+                "description": "What an agent did for the findings of one file. A measurement: it never\ndecides a fix.",
+                "properties": {
+                  "calls": {
+                    "description": "How many calls of each tool it made.",
+                    "properties": {
+                      "edit": {
+                        "format": "uint",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "list": {
+                        "format": "uint",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "read": {
+                        "format": "uint",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "run": {
+                        "format": "uint",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "search": {
+                        "format": "uint",
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "read",
+                      "search",
+                      "list",
+                      "edit",
+                      "run"
+                    ],
+                    "type": "object"
+                  },
+                  "file": {
+                    "description": "The file the findings are in.",
+                    "type": "string"
+                  },
+                  "incomplete": {
+                    "description": "This is not all the agent did: `note` says what is missing.",
+                    "type": "boolean"
+                  },
+                  "note": {
+                    "description": "What is missing from this, when `incomplete`: output that was cut,\nevents past the count kept, events that were not understood.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reads": {
+                    "description": "Files it read that the brief did not include, in the order it opened\nthem, each once; every file outside the project is one entry,\n`(outside the project)`.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "searches": {
+                    "description": "What it searched, and the listings it made, in order.",
+                    "items": {
+                      "description": "One thing an agent did, as its harness reported it.",
+                      "properties": {
+                        "command": {
+                          "description": "The command line of a `run`.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "outside": {
+                          "description": "It was about a path outside the directory the agent ran in. The host\nsets this and drops the path, so that no path of the machine reaches a\nreport; a plugin leaves it out.",
+                          "type": "boolean"
+                        },
+                        "path": {
+                          "description": "The file or directory it was about, relative to the directory the\nagent ran in, as the host normalizes it. A plugin may send it absolute\nor relative to that directory.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "pattern": {
+                          "description": "What a `search` looked for, or the glob of a `list`.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "tool": {
+                          "description": "What an agent did with a tool: the kinds of its work that a fix report\ntells apart.",
+                          "oneOf": [
+                            {
+                              "const": "read",
+                              "description": "Opened a file.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "search",
+                              "description": "Searched file contents for a pattern.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "list",
+                              "description": "Listed files or a directory.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "edit",
+                              "description": "Wrote or changed a file.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "run",
+                              "description": "Ran a command.",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "tool"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "file",
+                  "reads",
+                  "searches",
+                  "calls"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
             "runs": {
               "description": "Runs of the agent; answers kept from earlier runs are not counted.",
               "format": "uint",

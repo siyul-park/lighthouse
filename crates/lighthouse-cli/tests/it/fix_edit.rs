@@ -282,11 +282,11 @@ fn only_a_command_without_a_protocol_can_be_bound_to_edit() {
     for (provider, wanted) in [
         (
             "protocol = \"openai\"\nurl = \"http://127.0.0.1:9\"\n",
-            "provider `fake` does not serve `agent`: only a command without a protocol does",
+            "provider `fake` does not serve `agent`: only a command without a protocol, or a plugin that offers agents, does",
         ),
         (
             "protocol = \"typesafe\"\ncommand = [\"cat\"]\n",
-            "provider `fake` does not serve `agent`: only a command without a protocol does",
+            "provider `fake` does not serve `agent`: only a command without a protocol, or a plugin that offers agents, does",
         ),
         (
             "protocol = \"openai\"\ncommand = [\"cat\"]\n",
@@ -317,10 +317,16 @@ fn only_a_command_without_a_protocol_can_be_bound_to_edit() {
 }
 
 #[test]
-fn the_recipes_of_the_docs_skip_no_permission_check() {
+fn the_recipes_skip_no_permission_check() {
     let docs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/models.md");
     let text = fs::read_to_string(docs).unwrap();
-    let recipes: Vec<&str> = text.split("```").skip(1).step_by(2).collect();
+    let mut recipes: Vec<&str> = text.split("```").skip(1).step_by(2).collect();
+    let shipped: Vec<String> =
+        fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../recipes"))
+            .unwrap()
+            .map(|dir| fs::read_to_string(dir.unwrap().path().join("recipe.toml")).unwrap())
+            .collect();
+    recipes.extend(shipped.iter().map(String::as_str));
 
     assert!(recipes.iter().any(|r| r.contains("\"claude\", \"-p\"")));
     assert!(recipes.iter().any(|r| r.contains("\"codex\", \"exec\"")));

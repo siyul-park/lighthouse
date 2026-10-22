@@ -1,0 +1,17 @@
+[
+  { "tool": "read", "path": "pkg/a.go" },
+  { "tool": "search", "path": "pkg", "pattern": "Parse" },
+  { "tool": "list", "path": "pkg" },
+  { "tool": "read", "path": "pkg/b.go" },
+  { "tool": "edit", "path": "pkg/a.go" },
+  { "tool": "edit", "path": "pkg/new.go" },
+  { "tool": "run", "command": "go vet ./pkg" },
+  { "tool": "read", "path": "pkg/a.go" },
+  { "tool": "search", "pattern": "Parse" },
+  { "tool": "run", "command": "go test -run cat ./pkg" },
+  { "tool": "read", "path": "pkg/a.go" },
+  { "tool": "read", "path": "pkg/b.go" },
+  { "tool": "read", "outside": true },
+  { "tool": "read", "path": "Makefile" },
+  { "tool": "read", "path": "pkg/a.go" }
+]

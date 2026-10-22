@@ -94,19 +94,19 @@ spec:
       - name: documentation
         expr: >-
           lines(comment.text).exists(l,
-            (trim(l).startsWith('///') && !trim(l).startsWith('////'))
-            || trim(l).startsWith('//!'))
+            (l.trim().startsWith('///') && !l.trim().startsWith('////'))
+            || l.trim().startsWith('//!'))
       - name: bodies
         expr: >-
           lines(comment.text)
-            .map(l, trim(trimLeft(trimSuffixes(trimPrefixes(trimPrefixes(trim(l), '//'), '/*'), '*/'), '#')))
+            .map(l, trimLeft(trimSuffixes(trimPrefixes(trimPrefixes(l.trim(), '//'), '/*'), '*/'), '#').trim())
             .filter(b, b != '')
       - name: texts
         expr: >-
           bodies.map(b,
             options.labels.exists(m, b.startsWith(m))
-            ? trim(drop(b, size(options.labels.filter(m, b.startsWith(m))[0])))
-            : trim(trimRight(trim(drop(b, leadingRun(b, options.ruleChars))), options.ruleChars)))
+            ? drop(b, size(options.labels.filter(m, b.startsWith(m))[0])).trim()
+            : trimRight(drop(b, leadingRun(b, options.ruleChars)).trim(), options.ruleChars).trim())
       - name: named
         expr: texts.filter(t, t != '')
       - name: directive

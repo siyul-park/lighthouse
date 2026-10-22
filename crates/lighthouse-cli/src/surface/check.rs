@@ -27,6 +27,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
     }
     let mut messages = Vec::new();
     let mut shown = BTreeMap::new();
+    let mut properties = serde_json::Map::new();
     if command.fix {
         let selection = FixArgs {
             paths: args.paths.clone(),
@@ -38,6 +39,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
         let done = apply(ctx, &selection, !args.no_store, !args.no_cache)?;
         messages = done.lines();
         shown = done.shown.clone();
+        properties = done.properties();
         if command.options.dry_run && command.format == CheckFormat::Text {
             return Ok(Reply::text(done.diff).with_messages(&messages));
         }
@@ -48,7 +50,9 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
     let reporting = Instant::now();
     let mut reply = match command.format {
         CheckFormat::Json => Reply::json(&checked.report(args.detail.into(), args.limit))?,
-        CheckFormat::Sarif => Reply::text(checked.sarif_with_fixes(args.limit, &shown)),
+        CheckFormat::Sarif => {
+            Reply::text(checked.sarif_with_fixes(args.limit, &shown, &properties))
+        }
         CheckFormat::Text => Reply::text(checked.render(Format::Text, args.limit)),
     }
     .with_messages(&checked.messages);

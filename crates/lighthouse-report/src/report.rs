@@ -63,6 +63,9 @@ pub struct Briefing<'a> {
     pub tool_form: bool,
     /// How the check and the fix of each decision run, by decision id.
     pub descriptors: Option<&'a BTreeMap<String, Descriptor>>,
+    /// What the run adds to SARIF's property bag of the run, such as what the
+    /// agents of a fix run did.
+    pub properties: Option<&'a serde_json::Map<String, Value>>,
 }
 
 /// How much each finding carries.

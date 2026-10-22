@@ -181,7 +181,7 @@ fn serves(registry: &Registry, provider: &ModelProvider, task: Task) -> bool {
         let capabilities = &model.manifest().capabilities;
         let capability = match task {
             Task::Classification => capabilities.classification,
-            Task::Agent => None,
+            Task::Agent => capabilities.agent,
         };
         capability.is_some_and(|capability| capability.supported)
     });
@@ -192,7 +192,7 @@ fn serves(registry: &Registry, provider: &ModelProvider, task: Task) -> bool {
 /// provider's kind alone says.
 fn only_for(task: Task) -> &'static str {
     match task {
-        Task::Agent => ": only a command without a protocol does",
+        Task::Agent => ": only a command without a protocol, or a plugin that offers agents, does",
         Task::Classification => "",
     }
 }

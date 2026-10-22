@@ -3,6 +3,7 @@ mod catalog;
 mod check;
 mod command;
 mod decision;
+mod environment;
 mod error;
 mod expression;
 mod fix;
@@ -27,6 +28,7 @@ pub use check::{
 };
 pub use command::CommandCheck;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
+pub use environment::{compile, context, environment};
 pub use error::Error;
 pub use expression::{TemplatePart, parse_template};
 pub use fix::{CommandSpec, Fix, FixKind, FixScope, OpSpec};
@@ -41,9 +43,9 @@ pub use program::{
 };
 pub use project::{
     BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule, EnvironmentSpec, Evaluation,
-    FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GeneratedCheck, GlobSet, Layer, Layers, Level,
-    ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects, RESERVED_PROVIDERS,
-    Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, Task, glob_set,
+    EventsSpec, FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GeneratedCheck, GlobSet, Layer,
+    Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
+    RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, Task, glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 

@@ -4,6 +4,7 @@
 //! hold more.
 
 mod environment;
+mod events;
 mod fixing;
 mod layers;
 mod models;
@@ -28,6 +29,7 @@ use std::{
 pub use globset::GlobSet;
 
 pub use environment::{EnvironmentRule, EnvironmentSpec};
+pub use events::EventsSpec;
 pub use fixing::{FixEnvironment, FixPolicy, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
 pub use layers::{BUNDLED, Entry, Layer, Layers};

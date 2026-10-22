@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use lighthouse_plugin::{
-    Capabilities, CreateFineTuningJobRequest, EditRequest, Error, FineTuningJob, Model,
+    Capabilities, CreateFineTuningJobRequest, EditRequest, Edited, Error, FineTuningJob, Model,
     ModelClient, Registry, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_protocol::hash;
@@ -89,7 +89,7 @@ impl ModelClient for Refused {
         Err(self.failure())
     }
 
-    fn edit(&self, _: &EditRequest<'_>) -> Result<String, Error> {
+    fn edit(&self, _: &EditRequest<'_>) -> Result<Edited, Error> {
         Err(self.failure())
     }
 }
@@ -117,6 +117,13 @@ impl ModelClient for Plugin<'_> {
         asked.model.clone_from(&self.name);
         asked.options.clone_from(&self.options);
         self.model.train(&asked)
+    }
+
+    fn edit(&self, request: &EditRequest<'_>) -> Result<Edited, Error> {
+        self.model.edit(&EditRequest {
+            model: &self.name,
+            ..*request
+        })
     }
 }
 

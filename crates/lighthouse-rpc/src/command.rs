@@ -5,13 +5,16 @@
 //! it is run in. The program runs under the process contract of every
 //! program, so a trusted project is the only one that builds it.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use lighthouse_plugin::{
-    Answer, Capabilities, EditRequest, Error, Model, ModelClient, SystemOneRequest,
+    Answer, Capabilities, EditRequest, Edited, Error, Model, ModelClient, SystemOneRequest,
     SystemOneResponse,
 };
-use lighthouse_process::{Environment, Home, Job, Policy, referenced};
+use lighthouse_process::{Environment, Home, Job, Lines, Policy, Ran, referenced};
 use lighthouse_protocol::{
     canonical, hash,
     prompt::{json_in, noul_of},
@@ -19,8 +22,8 @@ use lighthouse_protocol::{
 use lighthouse_spec::{CommandProtocol, ModelProvider, Point, Program};
 use serde_json::{Value, json};
 
-/// How much of what an agent said is kept.
-const NOTES_BYTES: usize = 2048;
+use crate::events::{Events, NOTES_BYTES, Reading, Scrubber, tail};
+
 /// A program run as a model.
 pub struct CommandModel {
     manifest: Model,
@@ -29,6 +32,8 @@ pub struct CommandModel {
     /// The program, with `{model}` filled in.
     program: Program,
     pointer: Option<String>,
+    /// How the agent's stdout becomes events, when the provider says.
+    events: Option<Result<Arc<Events>, String>>,
     dir: PathBuf,
     /// How the program runs: the project's `[sandbox]` with the lists of the
     /// provider's own added.
@@ -50,6 +55,7 @@ impl CommandModel {
             protocol,
             program,
             pointer,
+            events,
             cost,
         } = provider
         else {
@@ -91,6 +97,9 @@ impl CommandModel {
                 ..program.clone()
             },
             pointer: pointer.clone(),
+            events: events
+                .as_deref()
+                .map(|spec| Events::new(spec).map(Arc::new)),
             dir: dir.to_owned(),
             policy: program.policy(sandbox),
         })
@@ -102,8 +111,16 @@ impl CommandModel {
     /// what it printed. Sandboxed, it keeps its own state in a home directory
     /// of the run, and changes the files of `dir` only when it `edits`.
     /// Returns what it printed, and the environment it ran in, which can tell
-    /// a value of a secret from the text around it.
-    fn run(&self, dir: &Path, input: &[u8], edits: bool) -> Result<(Vec<u8>, Environment), Error> {
+    /// a value of a secret from the text around it. When `lines` gives a
+    /// receiver for the environment, stdout goes to it a line at a time as it
+    /// is printed, and is not kept.
+    fn run(
+        &self,
+        dir: &Path,
+        input: &[u8],
+        edits: bool,
+        lines: impl FnOnce(&Environment) -> Option<Lines>,
+    ) -> Result<(Ran, Environment), Error> {
         let failed = |reason: String| Error::model(&self.manifest.id, reason);
         let home = self
             .policy
@@ -124,7 +141,7 @@ impl CommandModel {
         if edits {
             profile.writes.push(dir.to_owned());
         }
-        let ran = Job {
+        let job = Job {
             command: &self.program.command,
             dir,
             stdin: input,
@@ -132,12 +149,15 @@ impl CommandModel {
             timeout: self.program.timeout(self.point()),
             policy: &self.policy,
             profile: &profile,
+        };
+        let ran = match lines(&environment) {
+            Some(lines) => job.run_lines(lines),
+            None => job.run(),
         }
-        .run()
         .map_err(failed)?;
         ran.exit(&self.program.success(self.point()))
             .map_err(failed)?;
-        Ok((ran.stdout, environment))
+        Ok((ran, environment))
     }
 
     /// Where the program is bound: an agent when it edits.
@@ -163,8 +183,8 @@ impl ModelClient for CommandModel {
         let mut asked = params.clone();
         asked.model.clone_from(&self.model);
         let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
-        let (stdout, _) = self.run(&self.dir, &input, false)?;
-        let printed = printed_answer(&stdout, self.pointer.as_deref());
+        let (ran, _) = self.run(&self.dir, &input, false, |_| None)?;
+        let printed = printed_answer(&ran.stdout, self.pointer.as_deref());
         let answers = params
             .questions
             .keys()
@@ -188,24 +208,47 @@ impl ModelClient for CommandModel {
     }
 
     /// The program run in the directory of the request with the prompt on
-    /// stdin; what it printed is kept for the notes, cut to a few kilobytes.
-    fn edit(&self, request: &EditRequest<'_>) -> Result<String, Error> {
+    /// stdin. What it printed is kept for the notes, cut to a few kilobytes,
+    /// unless the provider maps it to events: then it is a stream of data,
+    /// not speech, which is read a line at a time as it is printed, and the
+    /// events are what is kept of it, with what the mapping takes for the
+    /// agent's words.
+    fn edit(&self, request: &EditRequest<'_>) -> Result<Edited, Error> {
         if self.protocol != CommandProtocol::PlainText {
             return Err(Error::model(&self.manifest.id, "it does not edit"));
         }
-        let (stdout, environment) = self.run(request.dir, request.prompt.as_bytes(), true)?;
-        let said = environment.scrub(String::from_utf8_lossy(&stdout).trim());
-        Ok(capped(&said, NOTES_BYTES))
+        let prompt = request.prompt.as_bytes();
+        match &self.events {
+            Some(Ok(events)) => {
+                let mut reading: Option<Reading> = None;
+                let (ran, _) = self.run(request.dir, prompt, true, |environment| {
+                    let environment = environment.clone();
+                    let scrub: Scrubber = Arc::new(move |text| environment.scrub(text));
+                    let started = Reading::new(events, request.dir, scrub);
+                    let lines = started.lines();
+                    reading = Some(started);
+                    Some(lines)
+                })?;
+                let mapped = reading
+                    .map(|r| r.finish(ran.truncated))
+                    .ok_or_else(|| Error::model(&self.manifest.id, "its output was not read"))?;
+                Ok(Edited {
+                    said: mapped.said,
+                    events: mapped.events,
+                    incomplete: mapped.incomplete,
+                })
+            }
+            Some(Err(reason)) => Err(Error::model(&self.manifest.id, reason)),
+            None => {
+                let (ran, environment) = self.run(request.dir, prompt, true, |_| None)?;
+                let printed = environment.scrub(String::from_utf8_lossy(&ran.stdout).trim());
+                Ok(Edited {
+                    said: tail(&printed, NOTES_BYTES).to_owned(),
+                    ..Edited::default()
+                })
+            }
+        }
     }
-}
-
-/// `text` cut to at most `max` bytes, at a character boundary.
-fn capped(text: &str, max: usize) -> String {
-    let end = (0..=max.min(text.len()))
-        .rev()
-        .find(|&at| text.is_char_boundary(at))
-        .unwrap_or_default();
-    text[..end].to_owned()
 }
 
 /// The content hash of the program a command runs, so that a changed program

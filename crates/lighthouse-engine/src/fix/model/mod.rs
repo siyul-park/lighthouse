@@ -10,6 +10,7 @@ mod account;
 mod edit;
 mod extent;
 mod reach;
+mod trace;
 mod verify;
 
 use std::{
@@ -27,6 +28,7 @@ use crate::{
 pub use account::ModelCounts;
 pub(super) use account::{Account, Class, Event};
 pub(super) use extent::choose as choose_extent;
+pub use trace::{BatchTrace, ToolCounts};
 pub(super) use verify::{Verdict, judge};
 
 /// How many findings of one file an agent is given at most.
@@ -69,6 +71,8 @@ pub(super) struct ModelFixer<'e> {
     pub(super) account: Account,
     /// What the agents said, for the notes of the run.
     said: Mutex<Vec<String>>,
+    /// What the agents did, by run, for the report.
+    traces: Mutex<Vec<BatchTrace>>,
     /// The tokens of context a brief may carry around the findings.
     context: usize,
 }
@@ -85,6 +89,7 @@ impl<'e> ModelFixer<'e> {
             fixes,
             account: Account::default(),
             said: Mutex::default(),
+            traces: Mutex::default(),
             context: engine.config.fix().context,
         })
     }
@@ -105,6 +110,15 @@ impl<'e> ModelFixer<'e> {
     /// What the requests that went to a model this run took.
     pub(super) fn usage(&self) -> Usage {
         self.route.usage()
+    }
+
+    /// What the agents did in the runs that were made now, in the order they
+    /// finished; a kept answer has no events.
+    pub(super) fn traces(&self) -> Vec<BatchTrace> {
+        self.traces
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     /// What the user should know about the route and the agents, once the run

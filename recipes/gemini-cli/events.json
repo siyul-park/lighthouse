@@ -1,0 +1,9 @@
+[
+  { "tool": "read", "path": "pkg/a.go" },
+  { "tool": "search", "path": ".", "pattern": "func Parse" },
+  { "tool": "search", "pattern": "**/*.go" },
+  { "tool": "list", "path": "pkg" },
+  { "tool": "read", "path": "pkg/b.go" },
+  { "tool": "edit", "path": "pkg/a.go" },
+  { "tool": "run", "command": "go vet ./pkg" }
+]

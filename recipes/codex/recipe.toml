@@ -1,0 +1,36 @@
+# Codex CLI as an agent. A configuration layer: copy it into
+# `$XDG_CONFIG_HOME/lighthouse/config.toml` or `.lighthouse/local.toml`, or
+# paste the table into `lighthouse.toml`; then bind it with
+# `[models] agent = "codex/<model>"`.
+#
+# Sources (checked 2026-10-22):
+# - Context7 /openai/codex (codex-rs/exec/src/cli.rs): `codex exec`, `--json` (events to stdout as JSONL),
+#   `--skip-git-repo-check`, `--sandbox`, `--model`; a prompt of `-` is read from stdin.
+# - Context7 /openai/codex (codex-rs/exec/src/exec_events.rs): top-level `type` thread.started, turn.started,
+#   turn.completed, turn.failed, item.started, item.updated, item.completed, error; `item.type` is
+#   agent_message, reasoning, command_execution, file_change, mcp_tool_call, web_search, todo_list or error.
+#   `command_execution` has `command` and `status`; `file_change` has `changes`, each with `path` and `kind`.
+# - The local `codex` binary could not be run on 2026-10-22 (its real binary is missing), so the item fields
+#   follow the source above and the fixture, not a live stream.
+# Codex reads and searches through the shell. `commands(line.item.command)` reads the command line as the
+# commands it runs (a pipe, `&&`, `;` or a `sh -c` script gives several), and each is classified by its program
+# alone, looked up in `tools` (a command that is not there is a `run`). A read is of all its operands, a search
+# looks for the first operand in the rest, a list is of its operands. Which operands are paths is not said here:
+# the host keeps the path of a read or a search only when it names an existing file (or, for a search, directory)
+# of the directory the agent ran in, so `sed 's/a/b/' x.go` reads `x.go` and `cat Makefile` reads `Makefile`.
+# Edit `tools` to teach it more programs.
+# Credentials are the user's: `codex login`, or the key in `env`.
+
+[models.providers.codex]
+command = ["codex", "exec", "--json", "--skip-git-repo-check", "--sandbox", "workspace-write", "--model", "{model}", "-"]
+timeout = "20m"
+
+[models.providers.codex.events]
+select = 'line.type == "item.completed" && line.item.type in ["command_execution", "file_change"]'
+each = 'line.item.type == "file_change" ? line.item.changes : commands(line.item.command)'
+tool = 'line.item.type == "file_change" ? "edit" : (item.word in tools ? tools[item.word] : "run")'
+path = 'line.item.type == "file_change" ? item.path : (!(item.word in tools) ? "" : (tools[item.word] == "search" ? item.rest : item.operands))'
+pattern = 'line.item.type == "command_execution" && item.word in tools && tools[item.word] == "search" && size(item.operands) > 0 ? item.operands[0] : ""'
+command = 'line.item.type == "command_execution" && !(item.word in tools) ? item.text : ""'
+said = 'line.type == "item.completed" && line.item.type == "agent_message" ? line.item.text : ""'
+tools = { cat = "read", sed = "read", head = "read", tail = "read", nl = "read", rg = "search", grep = "search", find = "list", ls = "list" }

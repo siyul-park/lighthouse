@@ -146,10 +146,11 @@ fn a_plain_text_command_edits_in_the_directory_it_is_given_and_keeps_what_it_sai
         .edit(&EditRequest {
             prompt: "make it better",
             dir: work.path(),
+            model: "",
         })
         .unwrap();
 
-    assert_eq!(said, "fixed 1");
+    assert_eq!(said.said, "fixed 1");
     let prompt = std::fs::read_to_string(work.path().join("prompt.txt")).unwrap();
     assert_eq!(prompt, "make it better");
     assert!(!home.path().join("prompt.txt").exists());
@@ -166,6 +167,7 @@ fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
     let asked = EditRequest {
         prompt: "p",
         dir: dir.path(),
+        model: "",
     };
 
     let said = CommandModel::new(dir.path(), "p/m", "m", &chatty, &Policy::default())
@@ -177,7 +179,7 @@ fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
         .edit(&asked)
         .unwrap_err();
 
-    assert!(said.len() <= 2048, "{}", said.len());
+    assert!(said.said.len() <= 2048, "{}", said.said.len());
     assert!(error.to_string().contains("exited 2"), "{error}");
 }
 
@@ -191,6 +193,7 @@ fn a_command_with_a_protocol_does_not_edit() {
         .edit(&EditRequest {
             prompt: "p",
             dir: dir.path(),
+            model: "",
         })
         .unwrap_err();
 
@@ -214,6 +217,7 @@ fn an_agent_runs_with_a_home_of_its_own_and_writes_only_in_its_directory() {
         .edit(&EditRequest {
             prompt: "go",
             dir: work.path(),
+            model: "",
         })
         .unwrap();
 
@@ -250,6 +254,7 @@ fn a_key_reaches_the_program_by_its_environment_and_nowhere_else() {
         .edit(&EditRequest {
             prompt: "go",
             dir: work.path(),
+            model: "",
         })
         .unwrap();
 
@@ -261,7 +266,7 @@ fn a_key_reaches_the_program_by_its_environment_and_nowhere_else() {
     );
     assert_eq!(read("argv.txt"), "--model m", "the command line has no key");
     assert_eq!(
-        said, "the key is ${LIGHTHOUSE_RPC_TEST_KEY}",
+        said.said, "the key is ${LIGHTHOUSE_RPC_TEST_KEY}",
         "the notes have its name"
     );
     assert!(!format!("{:?}", command.manifest()).contains("sk-agent-secret"));
@@ -303,6 +308,7 @@ fn a_key_that_is_not_set_fails_the_run_naming_the_variable() {
         .edit(&EditRequest {
             prompt: "go",
             dir: work.path(),
+            model: "",
         })
         .unwrap_err();
 

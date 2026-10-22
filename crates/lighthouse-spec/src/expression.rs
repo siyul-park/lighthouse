@@ -1,7 +1,7 @@
 //! The CEL expressions and `{{ cel }}` templates a decision's check and fix
 //! carry: split once, and described when they do not hold.
 
-use cel::Program;
+use crate::environment::compile;
 
 /// One part of a `{{ cel }}` template: literal text, or the source of a hole.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,9 +35,7 @@ pub fn parse_template(text: &str) -> Result<Vec<TemplatePart>, String> {
 
 /// Why `source`, written as `what`, is not a CEL expression.
 pub(crate) fn compile_problem(what: &str, source: &str) -> Option<String> {
-    Program::compile(source)
-        .err()
-        .map(|e| format!("{what}: {e}"))
+    compile(source).err().map(|e| format!("{what}: {e}"))
 }
 
 /// Why the `{{ cel }}` template `text`, written as `what`, is not well formed.

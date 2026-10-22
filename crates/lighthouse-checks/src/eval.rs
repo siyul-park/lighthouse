@@ -37,7 +37,7 @@ impl Template {
             pieces.push(match part {
                 TemplatePart::Text(text) => Piece::Text(text),
                 TemplatePart::Hole(source) => Piece::Hole(
-                    Program::compile(&source)
+                    lighthouse_spec::compile(&source)
                         .map_err(|e| Error::invalid(rule, format!("{what} `{source}`: {e}")))?,
                 ),
             });
@@ -64,11 +64,11 @@ impl Template {
 /// The variables of one judgment, over a context that has the library.
 pub(crate) struct Frame<'a> {
     rule: &'a str,
-    context: Context<'a>,
+    context: Context<'a, 'static>,
 }
 
 impl<'a> Frame<'a> {
-    pub(crate) fn new(rule: &'a str, base: &'a Context<'static>) -> Self {
+    pub(crate) fn new(rule: &'a str, base: &'a Context<'static, 'static>) -> Self {
         Self {
             rule,
             context: base.new_inner_scope(),
@@ -143,7 +143,7 @@ pub(crate) type Fact = Box<dyn Val>;
 
 /// Compiles `source`, naming `rule` and `what` in the error.
 pub(crate) fn compile(rule: &str, what: &str, source: &str) -> Result<Program, Error> {
-    Program::compile(source).map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
+    lighthouse_spec::compile(source).map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
 }
 
 /// Compiled `name: expression` pairs.
@@ -223,7 +223,7 @@ pub(crate) fn cel_fact(value: &Value) -> Fact {
 
 /// A copy of the map `base` with the entries of `extra` set over it; a copy
 /// of `base` itself when `base` is no map or `extra` is empty.
-pub(crate) fn with_entries(base: &dyn Val, extra: &Map<String, Value>) -> Fact {
+pub(crate) fn with_entries(base: &(dyn Val + 'static), extra: &Map<String, Value>) -> Fact {
     let Some(map) = base.downcast_ref::<CelMap>().filter(|_| !extra.is_empty()) else {
         return base.clone_as_boxed();
     };
@@ -234,7 +234,7 @@ pub(crate) fn with_entries(base: &dyn Val, extra: &Map<String, Value>) -> Fact {
         .collect();
     for (key, value) in extra {
         entries.insert(
-            CelMapKey::String(CelString::from(key.as_str())),
+            CelMapKey::String(CelString::from(key.clone())),
             cel_fact(value),
         );
     }
@@ -252,6 +252,6 @@ pub(crate) fn with_fact(base: Fact, name: &str, value: Fact) -> Fact {
         .iter()
         .map(|(key, value)| (key.clone(), value.clone_as_boxed()))
         .collect();
-    entries.insert(CelMapKey::String(CelString::from(name)), value);
+    entries.insert(CelMapKey::String(CelString::from(name.to_owned())), value);
     Box::new(CelMap::from(entries))
 }

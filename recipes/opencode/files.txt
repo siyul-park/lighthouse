@@ -1,0 +1,2 @@
+pkg/a.go
+pkg/b.go

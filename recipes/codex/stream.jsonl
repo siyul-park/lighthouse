@@ -1,0 +1,18 @@
+{"type":"thread.started","thread_id":"th_1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"Look at the file"}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc \"sed -n '1,120p' pkg/a.go\"","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc \"sed -n '1,120p' pkg/a.go\"","aggregated_output":"package pkg","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/bin/zsh -lc 'rg -n Parse pkg'","aggregated_output":"pkg/a.go:3:func Parse","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"command_execution","command":"/bin/zsh -lc 'ls pkg'","aggregated_output":"a.go\nb.go","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_4","type":"command_execution","command":"/bin/zsh -lc 'cat pkg/b.go'","aggregated_output":"package pkg","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_5","type":"file_change","changes":[{"path":"@ROOT@/pkg/a.go","kind":"update"},{"path":"@ROOT@/pkg/new.go","kind":"add"}],"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_6","type":"command_execution","command":"/bin/zsh -lc 'go vet ./pkg'","aggregated_output":"","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_7","type":"command_execution","command":"/bin/zsh -lc 'cat pkg/a.go | rg Parse'","aggregated_output":"func Parse","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_8","type":"command_execution","command":"/bin/zsh -lc 'go test -run cat ./pkg'","aggregated_output":"ok","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_9","type":"command_execution","command":"/bin/zsh -lc 'cat pkg/a.go pkg/b.go'","aggregated_output":"package pkg","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_10","type":"command_execution","command":"/bin/zsh -lc 'cat /etc/hosts'","aggregated_output":"127.0.0.1 localhost","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_11","type":"command_execution","command":"/bin/zsh -lc 'cat Makefile'","aggregated_output":"all:","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_12","type":"command_execution","command":"/bin/zsh -lc \"sed 's/a/b/' pkg/a.go\"","aggregated_output":"package pkg","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_13","type":"agent_message","text":"1 fixed"}}
+{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":0,"output_tokens":20}}

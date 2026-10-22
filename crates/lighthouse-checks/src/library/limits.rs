@@ -8,7 +8,7 @@ use cel::{
     common::types::{CelMap, CelMapKey, CelString},
 };
 
-use super::{Builtin, arguments, member, text};
+use super::{Builtin, arguments, builtin, member, text};
 
 /// The key of a limit map that covers every role it does not name.
 const FALLBACK_ROLE: &str = "default";
@@ -17,9 +17,9 @@ const FALLBACK_ROLE: &str = "default";
 const NO_LIMIT: i64 = -1;
 
 /// Adds `limit` and `counted` to the context.
-pub(super) fn install(context: &mut Context<'static>) {
-    context.add_function("limit", limit());
-    context.add_function("counted", counted());
+pub(super) fn install(context: &mut Context<'static, 'static>) -> Result<(), String> {
+    builtin(context, "limit", limit())?;
+    builtin(context, "counted", counted())
 }
 
 /// `limit(node, max)`: the integer a limit option gives the node's role, `-1`

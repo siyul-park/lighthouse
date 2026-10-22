@@ -57,6 +57,7 @@ and analyzers.
 | `lighthouse/index` | request | none |
 | `lighthouse/classify` | request | `POST /v1/systemone` |
 | `lighthouse/train` | request | `POST /v1/fine_tuning/jobs` |
+| `lighthouse/edit` | request | none |
 | `shutdown` | request | none |
 | `exit` | notification | none |
 
@@ -222,6 +223,23 @@ system and user prompts and the assistant's `{type, noul}`), in canonical JSON, 
 has `status: "succeeded"`, `fine_tuned_model: "learned@sha256:<hex>"` (or
 `general@sha256:<hex>`, the artifact reference) and, as its first
 `result_files` entry, a JSON file of the metrics. The same `seed` is the same request.
+
+`lighthouse/edit` runs an agent: `{model, prompt, dir}` asks the model to change the files of the
+directory `dir` as the prompt says, and answers `{said, events?}`. Only a model whose capabilities say
+`agent: {supported: true}` serves it. `dir` is a scratch copy of the project that the host verifies
+and deletes. The host does not send the request to the process it keeps for the other methods: for
+each request it starts a process of the plugin of its own, sandboxed like a `command` agent (it writes
+`dir` and its own `HOME`, reaches the hosts of the project's `[sandbox]`, and has no secret in its
+environment), tells it `initialize`, `lighthouse/edit` and `shutdown` in one go and reads the answers
+when it exits. `events` is what the agent did, when its harness tells: a list of `{tool, path?,
+pattern?, command?}` with `tool` one of `read`, `search`, `list`, `edit`, `run`, and paths absolute or
+relative to `dir`. The host reads them leniently: an event of another tool, or a malformed one, is
+skipped and counted, never a failure of the plugin; at most 10 000 are kept; paths are made relative to
+`dir`, and one outside it is dropped and marked; after the run the path of a `read` is kept only if it
+names an existing file of `dir` (of a `search`, a file or directory), else the event stays without it; a
+path through a symbolic link, and a `pattern` that is an absolute path outside `dir`, are marked like a
+path outside. `said` is cut to its last 2 KB with secrets hidden. The host
+reports them (see [models.md](models.md#what-an-agent-did)) and decides nothing by them.
 
 Errors are JSON-RPC errors; `data` carries the error body of the API reused (OpenAI's
 `{error: {message, type, param, code}}`, or TypeSafe's status code). Calls are retried with

@@ -1,0 +1,29 @@
+# opencode as an agent. A configuration layer: copy it into
+# `$XDG_CONFIG_HOME/lighthouse/config.toml` or `.lighthouse/local.toml`, or
+# paste the table into `lighthouse.toml`; then bind it with
+# `[models] agent = "opencode/<provider>/<model>"`.
+#
+# Sources (checked 2026-10-22):
+# - `opencode run --help`, opencode 1.19.3: `--pure`, `--format json`, `--model provider/model`; the
+#   message is read from stdin when none is given.
+# - Context7 /anomalyco/opencode (packages/opencode/src/cli/cmd/run.ts): `--format json` prints one JSON
+#   object per line, `{type, timestamp, sessionID, ...data}`, with type text, reasoning, step_start,
+#   tool_use, step_finish or error.
+# - Context7 /anomalyco/opencode-sdk-js (ToolPart): a tool call is `part = {type: "tool", tool, state}` and
+#   `state.input` holds the arguments; tool/read.ts takes `filePath`.
+# The model and its provider (`provider` in OPENCODE_CONFIG_CONTENT, with `apiKey` as `{env:NAME}`) are the
+# user's: add them to this `env`, and the hosts they reach to `sandbox`.
+
+[models.providers.opencode]
+command = ["opencode", "run", "--pure", "--format", "json", "--model", "{model}"]
+env = { OPENCODE_DISABLE_PROJECT_CONFIG = "1", OPENCODE_CONFIG_CONTENT = '{"$schema":"https://opencode.ai/config.json","permission":{"*":"deny","read":"allow","list":"allow","glob":"allow","grep":"allow","edit":"allow"}}' }
+timeout = "20m"
+
+[models.providers.opencode.events]
+select = 'line.type == "tool_use"'
+tool = 'tools[line.part.tool]'
+path = 'line.part.state.input.?filePath.orValue(line.part.state.input.?path.orValue(""))'
+pattern = 'line.part.state.input.?pattern.orValue("")'
+command = 'line.part.state.input.?command.orValue("")'
+said = 'line.type == "text" ? line.part.?text.orValue("") : ""'
+tools = { read = "read", grep = "search", glob = "search", list = "list", edit = "edit", write = "edit", patch = "edit", apply_patch = "edit", bash = "run" }

@@ -1,5 +1,6 @@
 //! The plugin wire protocol, one binary.
 
+mod agent;
 mod canonical;
 mod frame;
 mod hash;

@@ -1,0 +1,31 @@
+# Gemini CLI as an agent. A configuration layer: copy it into
+# `$XDG_CONFIG_HOME/lighthouse/config.toml` or `.lighthouse/local.toml`, or
+# paste the table into `lighthouse.toml`; then bind it with
+# `[models] agent = "gemini-cli/<model>"`.
+#
+# Sources (checked 2026-10-22):
+# - Context7 /google-gemini/gemini-cli (docs/cli/cli-reference.md): `-p/--prompt` ("appended to stdin input
+#   if provided; forces non-interactive mode"), `--model`, `--approval-mode` (default, auto_edit, yolo,
+#   plan), `--skip-trust`; (docs/reference/configuration.md): `--output-format stream-json`.
+# - Context7 /google-gemini/gemini-cli (docs/cli/headless.md): stream-json is newline-delimited JSON with
+#   event types init, message, tool_use ("tool call requests with arguments"), tool_result, error, result.
+# - Context7 /google-gemini/gemini-cli (docs/tools/file-system.md): tool names and arguments read_file
+#   `file_path`, list_directory `dir_path`, grep_search `pattern` and `path`, write_file `file_path`; glob
+#   and run_shell_command are tool-name constants of packages/core.
+# NOT verified against a live stream: `gemini` is not installed here and the docs show no tool_use line, so
+# the fields `tool_name` and `parameters` are what the event type is believed to carry. A mismatch shows as
+# an agent with no events, never as a failure.
+# Credentials are the user's: `GEMINI_API_KEY` in `env`.
+
+[models.providers.gemini-cli]
+command = ["gemini", "-p", "Do what the instructions on stdin ask.", "--output-format", "stream-json", "--approval-mode", "auto_edit", "--skip-trust", "--model", "{model}"]
+timeout = "20m"
+
+[models.providers.gemini-cli.events]
+select = 'line.type == "tool_use"'
+tool = 'tools[line.tool_name]'
+path = 'line.parameters.?file_path.orValue(line.parameters.?dir_path.orValue(line.parameters.?path.orValue("")))'
+pattern = 'line.parameters.?pattern.orValue("")'
+command = 'line.parameters.?command.orValue("")'
+said = 'line.type == "message" && line.?role.orValue("") == "assistant" ? line.?content.orValue("") : ""'
+tools = { read_file = "read", read_many_files = "read", grep_search = "search", glob = "search", list_directory = "list", replace = "edit", write_file = "edit", run_shell_command = "run" }

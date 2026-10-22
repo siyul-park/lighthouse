@@ -42,6 +42,8 @@ const MAX_FILES: usize = 40;
 struct Item {
     rank: usize,
     text: String,
+    /// The file of the symbol the text declares.
+    file: String,
 }
 
 /// One place that refers to what the fix may change.
@@ -115,6 +117,17 @@ impl Budget {
     }
 }
 
+/// What a fix of scope `files` is told of the places that refer to what it
+/// may change.
+struct Reached {
+    /// The places that fit the budget, as text.
+    sites: Vec<String>,
+    /// The files of all the places, at most [`MAX_FILES`].
+    files: Vec<String>,
+    /// The files the brief shows or names for them.
+    shown: BTreeSet<String>,
+}
+
 /// The context of the findings of `file`, each with the extent an edit of it
 /// may change when the scope holds it to one: the code of the extents and,
 /// within `budget` tokens, what surrounds it.
@@ -146,6 +159,9 @@ pub(super) fn localize(
         left_out: 0,
     };
     let mut localized = Localized {
+        briefed: std::iter::once(slashed(file))
+            .chain(code.iter().map(|c| c.path.clone()))
+            .collect(),
         code,
         ..Localized::default()
     };
@@ -153,26 +169,15 @@ pub(super) fn localize(
     items.sort_by_key(|item| item.rank);
     for item in items {
         if budget.take(&item.text) {
+            localized.briefed.insert(item.file);
             localized.uses.push(item.text);
         }
     }
     if scope == FixScope::Files {
-        let places = places(project, &anchors, file, &spans);
-        for (at, place) in places.iter().enumerate() {
-            if budget.left == 0 {
-                budget.left_out += places.len() - at;
-                break;
-            }
-            let text = rendered(place, project, &mut texts);
-            if budget.take(&text) {
-                localized.sites.push(text);
-            }
-        }
-        // The files are those of all the places, not only of those that fit:
-        // the scope allows the change of every one of them.
-        let files: BTreeSet<String> = places.iter().map(|p| slashed(p.file)).collect();
-        budget.left_out += files.len().saturating_sub(MAX_FILES);
-        localized.files = files.into_iter().take(MAX_FILES).collect();
+        let reached = reached(project, &anchors, file, &spans, &mut budget, &mut texts);
+        localized.briefed.extend(reached.shown);
+        localized.sites = reached.sites;
+        localized.files = reached.files;
     }
     // The imports come last: they say least, so they take what is left.
     for name in imports_of(project, file) {
@@ -182,6 +187,42 @@ pub(super) fn localize(
     }
     localized.left_out = budget.left_out;
     localized
+}
+
+/// The places that refer to the `anchors`, as many as fit `budget`, and the
+/// files that hold them all: the scope allows the change of every one of
+/// them, not only of those that fit.
+fn reached(
+    project: &Project,
+    anchors: &[&Symbol],
+    file: &Path,
+    spans: &[Span],
+    budget: &mut Budget,
+    texts: &mut Texts<'_, '_>,
+) -> Reached {
+    let places = places(project, anchors, file, spans);
+    let mut sites = Vec::new();
+    let mut shown = BTreeSet::new();
+    for (at, place) in places.iter().enumerate() {
+        if budget.left == 0 {
+            budget.left_out += places.len() - at;
+            break;
+        }
+        let text = rendered(place, project, texts);
+        if budget.take(&text) {
+            shown.extend(shown_in(place, project));
+            sites.push(text);
+        }
+    }
+    let files: BTreeSet<String> = places.iter().map(|p| slashed(p.file)).collect();
+    budget.left_out += files.len().saturating_sub(MAX_FILES);
+    let files: Vec<String> = files.into_iter().take(MAX_FILES).collect();
+    shown.extend(files.iter().cloned());
+    Reached {
+        sites,
+        files,
+        shown,
+    }
 }
 
 /// The tokens the budget counts for `text`.
@@ -260,6 +301,7 @@ fn used(
             items.push(Item {
                 rank: if symbol.file == file { 1 } else { 2 },
                 text: declared(symbol, texts),
+                file: slashed(&symbol.file),
             });
         }
     }
@@ -348,6 +390,19 @@ fn places<'p>(
         }
     }
     found.into_values().collect()
+}
+
+/// The files the text of a place shows: its own and that of the declaration
+/// around it.
+fn shown_in(place: &Place<'_>, project: &Project) -> Vec<String> {
+    let holder = match place.holder {
+        Holder::Symbol(symbol) => Some(symbol),
+        Holder::Site(Node::Symbol(id)) => project.symbol(id),
+        Holder::Site(Node::Module(_)) => None,
+    };
+    std::iter::once(slashed(place.file))
+        .chain(holder.map(|symbol| slashed(&symbol.file)))
+        .collect()
 }
 
 /// The text of a place: where it is, its line and what holds it.

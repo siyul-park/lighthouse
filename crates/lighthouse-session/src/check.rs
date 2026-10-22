@@ -209,11 +209,13 @@ impl Checked {
     }
 
     /// The run in SARIF with `fixes`, the previews of a fix run by
-    /// fingerprint, as the `fixes` of the findings they are for.
+    /// fingerprint, as the `fixes` of the findings they are for, and the
+    /// `properties` of the run.
     pub fn sarif_with_fixes(
         &self,
         limit: Option<usize>,
         fixes: &BTreeMap<String, Preview>,
+        properties: &serde_json::Map<String, serde_json::Value>,
     ) -> String {
         let sources = self.sources();
         render(
@@ -223,6 +225,7 @@ impl Checked {
             &Briefing {
                 fixes: Some(fixes),
                 sources: Some(&sources),
+                properties: Some(properties).filter(|p| !p.is_empty()),
                 ..self.briefing(limit)
             },
         )
@@ -294,6 +297,7 @@ impl Checked {
             sources: None,
             tool_form: false,
             descriptors: Some(&self.descriptors),
+            properties: None,
         }
     }
 }

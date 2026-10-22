@@ -50,6 +50,7 @@ pub fn render(
             briefing.fixes,
             briefing.suppressions.unwrap_or_default(),
             briefing.sources,
+            briefing.properties,
         ),
         Format::Agent => report::text(diagnostics, incomplete, briefing),
     }
