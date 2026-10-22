@@ -49,7 +49,7 @@ spec:
               ? ['const', 'var', 'type', 'public-function', 'private-function']
               : ['public-type', 'private-type', 'public-const', 'private-const', 'var', 'init',
                  'method', 'public-function', 'private-function'],
-          cel.bind(hooks, has(options.hookNames) ? options.hookNames
+          cel.bind(hooks, has(options.hooks) ? options.hooks
               : n.lang == 'rust' ? []
               : ['Clone', 'String', 'GoString', 'Error', 'Unwrap', 'MarshalJSON', 'UnmarshalJSON',
                  'MarshalText', 'UnmarshalText', 'MarshalBinary', 'UnmarshalBinary'],

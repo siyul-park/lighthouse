@@ -63,9 +63,10 @@ spec:
           written), `public-const`,
           `private-const`, `const`, `var`, `init`, `method` (the members of the
           types, one block per type, in the order the types are declared, each
-          in the order of `type`: constructors, exported methods, hooks,
-          unexported methods), `public-function`, `private-function`.
-      hookNames:
+          with the constructors of the type first, then its exported
+          methods, its hooks and its unexported methods),
+          `public-function`, `private-function`.
+      hooks:
         type: array
         default:
           - Clone
@@ -88,7 +89,7 @@ spec:
     rust:
       options:
         groups: [const, var, type, public-function, private-function]
-        hookNames: []
+        hooks: []
   check:
     type: cel
     select: symbol
