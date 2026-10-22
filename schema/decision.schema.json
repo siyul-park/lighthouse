@@ -43,26 +43,6 @@
       "description": "A standard operation over the code model.",
       "oneOf": [
         {
-          "description": "Declarations must follow the order of registered order keys, the same\nkeys a `reorder` fix sorts by. Each clause is judged on its own and the\nfindings are concatenated.",
-          "properties": {
-            "clauses": {
-              "items": {
-                "$ref": "#/$defs/OrderClause"
-              },
-              "type": "array"
-            },
-            "op": {
-              "const": "order",
-              "type": "string"
-            }
-          },
-          "required": [
-            "op",
-            "clauses"
-          ],
-          "type": "object"
-        },
-        {
           "description": "No dependency cycle over edges of one kind.",
           "properties": {
             "edge": {
@@ -1061,6 +1041,13 @@
           "default": false,
           "type": "boolean"
         },
+        "from": {
+          "description": "The decision whose options this one reads: the options it does not\ndeclare are those of that decision, as the project configured them. A\nproject sets them there, once, and both decisions judge by them.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "properties": {
           "additionalProperties": {
             "$ref": "#/$defs/OptionSchema"
@@ -1070,81 +1057,6 @@
         }
       },
       "type": "object"
-    },
-    "OrderClause": {
-      "additionalProperties": false,
-      "description": "One ordering a container of declarations must follow.",
-      "properties": {
-        "by": {
-          "description": "Qualified `plugin/name` order keys, most significant first.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "evidence": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Evidence fields, each a CEL expression over the same variables.",
-          "type": "object"
-        },
-        "message": {
-          "description": "Text with `{{ cel }}` holes over `symbol` (the declaration reported),\n`rank` and `ranks` (its rank by the first key and by every key),\n`after` (with `displaced`: the declaration it must follow, else an\nempty node), `earlier` (with `late`: the first declaration before it\nthat ranks higher) and `options`.",
-          "type": "string"
-        },
-        "report": {
-          "$ref": "#/$defs/OrderReport",
-          "default": "displaced"
-        },
-        "when": {
-          "description": "CEL over `file` and `options`: the clause runs on the files it is\ntrue for. Default: every file.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "within": {
-          "$ref": "#/$defs/OrderScope",
-          "description": "What is ordered: each module of a file, or each owner's members."
-        }
-      },
-      "required": [
-        "within",
-        "by",
-        "message"
-      ],
-      "type": "object"
-    },
-    "OrderReport": {
-      "description": "How an `order` clause picks the declarations to report.",
-      "oneOf": [
-        {
-          "const": "displaced",
-          "description": "The fewest declarations that, moved, would put the container in order:\nthose outside its longest in-order run.",
-          "type": "string"
-        },
-        {
-          "const": "late",
-          "description": "Every declaration that has an earlier one of a higher rank.",
-          "type": "string"
-        }
-      ]
-    },
-    "OrderScope": {
-      "description": "What an `order` check judges, and what a `reorder` fix permutes.",
-      "oneOf": [
-        {
-          "const": "file",
-          "description": "Every declaration of a file, each container on its own.",
-          "type": "string"
-        },
-        {
-          "const": "owner",
-          "description": "Only the members of one owner.",
-          "type": "string"
-        }
-      ]
     },
     "Output": {
       "description": "What a program prints, which decides what its result is. A program has one\nof two results: findings (`lines`, `sarif`, `status`) or changes (`files`,\n`stdout`).",
@@ -1422,6 +1334,13 @@
         "name": {
           "description": "A lower-case identifier that no expression variable already uses.",
           "type": "string"
+        },
+        "params": {
+          "description": "With parameters, the variable is a function of them: `name(a, b)` is\nthe expression, with its parameters bound to the arguments. It sees the\n`options` and the `file` of the caller, and nothing else.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [

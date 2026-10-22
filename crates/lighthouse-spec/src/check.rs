@@ -2,7 +2,7 @@
 //! provider kind is selected by `type`; each compiles into the single `Rule`
 //! interface. Further kinds join the same union.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use lighthouse_model::{
     RunScope,
@@ -67,11 +67,10 @@ impl<'de> Deserialize<'de> for Check {
                     return Err(D::Error::custom("a builtin `op` is a name"));
                 }
                 None => &["id"],
-                Some("order") => &["op", "clauses"],
                 Some("cycle") => &["op", "edge", "level"],
                 Some(other) => {
                     return Err(D::Error::custom(format!(
-                        "builtin `op` is `{other}`, expected order or cycle"
+                        "builtin `op` is `{other}`, expected cycle"
                     )));
                 }
             },
@@ -119,10 +118,7 @@ impl CheckKind {
     /// builtin, else the `type`.
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Builtin(BuiltinCheck::Op(op)) => match op {
-                BuiltinOp::Order { .. } => "order",
-                BuiltinOp::Cycle { .. } => "cycle",
-            },
+            Self::Builtin(BuiltinCheck::Op(BuiltinOp::Cycle { .. })) => "cycle",
             other => other.name(),
         }
     }
@@ -215,24 +211,10 @@ impl BuiltinCheck {
     }
 }
 
-/// What an `order` check judges, and what a `reorder` fix permutes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum OrderScope {
-    /// Every declaration of a file, each container on its own.
-    File,
-    /// Only the members of one owner.
-    Owner,
-}
-
 /// A standard operation over the code model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "op", rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum BuiltinOp {
-    /// Declarations must follow the order of registered order keys, the same
-    /// keys a `reorder` fix sorts by. Each clause is judged on its own and the
-    /// findings are concatenated.
-    Order { clauses: Vec<OrderClause> },
     /// No dependency cycle over edges of one kind.
     Cycle {
         /// The edge kind followed: `calls`, `references`, `imports`,
@@ -247,10 +229,6 @@ impl BuiltinOp {
     /// standard operation judges the shape of one file or of the whole project.
     fn problem(&self, subject: Subject) -> Option<String> {
         let own = match self {
-            Self::Order { clauses } if clauses.is_empty() => {
-                Some("check: `order` needs at least one clause".to_owned())
-            }
-            Self::Order { clauses } => clauses.iter().find_map(OrderClause::problem),
             Self::Cycle { edge, .. } => edge
                 .parse::<EdgeKind>()
                 .is_err()
@@ -258,78 +236,11 @@ impl BuiltinOp {
         };
         let per_file = subject.run_scope() == RunScope::File;
         own.or_else(|| match self {
-            Self::Order { .. } if !per_file => Some(format!(
-                "an `order` check judges one file at a time, which a `{subject}` decision does not"
-            )),
             Self::Cycle { .. } if per_file => Some(format!(
                 "a `cycle` check judges the whole project, which a `{subject}` decision does not"
             )),
             _ => None,
         })
-    }
-}
-
-/// How an `order` clause picks the declarations to report.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum OrderReport {
-    /// The fewest declarations that, moved, would put the container in order:
-    /// those outside its longest in-order run.
-    #[default]
-    Displaced,
-    /// Every declaration that has an earlier one of a higher rank.
-    Late,
-}
-
-/// One ordering a container of declarations must follow.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct OrderClause {
-    /// What is ordered: each module of a file, or each owner's members.
-    pub within: OrderScope,
-    /// Qualified `plugin/name` order keys, most significant first.
-    pub by: Vec<String>,
-    #[serde(default)]
-    pub report: OrderReport,
-    /// CEL over `file` and `options`: the clause runs on the files it is
-    /// true for. Default: every file.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub when: Option<String>,
-    /// Text with `{{ cel }}` holes over `symbol` (the declaration reported),
-    /// `rank` and `ranks` (its rank by the first key and by every key),
-    /// `after` (with `displaced`: the declaration it must follow, else an
-    /// empty node), `earlier` (with `late`: the first declaration before it
-    /// that ranks higher) and `options`.
-    pub message: String,
-    /// Evidence fields, each a CEL expression over the same variables.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub evidence: BTreeMap<String, String>,
-}
-
-impl OrderClause {
-    fn problem(&self) -> Option<String> {
-        let mut seen = BTreeSet::new();
-        if self.by.is_empty() {
-            return Some("check: an `order` clause needs at least one key in `by`".to_owned());
-        }
-        if let Some(key) = self
-            .by
-            .iter()
-            .find(|key| !key.contains('/') || !seen.insert(*key))
-        {
-            return Some(format!(
-                "check: order key `{key}` must be a qualified `plugin/name` and listed once"
-            ));
-        }
-        self.when
-            .as_deref()
-            .and_then(|source| compile_problem("check when", source))
-            .or_else(|| {
-                self.evidence.iter().find_map(|(name, source)| {
-                    compile_problem(&format!("check evidence `{name}`"), source)
-                })
-            })
-            .or_else(|| template_problem("check message", &self.message))
     }
 }
 
@@ -478,6 +389,41 @@ pub struct Variable {
     pub name: String,
     /// CEL.
     pub expression: String,
+    /// With parameters, the variable is a function of them: `name(a, b)` is
+    /// the expression, with its parameters bound to the arguments. It sees the
+    /// `options` and the `file` of the caller, and nothing else.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<String>,
+}
+
+impl Variable {
+    /// What is wrong with the name or the expression, described.
+    pub(crate) fn problem(&self) -> Option<String> {
+        let name = self.name.as_str();
+        let valid = !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit())
+            && name != "options"
+            && name != "node"
+            && !Select::ALL.iter().any(|s| s.variable() == name);
+        if !valid {
+            return Some(format!("check variables: `{name}` is not a usable name"));
+        }
+        if let Some(param) = self.params.iter().find(|p| {
+            p.is_empty()
+                || !p
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit())
+                || *p == "options"
+                || *p == "file"
+        }) {
+            return Some(format!(
+                "check variable `{name}`: `{param}` is not a usable parameter"
+            ));
+        }
+        compile_problem(&format!("check variable `{name}`"), &self.expression)
+    }
 }
 
 /// Where a finding is reported. Every field is a CEL expression.
@@ -515,22 +461,19 @@ impl CelCheck {
 
     /// The first expression that does not compile, described.
     pub(crate) fn problem(&self) -> Option<String> {
-        for variable in &self.variables {
-            let name = variable.name.as_str();
-            let valid = !name.is_empty()
-                && name
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit())
-                && name != "options"
-                && !Select::ALL.iter().any(|s| s.variable() == name);
-            if !valid {
-                return Some(format!("check variables: `{name}` is not a usable name"));
-            }
-            if let Some(problem) =
-                compile_problem(&format!("check variable `{name}`"), &variable.expression)
-            {
-                return Some(problem);
-            }
+        if let Some(problem) = self.variables.iter().find_map(Variable::problem) {
+            return Some(problem);
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        if let Some(twice) = self
+            .variables
+            .iter()
+            .find(|v| !seen.insert(v.name.as_str()))
+        {
+            return Some(format!(
+                "check variables: `{}` is defined twice",
+                twice.name
+            ));
         }
         if let Some(problem) = compile_problem("check where", &self.condition) {
             return Some(problem);

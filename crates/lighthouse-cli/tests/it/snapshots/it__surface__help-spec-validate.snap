@@ -4,7 +4,7 @@ expression: "printed(dir.path(), &args)"
 ---
 Check every spec document under PATHS against its schema and the rest.
 
-Default PATHS: the project's configuration and `.lighthouse/decisions`. Each document is checked against the schema of its kind, and against the others: presets name decisions that exist, fix operations name registered order keys, `extends` names a decision, CEL compiles, examples are well formed. Exits 1 when anything is wrong.
+Default PATHS: the project's configuration and `.lighthouse/decisions`. Each document is checked against the schema of its kind, and against the others: presets name decisions that exist, `extends` names a decision, CEL compiles, examples are well formed. Exits 1 when anything is wrong.
 
 Usage: lighthouse spec validate [OPTIONS] [PATHS]...
 

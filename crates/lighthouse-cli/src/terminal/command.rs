@@ -183,9 +183,8 @@ pub enum SpecCommand {
     ///
     /// Default PATHS: the project's configuration and `.lighthouse/decisions`.
     /// Each document is checked against the schema of its kind, and against the
-    /// others: presets name decisions that exist, fix operations name
-    /// registered order keys, `extends` names a decision, CEL compiles,
-    /// examples are well formed. Exits 1 when anything is wrong.
+    /// others: presets name decisions that exist, `extends` names a decision,
+    /// CEL compiles, examples are well formed. Exits 1 when anything is wrong.
     Validate {
         paths: Vec<PathBuf>,
         /// Also run the examples of the decisions found, through the whole

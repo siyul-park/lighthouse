@@ -1,5 +1,5 @@
 //! The check a decision's `check` block compiles into: a CEL expression over the code
-//! model, a standard operation (`order`, `cycle`), a program, or
+//! model, a standard operation (`cycle`), a program, or
 //! the name of an annotation rule the engine serves.
 //! The decision supplies id, severity, scope, options and the examples that
 //! `lighthouse decision test` runs.
@@ -20,8 +20,8 @@ use crate::{
     Error,
     cel_rule::CelRule,
     command::CommandRule,
-    manifest::{rule_manifest, rule_options},
-    ops,
+    cycle,
+    manifest::{rule_manifest, rule_options, validate_options},
 };
 
 /// The decisions whose named check the engine serves.
@@ -37,9 +37,8 @@ pub(crate) struct Check {
 
 enum Kind {
     Cel(Box<CelRule>),
-    Order(ops::OrderRule),
-    Cycle(ops::CycleRule),
-    Command(CommandRule),
+    Cycle(cycle::CycleRule),
+    Command(Box<CommandRule>),
     /// The rules about allow annotations: the engine reads the annotations of
     /// the whole project and reports these findings itself, because whether
     /// an annotation is used depends on every other rule's findings. The rule
@@ -58,15 +57,14 @@ impl Check {
         };
         let kind = match &check.kind {
             CheckKind::Cel(cel) => Kind::Cel(Box::new(CelRule::new(decision, cel)?)),
-            CheckKind::Builtin(BuiltinCheck::Op(op)) => match op {
-                BuiltinOp::Order { .. } => Kind::Order(ops::OrderRule::new(id, op)?),
-                BuiltinOp::Cycle { .. } => Kind::Cycle(ops::CycleRule::new(id, op)?),
-            },
-            CheckKind::Command(command) => Kind::Command(CommandRule::new(
+            CheckKind::Builtin(BuiltinCheck::Op(BuiltinOp::Cycle { edge, level })) => {
+                Kind::Cycle(cycle::CycleRule::new(id, edge, *level)?)
+            }
+            CheckKind::Command(command) => Kind::Command(Box::new(CommandRule::new(
                 command,
                 &decision.title,
                 decision.bundled(),
-            )?),
+            )?)),
             CheckKind::Builtin(BuiltinCheck::Named(named))
                 if ANNOTATION_RULES.contains(&named.id.as_str()) =>
             {
@@ -106,7 +104,6 @@ impl Check {
         .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
         let (reach, positions) = match &kind {
             Kind::Cel(rule) => rule.reach(meta.scope),
-            Kind::Order(rule) => rule.reach(),
             Kind::Cycle(_) => (Reach::Global, false),
             Kind::Command(_) | Kind::Annotation => (Reach::Global, false),
         };
@@ -158,7 +155,7 @@ impl Rule for Check {
     /// Accepts the options when they resolve against the decision's declared
     /// options: known keys of the declared types.
     fn validate(&self, options: &Options) -> Result<(), PluginError> {
-        rule_options(&self.decision, options, None).map(drop)
+        validate_options(&self.decision, options)
     }
 
     /// Runs once per file or once over the project, following the decision's scope.
@@ -167,7 +164,6 @@ impl Rule for Check {
         let meta = &self.meta;
         match self.kind.as_ref() {
             Kind::Cel(rule) => rule.check(meta, ctx, &resolved),
-            Kind::Order(rule) => rule.check(meta, ctx, &resolved),
             Kind::Cycle(rule) => rule.check(meta, ctx),
             Kind::Command(rule) => rule.check(meta, ctx, &resolved),
             Kind::Annotation => Ok(Vec::new()),

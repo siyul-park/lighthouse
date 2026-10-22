@@ -17,7 +17,7 @@ use lighthouse_model::{
     Span,
     ucm::{Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
-use lighthouse_plugin::{Context, Error, KeyContext, OrderKey as _, Workspace};
+use lighthouse_plugin::{Context, Error, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -26,7 +26,6 @@ use crate::{
     layout::{self, contains},
     library::Needs,
     naming::{Naming, Tests},
-    order,
     table::Table,
 };
 
@@ -62,8 +61,6 @@ pub(crate) struct Builder<'a> {
     project: &'a Project,
     ws: &'a Workspace,
     needs: &'a Needs,
-    rule: &'a str,
-    options: &'a Map<String, Value>,
     language: String,
     naming: Option<Tests<'a>>,
     measures: Option<BTreeMap<SymbolId, Measures>>,
@@ -81,7 +78,6 @@ impl<'a> Builder<'a> {
         ctx: &'a Context<'a>,
         needs: &'a Needs,
         options: &'a Map<String, Value>,
-        rule: &'a str,
     ) -> Result<Self, Error> {
         let measures = if needs.field("metrics") {
             Some(ctx.fact(MEASURES)?)
@@ -92,8 +88,6 @@ impl<'a> Builder<'a> {
             project: ctx.project,
             ws: ctx.workspace,
             needs,
-            rule,
-            options,
             language: ctx
                 .file
                 .map_or_else(String::new, |(file, _)| file.lang.clone()),
@@ -117,15 +111,12 @@ impl<'a> Builder<'a> {
         ws: &'a Workspace,
         needs: &'a Needs,
         options: &'a Map<String, Value>,
-        rule: &'a str,
         language: &str,
     ) -> Self {
         Self {
             project,
             ws,
             needs,
-            rule,
-            options,
             language: language.to_owned(),
             naming: Naming::from_options(options)
                 .map(|naming| Tests::new(naming, project, Arc::default())),
@@ -202,6 +193,9 @@ impl<'a> Builder<'a> {
     }
 
     /// Like [`Builder::function`], in the form the CEL runtime holds it.
+    /// `None` when the symbol is not a function (a type, a constant, a
+    /// variable): it has no summary, is no subject of a function check, and its
+    /// `func` is `null`. That is "not applicable", never a failure.
     pub(crate) fn function_fact(&self, symbol: &Symbol) -> Option<Fact> {
         let summary = self.project.function(&symbol.id)?;
         let extras = self.extras(symbol, Some(summary));
@@ -328,9 +322,6 @@ impl<'a> Builder<'a> {
         }
         if needs.field("span") {
             map.insert("span".to_owned(), span(&symbol.file, symbol.span));
-        }
-        if needs.field("group") {
-            map.insert("group".to_owned(), json!(self.group(symbol)));
         }
         if needs.field("words") {
             map.insert("words".to_owned(), json!(crate::text::words(&symbol.name)));
@@ -574,28 +565,6 @@ impl<'a> Builder<'a> {
                 })
                 .collect(),
         )
-    }
-
-    /// The index of the declaration group the symbol is in under the default
-    /// order of `design/declaration-groups`, -1 when the order does not place it.
-    fn group(&self, symbol: &Symbol) -> i64 {
-        let language = self
-            .project
-            .file(&symbol.file)
-            .map_or(self.language.as_str(), |f| f.lang.as_str());
-        let ctx = KeyContext {
-            project: self.project,
-            language,
-            rule: self.rule,
-            options: self.options,
-            constructors: self.ws.constructor_prefixes(language),
-        };
-        order::GroupKey
-            .rank(&ctx, symbol)
-            .ok()
-            .flatten()
-            .and_then(|rank| i64::try_from(rank).ok())
-            .unwrap_or(-1)
     }
 
     /// What is measured of a function, the numbers of its signature among them;

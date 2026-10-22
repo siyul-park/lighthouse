@@ -46,6 +46,31 @@ impl SourceFile {
 }
 
 impl SourceFile {
+    /// The first line, with its 1-based byte column, of the plain `//`
+    /// comment lines that lead the item starting on `line` with no blank line
+    /// between; `None` when no such line sits directly above it. Doc comments
+    /// are part of the item's tokens, and `//!` belongs to the module.
+    pub fn leading_comments(&self, line: usize) -> Option<(u32, u32)> {
+        let mut first = None;
+        let mut at = line.checked_sub(1)?;
+        while at > 0 {
+            let start = *self.line_starts.get(at - 1)?;
+            let text = self.text.get(start..)?.split('\n').next()?;
+            let trimmed = text.trim_start();
+            let plain = (trimmed.starts_with("//")
+                && !trimmed.starts_with("//!")
+                && !trimmed.starts_with("///"))
+                || trimmed.starts_with("////");
+            if !plain {
+                break;
+            }
+            let col = text.len() - trimmed.len() + 1;
+            first = Some((u32::try_from(at).ok()?, u32::try_from(col).ok()?));
+            at -= 1;
+        }
+        first
+    }
+
     /// Byte offset of a proc-macro2 position (1-based line, 0-based
     /// character column).
     pub fn offset(&self, line: usize, col: usize) -> Option<usize> {

@@ -33,7 +33,8 @@ pub fn span_of(file: &SourceFile, item: &impl ToTokens) -> Span {
 }
 
 /// Span of the whole item: from its first token, outer attributes and doc
-/// comments included, to its last.
+/// comments included, to its last, with the plain `//` comment lines that lead
+/// it with no blank line between, so a comment moves with its item.
 pub fn extent_of(file: &SourceFile, item: &impl ToTokens) -> Span {
     let trees: Vec<TokenTree> = item.to_token_stream().into_iter().collect();
     let (Some(first), Some(last)) = (trees.first(), trees.last()) else {
@@ -42,7 +43,11 @@ pub fn extent_of(file: &SourceFile, item: &impl ToTokens) -> Span {
             end: Position { line: 1, col: 1 },
         };
     };
-    range(file, first.span().start(), last.span().end())
+    let mut extent = range(file, first.span().start(), last.span().end());
+    if let Some((line, col)) = file.leading_comments(first.span().start().line) {
+        extent.start = Position { line, col };
+    }
+    extent
 }
 
 /// Span of an identifier, which is where a reference to it sits.

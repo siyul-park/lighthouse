@@ -1,0 +1,102 @@
+//! The variables of a check that have parameters: functions of CEL written in
+//! the decision or its pack, such as `group(n)`.
+
+use std::sync::Arc;
+
+use cel::{Context, ExecutionError, FunctionContext, Program, Value, extractors::Arguments};
+use lighthouse_spec::Variable;
+
+use crate::{Error, eval::compile_shared};
+
+/// What [`declare`] made of the variables of a check.
+pub(crate) struct Declared<'a> {
+    /// The variables that are values.
+    pub(crate) values: Vec<&'a Variable>,
+    /// The variables that are functions, and their compiled bodies.
+    pub(crate) functions: Vec<&'a Variable>,
+    pub(crate) bodies: Vec<Arc<Program>>,
+}
+
+/// Declares the variables that have parameters as functions of `context`, and
+/// gives the others, with the compiled bodies of the functions. A function sees the `options` and the `file` of its
+/// caller, besides its arguments.
+pub(crate) fn declare<'a>(
+    id: &str,
+    context: &mut Context<'static, 'static>,
+    variables: &'a [Variable],
+) -> Result<Declared<'a>, Error> {
+    let mut values = Vec::new();
+    let mut functions = Vec::new();
+    let mut bodies = Vec::new();
+    for variable in variables {
+        if variable.params.is_empty() {
+            values.push(variable);
+            continue;
+        }
+        let body = compile_shared(
+            id,
+            &format!("variable `{}`", variable.name),
+            &variable.expression,
+        )?;
+        context
+            .add_function(&variable.name, call(variable.params.clone(), body.clone()))
+            .map_err(|e| Error::invalid(id, format!("variable `{}`: {e}", variable.name)))?;
+        functions.push(variable);
+        bodies.push(body);
+    }
+    Ok(Declared {
+        values,
+        functions,
+        bodies,
+    })
+}
+
+/// Refuses a function variable whose body reads anything but its parameters,
+/// `options`, `file`, or a variable of `shared` (the file-level ones): a
+/// function does not see the variable of whoever calls it.
+pub(crate) fn check_scope(
+    id: &str,
+    functions: &[&Variable],
+    bodies: &[Arc<Program>],
+    shared: &dyn Fn(&str) -> bool,
+) -> Result<(), Error> {
+    for (variable, body) in functions.iter().zip(bodies) {
+        if let Some(name) = lighthouse_spec::free_variables(body)
+            .into_iter()
+            .find(|name| {
+                !variable.params.contains(name)
+                    && name != "options"
+                    && name != "file"
+                    && !shared(name)
+            })
+        {
+            return Err(Error::invalid(
+                id,
+                format!(
+                    "variable `{}`: `{name}` is not a parameter, `options`, `file` or a file-level variable; a function sees only those",
+                    variable.name
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn call(
+    params: Vec<String>,
+    body: Arc<Program>,
+) -> impl Fn(&FunctionContext, Arguments) -> Result<Value, ExecutionError> + Send + Sync + 'static {
+    move |ftx: &FunctionContext, Arguments(args): Arguments| {
+        if args.len() != params.len() {
+            return Err(ExecutionError::invalid_argument_count(
+                params.len(),
+                args.len(),
+            ));
+        }
+        let mut scope = ftx.ptx.new_inner_scope();
+        for (param, arg) in params.iter().zip(args.iter()) {
+            scope.add_variable_from_value(param.clone(), arg.clone());
+        }
+        body.execute(&scope)
+    }
+}

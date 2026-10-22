@@ -114,6 +114,15 @@ pub struct OptionsSchema {
     pub properties: BTreeMap<String, OptionSchema>,
     #[serde(default)]
     pub additional_properties: bool,
+    /// The decision whose options this one reads: the options it does not
+    /// declare are those of that decision, as the project configured them. A
+    /// project sets them there, once, and both decisions judge by them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// The options read from `from`, once the decision is built over it.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub inherited: Vec<String>,
 }
 
 impl OptionsSchema {
@@ -121,8 +130,9 @@ impl OptionsSchema {
     pub fn new(properties: BTreeMap<String, OptionSchema>) -> Self {
         Self {
             properties,
-
             additional_properties: false,
+            from: None,
+            inherited: Vec::new(),
         }
     }
 }

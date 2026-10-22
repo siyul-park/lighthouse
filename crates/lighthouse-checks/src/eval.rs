@@ -1,7 +1,7 @@
 //! Evaluating the CEL of a check: compiled programs, message templates, and
 //! the frame in which one selected value is judged.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use cel::{
     Context, Program,
@@ -9,6 +9,7 @@ use cel::{
         types::{CelMap, CelMapKey, CelNull, CelString},
         value::Val,
     },
+    context::VariableResolver,
 };
 use lighthouse_plugin::Error as PluginError;
 use serde_json::{Map, Value};
@@ -45,6 +46,14 @@ impl Template {
         Ok(Self(pieces))
     }
 
+    /// The programs of the holes.
+    pub(crate) fn programs(&self) -> impl Iterator<Item = &Program> {
+        self.0.iter().filter_map(|piece| match piece {
+            Piece::Hole(program) => Some(program),
+            Piece::Text(_) => None,
+        })
+    }
+
     /// The text with each hole replaced by what `run` makes of its program.
     pub(crate) fn render(
         &self,
@@ -64,7 +73,7 @@ impl Template {
 /// The variables of one judgment, over a context that has the library.
 pub(crate) struct Frame<'a> {
     rule: &'a str,
-    context: Context<'a, 'static>,
+    context: Context<'a, 'a>,
 }
 
 impl<'a> Frame<'a> {
@@ -75,20 +84,13 @@ impl<'a> Frame<'a> {
         }
     }
 
-    pub(crate) fn set(&mut self, name: &str, value: &Value) {
-        self.set_fact(name, cel_fact(value));
+    /// Lets the frame read `shared` as variables, without a copy.
+    pub(crate) fn share(&mut self, shared: &'a dyn VariableResolver) {
+        self.context.set_variable_resolver(shared);
     }
 
     pub(crate) fn set_fact(&mut self, name: &str, value: Fact) {
         self.context.add_variable_as_val(name, value);
-    }
-
-    pub(crate) fn set_cel(&mut self, name: &str, value: cel::Value) {
-        self.context.add_variable_from_value(name, value);
-    }
-
-    pub(crate) fn options(&mut self, options: &Map<String, Value>) {
-        self.set("options", &Value::Object(options.clone()));
     }
 
     pub(crate) fn run(&self, program: &Program) -> Result<cel::Value, PluginError> {
@@ -144,6 +146,13 @@ pub(crate) type Fact = Box<dyn Val>;
 /// Compiles `source`, naming `rule` and `what` in the error.
 pub(crate) fn compile(rule: &str, what: &str, source: &str) -> Result<Program, Error> {
     lighthouse_spec::compile(source).map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
+}
+
+/// Like [`compile`], the program shared with whoever compiled the same source:
+/// for the variables of a pack, which many decisions name.
+pub(crate) fn compile_shared(rule: &str, what: &str, source: &str) -> Result<Arc<Program>, Error> {
+    lighthouse_spec::compile_shared(source)
+        .map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
 }
 
 /// Compiled `name: expression` pairs.

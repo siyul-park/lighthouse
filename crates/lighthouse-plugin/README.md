@@ -6,7 +6,7 @@ The in-process plugin SPI: the traits and the registry through which rules, anal
 
 ## Entry points
 - `Plugin`, `Rule`, `Analyzer`, `LanguageProvider`: the traits a plugin implements (bundled code in checks, processes through rpc).
-- `Fixer`, `OrderKey`: fix proposals and the keys a reorder sorts by.
+- `Fixer`: fix proposals.
 - `Registry`, `plugin_of`: registration, lookup and analyzer resolution.
 - `Memo`: values the rules of one run share.
 - `Notices`: what a rule tells the user besides its findings.

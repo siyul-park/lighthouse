@@ -19,7 +19,7 @@ pub struct Span {
 #[derive(Debug, Clone)]
 pub struct LineIndex<'a> {
     text: &'a str,
-    starts: Vec<usize>,
+    starts: std::borrow::Cow<'a, [usize]>,
 }
 
 /// The unit in which a SARIF run counts columns (`columnKind`).
@@ -38,9 +38,26 @@ pub enum ColumnUnit {
 impl<'a> LineIndex<'a> {
     /// Indexes the lines of `text`.
     pub fn new(text: &'a str) -> Self {
+        Self {
+            text,
+            starts: std::borrow::Cow::Owned(Self::starts_of(text)),
+        }
+    }
+
+    /// The offsets where the lines of `text` start, to index the text again
+    /// with [`LineIndex::over`] without finding them each time.
+    pub fn starts_of(text: &str) -> Vec<usize> {
         let mut starts = vec![0];
         starts.extend(text.match_indices('\n').map(|(at, _)| at + 1));
-        Self { text, starts }
+        starts
+    }
+
+    /// An index of `text` over the `starts` of its lines.
+    pub fn over(text: &'a str, starts: &'a [usize]) -> Self {
+        Self {
+            text,
+            starts: std::borrow::Cow::Borrowed(starts),
+        }
     }
 
     /// The byte offset of a position; `None` when it lies outside the text.

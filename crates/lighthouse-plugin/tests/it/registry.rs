@@ -1,8 +1,7 @@
-use lighthouse_model::{RunScope, ucm::Symbol};
+use lighthouse_model::RunScope;
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Context, Error, Indexed, KeyContext, LanguageProvider, OrderKey,
-    OrderKeyManifest, Plugin, PluginManifest, ProviderManifest, Registry, Source, Workspace,
-    options,
+    Analyzer, AnalyzerManifest, Context, Error, Indexed, LanguageProvider, Plugin, PluginManifest,
+    ProviderManifest, Registry, Source, Workspace, options,
 };
 use serde_json::Value;
 
@@ -261,53 +260,4 @@ fn rule_manifest_fingerprints_are_seeded_by_the_uid_so_a_rename_moves_none() {
         current,
         "a rename moves no fingerprint"
     );
-}
-
-struct Ranked(OrderKeyManifest);
-
-impl OrderKey for Ranked {
-    fn manifest(&self) -> &OrderKeyManifest {
-        &self.0
-    }
-    fn rank(&self, _: &KeyContext, _: &Symbol) -> Result<Option<u64>, Error> {
-        Ok(None)
-    }
-}
-
-struct Keyed(PluginManifest, &'static [&'static str]);
-
-impl Plugin for Keyed {
-    fn manifest(&self) -> &PluginManifest {
-        &self.0
-    }
-    fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
-        self.1
-            .iter()
-            .map(|id| {
-                Box::new(Ranked(OrderKeyManifest {
-                    id: (*id).to_owned(),
-                    description: String::new(),
-                })) as Box<dyn OrderKey>
-            })
-            .collect()
-    }
-}
-
-#[test]
-fn order_keys_are_listed_by_id() {
-    let mut registry = Registry::default();
-    let manifest = PluginManifest {
-        id: "t".to_owned(),
-        version: "0".to_owned(),
-    };
-    registry
-        .register(&Keyed(manifest, &["t/b", "t/a"]))
-        .unwrap();
-
-    let ids: Vec<String> = registry
-        .order_keys()
-        .map(|k| k.manifest().id.clone())
-        .collect();
-
-    assert_eq!(ids, ["t/a", "t/b"]);
 }

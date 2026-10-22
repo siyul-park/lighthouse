@@ -4,6 +4,7 @@
 
 use cel::{ExecutionError, common::value::CowVal};
 
+pub(crate) mod bindings;
 pub(crate) mod lists;
 pub(crate) mod regex;
 

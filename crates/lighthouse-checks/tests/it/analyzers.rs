@@ -86,7 +86,6 @@ fn run(project: &Project, path: &str) -> BTreeMap<SymbolId, Measures> {
         project,
         file: Some((&file, "")),
         facts: &facts,
-        keys: &lighthouse_plugin::NoKeys,
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),

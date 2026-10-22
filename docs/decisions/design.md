@@ -490,7 +490,7 @@ Declaration order should let a reader follow ownership and behavior from public 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`design/layout`](#declarations-are-laid-out-for-reading) | Declarations are laid out for reading | warn · cel | unsafe |  |
-| [`design/declaration-groups`](#declarations-follow-ownership-groups) | Declarations follow ownership groups | error · order | safe |  |
+| [`design/declaration-groups`](#declarations-follow-ownership-groups) | Declarations follow ownership groups | error · cel | safe |  |
 
 ### Declarations are laid out for reading
 
@@ -525,7 +525,7 @@ Also: rust
 
 ### Declarations follow ownership groups
 
-`design/declaration-groups` · file · error · order · fix: safe
+`design/declaration-groups` · file · error · cel · fix: safe
 
 *A fixed group order makes every file predictable. Go: Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods. Rust: The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together); public free functions; private free functions. Associated functions named `new` come before the other methods of their type. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.*
 

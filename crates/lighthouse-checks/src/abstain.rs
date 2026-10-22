@@ -69,11 +69,15 @@ impl Abstain {
         }))
     }
 
+    /// The expression that says whether a subject is asked about.
+    pub(crate) fn program(&self) -> &Program {
+        &self.program
+    }
+
     /// Whether the subject in `frame` is to be asked about.
     pub(crate) fn asks(&self, frame: &Frame) -> Result<bool, lighthouse_plugin::Error> {
         match frame.run(&self.program)? {
             cel::Value::Bool(asks) => Ok(asks),
-            cel::Value::Null => Ok(false),
             other => Err(frame.fail(format!("`abstain` is {}, not a bool", render(&other)))),
         }
     }

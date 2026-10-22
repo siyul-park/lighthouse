@@ -45,7 +45,9 @@ pub use availability::{Availability, Needs};
 use cached::RunCache;
 pub use client::CommandModels;
 pub use config::active;
-use config::{constructors, io_error, load_languages, validate_config};
+use config::{
+    Inherited, constructors, inheritance, io_error, load_languages, options_at, validate_config,
+};
 use models::RunModels;
 pub(crate) use route::{Member, Refusal, Route, Usage};
 pub(crate) use scopes::Scopes;
@@ -270,6 +272,8 @@ pub struct Engine {
     /// What assembling the engine found worth telling; every run reports it.
     notices: Vec<String>,
     pub(crate) ws: Workspace,
+    /// What the decisions that read the options of another read.
+    inherited: BTreeMap<String, Inherited>,
     /// Providers from listed plugins; indexes into `languages`.
     providers: Vec<usize>,
     languages: Vec<Language>,
@@ -355,6 +359,7 @@ impl Engine {
             attributes,
             notices,
             ws,
+            inherited: inheritance(catalog),
             providers,
             languages,
             active: enabled,

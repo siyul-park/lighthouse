@@ -452,3 +452,38 @@ fn an_option_schema_refuses_keys_it_does_not_know() {
     let parsed: Result<lighthouse_spec::OptionSchema, _> = serde_norway::from_str(text);
     assert!(parsed.is_err(), "a misspelled keyword is refused");
 }
+
+#[test]
+fn decision_options_from() {
+    assert_eq!(
+        bundled("design/layout").options_from(),
+        Some("design/declaration-groups")
+    );
+    assert_eq!(bundled("design/declaration-groups").options_from(), None);
+}
+
+#[test]
+fn decision_inheriting() {
+    let layout = bundled("design/layout");
+    let source = bundled("design/declaration-groups");
+
+    let over = layout.inheriting(source);
+
+    let none = Map::new();
+    let own = layout.resolve_options(&none, None).unwrap();
+    assert!(
+        !own.contains_key("groups"),
+        "a reader without its source has none"
+    );
+    let resolved = over.resolve_options(&none, Some("rust")).unwrap();
+    assert_eq!(
+        resolved["groups"][0], "const",
+        "the values of the language of the source"
+    );
+    assert_eq!(resolved["hooks"], json!([]));
+    assert!(resolved.contains_key("kinds"), "its own stay");
+    assert_eq!(
+        over.options.as_ref().unwrap().inherited,
+        ["groups", "hooks"]
+    );
+}

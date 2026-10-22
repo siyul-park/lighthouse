@@ -11,7 +11,7 @@ use crate::{builder::Builder, facts, library::Needs};
 pub fn symbol_fact(ctx: &Context, symbol: &Symbol, fact: &'static str) -> Result<Value, Error> {
     let needs = Needs::of([format!("x.{fact}").as_str()], []);
     let options = Map::new();
-    let builder = Builder::new(ctx, &needs, &options, "probe")?;
+    let builder = Builder::new(ctx, &needs, &options)?;
     Ok(builder.symbol(symbol)[fact].clone())
 }
 
@@ -24,7 +24,7 @@ pub fn file_fact(
 ) -> Result<Value, Error> {
     let needs = Needs::of([format!("x.{fact}").as_str()], []);
     let options = Map::new();
-    let builder = Builder::new(ctx, &needs, &options, "probe")?;
+    let builder = Builder::new(ctx, &needs, &options)?;
     Ok(builder.file(file, text)[fact].clone())
 }
 

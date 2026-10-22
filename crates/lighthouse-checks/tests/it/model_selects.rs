@@ -32,6 +32,15 @@ fn reviewed(mut spec: Value) -> String {
     spec["check"]["message"] = json!(format!("{{{{ {name} }}}}"));
     spec["examples"] = serde_json::from_str(EXAMPLES_JSON).unwrap();
     spec.as_object_mut().unwrap().remove("fix");
+    // The review route reads none of the options the decision reads from
+    // another, which a local layer alone does not have: it declares them empty.
+    if let Some(options) = spec["options"].as_object_mut() {
+        options.remove("from");
+        for name in ["groups", "hooks"] {
+            options["properties"][name] =
+                json!({ "type": "array", "default": [], "description": "none" });
+        }
+    }
     format!("{}{}", LOCAL_HEAD, serde_json::to_string(&spec).unwrap())
 }
 

@@ -25,19 +25,12 @@ const HEAD: &str = include_str!("skill-head.md");
 pub const AGENT_LOOP: &str = include_str!("agent-loop.md");
 
 /// Every generated page by path under the docs directory: one per pack, and
-/// the fix operations with the order keys the bundled plugins register.
+/// the fix operations.
 pub fn bundled_docs() -> BTreeMap<String, String> {
     let mut pages = pages(Catalog::bundled());
-    let keys: Vec<(String, String)> = lighthouse_checks::registry()
-        .order_keys()
-        .map(|k| {
-            let manifest = k.manifest();
-            (manifest.id.clone(), manifest.description.clone())
-        })
-        .collect();
     pages.insert(
         format!("{DOCS_DIR}/fix-operations.md"),
-        fix_operations_markdown(&keys),
+        fix_operations_markdown(),
     );
     pages
 }

@@ -11,8 +11,6 @@ use crate::{Checks, metrics::Metrics};
 /// Pack whose plugin provides the fallback text language and that the
 /// `metrics` plugin is listed after.
 pub(crate) const CORE: &str = "core";
-/// Pack whose plugin provides the order keys.
-pub(crate) const DESIGN: &str = "design";
 
 /// Registry holding every bundled plugin.
 pub fn registry() -> Registry {

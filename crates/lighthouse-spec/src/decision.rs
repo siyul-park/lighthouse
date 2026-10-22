@@ -208,6 +208,42 @@ impl Decision {
         hash::short(&text, 8)
     }
 
+    /// The id of the decision whose options this one reads (`options.from`).
+    pub fn options_from(&self) -> Option<&str> {
+        self.options.as_ref()?.from.as_deref()
+    }
+
+    /// The same decision over the options of `source`: the options `source`
+    /// declares and this does not, with their defaults and the values the
+    /// languages of `source` set, are this decision's too, and listed in
+    /// `options.inherited`.
+    #[must_use]
+    pub fn inheriting(&self, source: &Decision) -> Self {
+        let mut spec = self.spec().clone();
+        let schema = spec.options.get_or_insert_with(OptionsSchema::default);
+        let own: Vec<String> = schema.properties.keys().cloned().collect();
+        if let Some(from) = &source.options {
+            for (key, property) in &from.properties {
+                if !own.contains(key) {
+                    schema.properties.insert(key.clone(), property.clone());
+                    schema.inherited.push(key.clone());
+                }
+            }
+        }
+        for (language, source_language) in &source.languages {
+            for (key, value) in &source_language.options {
+                if schema.inherited.contains(key) {
+                    spec.languages
+                        .entry(language.clone())
+                        .or_default()
+                        .options
+                        .insert(key.clone(), value.clone());
+                }
+            }
+        }
+        Self::new(self.metadata().clone(), spec)
+    }
+
     /// Defaults filled in and configured keys checked against the declared
     /// options; `language` selects its option values over the defaults.
     pub fn resolve_options(

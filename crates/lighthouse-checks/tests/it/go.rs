@@ -65,7 +65,6 @@ fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
         project: &project,
         file: Some((&file, source)),
         facts: &facts,
-        keys: &lighthouse_plugin::NoKeys,
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),

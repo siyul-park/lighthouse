@@ -1,9 +1,13 @@
 //! A `cel` check: a `where` expression that is true for a violation of the
 //! selected values, a message and evidence.
 
-use std::{cell::RefCell, collections::BTreeMap};
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    sync::{Arc, OnceLock},
+};
 
-use cel::Program;
+use cel::{Program, common::value::CowVal, context::VariableResolver};
 use lighthouse_model::{
     Diagnostic, Position, Reach, Span,
     ucm::{Edge, File, Node, Project, Symbol, SymbolId},
@@ -17,7 +21,7 @@ use crate::{
     abstain::{Abstain, Candidate},
     builder::Builder,
     caching,
-    eval::{Fact, Frame, Template, cel_fact, compile, compile_all},
+    eval::{Fact, Frame, Template, cel_fact, compile, compile_all, compile_shared},
     facts,
     library::{self, Needs},
     metrics::MEASURES,
@@ -27,7 +31,7 @@ use crate::{
 /// A CEL check with every expression compiled.
 pub(crate) struct CelRule {
     select: Select,
-    variables: Vec<(String, Program)>,
+    variables: Vec<(String, Arc<Program>)>,
     condition: Program,
     message: Template,
     evidence: Vec<(String, Program)>,
@@ -35,6 +39,9 @@ pub(crate) struct CelRule {
     identity: Option<Identity>,
     abstain: Option<Abstain>,
     needs: Needs,
+    /// Per variable: whether it reads nothing of the selected value (only the
+    /// file, the options and variables like it), so a file has one value of it.
+    file_level: Vec<bool>,
     library: cel::Context<'static, 'static>,
 }
 
@@ -62,64 +69,88 @@ impl CelRule {
     /// against what the check selects when the catalog was validated.
     pub(crate) fn new(decision: &Decision, check: &CelCheck) -> Result<Self, Error> {
         let id = decision.id();
-        let mut sources: Vec<&str> = vec![&check.condition];
-        sources.extend(check.variables.iter().map(|v| v.expression.as_str()));
-        sources.extend(check.evidence.values().map(String::as_str));
-        if let Some(at) = &check.at {
-            for source in [&at.symbol, &at.line, &at.end_line] {
-                sources.extend(source.as_deref());
-            }
-        }
-        if let Some(identity) = &check.identity {
-            sources.push(&identity.subject);
-            sources.extend(identity.snippet.as_deref());
-        }
-        sources.extend(check.abstain.as_deref());
         let select = check
             .selects(decision.scope.subject)
             .ok_or_else(|| Error::invalid(id, "a project decision needs a `select`"))?;
         let maybe = |what: &str, source: &Option<String>| {
             source.as_deref().map(|s| compile(id, what, s)).transpose()
         };
+        let mut library = library::context().map_err(|e| Error::invalid(id, e))?;
+        let declared = library::declare_variables(id, &mut library, &check.variables)?;
+        let (values, bodies) = (declared.values, declared.bodies);
+        let variables: Vec<(String, Arc<Program>)> = values
+            .into_iter()
+            .map(|v| {
+                Ok((
+                    v.name.clone(),
+                    compile_shared(id, &format!("variable `{}`", v.name), &v.expression)?,
+                ))
+            })
+            .collect::<Result<_, Error>>()?;
+        let level = file_level(&variables);
+        let shared = |name: &str| {
+            variables
+                .iter()
+                .zip(&level)
+                .any(|((variable, _), file_level)| *file_level && variable == name)
+        };
+        library::check_scope(id, &declared.functions, &bodies, &shared)?;
+        let condition = compile(id, "where", &check.condition)?;
+        let message = Template::compile(id, "message", &check.message)?;
+        let evidence = compile_all(id, "evidence", &check.evidence)?;
+        let at = check
+            .at
+            .as_ref()
+            .map(|at| {
+                Ok::<_, Error>(At {
+                    symbol: maybe("at.symbol", &at.symbol)?,
+                    line: maybe("at.line", &at.line)?,
+                    end_line: maybe("at.endLine", &at.end_line)?,
+                })
+            })
+            .transpose()?;
+        let identity = check
+            .identity
+            .as_ref()
+            .map(|i| {
+                Ok::<_, Error>(Identity {
+                    subject: compile(id, "identity.subject", &i.subject)?,
+                    snippet: maybe("identity.snippet", &i.snippet)?,
+                })
+            })
+            .transpose()?;
+        let abstain = Abstain::new(decision, check, select)?;
+        let read = variables
+            .iter()
+            .map(|(_, program)| program.as_ref())
+            .chain(bodies.iter().map(Arc::as_ref))
+            .chain([&condition])
+            .chain(message.programs())
+            .chain(evidence.iter().map(|(_, program)| program))
+            .chain(
+                at.iter()
+                    .flat_map(|at| [&at.symbol, &at.line, &at.end_line].into_iter().flatten()),
+            )
+            .chain(
+                identity
+                    .iter()
+                    .flat_map(|i| [Some(&i.subject), i.snippet.as_ref()].into_iter().flatten()),
+            )
+            .chain(abstain.iter().map(Abstain::program))
+            .collect::<Vec<&Program>>();
+        library::check_calls(id, &library, &declared.functions, read.iter().copied())?;
         Ok(Self {
             select,
-            abstain: Abstain::new(decision, check, select)?,
-            variables: check
-                .variables
-                .iter()
-                .map(|v| {
-                    Ok((
-                        v.name.clone(),
-                        compile(id, &format!("variable `{}`", v.name), &v.expression)?,
-                    ))
-                })
-                .collect::<Result<_, Error>>()?,
-            condition: compile(id, "where", &check.condition)?,
-            message: Template::compile(id, "message", &check.message)?,
-            evidence: compile_all(id, "evidence", &check.evidence)?,
-            at: check
-                .at
-                .as_ref()
-                .map(|at| {
-                    Ok::<_, Error>(At {
-                        symbol: maybe("at.symbol", &at.symbol)?,
-                        line: maybe("at.line", &at.line)?,
-                        end_line: maybe("at.endLine", &at.end_line)?,
-                    })
-                })
-                .transpose()?,
-            identity: check
-                .identity
-                .as_ref()
-                .map(|i| {
-                    Ok::<_, Error>(Identity {
-                        subject: compile(id, "identity.subject", &i.subject)?,
-                        snippet: maybe("identity.snippet", &i.snippet)?,
-                    })
-                })
-                .transpose()?,
-            needs: Needs::of(sources, [check.message.as_str()]),
-            library: library::context().map_err(|e| Error::invalid(id, e))?,
+            file_level: level,
+            needs: Needs::reading(read.iter().copied()),
+            abstain,
+            variables,
+            condition,
+            message,
+            evidence,
+            at,
+            identity,
+            library,
         })
     }
 
@@ -154,15 +185,15 @@ impl CelRule {
         ctx: &Context,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
-        let builder = Builder::new(ctx, &self.needs, options, &meta.id)?;
+        let builder = Builder::new(ctx, &self.needs, options)?;
         let reviewing = self.reviews() && ctx.models.asks(&meta.id);
         let run = Evaluation {
             rule: self,
             reviewing,
             meta,
             builder,
-            options: cel_fact(&Value::Object(options.clone())),
             candidates: RefCell::default(),
+            shared: Shared::new(self, cel_fact(&Value::Object(options.clone()))),
         };
         let mut found = match meta.scope {
             lighthouse_model::RunScope::File => run.check_file(ctx),
@@ -181,9 +212,55 @@ struct Evaluation<'a> {
     reviewing: bool,
     meta: &'a RuleManifest,
     builder: Builder<'a>,
-    options: Fact,
     /// The subjects `abstain` picked, to be put to the models.
     candidates: RefCell<Vec<Candidate>>,
+    /// What the judgments of the file read in place.
+    shared: Shared,
+}
+
+/// The values of one file that all its judgments read without holding a copy
+/// each: the file as a value, for expressions that name `file` while judging
+/// something in it, and the file-level variables, found when first asked. A
+/// frame sees them through its variable resolver.
+struct Shared {
+    options: Fact,
+    file: OnceLock<Fact>,
+    /// The name of each variable that is file-level.
+    names: Vec<Option<String>>,
+    values: Vec<OnceLock<Fact>>,
+}
+
+impl Shared {
+    fn new(rule: &CelRule, options: Fact) -> Self {
+        Self {
+            options,
+            file: OnceLock::new(),
+            names: rule
+                .variables
+                .iter()
+                .zip(&rule.file_level)
+                .map(|((name, _), level)| level.then(|| name.clone()))
+                .collect(),
+            values: rule.variables.iter().map(|_| OnceLock::new()).collect(),
+        }
+    }
+}
+
+impl VariableResolver for Shared {
+    fn resolve<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+        let found = if variable == "options" {
+            Some(&self.options)
+        } else if variable == "file" {
+            self.file.get()
+        } else {
+            let at = self
+                .names
+                .iter()
+                .position(|name| name.as_deref() == Some(variable))?;
+            self.values[at].get()
+        };
+        found.map(|fact| CowVal::Borrowed(fact.as_ref()))
+    }
 }
 
 impl Evaluation<'_> {
@@ -191,6 +268,12 @@ impl Evaluation<'_> {
         let Some((file, text)) = ctx.file else {
             return Ok(Vec::new());
         };
+        if self.rule.select != Select::File && self.rule.needs.ident("file") {
+            let _ = self
+                .shared
+                .file
+                .set(cel_fact(&self.builder.file(file, text)));
+        }
         match self.rule.select {
             Select::File if ctx.applies.admits_file(file) => {
                 let value = cel_fact(&self.builder.file(file, text));
@@ -356,10 +439,9 @@ impl Evaluation<'_> {
         let rule = self.rule;
         let mut frame = Frame::new(&self.meta.id, &rule.library);
         frame.set_fact(rule.select.variable(), value);
-        frame.set_fact("options", self.options.clone_as_boxed());
-        for (name, program) in &rule.variables {
-            let bound = frame.run(program)?;
-            frame.set_cel(name, bound);
+        frame.share(&self.shared);
+        for (at, (name, program)) in rule.variables.iter().enumerate() {
+            self.variable(&mut frame, at, name, program)?;
         }
         let found = frame.truth(&rule.condition)?;
         let abstain = rule.abstain.as_ref().filter(|_| self.reviewing);
@@ -418,6 +500,28 @@ impl Evaluation<'_> {
         Ok(Some(diagnostic))
     }
 
+    /// Gives variable number `at` its value in the frame: the file's one
+    /// value, found once, when it reads nothing of the subject.
+    fn variable(
+        &self,
+        frame: &mut Frame,
+        at: usize,
+        name: &str,
+        program: &Program,
+    ) -> Result<(), PluginError> {
+        let value = |frame: &Frame| {
+            Fact::try_from(frame.run(program)?).map_err(|_| frame.fail("the value cannot be held"))
+        };
+        if self.shared.names[at].is_none() || self.meta.scope != lighthouse_model::RunScope::File {
+            frame.set_fact(name, value(frame)?);
+        } else if self.shared.values[at].get().is_none() {
+            // Not held by the frame: the next variable reads it through the
+            // resolver, once it is set.
+            let _ = self.shared.values[at].set(value(frame)?);
+        }
+        Ok(())
+    }
+
     fn place(&self, frame: &Frame, default: Anchor) -> Result<Anchor, PluginError> {
         let Some(at) = &self.rule.at else {
             return Ok(default);
@@ -463,6 +567,26 @@ impl Evaluation<'_> {
         };
         Ok(Anchor { span, ..default })
     }
+}
+
+/// Per variable, whether it is file-level: it names no selected value and no
+/// variable that does.
+pub(crate) fn file_level(variables: &[(String, Arc<Program>)]) -> Vec<bool> {
+    let mut per_subject: Vec<&str> = lighthouse_spec::SUBJECT_VARIABLES
+        .into_iter()
+        .filter(|name| *name != "file")
+        .collect();
+    variables
+        .iter()
+        .map(|(name, program)| {
+            let names = lighthouse_spec::program_identifiers(program);
+            let level = !per_subject.iter().any(|s| names.contains(*s));
+            if !level {
+                per_subject.push(name);
+            }
+            level
+        })
+        .collect()
 }
 
 /// Where the findings about the edge at position `at` are reported, when it

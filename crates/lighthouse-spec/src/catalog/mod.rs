@@ -19,6 +19,7 @@ use merge::{assemble, check_local, merge_sections, resolve_examples};
 
 pub(crate) mod load;
 mod merge;
+mod variables;
 
 const SOURCES_FILE: &str = "sources.yaml";
 /// The pack and section the decisions of a project's own layer belong to.
@@ -109,6 +110,7 @@ impl Catalog {
                 id: LOCAL_PACK.to_owned(),
                 title: "Local decisions".to_owned(),
                 intro: "Decisions of this project, from `.lighthouse/decisions`.".to_owned(),
+                variables: Vec::new(),
                 sections: vec![Section {
                     id: LOCAL_SECTION.to_owned(),
                     title: "Decisions".to_owned(),

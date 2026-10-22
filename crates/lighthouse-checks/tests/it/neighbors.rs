@@ -9,7 +9,7 @@ use lighthouse_engine::cache::Digests;
 use lighthouse_model::ucm::{
     Applicability, EdgeKind, File, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
 };
-use lighthouse_plugin::{Context, Memo, NoKeys, Notices, Workspace};
+use lighthouse_plugin::{Context, Memo, Notices, Workspace};
 use serde_json::Value;
 
 use crate::support::World;
@@ -45,7 +45,6 @@ fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Context)
         project,
         file: file.map(|f| (f, "")),
         facts: &facts,
-        keys: &NoKeys,
         trusted: false,
         memo: &memo,
         notices: &notices,

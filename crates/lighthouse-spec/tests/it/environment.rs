@@ -87,3 +87,15 @@ fn the_children_of_an_expression_are_its_operands() {
         "an identifier has none"
     );
 }
+
+#[test]
+fn compile_shared() {
+    let first = lighthouse_spec::compile_shared("1 + 1").unwrap();
+    let again = lighthouse_spec::compile_shared("1 + 1").unwrap();
+
+    assert!(
+        std::sync::Arc::ptr_eq(&first, &again),
+        "one program per source"
+    );
+    assert!(lighthouse_spec::compile_shared("1 +").is_err());
+}

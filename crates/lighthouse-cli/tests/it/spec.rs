@@ -50,6 +50,27 @@ fn validate_names_what_is_wrong_across_documents() {
 }
 
 #[test]
+fn validate_finds_a_function_that_does_not_exist_in_a_branch_nothing_takes() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_test_support::project("plugins = [\"core\"]\n"),
+    );
+    write(
+        dir.path(),
+        ".lighthouse/decisions/typo.yaml",
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/typo\nspec:\n  title: Typo\n  context: A typo.\n  scope: { subject: file }\n  requirement: A file MUST hold.\n  severity: warn\n  check:\n    type: cel\n    select: file\n    where: \"file.path == 'x' ? false : file.lines.startsWithh('a')\"\n    message: m\n  examples:\n    - { name: bad, language: text, kind: invalid, files: [{ path: a.txt, body: x }], expect: [{ line: 1 }] }\n    - { name: good, language: text, kind: valid, files: [{ path: a.txt, body: y }] }\n",
+    );
+
+    lighthouse(dir.path())
+        .args(["spec", "validate"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("`startsWithh` is not a function"));
+}
+
+#[test]
 fn schema_prints_a_kind_in_any_case_and_lists_them() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())

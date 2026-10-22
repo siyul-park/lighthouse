@@ -51,6 +51,95 @@ fn layer_index_is_the_index_of_the_first_layer_with_a_matching_glob() {
 }
 
 #[test]
+fn misplaced_leaves_the_first_longest_run_in_place() {
+    let moved = |list: &str| evaluated(&format!("{list}.misplaced().map(i, string(i)).join(',')"));
+    assert_eq!(moved("[3, 0, 1, 2]"), "0");
+    assert_eq!(moved("[10, 10, 0]"), "2");
+    assert_eq!(moved("[1, 0]"), "1");
+    assert_eq!(moved("[]"), "");
+    assert_eq!(moved("[0, 1, 1, 2]"), "");
+    assert_eq!(moved("[-1, -5, -3, -3]"), "0");
+    assert_eq!(moved("[0, -1, -1, 5, -2]"), "0,4");
+}
+
+#[test]
+fn misplaced_is_empty_exactly_when_the_list_is_in_order() {
+    for list in ["[]", "[2]", "[1, 1, 3]", "[3, 2]", "[1, 3, 2]", "[2, 1, 1]"] {
+        assert_eq!(
+            evaluated(&format!("{list}.misplaced().size() == 0")),
+            evaluated(&format!("{list} == {list}.sortBy(k, k)")),
+            "{list}"
+        );
+    }
+}
+
+#[test]
+fn misplaced_and_anchors_refuse_a_list_that_holds_other_than_ints() {
+    for expression in ["['a'].misplaced().size()", "[1, 'a'].anchors().size()"] {
+        let failed = std::panic::catch_unwind(|| evaluated(expression)).unwrap_err();
+        let message = failed
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| failed.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+            .unwrap_or_default();
+        assert!(message.contains("holds ints"), "{expression}: {message}");
+    }
+}
+
+#[test]
+fn anchors_is_the_index_of_the_first_later_element_that_sorts_before() {
+    let found = |list: &str| evaluated(&format!("{list}.anchors().map(i, string(i)).join(',')"));
+    assert_eq!(found("[3, 1, 2, 0]"), "1,3,3,-1");
+    assert_eq!(found("[1, 1, 1]"), "-1,-1,-1");
+    assert_eq!(found("[]"), "");
+}
+
+/// The longest run by the definition, to compare the fast one with: the
+/// first longest run, each element after its earliest best predecessor; what
+/// it leaves out is what `misplaced` says.
+#[test]
+fn misplaced_agrees_with_the_quadratic_definition_on_many_lists() {
+    let mut seed = 7_u64;
+    let mut next = move |bound: u64| {
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (seed >> 33) % bound
+    };
+    for _ in 0..40 {
+        let n = 1 + usize::try_from(next(14)).unwrap();
+        let ranks: Vec<i64> = (0..n)
+            .map(|_| i64::try_from(next(6)).unwrap() - 2)
+            .collect();
+        let (mut best, mut from) = (vec![1usize; n], vec![usize::MAX; n]);
+        for i in 0..n {
+            for j in 0..i {
+                if ranks[j] <= ranks[i] && best[j] + 1 > best[i] {
+                    best[i] = best[j] + 1;
+                    from[i] = j;
+                }
+            }
+        }
+        let mut kept = Vec::new();
+        let mut at = (0..n).max_by_key(|&i| (best[i], std::cmp::Reverse(i)));
+        while let Some(i) = at {
+            kept.push(i);
+            at = Some(from[i]).filter(|&j| j != usize::MAX);
+        }
+        let expected: Vec<String> = (0..n)
+            .filter(|i| !kept.contains(i))
+            .map(|i| i.to_string())
+            .collect();
+        let list = format!("{ranks:?}");
+        assert_eq!(
+            evaluated(&format!("{list}.misplaced().map(i, string(i)).join(',')")),
+            expected.join(","),
+            "{list}"
+        );
+    }
+}
+
+#[test]
 fn the_words_of_a_symbol_are_the_words_of_its_name() {
     assert_eq!(
         evaluated_for("parseHTTPServer", "symbol.words.join(' ')"),

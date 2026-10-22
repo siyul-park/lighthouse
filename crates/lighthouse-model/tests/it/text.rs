@@ -109,3 +109,23 @@ fn the_line_ending_of_a_text_is_the_one_most_of_its_lines_end_in() {
     assert_eq!(eol_of("no break"), "\n");
     assert_eq!(eol_of(""), "\n");
 }
+
+#[test]
+fn line_index_starts_of() {
+    assert_eq!(LineIndex::starts_of("ab\ncd\n"), [0, 3, 6]);
+    assert_eq!(LineIndex::starts_of(""), [0]);
+}
+
+#[test]
+fn line_index_over() {
+    let text = "ab\ncd\n";
+    let starts = LineIndex::starts_of(text);
+
+    let index = LineIndex::over(text, &starts);
+
+    assert_eq!(
+        index.offset(at(2, 2)),
+        LineIndex::new(text).offset(at(2, 2))
+    );
+    assert_eq!(index.line_start(4), 3);
+}

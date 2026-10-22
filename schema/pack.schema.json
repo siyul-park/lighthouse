@@ -50,6 +50,13 @@
         },
         "title": {
           "type": "string"
+        },
+        "variables": {
+          "description": "Named CEL values the `cel` checks and fixes of the pack's decisions share.\nA decision uses one by naming it, as it uses one of its own `variables`:\nthe pack's variables a decision names (directly, or through another) are\nput before its own, in this order, and see the same `options`, selected\nvalue and `file`. A variable that names none of those is evaluated once\nper file, however many subjects the file has. The name of a pack variable\nis not one of the decision's.",
+          "items": {
+            "$ref": "#/$defs/Variable"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -86,6 +93,32 @@
         "title",
         "intro",
         "decisions"
+      ],
+      "type": "object"
+    },
+    "Variable": {
+      "additionalProperties": false,
+      "description": "A named CEL value: an intermediate result the check, its message, its\nevidence and its fix all see by name.",
+      "properties": {
+        "expression": {
+          "description": "CEL.",
+          "type": "string"
+        },
+        "name": {
+          "description": "A lower-case identifier that no expression variable already uses.",
+          "type": "string"
+        },
+        "params": {
+          "description": "With parameters, the variable is a function of them: `name(a, b)` is\nthe expression, with its parameters bound to the arguments. It sees the\n`options` and the `file` of the caller, and nothing else.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "expression"
       ],
       "type": "object"
     }

@@ -25,15 +25,17 @@ pub use attributes::Attributes;
 pub use catalog::Catalog;
 pub use catalog::load::{load_local, local_dir, local_files};
 pub use check::{
-    BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, NamedRule, OrderReport,
-    OrderScope, Select, Variable,
+    BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, NamedRule, Select, Variable,
 };
 pub use command::CommandCheck;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
 pub use edit::KIND as EDIT_KIND;
-pub use environment::{compile, context, environment};
+pub use environment::{compile, compile_shared, context, environment};
 pub use error::Error;
-pub use expression::{TemplatePart, children, parse_template};
+pub use expression::{
+    Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, parse_template,
+    program_calls, program_identifiers,
+};
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
 pub use model::{DecisionStatus, Example, ExampleFile, ExampleKind, Expect, Scope, Subject};
 pub use model_check::ModelCheck;

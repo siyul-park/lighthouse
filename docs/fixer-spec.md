@@ -88,7 +88,7 @@ fix:
 - **Validation** (every catalog load, local layers included): exactly one kind; a decision
   with an implementation; `safe` only on decisions that author `error`; every CEL expression and
   template compiles; operation parameters are well-typed (one of `before`/`after`, `node`
-  or `file` and `span`, qualified order keys); a command is a valid program (a program, known placeholders, an output it may have);
+  or `file` and `span`); a command is a valid program (a program, known placeholders, an output it may have);
   `rename` lists `complete-references`; placeholders fill whole arguments; an `rpc` fix is
   kept but only that rule's findings are declined as not yet supported (it does not fail
   the pack); and the decision has an invalid example with

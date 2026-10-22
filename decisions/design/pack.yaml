@@ -9,6 +9,51 @@ spec:
     Language-neutral rules for structure, naming, APIs, ownership, errors and
     comments. Each decision states its requirement and how it is enforced;
     language-specific wording lives in its tuning.
+  variables:
+    # A declaration the file-order decisions place: a type, constant,
+    # variable, function or method outside interfaces and function bodies.
+    # Test code and generated code are not placed, except the fixtures of a
+    # test file.
+    - name: is_placed
+      params: [n]
+      expression: >-
+        n.declaration && !n.generated
+        && (n.file_test ? n.test_role == 'fixture' : !n.test)
+    # The declaration group of a node, as `design/declaration-groups` orders
+    # them: the index in `options.groups` of the first of the node's candidate
+    # groups that the order names, -1 when none (or the node is no declaration
+    # that is judged). A decision that has no `groups` option, such as
+    # `design/layout`, reads the default order of its language.
+    - name: declaration_group
+      params: [n]
+      expression: >-
+        !is_placed(n) ? -1
+        : cel.bind(open, n.visibility != 'private',
+          cel.bind(order, has(options.groups) ? options.groups
+              : n.lang == 'rust'
+              ? ['const', 'var', 'type', 'public-function', 'private-function']
+              : ['public-type', 'private-type', 'public-const', 'private-const', 'var', 'init',
+                 'public-function', 'constructor', 'public-method', 'hook', 'private-function'],
+          cel.bind(hooks, has(options.hookNames) ? options.hookNames
+              : n.lang == 'rust' ? []
+              : ['Clone', 'String', 'GoString', 'Error', 'Unwrap', 'MarshalJSON', 'UnmarshalJSON',
+                 'MarshalText', 'UnmarshalText', 'MarshalBinary', 'UnmarshalBinary'],
+          cel.bind(found, (
+              n.kind == 'type' || n.kind == 'interface'
+              ? [open ? 'public-type' : 'private-type', 'type']
+              : n.kind == 'const'
+              ? (n.owner_key != '' ? ['type'] : [open ? 'public-const' : 'private-const', 'const'])
+              : n.kind == 'var' ? ['var']
+              : n.kind == 'function'
+              ? (n.name == 'init' ? ['init'] : [])
+                + (open && n.constructor_named ? ['constructor'] : [])
+                + [open ? 'public-function' : 'private-function']
+              : n.kind == 'method'
+              ? ['type'] + (open && n.name in hooks ? ['hook'] : [])
+                + [open ? 'public-method' : 'private-function']
+              : []
+            ).map(c, order.indexOf(c)).filter(i, i >= 0),
+            size(found) > 0 ? found[0] : -1))))
   sections:
     - name: principles
       title: Principles

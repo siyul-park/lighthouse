@@ -1,16 +1,14 @@
 //! The plugin of one pack: the checks and fixers its decisions compile into,
-//! and what only code provides for it (the fallback text language of `core`,
-//! the order keys of `design`).
+//! and what only code provides for it (the fallback text language of `core`).
 
-use lighthouse_plugin::{LanguageProvider, OrderKey, Plugin, PluginManifest, Rule};
+use lighthouse_plugin::{LanguageProvider, Plugin, PluginManifest, Rule};
 use lighthouse_spec::Catalog;
 
 use crate::{
     Error,
-    bundled::{CORE, DESIGN, core_pack},
+    bundled::{CORE, core_pack},
     check::Check,
     fix::Fixer,
-    order,
 };
 
 /// A plugin whose rules and fixers are the decisions of one catalog pack.
@@ -19,7 +17,6 @@ pub struct Checks {
     checks: Vec<Check>,
     fixers: Vec<Fixer>,
     languages: fn() -> Vec<Box<dyn LanguageProvider>>,
-    order_keys: fn() -> Vec<Box<dyn OrderKey>>,
 }
 
 impl Checks {
@@ -30,13 +27,18 @@ impl Checks {
         let mut checks = Vec::new();
         let mut fixers = Vec::new();
         for decision in catalog.decisions().filter(|d| d.id().starts_with(&prefix)) {
+            let over = decision
+                .options_from()
+                .and_then(|from| catalog.decision(from));
+            let decision =
+                &over.map_or_else(|| decision.clone(), |source| decision.inheriting(source));
             checks.extend(Check::new(decision)?);
             fixers.extend(Fixer::new(decision)?);
         }
-        let (languages, order_keys): (fn() -> _, fn() -> _) = match id {
-            CORE => (core_pack::languages, Vec::new),
-            DESIGN => (Vec::new, order::keys),
-            _ => (Vec::new, Vec::new),
+        let languages: fn() -> _ = if id == CORE {
+            core_pack::languages
+        } else {
+            Vec::new
         };
         Ok(Self {
             manifest: PluginManifest {
@@ -46,7 +48,6 @@ impl Checks {
             checks,
             fixers,
             languages,
-            order_keys,
         })
     }
 
@@ -83,10 +84,5 @@ impl Plugin for Checks {
             .cloned()
             .map(|f| Box::new(f) as Box<dyn lighthouse_plugin::Fixer>)
             .collect()
-    }
-
-    /// The keys fixes of the pack sort by.
-    fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
-        (self.order_keys)()
     }
 }

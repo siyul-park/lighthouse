@@ -4,7 +4,7 @@
 
 use lighthouse_model::{
     Diagnostic, Options,
-    ucm::{Capability, FixOutcome, Project, Symbol},
+    ucm::{Capability, FixOutcome, Project},
 };
 use serde_json::Value;
 
@@ -42,8 +42,6 @@ pub struct FixRequest<'a> {
     pub workspace: &'a Workspace,
     /// The text of `finding.file`.
     pub text: &'a str,
-    /// The registered order keys of the run's plugins.
-    pub keys: &'a dyn OrderKeys,
     /// Whether the project is trusted to run commands (`lighthouse trust`, or
     /// `LIGHTHOUSE_TRUST=1`); the repository cannot grant it itself.
     pub trusted: bool,
@@ -55,49 +53,4 @@ pub struct FixRequest<'a> {
 pub trait Fixer: Send + Sync {
     fn manifest(&self) -> &FixerManifest;
     fn fix(&self, request: &FixRequest) -> Result<FixOutcome, Error>;
-}
-
-/// What an order key reads when it ranks a declaration.
-pub struct KeyContext<'a> {
-    pub project: &'a Project,
-    /// Language of the file being reordered.
-    pub language: &'a str,
-    /// The rule whose finding is being fixed, and the options it ran with.
-    pub rule: &'a str,
-    pub options: &'a Options,
-    /// The constructor prefixes of `language`.
-    pub constructors: &'a [String],
-}
-
-/// A way to order declarations, for the `reorder` fix operation. `rank` is
-/// `None` for a declaration the key does not order: it stays where it is.
-pub trait OrderKey: Send + Sync {
-    fn manifest(&self) -> &OrderKeyManifest;
-    fn rank(&self, ctx: &KeyContext, symbol: &Symbol) -> Result<Option<u64>, Error>;
-}
-
-/// What an order key declares about itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OrderKeyManifest {
-    /// Fully qualified `plugin/name`.
-    pub id: String,
-    /// What the key orders by, for the generated docs.
-    pub description: String,
-}
-
-/// The order keys a run can use, by id.
-pub trait OrderKeys: Send + Sync {
-    /// The key registered under `id`.
-    fn key(&self, id: &str) -> Option<&dyn OrderKey>;
-}
-
-/// No order keys: for checks and tests that never ask for one.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct NoKeys;
-
-impl OrderKeys for NoKeys {
-    /// There is none.
-    fn key(&self, _: &str) -> Option<&dyn OrderKey> {
-        None
-    }
 }

@@ -13,6 +13,7 @@ mod kinds_option;
 mod layers;
 mod local;
 mod models;
+mod pack_variables;
 mod project;
 mod reference;
 mod sources;

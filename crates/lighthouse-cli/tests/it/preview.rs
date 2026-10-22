@@ -85,7 +85,7 @@ fn a_check_marks_what_is_fixable_and_computes_no_fix() {
         }),
         "{group}"
     );
-    assert_eq!(group["check"], json!({"by": "builtin", "runs": true}));
+    assert_eq!(group["check"], json!({"by": "cel", "runs": true}));
     assert!(group.get("brief").is_none(), "a safe fix needs no brief");
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),

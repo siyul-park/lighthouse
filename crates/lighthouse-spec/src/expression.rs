@@ -1,15 +1,41 @@
 //! The CEL expressions and `{{ cel }}` templates a decision's check and fix
 //! carry: split once, and described when they do not hold.
 
+use std::collections::BTreeSet;
+
 use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr};
 
-use crate::environment::compile;
+use crate::environment::compile_shared;
+
+/// The variables a check can name for the value it judges, by `select`, and
+/// `node`, the one of a value related to it.
+pub const SUBJECT_VARIABLES: [&str; 10] = [
+    "symbol", "func", "edge", "module", "file", "test", "comment", "event", "decision", "node",
+];
+
+/// The namespaces of the functions of the environment (`regex.extract`,
+/// `glob.matches`, `cel.bind`, ...): a name before a dot that is no variable.
+const NAMESPACES: [&str; 10] = [
+    "cel", "glob", "regex", "lists", "math", "strings", "base64", "optional", "sets", "encoders",
+];
 
 /// One part of a `{{ cel }}` template: literal text, or the source of a hole.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplatePart {
     Text(String),
     Hole(String),
+}
+
+/// A function a program calls.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Call {
+    pub name: String,
+    /// The namespace of the function (`regex` of `regex.extract(..)`), if it has one.
+    pub namespace: Option<String>,
+    /// Whether it is called on a value (`list.size()`), not as `size(list)`.
+    pub member: bool,
+    /// The arguments it is given, not counting the value of a member call.
+    pub args: usize,
 }
 
 /// The expressions directly inside `expr`: the operands of a call or a
@@ -31,6 +57,90 @@ pub fn children(expr: &IdedExpr) -> Vec<&IdedExpr> {
         Expr::Struct(structure) => entries(&structure.entries),
         Expr::Ident(_) | Expr::Literal(_) | Expr::Unspecified => Vec::new(),
     }
+}
+
+/// The identifiers a program names: its variables, the variables its
+/// comprehensions bind, and the functions it calls.
+pub fn program_identifiers(program: &cel::Program) -> BTreeSet<String> {
+    fn collect(expr: &IdedExpr, into: &mut BTreeSet<String>) {
+        match &expr.expr {
+            Expr::Ident(name) => {
+                into.insert(name.clone());
+            }
+            Expr::Call(call) => {
+                into.insert(call.func_name.clone());
+            }
+            _ => {}
+        }
+        children(expr).into_iter().for_each(|c| collect(c, into));
+    }
+    let mut names = BTreeSet::new();
+    collect(program.expression(), &mut names);
+    names
+}
+
+/// The functions a program calls, each once.
+pub fn program_calls(program: &cel::Program) -> BTreeSet<Call> {
+    fn collect(expr: &IdedExpr, into: &mut BTreeSet<Call>) {
+        if let Expr::Call(call) = &expr.expr {
+            let namespace = call
+                .target
+                .as_deref()
+                .and_then(|target| match &target.expr {
+                    Expr::Ident(name) if NAMESPACES.contains(&name.as_str()) => Some(name.clone()),
+                    _ => None,
+                });
+            into.insert(Call {
+                name: call.func_name.clone(),
+                member: call.target.is_some() && namespace.is_none(),
+                namespace,
+                args: call.args.len(),
+            });
+        }
+        children(expr).into_iter().for_each(|c| collect(c, into));
+    }
+    let mut calls = BTreeSet::new();
+    collect(program.expression(), &mut calls);
+    calls
+}
+
+/// The variables a program reads from its scope: the identifiers it names that
+/// no comprehension binds and that are no namespace of a function.
+pub fn free_variables(program: &cel::Program) -> BTreeSet<String> {
+    fn collect(expr: &IdedExpr, bound: &mut Vec<String>, into: &mut BTreeSet<String>) {
+        match &expr.expr {
+            Expr::Ident(name) => {
+                if !bound.contains(name) && !NAMESPACES.contains(&name.as_str()) {
+                    into.insert(name.clone());
+                }
+            }
+            Expr::Comprehension(c) => {
+                // The range and the initial value are read outside the variables
+                // the comprehension binds.
+                collect(&c.iter_range, bound, into);
+                collect(&c.accu_init, bound, into);
+                let before = bound.len();
+                bound.push(c.iter_var.clone());
+                bound.extend(c.iter_var2.clone());
+                bound.push(c.accu_var.clone());
+                collect(&c.loop_cond, bound, into);
+                collect(&c.loop_step, bound, into);
+                collect(&c.result, bound, into);
+                bound.truncate(before);
+            }
+            _ => children(expr)
+                .into_iter()
+                .for_each(|c| collect(c, bound, into)),
+        }
+    }
+    let mut names = BTreeSet::new();
+    collect(program.expression(), &mut Vec::new(), &mut names);
+    names
+}
+
+/// The identifiers an expression names; a source that does not compile names none.
+pub fn identifiers(source: &str) -> BTreeSet<String> {
+    compile_shared(source).map_or_else(|_| BTreeSet::new(), |p| program_identifiers(&p))
 }
 
 /// Splits a template into its text and its `{{ cel }}` holes; the one parser
@@ -58,7 +168,7 @@ pub fn parse_template(text: &str) -> Result<Vec<TemplatePart>, String> {
 
 /// Why `source`, written as `what`, is not a CEL expression.
 pub(crate) fn compile_problem(what: &str, source: &str) -> Option<String> {
-    compile(source).err().map(|e| format!("{what}: {e}"))
+    compile_shared(source).err().map(|e| format!("{what}: {e}"))
 }
 
 /// Why the `{{ cel }}` template `text`, written as `what`, is not well formed.

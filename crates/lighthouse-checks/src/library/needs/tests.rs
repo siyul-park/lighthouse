@@ -97,3 +97,33 @@ fn a_related_node_needs_only_what_is_read_from_something_else_than_the_subject()
     assert!(related.field("doc"));
     assert!(!related.field("metrics") && !related.field("callers"));
 }
+
+#[test]
+fn a_variable_over_a_range_is_a_position_in_a_list() {
+    let needs = of("lists.range(size(l)).filter(i, l[i].x > l[i + 1].x)");
+
+    assert!(needs.field("x"));
+    assert!(!needs.field("callers"));
+}
+
+#[test]
+fn a_variable_over_anything_else_may_name_a_field() {
+    let needs = of("keys.filter(k, node[k] == 1)");
+
+    assert!(needs.field("callers"));
+}
+
+#[test]
+fn a_variable_over_a_filter_of_a_range_is_a_position_too() {
+    let needs = of("lists.range(size(l)).filter(i, i in kept).map(i, l[i].x)");
+
+    assert!(needs.field("x"));
+    assert!(!needs.field("callers"));
+}
+
+#[test]
+fn a_variable_over_a_map_of_a_range_may_name_a_field() {
+    let needs = of("lists.range(3).map(i, keys[i]).map(k, node[k])");
+
+    assert!(needs.field("callers"));
+}

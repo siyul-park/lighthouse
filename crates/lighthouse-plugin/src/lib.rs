@@ -20,10 +20,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
 
-pub use fix::{
-    FixDecision, FixRequest, Fixer, FixerManifest, KeyContext, NoKeys, OrderKey, OrderKeyManifest,
-    OrderKeys,
-};
+pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
 pub use lighthouse_protocol::Conventions;
 pub use memo::Memo;
 pub use models::{
@@ -172,8 +169,6 @@ pub struct Context<'a> {
     /// The focused file and its text; `None` for project scope.
     pub file: Option<(&'a File, &'a str)>,
     pub facts: &'a Facts,
-    /// The order keys of the run's plugins, for checks that judge an order.
-    pub keys: &'a dyn OrderKeys,
     /// The user trusts the project to run the commands it names. The user
     /// decides that, never the repository.
     pub trusted: bool,
@@ -359,10 +354,6 @@ pub trait Plugin {
     }
     /// The fixers of the plugin's decisions; see [`Fixer`].
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
-        Vec::new()
-    }
-    /// Ways to order declarations that fix operations may name.
-    fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
         Vec::new()
     }
     /// The models of the plugin; each has the id of the plugin.

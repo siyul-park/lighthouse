@@ -1,4 +1,4 @@
-//! The vocabulary the ordering checks and order keys share.
+//! The vocabulary the ordering checks share.
 
 use lighthouse_checks::layout::{
     declarations, declarations_in, exposed, has_word_prefix, is_declaration, owner_key,
@@ -7,7 +7,7 @@ use lighthouse_model::{
     Position, Span,
     ucm::{File, Fragment, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility},
 };
-use lighthouse_plugin::{Context, NoKeys, Workspace};
+use lighthouse_plugin::{Context, Workspace};
 
 fn at(line: u32) -> Span {
     let p = Position { line, col: 1 };
@@ -61,7 +61,6 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
         project: &project,
         file: Some((&file, "")),
         facts: &facts,
-        keys: &NoKeys,
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),

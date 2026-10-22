@@ -86,17 +86,38 @@ Puts sibling declarations in the order of the list, in the places they hold. Not
 | `nodes` | list of nodes or symbol ids, required | The declarations, in the order they must have. |
 
 ```yaml
-edits: "[reorder(file.symbols.filter(s, s.group >= 0).sortBy(s, s.group))]"
+edits: "[reorder(file.symbols.filter(s, s.kind == 'function').sortBy(s, s.name))]"
 ```
 
-## Order keys
+## Orders
 
-Registered by plugins; the `group` field of a node reads `design/group`.
+An order is CEL in the decision: its check compares a node with its siblings (`node.prev`, `node.next`, `file.symbols`) by a rank, and its fix puts the nodes in the order of that rank with `reorder` or `move`. Decisions that share an order share the rank. A pack lists CEL `variables` that its decisions use by name, as they use their own: a variable with `params` is a function of them, and one without is a value that is computed once per file when it reads nothing of the selected node. `design/pack.yaml` shares the declaration group this way:
 
-| key | orders by |
-| --- | --- |
-| `design/constructor-first` | constructors before the other methods of their type |
-| `design/group` | the declaration group of `design/declaration-groups`, from public contract to private mechanics |
+```yaml
+# design/pack.yaml
+variables:
+  - name: declaration_group
+    params: [n]
+    expression: >-
+      ... the index in options.groups of the first candidate group of n that it names
+
+# design/file-order/declaration-groups.yaml
+check:
+  type: cel
+  select: symbol
+  variables:
+    - name: placed   # once per file
+      expression: file.symbols.filter(s, declaration_group(s) >= 0)
+    - name: displaced
+      expression: placed.map(s, declaration_group(s)).misplaced() ...
+  where: size(displacement) > 0
+fix:
+  type: cel
+  edits: "[reorder(placed.sortBy(s, declaration_group(s)))]"
+```
+
+`design/layout` reads the same `declaration_group(func)`. A function sees the `options` and the `file` of its caller. `list.misplaced()` gives the indexes of the fewest elements of a list of ints that, moved, put it in order.
+
 
 ## Commands
 

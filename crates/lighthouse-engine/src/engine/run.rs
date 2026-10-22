@@ -244,7 +244,9 @@ impl Engine {
                 _ => (Path::new(""), ""),
             };
             let rules = self.config.resolve(path, lang, &self.projects)?;
-            let found = rules.get(&d.rule_id).map(|c| c.options.clone());
+            let found = rules
+                .get(&d.rule_id)
+                .map(|c| options_at(&self.inherited, &rules, &d.rule_id, &c.options).into_owned());
             options.insert(d.fingerprint.clone(), found.unwrap_or_default());
         }
         Ok(options)

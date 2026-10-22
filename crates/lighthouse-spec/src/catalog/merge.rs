@@ -7,7 +7,7 @@ use crate::{
     validate,
 };
 
-use super::load::Files;
+use super::{load::Files, variables};
 
 /// Packs with their decisions, in the order the packs list them. Every
 /// decision is listed once, in the section of the pack its id names.
@@ -33,6 +33,8 @@ pub(super) fn assemble(
                 format!("pack `{id}` is defined twice"),
             ));
         }
+        variables::validate(&id, &pack.spec.variables)?;
+        let shared = pack.spec.variables;
         let mut sections = Vec::new();
         let mut names = BTreeSet::new();
         for SectionSpec {
@@ -57,7 +59,10 @@ pub(super) fn assemble(
                         format!("`{short}` is listed in section `{name}` but is not defined, or is listed twice"),
                     )
                 })?;
-                members.push(resolve_examples(files, &dir, decision)?);
+                members.push(variables::import(
+                    resolve_examples(files, &dir, decision)?,
+                    &shared,
+                )?);
             }
             sections.push(Section {
                 id: name,
@@ -70,6 +75,7 @@ pub(super) fn assemble(
             id,
             title: pack.spec.title,
             intro: pack.spec.intro,
+            variables: shared,
             sections,
         });
     }

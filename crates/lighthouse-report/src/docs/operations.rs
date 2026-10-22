@@ -121,9 +121,43 @@ pub const OPERATIONS: &[Operation] = &[
             required: true,
             description: "The declarations, in the order they must have.",
         }],
-        example: "edits: \"[reorder(file.symbols.filter(s, s.group >= 0).sortBy(s, s.group))]\"",
+        example: "edits: \"[reorder(file.symbols.filter(s, s.kind == 'function').sortBy(s, s.name))]\"",
     },
 ];
+
+/// How an order is written: in the decisions, as CEL.
+const ORDERS: &str = "## Orders\n\n\
+     An order is CEL in the decision: its check compares a node with its siblings \
+     (`node.prev`, `node.next`, `file.symbols`) by a rank, and its fix puts the nodes \
+     in the order of that rank with `reorder` or `move`. Decisions that share an order \
+     share the rank. A pack lists CEL `variables` that its decisions use by name, as \
+     they use their own: a variable with `params` is a function of them, and one \
+     without is a value that is computed once per file when it reads nothing of the \
+     selected node. `design/pack.yaml` shares the declaration group this way:\n\n\
+     ```yaml\n\
+     # design/pack.yaml\n\
+     variables:\n  \
+     - name: declaration_group\n    \
+       params: [n]\n    \
+       expression: >-\n      \
+         ... the index in options.groups of the first candidate group of n that it names\n\n\
+     # design/file-order/declaration-groups.yaml\n\
+     check:\n  \
+     type: cel\n  \
+     select: symbol\n  \
+     variables:\n    \
+     - name: placed   # once per file\n      \
+       expression: file.symbols.filter(s, declaration_group(s) >= 0)\n    \
+     - name: displaced\n      \
+       expression: placed.map(s, declaration_group(s)).misplaced() ...\n  \
+     where: size(displacement) > 0\n\
+     fix:\n  \
+     type: cel\n  \
+     edits: \"[reorder(placed.sortBy(s, declaration_group(s)))]\"\n\
+     ```\n\n\
+     `design/layout` reads the same `declaration_group(func)`. A function sees the \
+     `options` and the `file` of its caller. `list.misplaced()` gives the \
+     indexes of the fewest elements of a list of ints that, moved, put it in order.\n\n";
 
 /// One parameter of an edit constructor.
 pub struct Param {
@@ -141,9 +175,8 @@ pub struct Operation {
     pub example: &'static str,
 }
 
-/// The page of the fix operations. `keys` are the registered order keys with
-/// their descriptions.
-pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
+/// The page of the fix operations.
+pub fn fix_operations_markdown() -> String {
     let mut out = format!(
         "{NOTICE}\n\n# Fix operations\n\n\
          A decision's `fix:` block says how the findings of its rule are fixed. Its \
@@ -179,12 +212,7 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
         }
         let _ = write!(out, "\n```yaml\n{}\n```\n\n", op.example);
     }
-    out.push_str("## Order keys\n\nRegistered by plugins; the `group` field of a node reads `design/group`.\n\n");
-    let _ = writeln!(out, "| key | orders by |");
-    let _ = writeln!(out, "| --- | --- |");
-    for (id, description) in keys {
-        let _ = writeln!(out, "| `{id}` | {description} |");
-    }
+    out.push_str(ORDERS);
     out.push_str(
         "\n## Commands\n\n\
          The `command` type is a program like the others ([programs](../programs.md)): its \

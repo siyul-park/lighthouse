@@ -34,6 +34,7 @@ impl<'a> Sources<'a> {
             overlays,
             texts: RefCell::default(),
             containers: RefCell::default(),
+            starts: RefCell::default(),
         }
     }
 
@@ -101,6 +102,7 @@ pub(crate) struct Sources<'a> {
     overlays: &'a Overlays,
     texts: RefCell<BTreeMap<PathBuf, Rc<String>>>,
     containers: RefCell<BTreeMap<PathBuf, Rc<Containers>>>,
+    starts: RefCell<BTreeMap<PathBuf, Rc<Vec<usize>>>>,
 }
 
 /// A declaration located in its file: the symbol, the whole lines its extent
@@ -370,7 +372,8 @@ impl<'a> Lowerer<'a> {
         };
         let file = &spec.symbol.file;
         let text = self.sources.text(file)?;
-        let index = LineIndex::new(&text);
+        let starts = self.starts(file)?;
+        let index = LineIndex::over(&text, &starts);
         let loose = self.project.symbols_in(file).find(|s| {
             s.owner.is_none()
                 && !listed.contains(&s.id)
@@ -417,7 +420,8 @@ impl<'a> Lowerer<'a> {
             )
         })?;
         let text = self.sources.text(&symbol.file)?;
-        let range = LineIndex::new(&text)
+        let starts = self.starts(&symbol.file)?;
+        let range = LineIndex::over(&text, &starts)
             .range(extent)
             .filter(|r| !r.is_empty())
             .ok_or_else(|| format!("the extent of `{}` is outside its file", symbol.name))?;
@@ -434,6 +438,19 @@ impl<'a> Lowerer<'a> {
             container: container.open,
             group: container.group,
         })
+    }
+
+    /// Where the lines of `file` start, found once for all the operations on it.
+    fn starts(&self, file: &Path) -> Result<Rc<Vec<usize>>, String> {
+        if let Some(found) = self.sources.starts.borrow().get(file) {
+            return Ok(Rc::clone(found));
+        }
+        let built = Rc::new(LineIndex::starts_of(&self.sources.text(file)?));
+        self.sources
+            .starts
+            .borrow_mut()
+            .insert(file.to_owned(), Rc::clone(&built));
+        Ok(built)
     }
 }
 

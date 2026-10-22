@@ -354,7 +354,6 @@ impl<'e> Proposer<'e> {
             project: &outcome.project,
             workspace: &engine.ws,
             text: &text,
-            keys: &engine.registry,
             trusted: engine.trusted,
         };
         match fixer

@@ -53,9 +53,6 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("gap", Reach::Local),
     ("func", Reach::Local),
     ("line_widths", Reach::Local),
-    // The declaration group of the default order, which only the symbol's own
-    // file and owner decide.
-    ("group", Reach::Local),
     ("data_only", Reach::Neighbors),
     ("helper_user", Reach::Neighbors),
     ("receiver_affinity", Reach::Neighbors),

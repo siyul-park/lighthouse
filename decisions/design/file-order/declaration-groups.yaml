@@ -92,38 +92,79 @@ spec:
         hookNames: []
         constructorsFirst: true
   check:
-    type: builtin
-    op: order
-    clauses:
-      - within: file
-        by: [design/group]
-        message: >-
-          {{ symbol.kind }} {{ symbol.name }} belongs to the `{{ options.groups[rank] }}` group
-          and must {{ after.id != '' ? 'follow ' + after.name : 'come before the declarations above it' }}
-        evidence:
-          declaration: symbol.id
-          group: options.groups[rank]
-          expected_after: "after.id != '' ? after.name : null"
-          before: "''"
-      - within: owner
-        by: [design/constructor-first]
-        report: late
-        when: options.constructorsFirst
-        message: >-
-          constructor {{ symbol.name }} must precede the other methods of its type,
-          such as {{ earlier.name }}
-        evidence:
-          declaration: symbol.id
-          group: "'constructor'"
-          expected_after: "null"
-          before: earlier.id
+    type: cel
+    select: symbol
+    variables:
+      # The declarations the order places, in file order; one value per file.
+      - name: placed
+        expression: >-
+          file.symbols.filter(s, s.declaration && !s.generated).map(s, {'id': s.id, 'module': s.module, 'name': s.name, 'group': declaration_group(s)})
+            .filter(p, p.group >= 0)
+      # Per module, the placed declarations that are not in a longest run
+      # already in order: the fewest that, moved, put the module in order.
+      # Each is to follow the first later declaration of an earlier group that
+      # stays in place, else the first such declaration.
+      - name: displaced
+        expression: >-
+          placed.map(s, s.module).distinct().map(m,
+            cel.bind(l, placed.filter(s, s.module == m),
+            cel.bind(g, l.map(s, s.group),
+            cel.bind(kept, lists.range(size(g)).filter(i, !(i in g.misplaced())),
+              lists.range(size(l)).filter(i, !(i in kept)).map(i,
+                {'id': l[i].id, 'late': false, 'group': g[i], 'before': '',
+                 'after': (
+                   lists.range(size(l)).filter(j, j > i && g[j] < g[i] && j in kept).map(j, l[j].name)
+                   + lists.range(size(l)).filter(j, j > i && g[j] < g[i]).map(j, l[j].name)
+                   + [''])[0]}))))).flatten()
+      # The methods of the owners, in file order; one value per file.
+      - name: methods
+        expression: file.symbols.filter(s, is_placed(s) && s.kind == 'method' && s.owner_key != '')
+      # A constructor method of a type that follows another method of its type.
+      - name: late
+        expression: >-
+          !options.constructorsFirst ? [] :
+          lists.range(size(methods))
+            .filter(i, methods[i].visibility != 'private' && methods[i].constructor_named
+              && lists.range(i).exists(j, methods[j].owner_key == methods[i].owner_key
+                && methods[j].module == methods[i].module
+                && !(methods[j].visibility != 'private' && methods[j].constructor_named)))
+            .map(i, {'id': methods[i].id, 'late': true, 'group': -1,
+              'before': (lists.range(i).filter(j, methods[j].owner_key == methods[i].owner_key
+                  && methods[j].module == methods[i].module
+                  && !(methods[j].visibility != 'private' && methods[j].constructor_named))
+                .map(j, methods[j].id))[0],
+              'after': (lists.range(i).filter(j, methods[j].owner_key == methods[i].owner_key
+                  && methods[j].module == methods[i].module
+                  && !(methods[j].visibility != 'private' && methods[j].constructor_named))
+                .map(j, methods[j].name))[0]})
+      - name: reported
+        expression: displaced + late
+      - name: report
+        expression: reported.filter(d, d.id == symbol.id)
+    where: size(report) > 0
+    message: >-
+      {{ report[0].late
+         ? 'constructor ' + symbol.name + ' must precede the other methods of its type, such as '
+           + report[0].after
+         : symbol.kind + ' ' + symbol.name + ' belongs to the `' + options.groups[report[0].group]
+           + '` group and must '
+           + (report[0].after != '' ? 'follow ' + report[0].after
+              : 'come before the declarations above it') }}
+    evidence:
+      declaration: symbol.id
+      group: "report[0].late ? 'constructor' : options.groups[report[0].group]"
+      expected_after: "!report[0].late && report[0].after != '' ? report[0].after : null"
+      before: report[0].before
+    identity:
+      subject: symbol.id
+      snippet: "report[0].late ? 'clause 1' : ''"
   fix:
     safety: safe
     type: cel
     edits: >-
       finding.evidence.before != ''
       ? [move(finding.evidence.declaration, before(finding.evidence.before))]
-      : [reorder(file.symbols.filter(s, s.declaration && s.group >= 0).sortBy(s, s.group))]
+      : [reorder(placed.sortBy(s, s.group))]
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), G24 Follow Standard Conventions"

@@ -28,12 +28,11 @@ out-of-process plugins satisfy the same traits. Every kind describes itself thro
 
 | Kind | Manifest | Behavior |
 | --- | --- | --- |
-| `Plugin` | `PluginManifest { id, version }` | `languages`, `analyzers`, `rules`, `fixers`, `order_keys` |
+| `Plugin` | `PluginManifest { id, version }` | `languages`, `analyzers`, `rules`, `fixers` |
 | `LanguageProvider` | `ProviderManifest { id, globs, conventions, capabilities, fallback, priority }` | `index` |
 | `Analyzer` | `AnalyzerManifest { id, requires, scope }` | `run` |
 | `Rule` | `RuleManifest { id, severity, scope, description, docs, analyzers, capabilities, applicability }` | `validate`, `check` |
 | `Fixer` | `FixerManifest { id, requires }` | `fix` |
-| `OrderKey` | `OrderKeyManifest { id, description }` | `rank` (runtime only: no resource) |
 
 The `initialize` result of a plugin process is its `PluginManifest` plus one
 `ProviderManifest` per language, field for field (see
@@ -115,8 +114,7 @@ The JSON Schema (2020-12) of each kind is generated from the Rust types into
 writes all; a test fails when the files are stale). Documents carry a
 `# yaml-language-server: $schema=...` comment so editors validate them.
 `lighthouse spec validate [paths]` checks each document against its schema and
-against the others (extended projects and rules name things that exist, fix operations name
-registered order keys, CEL compiles, examples are well formed; `--examples` also
+against the others (extended projects and rules name things that exist, CEL compiles, examples are well formed; `--examples` also
 runs them). Readers accept the current format only.
 
 ### Configuration layers
@@ -181,10 +179,11 @@ Every external program (a command check or fix, a `[fix] verify` program, a mode
 Every implemented rule belongs to a catalog decision whose `check` is
 one provider of the union `builtin | cel | command | model`, with the common fields `requires` and `timeout`:
 
-- `builtin` is a standard, decision-agnostic operation (`order`, `cycle`) or, for the two rules the engine reports itself (`core/allow`, `core/no-unused-allow`), a rule named by `id`.
+- `builtin` is a standard, decision-agnostic operation (`cycle`) or, for the two rules the engine reports itself (`core/allow`, `core/no-unused-allow`), a rule named by `id`.
 - `cel` is an expression over the code model (UCM), written in the decision, with the model as fields of a node (`owner members callers callees references uses implementers prev next tests metrics params results type`, built only for the expressions that read them), the path helpers `path.matchesGlob('app/*')` (a module path against a glob, by segment) and `module.layerIndex([['app/**'], ['domain/**']])` (the index of the first layer holding a matching glob, -1 when none), and the `words` field of a symbol (`parseHTTPServer` is `[parse, http, server]`); intermediate values are the check's `variables`, which its fix sees too. They run in one CEL environment (`lighthouse_spec::environment`) that is the `cel` crate's standard library with its strings, lists, math and encoders extensions and optional syntax, exactly as shipped (`s.trim()`, `l.join(", ")`, `s.split(",")`, `math.greatest(a, b)`), plus the official extensions the crate lacks: cel-go's `regex.replace(s, pattern, replacement[, count])`, `regex.extract(s, pattern)` and `regex.extractAll(s, pattern)` (groups in a replacement are `\\1`; `$` is refused), and the Kubernetes list functions `l.indexOf(x)` and `l.lastIndexOf(x)`; a [model provider's event mapping](models.md#what-an-agent-did) uses the same one.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. The check reads the value for the node's role with `limits.params[?func.role].orValue(limits.params[?'default'].orValue(-1))` (an integer is for every role) and says it in its message (`NewServer needs 9 parameters`, `parse has 9 parameters`).
+  - Intermediate values are the check's `variables`, each evaluated in order and seen by the later ones, the message, the evidence and the fix. A variable with `params` is a function of them (`declaration_group(id)`): it sees its parameters, the `options` and the `file` of its caller and the file-level variables, and nothing else; a body that names anything more is refused when the check is built, as is a call of a function that does not exist and a variable name used twice. A variable that names no selected value (only `file`, `options` and variables like it) is computed once per file, however many nodes the file has. A pack lists `variables` in its `Pack` document that its decisions use by name, as they use their own: the pack's variables a decision names, directly or through another, are put before its own, and a decision does not redefine one. This is how decisions share an order: `design` defines `declaration_group(id)` once, `design/declaration-groups` orders by it and `design/layout` reads it, with the options `groups` and `hooks` it takes from `design/declaration-groups` (`options.from`), so there is no registry of order keys and the project sets the order once; the engine takes those options from what the configuration, with the `[[overrides]]` that match the file, sets for `design/declaration-groups` at each file, so an override for a file reaches the layout at that file only. A check that selects a node also sees `file` (its file, with `symbols` and `comments`) when it names it, and the order of siblings is `node.prev`, `node.next`, `file.symbols` and `list.indexOf`. The functions `list.misplaced()` and `list.anchors()` (not in any CEL library: the nearest official precedents are `sort`, `sortBy` and the Kubernetes `isSorted()`, which order a list or say whether it is ordered but not which elements are out of place; they are functions because no CEL expression computes them in linear time; one word, lowerCamelCase, members of a list of ints like `sort`, each with an example and a test) give the indexes of the fewest elements that, moved, put the list in order (empty exactly when the list is sorted) and, for each element, the index of the first later element that sorts before it. `cel.bind(name, init, body)` is cel-go's bindings extension.
 - `command` runs a [program](programs.md) whose result is findings: `output: lines` (the default; one finding per stdout line, with an optional `path:line[:col]: ` prefix, and a line that is only a project path is a finding at line 1 of that file), `sarif` or `status`. `{file}` runs it once per file, `{files}` over batches of files, neither once; exit `0` and `1` ran (`success`), anything else is an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script; the programs of the bundled catalog need none. A command runs in the project root, [sandboxed](#sandbox), under the one environment of every program (see [programs](programs.md#the-environment)). Trust and the sandbox protect together; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
 - `model` asks the `classification` task of the model the project binds to the decision (`select` and `prompt` optional); a subject nothing decides stays a review task. It is not deterministic and caps the severity at `warn`.
 
@@ -691,9 +690,9 @@ provider does not declare the `overlays` capability. Language plugins never veri
 verification is the re-check on the code model (UCM). An applied fix is not recorded: it records what happened to this checkout, not a decision.
 The run that ends the fixing resolves the findings the fixes removed.
 
-Bundled fixes: `design/declaration-groups` (a `reorder` by the `group` of a symbol, plus a `move`
-for constructors) and `testing/file-layout` (a `move` of a fixture above, or a helper
-below, the tests) are safe; `design/layout` and
+Bundled fixes: `design/declaration-groups` (a `move` of a declaration before the first one it
+must precede, or a `reorder` of the file in the order of the declarations' places) and
+`testing/file-layout` (a `move` of a fixture above, or a helper below, the tests) are safe;
 `design/layout` (a `move` next to the related symbol or the caller),
 `design/comments` and `core/no-unused-allow` (a `delete` of the comment or the
 annotation line) are unsafe. An `impl` block is not a symbol, so
@@ -781,7 +780,7 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 - [store](../crates/lighthouse-store/README.md): findings, judgments, the decision log.
 - [ml](../crates/lighthouse-ml/README.md): model evaluation and training.
 - [engine](../crates/lighthouse-engine/README.md): analysis and fix orchestration.
-- [checks](../crates/lighthouse-checks/README.md): declarative checks, metrics, order keys, the bundled registry.
+- [checks](../crates/lighthouse-checks/README.md): declarative checks, metrics, the bundled registry.
 - [rpc](../crates/lighthouse-rpc/README.md): language plugins as processes.
 - [plugin](../crates/lighthouse-plugin/README.md): SPI and Registry.
 - [spec](../crates/lighthouse-spec/README.md): decision kinds, Catalog, local layer.

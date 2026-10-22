@@ -159,6 +159,41 @@ fn error() {
             "select: symbol\nwhere: 'true'\nmessage: x\nextra: 1",
             "extra",
         ),
+        (
+            "symbol",
+            "select: symbol\nvariables:\n  - { name: a, expression: '1' }\n  - { name: a, expression: '2' }\nwhere: 'true'\nmessage: x",
+            "`a` is defined twice",
+        ),
+        (
+            "symbol",
+            "select: symbol\nvariables:\n  - { name: node, expression: '1' }\nwhere: 'true'\nmessage: x",
+            "`node` is not a usable name",
+        ),
+        (
+            "symbol",
+            "select: symbol\nvariables:\n  - { name: weight, params: [k], expression: 'k + symbol.span.start.line' }\nwhere: 'weight(1) > 0'\nmessage: x",
+            "`symbol` is not a parameter",
+        ),
+        (
+            "symbol",
+            "select: symbol\nwhere: \"symbol.name == 'x' ? true : nope(1)\"\nmessage: x",
+            "`nope` is not a function",
+        ),
+        (
+            "symbol",
+            "select: symbol\nwhere: \"symbol.name == 'x' ? true : symbol.name.startsWithh('a')\"\nmessage: x",
+            "`startsWithh` is not a function",
+        ),
+        (
+            "symbol",
+            "select: symbol\nwhere: \"symbol.name == 'x' || regex.matchs(symbol.name, 'a')\"\nmessage: x",
+            "`regex.matchs` is not a function",
+        ),
+        (
+            "symbol",
+            "select: symbol\nvariables:\n  - { name: plus, params: [n], expression: 'n + 1' }\nwhere: 'symbol.name == \"x\" ? true : plus(1, 2) > 0'\nmessage: x",
+            "`plus` takes 1 argument(s), not 2",
+        ),
     ];
     for (scope, rule, reason) in cases {
         let error = local(scope, rule).err().unwrap_or_default();

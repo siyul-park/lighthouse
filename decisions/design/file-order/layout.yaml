@@ -95,8 +95,8 @@ spec:
           'callers-first' in options.kinds
           && (func.kind == 'function' || func.kind == 'method') && size(local) > 0
           && func.pos <= anchor.pos
-          && !(func.group >= 0 && anchor.group >= 0
-               && func.group < anchor.group)
+          && !(declaration_group(func) >= 0 && declaration_group(anchor) >= 0
+               && declaration_group(func) < declaration_group(anchor))
           && !(func.lang == 'rust' && func.kind == 'method' && !func.implementation
                && anchor.kind == 'method' && anchor.implementation)
       - name: separated

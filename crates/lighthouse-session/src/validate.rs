@@ -1,6 +1,6 @@
 //! `lighthouse spec validate`: every spec document under some paths is read
 //! against its kind, and what the documents say about each other is checked:
-//! a decision's check and fix against the rules and order keys the bundled
+//! a decision's check and fix against the rules the bundled
 //! plugins register, a project's rules and the projects it extends against the
 //! decisions and projects that exist, a decision's CEL against the CEL
 //! compiler. Examples are checked for shape with the decision; running them
@@ -16,7 +16,7 @@ use lighthouse_engine::Engine;
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
-use lighthouse_spec::{BuiltinCheck, BuiltinOp, Catalog, CheckKind, Decision};
+use lighthouse_spec::{BuiltinCheck, Catalog, CheckKind, Decision};
 use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
@@ -128,7 +128,8 @@ impl Sets {
                         .decisions()
                         .filter(|d| d.automated() && bundled.decision(d.id()).is_none())
                         .map(|d| d.id().to_owned())
-                        .collect();
+                        .collect::<Vec<String>>();
+                    built(&catalog, &own, &place, problems);
                     layered.push((catalog, own));
                 }
                 Err(e) => problems.push(problem(&dir.display().to_string(), e)),
@@ -188,7 +189,7 @@ pub fn validate_paths(session: &Session, paths: &[PathBuf], examples: bool) -> R
     }
     files.sort();
     files.dedup();
-    let registry = session.in_process_registry()?;
+    let registry = registry_of(session);
     let mut sets = Sets::default();
     for file in &files {
         let Some(format) = Format::of_path(file) else {
@@ -209,6 +210,30 @@ pub fn validate_paths(session: &Session, paths: &[PathBuf], examples: bool) -> R
     }
     sets.check(session, &registry, examples, &mut found.problems)?;
     Ok(found)
+}
+
+/// The rules that run in this process. A local decision that does not build
+/// is reported with the documents that hold it, not as a failure of
+/// validating them, so it is left out.
+fn registry_of(session: &Session) -> Registry {
+    session
+        .in_process_registry()
+        .unwrap_or_else(|_| lighthouse_checks::registry())
+}
+
+/// What building the checks and fixes of the decisions `own` says is wrong
+/// with them: an expression that does not compile, a function that does not
+/// exist, a variable a function cannot see.
+fn built(catalog: &Catalog, own: &[String], place: &str, problems: &mut Vec<Problem>) {
+    let packs: BTreeSet<&str> = own
+        .iter()
+        .filter_map(|id| id.split_once('/').map(|(pack, _)| pack))
+        .collect();
+    for pack in packs {
+        if let Err(e) = lighthouse_checks::Checks::new(pack, catalog) {
+            problems.push(problem(place, e));
+        }
+    }
 }
 
 fn collect(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
@@ -250,12 +275,7 @@ fn naming(session: &Session, root: &Path, problems: &mut Vec<Problem>) -> Result
     let config = Config::parse_inline(&format!(
         "plugins = [\"core\"]\n[rules]\n\"{DECISION_NAMING}\" = \"warn\"\n"
     ))?;
-    let engine = Engine::new(
-        session.in_process_registry()?,
-        config,
-        Catalog::bundled(),
-        root,
-    )?;
+    let engine = Engine::new(registry_of(session), config, Catalog::bundled(), root)?;
     let outcome = engine.check(&[], &[DECISION_NAMING.to_owned()])?;
     problems.extend(outcome.diagnostics.iter().map(|d| {
         let at = root.join(&d.file);
@@ -303,10 +323,6 @@ fn by_file_name(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
 
 /// What a decision refers to outside itself exists.
 fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut Vec<Problem>) {
-    let keys: BTreeSet<&str> = registry
-        .order_keys()
-        .map(|k| k.manifest().id.as_str())
-        .collect();
     for decision in catalog.decisions() {
         if decision.uid().is_none() {
             problems.push(problem(
@@ -319,11 +335,6 @@ fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut
         }
         if let Some(CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind) {
             named_rule(decision, builtin, registry, path, problems);
-            if let BuiltinCheck::Op(BuiltinOp::Order { clauses }) = builtin {
-                for clause in clauses {
-                    unknown_keys(decision, "`order`", &clause.by, &keys, path, problems);
-                }
-            }
         }
     }
 }
@@ -345,22 +356,6 @@ fn named_rule(
                 "{}: builtin check `{id}` is not registered by its plugin",
                 decision.id()
             ),
-        ));
-    }
-}
-
-fn unknown_keys(
-    decision: &Decision,
-    what: &str,
-    by: &[String],
-    keys: &BTreeSet<&str>,
-    path: &str,
-    problems: &mut Vec<Problem>,
-) {
-    for key in by.iter().filter(|key| !keys.contains(key.as_str())) {
-        problems.push(problem(
-            path,
-            format!("{}: {what} names unknown order key `{key}`", decision.id()),
         ));
     }
 }

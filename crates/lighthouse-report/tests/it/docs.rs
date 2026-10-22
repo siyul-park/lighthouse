@@ -199,11 +199,8 @@ fn a_decision_is_found_in_the_docs_by_its_page_and_heading() {
 }
 
 #[test]
-fn the_fix_operations_page_documents_every_operation_and_key() {
-    let page = fix_operations_markdown(&[(
-        "design/group".to_owned(),
-        "the declaration group".to_owned(),
-    )]);
+fn the_fix_operations_page_documents_every_operation_and_the_orders() {
+    let page = fix_operations_markdown();
 
     for op in OPERATIONS {
         assert!(page.contains(&format!("## `{}`", op.name)), "{}", op.name);
@@ -211,7 +208,8 @@ fn the_fix_operations_page_documents_every_operation_and_key() {
             assert!(page.contains(&format!("| `{}` |", param.name)));
         }
     }
-    assert!(page.contains("| `design/group` | the declaration group |"));
+    assert!(page.contains("## Orders"));
+    assert!(page.contains("declaration_group"));
     assert!(page.contains("returns a list of edits"));
     assert!(page.contains("`rpc` type"));
     assert!(page.contains("type: command"));

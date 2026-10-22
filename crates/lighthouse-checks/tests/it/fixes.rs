@@ -11,10 +11,7 @@ use lighthouse_model::{
         SymbolKind, Visibility,
     },
 };
-use lighthouse_plugin::{
-    Error, FixDecision, FixRequest, Fixer, KeyContext, OrderKey, OrderKeyManifest, OrderKeys,
-    Plugin, Workspace,
-};
+use lighthouse_plugin::{Error, FixDecision, FixRequest, Fixer, Plugin, Workspace};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
@@ -134,46 +131,11 @@ fn finding(symbol: Option<&str>, evidence: Value) -> Diagnostic {
     d
 }
 
-struct Table(OrderKeyManifest, Vec<(&'static str, u64)>);
-
-impl OrderKey for Table {
-    fn manifest(&self) -> &OrderKeyManifest {
-        &self.0
-    }
-
-    fn rank(&self, _: &KeyContext, symbol: &Symbol) -> Result<Option<u64>, Error> {
-        Ok(self
-            .1
-            .iter()
-            .find(|(name, _)| *name == symbol.name)
-            .map(|(_, rank)| *rank))
-    }
-}
-
-struct Keys(Table);
-
-impl OrderKeys for Keys {
-    fn key(&self, id: &str) -> Option<&dyn OrderKey> {
-        (id == "t/rank").then_some(&self.0 as &dyn OrderKey)
-    }
-}
-
-fn keys(table: &[(&'static str, u64)]) -> Keys {
-    Keys(Table(
-        OrderKeyManifest {
-            id: "t/rank".to_owned(),
-            description: String::new(),
-        },
-        table.to_vec(),
-    ))
-}
-
 fn run(
     fixer: &dyn Fixer,
     project: &Project,
     finding: &Diagnostic,
     text: &str,
-    keys: &Keys,
     trusted: bool,
 ) -> Result<FixOutcome, Error> {
     let decision = FixDecision {
@@ -193,7 +155,6 @@ fn run(
         project,
         workspace: &ws,
         text,
-        keys,
         trusted,
     })
 }
@@ -222,7 +183,6 @@ fn evaluate(fix: &str, finding: &Diagnostic) -> Result<FixOutcome, Error> {
         &project(&["a", "b", "c"]),
         finding,
         "",
-        &keys(&[]),
         false,
     )
 }
@@ -361,7 +321,6 @@ fn add_inserts_text_at_an_anchor() {
             &project(&["a", "b", "c"]),
             &finding(Some("b"), json!({})),
             text,
-            &keys(&[]),
             false,
         )
         .unwrap();
@@ -391,7 +350,6 @@ fn add_ends_its_text_with_the_line_ending_of_the_file() {
         &project(&["a"]),
         &finding(Some("a"), json!({})),
         "one\r\ntwo\r\n",
-        &keys(&[]),
         false,
     )
     .unwrap());
@@ -416,7 +374,6 @@ fn replacing_a_symbol_whose_provider_reports_no_extent_declines() {
         &bare,
         &finding(Some("a"), json!({})),
         "",
-        &keys(&[]),
         false,
     )
     .unwrap();
@@ -431,6 +388,16 @@ fn an_expression_that_fails_is_an_error_naming_the_fix() {
     let error = evaluate(fix, &finding(None, json!({}))).unwrap_err();
 
     assert!(error.to_string().contains("local/probe: fix:"), "{error}");
+}
+
+#[test]
+fn a_function_the_fix_never_calls_in_a_branch_no_example_takes_is_found_at_load() {
+    let fix = "safety: unsafe\ntype: cel\nedits: \"finding.file == 'x' ? [] : [remove(nope(1))]\"";
+    let layer = local_layer(fix).unwrap();
+
+    let error = Checks::new("local", &layer).err().unwrap().to_string();
+
+    assert!(error.contains("`nope` is not a function"), "{error}");
 }
 
 #[test]
@@ -460,7 +427,6 @@ fn reorder(table: &str, names: &[&str]) -> FixOutcome {
         &project(names),
         &finding(Some(names[0]), json!({})),
         "",
-        &keys(&[]),
         false,
     )
     .unwrap()

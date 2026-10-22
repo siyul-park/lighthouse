@@ -19,6 +19,7 @@ pub(crate) fn layer(catalog: &Catalog) -> Result<(), Error> {
     }
     unique(catalog)?;
     catalog.decisions().try_for_each(decision)?;
+    option_sources(catalog)?;
     lifecycle(catalog, catalog.decisions())?;
     sources(catalog)
 }
@@ -116,6 +117,33 @@ fn unique(catalog: &Catalog) -> Result<(), Error> {
                     "uid `{uid}` is also the uid of `{other}`; a uid is assigned once and never copied"
                 ),
             ));
+        }
+    }
+    Ok(())
+}
+
+/// A decision that reads the options of another (`options.from`) names one
+/// that exists, is not itself, and reads none in its turn.
+fn option_sources(catalog: &Catalog) -> Result<(), Error> {
+    for decision in catalog.decisions() {
+        let Some(from) = decision.options_from() else {
+            continue;
+        };
+        let source = catalog.decision(from).filter(|s| s.id() != decision.id());
+        match source {
+            None => {
+                return Err(Error::invalid(
+                    decision.id(),
+                    format!("`options.from` names `{from}`, which is no other decision"),
+                ));
+            }
+            Some(source) if source.options_from().is_some() => {
+                return Err(Error::invalid(
+                    decision.id(),
+                    format!("`options.from` names `{from}`, which reads the options of another"),
+                ));
+            }
+            Some(_) => {}
         }
     }
     Ok(())

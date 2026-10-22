@@ -106,3 +106,42 @@ fn a_list_knows_the_index_of_an_element() {
 fn the_string_indexof_is_still_the_strings_one() {
     is("'tacocat'.indexOf('cat')", "4");
 }
+
+#[test]
+fn cel_bind_names_a_value_computed_once() {
+    is("cel.bind(a, 'hello', a + ', ' + a)", "'hello, hello'");
+    is("cel.bind(a, 1, cel.bind(b, a + 1, a + b))", "3");
+    is("cel.bind(a, [1, 2], a.map(x, x * 2))", "[2, 4]");
+    is("[1, 2].map(x, cel.bind(y, x + 1, y * y))", "[4, 9]");
+    is("cel.bind(a, 1, cel.bind(a, 2, a))", "2");
+}
+
+#[test]
+fn program_identifiers() {
+    let program = compile("regex.extract(a.b, c) + size(d)").unwrap();
+    let names = lighthouse_spec::program_identifiers(&program);
+    for name in ["a", "c", "d", "size", "regex"] {
+        assert!(names.contains(name), "{name}: {names:?}");
+    }
+}
+
+#[test]
+fn program_calls() {
+    let program = compile("regex.extract(a, b) + size(c) + c.startsWith('x')").unwrap();
+
+    let calls: Vec<(String, Option<String>, bool, usize)> =
+        lighthouse_spec::program_calls(&program)
+            .into_iter()
+            .filter(|call| call.name.chars().all(|c| c.is_ascii_alphabetic()))
+            .map(|call| (call.name, call.namespace, call.member, call.args))
+            .collect();
+
+    assert_eq!(
+        calls,
+        [
+            ("extract".to_owned(), Some("regex".to_owned()), false, 2),
+            ("size".to_owned(), None, false, 1),
+            ("startsWith".to_owned(), None, true, 1),
+        ]
+    );
+}

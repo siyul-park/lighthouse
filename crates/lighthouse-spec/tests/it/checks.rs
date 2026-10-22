@@ -18,13 +18,14 @@ fn bundled(id: &str) -> &'static Decision {
 
 #[test]
 fn builtin_op() {
-    let check = bundled("design/declaration-groups").check.as_ref().unwrap();
+    let check =
+        check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).unwrap();
 
     let CheckKind::Builtin(BuiltinCheck::Op(op)) = &check.kind else {
         panic!("a standard operation expected");
     };
 
-    assert!(matches!(op, BuiltinOp::Order { clauses, .. } if !clauses.is_empty()));
+    assert!(matches!(op, BuiltinOp::Cycle { .. }));
 }
 
 #[test]
@@ -44,8 +45,9 @@ fn check_kind_deterministic_is_false_only_for_a_model() {
 
 #[test]
 fn check_kind_label_names_the_operation_of_a_standard_builtin() {
-    let order = bundled("design/declaration-groups").check.as_ref().unwrap();
-    assert_eq!(order.kind.label(), "order");
+    let cycle =
+        check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).unwrap();
+    assert_eq!(cycle.kind.label(), "cycle");
     let cel = bundled("core/file-size").check.as_ref().unwrap();
     assert_eq!(cel.kind.label(), "cel");
 }
@@ -56,8 +58,9 @@ fn builtin_check_named_is_the_id_of_a_registered_rule_only() {
         id: "core/no-unused-allow".into(),
     });
     assert_eq!(named.named(), Some("core/no-unused-allow"));
-    let order = bundled("design/declaration-groups").check.as_ref().unwrap();
-    let CheckKind::Builtin(op) = &order.kind else {
+    let cycle =
+        check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).unwrap();
+    let CheckKind::Builtin(op) = &cycle.kind else {
         panic!("builtin expected");
     };
     assert_eq!(op.named(), None);
@@ -244,8 +247,6 @@ fn a_supersession_names_decisions_that_exist_and_are_marked_superseded() {
 
 #[test]
 fn a_builtin_names_one_operation_and_only_its_own_fields() {
-    let order = json!({"type":"builtin","op":"order","clauses":[{"within":"file","by":["p/k"],"message":"m"}]});
-    assert!(check(order).is_ok());
     assert!(
         check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).is_ok()
     );
@@ -253,7 +254,8 @@ fn a_builtin_names_one_operation_and_only_its_own_fields() {
         json!({"type":"builtin","op":"cycle","edge":"imports","level":"module","maxDistance":1}),
         json!({"type":"builtin","op":"cycle","edge":"imports","level":"module","prompt":"p"}),
         json!({"type":"builtin","clauses":[]}),
-        json!({"type":"builtin","op":"order","id":"p/a","clauses":[]}),
+        json!({"type":"builtin","op":"order","clauses":[]}),
+        json!({"type":"builtin","op":"cycle","id":"p/a","edge":"imports","level":"module"}),
         json!({"type":"builtin","op":"judge"}),
     ];
     for stray in strays {
@@ -276,7 +278,6 @@ fn a_command_cannot_be_a_placeholder() {
 
 #[test]
 fn a_standard_operation_needs_the_scope_it_judges() {
-    let order = "  severity: error\n  check:\n    type: builtin\n    op: order\n    clauses:\n      - { within: file, by: [p/k], message: m }\n";
     let cycle = "  severity: error\n  check:\n    type: builtin\n    op: cycle\n    edge: imports\n    level: module\n";
     let examples = "  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{ path: a.go, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: go\n      kind: valid\n      files: [{ path: a.go, body: y }]\n";
     let load = |scope: &str, check: &str| {
@@ -288,14 +289,7 @@ fn a_standard_operation_needs_the_scope_it_judges() {
         );
         Catalog::from_files(with("p/s/a.yaml", &text))
     };
-    assert!(load("file", order).is_ok());
     assert!(load("project", cycle).is_ok());
-    assert!(
-        load("project", order)
-            .unwrap_err()
-            .to_string()
-            .contains("one file at a time")
-    );
     assert!(
         load("file", cycle)
             .unwrap_err()

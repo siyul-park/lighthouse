@@ -2,16 +2,26 @@
 //! whether the plugins and rules it names exist, and what its languages say.
 
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     io,
     path::Path,
 };
 
-use lighthouse_model::ModelRef;
+use lighthouse_model::{ModelRef, Options};
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Config, ModelProvider, Models, Projects, Task, glob_set};
+use lighthouse_spec::{Catalog, Config, ModelProvider, Models, Projects, Rules, Task, glob_set};
 
 use super::{Error, Language};
+
+/// The options a decision reads from another (`options.from`).
+#[derive(Debug, Clone)]
+pub(super) struct Inherited {
+    /// The decision whose options these are.
+    from: String,
+    /// The options read, by key.
+    keys: Vec<String>,
+}
 
 /// The rules the configuration enables for at least one file: the projects it
 /// extends and the entries it sets, resolved over `projects`.
@@ -24,6 +34,53 @@ pub fn active(config: &Config, projects: &Projects) -> Result<BTreeSet<String>, 
     let overridden = config.configured().filter(|(_, c)| c.level.is_some());
     active.extend(overridden.map(|(id, _)| id.to_owned()));
     Ok(active)
+}
+
+/// What each decision that reads the options of another reads, by decision id.
+pub(super) fn inheritance(catalog: &Catalog) -> BTreeMap<String, Inherited> {
+    catalog
+        .decisions()
+        .filter_map(|reader| {
+            let source = catalog.decision(reader.options_from()?)?;
+            let keys = reader
+                .inheriting(source)
+                .options
+                .as_ref()?
+                .inherited
+                .clone();
+            Some((
+                reader.id().to_owned(),
+                Inherited {
+                    from: source.id().to_owned(),
+                    keys,
+                },
+            ))
+        })
+        .collect()
+}
+
+/// The options of `id` at a file: those `own` configures, and the ones it
+/// reads from another decision as `resolved` (the rules at that file) sets them
+/// there, so an override of the source for the file reaches the reader.
+pub(super) fn options_at<'a>(
+    inheritance: &BTreeMap<String, Inherited>,
+    resolved: &Rules,
+    id: &str,
+    own: &'a Options,
+) -> Cow<'a, Options> {
+    let Some(inherited) = inheritance.get(id) else {
+        return Cow::Borrowed(own);
+    };
+    let Some(source) = resolved.get(&inherited.from) else {
+        return Cow::Borrowed(own);
+    };
+    let mut all = own.clone();
+    for key in &inherited.keys {
+        if let Some(value) = source.options.get(key) {
+            all.insert(key.clone(), value.clone());
+        }
+    }
+    Cow::Owned(all)
 }
 
 /// Rejects a configuration that names plugins, projects or rules the registry

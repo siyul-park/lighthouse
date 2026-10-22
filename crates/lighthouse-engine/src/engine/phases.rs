@@ -243,7 +243,6 @@ impl Engine {
                     project,
                     file: input.map(|i| (&i.file, i.text.as_str())),
                     facts,
-                    keys: &self.registry,
                     trusted: self.trusted,
                     memo,
                     notices: &Notices::default(),
@@ -336,7 +335,8 @@ impl Engine {
                 continue;
             }
             let at = Some((file, input.text.as_str()));
-            self.run_one(scene, *rule, (config, level, applies), at, &mut gathered)?;
+            let options = options_at(&self.inherited, &resolved, &meta.id, &config.options);
+            self.run_one(scene, *rule, (&options, level, applies), at, &mut gathered)?;
         }
         // The models answer what the file's rules queued, all at once.
         for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
@@ -397,7 +397,8 @@ impl Engine {
             return Ok(gathered);
         }
         let applies = self.applies(meta.applicability, config);
-        self.run_one(scene, rule, (config, level, applies), None, &mut gathered)?;
+        let options = options_at(&self.inherited, resolved, &meta.id, &config.options);
+        self.run_one(scene, rule, (&options, level, applies), None, &mut gathered)?;
         Ok(gathered)
     }
 
@@ -408,7 +409,7 @@ impl Engine {
         &self,
         scene: &Scene,
         rule: &dyn Rule,
-        (config, level, applies): (&RuleConfig, Severity, Applicability),
+        (options, level, applies): (&Options, Severity, Applicability),
         file: Option<(&File, &str)>,
         gathered: &mut Gathered,
     ) -> Result<(), Error> {
@@ -419,7 +420,6 @@ impl Engine {
             project: scene.project,
             file,
             facts: scene.facts,
-            keys: &self.registry,
             trusted: self.trusted,
             memo: scene.memo,
             notices: &notices,
@@ -427,7 +427,7 @@ impl Engine {
             models: scene.models,
         };
         let started = Instant::now();
-        let checked = self.run_rule(scene, rule, &ctx, &config.options);
+        let checked = self.run_rule(scene, rule, &ctx, options);
         gathered.notices.extend(notices.take());
         *gathered.times.entry(meta.id.clone()).or_default() += started.elapsed();
         let at = file.map(|(file, _)| file.path.as_path());

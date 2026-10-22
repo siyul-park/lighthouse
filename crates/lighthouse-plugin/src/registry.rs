@@ -3,10 +3,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
-use crate::{
-    Analyzer, Error, Fixer, LanguageProvider, ModelClient, OrderKey, OrderKeys, Plugin,
-    PluginManifest, Rule,
-};
+use crate::{Analyzer, Error, Fixer, LanguageProvider, ModelClient, Plugin, PluginManifest, Rule};
 
 /// A language provider with the id of the plugin that registered it.
 pub struct Language {
@@ -23,7 +20,6 @@ pub struct Registry {
     analyzers: BTreeMap<String, Box<dyn Analyzer>>,
     rules: BTreeMap<String, Box<dyn Rule>>,
     fixers: BTreeMap<String, Box<dyn Fixer>>,
-    keys: BTreeMap<String, Box<dyn OrderKey>>,
     models: BTreeMap<String, Box<dyn ModelClient>>,
 }
 
@@ -52,7 +48,6 @@ impl Registry {
         let analyzers = plugin.analyzers();
         let rules = plugin.rules();
         let fixers = plugin.fixers();
-        let keys = plugin.order_keys();
         let models = plugin.models();
         let id = manifest.id.as_str();
         let own = |model: &str| model == id;
@@ -87,13 +82,6 @@ impl Registry {
             &mut BTreeSet::new(),
             id,
         )?;
-        claim(
-            keys.iter().map(|k| k.manifest().id.as_str()),
-            qualified,
-            |k| self.keys.contains_key(k),
-            &mut BTreeSet::new(),
-            id,
-        )?;
 
         let id = manifest.id.clone();
         self.plugins.push(manifest);
@@ -121,8 +109,6 @@ impl Registry {
             .extend(rules.into_iter().map(|r| (r.manifest().id.clone(), r)));
         self.fixers
             .extend(fixers.into_iter().map(|f| (f.manifest().id.clone(), f)));
-        self.keys
-            .extend(keys.into_iter().map(|k| (k.manifest().id.clone(), k)));
         self.models
             .extend(models.into_iter().map(|m| (m.manifest().id.clone(), m)));
         Ok(())
@@ -141,11 +127,6 @@ impl Registry {
     /// Sorted by id.
     pub fn fixers(&self) -> impl Iterator<Item = &dyn Fixer> {
         self.fixers.values().map(Box::as_ref)
-    }
-
-    /// The order keys, sorted by id.
-    pub fn order_keys(&self) -> impl Iterator<Item = &dyn OrderKey> {
-        self.keys.values().map(Box::as_ref)
     }
 
     fn check_languages(&self, languages: &[Box<dyn LanguageProvider>]) -> Result<(), Error> {
@@ -210,13 +191,6 @@ impl Registry {
     pub fn validate(&self) -> Result<(), Error> {
         self.order(self.analyzers.keys().map(String::as_str))
             .map(drop)
-    }
-}
-
-impl OrderKeys for Registry {
-    /// The order key with this qualified id.
-    fn key(&self, id: &str) -> Option<&dyn OrderKey> {
-        self.keys.get(id).map(Box::as_ref)
     }
 }
 
