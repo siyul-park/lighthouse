@@ -45,16 +45,6 @@ pub(super) fn first_outside(old: &str, new: &str, extents: &[Span]) -> Option<us
         })
 }
 
-/// The lines `extent` covers as a range of zero-based line numbers: the first
-/// and one past the last. An extent that ends at the start of a line does not
-/// cover it.
-fn lines_of(extent: &Span) -> (usize, usize) {
-    let first = extent.start.line.saturating_sub(1) as usize;
-    let ends_before = extent.end.col == 1 && extent.end.line > extent.start.line;
-    let end = extent.end.line.saturating_sub(u32::from(ends_before)) as usize;
-    (first, end.max(first))
-}
-
 /// The files the scope `references` lets a change reach: `file`, and every
 /// file that holds a reference site (a caller, a use, a site such as an
 /// import) of a symbol that the change makes in a file already reached, again
@@ -81,6 +71,16 @@ pub(in crate::fix) fn reached(
         }
     }
     reached
+}
+
+/// The lines `extent` covers as a range of zero-based line numbers: the first
+/// and one past the last. An extent that ends at the start of a line does not
+/// cover it.
+fn lines_of(extent: &Span) -> (usize, usize) {
+    let first = extent.start.line.saturating_sub(1) as usize;
+    let ends_before = extent.end.col == 1 && extent.end.line > extent.start.line;
+    let end = extent.end.line.saturating_sub(u32::from(ends_before)) as usize;
+    (first, end.max(first))
 }
 
 /// The symbols of `path` whose lines change from `old` to `new`.

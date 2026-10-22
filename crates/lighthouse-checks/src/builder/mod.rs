@@ -72,6 +72,8 @@ pub(crate) struct Builder<'a> {
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
     declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
+    related: RefCell<BTreeMap<SymbolId, Value>>,
+    related_needs: Needs,
 }
 
 impl<'a> Builder<'a> {
@@ -103,6 +105,8 @@ impl<'a> Builder<'a> {
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
             declared: RefCell::default(),
+            related: RefCell::default(),
+            related_needs: needs.of_related(),
         })
     }
 
@@ -131,6 +135,8 @@ impl<'a> Builder<'a> {
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
             declared: RefCell::default(),
+            related: RefCell::default(),
+            related_needs: needs.of_related(),
         }
     }
 
@@ -293,17 +299,21 @@ impl<'a> Builder<'a> {
     /// The fields on top of the base fields of a symbol, which only the
     /// expressions of this check ask for.
     fn extras(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Map<String, Value> {
-        let mut extras = self.fields(symbol, summary);
+        let mut extras = self.fields(symbol, summary, self.needs);
         self.relations(&mut extras, symbol);
         extras
     }
 
     /// The extra fields that are no relation to other nodes: what a node
     /// related to another one has, as the node itself.
-    fn fields(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Map<String, Value> {
+    fn fields(
+        &self,
+        symbol: &Symbol,
+        summary: Option<&FunctionSummary>,
+        needs: &Needs,
+    ) -> Map<String, Value> {
         let mut extras = Map::new();
         let map = &mut extras;
-        let needs = self.needs;
         if needs.field("metrics") {
             map.insert("metrics".to_owned(), self.metrics(symbol, summary));
         }
@@ -325,7 +335,7 @@ impl<'a> Builder<'a> {
         if needs.field("words") {
             map.insert("words".to_owned(), json!(crate::text::words(&symbol.name)));
         }
-        self.facts(map, symbol, summary);
+        self.facts(map, symbol, summary, needs);
         extras
     }
 
@@ -334,8 +344,8 @@ impl<'a> Builder<'a> {
         map: &mut Map<String, Value>,
         symbol: &Symbol,
         summary: Option<&FunctionSummary>,
+        needs: &Needs,
     ) {
-        let needs = self.needs;
         let project = self.project;
         if needs.field("forwards_only") || needs.field("forward_target") {
             let target = summary.and_then(|_| forwarded(project, symbol));
@@ -362,14 +372,6 @@ impl<'a> Builder<'a> {
                 "touched_by_tests".to_owned(),
                 json!(touched_by_tests(project, symbol)),
             );
-        }
-        if needs.field("implementers") {
-            let types = if symbol.kind == SymbolKind::Interface {
-                project.implementers(&symbol.id)
-            } else {
-                &[]
-            };
-            map.insert("implementers".to_owned(), self.nodes(types));
         }
         if needs.field("data_only") {
             map.insert("data_only".to_owned(), json!(data_only(project, symbol)));
@@ -425,6 +427,14 @@ impl<'a> Builder<'a> {
                 map.insert(name.to_owned(), self.nodes(ids));
             }
         }
+        if self.needs.field("implementers") {
+            let types = if symbol.kind == SymbolKind::Interface {
+                project.implementers(&symbol.id)
+            } else {
+                &[]
+            };
+            map.insert("implementers".to_owned(), self.nodes(types));
+        }
         if self.needs.field("owner") {
             map.insert("owner".to_owned(), self.owner(symbol));
         }
@@ -450,20 +460,33 @@ impl<'a> Builder<'a> {
     /// which stay one level deep. Its owner and members are the nodes of the
     /// base fields; reading any other relation is an error.
     fn related(&self, symbol: &Symbol) -> Value {
+        if let Some(found) = self.related.borrow().get(&symbol.id) {
+            return found.clone();
+        }
+        let value = self.build_related(symbol);
+        self.related
+            .borrow_mut()
+            .insert(symbol.id.clone(), value.clone());
+        value
+    }
+
+    /// A related node as the expressions read it; see [`Builder::related`].
+    fn build_related(&self, symbol: &Symbol) -> Value {
         let summary = self.project.function(&symbol.id);
         let mut value = facts::symbol(self.project, symbol);
-        let mut fields = self.fields(symbol, summary);
-        if self.needs.field("func") {
+        let needs = &self.related_needs;
+        let mut fields = self.fields(symbol, summary, needs);
+        if needs.field("func") {
             let mut func = facts::function(self.project, symbol).unwrap_or(Value::Null);
             if let Some(map) = func.as_object_mut() {
-                map.extend(self.fields(symbol, summary));
+                map.extend(fields.clone());
             }
             fields.insert("func".to_owned(), func);
         }
-        if self.needs.field("owner") {
+        if needs.field("owner") {
             fields.insert("owner".to_owned(), self.owner(symbol));
         }
-        if self.needs.field("members") {
+        if needs.field("members") {
             let members = self.project.members(&symbol.id);
             fields.insert(
                 "members".to_owned(),
@@ -492,22 +515,6 @@ impl<'a> Builder<'a> {
             .map_or(Value::Null, |o| self.node(o))
     }
 
-    /// The declarations of a file, grouped as they sit, found once per file.
-    fn declarations(&self, path: &Path) -> Rc<Vec<Vec<&'a Symbol>>> {
-        let mut declared = self.declared.borrow_mut();
-        if let Some(found) = declared.get(path) {
-            return Rc::clone(found);
-        }
-        let found = Rc::new(
-            self.project
-                .file(path)
-                .map(|file| layout::declarations_in(self.project, file))
-                .unwrap_or_default(),
-        );
-        declared.insert(path.to_owned(), Rc::clone(&found));
-        found
-    }
-
     /// The declarations next to a symbol in its file, before and after it.
     fn siblings(&self, symbol: &Symbol) -> (Value, Value) {
         let project = self.project;
@@ -532,6 +539,22 @@ impl<'a> Builder<'a> {
             node(at.checked_sub(1).and_then(|i| peers.get(i))),
             node(peers.get(at + 1)),
         )
+    }
+
+    /// The declarations of a file, grouped as they sit, found once per file.
+    fn declarations(&self, path: &Path) -> Rc<Vec<Vec<&'a Symbol>>> {
+        let mut declared = self.declared.borrow_mut();
+        if let Some(found) = declared.get(path) {
+            return Rc::clone(found);
+        }
+        let found = Rc::new(
+            self.project
+                .file(path)
+                .map(|file| layout::declarations_in(self.project, file))
+                .unwrap_or_default(),
+        );
+        declared.insert(path.to_owned(), Rc::clone(&found));
+        found
     }
 
     /// The credited tests of a symbol, each a node with the way its name

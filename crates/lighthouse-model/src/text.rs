@@ -14,23 +14,25 @@ pub struct Span {
     pub end: Position,
 }
 
-/// The dominant line ending of a text: CRLF when most of its lines end in it.
-pub fn eol_of(text: &str) -> &'static str {
-    let crlf = text.matches("\r\n").count();
-    let lf = text.matches('\n').count();
-    if lf > 0 && crlf * 2 > lf {
-        "\r\n"
-    } else {
-        "\n"
-    }
-}
-
 /// Converts between byte offsets of a text and the 1-based line and byte
 /// column positions spans use.
 #[derive(Debug, Clone)]
 pub struct LineIndex<'a> {
     text: &'a str,
     starts: Vec<usize>,
+}
+
+/// The unit in which a SARIF run counts columns (`columnKind`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ColumnUnit {
+    /// UTF-16 code units, the unit Lighthouse assumes for a log that does not
+    /// say.
+    #[default]
+    Utf16,
+    /// Unicode code points.
+    CodePoints,
+    /// Bytes, as the tools that do not process text as UTF-16 count.
+    Bytes,
 }
 
 impl<'a> LineIndex<'a> {
@@ -94,17 +96,15 @@ impl<'a> LineIndex<'a> {
     }
 }
 
-/// The unit in which a SARIF run counts columns (`columnKind`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ColumnUnit {
-    /// UTF-16 code units, the unit Lighthouse assumes for a log that does not
-    /// say.
-    #[default]
-    Utf16,
-    /// Unicode code points.
-    CodePoints,
-    /// Bytes, as the tools that do not process text as UTF-16 count.
-    Bytes,
+/// The dominant line ending of a text: CRLF when most of its lines end in it.
+pub fn eol_of(text: &str) -> &'static str {
+    let crlf = text.matches("\r\n").count();
+    let lf = text.matches('\n').count();
+    if lf > 0 && crlf * 2 > lf {
+        "\r\n"
+    } else {
+        "\n"
+    }
 }
 
 /// `at` with its byte column turned into a count of UTF-16 code units of the

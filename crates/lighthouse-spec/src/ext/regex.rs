@@ -20,7 +20,18 @@ use cel::{
         value::Val,
     },
 };
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock, PoisonError},
+};
+
 use regex::{Captures, Regex};
+
+/// One piece of a replacement string.
+enum Piece {
+    Text(String),
+    Group(usize),
+}
 
 /// Registers the overloads on `env`.
 pub(crate) fn install(env: &mut Env) -> Result<(), DeclarationError> {
@@ -32,11 +43,6 @@ pub(crate) fn install(env: &mut Env) -> Result<(), DeclarationError> {
         name = "regex.extract")?;
     cel::add_overload!(env, fn extract_all: (CelString, CelString) -> Result<CelList>,
         name = "regex.extractAll")
-}
-
-fn compile(function: &str, pattern: &CelString<'_>) -> Result<Regex, ExecutionError> {
-    Regex::new(pattern.inner())
-        .map_err(|e| ExecutionError::function_error(function, format!("invalid regex string: {e}")))
 }
 
 fn replace(
@@ -56,10 +62,30 @@ fn replace_n(
     substitute(target, pattern, replacement, *count.inner())
 }
 
-/// One piece of a replacement string.
-enum Piece {
-    Text(String),
-    Group(usize),
+fn substitute(
+    target: &CelString<'_>,
+    pattern: &CelString<'_>,
+    replacement: &CelString<'_>,
+    count: i64,
+) -> Result<CelString<'static>, ExecutionError> {
+    let function = "regex.replace";
+    let regex = compile(function, pattern)?;
+    let pieces = pieces(replacement.inner(), regex.captures_len() - 1)
+        .map_err(|why| ExecutionError::function_error(function, why))?;
+    let limit = usize::try_from(count).ok();
+    let mut out = String::new();
+    let mut at = 0;
+    for (n, found) in regex.captures_iter(target.inner()).enumerate() {
+        if limit.is_some_and(|limit| n >= limit) {
+            break;
+        }
+        let whole = found.get(0).map_or(0..0, |m| m.range());
+        out.push_str(&target.inner()[at..whole.start]);
+        expand(&mut out, &pieces, &found);
+        at = whole.end;
+    }
+    out.push_str(&target.inner()[at..]);
+    Ok(out.into())
 }
 
 /// The pieces of `replacement`, or why it is not one.
@@ -94,32 +120,6 @@ fn pieces(replacement: &str, groups: usize) -> Result<Vec<Piece>, String> {
     Ok(pieces)
 }
 
-fn substitute(
-    target: &CelString<'_>,
-    pattern: &CelString<'_>,
-    replacement: &CelString<'_>,
-    count: i64,
-) -> Result<CelString<'static>, ExecutionError> {
-    let function = "regex.replace";
-    let regex = compile(function, pattern)?;
-    let pieces = pieces(replacement.inner(), regex.captures_len() - 1)
-        .map_err(|why| ExecutionError::function_error(function, why))?;
-    let limit = usize::try_from(count).ok();
-    let mut out = String::new();
-    let mut at = 0;
-    for (n, found) in regex.captures_iter(target.inner()).enumerate() {
-        if limit.is_some_and(|limit| n >= limit) {
-            break;
-        }
-        let whole = found.get(0).map_or(0..0, |m| m.range());
-        out.push_str(&target.inner()[at..whole.start]);
-        expand(&mut out, &pieces, &found);
-        at = whole.end;
-    }
-    out.push_str(&target.inner()[at..]);
-    Ok(out.into())
-}
-
 fn expand(out: &mut String, pieces: &[Piece], found: &Captures<'_>) {
     for piece in pieces {
         match piece {
@@ -127,24 +127,6 @@ fn expand(out: &mut String, pieces: &[Piece], found: &Captures<'_>) {
             Piece::Group(group) => out.push_str(found.get(*group).map_or("", |m| m.as_str())),
         }
     }
-}
-
-/// Whether `regex` can extract: it has at most one capture group.
-fn single(function: &str, regex: &Regex) -> Result<(), ExecutionError> {
-    if regex.captures_len() > 2 {
-        return Err(ExecutionError::function_error(
-            function,
-            "multiple capture groups",
-        ));
-    }
-    Ok(())
-}
-
-/// The text of a match: the capture group when the pattern has one, else the
-/// whole match.
-fn matched<'t>(regex: &Regex, found: &Captures<'t>) -> &'t str {
-    let group = usize::from(regex.captures_len() > 1);
-    found.get(group).map_or("", |m| m.as_str())
 }
 
 fn extract(
@@ -174,4 +156,36 @@ fn extract_all(
         .map(|found| Box::new(CelString::from(matched(&regex, &found).to_owned())) as Box<dyn Val>)
         .collect();
     Ok(CelList::from(all))
+}
+
+/// Whether `regex` can extract: it has at most one capture group.
+fn single(function: &str, regex: &Regex) -> Result<(), ExecutionError> {
+    if regex.captures_len() > 2 {
+        return Err(ExecutionError::function_error(
+            function,
+            "multiple capture groups",
+        ));
+    }
+    Ok(())
+}
+
+/// The text of a match: the capture group when the pattern has one, else the
+/// whole match.
+fn matched<'t>(regex: &Regex, found: &Captures<'t>) -> &'t str {
+    let group = usize::from(regex.captures_len() > 1);
+    found.get(group).map_or("", |m| m.as_str())
+}
+
+fn compile(function: &str, pattern: &CelString<'_>) -> Result<Regex, ExecutionError> {
+    static COMPILED: OnceLock<Mutex<HashMap<String, Regex>>> = OnceLock::new();
+    let cache = COMPILED.get_or_init(Mutex::default);
+    let mut cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some(found) = cache.get(pattern.inner()) {
+        return Ok(found.clone());
+    }
+    let regex = Regex::new(pattern.inner()).map_err(|e| {
+        ExecutionError::function_error(function, format!("invalid regex string: {e}"))
+    })?;
+    cache.insert(pattern.inner().to_string(), regex.clone());
+    Ok(regex)
 }

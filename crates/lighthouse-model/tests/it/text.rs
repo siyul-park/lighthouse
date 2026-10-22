@@ -1,5 +1,5 @@
 use lighthouse_model::{
-    ColumnUnit, LineIndex, Position, Span, byte_position, squash, utf16_position,
+    ColumnUnit, LineIndex, Position, Span, byte_position, eol_of, squash, utf16_position,
 };
 
 fn at(line: u32, col: u32) -> Position {
@@ -100,4 +100,12 @@ fn line_start_and_end_bound_the_line_holding_an_offset() {
 fn squash_turns_runs_of_whitespace_into_one_space() {
     assert_eq!(squash("  a \n\t b  c "), "a b c");
     assert_eq!(squash(" \n"), "");
+}
+
+#[test]
+fn the_line_ending_of_a_text_is_the_one_most_of_its_lines_end_in() {
+    assert_eq!(eol_of("a\r\nb\r\nc\n"), "\r\n");
+    assert_eq!(eol_of("a\nb\r\nc\n"), "\n");
+    assert_eq!(eol_of("no break"), "\n");
+    assert_eq!(eol_of(""), "\n");
 }

@@ -444,6 +444,16 @@ pub(crate) struct Lowerer<'a> {
     complete: &'a dyn Fn(&str) -> bool,
 }
 
+/// What the specs of a `const` group after one that is removed need of it.
+enum Later {
+    /// Nothing: they give their own values.
+    Independent,
+    /// Its place, for the `iota` they count with or the expression they repeat.
+    Positional,
+    /// Its name, which they spell.
+    Named,
+}
+
 /// The whole lines `range` fills, or `None` when other code shares them.
 fn lines_of(text: &str, range: &Range<usize>) -> Option<Range<usize>> {
     let start = text[..range.start].rfind('\n').map_or(0, |n| n + 1);
@@ -493,24 +503,14 @@ fn code_follows(rest: &str) -> bool {
     !(rest.starts_with("/*") && rest.find("*/") == rest.len().checked_sub(2))
 }
 
+#[cfg(test)]
+mod tests;
+
 /// `range` with the spaces and tabs before it included, for a deletion that
 /// leaves other text on its line.
 fn trimmed_back(text: &str, range: Range<usize>) -> Range<usize> {
     let kept = text[..range.start].trim_end_matches([' ', '\t']).len();
     kept..range.end
-}
-
-#[cfg(test)]
-mod tests;
-
-/// What the specs of a `const` group after one that is removed need of it.
-enum Later {
-    /// Nothing: they give their own values.
-    Independent,
-    /// Its place, for the `iota` they count with or the expression they repeat.
-    Positional,
-    /// Its name, which they spell.
-    Named,
 }
 
 /// What the specs after the spec of `removed` in its `const` group need of it;

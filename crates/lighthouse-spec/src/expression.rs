@@ -5,14 +5,11 @@ use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr};
 
 use crate::environment::compile;
 
-fn entries(entries: &[IdedEntryExpr]) -> Vec<&IdedExpr> {
-    entries
-        .iter()
-        .flat_map(|entry| match &entry.expr {
-            EntryExpr::StructField(field) => vec![&field.value],
-            EntryExpr::MapEntry(entry) => vec![&entry.key, &entry.value],
-        })
-        .collect()
+/// One part of a `{{ cel }}` template: literal text, or the source of a hole.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TemplatePart {
+    Text(String),
+    Hole(String),
 }
 
 /// The expressions directly inside `expr`: the operands of a call or a
@@ -34,13 +31,6 @@ pub fn children(expr: &IdedExpr) -> Vec<&IdedExpr> {
         Expr::Struct(structure) => entries(&structure.entries),
         Expr::Ident(_) | Expr::Literal(_) | Expr::Unspecified => Vec::new(),
     }
-}
-
-/// One part of a `{{ cel }}` template: literal text, or the source of a hole.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TemplatePart {
-    Text(String),
-    Hole(String),
 }
 
 /// Splits a template into its text and its `{{ cel }}` holes; the one parser
@@ -80,4 +70,14 @@ pub(crate) fn template_problem(what: &str, text: &str) -> Option<String> {
             TemplatePart::Text(_) => None,
         }),
     }
+}
+
+fn entries(entries: &[IdedEntryExpr]) -> Vec<&IdedExpr> {
+    entries
+        .iter()
+        .flat_map(|entry| match &entry.expr {
+            EntryExpr::StructField(field) => vec![&field.value],
+            EntryExpr::MapEntry(entry) => vec![&entry.key, &entry.value],
+        })
+        .collect()
 }

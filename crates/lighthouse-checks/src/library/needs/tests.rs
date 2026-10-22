@@ -81,3 +81,19 @@ fn a_word_inside_a_string_or_a_longer_name_is_not_a_field() {
     assert!(!needs.field("owner"));
     assert!(!needs.field("role"));
 }
+
+#[test]
+fn an_index_computed_from_a_size_is_a_position_not_a_field() {
+    let needs = of("l[size(l) - 1].doc");
+    assert!(needs.field("doc"));
+    assert!(!needs.field("callers"));
+}
+
+#[test]
+fn a_related_node_needs_only_what_is_read_from_something_else_than_the_subject() {
+    let needs = of("func.metrics.lines > 3 && symbol.callers.exists(c, c.doc == '')");
+    let related = needs.of_related();
+    assert!(needs.field("metrics") && needs.field("callers"));
+    assert!(related.field("doc"));
+    assert!(!related.field("metrics") && !related.field("callers"));
+}

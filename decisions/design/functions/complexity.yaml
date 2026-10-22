@@ -127,15 +127,13 @@ spec:
         expression: func.unit
       - name: fold
         expression: "'helpers' in options.kinds"
-      - name: limits
-        expression: options.limits
       - name: caps
         expression: >-
-          {'lines': type(limits.lines) == int ? limits.lines : limits.lines[?func.role].orValue(limits.lines[?'default'].orValue(-1)),
-            'statements': type(limits.statements) == int ? limits.statements : limits.statements[?func.role].orValue(limits.statements[?'default'].orValue(-1)),
-            'cyclomatic': type(limits.cyclomatic) == int ? limits.cyclomatic : limits.cyclomatic[?func.role].orValue(limits.cyclomatic[?'default'].orValue(-1)),
-            'cognitive': type(limits.cognitive) == int ? limits.cognitive : limits.cognitive[?func.role].orValue(limits.cognitive[?'default'].orValue(-1)),
-            'nesting': type(limits.nesting) == int ? limits.nesting : limits.nesting[?func.role].orValue(limits.nesting[?'default'].orValue(-1))}
+          {'lines': type(options.limits.lines) == int ? options.limits.lines : options.limits.lines[?func.role].orValue(options.limits.lines[?'default'].orValue(-1)),
+            'statements': type(options.limits.statements) == int ? options.limits.statements : options.limits.statements[?func.role].orValue(options.limits.statements[?'default'].orValue(-1)),
+            'cyclomatic': type(options.limits.cyclomatic) == int ? options.limits.cyclomatic : options.limits.cyclomatic[?func.role].orValue(options.limits.cyclomatic[?'default'].orValue(-1)),
+            'cognitive': type(options.limits.cognitive) == int ? options.limits.cognitive : options.limits.cognitive[?func.role].orValue(options.limits.cognitive[?'default'].orValue(-1)),
+            'nesting': type(options.limits.nesting) == int ? options.limits.nesting : options.limits.nesting[?func.role].orValue(options.limits.nesting[?'default'].orValue(-1))}
       - name: subject
         expression: "func.role == 'constructor' ? func.built + ' needs' : func.name + ' has'"
       - name: hub_role

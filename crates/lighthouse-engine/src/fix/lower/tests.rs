@@ -724,7 +724,10 @@ fn rename_needs_complete_references_a_private_symbol_and_a_free_name() {
     }
 }
 
-fn site_edges(sites: &[((u32, u32), (u32, u32))]) -> Vec<Edge> {
+/// A (line, column) pair.
+type Point = (u32, u32);
+
+fn site_edges(sites: &[(Point, Point)]) -> Vec<Edge> {
     sites
         .iter()
         .map(|(from, to)| reference("user", "old", Some(span(*from, *to)), Resolution::Semantic))
