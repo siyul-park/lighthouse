@@ -16,7 +16,7 @@ use lighthouse_engine::Engine;
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
-use lighthouse_spec::{BuiltinCheck, Catalog, CheckKind, Decision};
+use lighthouse_spec::Catalog;
 use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
@@ -120,7 +120,7 @@ impl Sets {
             };
             match loaded {
                 Ok((place, catalog)) => {
-                    references(&catalog, registry, &place, problems);
+                    uids(&catalog, &place, problems);
                     if named.insert(at.clone()) {
                         naming(session, &at, problems)?;
                     }
@@ -321,8 +321,8 @@ fn by_file_name(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// What a decision refers to outside itself exists.
-fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut Vec<Problem>) {
+/// Every decision has the `uid` its findings are identified by.
+fn uids(catalog: &Catalog, path: &str, problems: &mut Vec<Problem>) {
     for decision in catalog.decisions() {
         if decision.uid().is_none() {
             problems.push(problem(
@@ -333,29 +333,5 @@ fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut
                 ),
             ));
         }
-        if let Some(CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind) {
-            named_rule(decision, builtin, registry, path, problems);
-        }
-    }
-}
-
-fn named_rule(
-    decision: &Decision,
-    builtin: &BuiltinCheck,
-    registry: &Registry,
-    path: &str,
-    problems: &mut Vec<Problem>,
-) {
-    let Some(id) = builtin.named() else {
-        return;
-    };
-    if registry.has_plugin(plugin_of(id)) && registry.rule(id).is_none() {
-        problems.push(problem(
-            path,
-            format!(
-                "{}: builtin check `{id}` is not registered by its plugin",
-                decision.id()
-            ),
-        ));
     }
 }

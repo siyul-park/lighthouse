@@ -15,8 +15,8 @@ fn bundled(id: &str) -> &'static Decision {
 mod write {
     use lighthouse_resource::Metadata;
     use lighthouse_spec::{
-        BuiltinCheck, Check, CheckKind, DecisionSpec, Example, ExampleKind, Expect, LanguageSpec,
-        NamedRule, OptionSchema, OptionType, OptionsSchema, Scope,
+        DecisionSpec, Example, ExampleKind, Expect, LanguageSpec, OptionSchema, OptionType,
+        OptionsSchema, Scope,
     };
 
     use super::*;
@@ -51,11 +51,12 @@ mod write {
                 },
             )]
             .into(),
-            check: Some(Check::new(CheckKind::Builtin(BuiltinCheck::Named(
-                NamedRule {
-                    id: "p/rich".into(),
-                },
-            )))),
+            check: Some(
+                serde_json::from_value(
+                    json!({"type":"cel","select":"file","where":"true","message":"m"}),
+                )
+                .unwrap(),
+            ),
             fix: None,
             provenance: Provenance {
                 was_derived_from: vec!["Someone 2001".into()],

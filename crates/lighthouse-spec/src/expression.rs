@@ -9,8 +9,18 @@ use crate::environment::{compile_shared, is_namespace};
 
 /// The variables a check can name for the value it judges, by `select`, and
 /// `node`, the one of a value related to it.
-pub const SUBJECT_VARIABLES: [&str; 10] = [
-    "symbol", "func", "edge", "module", "file", "test", "comment", "event", "decision", "node",
+pub const SUBJECT_VARIABLES: [&str; 11] = [
+    "symbol",
+    "func",
+    "edge",
+    "module",
+    "file",
+    "test",
+    "comment",
+    "annotation",
+    "event",
+    "decision",
+    "node",
 ];
 
 /// One part of a `{{ cel }}` template: literal text, or the source of a hole.

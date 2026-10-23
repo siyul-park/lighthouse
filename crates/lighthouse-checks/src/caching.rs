@@ -31,6 +31,9 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("built", Reach::Local),
     ("role", Reach::Local),
     ("symbols", Reach::Local),
+    // What the directives of the file suppressed: judged after every rule.
+    ("annotations", Reach::Global),
+    ("cycle", Reach::Global),
     ("comments", Reach::Local),
     ("params", Reach::Local),
     ("results", Reach::Local),

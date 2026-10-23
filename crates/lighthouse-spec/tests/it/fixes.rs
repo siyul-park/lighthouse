@@ -12,7 +12,8 @@ fn rejected(files: Files, needle: &str) {
     );
 }
 
-const CHECKED: &str = "  check:\n    type: builtin\n    id: p/a\n";
+const CHECKED: &str =
+    "  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n";
 const EXAMPLES: &str = "  examples:
     - name: bad
       language: go

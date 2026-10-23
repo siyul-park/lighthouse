@@ -1,3 +1,4 @@
+mod annotations;
 mod cel;
 mod fix;
 mod memo;
@@ -21,6 +22,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
 
+pub use annotations::Annotations;
 pub use cel::{CatalogFunction, CelLibrary, CelLibraryManifest, Function, Overload, Precedence};
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
 pub use lighthouse_protocol::Conventions;
@@ -337,6 +339,13 @@ pub trait Rule: Send + Sync {
     /// Whether the rule puts subjects to models (an `abstain` route). Its findings
     /// are stored only for a run that does not ask the models.
     fn reviews(&self) -> bool {
+        false
+    }
+    /// Whether the rule reads the suppression directives of its files with
+    /// what each suppressed (see [`Annotations`]). The engine runs such a rule
+    /// once the other rules' findings are known, and its findings are not
+    /// themselves suppressed.
+    fn after_suppression(&self) -> bool {
         false
     }
 }

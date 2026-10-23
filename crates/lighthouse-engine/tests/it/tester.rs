@@ -191,8 +191,10 @@ spec:
         description: Word to flag.
     additionalProperties: false
   check:
-    type: builtin
-    id: fake/marker
+    type: cel
+    select: file
+    where: 'true'
+    message: m
 {}  examples:
 {}",
         under_spec(fix),

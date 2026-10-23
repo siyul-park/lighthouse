@@ -44,8 +44,17 @@ spec:
     the reason is required. Allowed findings are counted in the report.
   severity: error
   check:
-    type: builtin
-    id: core/allow
+    type: cel
+    select: annotation
+    # One finding per directive that names rules: at the first of them.
+    where: >-
+      annotation.reason == null && annotation.form != 'enable' &&
+      annotation.rules.size() > 0 && annotation.rule == annotation.rules[0]
+    message: "`{{ annotation.marker }}` needs a reason: write `{{ annotation.marker }} <rule> -- <why>`; the annotation is ignored"
+    evidence:
+      rules: annotation.rules
+      reason: annotation.reason
+      annotation: annotation.extent
   provenance:
     wasDerivedFrom:
     - 'ESLint eslint-comments/require-description: https://eslint-community.github.io/eslint-plugin-eslint-comments/rules/require-description.html'

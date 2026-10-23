@@ -16,7 +16,6 @@ mod check;
 mod checks;
 pub mod command;
 mod compose;
-mod cycle;
 mod eval;
 mod facts;
 mod fix;

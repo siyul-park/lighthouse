@@ -42,7 +42,7 @@ fn imported(catalog: &Catalog) -> Vec<String> {
         .kind
     {
         CheckKind::Cel(cel) => cel.variables.iter().map(|v| v.name.clone()).collect(),
-        other => panic!("cel expected, got {}", other.label()),
+        other => panic!("cel expected, got {}", other.name()),
     }
 }
 

@@ -14,7 +14,6 @@ use serde_json::{Value, json};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum CheckBy {
-    Builtin,
     Cel,
     Command,
     Model,
@@ -168,7 +167,6 @@ impl CheckBy {
     /// The word the descriptor calls the provider of a check by.
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Builtin => "builtin",
             Self::Cel => "cel",
             Self::Command => "command",
             Self::Model => "model",

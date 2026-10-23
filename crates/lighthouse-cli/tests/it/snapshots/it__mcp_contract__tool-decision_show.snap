@@ -40,7 +40,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           "by": {
             "description": "What decides the findings of a decision.",
             "enum": [
-              "builtin",
               "cel",
               "command",
               "model"

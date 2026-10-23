@@ -7,7 +7,7 @@ The spec kinds (Decision, Pack, Project, check and fix specs, options schema) an
 ## Entry points
 - `Catalog`: `bundled()`, `load`, `overlay` (the project layer over the bundled one), `load_local`.
 - `Decision`, `Pack`, `Section`: the documents of the catalog; `Decision::reference()` gives the protocol `DecisionRef`.
-- `Check`, `CheckKind` (builtin, cel, command, rpc, model) and `Fix`, `FixKind`: how a decision is checked and fixed.
+- `Check`, `CheckKind` (cel, command, rpc, model) and `Fix`, `FixKind`: how a decision is checked and fixed.
 - `Config`: `lighthouse.toml` (rule levels, overrides, plugins, languages, model bindings).
 - `descriptors()`: the JSON Schema of every kind defined here.
 

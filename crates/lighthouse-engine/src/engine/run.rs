@@ -162,7 +162,6 @@ impl Engine {
         scopes: &Scopes,
         run: &mut Run,
     ) -> Result<Vec<Diagnostic>, Error> {
-        let level = |rule: &str, file: &Path, lang: &str| self.level_at(rule, file, lang);
         let texts: BTreeMap<&Path, &str> = scene
             .inputs
             .iter()
@@ -170,14 +169,13 @@ impl Engine {
             .collect();
         let text = |path: &Path| texts.get(path).copied();
         let gate = annotations::Gate {
-            level: &level,
             active: &self.active,
             selected: ran,
-            registry: &self.registry,
             text: &text,
         };
-        let applied = annotations::apply(found, scene.project, &gate)?;
+        let applied = annotations::apply(found, scene.project, &gate);
         let mut kept = applied.kept;
+        kept.extend(self.judge_annotations(scene, applied.annotations, run)?);
         kept.retain(|d| scopes.contains(&d.file));
         run.reviews.retain(|d| scopes.contains(&d.file));
         in_order(&mut run.reviews);
@@ -213,17 +211,6 @@ impl Engine {
         run.options = self.options_of(&found, scene.project)?;
         run.diagnostics = found;
         Ok(())
-    }
-
-    /// The level the configuration gives a rule at a file; `None` when off.
-    fn level_at(
-        &self,
-        rule: &str,
-        file: &Path,
-        lang: &str,
-    ) -> Result<Option<Severity>, lighthouse_spec::Error> {
-        let rules = self.config.resolve(file, lang, &self.projects)?;
-        Ok(rules.get(rule).and_then(|config| config.level))
     }
 
     /// The options the configuration resolves for each finding's rule at its

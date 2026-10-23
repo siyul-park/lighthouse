@@ -20,8 +20,29 @@ spec:
     fires there, or is not enabled, SHOULD be removed.
   severity: warn
   check:
-    type: builtin
-    id: core/no-unused-allow
+    type: cel
+    select: annotation
+    variables:
+      - name: said
+        expression: >-
+          annotation.rules.size() == 0
+            ? '`' + annotation.marker + '` names no decision; there is no form without ids, name the decisions it is for'
+            : annotation.form == 'enable'
+              ? '`' + annotation.marker + ' ' + annotation.rule + '` has no matching `lighthouse-disable`; remove it'
+              : '`' + annotation.marker + ' ' + annotation.rule + '` suppresses nothing ' +
+                (annotation.range ? 'in its range' : 'here') + '; remove it'
+    # A directive that names no rule, an `enable` that ends no range, or a
+    # claim whose rule could have fired and that suppressed nothing.
+    where: >-
+      annotation.rules.size() == 0 ||
+      (annotation.form == 'enable'
+        ? !annotation.closes
+        : annotation.reason != null && annotation.settled && !annotation.used)
+    message: "{{ said }}"
+    evidence:
+      rules: annotation.rules
+      reason: annotation.reason
+      annotation: annotation.extent
   fix:
     safety: unsafe
     type: cel

@@ -17,7 +17,7 @@ use lighthouse_model::{
     Span,
     ucm::{Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
-use lighthouse_plugin::{Context, Error, Workspace};
+use lighthouse_plugin::{Annotations, Context, Error, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -31,6 +31,7 @@ use crate::{
 
 mod api;
 mod cohesion;
+mod cycle;
 mod effective;
 mod forward;
 mod gap;
@@ -50,6 +51,7 @@ use forward::{forwarded, reaches};
 pub(crate) struct Indexes {
     single: OnceLock<effective::Index>,
     imports: OnceLock<BTreeMap<String, Vec<String>>>,
+    cycles: OnceLock<BTreeMap<String, Vec<String>>>,
     types: OnceLock<BTreeMap<String, Vec<Value>>>,
     parents: OnceLock<parent::Uses>,
     modules: OnceLock<System>,
@@ -66,6 +68,7 @@ pub(crate) struct Builder<'a> {
     measures: Option<BTreeMap<SymbolId, Measures>>,
     table: Arc<Table>,
     indexes: Arc<Indexes>,
+    annotations: Arc<Annotations>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
     declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
@@ -96,6 +99,7 @@ impl<'a> Builder<'a> {
             measures,
             table: ctx.memo.slot(),
             indexes: ctx.memo.slot(),
+            annotations: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
             declared: RefCell::default(),
@@ -123,6 +127,7 @@ impl<'a> Builder<'a> {
             measures: None,
             table: Arc::default(),
             indexes: Arc::default(),
+            annotations: Arc::default(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
             declared: RefCell::default(),
@@ -235,6 +240,9 @@ impl<'a> Builder<'a> {
         if self.needs.field("types") {
             value["types"] = self.module_types(&module.path);
         }
+        if self.needs.field("cycle") {
+            value["cycle"] = self.module_cycle(&module.path);
+        }
         if self.needs.field("parent") {
             value["parent"] = self.module_parent(module);
         }
@@ -242,6 +250,12 @@ impl<'a> Builder<'a> {
             value["stability"] = self.module_stability(module);
         }
         value
+    }
+
+    /// What the suppression directives of the file say, once the engine has
+    /// judged them; `None` before.
+    pub(crate) fn annotations(&self, file: &Path) -> Option<Vec<Value>> {
+        self.annotations.of(file)
     }
 
     /// A file with the facts about its text and its symbols.
@@ -266,6 +280,11 @@ impl<'a> Builder<'a> {
         }
         if self.needs.field("line_widths") {
             value["line_widths"] = widths::line_widths(text);
+        }
+        if self.needs.field("annotations") {
+            value["annotations"] = self
+                .annotations(&file.path)
+                .map_or(Value::Null, Value::Array);
         }
         if self.needs.field("private_reach") {
             value["private_reach"] = self.private_reach(file);

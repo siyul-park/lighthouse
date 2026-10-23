@@ -12,8 +12,10 @@ const ALPHA: &str = "  title: Alpha holds
   requirement: Alpha MUST hold.
   severity: error
   check:
-    type: builtin
-    id: demo/alpha
+    type: cel
+    select: symbol
+    where: 'true'
+    message: m
   options:
     properties:
       limit:
@@ -122,8 +124,10 @@ fn fixed_fixture() -> Catalog {
   requirement: Gamma MUST come first.
   severity: error
   check:
-    type: builtin
-    id: p/a
+    type: cel
+    select: file
+    where: 'true'
+    message: m
   fix:
     safety: safe
     type: cel
@@ -162,7 +166,7 @@ fn fixed_fixture() -> Catalog {
 fn a_fixable_decision_shows_a_diff_and_links_other_languages() {
     let text = pages(&fixed_fixture())["decisions/demo.md"].clone();
     assert!(
-        text.contains("`demo/gamma` · file · error · builtin · fix: safe"),
+        text.contains("`demo/gamma` · file · error · cel · fix: safe"),
         "{text}"
     );
     assert!(text.contains("```diff\n--- a/a.go\n+++ b/a.go\n"), "{text}");

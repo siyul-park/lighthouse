@@ -47,12 +47,12 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/allow`](#allow-a-finding-in-source-with-a-reason) | Allow a finding in source, with a reason | error · builtin |  |  |
-| [`core/no-unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · builtin | unsafe |  |
+| [`core/allow`](#allow-a-finding-in-source-with-a-reason) | Allow a finding in source, with a reason | error · cel |  |  |
+| [`core/no-unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · cel | unsafe |  |
 
 ### Allow a finding in source, with a reason
 
-`core/allow` · file · error · builtin
+`core/allow` · file · error · cel
 
 *A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change, and an exception without a reason cannot be reviewed or revisited. A silenced check is the smell Martin calls Overridden Safeties, so the way to silence one is narrow and explained. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids (ESLint `eslint-comments/require-description`, golangci `nolintlint` with `require-explanation`, clippy `allow_attributes_without_reason`). `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive. The check reports a directive that gives no reason (kind `reason`); the directive is then ignored. One that suppresses nothing is `core/no-unused-allow`.*
 
@@ -78,7 +78,7 @@ Also: rust
 
 ### Allow annotations suppress something
 
-`core/no-unused-allow` · file · warn · builtin · fix: unsafe
+`core/no-unused-allow` · file · warn · cel · fix: unsafe
 
 *An exception that no longer applies is noise that hides the next real one. A `lighthouse-disable` range that covers no finding is as stale as a single directive, and so is a `lighthouse-enable` that closes no range, or a directive that names no decision (there is no form without ids).*
 

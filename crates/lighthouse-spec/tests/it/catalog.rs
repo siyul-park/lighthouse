@@ -306,12 +306,6 @@ mod overlay {
         let probe = decision("p/x", SPEC);
         let error = Catalog::from_local(files(&[("x.yaml", probe)])).unwrap_err();
         assert!(error.to_string().contains("local/<name>"), "{error}");
-        let builtin = decision(
-            "local/x",
-            &format!("{SPEC}{CHECKED_SPEC}  check:\n    type: builtin\n    id: local/x\n"),
-        );
-        let error = Catalog::from_local(files(&[("x.yaml", builtin)])).unwrap_err();
-        assert!(error.to_string().contains("standard operation"), "{error}");
     }
 }
 

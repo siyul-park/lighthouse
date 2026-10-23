@@ -4,39 +4,33 @@ use std::{
 };
 
 use lighthouse_model::{
-    Diagnostic, Fingerprint, Position, Severity, Span, Suppressed, Suppression,
-    annotation::{self, ANNOTATION_REASON, Directive, Form, UNUSED_ALLOW},
+    Diagnostic, Position, Span, Suppressed, Suppression,
+    annotation::{self, Directive, Form},
     squash,
     ucm::{Comment, Project},
 };
-use lighthouse_plugin::Registry;
-use lighthouse_spec::Error as SpecError;
-use serde_json::json;
-
-/// The level the configuration gives a rule at a file of a language.
-pub(crate) type LevelAt<'a> = dyn Fn(&str, &Path, &str) -> Result<Option<Severity>, SpecError> + 'a;
+use serde_json::{Value, json};
 
 /// What the run knows about rules, which directives need to judge whether
 /// they are used.
 pub(crate) struct Gate<'a> {
-    /// The level a rule has at a file and language, `None` when it is off.
-    pub level: &'a LevelAt<'a>,
     /// Rules enabled by the configuration.
     pub active: &'a BTreeSet<String>,
     /// Rules that ran in this run.
     pub selected: &'a BTreeSet<String>,
-    /// The rules: the uid and former names of one that ran seed the
-    /// fingerprints of the findings the engine reports itself.
-    pub registry: &'a Registry,
     /// The text of a file of the run.
     pub text: &'a dyn Fn(&Path) -> Option<&'a str>,
 }
 
 /// What applying the directives came to.
 pub(crate) struct Applied {
-    /// The findings that remain, and the findings about directives.
+    /// The findings that remain.
     pub kept: Vec<Diagnostic>,
     pub allowed: Vec<Suppressed>,
+    /// What the directives of each file with one say, for the rules that
+    /// judge them: one value per rule a directive names (one for a directive
+    /// that names none), as [`Reader::annotation`] describes it.
+    pub annotations: BTreeMap<PathBuf, Vec<Value>>,
 }
 
 /// A directive on a line of a comment of the file being read.
@@ -72,37 +66,34 @@ struct Claim<'a> {
 
 /// The directives of one file read in source order: what each disables, which
 /// ranges are open, and the findings about directives that are wrong.
-struct Reader<'a, 'g> {
-    gate: &'g Gate<'g>,
-    lang: &'a str,
+struct Reader<'a> {
     /// The line of the file's first code; a `lighthouse-disable` above it is
     /// at the top of the file.
     first_code: u32,
     claims: Vec<Claim<'a>>,
     /// The claims of the ranges still open, by rule.
     open: BTreeMap<String, Vec<usize>>,
-    extra: Vec<Diagnostic>,
+    /// What the directives that are wrong say, with their claims' own below.
+    annotations: Vec<Value>,
 }
 
-impl<'a> Reader<'a, '_> {
-    fn read(&mut self, at: &'a Located<'a>) -> Result<(), SpecError> {
+impl<'a> Reader<'a> {
+    fn read(&mut self, at: &'a Located<'a>) {
         let directive = &at.directive;
         if directive.rules.is_empty() {
-            let message = format!(
-                "`{}` names no decision; there is no form without ids, name the decisions it is for",
-                directive.marker
-            );
-            return self.note(at, UNUSED_ALLOW, message);
+            self.annotations.push(annotation(at, "", None));
+            return;
         }
         if directive.form == Form::Enable {
-            return self.enable(at);
+            self.enable(at);
+            return;
         }
         if directive.reason.is_none() {
-            let marker = directive.marker;
-            let message = format!(
-                "`{marker}` needs a reason: write `{marker} <rule> -- <why>`; the annotation is ignored"
-            );
-            return self.note(at, ANNOTATION_REASON, message);
+            // Ignored: it claims nothing, so it is neither used nor unused.
+            for rule in &directive.rules {
+                self.annotations.push(annotation(at, rule, None));
+            }
+            return;
         }
         for id in &directive.rules {
             let rule = id.clone();
@@ -128,49 +119,31 @@ impl<'a> Reader<'a, '_> {
             }
             self.claims.push(Claim { at, rule, coverage });
         }
-        Ok(())
     }
 
     /// `lighthouse-enable` ends the open ranges of the rules it names; one
     /// that closes nothing is reported.
-    fn enable(&mut self, at: &'a Located<'a>) -> Result<(), SpecError> {
+    fn enable(&mut self, at: &'a Located<'a>) {
         for id in &at.directive.rules {
             let rule = id.clone();
-            let Some(ranges) = self.open.remove(&rule) else {
-                let message = format!(
-                    "`{} {rule}` has no matching `lighthouse-disable`; remove it",
-                    at.directive.marker
-                );
-                self.note(at, UNUSED_ALLOW, message)?;
-                continue;
-            };
-            for range in ranges {
+            let closed = self.open.remove(&rule);
+            self.annotations
+                .push(annotation(at, &rule, Some(closed.is_some())));
+            for range in closed.into_iter().flatten() {
                 if let Coverage::Range { to, .. } = &mut self.claims[range].coverage {
                     *to = Some(at.line);
                 }
             }
         }
-        Ok(())
-    }
-
-    fn note(&mut self, at: &Located, rule: &str, message: String) -> Result<(), SpecError> {
-        self.extra
-            .extend(finding(self.gate, at, self.lang, rule, message)?);
-        Ok(())
     }
 }
 
 /// Applies the suppression directives of the project to `found`: a finding of
 /// a named rule that a directive reaches is removed and returned as allowed,
 /// whatever its severity. A directive that disables without a reason is
-/// ignored and reported, and so is one that suppresses nothing, an
-/// unmatched `lighthouse-enable` and one that names no rule, when the rules
-/// for them are enabled.
-pub(crate) fn apply<'g>(
-    found: Vec<Diagnostic>,
-    project: &Project,
-    gate: &'g Gate<'g>,
-) -> Result<Applied, SpecError> {
+/// ignored. What each directive said and whether it suppressed anything is
+/// returned for the rules that judge directives.
+pub(crate) fn apply<'g>(found: Vec<Diagnostic>, project: &Project, gate: &'g Gate<'g>) -> Applied {
     let mut allowed = Vec::new();
     let mut open = Vec::new();
     for mut diagnostic in found {
@@ -194,7 +167,7 @@ pub(crate) fn apply<'g>(
             .push(n);
     }
     let mut found: Vec<Option<Diagnostic>> = open.into_iter().map(Some).collect();
-    let mut extra = Vec::new();
+    let mut annotations = BTreeMap::new();
     for file in &project.files {
         let located = locate(project, &file.path);
         if located.is_empty() {
@@ -203,36 +176,36 @@ pub(crate) fn apply<'g>(
         let first_code = (gate.text)(&file.path)
             .map_or(u32::MAX, |text| first_code_line(project, &file.path, text));
         let mut reader = Reader {
-            gate,
-            lang: &file.lang,
             first_code,
             claims: Vec::new(),
             open: BTreeMap::new(),
-            extra: Vec::new(),
+            annotations: Vec::new(),
         };
         for at in &located {
-            reader.read(at)?;
+            reader.read(at);
         }
         let Reader {
             claims,
-            extra: noted,
+            annotations: mut said,
             ..
         } = reader;
-        extra.extend(noted);
         let here = index.get(&file.path);
         for claim in &claims {
             let taken = take(&mut found, here, claim);
-            extra.extend(unused_note(gate, &file.lang, claim, taken.is_empty())?);
+            said.push(claimed(gate, claim, !taken.is_empty()));
             let reason = claim.at.directive.reason.clone().unwrap_or_default();
             allowed.extend(taken.into_iter().map(|diagnostic| Suppressed {
                 diagnostic,
                 suppression: Suppression::in_source(reason.clone()),
             }));
         }
+        annotations.insert(file.path.clone(), said);
     }
-    let mut kept: Vec<Diagnostic> = found.into_iter().flatten().collect();
-    kept.extend(extra);
-    Ok(Applied { kept, allowed })
+    Applied {
+        kept: found.into_iter().flatten().collect(),
+        allowed,
+        annotations,
+    }
 }
 
 /// The directives of the comments of `file`, in source order.
@@ -253,27 +226,15 @@ fn locate<'a>(project: &'a Project, file: &Path) -> Vec<Located<'a>> {
         .collect()
 }
 
-/// The finding about a claim that suppressed nothing, when its rule could
-/// have fired.
-fn unused_note(
-    gate: &Gate,
-    lang: &str,
-    claim: &Claim,
-    nothing: bool,
-) -> Result<Option<Diagnostic>, SpecError> {
-    if !nothing || !unused(gate, &claim.rule) {
-        return Ok(None);
-    }
-    let marker = claim.at.directive.marker;
-    let place = match claim.coverage {
-        Coverage::Range { .. } => "in its range",
-        Coverage::NextLine(_) | Coverage::Line(_) => "here",
-    };
-    let message = format!(
-        "`{marker} {}` suppresses nothing {place}; remove it",
-        claim.rule
-    );
-    finding(gate, claim.at, lang, UNUSED_ALLOW, message)
+/// What a claim of a directive says, for the rules that judge directives:
+/// whether it suppressed a finding (`used`), and whether its rule could have
+/// fired (`settled`), so that a claim that suppressed nothing is stale.
+fn claimed(gate: &Gate, claim: &Claim, used: bool) -> Value {
+    let mut value = annotation(claim.at, &claim.rule, None);
+    value["used"] = json!(used);
+    value["settled"] = json!(unused(gate, &claim.rule));
+    value["range"] = json!(matches!(claim.coverage, Coverage::Range { .. }));
+    value
 }
 
 /// Removes and returns the findings of the claim's rule that it reaches;
@@ -323,43 +284,35 @@ fn unused(gate: &Gate, rule: &str) -> bool {
     gate.selected.contains(rule) || !gate.active.contains(rule)
 }
 
-fn finding(
-    gate: &Gate,
-    at: &Located,
-    lang: &str,
-    rule: &str,
-    message: String,
-) -> Result<Option<Diagnostic>, SpecError> {
+/// What one rule named by a directive, or a directive that names none (`rule`
+/// is empty), says: the rule and all the directive's rules, the reason (null
+/// when it gives none), the marker and form as written, and where it is. A
+/// claim is `used` when it suppressed something, `settled` when its rule could
+/// have fired, `range` when it covers a range; `closes` is for `enable`, true
+/// when it ended a range. `snippet` is what identifies it from one run to the
+/// next, `place` where a finding about it is reported and `extent` the text a
+/// fix removes.
+fn annotation(at: &Located, rule: &str, closes: Option<bool>) -> Value {
     let comment = at.comment;
-    if !gate.selected.contains(rule) {
-        return Ok(None);
-    }
-    let Some(severity) = (gate.level)(rule, &comment.file, lang)? else {
-        return Ok(None);
-    };
     let mut snippet = squash(&comment.text);
     if at.index > 0 {
         snippet.push_str(&format!(" #{}", at.index));
     }
-    let path = comment.file.to_string_lossy();
-    let fingerprint = match gate.registry.rule(rule) {
-        Some(rule) => rule.manifest().fingerprint(&path, &snippet),
-        None => Fingerprint::new(rule, &path, &snippet),
-    };
-    let mut d = Diagnostic::new(
-        rule,
-        severity,
-        message,
-        &comment.file,
-        place(at),
-        fingerprint,
-    );
-    d.evidence = json!({
+    json!({
+        "rule": rule,
         "rules": at.directive.rules,
         "reason": at.directive.reason,
-        "annotation": annotation_span(at),
-    });
-    Ok(Some(d))
+        "marker": at.directive.marker,
+        "form": at.directive.form.as_str(),
+        "used": false,
+        "settled": true,
+        "range": false,
+        "closes": closes.unwrap_or(true),
+        "line": at.line,
+        "snippet": snippet,
+        "place": place(at),
+        "extent": annotation_span(at),
+    })
 }
 
 /// Where a finding about the directive is reported: the comment, or, for a

@@ -35,3 +35,23 @@ fn memo_slot() {
 
     assert!(slots.iter().all(|slot| Arc::ptr_eq(slot, &slots[0])));
 }
+
+#[test]
+fn annotations_of() {
+    let annotations = lighthouse_plugin::Annotations::default();
+    assert!(annotations.of(std::path::Path::new("a.rs")).is_none());
+
+    annotations.insert("a.rs".into(), vec![serde_json::json!({ "rule": "x/y" })]);
+    annotations.insert("b.rs".into(), Vec::new());
+
+    assert_eq!(
+        annotations.of(std::path::Path::new("a.rs")).unwrap().len(),
+        1
+    );
+    assert!(
+        annotations
+            .of(std::path::Path::new("b.rs"))
+            .unwrap()
+            .is_empty()
+    );
+}

@@ -1,31 +1,23 @@
 //! The check a decision's `check` block compiles into: a CEL expression over the code
-//! model, a standard operation (`cycle`), a program, or
-//! the name of an annotation rule the engine serves.
+//! model, or a program.
 //! The decision supplies id, severity, scope, options and the examples that
 //! `lighthouse decision test` runs.
 
 use std::{collections::BTreeMap, sync::Arc};
 
-use lighthouse_model::{
-    Diagnostic, Options, Reach, RunScope,
-    annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
-};
+use lighthouse_model::{Diagnostic, Options, Reach, RunScope};
 
 use lighthouse_plugin::{Caching, Context, Error as PluginError, Rule, RuleManifest};
 use lighthouse_protocol::hash;
-use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, Select};
+use lighthouse_spec::{CheckKind, Decision, Select};
 use serde_json::{Map, Value};
 
 use crate::{
     Error,
     cel_rule::CelRule,
     command::CommandRule,
-    cycle,
     manifest::{rule_manifest, rule_options, validate_options},
 };
-
-/// The decisions whose named check the engine serves.
-const ANNOTATION_RULES: [&str; 2] = [ANNOTATION_REASON, UNUSED_ALLOW];
 
 /// A rule built from a decision and its check.
 #[derive(Clone)]
@@ -37,19 +29,12 @@ pub(crate) struct Check {
 
 enum Kind {
     Cel(Box<CelRule>),
-    Cycle(cycle::CycleRule),
     Command(Box<CommandRule>),
-    /// The rules about allow annotations: the engine reads the annotations of
-    /// the whole project and reports these findings itself, because whether
-    /// an annotation is used depends on every other rule's findings. The rule
-    /// exists so that configuration, presets and the catalog treat it like any
-    /// other.
-    Annotation,
 }
 
 impl Check {
     /// Compiles the check of `decision`; `None` for a decision whose check no
-    /// program runs here (a named rule, `judged`, `rpc`) or that has none.
+    /// program runs here (`judged`, `rpc`) or that has none.
     pub(crate) fn new(decision: &Decision) -> Result<Option<Self>, Error> {
         let id = decision.id();
         let Some(check) = &decision.check else {
@@ -57,19 +42,11 @@ impl Check {
         };
         let kind = match &check.kind {
             CheckKind::Cel(cel) => Kind::Cel(Box::new(CelRule::new(decision, cel)?)),
-            CheckKind::Builtin(BuiltinCheck::Op(BuiltinOp::Cycle { edge, level })) => {
-                Kind::Cycle(cycle::CycleRule::new(id, edge, *level)?)
-            }
             CheckKind::Command(command) => Kind::Command(Box::new(CommandRule::new(
                 command,
                 &decision.title,
                 decision.bundled(),
             )?)),
-            CheckKind::Builtin(BuiltinCheck::Named(named))
-                if ANNOTATION_RULES.contains(&named.id.as_str()) =>
-            {
-                Kind::Annotation
-            }
             CheckKind::Model(model) => {
                 // A model check only ranges over subjects of a file; the
                 // others stay with agent review.
@@ -84,7 +61,6 @@ impl Check {
                 }
                 Kind::Cel(Box::new(CelRule::new(decision, &cel)?))
             }
-            CheckKind::Builtin(BuiltinCheck::Named(_)) => return Ok(None),
         };
         let mut meta = rule_manifest(decision)
             .ok_or_else(|| Error::invalid(id, "the decision has no severity or check"))?;
@@ -100,20 +76,21 @@ impl Check {
             .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
         let (reach, positions) = match &kind {
             Kind::Cel(rule) => rule.reach(meta.scope),
-            Kind::Cycle(_) => (Reach::Global, false),
-            Kind::Command(_) | Kind::Annotation => (Reach::Global, false),
+            Kind::Command(_) => (Reach::Global, false),
         };
         // The findings of a program that reads the code model are stored;
-        // those of a command, which reads whatever the program reads, and the
-        // annotation rules, which the engine reports itself, are not. A
-        // bundled command that judges a file by its text alone is.
+        // those of a command, which reads whatever the program reads, and of
+        // a rule that reads the directives, which depend on what every other
+        // rule found, are not. A bundled command that judges a file by its
+        // text alone is.
         meta.caching = match &kind {
+            Kind::Cel(rule) if rule.after_suppression() => None,
             Kind::Command(rule) if rule.local(meta.scope) => Some(Caching {
                 reach: Reach::Local,
                 positions: false,
                 revision,
             }),
-            Kind::Command(_) | Kind::Annotation => None,
+            Kind::Command(_) => None,
             _ => Some(Caching {
                 reach,
                 positions,
@@ -156,6 +133,10 @@ impl Rule for Check {
         matches!(&*self.kind, Kind::Cel(rule) if rule.reviews())
     }
 
+    fn after_suppression(&self) -> bool {
+        matches!(&*self.kind, Kind::Cel(rule) if rule.after_suppression())
+    }
+
     /// Accepts the options when they resolve against the decision's declared
     /// options: known keys of the declared types.
     fn validate(&self, options: &Options) -> Result<(), PluginError> {
@@ -168,9 +149,7 @@ impl Rule for Check {
         let meta = &self.meta;
         match self.kind.as_ref() {
             Kind::Cel(rule) => rule.check(meta, ctx, &resolved),
-            Kind::Cycle(rule) => rule.check(meta, ctx),
             Kind::Command(rule) => rule.check(meta, ctx, &resolved),
-            Kind::Annotation => Ok(Vec::new()),
         }
     }
 }

@@ -2,8 +2,8 @@
 
 use lighthouse_process::Policy;
 use lighthouse_spec::{
-    Batching, BuiltinCheck, BuiltinOp, Catalog, Check, CheckKind, CommandCheck, Decision,
-    DecisionStatus, ModelCheck, NamedRule, Output, Point, Program, ProgramSpec, Sandbox, Stdin,
+    Batching, Catalog, Check, CheckKind, CommandCheck, Decision, DecisionStatus, ModelCheck,
+    Output, Point, Program, ProgramSpec, Sandbox, Stdin,
 };
 use lighthouse_test_support::catalog::*;
 use serde_json::json;
@@ -17,18 +17,6 @@ fn bundled(id: &str) -> &'static Decision {
 }
 
 #[test]
-fn builtin_op() {
-    let check =
-        check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).unwrap();
-
-    let CheckKind::Builtin(BuiltinCheck::Op(op)) = &check.kind else {
-        panic!("a standard operation expected");
-    };
-
-    assert!(matches!(op, BuiltinOp::Cycle { .. }));
-}
-
-#[test]
 fn check_is_deterministic_unless_a_model_answers_it() {
     let cel = check(json!({"type":"cel","select":"file","where":"true","message":"m"})).unwrap();
     assert!(cel.kind.deterministic());
@@ -37,39 +25,33 @@ fn check_is_deterministic_unless_a_model_answers_it() {
 }
 
 #[test]
-fn check_kind_deterministic_is_false_only_for_a_model() {
-    let named = CheckKind::Builtin(BuiltinCheck::Named(NamedRule { id: "p/a".into() }));
-    assert!(named.deterministic());
-    assert!(!CheckKind::Model(ModelCheck::default()).deterministic());
-}
-
-#[test]
-fn check_kind_label_names_the_operation_of_a_standard_builtin() {
-    let cycle =
-        check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).unwrap();
-    assert_eq!(cycle.kind.label(), "cycle");
+fn check_kind_name_is_the_type_as_written() {
     let cel = bundled("core/file-size").check.as_ref().unwrap();
-    assert_eq!(cel.kind.label(), "cel");
+    assert_eq!(cel.kind.name(), "cel");
 }
 
 #[test]
-fn builtin_check_named_is_the_id_of_a_registered_rule_only() {
-    let named = BuiltinCheck::Named(NamedRule {
-        id: "core/no-unused-allow".into(),
-    });
-    assert_eq!(named.named(), Some("core/no-unused-allow"));
-    let cycle =
-        check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).unwrap();
-    let CheckKind::Builtin(op) = &cycle.kind else {
-        panic!("builtin expected");
-    };
-    assert_eq!(op.named(), None);
+fn there_is_no_builtin_check() {
+    for value in [
+        json!({"type":"builtin","id":"p/a"}),
+        json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"}),
+    ] {
+        let error = check(value).unwrap_err().to_string();
+        assert!(error.contains("expected cel, command or model"), "{error}");
+    }
+}
+
+#[test]
+fn check_kind_deterministic_is_false_only_for_a_model() {
+    let cel = check(json!({"type":"cel","select":"file","where":"true","message":"m"})).unwrap();
+    assert!(cel.kind.deterministic());
+    assert!(!CheckKind::Model(ModelCheck::default()).deterministic());
 }
 
 fn command(value: serde_json::Value) -> CommandCheck {
     match check(value).unwrap().kind {
         CheckKind::Command(command) => command,
-        other => panic!("command expected, got {}", other.label()),
+        other => panic!("command expected, got {}", other.name()),
     }
 }
 
@@ -246,24 +228,6 @@ fn a_supersession_names_decisions_that_exist_and_are_marked_superseded() {
 }
 
 #[test]
-fn a_builtin_names_one_operation_and_only_its_own_fields() {
-    assert!(
-        check(json!({"type":"builtin","op":"cycle","edge":"imports","level":"module"})).is_ok()
-    );
-    let strays = [
-        json!({"type":"builtin","op":"cycle","edge":"imports","level":"module","maxDistance":1}),
-        json!({"type":"builtin","op":"cycle","edge":"imports","level":"module","prompt":"p"}),
-        json!({"type":"builtin","clauses":[]}),
-        json!({"type":"builtin","op":"order","clauses":[]}),
-        json!({"type":"builtin","op":"cycle","id":"p/a","edge":"imports","level":"module"}),
-        json!({"type":"builtin","op":"judge"}),
-    ];
-    for stray in strays {
-        assert!(check(stray.clone()).is_err(), "{stray}");
-    }
-}
-
-#[test]
 fn a_command_cannot_be_a_placeholder() {
     let catalog = |argv: &str| {
         let spec = format!(
@@ -274,28 +238,6 @@ fn a_command_cannot_be_a_placeholder() {
     assert!(catalog("[lint, \"{file}\"]").is_ok());
     let refused = catalog("[\"{file}\"]").unwrap_err().to_string();
     assert!(refused.contains("cannot be a placeholder"), "{refused}");
-}
-
-#[test]
-fn a_standard_operation_needs_the_scope_it_judges() {
-    let cycle = "  severity: error\n  check:\n    type: builtin\n    op: cycle\n    edge: imports\n    level: module\n";
-    let examples = "  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{ path: a.go, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: go\n      kind: valid\n      files: [{ path: a.go, body: y }]\n";
-    let load = |scope: &str, check: &str| {
-        let text = decision(
-            "p/a",
-            &format!(
-                "  title: A\n  context: i\n  scope: {{ subject: {scope} }}\n  requirement: A MUST b.\n{check}{examples}"
-            ),
-        );
-        Catalog::from_files(with("p/s/a.yaml", &text))
-    };
-    assert!(load("project", cycle).is_ok());
-    assert!(
-        load("file", cycle)
-            .unwrap_err()
-            .to_string()
-            .contains("whole project")
-    );
 }
 
 #[test]

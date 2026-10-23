@@ -28,44 +28,6 @@
       },
       "type": "object"
     },
-    "BuiltinCheck": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/BuiltinOp"
-        },
-        {
-          "$ref": "#/$defs/NamedRule"
-        }
-      ],
-      "description": "A builtin check: one of the standard, decision-agnostic operations, or a\nrule registered by name that no standard operation can express."
-    },
-    "BuiltinOp": {
-      "description": "A standard operation over the code model.",
-      "oneOf": [
-        {
-          "description": "No dependency cycle over edges of one kind.",
-          "properties": {
-            "edge": {
-              "description": "The edge kind followed: `calls`, `references`, `imports`,\n`contains`, `implements` or `accesses-private`.",
-              "type": "string"
-            },
-            "level": {
-              "$ref": "#/$defs/CycleLevel"
-            },
-            "op": {
-              "const": "cycle",
-              "type": "string"
-            }
-          },
-          "required": [
-            "op",
-            "edge",
-            "level"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "Capability": {
       "description": "Provider feature that rules may require.",
       "oneOf": [
@@ -100,28 +62,6 @@
     "Check": {
       "description": "How a decision is checked, mirroring [`crate::Fix`]: one provider selected by\n`type`, with the fields every provider shares. Which other fields a check\nmay have depends on its `type`; any other is refused.",
       "oneOf": [
-        {
-          "$ref": "#/$defs/BuiltinCheck",
-          "description": "A standard operation, or a rule registered by a bundled plugin.",
-          "properties": {
-            "requires": {
-              "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
-              "items": {
-                "$ref": "#/$defs/Capability"
-              },
-              "type": "array"
-            },
-            "type": {
-              "const": "builtin",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object",
-          "unevaluatedProperties": false
-        },
         {
           "additionalProperties": false,
           "description": "A CEL expression over the code model.",
@@ -485,14 +425,6 @@
         "command"
       ],
       "type": "object"
-    },
-    "CycleLevel": {
-      "description": "At what level a `cycle` check looks for strongly connected components.",
-      "enum": [
-        "module",
-        "symbol"
-      ],
-      "type": "string"
     },
     "DecisionSpec": {
       "additionalProperties": false,
@@ -1015,19 +947,6 @@
       ],
       "type": "object"
     },
-    "NamedRule": {
-      "description": "A rule implemented in Rust and registered by a bundled plugin. Strays are\nrefused by [`Check`], which knows the fields every provider shares.",
-      "properties": {
-        "id": {
-          "description": "The id of the registered rule.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
     "OptionSchema": {
       "additionalProperties": true,
       "description": "One tunable value: its shape, default and description. The shape's keys\nsit beside `default` and `description`; a key that is none of them is\nrefused.",
@@ -1228,6 +1147,11 @@
         {
           "const": "comment",
           "description": "A comment of a file, with its text and position.",
+          "type": "string"
+        },
+        {
+          "const": "annotation",
+          "description": "A suppression directive of a comment (`lighthouse-disable ...`), one\nper rule it names: its `rule`, `reason`, whether it suppressed a\nfinding (`used`) and the text and place of the directive. Judged after\nthe other rules, so that what a directive suppressed is known.",
           "type": "string"
         },
         {

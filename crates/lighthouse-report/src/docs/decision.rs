@@ -299,7 +299,7 @@ fn with_newline(text: &str) -> String {
 /// decision without a check.
 fn level(decision: &Decision) -> String {
     match (&decision.check, decision.severity) {
-        (Some(check), Some(severity)) => format!("{severity} · {}", check.kind.label()),
+        (Some(check), Some(severity)) => format!("{severity} · {}", check.kind.name()),
         _ => "doc".to_owned(),
     }
 }

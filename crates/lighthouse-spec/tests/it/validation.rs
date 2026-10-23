@@ -89,14 +89,16 @@ fn decision_rules_are_enforced() {
         with("p/s/a.yaml", &decision("p/a", &severity_without_check)),
         "no `severity`",
     );
-    let check_without_severity = format!("{SPEC}  check:\n    type: builtin\n    id: p/a\n");
+    let check_without_severity = format!(
+        "{SPEC}  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n"
+    );
     rejected(
         with("p/s/a.yaml", &decision("p/a", &check_without_severity)),
         "needs a `severity`",
     );
     rejected(swap("MUST", "must"), "MUST, SHOULD or MAY");
     rejected(swap("context: i", "context: ' '"), "context");
-    let no_examples = "  severity: error\n  check:\n    type: builtin\n    id: p/a\n";
+    let no_examples = "  severity: error\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n";
     rejected(
         with(
             "p/s/a.yaml",
@@ -112,7 +114,7 @@ fn decision_rules_are_enforced() {
 
 #[test]
 fn checked_decisions_need_a_valid_and_an_invalid_example() {
-    let checked = "  check:\n    type: builtin\n    id: p/a\n";
+    let checked = "  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n";
     rejected(decision_with(checked), "valid and an invalid example");
     Catalog::from_files(decision_with(&format!("{checked}{EXAMPLE_PAIR}"))).unwrap();
     let judged = "  severity: info\n  check:\n    type: model\n";
@@ -121,10 +123,6 @@ fn checked_decisions_need_a_valid_and_an_invalid_example() {
         &decision("p/a", &format!("{SPEC}{judged}")),
     ))
     .unwrap();
-    rejected(
-        decision_with("  check:\n    type: builtin\n    id: ''\n"),
-        "needs a rule id",
-    );
 }
 
 #[test]
@@ -145,7 +143,7 @@ fn a_cel_check_must_compile_and_select_what_the_scope_runs_over() {
     );
     rejected(
         decision_with("  check:\n    type: python\n    code: x\n"),
-        "expected builtin, cel, command or model",
+        "expected cel, command or model",
     );
 }
 

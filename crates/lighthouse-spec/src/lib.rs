@@ -23,9 +23,7 @@ use lighthouse_resource::Descriptor;
 pub use attributes::Attributes;
 pub use catalog::Catalog;
 pub use catalog::load::{load_local, local_dir, local_files};
-pub use check::{
-    BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, NamedRule, Select, Variable,
-};
+pub use check::{CelCheck, Check, CheckKind, Select, Variable};
 pub use command::CommandCheck;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
 pub use edit::KIND as EDIT_KIND;

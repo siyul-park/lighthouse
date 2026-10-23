@@ -171,6 +171,12 @@ impl CelRule {
         &self.libraries
     }
 
+    /// Whether the check judges the suppression directives, which are known
+    /// once the other rules have run.
+    pub(crate) fn after_suppression(&self) -> bool {
+        self.select == Select::Annotation
+    }
+
     /// Whether the check has a route that puts subjects to the models.
     pub(crate) fn reviews(&self) -> bool {
         self.abstain.is_some()
@@ -339,6 +345,7 @@ impl Evaluation<'_> {
                 self.check_symbols(ctx, file)
             }
             Select::Comment => self.check_comments(ctx, file, text),
+            Select::Annotation => self.check_annotations(file),
             Select::File | Select::Edge | Select::Module | Select::Decision => Ok(Vec::new()),
         }
     }
@@ -401,6 +408,34 @@ impl Evaluation<'_> {
                 symbol: None,
             };
             found.extend(self.judge(value, place, &comment.text)?);
+        }
+        Ok(found)
+    }
+
+    /// The directives of `file`, one subject per rule each names, as the
+    /// engine judged them.
+    fn check_annotations(&self, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
+        let Some(annotations) = self.builder.annotations(&file.path) else {
+            return Err(PluginError::Failed(format!(
+                "{}: the directives are judged after the other rules, and this rule ran before",
+                self.meta.id
+            )));
+        };
+        let mut found = Vec::new();
+        for annotation in annotations {
+            let span = serde_json::from_value(annotation["place"].clone()).map_err(|e| {
+                PluginError::Failed(format!("{}: an annotation has no place: {e}", self.meta.id))
+            })?;
+            let place = Anchor {
+                file: file.path.clone(),
+                span,
+                symbol: None,
+            };
+            let key = annotation["snippet"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            found.extend(self.judge(cel_fact(&annotation), place, &key)?);
         }
         Ok(found)
     }

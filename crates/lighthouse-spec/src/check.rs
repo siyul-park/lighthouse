@@ -4,10 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::{
-    RunScope,
-    ucm::{Capability, EdgeKind},
-};
+use lighthouse_model::{RunScope, ucm::Capability};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,18 +59,6 @@ impl<'de> Deserialize<'de> for Check {
             .ok_or_else(|| D::Error::custom("a check is a table"))?;
         let command = command::fields();
         let own: &[&str] = match table.get("type").and_then(Value::as_str) {
-            Some("builtin") => match table.get("op").and_then(Value::as_str) {
-                None if table.contains_key("op") => {
-                    return Err(D::Error::custom("a builtin `op` is a name"));
-                }
-                None => &["id"],
-                Some("cycle") => &["op", "edge", "level"],
-                Some(other) => {
-                    return Err(D::Error::custom(format!(
-                        "builtin `op` is `{other}`, expected cycle"
-                    )));
-                }
-            },
             Some("cel") => &[
                 "select",
                 "variables",
@@ -89,11 +74,9 @@ impl<'de> Deserialize<'de> for Check {
             Some("model") => &["over", "variables", "select", "prompt", "identity"],
             other => {
                 return Err(D::Error::custom(match other {
-                    None => "a check needs a `type`: builtin, cel, command or model".to_owned(),
+                    None => "a check needs a `type`: cel, command or model".to_owned(),
                     Some(found) => {
-                        format!(
-                            "check `type` is `{found}`, expected builtin, cel, command or model"
-                        )
+                        format!("check `type` is `{found}`, expected cel, command or model")
                     }
                 }));
             }
@@ -114,19 +97,9 @@ impl CheckKind {
         !matches!(self, Self::Model(_))
     }
 
-    /// The name of what runs, for documents: the operation of a standard
-    /// builtin, else the `type`.
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Builtin(BuiltinCheck::Op(BuiltinOp::Cycle { .. })) => "cycle",
-            other => other.name(),
-        }
-    }
-
     /// The `type` as written in a decision file.
     pub fn name(&self) -> &'static str {
         match self {
-            Self::Builtin(_) => "builtin",
             Self::Cel(_) => "cel",
             Self::Command(_) => "command",
             Self::Model(_) => "model",
@@ -136,11 +109,6 @@ impl CheckKind {
     /// What is wrong with the provider this names, for a decision about `subject`.
     pub(crate) fn problem(&self, subject: Subject) -> Option<String> {
         match self {
-            Self::Builtin(BuiltinCheck::Named(named)) if named.id.is_empty() => {
-                Some("a builtin check needs a rule id".to_owned())
-            }
-            Self::Builtin(BuiltinCheck::Named(_)) => None,
-            Self::Builtin(BuiltinCheck::Op(op)) => op.problem(subject),
             Self::Cel(cel) => cel.problem().or_else(|| {
                 let Some(select) = cel.selects(subject) else {
                     return Some(format!("a `{subject}` decision needs a `select`"));
@@ -173,8 +141,6 @@ impl CheckKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum CheckKind {
-    /// A standard operation, or a rule registered by a bundled plugin.
-    Builtin(BuiltinCheck),
     /// A CEL expression over the code model.
     Cel(CelCheck),
     /// An external program under the process contract.
@@ -182,74 +148,6 @@ pub enum CheckKind {
     /// Agent review: a model is asked about the candidates. Not
     /// deterministic; today's agent review tasks serve it.
     Model(ModelCheck),
-}
-
-/// A builtin check: one of the standard, decision-agnostic operations, or a
-/// rule registered by name that no standard operation can express.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(untagged)]
-pub enum BuiltinCheck {
-    Op(BuiltinOp),
-    Named(NamedRule),
-}
-
-/// A rule implemented in Rust and registered by a bundled plugin. Strays are
-/// refused by [`Check`], which knows the fields every provider shares.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct NamedRule {
-    /// The id of the registered rule.
-    pub id: String,
-}
-
-impl BuiltinCheck {
-    /// The id of the registered rule, for a named one.
-    pub fn named(&self) -> Option<&str> {
-        match self {
-            Self::Named(rule) => Some(&rule.id),
-            Self::Op(_) => None,
-        }
-    }
-}
-
-/// A standard operation over the code model.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "op", rename_all = "kebab-case", rename_all_fields = "camelCase")]
-pub enum BuiltinOp {
-    /// No dependency cycle over edges of one kind.
-    Cycle {
-        /// The edge kind followed: `calls`, `references`, `imports`,
-        /// `contains`, `implements` or `accesses-private`.
-        edge: String,
-        level: CycleLevel,
-    },
-}
-
-impl BuiltinOp {
-    /// What is wrong with the operation for a decision about `subject`: a
-    /// standard operation judges the shape of one file or of the whole project.
-    fn problem(&self, subject: Subject) -> Option<String> {
-        let own = match self {
-            Self::Cycle { edge, .. } => edge
-                .parse::<EdgeKind>()
-                .is_err()
-                .then(|| format!("check: `{edge}` is not an edge kind")),
-        };
-        let per_file = subject.run_scope() == RunScope::File;
-        own.or_else(|| match self {
-            Self::Cycle { .. } if per_file => Some(format!(
-                "a `cycle` check judges the whole project, which a `{subject}` decision does not"
-            )),
-            _ => None,
-        })
-    }
-}
-
-/// At what level a `cycle` check looks for strongly connected components.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum CycleLevel {
-    Module,
-    Symbol,
 }
 
 /// What a CEL check looks at; each choice binds one variable of the same name.
@@ -264,6 +162,11 @@ pub enum Select {
     Test,
     /// A comment of a file, with its text and position.
     Comment,
+    /// A suppression directive of a comment (`lighthouse-disable ...`), one
+    /// per rule it names: its `rule`, `reason`, whether it suppressed a
+    /// finding (`used`) and the text and place of the directive. Judged after
+    /// the other rules, so that what a directive suppressed is known.
+    Annotation,
     /// A body event of a function (a panic, an `unwrap`, an error compared
     /// with `==`, ...): one finding per event, at the event. The event has
     /// its `kind`, `detail`, `line` and the function it is in (`event.func`).
@@ -274,7 +177,7 @@ pub enum Select {
 }
 
 impl Select {
-    const ALL: [Self; 9] = [
+    const ALL: [Self; 10] = [
         Self::Symbol,
         Self::Function,
         Self::Edge,
@@ -282,6 +185,7 @@ impl Select {
         Self::File,
         Self::Test,
         Self::Comment,
+        Self::Annotation,
         Self::Event,
         Self::Decision,
     ];
@@ -327,6 +231,7 @@ impl Select {
             Self::File => "file",
             Self::Test => "test",
             Self::Comment => "comment",
+            Self::Annotation => "annotation",
             Self::Event => "event",
             Self::Decision => "decision",
         }
@@ -335,7 +240,7 @@ impl Select {
 
 /// A rule written as data: a `where` expression that is true for a violation
 /// of the selected values, and a message. The expressions see the selected
-/// value (`symbol`, `func`, `edge`, `module`, `file`, `test`, `comment` or
+/// value (`symbol`, `func`, `edge`, `module`, `file`, `test`, `comment`, `annotation` or
 /// `event`),
 /// the decision's resolved `options`, and the standard function library over
 /// the code model: `metrics(n)`, `callers(n)`, `owner(n)`, `tests(n)`.

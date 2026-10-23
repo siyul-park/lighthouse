@@ -51,8 +51,8 @@ pub(crate) fn refuse_strays(schema: &mut schemars::Schema) {
         {
             own.extend(shared.iter().cloned());
         }
-        // A branch that refers to another schema for its own fields (the
-        // builtin operations) cannot close itself with `additionalProperties`,
+        // A branch that refers to another schema for its own fields cannot
+        // close itself with `additionalProperties`,
         // which only sees the properties written beside it.
         let closing = if branch.contains_key("$ref") {
             "unevaluatedProperties"

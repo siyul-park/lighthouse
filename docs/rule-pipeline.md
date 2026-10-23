@@ -64,7 +64,7 @@ parts, and each answers a different question:
 
 A check is one provider, configured like every other provider in Lighthouse (fix,
 verify):
-- **`type`** names where evaluation happens: `builtin` (a standard op in process), `cel` (an expression), `command` (a process), `rpc` (a plugin process) or `model` (the bound classification model).
+- **`type`** names where evaluation happens: `cel` (an expression), `command` (a process), `rpc` (a plugin process) or `model` (the bound classification model).
 - **Capabilities** in the manifest say how it behaves: `deterministic`, `abstains`, `cost`.
 
 **Fix.** A decision's `fix` is `cel`, `command`, `rpc` or `model`. A command is a [program](programs.md), the same shape as a command check. A model fix is made by an agent that edits a scratch copy of the project (`[models] agent`) for the decisions `[fix] decisions` lists, within the scope `symbol` or `files`; with no agent bound the finding stays a review task carrying the brief. An agent's work is a guess, so it is kept only when the scope holds, the finding is gone, nothing of `warn` or `error` is new in the changed and referencing files and they are fully analyzed; `[fix] verify` programs must also pass over the fixed texts. A kept fix is written when `[fix] unsafe = true` or the run has `--unsafe-fixes`, and otherwise reported as a preview. Details: [models.md](models.md#fixes-by-a-model), [fixer-spec.md](fixer-spec.md).
@@ -377,7 +377,7 @@ judgment, meaning version and check revision.
 | Part | State |
 | --- | --- |
 | Decisions, packs, judgments, suppressions (reviewer-declared and in the code), `decisions.jsonl`, SQLite memory | done |
-| `check` providers (`builtin`, `cel` with `abstain`, `command`, `model`), meaning version and check revision | done |
+| `check` providers (`cel` with `abstain`, `command`, `model`), meaning version and check revision | done |
 | `classification` with layered bindings (Revision, rule, project, agent), `provider/model` references, `model-http` (`openai` protocol) and `command` providers, answer cache, budget, SARIF `review` results, `decision eval`, the label collector, `model train` plumbing | done |
 | Judgments and suppressions replace verdicts; naming alignment (`intent` → `context`, provenance fields) | done |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |

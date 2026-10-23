@@ -1,4 +1,4 @@
-//! The facts that let a cel check read what a builtin op reads today: `gap`
+//! The facts that let a cel check read what a native rule read once: `gap`
 //! of a method, and the function fact of a symbol (`symbol.func`).
 
 use std::collections::{BTreeMap, BTreeSet};

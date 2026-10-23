@@ -65,7 +65,7 @@ spec:
     A simple single-use wrapper SHOULD be inlined unless its name expresses a
     real policy or mechanic.
   severity: warn             # error: definitive · warn, info: a reviewer's judgment may hide it
-  check:                     # builtin | cel | command | rpc | model
+  check:                     # cel | command | rpc | model
     type: cel
     select: function
     where: func.forwards_only

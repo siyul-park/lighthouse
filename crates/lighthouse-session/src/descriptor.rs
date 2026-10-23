@@ -59,7 +59,6 @@ impl Fixing {
     pub fn describe(&self, decision: &Decision, aim: Aim<'_>) -> Option<Descriptor> {
         let id = decision.id();
         let (by, needs) = match &decision.check.as_ref()?.kind {
-            CheckKind::Builtin(_) => (CheckBy::Builtin, Needs::Nothing),
             CheckKind::Cel(_) => (CheckBy::Cel, Needs::Nothing),
             CheckKind::Command(_) if decision.bundled() => (CheckBy::Command, Needs::Bundled),
             CheckKind::Command(_) => (CheckBy::Command, Needs::Program),

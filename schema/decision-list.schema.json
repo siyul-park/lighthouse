@@ -13,7 +13,6 @@
               "by": {
                 "description": "What decides the findings of a decision.",
                 "enum": [
-                  "builtin",
                   "cel",
                   "command",
                   "model"

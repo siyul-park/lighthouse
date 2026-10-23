@@ -301,6 +301,59 @@ impl Engine {
     }
 
     fn apply_to_file(&self, scene: &Scene, input: &Input) -> Result<Gathered, Error> {
+        let mut gathered = self.apply_rules_of(scene, input, false)?;
+        let resolved = self
+            .config
+            .resolve(&input.file.path, &input.file.lang, &self.projects)?;
+        // The models answer what the file's rules queued, all at once.
+        for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
+            let Some(level) = resolved.get(&rule).and_then(|config| config.level) else {
+                continue;
+            };
+            gathered
+                .found
+                .extend(found.into_iter().map(|d| answered(d, level)));
+        }
+        Ok(gathered)
+    }
+
+    /// Judges the suppression directives, which the rules that read them
+    /// (`after_suppression`) see as `said` them, once the findings of every
+    /// other rule are known. What they find is not itself suppressed.
+    pub(super) fn judge_annotations(
+        &self,
+        scene: &Scene,
+        mut said: BTreeMap<PathBuf, Vec<Value>>,
+        run: &mut Run,
+    ) -> Result<Vec<Diagnostic>, Error> {
+        if !scene.rules.iter().any(|r| r.after_suppression()) {
+            return Ok(Vec::new());
+        }
+        let annotations = scene.memo.slot::<lighthouse_plugin::Annotations>();
+        for input in scene.inputs {
+            let path = &input.file.path;
+            annotations.insert(path.clone(), said.remove(path).unwrap_or_default());
+        }
+        let per_file: Vec<Result<Gathered, Error>> = in_pool(|| {
+            scene
+                .inputs
+                .par_iter()
+                .map(|input| self.apply_rules_of(scene, input, true))
+                .collect()
+        });
+        let mut all = Gathered::default();
+        for gathered in per_file {
+            all.merge(gathered?);
+        }
+        run.notices.extend(all.notices);
+        run.incomplete.extend(all.incomplete);
+        run.timings.add_rules(all.times);
+        Ok(all.found)
+    }
+
+    /// The rules of the files that read the directives (`after`), or those
+    /// that do not, over one file.
+    fn apply_rules_of(&self, scene: &Scene, input: &Input, after: bool) -> Result<Gathered, Error> {
         let mut gathered = Gathered::default();
         let resolved = self
             .config
@@ -312,7 +365,7 @@ impl Engine {
         for rule in scene
             .rules
             .iter()
-            .filter(|r| r.manifest().scope == RunScope::File)
+            .filter(|r| r.manifest().scope == RunScope::File && r.after_suppression() == after)
         {
             let meta = rule.manifest();
             let Some(config) = resolved.get(&meta.id) else {
@@ -337,15 +390,6 @@ impl Engine {
             let at = Some((file, input.text.as_str()));
             let options = options_at(&self.inherited, &resolved, &meta.id, &config.options);
             self.run_one(scene, *rule, (&options, level, applies), at, &mut gathered)?;
-        }
-        // The models answer what the file's rules queued, all at once.
-        for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
-            let Some(level) = resolved.get(&rule).and_then(|config| config.level) else {
-                continue;
-            };
-            gathered
-                .found
-                .extend(found.into_iter().map(|d| answered(d, level)));
         }
         Ok(gathered)
     }

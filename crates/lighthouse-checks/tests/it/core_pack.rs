@@ -153,9 +153,6 @@ fn registered_rules_are_exactly_the_automated_catalog_decisions() {
             .decision(id)
             .unwrap_or_else(|| panic!("{id} has no decision"));
         match decision.check.as_ref().map(|c| &c.kind) {
-            Some(CheckKind::Builtin(rule)) => {
-                assert!(rule.named().is_none_or(|rule| rule == id), "{id}");
-            }
             Some(CheckKind::Cel(_) | CheckKind::Command(_) | CheckKind::Model(_)) => {}
             other => panic!("{id} is registered but its decision's check is {other:?}"),
         }

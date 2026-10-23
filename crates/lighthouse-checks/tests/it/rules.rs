@@ -279,16 +279,6 @@ fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
             .to_string()
             .contains("local/<name>")
     );
-    let builtin = format!(
-        "{}  check:\n    type: builtin\n    id: local/x\n",
-        header("local/x").replace("doc", "judgment")
-    );
-    assert!(
-        Catalog::from_local(files(&builtin))
-            .unwrap_err()
-            .to_string()
-            .contains("standard operation")
-    );
     let sourced = format!(
         "{}  examples:\n    - name: e\n      language: text\n      kind: valid\n      files: [{{ path: a, source: a.txt }}]\n",
         header("local/x")

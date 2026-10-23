@@ -4,14 +4,11 @@
 //! `strict` is present only when some decision of the pack has such an option.
 //! They derive from the decisions, so a catalog never lists them.
 
-use lighthouse_model::{
-    Options,
-    annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
-};
+use lighthouse_model::Options;
 use serde_json::Value;
 
 use super::{Level, Metadata, ProjectSpec, Resource, RuleSetting, rules::RuleDetail};
-use crate::{BuiltinCheck, Catalog, CheckKind, Decision, Pack, options::KINDS};
+use crate::{Catalog, CheckKind, Decision, Pack, options::KINDS};
 
 /// The standard projects of every pack of `catalog`, pack by pack.
 pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
@@ -73,17 +70,10 @@ fn every_kind(decision: &Decision) -> Option<Vec<Value>> {
         .then(|| all.clone())
 }
 
-/// Whether the engine runs a rule for the decision: its check is a program,
-/// or one of the named rules the engine serves itself.
+/// Whether the engine runs a rule for the decision: its check is a program.
 fn runs_as_rule(decision: &Decision) -> bool {
-    let Some(check) = &decision.check else {
-        return false;
-    };
-    match &check.kind {
-        CheckKind::Cel(_) | CheckKind::Command(_) | CheckKind::Builtin(BuiltinCheck::Op(_)) => true,
-        CheckKind::Builtin(BuiltinCheck::Named(named)) => {
-            [ANNOTATION_REASON, UNUSED_ALLOW].contains(&named.id.as_str())
-        }
-        CheckKind::Model(_) => false,
-    }
+    matches!(
+        decision.check.as_ref().map(|check| &check.kind),
+        Some(CheckKind::Cel(_) | CheckKind::Command(_))
+    )
 }

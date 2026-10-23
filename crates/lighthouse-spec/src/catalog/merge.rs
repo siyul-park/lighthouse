@@ -3,8 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_resource::Resource;
 
 use crate::{
-    CheckKind, Decision, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec,
-    validate,
+    Decision, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec, validate,
 };
 
 use super::{load::Files, variables};
@@ -100,14 +99,6 @@ pub(super) fn check_local(file: &str, decision: &Decision) -> Result<(), Error> 
                 "id is `{}`, a local decision is `local/<name>`",
                 decision.id()
             ),
-        ));
-    }
-    if let Some(CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind)
-        && builtin.named().is_some()
-    {
-        return Err(Error::layout(
-            file,
-            "a local decision may not name a bundled rule with `builtin: {id}`; use a standard operation, `cel` or `command`",
         ));
     }
     Ok(())
