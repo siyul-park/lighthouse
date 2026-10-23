@@ -376,3 +376,42 @@ fn a_decision_of_the_catalog_as_it_ships_is_bundled_and_an_edited_one_is_not() {
     let edited: Decision = serde_json::from_value(value).unwrap();
     assert!(!edited.bundled(lighthouse_test_support::bundled()));
 }
+
+#[test]
+fn file_fact() {
+    assert_eq!(
+        lighthouse_spec::file_fact("{file.edition}"),
+        Some("edition")
+    );
+    assert_eq!(lighthouse_spec::file_fact("{file}"), None);
+    assert_eq!(lighthouse_spec::file_fact("--edition={file.edition}"), None);
+    assert_eq!(lighthouse_spec::file_fact("{file.}"), None);
+    assert_eq!(lighthouse_spec::file_fact("{file.Edition}"), None);
+    assert_eq!(lighthouse_spec::file_fact("{file.a-b}"), None);
+}
+
+#[test]
+fn a_fact_of_a_file_is_a_placeholder_of_a_check_beside_its_files_and_of_a_fix() {
+    let program = |args: &[&str]| Program::of(args.iter().map(|a| (*a).to_owned()).collect());
+    let fact = "{file.edition}";
+
+    assert_eq!(
+        program(&["fmt", "--edition", fact, "{files}"]).problem(Point::Check),
+        None
+    );
+    assert_eq!(
+        program(&["fmt", fact, "{file}"]).problem(Point::Check),
+        None
+    );
+    let alone = program(&["fmt", fact]).problem(Point::Check).unwrap();
+    assert!(alone.contains("needs `{file}` or `{files}`"), "{alone}");
+    let mixed = program(&["fmt", "--edition={file.edition}", "{files}"])
+        .problem(Point::Check)
+        .unwrap();
+    assert!(mixed.contains("fills a whole argument"), "{mixed}");
+    assert_eq!(program(&["fmt", fact]).problem(Point::Fix), None);
+    for point in [Point::Verify, Point::Provider, Point::Agent] {
+        let why = program(&["fmt", fact]).problem(point).unwrap();
+        assert!(why.contains("is not a placeholder"), "{point}: {why}");
+    }
+}

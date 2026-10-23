@@ -85,6 +85,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "app/src/main.rs"
       },
       "functions": [
@@ -212,6 +215,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "core-lib/src/lib.rs"
       },
       "functions": [

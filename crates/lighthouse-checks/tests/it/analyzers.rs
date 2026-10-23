@@ -59,6 +59,7 @@ fn file(path: &str, test: bool) -> File {
         hash: String::new(),
         generated: false,
         test,
+        facts: Default::default(),
     }
 }
 

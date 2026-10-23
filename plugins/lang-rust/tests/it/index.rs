@@ -327,3 +327,92 @@ fn a_static_initializer_uses_what_it_names_and_enum_variants_are_variants() {
     });
     assert!(uses_run, "{:?}", fragment.edges);
 }
+
+/// The `edition` fact of each file of `result`, by path.
+fn editions(result: &IndexResult) -> Vec<(String, String)> {
+    let mut found: Vec<(String, String)> = result
+        .fragments
+        .iter()
+        .map(|f| {
+            (
+                f.file.path.clone(),
+                f.file.facts.get("edition").cloned().unwrap_or_default(),
+            )
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+#[test]
+fn every_file_states_the_edition_of_the_crate_that_holds_it() {
+    let dir = project(&[
+        (
+            "Cargo.toml",
+            "[workspace]\nmembers = [\"a\", \"b\", \"c\"]\n[workspace.package]\nedition = \"2021\"\n",
+        ),
+        (
+            "a/Cargo.toml",
+            "[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        ),
+        ("a/src/lib.rs", "pub fn a() {}\n"),
+        (
+            "b/Cargo.toml",
+            "[package]\nname = \"b\"\nversion = \"0.1.0\"\nedition.workspace = true\n",
+        ),
+        ("b/src/lib.rs", "pub fn b() {}\n"),
+        (
+            "c/Cargo.toml",
+            "[package]\nname = \"c\"\nversion = \"0.1.0\"\n",
+        ),
+        ("c/src/lib.rs", "pub mod inner;\n"),
+        ("c/src/inner.rs", "pub fn c() {}\n"),
+        ("c/testdata/x.rs", "fn x() {}\n"),
+    ]);
+
+    let found = editions(&index(dir.path(), serde_json::json!({})));
+
+    let want = [
+        ("a/src/lib.rs", "2024"),
+        ("b/src/lib.rs", "2021"),
+        ("c/src/inner.rs", "2015"),
+        ("c/src/lib.rs", "2015"),
+        ("c/testdata/x.rs", "2015"),
+    ];
+    let want: Vec<(String, String)> = want
+        .iter()
+        .map(|(f, e)| ((*f).to_owned(), (*e).to_owned()))
+        .collect();
+    assert_eq!(found, want);
+}
+
+#[test]
+fn a_file_no_package_holds_has_the_default_edition() {
+    let dir = project(&[("lone.rs", "pub fn lone() {}\n")]);
+
+    let found = editions(&index(dir.path(), serde_json::json!({})));
+
+    assert_eq!(found, [("lone.rs".to_owned(), "2015".to_owned())]);
+}
+
+#[test]
+fn an_inherited_edition_the_workspace_does_not_set_is_a_gap() {
+    let dir = project(&[
+        ("Cargo.toml", "[workspace]\nmembers = [\"a\"]\n"),
+        (
+            "a/Cargo.toml",
+            "[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition.workspace = true\n",
+        ),
+        ("a/src/lib.rs", "pub fn a() {}\n"),
+    ]);
+
+    let result = index(dir.path(), serde_json::json!({}));
+
+    assert!(
+        reasons(&result)
+            .iter()
+            .any(|r| r.contains("the workspace sets none")),
+        "{:?}",
+        reasons(&result)
+    );
+}

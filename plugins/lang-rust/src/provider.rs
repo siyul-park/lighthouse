@@ -15,7 +15,7 @@ use serde::Deserialize;
 
 use crate::{
     cache::Cache,
-    cargo::{self, Package, Target, TargetKind},
+    cargo::{self, Manifests, Package, Target, TargetKind},
     extract,
     names::Index,
     tree::{Root, Tree},
@@ -165,11 +165,16 @@ pub fn normalize(path: &Path) -> PathBuf {
 fn index_files(params: &IndexParams, options: &Options, provider: &str) -> IndexResult {
     let root = normalize(Path::new(&params.project.root));
     let (skipped, files) = requested_files(params);
+    let mut incomplete: BTreeSet<(Option<String>, String)> = BTreeSet::new();
+    let mut editions = Manifests::default();
     let mut fragments: BTreeMap<String, Fragment> = skipped
         .iter()
-        .map(|rel| (rel.clone(), empty_fragment(rel)))
+        .map(|rel| {
+            let mut fragment = empty_fragment(rel);
+            state_edition(&mut fragment, &root, &mut editions, &mut incomplete);
+            (rel.clone(), fragment)
+        })
         .collect();
-    let mut incomplete: BTreeSet<(Option<String>, String)> = BTreeSet::new();
     let mut notices = Vec::new();
 
     let found = packages(&root, &files);
@@ -191,6 +196,7 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
             }
             (_, None) => orphans.push(rel.clone()),
         }
+        state_edition(&mut fragment, &root, &mut editions, &mut incomplete);
         fragments.insert(rel.clone(), fragment);
     }
     for (rel, reason) in &tree.problems {
@@ -208,6 +214,26 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
             .into_iter()
             .map(|(path, reason)| Incomplete { path, reason })
             .collect(),
+    }
+}
+
+/// The fact `edition` of the file `fragment` describes: the edition of the
+/// crate that holds it, which a formatter needs and cannot read for itself. A
+/// file whose edition cannot be settled is a gap, not a guess.
+fn state_edition(
+    fragment: &mut Fragment,
+    root: &Path,
+    editions: &mut Manifests,
+    incomplete: &mut BTreeSet<(Option<String>, String)>,
+) {
+    let rel = fragment.file.path.clone();
+    match editions.edition(root, &root.join(&rel)) {
+        Ok(edition) => {
+            fragment.file.facts.insert("edition".to_owned(), edition);
+        }
+        Err(reason) => {
+            incomplete.insert((Some(rel), reason));
+        }
     }
 }
 
@@ -249,6 +275,7 @@ fn empty_fragment(path: &str) -> Fragment {
         file: FileInfo {
             path: path.to_owned(),
             generated: false,
+            facts: Default::default(),
         },
         ..Fragment::default()
     }

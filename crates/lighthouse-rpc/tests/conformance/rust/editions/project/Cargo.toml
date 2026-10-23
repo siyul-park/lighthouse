@@ -1,0 +1,6 @@
+[workspace]
+members = ["explicit", "inherits", "unset"]
+resolver = "3"
+
+[workspace.package]
+edition = "2021"

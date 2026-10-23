@@ -11,9 +11,10 @@ use crate::{cache_fixtures::write, mcp::Client};
 
 const IMPORT: &str = "use std::{b, A};\n";
 
-/// A workspace of three crates holding the same `use`: `old` of the 2021
-/// edition, `inherits` of the one the workspace gives it (2021 too) and `new`
-/// of the 2024 edition.
+/// A workspace of four crates holding the same `use`: `old` of the 2021
+/// edition, `inherits` of the one the workspace gives it (2021 too), `new` of
+/// the 2024 edition and `none`, which sets none, so it has Cargo's default,
+/// 2015, which writes it as 2021 does.
 fn workspace() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let plugin = lighthouse_test_support::lang_rust();
@@ -28,12 +29,13 @@ fn workspace() -> TempDir {
     write(
         dir.path(),
         "Cargo.toml",
-        "[workspace]\nmembers = [\"old\", \"inherits\", \"new\"]\nresolver = \"3\"\n\n[workspace.package]\nedition = \"2021\"\n",
+        "[workspace]\nmembers = [\"old\", \"inherits\", \"new\", \"none\"]\nresolver = \"3\"\n\n[workspace.package]\nedition = \"2021\"\n",
     );
     for (name, edition) in [
         ("old", "edition = \"2021\""),
         ("inherits", "edition.workspace = true"),
         ("new", "edition = \"2024\""),
+        ("none", ""),
     ] {
         write(
             dir.path(),
@@ -95,6 +97,7 @@ fn a_file_is_fixed_under_the_edition_of_its_crate() {
         "{fixed}"
     );
     assert_eq!(read(&dir, "old/src/lib.rs"), IMPORT, "{fixed}");
+    assert_eq!(read(&dir, "none/src/lib.rs"), IMPORT, "{fixed}");
     assert_eq!(read(&dir, "inherits/src/lib.rs"), IMPORT, "{fixed}");
     assert!(flagged(&dir).is_empty());
 }

@@ -33,6 +33,7 @@ fn file() -> File {
         hash: String::new(),
         generated: false,
         test: false,
+        facts: Default::default(),
     }
 }
 

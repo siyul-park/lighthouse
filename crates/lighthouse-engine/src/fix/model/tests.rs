@@ -60,6 +60,7 @@ fn project(symbols: Vec<Symbol>) -> Project {
             hash: String::new(),
             generated: false,
             test: false,
+            facts: Default::default(),
         }],
         symbols,
         ..Fragment::default()

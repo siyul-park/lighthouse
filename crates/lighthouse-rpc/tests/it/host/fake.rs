@@ -114,6 +114,7 @@ pub(super) fn file(path: &str) -> File {
         hash: "abc".to_owned(),
         generated: false,
         test: false,
+        facts: Default::default(),
     }
 }
 

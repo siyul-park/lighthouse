@@ -454,6 +454,13 @@
     "FileInfo": {
       "description": "Identity and classification of an indexed file.",
       "properties": {
+        "facts": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "What the provider says of the file besides that, by name, for a\nprogram to name as `{file.<name>}`: the `edition` of a Rust file's\ncrate.",
+          "type": "object"
+        },
         "generated": {
           "description": "The file is machine-generated.",
           "type": "boolean"

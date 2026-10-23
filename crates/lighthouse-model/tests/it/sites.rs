@@ -48,6 +48,7 @@ fn fragment(file: &str, symbols: Vec<Symbol>, edges: Vec<Edge>) -> Fragment {
             hash: String::new(),
             generated: false,
             test: false,
+            facts: Default::default(),
         }],
         symbols,
         edges,

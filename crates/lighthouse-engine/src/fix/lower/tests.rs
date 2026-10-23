@@ -64,6 +64,7 @@ fn case(text: &str, symbols: &[(&str, u32, u32)], edges: Vec<Edge>) -> Case {
             hash: String::new(),
             generated: false,
             test: false,
+            facts: Default::default(),
         }],
         symbols: symbols
             .iter()
@@ -651,6 +652,7 @@ fn generated_files_are_not_edited() {
             hash: String::new(),
             generated: true,
             test: false,
+            facts: Default::default(),
         }],
         ..Fragment::default()
     }]);
@@ -679,6 +681,7 @@ fn a_symlinked_file_or_directory_is_not_followed() {
         hash: String::new(),
         generated: false,
         test: false,
+        facts: Default::default(),
     };
     let project = Project::merge([Fragment {
         files: vec![file("sub/x.src"), file("link.src")],

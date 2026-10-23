@@ -125,6 +125,7 @@ impl Engine {
             hash: hash::sha256(&text),
             generated: self.config.is_generated(rel) || self.attributes.is_generated(rel),
             test: self.languages[language].tests.is_match(rel),
+            facts: Default::default(),
         };
         Some(Ok(Input {
             file,

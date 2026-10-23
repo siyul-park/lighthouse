@@ -75,6 +75,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "app/src/lib.rs"
       },
       "functions": [
@@ -203,6 +206,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "fixtures/src/lib.rs"
       },
       "functions": [
@@ -292,6 +298,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "shared/src/lib.rs"
       },
       "functions": [

@@ -290,6 +290,11 @@ pub struct FileInfo {
     /// The file is machine-generated.
     #[serde(default, skip_serializing_if = "is_false")]
     pub generated: bool,
+    /// What the provider says of the file besides that, by name, for a
+    /// program to name as `{file.<name>}`: the `edition` of a Rust file's
+    /// crate.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub facts: BTreeMap<String, String>,
 }
 
 /// Package, directory or namespace; `path` identifies it project-wide.

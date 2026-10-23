@@ -46,6 +46,7 @@ fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
         hash: String::new(),
         generated: false,
         test: false,
+        facts: Default::default(),
     };
     let ws = Workspace::new(dir.path().canonicalize().unwrap());
     let indexed = provider

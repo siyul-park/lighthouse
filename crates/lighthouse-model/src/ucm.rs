@@ -56,6 +56,11 @@ pub struct File {
     pub hash: String,
     pub generated: bool,
     pub test: bool,
+    /// What the provider says of the file besides that, by name: the edition
+    /// of the crate a Rust file is in, say. A program names one as
+    /// `{file.<name>}`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub facts: BTreeMap<String, String>,
 }
 
 /// Package, directory or namespace.

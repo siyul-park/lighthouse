@@ -227,6 +227,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/lib.rs"
       },
       "functions": [
@@ -398,6 +401,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/other/platform.rs"
       },
       "functions": [
@@ -470,6 +476,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/other/special.rs"
       },
       "functions": [
@@ -594,6 +603,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/shapes/mod.rs"
       },
       "functions": [
@@ -793,6 +805,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/shapes/square.rs"
       },
       "functions": [
@@ -883,6 +898,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/util.rs"
       },
       "functions": [
@@ -956,6 +974,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/util/hidden.rs"
       },
       "functions": [

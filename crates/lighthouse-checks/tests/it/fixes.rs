@@ -72,6 +72,7 @@ fn declared(names: &[&str], extents: bool) -> Project {
             hash: String::new(),
             generated: false,
             test: false,
+            facts: Default::default(),
         }],
         symbols,
         ..Fragment::default()

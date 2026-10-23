@@ -175,6 +175,7 @@ fn a_module_edge_remembers_the_file_of_the_first_fragment_that_has_it() {
             hash: String::new(),
             generated: false,
             test: false,
+            facts: Default::default(),
         }],
         edges,
         ..Fragment::default()
@@ -219,6 +220,7 @@ fn an_import_at_several_sites_is_one_edge_with_the_site_of_the_first_file_in_pat
             hash: String::new(),
             generated: false,
             test: false,
+            facts: Default::default(),
         }],
         edges,
         ..Fragment::default()
@@ -244,6 +246,7 @@ fn project_indexes_answer_by_file_symbol_and_call_graph() {
         hash: String::new(),
         generated: false,
         test: true,
+        facts: Default::default(),
     };
     let fragment = Fragment {
         files: vec![test_file],
@@ -570,6 +573,7 @@ fn file_of(symbol: &Symbol) -> File {
         hash: String::new(),
         generated: false,
         test: false,
+        facts: Default::default(),
     }
 }
 

@@ -112,9 +112,9 @@ fix:
 - **The formatter is a decision.** `go/formatted` and `rust/formatted` (severity `error`) check with the
   tool's list mode (`gofmt -l`, `rustfmt --check -l`) and fix with the tool as a filter
   (`stdin: file`, `output: stdout`, `safe`, `priority: -100`), `rust/formatted` with the edition
-  of the crate that holds each file (the nearest `Cargo.toml` that sets one, in its package or in
-  the workspace it inherits from; `cargo fmt` does the same but needs a manifest at the root and is
-  no filter over one file). They are in the recommended sets of
+  of the crate that holds each file (`{file.edition}`, which the Rust provider states: the nearest
+  package's, in its manifest or in the workspace it inherits from, else Cargo's default, 2015;
+  `cargo fmt` formats every target, not the files it is given, and needs a manifest at the root). They are in the recommended sets of
   the language packs and need no trust. To use another formatter, switch the decision off and add a
   decision of the project that names it.
 - **Testing:** an invalid example may carry `fixed:`, the new text of each file that

@@ -12,6 +12,7 @@ fn file(path: &str, generated: bool, test: bool) -> File {
         hash: String::new(),
         generated,
         test,
+        facts: Default::default(),
     }
 }
 

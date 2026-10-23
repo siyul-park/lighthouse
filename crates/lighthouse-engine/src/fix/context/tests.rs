@@ -108,6 +108,7 @@ fn file(path: &str, language: &str) -> File {
         hash: String::new(),
         generated: false,
         test: false,
+        facts: Default::default(),
     }
 }
 

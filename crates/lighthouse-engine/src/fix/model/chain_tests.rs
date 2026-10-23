@@ -80,6 +80,7 @@ fn project_calling(result: &str, calls: bool) -> Project {
         hash: String::new(),
         generated: false,
         test: false,
+        facts: Default::default(),
     };
     let calls_f = Edge {
         kind: EdgeKind::Calls,
@@ -150,6 +151,7 @@ fn with_module_level_use(without_f: bool) -> Project {
         hash: String::new(),
         generated: false,
         test: false,
+        facts: Default::default(),
     };
     let uses = Edge {
         kind: EdgeKind::Imports,
@@ -293,6 +295,7 @@ fn indexed(hash: &str) -> Run {
         hash: hash.to_owned(),
         generated: false,
         test: false,
+        facts: Default::default(),
     };
     Run {
         project: Project::merge([Fragment {

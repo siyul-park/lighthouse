@@ -132,6 +132,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/lib.rs"
       },
       "functions": [
@@ -443,6 +446,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/more.rs"
       },
       "functions": [
@@ -517,6 +523,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "tests/common/mod.rs"
       },
       "functions": [
@@ -932,6 +941,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "tests/integration.rs"
       },
       "functions": [
@@ -1412,6 +1424,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "tests/other.rs"
       },
       "functions": [

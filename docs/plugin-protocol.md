@@ -159,7 +159,10 @@ with an uncached run byte for byte. The field is optional.
 Result `{ fragments, notices, incomplete }`:
 
 - `fragments`: one per analyzed file, sorted by path, each
-  `{ file: { path, generated? }, modules, symbols, edges, functions, tests, comments }`.
+  `{ file: { path, generated?, facts? }, modules, symbols, edges, functions, tests, comments }`;
+  `facts` is what the provider says of the file by name, text to text, which a program names as
+  `{file.<name>}` ([programs](programs.md#the-command-line)); the Rust provider states the `edition` of
+  the crate that holds each file.
   A requested file with no fragment is incomplete. Files the provider
   deliberately skips (excluded by the build context, `testdata`) get an empty
   fragment.

@@ -11,7 +11,7 @@ use std::{collections::BTreeMap, path::Path};
 use lighthouse_model::{Diagnostic, Safety};
 use lighthouse_process::{Environment, Home, Job, Ran, context, expand};
 use lighthouse_protocol::hash;
-use lighthouse_spec::{FixScope, Output, Point, Stdin};
+use lighthouse_spec::{FixScope, Output, Point, Stdin, file_fact};
 use serde_json::json;
 
 use super::{
@@ -28,6 +28,9 @@ use crate::{Overlays, Run};
 /// How many characters of what a program said a reason carries.
 const SAID_SHOWN: usize = 400;
 
+/// What a file with no provider facts has.
+static NO_FACTS: BTreeMap<String, String> = BTreeMap::new();
+
 /// Why a finding gets no fix by a command, and how that is counted.
 type Failure = (Class, String);
 
@@ -39,6 +42,8 @@ struct Launch<'a> {
     text: &'a str,
     /// The options the finding's rule ran with.
     options: &'a serde_json::Map<String, serde_json::Value>,
+    /// What the provider says of the finding's file, for `{file.<fact>}`.
+    facts: &'a BTreeMap<String, String>,
 }
 
 impl Proposer<'_> {
@@ -83,6 +88,10 @@ impl Proposer<'_> {
             finding,
             text: text.as_str(),
             options: &options,
+            facts: outcome
+                .project
+                .file(&finding.file)
+                .map_or(&NO_FACTS, |f| &f.facts),
         };
         let changes = self.rewrite(&launch, &world)?;
         let extents = if fix.scope == FixScope::Symbol {
@@ -196,12 +205,23 @@ impl Proposer<'_> {
         let (fix, finding) = (launch.fix, launch.finding);
         let program = &fix.program;
         let shown = program.shown();
+        if let Some(fact) = program
+            .command
+            .iter()
+            .filter_map(|arg| file_fact(arg))
+            .find(|fact| !launch.facts.contains_key(*fact))
+        {
+            return Err(fail(format!(
+                "`{}` has no `{fact}` fact: the provider of its language states none",
+                finding.file.display()
+            )));
+        }
         let command = expand(&program.command, dir, |arg| match arg {
             "{file}" => Some(vec![finding.file.to_string_lossy().replace('\\', "/")]),
             "{line}" => Some(vec![finding.span.start.line.to_string()]),
             "{symbol}" => Some(vec![finding.symbol.clone().unwrap_or_default()]),
             "{decision}" => Some(vec![finding.rule_id.clone()]),
-            _ => None,
+            _ => file_fact(arg).and_then(|fact| launch.facts.get(fact).map(|v| vec![v.clone()])),
         })
         .map_err(fail)?;
         let decision = json!({

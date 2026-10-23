@@ -47,6 +47,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "closed/src/lib.rs"
       },
       "functions": [
@@ -214,6 +217,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "consumer/src/lib.rs"
       },
       "functions": [
@@ -326,6 +332,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "open/src/lib.rs"
       },
       "functions": [
@@ -491,6 +500,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "shared/src/lib.rs"
       },
       "functions": [

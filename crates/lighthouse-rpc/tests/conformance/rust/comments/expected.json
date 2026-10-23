@@ -76,6 +76,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/lib.rs"
       },
       "functions": [

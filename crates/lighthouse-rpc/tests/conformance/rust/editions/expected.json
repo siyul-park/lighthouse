@@ -1,0 +1,207 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "explicit"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "explicit::explicit#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "explicit/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "explicit::explicit#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "explicit",
+          "path": "explicit"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "explicit/src/lib.rs",
+          "id": "explicit::explicit#function",
+          "kind": "function",
+          "name": "explicit",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "inherits"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "inherits::inherits#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2021"
+        },
+        "path": "inherits/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "inherits::inherits#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "inherits",
+          "path": "inherits"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "inherits/src/lib.rs",
+          "id": "inherits::inherits#function",
+          "kind": "function",
+          "name": "inherits",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "unset"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "unset::unset#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2015"
+        },
+        "path": "unset/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "unset::unset#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "unset",
+          "path": "unset"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "unset/src/lib.rs",
+          "id": "unset::unset#function",
+          "kind": "function",
+          "name": "unset",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

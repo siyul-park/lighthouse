@@ -281,9 +281,25 @@ impl Program {
         self.command
             .iter()
             .find_map(|arg| refused(arg, point))
+            .or_else(|| self.fact_problem(point))
             .or_else(|| self.output_problem(point))
             .or_else(|| self.env_problem())
             .or_else(|| self.sandbox_problem())
+    }
+
+    /// A check reads a fact of a file for the files of a run, so the run must
+    /// have them: `{file}` or `{files}` must be there too. A fix has the file
+    /// of its finding.
+    fn fact_problem(&self, point: Point) -> Option<String> {
+        if point != Point::Check {
+            return None;
+        }
+        let fact = self.command.iter().find(|arg| file_fact(arg).is_some())?;
+        let has_files = self
+            .command
+            .iter()
+            .any(|arg| arg == "{file}" || arg == "{files}");
+        (!has_files).then(|| format!("`{fact}` needs `{{file}}` or `{{files}}` in the command"))
     }
 
     fn output_problem(&self, point: Point) -> Option<String> {
@@ -446,6 +462,15 @@ impl From<&Program> for ProgramSpec {
     }
 }
 
+/// The name of the fact of a file that `arg` is the placeholder of, when it
+/// is one of its own: `edition` for `{file.edition}`, and nothing for
+/// `{file}` or `--edition={file.edition}`.
+pub fn file_fact(arg: &str) -> Option<&str> {
+    let name = arg.strip_prefix("{file.")?.strip_suffix('}')?;
+    let mut chars = name.chars();
+    (chars.next()?.is_ascii_lowercase() && chars.all(|c| c.is_ascii_alphanumeric())).then_some(name)
+}
+
 /// `arg` as a placeholder, when it is one of its own: `{file}` and not
 /// `--file={file}`.
 fn placeholder(arg: &str) -> Option<&str> {
@@ -458,6 +483,15 @@ fn placeholder(arg: &str) -> Option<&str> {
 /// the point does not accept, or mixes one into other text.
 fn refused(arg: &str, point: Point) -> Option<String> {
     let accepted = point.accepts();
+    if arg.contains("{file.") {
+        return match file_fact(arg) {
+            None => Some(format!(
+                "`{arg}` is not a placeholder of its own: `{{file.<fact>}}` fills a whole argument, and a fact is a name such as `edition`"
+            )),
+            Some(_) if accepted.contains(&"file") => None,
+            Some(_) => Some(format!("`{arg}` is not a placeholder of a {point}")),
+        };
+    }
     for name in names_in(arg) {
         if !PLACEHOLDERS.contains(&name) && !RETIRED.contains(&name) {
             continue;

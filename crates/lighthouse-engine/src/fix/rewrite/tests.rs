@@ -312,6 +312,7 @@ fn world_run() -> Run {
                     hash: String::new(),
                     generated: false,
                     test: false,
+                    facts: Default::default(),
                 })
                 .collect(),
             symbols: vec![f, g, h, x, k],

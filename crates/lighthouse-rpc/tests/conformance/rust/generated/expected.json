@@ -27,6 +27,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "generated": true,
         "path": "src/gen.rs"
       },
@@ -121,6 +124,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/lib.rs"
       },
       "functions": [],
@@ -179,6 +185,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "edition": "2024"
+        },
         "path": "src/plain.rs"
       },
       "functions": [

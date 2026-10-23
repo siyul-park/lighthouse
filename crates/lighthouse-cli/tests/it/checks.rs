@@ -327,3 +327,14 @@ fn a_proposed_decision_is_tested_by_decision_test_but_not_enforced() {
         .assert()
         .success();
 }
+
+#[test]
+fn a_fact_of_a_file_its_provider_does_not_state_is_an_error_naming_the_file_and_the_fact() {
+    let (code, report) = checked_at(
+        "project",
+        "    command: [sh, -c, \"exit 0\", sh, \"{file.edition}\", \"{files}\"]\n    files: [\"a.txt\"]\n",
+    );
+
+    assert_eq!(code, 3, "{report}");
+    assert!(report.contains("`a.txt` has no `edition` fact"), "{report}");
+}

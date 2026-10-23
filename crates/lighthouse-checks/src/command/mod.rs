@@ -10,7 +10,7 @@
 pub mod sarif;
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -19,7 +19,7 @@ use lighthouse_model::{Diagnostic, Position, RunScope, Span, squash, ucm::Projec
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use lighthouse_process::{Environment, Home, Job, Ran, context, copy_project, expand};
 use lighthouse_protocol::hash::Hasher;
-use lighthouse_spec::{Batching, GlobSet, Output, Point, Program, Stdin, glob_set};
+use lighthouse_spec::{Batching, GlobSet, Output, Point, Program, Stdin, file_fact, glob_set};
 use serde_json::{Map, Value, json};
 use tempfile::TempDir;
 
@@ -223,21 +223,83 @@ impl Invocation<'_> {
             .map(|f| f.path.clone())
             .collect();
         let mut found = Vec::new();
-        for chunk in chunks(&self.rule.program.command, &files) {
-            let command = self.arguments(chunk)?;
-            let printed = self.invoke(&command, &[])?;
-            found.extend(self.collect(&printed, None)?);
+        for group in self.grouped(files)? {
+            for chunk in chunks(&self.rule.program.command, &group) {
+                let command = self.arguments(chunk)?;
+                let printed = self.invoke(&command, &[])?;
+                found.extend(self.collect(&printed, None)?);
+            }
         }
         Ok(found)
     }
 
-    /// The command line: `{file}`, `{files}` and `{decision}` fill whole
-    /// arguments.
+    /// `files` in the runs the command asks for: one group when it names no
+    /// fact of a file, else one group per combination of the facts it names,
+    /// since a run has one value of each.
+    fn grouped(&self, files: Vec<PathBuf>) -> Result<Vec<Vec<PathBuf>>, PluginError> {
+        let facts = self.facts();
+        if facts.is_empty() {
+            return Ok(vec![files]);
+        }
+        let mut groups: BTreeMap<Vec<String>, Vec<PathBuf>> = BTreeMap::new();
+        for file in files {
+            let values = facts
+                .iter()
+                .map(|fact| self.fact(&file, fact))
+                .collect::<Result<Vec<_>, _>>()?;
+            groups.entry(values).or_default().push(file);
+        }
+        Ok(groups.into_values().collect())
+    }
+
+    /// The facts of a file the command names, as `{file.<fact>}`.
+    fn facts(&self) -> Vec<&str> {
+        let mut facts: Vec<&str> = self
+            .rule
+            .program
+            .command
+            .iter()
+            .filter_map(|arg| file_fact(arg))
+            .collect();
+        facts.sort_unstable();
+        facts.dedup();
+        facts
+    }
+
+    /// What the provider says of `file` under `fact`; a file it says nothing
+    /// of is an error, not a run without a value.
+    fn fact(&self, file: &Path, fact: &str) -> Result<String, PluginError> {
+        self.ctx
+            .project
+            .file(file)
+            .and_then(|f| f.facts.get(fact))
+            .cloned()
+            .ok_or_else(|| {
+                PluginError::Incomplete(format!(
+                    "{}: `{}` has no `{fact}` fact: the provider of its language states none",
+                    self.meta.id,
+                    file.display()
+                ))
+            })
+    }
+
+    /// The command line: `{file}`, `{files}`, `{file.<fact>}` (the value the
+    /// files of the run share) and `{decision}` fill whole arguments.
     fn arguments(&self, files: &[PathBuf]) -> Result<Vec<String>, PluginError> {
+        let facts: BTreeMap<&str, String> = match files.first() {
+            Some(first) => self
+                .facts()
+                .into_iter()
+                .map(|fact| Ok((fact, self.fact(first, fact)?)))
+                .collect::<Result<_, PluginError>>()?,
+            None => BTreeMap::new(),
+        };
         expand(&self.rule.program.command, &self.root, |arg| match arg {
             "{file}" | "{files}" => Some(files.iter().map(|f| slashed(f)).collect()),
             "{decision}" => Some(vec![self.meta.id.clone()]),
-            _ => None,
+            _ => file_fact(arg)
+                .and_then(|fact| facts.get(fact))
+                .map(|value| vec![value.clone()]),
         })
         .map_err(|reason| PluginError::Incomplete(format!("{}: {reason}", self.meta.id)))
     }

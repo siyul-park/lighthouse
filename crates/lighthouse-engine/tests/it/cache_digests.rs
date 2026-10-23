@@ -30,6 +30,7 @@ fn file(path: &str) -> File {
         hash: path.to_owned(),
         generated: false,
         test: false,
+        facts: Default::default(),
     }
 }
 

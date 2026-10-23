@@ -52,6 +52,7 @@ impl Fixture {
                 hash: String::new(),
                 generated: false,
                 test: p.ends_with("_test.go"),
+                facts: Default::default(),
             })
             .collect();
         let texts: Vec<String> = paths

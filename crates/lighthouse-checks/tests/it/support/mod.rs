@@ -325,6 +325,7 @@ impl World {
                     hash: String::new(),
                     generated: *generated,
                     test: path.ends_with("_test.ucm"),
+                    facts: Default::default(),
                 };
                 let own = |s: &Symbol| s.file.to_string_lossy() == path.as_str();
                 let ids: Vec<&SymbolId> = self

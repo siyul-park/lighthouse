@@ -14,6 +14,9 @@ const DEP_SECTIONS: [&str; 3] = ["dependencies", "dev-dependencies", "build-depe
 /// The sections whose crates are linked into what the package ships.
 const RUNTIME_SECTIONS: [&str; 2] = ["dependencies", "build-dependencies"];
 
+/// The edition Cargo gives a package that sets none.
+const DEFAULT_EDITION: &str = "2015";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TargetKind {
     Lib,
@@ -57,6 +60,88 @@ pub struct Package {
     /// The packages that `[dependencies]` and `[build-dependencies]` name, as
     /// opposed to `[dev-dependencies]`.
     pub runtime: BTreeSet<String>,
+}
+
+/// The manifests read so far, by directory, so that each is parsed once.
+#[derive(Default)]
+pub struct Manifests(BTreeMap<PathBuf, Option<Result<Table, String>>>);
+
+impl Manifests {
+    /// The edition of the package that holds `file` (a path under `root`): the
+    /// `edition` of the nearest `Cargo.toml` with a `[package]`, or the one its
+    /// workspace sets for it (`edition.workspace = true`), or Cargo's own
+    /// default, 2015, for a package that sets none. A file no package holds
+    /// has the default too, which is also what `rustfmt` assumes.
+    pub fn edition(&mut self, root: &Path, file: &Path) -> Result<String, String> {
+        let mut dir = file.parent().map(Path::to_owned);
+        while let Some(current) = dir.filter(|d| d.starts_with(root)) {
+            if let Some(manifest) = self.manifest(&current)? {
+                let Some(package) = manifest.get("package").and_then(Value::as_table) else {
+                    dir = current.parent().map(Path::to_owned);
+                    continue;
+                };
+                return match package.get("edition") {
+                    None => Ok(DEFAULT_EDITION.to_owned()),
+                    Some(Value::String(edition)) => Ok(edition.clone()),
+                    Some(inherited)
+                        if inherited.get("workspace").and_then(Value::as_bool) == Some(true) =>
+                    {
+                        self.workspace_edition(root, &current)
+                    }
+                    Some(other) => Err(format!(
+                        "{}: `edition` is {other}, not a string",
+                        current.join("Cargo.toml").display()
+                    )),
+                };
+            }
+            dir = current.parent().map(Path::to_owned);
+        }
+        Ok(DEFAULT_EDITION.to_owned())
+    }
+
+    /// The `[workspace.package] edition` of the nearest workspace above `from`.
+    fn workspace_edition(&mut self, root: &Path, from: &Path) -> Result<String, String> {
+        let mut dir = from.parent().map(Path::to_owned);
+        while let Some(current) = dir.filter(|d| d.starts_with(root)) {
+            if let Some(manifest) = self.manifest(&current)?
+                && let Some(workspace) = manifest.get("workspace").and_then(Value::as_table)
+            {
+                return match workspace
+                    .get("package")
+                    .and_then(|p| p.get("edition"))
+                    .and_then(Value::as_str)
+                {
+                    Some(edition) => Ok(edition.to_owned()),
+                    None => Err(format!(
+                        "{}: the package inherits its edition, and the workspace sets none",
+                        from.join("Cargo.toml").display()
+                    )),
+                };
+            }
+            dir = current.parent().map(Path::to_owned);
+        }
+        Err(format!(
+            "{}: the package inherits its edition from a workspace that is not there",
+            from.join("Cargo.toml").display()
+        ))
+    }
+
+    /// The manifest in `dir`, parsed once; `None` when there is none.
+    fn manifest(&mut self, dir: &Path) -> Result<Option<&Table>, String> {
+        let loaded = self.0.entry(dir.to_owned()).or_insert_with(|| {
+            let path = dir.join("Cargo.toml");
+            let text = fs::read_to_string(&path).ok()?;
+            Some(
+                text.parse::<Table>()
+                    .map_err(|e| format!("{}: {e}", path.display())),
+            )
+        });
+        match loaded {
+            None => Ok(None),
+            Some(Ok(table)) => Ok(Some(table)),
+            Some(Err(reason)) => Err(reason.clone()),
+        }
+    }
 }
 
 /// Reads the package of the manifest in `dir`; `None` for a virtual workspace
