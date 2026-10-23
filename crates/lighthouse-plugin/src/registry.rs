@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    Analyzer, CatalogFunction, CelLibrary, Error, Fixer, LanguageProvider, ModelClient, Plugin,
+    Analyzer, CelCatalog, CelLibrary, Error, Fixer, LanguageProvider, ModelClient, Plugin,
     PluginManifest, Rule,
 };
 
@@ -122,30 +122,9 @@ impl Registry {
         Ok(())
     }
 
-    /// The CEL libraries of the registered plugins, in registration order.
-    pub fn cel_libraries(&self) -> impl Iterator<Item = &dyn CelLibrary> {
-        self.libraries.iter().map(Box::as_ref)
-    }
-
-    /// The one function catalog: the functions of every registered library,
-    /// sorted by name.
-    pub fn cel_functions(&self) -> Vec<CatalogFunction<'_>> {
-        let mut all: Vec<CatalogFunction<'_>> = self
-            .libraries
-            .iter()
-            .flat_map(|l| {
-                let manifest = l.manifest();
-                manifest.functions.iter().map(|function| CatalogFunction {
-                    library: manifest.id.as_str(),
-                    version: manifest.version.as_str(),
-                    function,
-                })
-            })
-            .collect();
-        all.sort_by(|a, b| {
-            (&a.function.name, &a.function.receiver).cmp(&(&b.function.name, &b.function.receiver))
-        });
-        all
+    /// The CEL libraries of the registered plugins and their function catalog.
+    pub fn cel(&self) -> CelCatalog<'_> {
+        CelCatalog::new(&self.libraries)
     }
 
     /// The model with this id.
@@ -173,7 +152,8 @@ impl Registry {
     ) -> Result<(), Error> {
         let mut ids = BTreeSet::new();
         let mut functions: BTreeMap<(&str, Option<&str>), &str> = self
-            .cel_functions()
+            .cel()
+            .functions()
             .into_iter()
             .map(|c| {
                 (

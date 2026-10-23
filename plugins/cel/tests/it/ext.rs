@@ -15,7 +15,7 @@ pub(crate) fn environment() -> Arc<Env> {
         let mut registry = Registry::default();
         registry.register(&Cel::new()).unwrap();
         let mut env = lighthouse_spec::base().unwrap();
-        for library in registry.cel_libraries() {
+        for library in registry.cel().libraries() {
             library.register(&mut env).unwrap();
         }
         Arc::new(env)

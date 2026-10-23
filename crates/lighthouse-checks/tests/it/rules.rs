@@ -477,7 +477,8 @@ fn the_function_catalog_is_what_the_plugin_registers_and_the_runtime_has() {
     let catalog = composition.functions();
     let registry = lighthouse_test_support::registry();
     let registered: Vec<String> = registry
-        .cel_functions()
+        .cel()
+        .functions()
         .iter()
         .map(|c| {
             format!(

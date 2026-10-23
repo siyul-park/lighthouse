@@ -125,3 +125,40 @@ pub struct CatalogFunction<'r> {
     pub version: &'r str,
     pub function: &'r Function,
 }
+
+/// The CEL libraries a registry holds, and the one function catalog they make.
+#[derive(Clone, Copy)]
+pub struct CelCatalog<'r> {
+    libraries: &'r [Box<dyn CelLibrary>],
+}
+
+impl<'r> CelCatalog<'r> {
+    pub(crate) fn new(libraries: &'r [Box<dyn CelLibrary>]) -> Self {
+        Self { libraries }
+    }
+
+    /// The libraries of the registered plugins, in registration order.
+    pub fn libraries(&self) -> impl Iterator<Item = &'r dyn CelLibrary> {
+        self.libraries.iter().map(Box::as_ref)
+    }
+
+    /// The functions of every library, sorted by name.
+    pub fn functions(&self) -> Vec<CatalogFunction<'r>> {
+        let mut all: Vec<CatalogFunction<'r>> = self
+            .libraries
+            .iter()
+            .flat_map(|l| {
+                let manifest = l.manifest();
+                manifest.functions.iter().map(|function| CatalogFunction {
+                    library: manifest.id.as_str(),
+                    version: manifest.version.as_str(),
+                    function,
+                })
+            })
+            .collect();
+        all.sort_by(|a, b| {
+            (&a.function.name, &a.function.receiver).cmp(&(&b.function.name, &b.function.receiver))
+        });
+        all
+    }
+}

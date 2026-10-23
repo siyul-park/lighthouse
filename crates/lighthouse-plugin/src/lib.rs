@@ -23,7 +23,9 @@ use serde_json::Value;
 use thiserror::Error;
 
 pub use annotations::Annotations;
-pub use cel::{CatalogFunction, CelLibrary, CelLibraryManifest, Function, Overload, Precedence};
+pub use cel::{
+    CatalogFunction, CelCatalog, CelLibrary, CelLibraryManifest, Function, Overload, Precedence,
+};
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
 pub use lighthouse_protocol::Conventions;
 pub use memo::Memo;

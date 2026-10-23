@@ -86,7 +86,8 @@ fn the_catalog_is_the_union_of_the_libraries_sorted_by_name() {
         .unwrap();
 
     let names: Vec<(&str, &str)> = registry
-        .cel_functions()
+        .cel()
+        .functions()
         .iter()
         .map(|c| (c.function.name.as_str(), c.library))
         .collect();
@@ -121,7 +122,7 @@ fn a_function_two_libraries_provide_is_a_load_error_and_nothing_of_the_plugin_is
         "{error}"
     );
     assert!(!registry.has_plugin("b"));
-    assert_eq!(registry.cel_functions().len(), 1);
+    assert_eq!(registry.cel().functions().len(), 1);
 }
 
 #[test]
@@ -137,7 +138,7 @@ fn the_same_name_on_another_kind_of_value_is_another_function() {
         ))
         .unwrap();
 
-    assert_eq!(registry.cel_functions().len(), 2);
+    assert_eq!(registry.cel().functions().len(), 2);
 }
 
 #[test]

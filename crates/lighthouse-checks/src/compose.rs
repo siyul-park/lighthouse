@@ -51,14 +51,15 @@ pub fn compose() -> Result<Composition, String> {
 /// The composition of the libraries `registry` holds.
 pub fn compose_from(registry: &Registry) -> Result<Composition, String> {
     let mut env = lighthouse_spec::base()?;
-    for library in registry.cel_libraries() {
+    for library in registry.cel().libraries() {
         let id = &library.manifest().id;
         library
             .register(&mut env)
             .map_err(|e| format!("CEL library `{id}`: {e}"))?;
     }
     let functions: Vec<Entry> = registry
-        .cel_functions()
+        .cel()
+        .functions()
         .into_iter()
         .map(|c| Entry {
             library: c.library.to_owned(),

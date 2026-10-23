@@ -16,10 +16,11 @@ fn registry() -> Registry {
 fn the_plugin_registers_without_a_duplicate_function() {
     let registry = registry();
 
-    assert!(!registry.cel_functions().is_empty());
+    assert!(!registry.cel().functions().is_empty());
     assert!(
         registry
-            .cel_libraries()
+            .cel()
+            .libraries()
             .all(|l| l.manifest().id.starts_with("cel/"))
     );
 }
@@ -29,7 +30,7 @@ fn every_function_of_the_catalog_is_registered_with_every_overload_it_lists() {
     let env = environment();
     let context = Context::with_env(env.clone());
     let registry = registry();
-    for entry in registry.cel_functions() {
+    for entry in registry.cel().functions() {
         let function = entry.function;
         if function.name == "cel.bind" {
             // A macro: it is expanded when the source is compiled.
@@ -56,7 +57,7 @@ fn every_example_of_the_catalog_holds() {
     let env = environment();
     let context = Context::with_env(env.clone());
     let registry = registry();
-    for entry in registry.cel_functions() {
+    for entry in registry.cel().functions() {
         let function = entry.function;
         let outcome = env
             .compile(&function.example)
@@ -70,7 +71,7 @@ fn every_example_of_the_catalog_holds() {
 #[test]
 fn every_library_is_named_after_the_plugin_and_has_a_version() {
     let registry = registry();
-    for library in registry.cel_libraries() {
+    for library in registry.cel().libraries() {
         let manifest = library.manifest();
         assert!(manifest.id.starts_with("cel/"), "{}", manifest.id);
         assert!(!manifest.version.is_empty());
