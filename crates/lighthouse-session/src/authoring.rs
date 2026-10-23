@@ -154,7 +154,7 @@ fn commit(
     let plugin_listed = session.config.lists(LOCAL_PACK);
     let mut files: BTreeMap<String, String> = local_files(&root)?.unwrap_or_default();
     files.insert(file_name(name), serde_norway::to_string(&doc)?);
-    let local = Catalog::from_local(files)?;
+    let local = Catalog::from_local(files, session.comp.cel())?;
     let text = canonical(&local, id)?;
     let candidate = session.with_local(Some(local))?;
     let testable = candidate

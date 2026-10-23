@@ -1,14 +1,14 @@
 //! The composition of the CEL environment: the libraries of the bundled
-//! plugins registered into the `cel` crate's standard environment, installed
-//! once for the process (spec never knows a library), and the function
-//! catalog they declare, which the load-time check of the functions a decision
-//! calls, the revision of a check and the generated docs read.
+//! plugins registered into the `cel` crate's standard environment, and the
+//! function catalog they declare, which the load-time check of the functions a
+//! decision calls, the revision of a check and the generated docs read. The
+//! composition root builds one [`Composition`] and passes it to everything
+//! that compiles or runs an expression; nothing keeps it in a global.
 
-use std::{collections::BTreeSet, sync::OnceLock};
+use std::{collections::BTreeSet, sync::Arc};
 
 use lighthouse_plugin::{Function, Registry};
-
-static CATALOG: OnceLock<Result<Vec<Entry>, String>> = OnceLock::new();
+use lighthouse_spec::Cel;
 
 /// A function of the catalog with the library that provides it.
 #[derive(Debug, Clone)]
@@ -18,10 +18,29 @@ pub struct Entry {
     pub function: Function,
 }
 
-/// Installs the environment of the bundled libraries, once per process: what
-/// every entry point does before it reads a decision. The first call
-/// decides; later calls (and `registry`) find it done.
-pub fn compose() -> Result<(), String> {
+/// The environment of the bundled libraries and the catalog of their
+/// functions. Clones share both.
+#[derive(Clone)]
+pub struct Composition {
+    cel: Cel,
+    functions: Arc<[Entry]>,
+}
+
+impl Composition {
+    /// The environment.
+    pub fn cel(&self) -> &Cel {
+        &self.cel
+    }
+
+    /// The function catalog of the libraries, sorted by name.
+    pub fn functions(&self) -> &[Entry] {
+        &self.functions
+    }
+}
+
+/// The composition of the bundled libraries: what every entry point builds
+/// before it reads a decision.
+pub fn compose() -> Result<Composition, String> {
     let mut registry = Registry::default();
     registry
         .register(&lighthouse_cel::Cel::new())
@@ -29,31 +48,16 @@ pub fn compose() -> Result<(), String> {
     compose_from(&registry)
 }
 
-/// Like [`compose`], from the libraries of `registry`, when this is the first
-/// composition of the process.
-pub(crate) fn compose_from(registry: &Registry) -> Result<(), String> {
-    CATALOG
-        .get_or_init(|| build(registry))
-        .as_ref()
-        .map(drop)
-        .map_err(Clone::clone)
-}
-
-/// The function catalog of the composed environment.
-pub fn catalog() -> Result<&'static [Entry], String> {
-    CATALOG
-        .get()
-        .ok_or_else(|| "the CEL environment is not composed".to_owned())?
-        .as_deref()
-        .map_err(Clone::clone)
-}
-
-fn build(registry: &Registry) -> Result<Vec<Entry>, String> {
+/// The composition of the libraries `registry` holds.
+pub fn compose_from(registry: &Registry) -> Result<Composition, String> {
     let mut env = lighthouse_spec::base()?;
     for library in registry.cel_libraries() {
-        library.register(&mut env).map_err(|e| e.to_string())?;
+        let id = &library.manifest().id;
+        library
+            .register(&mut env)
+            .map_err(|e| format!("CEL library `{id}`: {e}"))?;
     }
-    let entries: Vec<Entry> = registry
+    let functions: Vec<Entry> = registry
         .cel_functions()
         .into_iter()
         .map(|c| Entry {
@@ -62,10 +66,12 @@ fn build(registry: &Registry) -> Result<Vec<Entry>, String> {
             function: c.function.clone(),
         })
         .collect();
-    let namespaces: BTreeSet<String> = entries
+    let namespaces: BTreeSet<String> = functions
         .iter()
         .filter_map(|e| e.function.namespace().map(str::to_owned))
         .collect();
-    lighthouse_spec::install(env, namespaces)?;
-    Ok(entries)
+    Ok(Composition {
+        cel: Cel::new(env, namespaces),
+        functions: functions.into(),
+    })
 }

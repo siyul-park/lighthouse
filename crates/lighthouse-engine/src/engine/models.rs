@@ -443,16 +443,11 @@ pub(super) fn named(model: &Model) -> String {
 mod tests {
     use super::*;
 
-    /// The CEL environment is installed before any test reads a decision.
-    #[ctor::ctor(unsafe)]
-    fn compose() {
-        lighthouse_test_support::cel();
-    }
     use lighthouse_plugin::{
         Capabilities, CreateFineTuningJobRequest, Error, FineTuningJob, Plugin, PluginManifest,
         Registry, Supports, SystemOneRequest, SystemOneResponse,
     };
-    use lighthouse_spec::{Catalog, Config};
+    use lighthouse_spec::Config;
 
     struct Echo(Model);
 
@@ -520,10 +515,14 @@ mod tests {
                 "plugins = [\"echo\"]\n[models.providers.work]\nplugin = \"echo\"\n",
             )
             .unwrap();
-            let engine =
-                super::super::Engine::new(registry, config, Catalog::bundled(), dir.path())
-                    .unwrap()
-                    .with_models(super::super::ModelOptions::default());
+            let engine = super::super::Engine::new(
+                registry,
+                config,
+                lighthouse_test_support::bundled(),
+                dir.path(),
+            )
+            .unwrap()
+            .with_models(super::super::ModelOptions::default());
             let scopes = Scopes::default();
             let models = RunModels::new(&engine, &scopes, None);
 

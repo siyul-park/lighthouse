@@ -7,6 +7,7 @@ use std::{
     fmt::Write,
 };
 
+use lighthouse_checks::Composition;
 use lighthouse_engine::active;
 use lighthouse_report::docs::{
     DOCS_DIR, FunctionDoc, cel_functions_markdown, fix_operations_markdown, pages,
@@ -29,15 +30,15 @@ pub const AGENT_LOOP: &str = include_str!("agent-loop.md");
 /// Every generated page by path under the docs directory: one per pack, and
 /// the fix operations and the CEL functions.
 pub fn bundled_docs() -> Result<BTreeMap<String, String>> {
-    crate::compose()?;
-    let mut pages = pages(Catalog::bundled());
+    let comp = crate::compose()?;
+    let mut pages = pages(comp.cel().bundled()?);
     pages.insert(
         format!("{DOCS_DIR}/fix-operations.md"),
         fix_operations_markdown(),
     );
     pages.insert(
         format!("{DOCS_DIR}/cel-functions.md"),
-        cel_functions_markdown(&function_docs()?),
+        cel_functions_markdown(&function_docs(&comp)),
     );
     Ok(pages)
 }
@@ -112,8 +113,8 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
 }
 
 /// The function catalog of the bundled CEL libraries, as the docs page shows it.
-fn function_docs() -> Result<Vec<FunctionDoc>> {
-    Ok(lighthouse_checks::catalog()?
+fn function_docs(comp: &Composition) -> Vec<FunctionDoc> {
+    comp.functions()
         .iter()
         .map(|entry| FunctionDoc {
             library: entry.library.clone(),
@@ -129,5 +130,5 @@ fn function_docs() -> Result<Vec<FunctionDoc>> {
             example: entry.function.example.clone(),
             step: entry.function.precedence.step(),
         })
-        .collect())
+        .collect()
 }

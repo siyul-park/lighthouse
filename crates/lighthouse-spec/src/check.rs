@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    CommandCheck, ModelCheck, Subject, command,
+    Cel, CommandCheck, ModelCheck, Subject, command,
     expression::{compile_problem, template_problem},
     union::{refuse_strays, stray_field},
 };
@@ -107,10 +107,10 @@ impl CheckKind {
     }
 
     /// What is wrong with the provider this names, for a decision about `subject`.
-    pub(crate) fn problem(&self, subject: Subject) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Cel, subject: Subject) -> Option<String> {
         match self {
-            Self::Cel(cel) => cel.problem().or_else(|| {
-                let Some(select) = cel.selects(subject) else {
+            Self::Cel(check) => check.problem(cel).or_else(|| {
+                let Some(select) = check.selects(subject) else {
                     return Some(format!("a `{subject}` decision needs a `select`"));
                 };
                 if select.scope() != subject.run_scope() {
@@ -121,7 +121,7 @@ impl CheckKind {
                 }
                 // A model cannot be asked about a subject outside a file; a
                 // module is left to agent review, which lists its subjects.
-                (cel.abstain.is_some()
+                (check.abstain.is_some()
                     && select.scope() != RunScope::File
                     && select != Select::Module)
                     .then(|| {
@@ -132,7 +132,7 @@ impl CheckKind {
                     })
             }),
             Self::Command(command) => command.problem(),
-            Self::Model(model) => model.problem(subject),
+            Self::Model(model) => model.problem(cel, subject),
         }
     }
 }
@@ -303,7 +303,7 @@ pub struct Variable {
 
 impl Variable {
     /// What is wrong with the name or the expression, described.
-    pub(crate) fn problem(&self) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Cel) -> Option<String> {
         let name = self.name.as_str();
         let valid = !name.is_empty()
             && name
@@ -327,7 +327,7 @@ impl Variable {
                 "check variable `{name}`: `{param}` is not a usable parameter"
             ));
         }
-        compile_problem(&format!("check variable `{name}`"), &self.expression)
+        compile_problem(cel, &format!("check variable `{name}`"), &self.expression)
     }
 }
 
@@ -365,8 +365,8 @@ impl CelCheck {
     }
 
     /// The first expression that does not compile, described.
-    pub(crate) fn problem(&self) -> Option<String> {
-        if let Some(problem) = self.variables.iter().find_map(Variable::problem) {
+    pub(crate) fn problem(&self, cel: &Cel) -> Option<String> {
+        if let Some(problem) = self.variables.iter().find_map(|v| v.problem(cel)) {
             return Some(problem);
         }
         let mut seen = std::collections::BTreeSet::new();
@@ -380,14 +380,15 @@ impl CelCheck {
                 twice.name
             ));
         }
-        if let Some(problem) = compile_problem("check where", &self.condition) {
+        if let Some(problem) = compile_problem(cel, "check where", &self.condition) {
             return Some(problem);
         }
-        if let Some(problem) = self.abstain_problem() {
+        if let Some(problem) = self.abstain_problem(cel) {
             return Some(problem);
         }
         for (name, source) in &self.evidence {
-            if let Some(problem) = compile_problem(&format!("check evidence `{name}`"), source) {
+            if let Some(problem) = compile_problem(cel, &format!("check evidence `{name}`"), source)
+            {
                 return Some(problem);
             }
         }
@@ -406,22 +407,22 @@ impl CelCheck {
         });
         for (what, source) in positions.chain(identity) {
             if let Some(problem) =
-                source.and_then(|source| compile_problem(&format!("check {what}"), source))
+                source.and_then(|source| compile_problem(cel, &format!("check {what}"), source))
             {
                 return Some(problem);
             }
         }
-        template_problem("check message", &self.message)
+        template_problem(cel, "check message", &self.message)
     }
 
     /// What is wrong with `abstain` or `prompt`.
-    fn abstain_problem(&self) -> Option<String> {
+    fn abstain_problem(&self, cel: &Cel) -> Option<String> {
         if self.abstain.is_none() && self.prompt.is_some() {
             return Some("check: `prompt` needs an `abstain`".to_owned());
         }
         if self.prompt.as_deref().is_some_and(|p| p.trim().is_empty()) {
             return Some("check: `prompt` is empty".to_owned());
         }
-        compile_problem("check abstain", self.abstain.as_deref()?)
+        compile_problem(cel, "check abstain", self.abstain.as_deref()?)
     }
 }

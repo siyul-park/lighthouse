@@ -6,11 +6,11 @@ use std::{fs, path::Path};
 use lighthouse_engine::Engine;
 use lighthouse_model::Fingerprint;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 
 fn registry() -> Registry {
     let plugin = lighthouse_test_support::lang_rust();
-    let mut registry = lighthouse_checks::registry();
+    let mut registry = lighthouse_test_support::registry();
     let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-rust\", path = {:?} }}]",
         plugin.to_str().unwrap()
@@ -22,16 +22,19 @@ fn registry() -> Registry {
 
 #[test]
 fn every_checked_decision_passes_its_rust_examples() {
-    let failures =
-        lighthouse_engine::RuleTester::new(registry, lighthouse_spec::Catalog::bundled())
-            .language("rust")
-            .check_all();
+    let failures = lighthouse_engine::RuleTester::new(
+        registry,
+        lighthouse_test_support::bundled(),
+        lighthouse_test_support::bundled(),
+    )
+    .language("rust")
+    .check_all();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]
 fn the_design_decisions_have_rust_examples() {
-    let catalog = lighthouse_spec::Catalog::bundled();
+    let catalog = lighthouse_test_support::bundled();
     for id in [
         "design/complexity",
         "design/complexity",
@@ -57,10 +60,13 @@ fn the_design_decisions_have_rust_examples() {
 
 #[test]
 fn a_language_without_examples_is_a_failure_not_silence() {
-    let failures =
-        lighthouse_engine::RuleTester::new(registry, lighthouse_spec::Catalog::bundled())
-            .language("cobol")
-            .check_all();
+    let failures = lighthouse_engine::RuleTester::new(
+        registry,
+        lighthouse_test_support::bundled(),
+        lighthouse_test_support::bundled(),
+    )
+    .language("cobol")
+    .check_all();
     assert!(
         failures
             .iter()
@@ -86,9 +92,15 @@ fn exported_doc_findings(source: &str) -> Vec<(String, Fingerprint)> {
         plugin.to_str().unwrap()
     ))
     .unwrap();
-    let mut registry = lighthouse_checks::registry();
+    let mut registry = lighthouse_test_support::registry();
     lighthouse_rpc::register(&mut registry, &config, dir.path(), dir.path(), &[]).unwrap();
-    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
     let outcome = engine.check(&[], &[]).unwrap();
     assert!(outcome.incomplete.is_empty(), "{:?}", outcome.incomplete);
     outcome

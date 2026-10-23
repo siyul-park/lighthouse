@@ -12,8 +12,12 @@ use serde_json::json;
 /// One finding per cycle, at its first module.
 fn plugin() -> Checks {
     let text = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/acyclic\nspec:\n  title: No cycles\n  context: Dependencies point one way.\n  scope: { subject: project }\n  requirement: Modules MUST NOT depend on each other in a circle.\n  severity: error\n  check:\n    type: cel\n    select: module\n    where: \"size(module.cycle) > 0 && module.cycle[0] == module.path\"\n    message: \"dependency cycle of {{ size(module.cycle) }} modules over imports edges: {{ module.cycle.join(' -> ') }}\"\n    identity:\n      subject: \"module.cycle.join(',')\"\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: y }]\n".to_owned();
-    let layer = Catalog::from_local(BTreeMap::from([("acyclic.yaml".to_owned(), text)])).unwrap();
-    Checks::new("local", &layer).unwrap()
+    let layer = Catalog::from_local(
+        BTreeMap::from([("acyclic.yaml".to_owned(), text)]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    Checks::new(&lighthouse_test_support::composition(), "local", &layer).unwrap()
 }
 
 fn found(plugin: &Checks, w: &World) -> Vec<(String, u32)> {

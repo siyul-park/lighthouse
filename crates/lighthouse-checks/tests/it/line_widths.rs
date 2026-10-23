@@ -58,19 +58,22 @@ fn catalog() -> Catalog {
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect();
-    Catalog::from_files(files).unwrap()
+    Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap()
 }
 
 fn registry() -> Registry {
-    let mut registry = lighthouse_checks::registry();
+    let mut registry = lighthouse_test_support::registry();
     registry
-        .register(&Checks::new("demo", &catalog()).unwrap())
+        .register(
+            &Checks::new(&lighthouse_test_support::composition(), "demo", &catalog()).unwrap(),
+        )
         .unwrap();
     registry
 }
 
 #[test]
 fn line_widths_count_characters_and_skip_what_cannot_wrap() {
-    let failures = RuleTester::new(registry, &catalog()).check_all();
+    let failures =
+        RuleTester::new(registry, &catalog(), lighthouse_test_support::bundled()).check_all();
     assert!(failures.is_empty(), "{failures:?}");
 }

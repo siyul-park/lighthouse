@@ -64,12 +64,14 @@ fn reference(markdown: &str, text: &str) -> String {
 
 #[test]
 fn catalog_verify_sources() {
-    Catalog::bundled().verify_sources(&vendored()).unwrap();
+    lighthouse_test_support::bundled()
+        .verify_sources(&vendored())
+        .unwrap();
 
     let mut changed = vendored();
     let text = changed.get_mut("testing").unwrap();
     *text = text.replace("A test MUST show public usage", "A test MUST show usage");
-    let err = Catalog::bundled()
+    let err = lighthouse_test_support::bundled()
         .verify_sources(&changed)
         .unwrap_err()
         .to_string();
@@ -82,7 +84,7 @@ fn catalog_verify_sources() {
         reference(markdown, "one")
     );
     let files = BTreeMap::from([("sources.yaml".to_owned(), sources)]);
-    let catalog = Catalog::from_files(files).unwrap();
+    let catalog = Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap();
     catalog.verify_sources(&docs(markdown)).unwrap();
     catalog
         .verify_sources(&docs("## H\n\n- extra MUST\n- one\n"))

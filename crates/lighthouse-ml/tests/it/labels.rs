@@ -5,7 +5,6 @@ use lighthouse_ml::{
     metrics::Outcome,
 };
 use lighthouse_model::{AgentKind, Attribution, Judgment};
-use lighthouse_spec::Catalog;
 
 const RULE: &str = "core/file-size";
 
@@ -27,7 +26,7 @@ fn model(id: &str) -> Attribution {
 }
 
 fn collect(judgments: Vec<Judged>, table: Option<&Table>, exclude: Option<&str>) -> Vec<Label> {
-    let catalog = Catalog::bundled().clone();
+    let catalog = lighthouse_test_support::bundled().clone();
     let decision = catalog.decision(RULE).unwrap().clone();
     Labels {
         judgments,
@@ -43,7 +42,10 @@ fn collect(judgments: Vec<Judged>, table: Option<&Table>, exclude: Option<&str>)
 #[test]
 fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() {
     let dir = tempfile::tempdir().unwrap();
-    let decision = Catalog::bundled().decision(RULE).unwrap().clone();
+    let decision = lighthouse_test_support::bundled()
+        .decision(RULE)
+        .unwrap()
+        .clone();
     let meaning = decision.meaning_version();
     let judge =
         |fingerprint, judgment, by, meaning: &str| judged(fingerprint, judgment, by, meaning);

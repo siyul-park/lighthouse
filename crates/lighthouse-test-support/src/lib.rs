@@ -3,11 +3,34 @@
 
 pub mod catalog;
 
-/// Installs the CEL environment of the bundled libraries, as every entry point
-/// of the tool does before it reads a decision. A test binary calls it from a
-/// constructor, so that it runs before any test; it is idempotent.
-pub fn cel() {
-    lighthouse_checks::compose().expect("the bundled CEL libraries compose");
+/// The composition of the bundled CEL libraries, built the way every entry
+/// point of the tool builds it before it reads a decision.
+pub fn composition() -> Composition {
+    lighthouse_checks::compose().expect("the bundled CEL libraries compose")
+}
+
+/// The CEL environment of [`composition`].
+pub fn cel() -> Cel {
+    composition().cel().clone()
+}
+
+/// The bundled catalog, validated in one composition shared by the tests of a
+/// process, so that they do not validate it again each.
+pub fn bundled() -> &'static Catalog {
+    shared()
+        .cel()
+        .bundled()
+        .expect("the bundled catalog is valid")
+}
+
+/// The bundled plugins, compiled in the composition [`bundled`] belongs to.
+pub fn registry() -> Registry {
+    lighthouse_checks::registry(shared()).expect("the bundled plugins build")
+}
+
+fn shared() -> &'static Composition {
+    static SHARED: OnceLock<Composition> = OnceLock::new();
+    SHARED.get_or_init(composition)
 }
 
 use std::{
@@ -17,7 +40,10 @@ use std::{
     sync::OnceLock,
 };
 
+use lighthouse_checks::Composition;
+use lighthouse_plugin::Registry;
 use lighthouse_resource::API_VERSION;
+use lighthouse_spec::{Catalog, Cel};
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
 

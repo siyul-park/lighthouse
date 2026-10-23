@@ -33,7 +33,7 @@ mod text;
 
 pub use bundled::registry;
 pub use checks::Checks;
-pub use compose::{Entry, catalog, compose};
+pub use compose::{Composition, Entry, compose, compose_from};
 
 impl Error {
     pub(crate) fn invalid(rule: &str, message: impl Into<String>) -> Self {

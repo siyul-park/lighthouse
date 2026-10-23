@@ -36,7 +36,11 @@ const NARROW: &str =
     "        type: array\n        items: { enum: [a, b, c] }\n        default: [a]\n";
 
 fn rejected(kinds: &str, needle: &str) {
-    let err = Catalog::from_files(decision_with(&with_kinds(kinds))).unwrap_err();
+    let err = Catalog::from_files(
+        decision_with(&with_kinds(kinds)),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap_err();
     assert!(
         err.to_string().contains(needle),
         "{err} should mention {needle}"
@@ -45,9 +49,17 @@ fn rejected(kinds: &str, needle: &str) {
 
 #[test]
 fn a_kinds_option_lists_unique_strings_and_defaults_to_some_of_them() {
-    Catalog::from_files(decision_with(&with_kinds(NARROW))).unwrap();
+    Catalog::from_files(
+        decision_with(&with_kinds(NARROW)),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     let all = "        type: array\n        items: { enum: [a, b] }\n        default: [a, b]\n";
-    Catalog::from_files(decision_with(&with_kinds(all))).unwrap();
+    Catalog::from_files(
+        decision_with(&with_kinds(all)),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -88,7 +100,11 @@ fn the_default_of_a_kinds_option_is_a_subset_of_its_items() {
 
 #[test]
 fn a_value_of_a_kinds_option_is_one_of_the_declared_kinds() {
-    let catalog = Catalog::from_files(decision_with(&with_kinds(NARROW))).unwrap();
+    let catalog = Catalog::from_files(
+        decision_with(&with_kinds(NARROW)),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     let decision = catalog.decision("p/a").unwrap();
     let kinds = |value| lighthouse_model::Options::from_iter([("kinds".to_owned(), value)]);
     assert!(
@@ -114,7 +130,7 @@ fn catalog(decisions: &[(&str, &str)]) -> Catalog {
         );
         all.insert(format!("p/s/{name}.yaml"), text);
     }
-    Catalog::from_files(all).unwrap()
+    Catalog::from_files(all, &lighthouse_test_support::cel()).unwrap()
 }
 
 fn resolve(catalog: &Catalog, project: &str) -> Arc<Rules> {

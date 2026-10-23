@@ -140,8 +140,8 @@ impl Decision {
     /// Whether this is a decision of the bundled catalog as it ships: the
     /// programs it names are Lighthouse's own, and run without the trust a
     /// program of the project or of a plugin needs.
-    pub fn bundled(&self) -> bool {
-        Catalog::bundled()
+    pub fn bundled(&self, shipped: &Catalog) -> bool {
+        shipped
             .decision(self.id())
             .is_some_and(|shipped| shipped == self)
     }

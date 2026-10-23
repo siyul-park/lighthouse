@@ -17,17 +17,23 @@ const NEUTRAL: &str = "text";
 pub struct RuleTester<'a> {
     registry: Box<dyn Fn() -> Registry + 'a>,
     catalog: &'a Catalog,
+    shipped: &'a Catalog,
     language: Option<String>,
     trusted: bool,
 }
 
 impl<'a> RuleTester<'a> {
     /// A tester over `catalog` that builds a fresh registry from `registry` for
-    /// every example.
-    pub fn new(registry: impl Fn() -> Registry + 'a, catalog: &'a Catalog) -> Self {
+    /// every example; `shipped` is the bundled catalog.
+    pub fn new(
+        registry: impl Fn() -> Registry + 'a,
+        catalog: &'a Catalog,
+        shipped: &'a Catalog,
+    ) -> Self {
         Self {
             registry: Box::new(registry),
             catalog,
+            shipped,
             language: None,
             trusted: false,
         }
@@ -128,7 +134,7 @@ impl<'a> RuleTester<'a> {
         example: &Example,
         dir: &Path,
     ) -> Result<(), String> {
-        let plan = FixPlan::from_catalog(self.catalog);
+        let plan = FixPlan::from_catalog(self.catalog, self.shipped);
         let run = FixRun {
             rules: vec![decision.id().to_owned()],
             unsafe_fixes: Some(true),

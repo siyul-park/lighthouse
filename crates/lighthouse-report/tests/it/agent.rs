@@ -149,7 +149,7 @@ fn full_agent_text_gives_each_finding_everything_needed_to_act() {
     let findings = [coupling(), helper(), unknown_rule()];
     let facts = facts(&findings);
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         facts: Some(&facts),
         suppressed: 2,
         allowed: 1,
@@ -164,7 +164,7 @@ fn full_agent_json_is_one_object_of_tagged_records() {
     let findings = [coupling(), helper(), unknown_rule()];
     let facts = facts(&findings);
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         facts: Some(&facts),
         suppressed: 2,
         allowed: 1,
@@ -248,7 +248,7 @@ fn agent_excerpts_stay_bounded() {
     let findings = [coupling()];
     let facts = facts(&findings);
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         facts: Some(&facts),
         ..Briefing::default()
     };
@@ -264,7 +264,7 @@ fn briefed<'a>(
     extra: impl FnOnce(Briefing<'a>) -> Briefing<'a>,
 ) -> Briefing<'a> {
     extra(Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         facts: Some(facts),
         ..Briefing::default()
     })
@@ -472,7 +472,7 @@ fn decision_with(examples: &str) -> Catalog {
         ),
         ("p/s/a.yaml".to_owned(), decision),
     ]);
-    Catalog::from_files(files).unwrap()
+    Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap()
 }
 
 fn example(name: &str, kind: &str, canonical: bool, body: &str) -> String {
@@ -550,7 +550,7 @@ fn expected_structure_prefers_canonical_then_a_match_then_the_shortest() {
 
 #[test]
 fn report_has_the_fields_the_json_prints() {
-    let catalog = Catalog::bundled();
+    let catalog = lighthouse_test_support::bundled();
     let briefing = Briefing {
         catalog: Some(catalog),
         limit: Some(1),
@@ -607,7 +607,7 @@ fn report_has_the_fields_the_json_prints() {
 #[test]
 fn needs_review_follows_the_authored_severity_of_the_decision_and_the_judgments_that_stand() {
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         ..Briefing::default()
     };
     let mut heuristic = coupling();
@@ -642,7 +642,7 @@ fn compact_agent_text_groups_findings_by_decision() {
         "judgment expired: decision changed".to_owned(),
     )]);
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         facts: Some(&facts),
         notes: Some(&notes),
         suppressed: 2,
@@ -664,7 +664,7 @@ fn compact_agent_json_groups_findings_by_decision() {
         "judgment expired: decision changed".to_owned(),
     )]);
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         facts: Some(&facts),
         notes: Some(&notes),
         suppressed: 2,
@@ -745,7 +745,7 @@ fn detail_is_compact_by_default() {
 #[test]
 fn briefing_group_options_carry_the_limit_and_the_catalog() {
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         limit: Some(4),
         tool_form: true,
         ..Briefing::default()

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_resource::Resource;
 
 use crate::{
-    Decision, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec, validate,
+    Cel, Decision, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec, validate,
 };
 
 use super::{load::Files, variables};
@@ -11,6 +11,7 @@ use super::{load::Files, variables};
 /// Packs with their decisions, in the order the packs list them. Every
 /// decision is listed once, in the section of the pack its id names.
 pub(super) fn assemble(
+    cel: &Cel,
     files: &Files,
     packs: Vec<(String, Resource<PackSpec>)>,
     decisions: Vec<(String, Decision)>,
@@ -32,7 +33,7 @@ pub(super) fn assemble(
                 format!("pack `{id}` is defined twice"),
             ));
         }
-        variables::validate(&id, &pack.spec.variables)?;
+        variables::validate(cel, &id, &pack.spec.variables)?;
         let shared = pack.spec.variables;
         let mut sections = Vec::new();
         let mut names = BTreeSet::new();
@@ -59,6 +60,7 @@ pub(super) fn assemble(
                     )
                 })?;
                 members.push(variables::import(
+                    cel,
                     resolve_examples(files, &dir, decision)?,
                     &shared,
                 )?);

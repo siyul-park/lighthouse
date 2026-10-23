@@ -16,7 +16,7 @@ use lighthouse_ml::{
     labels::{Label, Source},
 };
 use lighthouse_model::Severity;
-use lighthouse_spec::{Catalog, local_files};
+use lighthouse_spec::{Catalog, Cel, local_files};
 
 use super::{Labelling, Repo, attached, examples, labelling};
 use crate::{CheckRequest, Checked, Result, Session, check};
@@ -44,13 +44,13 @@ struct CandidateFile {
 }
 
 impl CandidateFile {
-    fn read(root: &Path, file: &Path) -> Result<Self> {
+    fn read(cel: &Cel, root: &Path, file: &Path) -> Result<Self> {
         let text = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
         let name = file.file_name().map_or_else(
             || "candidate.yaml".to_owned(),
             |n| n.to_string_lossy().into_owned(),
         );
-        let id = Catalog::from_local(BTreeMap::from([(name.clone(), text.clone())]))?
+        let id = Catalog::from_local(BTreeMap::from([(name.clone(), text.clone())]), cel)?
             .decisions()
             .next()
             .map(|d| d.id().to_owned())
@@ -59,7 +59,7 @@ impl CandidateFile {
         files.insert(name, text);
         Ok(Self {
             id,
-            local: Catalog::from_local(files)?,
+            local: Catalog::from_local(files, cel)?,
         })
     }
 
@@ -73,7 +73,6 @@ impl CandidateFile {
 
 /// Runs the evaluation.
 pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
-    crate::compose()?;
     if request.model.is_some() && request.candidate.is_some() {
         return Err("--model and --candidate are exclusive".into());
     }
@@ -167,7 +166,7 @@ fn one(request: &EvalRequest, repo: &Repo, session: &Session, first: bool) -> Re
         } = layer(model).apply(&base, labels)?;
         Some((request.decision.clone(), found, shown))
     } else if let Some(file) = request.candidate.as_deref() {
-        let file = CandidateFile::read(&session.root, file)?;
+        let file = CandidateFile::read(session.comp.cel(), &session.root, file)?;
         let beside = file.session(session)?;
         // The candidate's fingerprints are not known before it runs, so it
         // asks models about everything it selects.

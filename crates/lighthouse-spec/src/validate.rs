@@ -4,13 +4,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Catalog, Decision, DecisionStatus, Error, Example, ExampleKind, OptionType,
+    Catalog, Cel, Decision, DecisionStatus, Error, Example, ExampleKind, OptionType,
     options::KINDS,
     sources::{SourceLine, has_keyword},
 };
 
 /// Everything a single layer must satisfy on its own.
-pub(crate) fn layer(catalog: &Catalog) -> Result<(), Error> {
+pub(crate) fn layer(catalog: &Catalog, cel: &Cel) -> Result<(), Error> {
     for pack in catalog.packs() {
         kebab(&pack.id)?;
         for section in &pack.sections {
@@ -18,7 +18,7 @@ pub(crate) fn layer(catalog: &Catalog) -> Result<(), Error> {
         }
     }
     unique(catalog)?;
-    catalog.decisions().try_for_each(decision)?;
+    catalog.decisions().try_for_each(|d| decision(d, cel))?;
     option_sources(catalog)?;
     lifecycle(catalog, catalog.decisions())?;
     sources(catalog)
@@ -44,7 +44,7 @@ pub(crate) fn projects(catalog: &Catalog) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
+pub(crate) fn decision(decision: &Decision, cel: &Cel) -> Result<(), Error> {
     let id = decision.id();
     let (pack, name) = id
         .split_once('/')
@@ -92,8 +92,8 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .iter()
         .try_for_each(|e| example(decision, e))?;
     canonical(decision)?;
-    check(decision)?;
-    fix(decision)
+    check(decision, cel)?;
+    fix(decision, cel)
 }
 
 pub(crate) fn relative(path: &str) -> bool {
@@ -209,10 +209,10 @@ fn supersession_cycle<'c>(catalog: &'c Catalog, start: &'c str) -> Option<Vec<&'
     None
 }
 
-fn fix(decision: &Decision) -> Result<(), Error> {
+fn fix(decision: &Decision, cel: &Cel) -> Result<(), Error> {
     let id = decision.id();
     if let Some(fix) = &decision.fix {
-        if let Some(reason) = fix.problem(decision) {
+        if let Some(reason) = fix.problem(cel, decision) {
             return Err(Error::invalid(id, format!("fix: {reason}")));
         }
         let fixed = decision
@@ -372,12 +372,12 @@ fn canonical(decision: &Decision) -> Result<(), Error> {
     Ok(())
 }
 
-fn check(decision: &Decision) -> Result<(), Error> {
+fn check(decision: &Decision, cel: &Cel) -> Result<(), Error> {
     let id = decision.id();
     let Some(check) = &decision.check else {
         return Ok(());
     };
-    if let Some(reason) = check.kind.problem(decision.scope.subject) {
+    if let Some(reason) = check.kind.problem(cel, decision.scope.subject) {
         return Err(Error::invalid(id, reason));
     }
     let has = |kind| decision.examples.iter().any(|e| e.kind == kind);

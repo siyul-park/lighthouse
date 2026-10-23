@@ -4,7 +4,7 @@ use lighthouse_engine::{
     FixPlan,
     brief::{MAX_EXAMPLES, examples_for, safe_fixes},
 };
-use lighthouse_spec::{Catalog, Example};
+use lighthouse_spec::Example;
 use serde_json::json;
 
 fn example(name: &str, kind: &str, fixed: bool) -> Example {
@@ -42,7 +42,10 @@ fn examples_for_keeps_the_invalid_examples_that_show_a_fix_and_at_most_the_limit
 
 #[test]
 fn safe_fixes_are_the_decisions_with_a_safe_fix_in_the_language() {
-    let plan = FixPlan::from_catalog(Catalog::bundled());
+    let plan = FixPlan::from_catalog(
+        lighthouse_test_support::bundled(),
+        lighthouse_test_support::bundled(),
+    );
 
     let rust = safe_fixes(&plan, Some("rust"));
     let none = safe_fixes(&plan, Some("cobol"));
@@ -55,7 +58,10 @@ fn safe_fixes_are_the_decisions_with_a_safe_fix_in_the_language() {
 
 #[test]
 fn fix_plan_bindings_name_the_rules_with_a_fix_in_the_order_of_their_ids() {
-    let plan = FixPlan::from_catalog(Catalog::bundled());
+    let plan = FixPlan::from_catalog(
+        lighthouse_test_support::bundled(),
+        lighthouse_test_support::bundled(),
+    );
 
     let rules: Vec<&str> = plan.bindings().map(|(rule, _)| rule).collect();
 

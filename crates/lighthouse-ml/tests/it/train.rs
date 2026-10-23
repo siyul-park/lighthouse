@@ -6,7 +6,6 @@ use lighthouse_ml::{
 };
 use lighthouse_model::Judgment;
 use lighthouse_plugin::{DATASETS_DIR, Subject, dataset_path};
-use lighthouse_spec::Catalog;
 use serde_json::json;
 
 const RULE: &str = "core/file-size";
@@ -35,7 +34,10 @@ fn rows_of_labels_with_a_subject_count_and_the_rest_are_unresolved() {
         label("gone", Judgment::Pass, Source::Tsv),
         label("na", Judgment::NotApplicable, Source::Person),
     ];
-    let decision = Catalog::bundled().decision(RULE).unwrap().reference();
+    let decision = lighthouse_test_support::bundled()
+        .decision(RULE)
+        .unwrap()
+        .reference();
     let rows = Rows::of(&labels, &observed, None, &decision).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
@@ -59,7 +61,10 @@ fn examples_are_not_rows_because_the_question_already_shows_them() {
         label("seen", Judgment::Fail, Source::Person),
         label("ex", Judgment::Pass, Source::Example),
     ];
-    let decision = Catalog::bundled().decision(RULE).unwrap().reference();
+    let decision = lighthouse_test_support::bundled()
+        .decision(RULE)
+        .unwrap()
+        .reference();
     let rows = Rows::of(&labels, &observed, None, &decision).unwrap();
 
     let dir = tempfile::tempdir().unwrap();
@@ -77,7 +82,10 @@ fn examples_are_not_rows_because_the_question_already_shows_them() {
 
 #[test]
 fn train_writes_the_same_dataset_for_the_same_labels_and_no_job_without_a_model() {
-    let decision = Catalog::bundled().decision(RULE).unwrap().reference();
+    let decision = lighthouse_test_support::bundled()
+        .decision(RULE)
+        .unwrap()
+        .reference();
     let dir = tempfile::tempdir().unwrap();
     let observed = BTreeMap::from([("seen".to_owned(), subject())]);
     let run = || {
@@ -107,7 +115,10 @@ fn train_writes_the_same_dataset_for_the_same_labels_and_no_job_without_a_model(
 
 #[test]
 fn rows_extend_adds_what_another_repository_gave() {
-    let decision = Catalog::bundled().decision(RULE).unwrap().reference();
+    let decision = lighthouse_test_support::bundled()
+        .decision(RULE)
+        .unwrap()
+        .reference();
     let observed = BTreeMap::from([("seen".to_owned(), subject())]);
     let mut rows = Rows::of(
         &[label("seen", Judgment::Fail, Source::Person)],

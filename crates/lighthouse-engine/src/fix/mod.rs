@@ -103,8 +103,9 @@ impl FixPlan {
     /// The fixer of every rule whose decision has a `fix` that is not by a
     /// model: the decision's id, under which its fixer is registered (a
     /// command is run by the fix run itself), with the cap its `safety` puts
-    /// on what the fixer may claim.
-    pub fn from_catalog(catalog: &Catalog) -> Self {
+    /// on what the fixer may claim. `shipped` is the bundled catalog, which tells
+    /// a decision as it ships from one a project edited.
+    pub fn from_catalog(catalog: &Catalog, shipped: &Catalog) -> Self {
         let mut plan = Self::default();
         for decision in catalog.decisions() {
             let Some(fix) = &decision.fix else { continue };
@@ -118,7 +119,7 @@ impl FixPlan {
                     cap: decision.fix_safety(None),
                     languages: languages_of(decision),
                     needs: match fix.kind {
-                        FixKind::Command(_) if decision.bundled() => Needs::Bundled,
+                        FixKind::Command(_) if decision.bundled(shipped) => Needs::Bundled,
                         FixKind::Command(_) => Needs::Program,
                         FixKind::Rpc { .. } => Needs::Unserved,
                         _ => Needs::Nothing,

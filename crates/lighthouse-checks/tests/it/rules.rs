@@ -22,9 +22,12 @@ pub(crate) fn scoped(scope: &str, check: &str) -> Result<Checks, String> {
     let text = format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {scope}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
-    let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
-        .map_err(|e| e.to_string())?;
-    Checks::new("local", &layer).map_err(|e| e.to_string())
+    let layer = Catalog::from_local(
+        BTreeMap::from([("probe.yaml".to_owned(), text)]),
+        &lighthouse_test_support::cel(),
+    )
+    .map_err(|e| e.to_string())?;
+    Checks::new(&lighthouse_test_support::composition(), "local", &layer).map_err(|e| e.to_string())
 }
 
 pub(crate) fn found(plugin: &Checks, w: &World) -> Vec<(String, u32)> {
@@ -274,7 +277,7 @@ fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
         )
     };
     assert!(
-        Catalog::from_local(files(&header("other/x")))
+        Catalog::from_local(files(&header("other/x")), &lighthouse_test_support::cel())
             .unwrap_err()
             .to_string()
             .contains("local/<name>")
@@ -284,25 +287,40 @@ fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
         header("local/x")
     );
     assert!(
-        Catalog::from_local(files(&sourced))
+        Catalog::from_local(files(&sourced), &lighthouse_test_support::cel())
             .unwrap_err()
             .to_string()
             .contains("does not exist")
     );
-    assert!(Catalog::from_local(files(&header("local/x"))).is_ok());
+    assert!(
+        Catalog::from_local(files(&header("local/x")), &lighthouse_test_support::cel()).is_ok()
+    );
 }
 
 #[test]
 fn declarative_is_empty() {
     let probe = local("symbol", "select: symbol\nwhere: 'true'\nmessage: x").unwrap();
     assert!(!probe.is_empty());
-    let elsewhere = Checks::new("elsewhere", Catalog::bundled()).unwrap();
+    let elsewhere = Checks::new(
+        &lighthouse_test_support::composition(),
+        "elsewhere",
+        lighthouse_test_support::bundled(),
+    )
+    .unwrap();
     assert!(elsewhere.is_empty());
 }
 
 #[test]
 fn declarative_bundled_rules() {
-    let rules = |pack: &str| Checks::new(pack, Catalog::bundled()).unwrap().rules();
+    let rules = |pack: &str| {
+        Checks::new(
+            &lighthouse_test_support::composition(),
+            pack,
+            lighthouse_test_support::bundled(),
+        )
+        .unwrap()
+        .rules()
+    };
     assert!(!rules("design").is_empty());
     assert!(rules("elsewhere").is_empty());
 }
@@ -390,7 +408,11 @@ fn probe(scope: &str, check: &str) -> lighthouse_spec::Decision {
     let text = format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: {scope}, tests: include }}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
-    let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)])).unwrap();
+    let layer = Catalog::from_local(
+        BTreeMap::from([("probe.yaml".to_owned(), text)]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     layer.decision("local/probe").unwrap().clone()
 }
 
@@ -400,26 +422,32 @@ fn the_check_revision_names_the_libraries_its_expressions_call() {
         "symbol",
         "select: symbol\nwhere: \"glob.matches(symbol.module, 'a/**')\"\nmessage: x",
     );
-    let (used, revision) = lighthouse_checks::probe::revision(&globs, |_| None).unwrap();
+    let (used, revision) =
+        lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &globs, |_| {
+            None
+        })
+        .unwrap();
     assert_eq!(
         used.keys().collect::<Vec<_>>(),
         ["cel/glob"],
         "only the library it calls"
     );
 
-    let (_, bumped) = lighthouse_checks::probe::revision(&globs, |id| {
-        (id == "cel/glob").then(|| "9.9.9".to_owned())
-    })
-    .unwrap();
+    let (_, bumped) =
+        lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &globs, |id| {
+            (id == "cel/glob").then(|| "9.9.9".to_owned())
+        })
+        .unwrap();
     assert_ne!(
         revision, bumped,
         "a used library's version is in the revision"
     );
 
-    let (_, other) = lighthouse_checks::probe::revision(&globs, |id| {
-        (id == "cel/regex").then(|| "9.9.9".to_owned())
-    })
-    .unwrap();
+    let (_, other) =
+        lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &globs, |id| {
+            (id == "cel/regex").then(|| "9.9.9".to_owned())
+        })
+        .unwrap();
     assert_eq!(revision, other, "an unused library's version is not");
 }
 
@@ -429,17 +457,25 @@ fn a_decision_that_calls_no_library_has_a_revision_no_library_changes() {
         "symbol",
         "select: symbol\nwhere: \"symbol.name.startsWith('a')\"\nmessage: x",
     );
-    let (used, revision) = lighthouse_checks::probe::revision(&plain, |_| None).unwrap();
+    let (used, revision) =
+        lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &plain, |_| {
+            None
+        })
+        .unwrap();
     assert!(used.is_empty());
     let (_, bumped) =
-        lighthouse_checks::probe::revision(&plain, |_| Some("9.9.9".to_owned())).unwrap();
+        lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &plain, |_| {
+            Some("9.9.9".to_owned())
+        })
+        .unwrap();
     assert_eq!(revision, bumped);
 }
 
 #[test]
 fn the_function_catalog_is_what_the_plugin_registers_and_the_runtime_has() {
-    let catalog = lighthouse_checks::catalog().unwrap();
-    let registry = lighthouse_checks::registry();
+    let composition = lighthouse_test_support::composition();
+    let catalog = composition.functions();
+    let registry = lighthouse_test_support::registry();
     let registered: Vec<String> = registry
         .cel_functions()
         .iter()
@@ -471,12 +507,63 @@ fn the_function_catalog_is_what_the_plugin_registers_and_the_runtime_has() {
         }
         let args = vec!["null"; args].join(", ");
         let source = format!("{call}({args})");
-        let outcome = lighthouse_spec::compile(&source)
-            .unwrap()
-            .execute(&lighthouse_spec::context().unwrap());
+        let cel = composition.cel();
+        let outcome = cel.compile(&source).unwrap().execute(&cel.context());
         assert!(
             !matches!(outcome, Err(cel::ExecutionError::UndeclaredReference(_))),
             "{source}: {outcome:?}"
         );
     }
+}
+
+struct Failing {
+    manifest: lighthouse_plugin::PluginManifest,
+}
+
+struct FailingLibrary(lighthouse_plugin::CelLibraryManifest);
+
+impl lighthouse_plugin::CelLibrary for FailingLibrary {
+    fn manifest(&self) -> &lighthouse_plugin::CelLibraryManifest {
+        &self.0
+    }
+
+    fn register(&self, _: &mut cel::Env) -> Result<(), lighthouse_plugin::Error> {
+        Err(lighthouse_plugin::Error::Failed("no room".to_owned()))
+    }
+}
+
+impl lighthouse_plugin::Plugin for Failing {
+    fn manifest(&self) -> &lighthouse_plugin::PluginManifest {
+        &self.manifest
+    }
+
+    fn cel_libraries(&self) -> Vec<Box<dyn lighthouse_plugin::CelLibrary>> {
+        vec![Box::new(FailingLibrary(
+            lighthouse_plugin::CelLibraryManifest {
+                id: "bad/lib".to_owned(),
+                version: "1.0.0".to_owned(),
+                functions: Vec::new(),
+            },
+        ))]
+    }
+}
+
+#[test]
+fn compose_from_names_the_library_that_cannot_register() {
+    let mut registry = lighthouse_plugin::Registry::default();
+    registry
+        .register(&Failing {
+            manifest: lighthouse_plugin::PluginManifest {
+                id: "bad".to_owned(),
+                version: "1".to_owned(),
+            },
+        })
+        .unwrap();
+
+    let error = lighthouse_checks::compose_from(&registry).err().unwrap();
+
+    assert!(
+        error.contains("`bad/lib`") && error.contains("no room"),
+        "{error}"
+    );
 }

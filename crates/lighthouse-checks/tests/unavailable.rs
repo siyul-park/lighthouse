@@ -38,19 +38,19 @@ spec:
 /// Checks a project with the command check `local/probe` and the bundled
 /// `go/formatted`, whose program is `gofmt`.
 fn check(dir: &std::path::Path) -> Run {
-    let layer = Catalog::from_local(BTreeMap::from([(
-        "probe.yaml".to_owned(),
-        PROBE.to_owned(),
-    )]))
+    let layer = Catalog::from_local(
+        BTreeMap::from([("probe.yaml".to_owned(), PROBE.to_owned())]),
+        &lighthouse_test_support::cel(),
+    )
     .unwrap();
-    let plugin = Checks::new("local", &layer).unwrap();
-    let mut registry = lighthouse_checks::registry();
+    let plugin = Checks::new(&lighthouse_test_support::composition(), "local", &layer).unwrap();
+    let mut registry = lighthouse_test_support::registry();
     registry.register(&plugin).unwrap();
     let config = Config::parse_inline(
         "plugins = [\"core\", \"go\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n\"go/formatted\" = \"error\"\n",
     )
     .unwrap();
-    let catalog = Catalog::overlay(Catalog::bundled(), &layer).unwrap();
+    let catalog = Catalog::overlay(lighthouse_test_support::bundled(), &layer).unwrap();
     Engine::new(registry, config, &catalog, dir)
         .unwrap()
         .with_trust(true)
@@ -81,10 +81,4 @@ fn a_command_check_and_a_bundled_one_leave_the_analysis_incomplete_when_the_sand
         "the check and the bundled one both: {reasons:?}"
     );
     assert!(!dir.path().join("ran").exists(), "the program ran");
-}
-
-/// The CEL environment is installed before any test reads a decision.
-#[ctor::ctor(unsafe)]
-fn compose() {
-    lighthouse_test_support::cel();
 }

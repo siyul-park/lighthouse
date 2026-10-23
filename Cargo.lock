@@ -602,16 +602,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "1.0.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
-dependencies = [
- "link-section",
- "linktime-proc-macro",
-]
-
-[[package]]
 name = "daachorse"
 version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1732,7 +1722,6 @@ name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
  "cel",
- "ctor",
  "lighthouse-cel",
  "lighthouse-engine",
  "lighthouse-model",
@@ -1788,7 +1777,6 @@ dependencies = [
 name = "lighthouse-engine"
 version = "0.1.0"
 dependencies = [
- "ctor",
  "globset",
  "ignore",
  "lighthouse-model",
@@ -1812,7 +1800,6 @@ dependencies = [
 name = "lighthouse-ml"
 version = "0.1.0"
 dependencies = [
- "ctor",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -1875,7 +1862,6 @@ dependencies = [
 name = "lighthouse-report"
 version = "0.1.0"
 dependencies = [
- "ctor",
  "insta",
  "lighthouse-model",
  "lighthouse-spec",
@@ -1905,7 +1891,6 @@ name = "lighthouse-rpc"
 version = "0.1.0"
 dependencies = [
  "cel",
- "ctor",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -1950,7 +1935,6 @@ name = "lighthouse-spec"
 version = "0.1.0"
 dependencies = [
  "cel",
- "ctor",
  "globset",
  "include_dir",
  "insta",
@@ -1988,21 +1972,11 @@ name = "lighthouse-test-support"
 version = "0.1.0"
 dependencies = [
  "lighthouse-checks",
+ "lighthouse-plugin",
  "lighthouse-resource",
+ "lighthouse-spec",
  "toml",
 ]
-
-[[package]]
-name = "link-section"
-version = "0.19.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39c29a617ce3df32c08497bdc1ab6e2376e0b17948ac166a2fbe5977c5954cd9"
-
-[[package]]
-name = "linktime-proc-macro"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e57c38c1e860fd37c604281cdfb1dd2216977fd76a50f85ba2f388ef3219616"
 
 [[package]]
 name = "linux-raw-sys"

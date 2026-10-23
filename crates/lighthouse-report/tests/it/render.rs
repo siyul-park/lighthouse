@@ -2,7 +2,6 @@ use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Position, Severity, 
 use lighthouse_report::{Briefing, Format, render};
 
 use crate::plain;
-use lighthouse_spec::Catalog;
 use serde_json::json;
 
 fn span(line: u32, col: u32, end_line: u32) -> Span {
@@ -126,7 +125,7 @@ fn sarif_maps_severities_one_to_one() {
 fn sarif_describes_a_rule_by_the_decision_it_cites_and_links_its_docs() {
     let findings = fixture();
     let briefing = Briefing {
-        catalog: Some(Catalog::bundled()),
+        catalog: Some(lighthouse_test_support::bundled()),
         ..Briefing::default()
     };
 

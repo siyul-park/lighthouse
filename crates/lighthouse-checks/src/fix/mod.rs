@@ -13,7 +13,7 @@ use lighthouse_model::{Safety, ucm::FixOutcome};
 use lighthouse_plugin::{Error as PluginError, FixRequest, FixerManifest};
 use lighthouse_spec::{Decision, FixKind};
 
-use crate::Error;
+use crate::{Composition, Error};
 
 /// The reason a fix gives when its expression returns no edit.
 const NO_EDIT: &str = "the fix proposes no edit";
@@ -30,12 +30,12 @@ pub(crate) struct Fixer {
 impl Fixer {
     /// `None` when the decision has no fix, or one of a kind another fixer
     /// serves or that is not yet supported; an error when it cannot compile.
-    pub(crate) fn new(decision: &Decision) -> Result<Option<Self>, Error> {
+    pub(crate) fn new(comp: &Composition, decision: &Decision) -> Result<Option<Self>, Error> {
         let Some(fix) = &decision.fix else {
             return Ok(None);
         };
         let compiled = match &fix.kind {
-            FixKind::Cel { edits, .. } => cel::CelFix::new(decision, edits)?,
+            FixKind::Cel { edits, .. } => cel::CelFix::new(comp, decision, edits)?,
             // The fix run itself serves a command and a model.
             FixKind::Command(_) | FixKind::Model { .. } => return Ok(None),
             // Not supported yet: the decision keeps its fix, no fixer is built, and
@@ -46,7 +46,7 @@ impl Fixer {
         Ok(Some(Self {
             meta: FixerManifest {
                 id: decision.id().to_owned(),
-                requires: fix.requires.clone(),
+                requires: fix.needs(comp.cel()),
             },
             description: decision.title.clone(),
             safety: fix.safety,

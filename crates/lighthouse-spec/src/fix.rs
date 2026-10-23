@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
-    DecisionSpec, Point, Program,
+    Cel, DecisionSpec, Point, Program,
     expression::compile_problem,
     union::{refuse_strays, stray_field},
 };
@@ -23,7 +23,8 @@ pub struct Fix {
     /// Caps what the fixer may claim: a `safe` proposal under an `unsafe`
     /// decision is downgraded. `safe` is reserved for decisions that author `error`.
     pub safety: Safety,
-    /// Provider capabilities the fix needs; without them it is declined.
+    /// Provider capabilities the fix needs, besides those its edits imply
+    /// ([`Fix::needs`]); without them it is declined.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<Capability>,
     /// Which fix wins when several of one round overlap: higher first.
@@ -81,10 +82,6 @@ impl<'de> Deserialize<'de> for Fix {
             priority,
             kind,
         } = serde_json::from_value(value).map_err(D::Error::custom)?;
-        let requires = match &kind {
-            FixKind::Cel { edits, .. } => with_derived(requires, edits),
-            _ => requires,
-        };
         Ok(Self {
             safety,
             requires,
@@ -95,8 +92,17 @@ impl<'de> Deserialize<'de> for Fix {
 }
 
 impl Fix {
+    /// The capabilities the fix needs: the ones it says and, for a CEL fix, the
+    /// ones its edits imply, read in `cel`.
+    pub fn needs(&self, cel: &Cel) -> Vec<Capability> {
+        match &self.kind {
+            FixKind::Cel { edits, .. } => with_derived(cel, self.requires.clone(), edits),
+            _ => self.requires.clone(),
+        }
+    }
+
     /// What is wrong with the fix of `decision`, for the catalog to refuse.
-    pub(crate) fn problem(&self, decision: &DecisionSpec) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Cel, decision: &DecisionSpec) -> Option<String> {
         if decision.check.is_none() {
             return Some("a decision without a check has no findings to fix".to_owned());
         }
@@ -106,7 +112,7 @@ impl Fix {
             );
         }
         match &self.kind {
-            FixKind::Cel { edits, .. } => compile_problem("fix edits", edits),
+            FixKind::Cel { edits, .. } => compile_problem(cel, "fix edits", edits),
             FixKind::Command(command) => command.problem(),
             FixKind::Model { .. } if self.safety == Safety::Safe => {
                 Some("a fix by a model is never `safe`; use `unsafe`".to_owned())
@@ -254,9 +260,9 @@ impl CommandSpec {
 /// replacement needs the extent when it names the node itself (`node`,
 /// `finding.symbol`): a range of text held in the evidence is for the fix to
 /// declare, and the edit declines when the extent is missing.
-fn with_derived(mut requires: Vec<Capability>, edits: &str) -> Vec<Capability> {
+fn with_derived(cel: &Cel, mut requires: Vec<Capability>, edits: &str) -> Vec<Capability> {
     let mut calls = Vec::new();
-    if let Ok(program) = crate::environment::compile(edits) {
+    if let Ok(program) = cel.compile(edits) {
         collect(program.expression(), &mut calls);
     }
     let on_node = |(name, node): &&(String, bool)| match name.as_str() {

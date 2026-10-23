@@ -6,6 +6,8 @@ use std::sync::Arc;
 use cel::{Context, ExecutionError, FunctionContext, Program, Value, extractors::Arguments};
 use lighthouse_spec::Variable;
 
+use lighthouse_spec::Cel;
+
 use crate::{Error, eval::compile_shared};
 
 /// What [`declare`] made of the variables of a check.
@@ -21,6 +23,7 @@ pub(crate) struct Declared<'a> {
 /// gives the others, with the compiled bodies of the functions. A function sees the `options` and the `file` of its
 /// caller, besides its arguments.
 pub(crate) fn declare<'a>(
+    cel: &Cel,
     id: &str,
     context: &mut Context<'static, 'static>,
     variables: &'a [Variable],
@@ -34,6 +37,7 @@ pub(crate) fn declare<'a>(
             continue;
         }
         let body = compile_shared(
+            cel,
             id,
             &format!("variable `{}`", variable.name),
             &variable.expression,
@@ -55,13 +59,14 @@ pub(crate) fn declare<'a>(
 /// `options`, `file`, or a variable of `shared` (the file-level ones): a
 /// function does not see the variable of whoever calls it.
 pub(crate) fn check_scope(
+    cel: &Cel,
     id: &str,
     functions: &[&Variable],
     bodies: &[Arc<Program>],
     shared: &dyn Fn(&str) -> bool,
 ) -> Result<(), Error> {
     for (variable, body) in functions.iter().zip(bodies) {
-        if let Some(name) = lighthouse_spec::free_variables(body)
+        if let Some(name) = lighthouse_spec::free_variables(cel, body)
             .into_iter()
             .find(|name| {
                 !variable.params.contains(name)

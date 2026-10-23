@@ -19,7 +19,15 @@ fn an_agent_is_refused_when_the_sandbox_is_unavailable_and_never_runs_without_it
         .unwrap()
         .provider("p")
         .unwrap();
-    let agent = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let agent = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
     let _gone: Simulation = simulate_unavailable("no backend here");
 
     let error = agent
@@ -36,10 +44,4 @@ fn an_agent_is_refused_when_the_sandbox_is_unavailable_and_never_runs_without_it
         "{error}"
     );
     assert!(!dir.path().join("ran").exists(), "the agent ran");
-}
-
-/// The CEL environment is installed before any test reads a decision.
-#[ctor::ctor(unsafe)]
-fn compose() {
-    lighthouse_test_support::cel();
 }

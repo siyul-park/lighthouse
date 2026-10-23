@@ -6,7 +6,7 @@ use lighthouse_engine::Engine;
 use lighthouse_model::{Incomplete, ucm::File};
 use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Registry, Source, Workspace};
 use lighthouse_rpc::{Error, RpcPlugin};
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 use tempfile::TempDir;
 
 pub(super) const SCRIPT: &str = r#"#!/bin/bash
@@ -136,7 +136,7 @@ pub(super) fn engine_with(fake: &Fake, root: &Path) -> Engine {
     Engine::new(
         registry,
         Config::parse_inline("plugins = [\"fake\"]").unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         root,
     )
     .unwrap()

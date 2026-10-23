@@ -140,11 +140,11 @@ fn catalog() -> Catalog {
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect();
-    Catalog::from_files(files).unwrap()
+    Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap()
 }
 
 fn registry() -> Registry {
-    let mut registry = lighthouse_checks::registry();
+    let mut registry = lighthouse_test_support::registry();
     let plugins: Vec<_> = [
         ("lang-go", lighthouse_test_support::lang_go()),
         ("lang-rust", Some(lighthouse_test_support::lang_rust())),
@@ -155,13 +155,16 @@ fn registry() -> Registry {
     let config = Config::parse_inline(&format!("plugins = [{}]", plugins.join(", "))).unwrap();
     lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
     registry
-        .register(&Checks::new("demo", &catalog()).unwrap())
+        .register(
+            &Checks::new(&lighthouse_test_support::composition(), "demo", &catalog()).unwrap(),
+        )
         .unwrap();
     registry
 }
 
 #[test]
 fn module_types_count_methods_and_find_the_groups_that_share_nothing() {
-    let failures = RuleTester::new(registry, &catalog()).check_all();
+    let failures =
+        RuleTester::new(registry, &catalog(), lighthouse_test_support::bundled()).check_all();
     assert!(failures.is_empty(), "{failures:?}");
 }

@@ -58,7 +58,15 @@ fn run_with(text: &str, name: &str, stream: &str, files: &[&str]) -> Edited {
     )
     .unwrap();
     let provider = provider_of(text, name, &path);
-    let agent = CommandModel::new(kept.path(), name, "m", &provider, &Policy::default()).unwrap();
+    let agent = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        kept.path(),
+        name,
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
     agent
         .edit(&EditRequest {
             prompt: "fix it",

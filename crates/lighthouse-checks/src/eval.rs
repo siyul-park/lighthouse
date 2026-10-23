@@ -14,7 +14,7 @@ use cel::{
 use lighthouse_plugin::Error as PluginError;
 use serde_json::{Map, Value};
 
-use lighthouse_spec::TemplatePart;
+use lighthouse_spec::{Cel, TemplatePart};
 
 use crate::Error;
 
@@ -30,7 +30,7 @@ enum Piece {
 pub(crate) struct Template(Vec<Piece>);
 
 impl Template {
-    pub(crate) fn compile(rule: &str, what: &str, text: &str) -> Result<Self, Error> {
+    pub(crate) fn compile(cel: &Cel, rule: &str, what: &str, text: &str) -> Result<Self, Error> {
         let parts = lighthouse_spec::parse_template(text)
             .map_err(|e| Error::invalid(rule, format!("{what}: {e}")))?;
         let mut pieces = Vec::new();
@@ -38,7 +38,7 @@ impl Template {
             pieces.push(match part {
                 TemplatePart::Text(text) => Piece::Text(text),
                 TemplatePart::Hole(source) => Piece::Hole(
-                    lighthouse_spec::compile(&source)
+                    cel.compile(&source)
                         .map_err(|e| Error::invalid(rule, format!("{what} `{source}`: {e}")))?,
                 ),
             });
@@ -144,19 +144,26 @@ impl<'a> Frame<'a> {
 pub(crate) type Fact = Box<dyn Val>;
 
 /// Compiles `source`, naming `rule` and `what` in the error.
-pub(crate) fn compile(rule: &str, what: &str, source: &str) -> Result<Program, Error> {
-    lighthouse_spec::compile(source).map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
+pub(crate) fn compile(cel: &Cel, rule: &str, what: &str, source: &str) -> Result<Program, Error> {
+    cel.compile(source)
+        .map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
 }
 
 /// Like [`compile`], the program shared with whoever compiled the same source:
 /// for the variables of a pack, which many decisions name.
-pub(crate) fn compile_shared(rule: &str, what: &str, source: &str) -> Result<Arc<Program>, Error> {
-    lighthouse_spec::compile_shared(source)
+pub(crate) fn compile_shared(
+    cel: &Cel,
+    rule: &str,
+    what: &str,
+    source: &str,
+) -> Result<Arc<Program>, Error> {
+    cel.compile_shared(source)
         .map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
 }
 
 /// Compiled `name: expression` pairs.
 pub(crate) fn compile_all(
+    cel: &Cel,
     rule: &str,
     what: &str,
     sources: impl IntoIterator<Item = (impl AsRef<str>, impl AsRef<str>)>,
@@ -167,7 +174,7 @@ pub(crate) fn compile_all(
             let name = name.as_ref();
             Ok((
                 name.to_owned(),
-                compile(rule, &format!("{what} `{name}`"), source.as_ref())?,
+                compile(cel, rule, &format!("{what} `{name}`"), source.as_ref())?,
             ))
         })
         .collect()

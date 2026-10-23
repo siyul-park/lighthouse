@@ -13,7 +13,7 @@ fn check(value: serde_json::Value) -> Result<Check, serde_json::Error> {
 }
 
 fn bundled(id: &str) -> &'static Decision {
-    Catalog::bundled().decision(id).unwrap()
+    lighthouse_test_support::bundled().decision(id).unwrap()
 }
 
 #[test]
@@ -101,7 +101,8 @@ fn load_check(fields: &str) -> Result<Catalog, String> {
     let spec = format!(
         "  severity: error\n  check:\n    type: command\n    command: [lint]\n{fields}  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
     );
-    Catalog::from_files(decision_with(&spec)).map_err(|e| e.to_string())
+    Catalog::from_files(decision_with(&spec), &lighthouse_test_support::cel())
+        .map_err(|e| e.to_string())
 }
 
 #[test]
@@ -145,7 +146,8 @@ fn a_placeholder_the_binding_point_does_not_accept_is_refused_at_load() {
         let spec = format!(
             "  severity: error\n  check:\n    type: command\n    command: {args}\n  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
         );
-        Catalog::from_files(decision_with(&spec)).map_err(|e| e.to_string())
+        Catalog::from_files(decision_with(&spec), &lighthouse_test_support::cel())
+            .map_err(|e| e.to_string())
     };
     for fine in ["file", "files", "decision"] {
         assert!(
@@ -218,7 +220,7 @@ fn a_supersession_names_decisions_that_exist_and_are_marked_superseded() {
             "p/pack.yaml".into(),
             pack("p", &[("s", &["a", "old", "new"])]),
         );
-        Catalog::from_files(files)
+        Catalog::from_files(files, &lighthouse_test_support::cel())
     };
     assert!(two("superseded", "p/old").is_ok());
     let not_marked = two("accepted", "p/old").unwrap_err().to_string();
@@ -233,7 +235,7 @@ fn a_command_cannot_be_a_placeholder() {
         let spec = format!(
             "  severity: error\n  check:\n    type: command\n    command: {argv}\n  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
         );
-        Catalog::from_files(decision_with(&spec))
+        Catalog::from_files(decision_with(&spec), &lighthouse_test_support::cel())
     };
     assert!(catalog("[lint, \"{file}\"]").is_ok());
     let refused = catalog("[\"{file}\"]").unwrap_err().to_string();
@@ -254,7 +256,7 @@ fn supersession_that_goes_round_in_a_circle_is_an_error_of_any_length() {
         let mut all = vec!["a"];
         all.extend(names);
         files.insert("p/pack.yaml".into(), pack("p", &[("s", &all)]));
-        Catalog::from_files(files)
+        Catalog::from_files(files, &lighthouse_test_support::cel())
     };
     let three = chain(&[("p/b", "p/c"), ("p/c", "p/d"), ("p/d", "p/b")]);
     assert!(three.unwrap_err().to_string().contains("circle"));
@@ -367,10 +369,10 @@ fn a_program_is_a_list_or_a_table() {
 #[test]
 fn a_decision_of_the_catalog_as_it_ships_is_bundled_and_an_edited_one_is_not() {
     let shipped = bundled("go/formatted");
-    assert!(shipped.bundled());
+    assert!(shipped.bundled(lighthouse_test_support::bundled()));
 
     let mut value = serde_json::to_value(shipped).unwrap();
     value["spec"]["severity"] = json!("info");
     let edited: Decision = serde_json::from_value(value).unwrap();
-    assert!(!edited.bundled());
+    assert!(!edited.bundled(lighthouse_test_support::bundled()));
 }

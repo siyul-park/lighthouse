@@ -3,14 +3,18 @@
 use crate::support::{Subject, World};
 use lighthouse_checks::Checks;
 use lighthouse_model::ucm::{EdgeKind, Resolution, Symbol, SymbolKind, Visibility};
-use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
 const EXTERNAL: &str = "testing/public-boundary";
 const OWNER: &str = "testing/owner";
 
 fn check(w: &World, rule: &str, options: Value) -> Vec<(String, u32)> {
-    let testing = Checks::new("testing", Catalog::bundled()).unwrap();
+    let testing = Checks::new(
+        &lighthouse_test_support::composition(),
+        "testing",
+        lighthouse_test_support::bundled(),
+    )
+    .unwrap();
     w.check_in(
         &Subject {
             plugin: &testing,

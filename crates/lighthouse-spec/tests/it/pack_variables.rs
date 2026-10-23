@@ -29,7 +29,7 @@ fn catalog(variables: &str, own: &str, condition: &str) -> Result<Catalog, light
         ("p/pack.yaml", pack),
         ("p/s/a.yaml", decision("p/a", &spec)),
     ]);
-    Catalog::from_files(all)
+    Catalog::from_files(all, &lighthouse_test_support::cel())
 }
 
 fn imported(catalog: &Catalog) -> Vec<String> {
@@ -101,12 +101,15 @@ fn a_pack_variable_must_compile_and_be_named_once() {
 
 #[test]
 fn identifiers_name_the_variables_the_comprehensions_and_the_calls_of_an_expression() {
-    let names = lighthouse_spec::identifiers("xs.filter(x, f(x) > limit)");
+    let names = lighthouse_spec::identifiers(
+        &lighthouse_test_support::cel(),
+        "xs.filter(x, f(x) > limit)",
+    );
 
     for name in ["f", "limit", "x", "xs"] {
         assert!(names.contains(name), "{name} in {names:?}");
     }
-    assert!(lighthouse_spec::identifiers("1 +").is_empty());
+    assert!(lighthouse_spec::identifiers(&lighthouse_test_support::cel(), "1 +").is_empty());
 }
 
 #[test]

@@ -5,7 +5,7 @@ use lighthouse_spec::{Catalog, CommandSpec, DecisionSpec, Fix, FixKind, FixScope
 use lighthouse_test_support::catalog::*;
 
 fn rejected(files: Files, needle: &str) {
-    let err = Catalog::from_files(files).unwrap_err();
+    let err = Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap_err();
     assert!(
         err.to_string().contains(needle),
         "{err} should mention {needle}"
@@ -43,13 +43,13 @@ const MOVE: &str = "  fix:
 
 #[test]
 fn a_cel_fix_loads_and_its_requirements_follow_from_its_constructors() {
-    let catalog = Catalog::from_files(fixable(MOVE)).unwrap();
+    let catalog = Catalog::from_files(fixable(MOVE), &lighthouse_test_support::cel()).unwrap();
 
     let fix: &Fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
 
     assert_eq!(fix.safety, Safety::Safe);
     assert_eq!(
-        fix.requires,
+        fix.needs(&lighthouse_test_support::cel()),
         [Capability::CompleteReferences, Capability::Extent]
     );
     assert!(matches!(&fix.kind, FixKind::Cel { edits, .. } if edits.contains("move(")));
@@ -58,7 +58,7 @@ fn a_cel_fix_loads_and_its_requirements_follow_from_its_constructors() {
 #[test]
 fn a_cel_fix_may_declare_how_far_its_edits_go() {
     let fix = "  fix:\n    safety: unsafe\n    type: cel\n    edits: '[remove(finding.span)]'\n    scope: files\n";
-    let catalog = Catalog::from_files(fixable(fix)).unwrap();
+    let catalog = Catalog::from_files(fixable(fix), &lighthouse_test_support::cel()).unwrap();
 
     let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
 
@@ -74,22 +74,26 @@ fn a_cel_fix_may_declare_how_far_its_edits_go() {
 #[test]
 fn a_removal_of_a_span_needs_no_extent() {
     let fix = "  fix:\n    safety: unsafe\n    type: cel\n    edits: '[remove(finding.span)]'\n";
-    let catalog = Catalog::from_files(fixable(fix)).unwrap();
+    let catalog = Catalog::from_files(fixable(fix), &lighthouse_test_support::cel()).unwrap();
 
     let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
 
-    assert!(fix.requires.is_empty());
+    assert!(fix.needs(&lighthouse_test_support::cel()).is_empty());
 }
 
 #[test]
 fn removing_or_replacing_a_declaration_needs_its_extent() {
     for edits in ["[remove(finding.symbol)]", "[replace(node, 'x')]"] {
         let fix = format!("  fix:\n    safety: unsafe\n    type: cel\n    edits: \"{edits}\"\n");
-        let catalog = Catalog::from_files(fixable(&fix)).unwrap();
+        let catalog = Catalog::from_files(fixable(&fix), &lighthouse_test_support::cel()).unwrap();
 
         let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
 
-        assert_eq!(fix.requires, [Capability::Extent], "{edits}");
+        assert_eq!(
+            fix.needs(&lighthouse_test_support::cel()),
+            [Capability::Extent],
+            "{edits}"
+        );
     }
 }
 
@@ -111,7 +115,7 @@ fn a_fix_names_its_type_and_the_type_decides_its_fields() {
 fn the_rpc_type_is_kept_without_failing_the_pack() {
     let rpc = "  fix:\n    safety: unsafe\n    type: rpc\n    params: { method: fix }\n";
 
-    let catalog = Catalog::from_files(fixable(rpc)).unwrap();
+    let catalog = Catalog::from_files(fixable(rpc), &lighthouse_test_support::cel()).unwrap();
 
     let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
     assert!(matches!(fix.kind, FixKind::Rpc { .. }));
@@ -192,7 +196,7 @@ fn a_command_needs_a_program_and_a_usable_timeout() {
     );
     rejected(fixable(&command("argv: [gofmt]")), "argv");
     let ok = command("command: [gofmt, -w, '{file}']\n    output: files\n    timeout: 2m");
-    let catalog = Catalog::from_files(fixable(&ok)).unwrap();
+    let catalog = Catalog::from_files(fixable(&ok), &lighthouse_test_support::cel()).unwrap();
     let fix: &Fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
     let FixKind::Command(command) = &fix.kind else {
         panic!("command expected");
@@ -211,14 +215,17 @@ fn a_command_fix_has_the_placeholders_of_a_fix_and_a_scope_of_its_output() {
         |fields: &str| format!("  fix:\n    safety: unsafe\n    type: command\n    {fields}\n");
     for fine in ["file", "line", "symbol", "decision"] {
         let fix = command(&format!("command: [fixer, '{{{fine}}}']"));
-        assert!(Catalog::from_files(fixable(&fix)).is_ok(), "{fine}");
+        assert!(
+            Catalog::from_files(fixable(&fix), &lighthouse_test_support::cel()).is_ok(),
+            "{fine}"
+        );
     }
     for bad in ["files", "model", "rule", "path"] {
         let fix = command(&format!("command: [fixer, '{{{bad}}}']"));
         rejected(fixable(&fix), &format!("`{{{bad}}}` is not a placeholder"));
     }
     let filter = command("command: [gofmt]\n    stdin: file\n    output: stdout");
-    assert!(Catalog::from_files(fixable(&filter)).is_ok());
+    assert!(Catalog::from_files(fixable(&filter), &lighthouse_test_support::cel()).is_ok());
     rejected(
         fixable(&command("command: [gofmt]\n    output: stdout")),
         "needs `{file}` or `stdin: file`",
@@ -230,7 +237,7 @@ fn a_command_fix_has_the_placeholders_of_a_fix_and_a_scope_of_its_output() {
         "scope",
     );
     let scoped = command("command: [fixer]\n    scope: files");
-    let catalog = Catalog::from_files(fixable(&scoped)).unwrap();
+    let catalog = Catalog::from_files(fixable(&scoped), &lighthouse_test_support::cel()).unwrap();
     let FixKind::Command(spec) = &catalog.decision("p/a").unwrap().fix.as_ref().unwrap().kind
     else {
         panic!("command expected");
@@ -240,7 +247,7 @@ fn a_command_fix_has_the_placeholders_of_a_fix_and_a_scope_of_its_output() {
 
 #[test]
 fn a_fix_has_a_priority_that_defaults_to_zero() {
-    let plain = Catalog::from_files(fixable(MOVE)).unwrap();
+    let plain = Catalog::from_files(fixable(MOVE), &lighthouse_test_support::cel()).unwrap();
     assert_eq!(
         plain
             .decision("p/a")
@@ -252,7 +259,7 @@ fn a_fix_has_a_priority_that_defaults_to_zero() {
         0
     );
     let low = MOVE.replace("safety: safe", "safety: safe\n    priority: -100");
-    let catalog = Catalog::from_files(fixable(&low)).unwrap();
+    let catalog = Catalog::from_files(fixable(&low), &lighthouse_test_support::cel()).unwrap();
     assert_eq!(
         catalog
             .decision("p/a")
@@ -268,8 +275,12 @@ fn a_fix_has_a_priority_that_defaults_to_zero() {
 #[test]
 fn a_fix_is_part_of_the_decision_version_but_not_of_what_it_means() {
     let unfixed = EXAMPLES.replace("      fixed: [{ path: a.go, body: y }]\n", "");
-    let plain = Catalog::from_files(decision_with(&format!("{CHECKED}{unfixed}"))).unwrap();
-    let with_fix = Catalog::from_files(fixable(MOVE)).unwrap();
+    let plain = Catalog::from_files(
+        decision_with(&format!("{CHECKED}{unfixed}")),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    let with_fix = Catalog::from_files(fixable(MOVE), &lighthouse_test_support::cel()).unwrap();
     let (a, b) = (
         plain.decision("p/a").unwrap(),
         with_fix.decision("p/a").unwrap(),
@@ -283,7 +294,7 @@ fn a_fix_is_part_of_the_decision_version_but_not_of_what_it_means() {
 #[test]
 fn the_effective_safety_of_a_fix_is_decided_in_one_place() {
     let load = |fix: &str| {
-        Catalog::from_files(fixable(fix))
+        Catalog::from_files(fixable(fix), &lighthouse_test_support::cel())
             .unwrap()
             .decision("p/a")
             .unwrap()
@@ -292,10 +303,13 @@ fn the_effective_safety_of_a_fix_is_decided_in_one_place() {
     let ops_safe = load(MOVE);
     let ops_unsafe = load(&MOVE.replace("safety: safe", "safety: unsafe"));
     let model = load("  fix:\n    safety: unsafe\n    type: model\n");
-    let unfixed = Catalog::from_files(decision_with(&format!(
-        "{CHECKED}{}",
-        EXAMPLES.replace("      fixed: [{ path: a.go, body: y }]\n", "")
-    )))
+    let unfixed = Catalog::from_files(
+        decision_with(&format!(
+            "{CHECKED}{}",
+            EXAMPLES.replace("      fixed: [{ path: a.go, body: y }]\n", "")
+        )),
+        &lighthouse_test_support::cel(),
+    )
     .unwrap()
     .decision("p/a")
     .unwrap()
@@ -326,17 +340,20 @@ fn the_effective_safety_of_a_fix_is_decided_in_one_place() {
 
 #[test]
 fn the_safety_a_project_gives_a_rule_replaces_every_other_in_the_last_place() {
-    let catalog = Catalog::from_files(fixable(MOVE)).unwrap();
+    let catalog = Catalog::from_files(fixable(MOVE), &lighthouse_test_support::cel()).unwrap();
     let ops = catalog.decision("p/a").unwrap().clone();
     let warned = ops.clone().map_spec(|spec| DecisionSpec {
         severity: Some(Severity::Warn),
         ..spec
     });
-    let model = Catalog::from_files(fixable("  fix:\n    safety: unsafe\n    type: model\n"))
-        .unwrap()
-        .decision("p/a")
-        .unwrap()
-        .clone();
+    let model = Catalog::from_files(
+        fixable("  fix:\n    safety: unsafe\n    type: model\n"),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap()
+    .decision("p/a")
+    .unwrap()
+    .clone();
 
     assert_eq!(ops.fix_safety(Some(Safety::Unsafe)), Safety::Unsafe);
     assert_eq!(warned.fix_safety(Some(Safety::Safe)), Safety::Safe);
@@ -345,7 +362,7 @@ fn the_safety_a_project_gives_a_rule_replaces_every_other_in_the_last_place() {
 
 #[test]
 fn the_bundled_decisions_a_model_may_fix_declare_how_far_it_may_go_or_take_references() {
-    let bundled = Catalog::bundled();
+    let bundled = lighthouse_test_support::bundled();
     let scope_of = |id: &str| match &bundled.decision(id).unwrap().fix.as_ref().unwrap().kind {
         FixKind::Model { scope, .. } => *scope,
         other => panic!("{id}: a model fix expected, found {other:?}"),

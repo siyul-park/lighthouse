@@ -7,7 +7,7 @@ use lighthouse_plugin::{
     FineTuningJob, Model, ModelClient, Plugin, PluginManifest, Registry, State, SystemOneRequest,
     SystemOneResponse,
 };
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 
 /// A model that echoes the model it was asked for, taken from the options.
 struct Echo(Model);
@@ -103,9 +103,14 @@ fn a_reference_names_a_provider_and_the_model_it_is_asked_for() {
     let config =
         Config::parse_inline("plugins = [\"echo\"]\n[models.providers.work]\nplugin = \"echo\"\n")
             .unwrap();
-    let engine = Engine::new(registry(), config, Catalog::bundled(), dir.path())
-        .unwrap()
-        .with_models(ModelOptions::default());
+    let engine = Engine::new(
+        registry(),
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap()
+    .with_models(ModelOptions::default());
 
     let model = engine.model("work/some/model:free").unwrap();
     let answer = model
@@ -174,7 +179,7 @@ fn engine_with_commands_builds_the_command_models_of_a_trusted_project() {
         let engine = Engine::new(
             Registry::default(),
             config.clone(),
-            Catalog::bundled(),
+            lighthouse_test_support::bundled(),
             dir.path(),
         )
         .unwrap()
@@ -200,9 +205,14 @@ fn a_project_cannot_declare_the_reserved_provider_local() {
          [models.providers.local]\nplugin = \"echo\"\n",
     )
     .unwrap();
-    let error = Engine::new(registry(), config, Catalog::bundled(), dir.path())
-        .err()
-        .expect("local is reserved");
+    let error = Engine::new(
+        registry(),
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .err()
+    .expect("local is reserved");
     assert!(error.to_string().contains("reserved"), "{error}");
 }
 
@@ -212,9 +222,14 @@ fn a_trained_model_is_another_model_to_the_answer_cache_by_its_digest() {
     let config =
         Config::parse_inline("plugins = [\"echo\"]\n[models.providers.work]\nplugin = \"echo\"\n")
             .unwrap();
-    let engine = Engine::new(registry(), config, Catalog::bundled(), dir.path())
-        .unwrap()
-        .with_models(ModelOptions::default());
+    let engine = Engine::new(
+        registry(),
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap()
+    .with_models(ModelOptions::default());
     let manifest = |digest: &str| {
         engine
             .model(&format!("work/learned@sha256:{digest}"))

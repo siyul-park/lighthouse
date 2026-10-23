@@ -5,7 +5,7 @@ use lighthouse_plugin::{LanguageProvider, Plugin, PluginManifest, Rule};
 use lighthouse_spec::Catalog;
 
 use crate::{
-    Error,
+    Composition, Error,
     bundled::{CORE, core_pack},
     check::Check,
     fix::Fixer,
@@ -22,7 +22,7 @@ pub struct Checks {
 impl Checks {
     /// Builds the checks and fixers of every decision in pack `id` whose check
     /// is `cel` (or another program this crate runs) or that has a `fix`.
-    pub fn new(id: &str, catalog: &Catalog) -> Result<Self, Error> {
+    pub fn new(comp: &Composition, id: &str, catalog: &Catalog) -> Result<Self, Error> {
         let prefix = format!("{id}/");
         let mut checks = Vec::new();
         let mut fixers = Vec::new();
@@ -32,8 +32,8 @@ impl Checks {
                 .and_then(|from| catalog.decision(from));
             let decision =
                 &over.map_or_else(|| decision.clone(), |source| decision.inheriting(source));
-            checks.extend(Check::new(decision)?);
-            fixers.extend(Fixer::new(decision)?);
+            checks.extend(Check::new(comp, decision)?);
+            fixers.extend(Fixer::new(comp, decision)?);
         }
         let languages: fn() -> _ = if id == CORE {
             core_pack::languages

@@ -11,7 +11,7 @@ use lighthouse_checks::metrics::{
 use lighthouse_engine::Engine;
 use lighthouse_model::ucm::{EdgeKind, Flow, FlowKind, Symbol, SymbolKind};
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 use serde_json::json;
 
 use crate::{
@@ -274,17 +274,22 @@ fn indexed(id: &str, plugin: &Path, files: &[(&str, &str)]) -> System {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, text).unwrap();
     }
-    let mut registry: Registry = lighthouse_checks::registry();
+    let mut registry: Registry = lighthouse_test_support::registry();
     let config = Config::parse_inline(&format!(
         "plugins = [{{ id = {id:?}, path = {:?} }}, \"design\"]",
         plugin.to_str().unwrap()
     ))
     .unwrap();
     lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
-    let outcome = Engine::new(registry, config, Catalog::bundled(), dir.path())
-        .unwrap()
-        .check(&[], &[])
-        .unwrap();
+    let outcome = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap()
+    .check(&[], &[])
+    .unwrap();
     modules(&outcome.project)
 }
 

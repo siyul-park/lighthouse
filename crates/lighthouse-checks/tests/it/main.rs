@@ -30,9 +30,3 @@ mod stability;
 mod support;
 mod testing_rules;
 mod unit_facts;
-
-/// The CEL environment is installed before any test reads a decision.
-#[ctor::ctor(unsafe)]
-fn compose() {
-    lighthouse_test_support::cel();
-}

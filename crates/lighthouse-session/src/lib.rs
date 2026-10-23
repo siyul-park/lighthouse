@@ -50,9 +50,11 @@ pub use lighthouse_engine::SKIPPED_DIRS;
 
 pub use lighthouse_model::Result;
 
-/// Installs the CEL environment of the bundled libraries, once per process:
-/// the composition root every way into the session goes through before a
-/// decision is read.
-pub(crate) fn compose() -> Result<()> {
+use lighthouse_checks::Composition;
+
+/// The CEL environment of the bundled libraries: built at the composition
+/// root every way into the session goes through before a decision is read,
+/// and passed on from there.
+pub(crate) fn compose() -> Result<Composition> {
     lighthouse_checks::compose().map_err(Into::into)
 }

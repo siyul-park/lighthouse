@@ -8,7 +8,7 @@ use std::{
     sync::Arc,
 };
 
-use lighthouse_checks::Checks;
+use lighthouse_checks::{Checks, Composition};
 use lighthouse_engine::{CommandModels, Engine};
 use lighthouse_plugin::{ModelClient, Registry};
 use lighthouse_resource::Format;
@@ -47,6 +47,8 @@ pub struct Session {
     pub basis: Basis,
     /// The environment of the configuration, layer by layer.
     pub(crate) layers: Layers,
+    /// The CEL environment every decision of the session is compiled in.
+    pub comp: Composition,
 }
 
 impl Session {
@@ -113,7 +115,7 @@ impl Session {
     /// and the decision files read here, once: what is parsed is what trust is
     /// judged on.
     fn assemble(path: &Path, text: &str, root: PathBuf) -> Result<Self> {
-        crate::compose()?;
+        let comp = crate::compose()?;
         let format = Format::of_path(path).unwrap_or(Format::Toml);
         let personal = environment::read(&root)?;
         let covered: Vec<(&str, String)> = personal
@@ -127,10 +129,13 @@ impl Session {
         let layers = personal.iter().map(|p| p.layer.clone()).collect();
         let (config, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;
         let files = local_files(&root)?;
-        let local = files.clone().map(Catalog::from_local).transpose()?;
-        let catalog = layered(local.as_ref())?;
+        let local = files
+            .clone()
+            .map(|files| Catalog::from_local(files, comp.cel()))
+            .transpose()?;
+        let catalog = layered(&comp, local.as_ref())?;
         environment::check_local(&root, &personal, &catalog)?;
-        let commands = commands(&config, &catalog, &root)?;
+        let commands = commands(&config, &catalog, comp.cel().bundled()?, &root)?;
         let basis = Basis::of(&root, text, &texts, &files.unwrap_or_default(), &commands);
         Ok(Self {
             config,
@@ -140,6 +145,7 @@ impl Session {
             catalog: Arc::new(catalog),
             basis,
             layers,
+            comp,
         })
     }
 
@@ -147,15 +153,16 @@ impl Session {
     /// decisions: for commands that must work on a project whose own files
     /// are broken or out of date.
     pub fn bare(root: PathBuf) -> Result<Self> {
-        crate::compose()?;
+        let comp = crate::compose()?;
         Ok(Self {
             config: Config::parse(DEFAULT_CONFIG)?,
             store: root.clone(),
             root,
             local: None,
-            catalog: Arc::new(layered(None)?),
+            catalog: Arc::new(layered(&comp, None)?),
             basis: Basis::default(),
             layers: Layers::default(),
+            comp,
         })
     }
 
@@ -199,8 +206,9 @@ impl Session {
         let (registry, plugins) = self.registry()?;
         let root = self.root.clone();
         let policy = sandbox.clone();
+        let cel = self.comp.cel().clone();
         let commands: CommandModels = Arc::new(move |name, model, provider| {
-            CommandModel::new(&root, name, model, provider, &policy)
+            CommandModel::new(&cel, &root, name, model, provider, &policy)
                 .map(|command| Box::new(command) as Box<dyn ModelClient>)
         });
         let engine = Engine::new(registry, self.config.clone(), &self.catalog, &self.root)?
@@ -222,7 +230,7 @@ impl Session {
     pub fn with_local(&self, local: Option<Catalog>) -> Result<Self> {
         // The candidate was never read by the user, so it is never trusted.
         Ok(Self {
-            catalog: Arc::new(layered(local.as_ref())?),
+            catalog: Arc::new(layered(&self.comp, local.as_ref())?),
             local,
             basis: Basis::default(),
             ..self.clone()
@@ -233,9 +241,9 @@ impl Session {
     /// decisions. Nothing is started, so it is cheap and cannot fail on a
     /// language plugin.
     pub fn in_process_registry(&self) -> Result<Registry> {
-        let mut registry = lighthouse_checks::registry();
+        let mut registry = lighthouse_checks::registry(&self.comp).map_err(|e| e.to_string())?;
         if let Some(local) = &self.local {
-            let plugin = Checks::new("local", local)?;
+            let plugin = Checks::new(&self.comp, "local", local)?;
             if !plugin.is_empty() {
                 registry.register(&plugin)?;
             }
@@ -266,15 +274,20 @@ pub fn config_file(root: &Path) -> Option<PathBuf> {
 /// The catalog of the project at `root`: the bundled one with the project's
 /// layer on top. Fails when the project's layer is broken.
 pub fn catalog_at(root: &Path) -> Result<Catalog> {
-    crate::compose()?;
-    layered(load_local(root)?.as_ref())
+    let comp = crate::compose()?;
+    layered(&comp, load_local(root, comp.cel())?.as_ref())
 }
 
 /// Every program the project would run: the programs of the fix
 /// verification of its configuration, its command model providers, and the
 /// command fixes and command checks of its catalog that are not the bundled
 /// catalog's own, and the plugins that come with the project.
-fn commands(config: &Config, catalog: &Catalog, root: &Path) -> Result<Vec<Program>> {
+fn commands(
+    config: &Config,
+    catalog: &Catalog,
+    shipped: &Catalog,
+    root: &Path,
+) -> Result<Vec<Program>> {
     let mut found: Vec<Program> = config
         .fix()
         .verify
@@ -298,7 +311,7 @@ fn commands(config: &Config, catalog: &Catalog, root: &Path) -> Result<Vec<Progr
             });
         }
     }
-    for decision in catalog.decisions().filter(|d| !d.bundled()) {
+    for decision in catalog.decisions().filter(|d| !d.bundled(shipped)) {
         if let Some(check) = &decision.check
             && let CheckKind::Command(command) = &check.kind
         {
@@ -321,9 +334,10 @@ fn commands(config: &Config, catalog: &Catalog, root: &Path) -> Result<Vec<Progr
     Ok(found)
 }
 
-fn layered(local: Option<&Catalog>) -> Result<Catalog> {
+fn layered(comp: &Composition, local: Option<&Catalog>) -> Result<Catalog> {
+    let shipped = comp.cel().bundled()?;
     match local {
-        Some(local) => Ok(Catalog::overlay(Catalog::bundled(), local)?),
-        None => Ok(Catalog::bundled().clone()),
+        Some(local) => Ok(Catalog::overlay(shipped, local)?),
+        None => Ok(shipped.clone()),
     }
 }

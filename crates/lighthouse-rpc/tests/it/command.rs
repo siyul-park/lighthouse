@@ -51,7 +51,15 @@ fn command_new_runs_a_program_that_prints_the_answer() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "cat >/dev/null; printf '{\"noul\": 0.75}'"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
     let answer = command.classify(&request()).unwrap();
 
     assert_eq!(command.manifest().id, "p/m");
@@ -63,7 +71,15 @@ fn command_new_fails_a_program_that_exits_with_an_error() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "exit 3"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
 
     assert!(command.classify(&request()).is_err());
 }
@@ -79,7 +95,17 @@ fn command_new_is_none_for_a_provider_that_is_not_a_command() {
         .provider("p")
         .unwrap();
 
-    assert!(CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).is_none());
+    assert!(
+        CommandModel::new(
+            &lighthouse_test_support::cel(),
+            dir.path(),
+            "p/m",
+            "m",
+            &provider,
+            &Policy::default()
+        )
+        .is_none()
+    );
 }
 
 #[test]
@@ -87,7 +113,15 @@ fn command_new_gives_the_program_the_login_variables_and_no_other_of_the_environ
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "env | cut -d= -f1 | tr '\\n' ' ' >&2; exit 1"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
     let failed = command.classify(&request()).unwrap_err().to_string();
 
     for name in ["PATH", "HOME", "USER", "LOGNAME"] {
@@ -105,7 +139,15 @@ fn a_command_without_a_protocol_serves_edit_and_neither_classifies_nor_chats() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider_of("", r#"["true"]"#);
 
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
 
     assert!(command.manifest().capabilities.classification.is_none());
     assert!(
@@ -139,8 +181,15 @@ fn a_plain_text_command_edits_in_the_directory_it_is_given_and_keeps_what_it_sai
     let home = tempfile::tempdir().unwrap();
     let work = tempfile::tempdir().unwrap();
     let provider = provider_of("", r#"["sh", "-c", "cat > prompt.txt; echo fixed 1"]"#);
-    let command =
-        CommandModel::new(home.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        home.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
 
     let said = command
         .edit(&EditRequest {
@@ -170,14 +219,28 @@ fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
         model: "",
     };
 
-    let said = CommandModel::new(dir.path(), "p/m", "m", &chatty, &Policy::default())
-        .unwrap()
-        .edit(&asked)
-        .unwrap();
-    let error = CommandModel::new(dir.path(), "p/m", "m", &failing, &Policy::default())
-        .unwrap()
-        .edit(&asked)
-        .unwrap_err();
+    let said = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &chatty,
+        &Policy::default(),
+    )
+    .unwrap()
+    .edit(&asked)
+    .unwrap();
+    let error = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &failing,
+        &Policy::default(),
+    )
+    .unwrap()
+    .edit(&asked)
+    .unwrap_err();
 
     assert!(said.said.len() <= 2048, "{}", said.said.len());
     assert!(error.to_string().contains("exited 2"), "{error}");
@@ -187,7 +250,15 @@ fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
 fn a_command_with_a_protocol_does_not_edit() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "true"]"#);
-    let command = CommandModel::new(dir.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
 
     let error = command
         .edit(&EditRequest {
@@ -210,8 +281,15 @@ fn an_agent_runs_with_a_home_of_its_own_and_writes_only_in_its_directory() {
         outside.path().display()
     );
     let provider = provider_of("", &serde_json::json!(["sh", "-c", script]).to_string());
-    let command =
-        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        work.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
 
     command
         .edit(&EditRequest {
@@ -247,8 +325,15 @@ fn a_key_reaches_the_program_by_its_environment_and_nowhere_else() {
     unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_KEY", "sk-agent-secret") };
     let work = tempfile::tempdir().unwrap();
     let provider = keyed("LIGHTHOUSE_RPC_TEST_KEY");
-    let command =
-        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        work.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
 
     let said = command
         .edit(&EditRequest {
@@ -279,11 +364,18 @@ fn the_version_of_a_model_holds_the_name_of_a_key_and_a_hash_of_its_value() {
         // SAFETY: this variable belongs to this test.
         unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_ROTATED", value) };
         let provider = keyed("LIGHTHOUSE_RPC_TEST_ROTATED");
-        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default())
-            .unwrap()
-            .manifest()
-            .version
-            .clone()
+        CommandModel::new(
+            &lighthouse_test_support::cel(),
+            work.path(),
+            "p/m",
+            "m",
+            &provider,
+            &Policy::default(),
+        )
+        .unwrap()
+        .manifest()
+        .version
+        .clone()
     };
 
     let first = version("sk-one");
@@ -301,8 +393,15 @@ fn the_version_of_a_model_holds_the_name_of_a_key_and_a_hash_of_its_value() {
 fn a_key_that_is_not_set_fails_the_run_naming_the_variable() {
     let work = tempfile::tempdir().unwrap();
     let provider = keyed("LIGHTHOUSE_RPC_TEST_NEVER_SET");
-    let command =
-        CommandModel::new(work.path(), "p/m", "m", &provider, &Policy::default()).unwrap();
+    let command = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        work.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap();
 
     let error = command
         .edit(&EditRequest {

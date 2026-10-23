@@ -19,6 +19,5 @@ serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
-ctor = "1.0.13"
 lighthouse-test-support = { path = "../lighthouse-test-support" }
 tempfile.workspace = true

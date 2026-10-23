@@ -20,7 +20,7 @@ use lighthouse_plugin::{
     Caching, Context, Error as PluginError, Indexed, LanguageProvider, Plugin, PluginManifest,
     ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
 };
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 use tempfile::TempDir;
 
 const CONFIG: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/local\" = \"warn\"\n\"counting/global\" = \"warn\"\n";
@@ -164,7 +164,7 @@ fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
     let engine = Engine::new(
         registry,
         Config::parse_inline(config).unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         root,
     )
     .unwrap();

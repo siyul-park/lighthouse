@@ -8,7 +8,6 @@ use lighthouse_ml::{
 use lighthouse_model::Judgment;
 use lighthouse_plugin::{DecisionRef, Subject};
 use lighthouse_protocol::{canonical, hash::sha256};
-use lighthouse_spec::Catalog;
 use serde_json::json;
 
 use crate::layer_support::{Memorizer, manifest};
@@ -16,7 +15,10 @@ use crate::layer_support::{Memorizer, manifest};
 const RULE: &str = "core/file-size";
 
 fn decision() -> DecisionRef {
-    Catalog::bundled().decision(RULE).unwrap().reference()
+    lighthouse_test_support::bundled()
+        .decision(RULE)
+        .unwrap()
+        .reference()
 }
 
 fn dataset(root: &Path, texts: &[&str]) -> String {

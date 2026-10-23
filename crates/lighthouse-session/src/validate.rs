@@ -12,6 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_checks::Composition;
 use lighthouse_engine::Engine;
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
@@ -95,7 +96,8 @@ impl Sets {
         examples: bool,
         problems: &mut Vec<Problem>,
     ) -> Result<()> {
-        let bundled = Catalog::bundled();
+        let cel = session.comp.cel();
+        let bundled = cel.bundled()?;
         let mut layered: Vec<(Catalog, Vec<String>)> = Vec::new();
         let known: BTreeSet<String> = session
             .catalog
@@ -113,8 +115,8 @@ impl Sets {
             let at = self.catalog_root(dir).unwrap_or_else(|| dir.clone());
             let loaded = match self.catalog_root(dir) {
                 Some(root) if !roots.insert(root.clone()) => continue,
-                Some(root) => Catalog::load(&root).map(|c| (root.display().to_string(), c)),
-                None => Catalog::from_local(by_file_name(files))
+                Some(root) => Catalog::load(&root, cel).map(|c| (root.display().to_string(), c)),
+                None => Catalog::from_local(by_file_name(files), cel)
                     .and_then(|local| Catalog::overlay(bundled, &local))
                     .map(|c| (dir.display().to_string(), c)),
             };
@@ -129,7 +131,7 @@ impl Sets {
                         .filter(|d| d.automated() && bundled.decision(d.id()).is_none())
                         .map(|d| d.id().to_owned())
                         .collect::<Vec<String>>();
-                    built(&catalog, &own, &place, problems);
+                    built(&session.comp, &catalog, &own, &place, problems);
                     layered.push((catalog, own));
                 }
                 Err(e) => problems.push(problem(&dir.display().to_string(), e)),
@@ -189,7 +191,7 @@ pub fn validate_paths(session: &Session, paths: &[PathBuf], examples: bool) -> R
     }
     files.sort();
     files.dedup();
-    let registry = registry_of(session);
+    let registry = registry_of(session)?;
     let mut sets = Sets::default();
     for file in &files {
         let Some(format) = Format::of_path(file) else {
@@ -215,22 +217,28 @@ pub fn validate_paths(session: &Session, paths: &[PathBuf], examples: bool) -> R
 /// The rules that run in this process. A local decision that does not build
 /// is reported with the documents that hold it, not as a failure of
 /// validating them, so it is left out.
-fn registry_of(session: &Session) -> Registry {
+fn registry_of(session: &Session) -> Result<Registry> {
     session
         .in_process_registry()
-        .unwrap_or_else(|_| lighthouse_checks::registry())
+        .or_else(|_| lighthouse_checks::registry(&session.comp).map_err(|e| e.to_string().into()))
 }
 
 /// What building the checks and fixes of the decisions `own` says is wrong
 /// with them: an expression that does not compile, a function that does not
 /// exist, a variable a function cannot see.
-fn built(catalog: &Catalog, own: &[String], place: &str, problems: &mut Vec<Problem>) {
+fn built(
+    comp: &Composition,
+    catalog: &Catalog,
+    own: &[String],
+    place: &str,
+    problems: &mut Vec<Problem>,
+) {
     let packs: BTreeSet<&str> = own
         .iter()
         .filter_map(|id| id.split_once('/').map(|(pack, _)| pack))
         .collect();
     for pack in packs {
-        if let Err(e) = lighthouse_checks::Checks::new(pack, catalog) {
+        if let Err(e) = lighthouse_checks::Checks::new(comp, pack, catalog) {
             problems.push(problem(place, e));
         }
     }
@@ -275,7 +283,12 @@ fn naming(session: &Session, root: &Path, problems: &mut Vec<Problem>) -> Result
     let config = Config::parse_inline(&format!(
         "plugins = [\"core\"]\n[rules]\n\"{DECISION_NAMING}\" = \"warn\"\n"
     ))?;
-    let engine = Engine::new(registry_of(session), config, Catalog::bundled(), root)?;
+    let engine = Engine::new(
+        registry_of(session)?,
+        config,
+        session.comp.cel().bundled()?,
+        root,
+    )?;
     let outcome = engine.check(&[], &[DECISION_NAMING.to_owned()])?;
     problems.extend(outcome.diagnostics.iter().map(|d| {
         let at = root.join(&d.file);

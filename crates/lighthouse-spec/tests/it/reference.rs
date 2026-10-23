@@ -1,8 +1,8 @@
-use lighthouse_spec::Catalog;
-
 #[test]
 fn a_decision_reference_carries_its_requirement_and_examples() {
-    let decision = Catalog::bundled().decision("design/prefer-method").unwrap();
+    let decision = lighthouse_test_support::bundled()
+        .decision("design/prefer-method")
+        .unwrap();
     let told = decision.reference();
 
     assert_eq!(told.id, "design/prefer-method");

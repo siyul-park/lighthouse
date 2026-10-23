@@ -236,7 +236,7 @@ fn brief_of(session: &Session, decision: &Decision, finding: &FindingRecord) -> 
         evidence: &finding.evidence,
         place: format!("{}:{}:{}", finding.path, finding.line(), finding.col()),
     };
-    let plan = FixPlan::from_catalog(&session.catalog);
+    let plan = FixPlan::from_catalog(&session.catalog, session.comp.cel().bundled()?);
     let active = active(&session.config, session.catalog.projects())?;
     let tools: Vec<&str> = brief::safe_fixes(&plan, None)
         .into_iter()

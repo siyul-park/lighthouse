@@ -41,7 +41,7 @@ fn engine_with_cache_gives_the_providers_a_directory_to_keep_results_in_and_with
         let engine = Engine::new(
             registry,
             Config::parse_inline("plugins = [\"probe\"]").unwrap(),
-            Catalog::bundled(),
+            lighthouse_test_support::bundled(),
             dir.path(),
         )
         .unwrap();

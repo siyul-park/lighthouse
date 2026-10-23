@@ -13,11 +13,11 @@ use lighthouse_model::{
     ucm::{Edge, File, Node, Project, Symbol, SymbolId},
 };
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
-use lighthouse_spec::{CelCheck, Decision, Select};
+use lighthouse_spec::{Cel, CelCheck, Decision, Select};
 use serde_json::{Map, Value};
 
 use crate::{
-    Error,
+    Composition, Error,
     abstain::{Abstain, Candidate},
     builder::Builder,
     caching,
@@ -56,9 +56,29 @@ struct At {
     end_line: Option<Program>,
 }
 
+impl At {
+    fn compile(cel: &Cel, id: &str, at: &lighthouse_spec::At) -> Result<Self, Error> {
+        let maybe = |what: &str, source: &Option<String>| optional(cel, id, what, source);
+        Ok(Self {
+            symbol: maybe("at.symbol", &at.symbol)?,
+            line: maybe("at.line", &at.line)?,
+            end_line: maybe("at.endLine", &at.end_line)?,
+        })
+    }
+}
+
 struct Identity {
     subject: Program,
     snippet: Option<Program>,
+}
+
+impl Identity {
+    fn compile(cel: &Cel, id: &str, identity: &lighthouse_spec::Identity) -> Result<Self, Error> {
+        Ok(Self {
+            subject: compile(cel, id, "identity.subject", &identity.subject)?,
+            snippet: optional(cel, id, "identity.snippet", &identity.snippet)?,
+        })
+    }
 }
 
 /// Where a finding goes, and what it is about.
@@ -72,23 +92,25 @@ struct Anchor {
 impl CelRule {
     /// Compiles `check` for `decision`. The decision's scope has been checked
     /// against what the check selects when the catalog was validated.
-    pub(crate) fn new(decision: &Decision, check: &CelCheck) -> Result<Self, Error> {
+    pub(crate) fn new(
+        comp: &Composition,
+        decision: &Decision,
+        check: &CelCheck,
+    ) -> Result<Self, Error> {
+        let cel = comp.cel();
         let id = decision.id();
         let select = check
             .selects(decision.scope.subject)
             .ok_or_else(|| Error::invalid(id, "a project decision needs a `select`"))?;
-        let maybe = |what: &str, source: &Option<String>| {
-            source.as_deref().map(|s| compile(id, what, s)).transpose()
-        };
-        let mut library = library::context().map_err(|e| Error::invalid(id, e))?;
-        let declared = library::declare_variables(id, &mut library, &check.variables)?;
+        let mut library = cel.context();
+        let declared = library::declare_variables(cel, id, &mut library, &check.variables)?;
         let (values, bodies) = (declared.values, declared.bodies);
         let variables: Vec<(String, Arc<Program>)> = values
             .into_iter()
             .map(|v| {
                 Ok((
                     v.name.clone(),
-                    compile_shared(id, &format!("variable `{}`", v.name), &v.expression)?,
+                    compile_shared(cel, id, &format!("variable `{}`", v.name), &v.expression)?,
                 ))
             })
             .collect::<Result<_, Error>>()?;
@@ -99,32 +121,21 @@ impl CelRule {
                 .zip(&level)
                 .any(|((variable, _), file_level)| *file_level && variable == name)
         };
-        library::check_scope(id, &declared.functions, &bodies, &shared)?;
-        let condition = compile(id, "where", &check.condition)?;
-        let message = Template::compile(id, "message", &check.message)?;
-        let evidence = compile_all(id, "evidence", &check.evidence)?;
+        library::check_scope(cel, id, &declared.functions, &bodies, &shared)?;
+        let condition = compile(cel, id, "where", &check.condition)?;
+        let message = Template::compile(cel, id, "message", &check.message)?;
+        let evidence = compile_all(cel, id, "evidence", &check.evidence)?;
         let at = check
             .at
             .as_ref()
-            .map(|at| {
-                Ok::<_, Error>(At {
-                    symbol: maybe("at.symbol", &at.symbol)?,
-                    line: maybe("at.line", &at.line)?,
-                    end_line: maybe("at.endLine", &at.end_line)?,
-                })
-            })
+            .map(|at| At::compile(cel, id, at))
             .transpose()?;
         let identity = check
             .identity
             .as_ref()
-            .map(|i| {
-                Ok::<_, Error>(Identity {
-                    subject: compile(id, "identity.subject", &i.subject)?,
-                    snippet: maybe("identity.snippet", &i.snippet)?,
-                })
-            })
+            .map(|i| Identity::compile(cel, id, i))
             .transpose()?;
-        let abstain = Abstain::new(decision, check, select)?;
+        let abstain = Abstain::new(cel, decision, check, select)?;
         let read = variables
             .iter()
             .map(|(_, program)| program.as_ref())
@@ -143,11 +154,16 @@ impl CelRule {
             )
             .chain(abstain.iter().map(Abstain::program))
             .collect::<Vec<&Program>>();
-        library::check_calls(id, &library, &declared.functions, read.iter().copied())?;
+        library::check_calls(
+            comp,
+            id,
+            &library,
+            &declared.functions,
+            read.iter().copied(),
+        )?;
         let roots: Vec<&Program> = read[variables.len() + bodies.len()..].to_vec();
         let used = library::reached(&variables, &declared.functions, &bodies, &roots);
-        let libraries =
-            library::libraries_called(read.iter().copied()).map_err(|e| Error::invalid(id, e))?;
+        let libraries = library::libraries_called(comp, read.iter().copied());
         Ok(Self {
             libraries,
             select,
@@ -751,4 +767,17 @@ fn admits_module(
 fn top_of_file() -> Span {
     let p = Position { line: 1, col: 1 };
     Span { start: p, end: p }
+}
+
+/// `source` compiled, when there is one.
+fn optional(
+    cel: &Cel,
+    id: &str,
+    what: &str,
+    source: &Option<String>,
+) -> Result<Option<Program>, Error> {
+    source
+        .as_deref()
+        .map(|source| compile(cel, id, what, source))
+        .transpose()
 }

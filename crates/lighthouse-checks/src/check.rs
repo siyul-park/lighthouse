@@ -13,7 +13,7 @@ use lighthouse_spec::{CheckKind, Decision, Select};
 use serde_json::{Map, Value};
 
 use crate::{
-    Error,
+    Composition, Error,
     cel_rule::CelRule,
     command::CommandRule,
     manifest::{rule_manifest, rule_options, validate_options},
@@ -35,17 +35,21 @@ enum Kind {
 impl Check {
     /// Compiles the check of `decision`; `None` for a decision whose check no
     /// program runs here (`judged`, `rpc`) or that has none.
-    pub(crate) fn new(decision: &Decision) -> Result<Option<Self>, Error> {
+    pub(crate) fn new(comp: &Composition, decision: &Decision) -> Result<Option<Self>, Error> {
         let id = decision.id();
         let Some(check) = &decision.check else {
             return Ok(None);
         };
         let kind = match &check.kind {
-            CheckKind::Cel(cel) => Kind::Cel(Box::new(CelRule::new(decision, cel)?)),
+            CheckKind::Cel(cel) => Kind::Cel(Box::new(CelRule::new(comp, decision, cel)?)),
             CheckKind::Command(command) => Kind::Command(Box::new(CommandRule::new(
                 command,
                 &decision.title,
-                decision.bundled(),
+                decision.bundled(
+                    comp.cel()
+                        .bundled()
+                        .map_err(|e| Error::invalid(id, e.to_string()))?,
+                ),
             )?)),
             CheckKind::Model(model) => {
                 // A model check only ranges over subjects of a file; the
@@ -59,7 +63,7 @@ impl Check {
                 if cel.selects(decision.scope.subject).map(Select::scope) != Some(RunScope::File) {
                     return Ok(None);
                 }
-                Kind::Cel(Box::new(CelRule::new(decision, &cel)?))
+                Kind::Cel(Box::new(CelRule::new(comp, decision, &cel)?))
             }
         };
         let mut meta = rule_manifest(decision)

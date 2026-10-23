@@ -247,7 +247,12 @@ impl World {
     }
 
     pub fn check(&self, rule: &str, options: Value) -> Vec<(String, u32)> {
-        let design = Checks::new("design", Catalog::bundled()).unwrap();
+        let design = Checks::new(
+            &lighthouse_test_support::composition(),
+            "design",
+            lighthouse_test_support::bundled(),
+        )
+        .unwrap();
         self.check_in(
             &Subject {
                 plugin: &design,
@@ -267,7 +272,12 @@ impl World {
 
     /// The messages of what `rule` reports, in report order.
     pub fn messages(&self, rule: &str, options: Value) -> Vec<String> {
-        let design = Checks::new("design", Catalog::bundled()).unwrap();
+        let design = Checks::new(
+            &lighthouse_test_support::composition(),
+            "design",
+            lighthouse_test_support::bundled(),
+        )
+        .unwrap();
         let subject = Subject {
             plugin: &design,
             id: "design",
@@ -288,7 +298,12 @@ impl World {
 
     /// The fingerprints of what `rule` reports, in report order.
     pub fn fingerprints(&self, rule: &str, options: Value) -> Vec<String> {
-        let design = Checks::new("design", Catalog::bundled()).unwrap();
+        let design = Checks::new(
+            &lighthouse_test_support::composition(),
+            "design",
+            lighthouse_test_support::bundled(),
+        )
+        .unwrap();
         let subject = Subject {
             plugin: &design,
             id: "design",
@@ -387,7 +402,7 @@ impl World {
         rule: &str,
         options: Value,
     ) -> Vec<lighthouse_model::Diagnostic> {
-        self.diagnose_with(Catalog::bundled(), subject, rule, options)
+        self.diagnose_with(lighthouse_test_support::bundled(), subject, rule, options)
     }
 
     /// Runs `rule` of `subject`, described by `catalog`, over the world.

@@ -2,7 +2,6 @@
 
 use lighthouse_engine::{FixPlan, FixRun, Needs};
 use lighthouse_model::Safety;
-use lighthouse_spec::Catalog;
 
 use crate::support::*;
 
@@ -45,7 +44,10 @@ fn a_fix_that_cannot_be_proposed_has_no_preview() {
 
 #[test]
 fn fix_plan_needs_a_program_only_for_fixers_that_run_one() {
-    let plan = FixPlan::from_catalog(Catalog::bundled());
+    let plan = FixPlan::from_catalog(
+        lighthouse_test_support::bundled(),
+        lighthouse_test_support::bundled(),
+    );
     let needs = |rule: &str| plan.get(rule).map(|binding| binding.needs.clone());
     assert_eq!(needs("design/declaration-groups"), Some(Needs::Nothing));
     assert_eq!(needs("nope/nope"), None);

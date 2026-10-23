@@ -4,37 +4,37 @@
 pub(crate) mod core_pack;
 
 use lighthouse_plugin::{Plugin, Registry};
-use lighthouse_spec::Catalog;
 
-use crate::{Checks, metrics::Metrics};
+use crate::{Checks, Composition, Error, metrics::Metrics};
 
 /// Pack whose plugin provides the fallback text language and that the
 /// `metrics` plugin is listed after.
 pub(crate) const CORE: &str = "core";
 
-/// Registry holding every bundled plugin.
-pub fn registry() -> Registry {
+/// Registry holding every bundled plugin, its decisions compiled in `comp`.
+pub fn registry(comp: &Composition) -> Result<Registry, Error> {
     let mut registry = Registry::default();
-    register(&mut registry, &lighthouse_cel::Cel::new());
-    crate::compose::compose_from(&registry)
-        .unwrap_or_else(|e| panic!("the bundled CEL libraries compose: {e}"));
-    let catalog = Catalog::bundled();
+    register(&mut registry, &lighthouse_cel::Cel::new())?;
+    let catalog = comp
+        .cel()
+        .bundled()
+        .map_err(|e| Error::invalid("bundled", e.to_string()))?;
     for pack in catalog.packs() {
-        let checks = Checks::new(&pack.id, catalog)
-            .unwrap_or_else(|e| panic!("bundled decisions of `{}` are valid: {e}", pack.id));
-        register(&mut registry, &checks);
+        let checks = Checks::new(comp, &pack.id, catalog)?;
+        register(&mut registry, &checks)?;
         if pack.id == CORE {
-            register(&mut registry, &Metrics);
+            register(&mut registry, &Metrics)?;
         }
     }
     registry
         .validate()
-        .expect("bundled analyzers form a valid DAG");
-    registry
+        .map_err(|e| Error::invalid("bundled", format!("analyzers form no valid DAG: {e}")))?;
+    Ok(registry)
 }
 
-fn register(registry: &mut Registry, plugin: &dyn Plugin) {
+fn register(registry: &mut Registry, plugin: &dyn Plugin) -> Result<(), Error> {
+    let id = plugin.manifest().id.clone();
     registry
         .register(plugin)
-        .unwrap_or_else(|e| panic!("bundled plugin `{}` is valid: {e}", plugin.manifest().id));
+        .map_err(|e| Error::invalid(&id, format!("bundled plugin is not valid: {e}")))
 }

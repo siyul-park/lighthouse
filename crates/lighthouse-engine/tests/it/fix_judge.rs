@@ -6,7 +6,7 @@ use lighthouse_model::{Diagnostic, Options, Safety};
 use lighthouse_plugin::{
     Context, Error as PluginError, Fixer, Plugin, PluginManifest, Registry, Rule, RuleManifest,
 };
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 
 use crate::support::*;
 
@@ -73,7 +73,13 @@ fn judged(text: &str) -> (tempfile::TempDir, Engine) {
         "plugins = [\"fake\", \"judged\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"judged/warn\" = \"warn\"\n",
     )
     .unwrap();
-    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
     (dir, engine)
 }
 

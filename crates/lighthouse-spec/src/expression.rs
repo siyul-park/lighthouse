@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr};
 
-use crate::environment::{compile_shared, is_namespace};
+use crate::Cel;
 
 /// The variables a check can name for the value it judges, by `select`, and
 /// `node`, the one of a value related to it.
@@ -84,14 +84,14 @@ pub fn program_identifiers(program: &cel::Program) -> BTreeSet<String> {
 }
 
 /// The functions a program calls, each once.
-pub fn program_calls(program: &cel::Program) -> BTreeSet<Call> {
-    fn collect(expr: &IdedExpr, into: &mut BTreeSet<Call>) {
+pub fn program_calls(cel: &Cel, program: &cel::Program) -> BTreeSet<Call> {
+    fn collect(cel: &Cel, expr: &IdedExpr, into: &mut BTreeSet<Call>) {
         if let Expr::Call(call) = &expr.expr {
             let namespace = call
                 .target
                 .as_deref()
                 .and_then(|target| match &target.expr {
-                    Expr::Ident(name) if is_namespace(name) => Some(name.clone()),
+                    Expr::Ident(name) if cel.is_namespace(name) => Some(name.clone()),
                     _ => None,
                 });
             into.insert(Call {
@@ -101,50 +101,53 @@ pub fn program_calls(program: &cel::Program) -> BTreeSet<Call> {
                 args: call.args.len(),
             });
         }
-        children(expr).into_iter().for_each(|c| collect(c, into));
+        children(expr)
+            .into_iter()
+            .for_each(|c| collect(cel, c, into));
     }
     let mut calls = BTreeSet::new();
-    collect(program.expression(), &mut calls);
+    collect(cel, program.expression(), &mut calls);
     calls
 }
 
 /// The variables a program reads from its scope: the identifiers it names that
 /// no comprehension binds and that are no namespace of a function.
-pub fn free_variables(program: &cel::Program) -> BTreeSet<String> {
-    fn collect(expr: &IdedExpr, bound: &mut Vec<String>, into: &mut BTreeSet<String>) {
+pub fn free_variables(cel: &Cel, program: &cel::Program) -> BTreeSet<String> {
+    fn collect(cel: &Cel, expr: &IdedExpr, bound: &mut Vec<String>, into: &mut BTreeSet<String>) {
         match &expr.expr {
             Expr::Ident(name) => {
-                if !bound.contains(name) && !is_namespace(name) {
+                if !bound.contains(name) && !cel.is_namespace(name) {
                     into.insert(name.clone());
                 }
             }
             Expr::Comprehension(c) => {
                 // The range and the initial value are read outside the variables
                 // the comprehension binds.
-                collect(&c.iter_range, bound, into);
-                collect(&c.accu_init, bound, into);
+                collect(cel, &c.iter_range, bound, into);
+                collect(cel, &c.accu_init, bound, into);
                 let before = bound.len();
                 bound.push(c.iter_var.clone());
                 bound.extend(c.iter_var2.clone());
                 bound.push(c.accu_var.clone());
-                collect(&c.loop_cond, bound, into);
-                collect(&c.loop_step, bound, into);
-                collect(&c.result, bound, into);
+                collect(cel, &c.loop_cond, bound, into);
+                collect(cel, &c.loop_step, bound, into);
+                collect(cel, &c.result, bound, into);
                 bound.truncate(before);
             }
             _ => children(expr)
                 .into_iter()
-                .for_each(|c| collect(c, bound, into)),
+                .for_each(|c| collect(cel, c, bound, into)),
         }
     }
     let mut names = BTreeSet::new();
-    collect(program.expression(), &mut Vec::new(), &mut names);
+    collect(cel, program.expression(), &mut Vec::new(), &mut names);
     names
 }
 
 /// The identifiers an expression names; a source that does not compile names none.
-pub fn identifiers(source: &str) -> BTreeSet<String> {
-    compile_shared(source).map_or_else(|_| BTreeSet::new(), |p| program_identifiers(&p))
+pub fn identifiers(cel: &Cel, source: &str) -> BTreeSet<String> {
+    cel.compile_shared(source)
+        .map_or_else(|_| BTreeSet::new(), |p| program_identifiers(&p))
 }
 
 /// Splits a template into its text and its `{{ cel }}` holes; the one parser
@@ -171,16 +174,20 @@ pub fn parse_template(text: &str) -> Result<Vec<TemplatePart>, String> {
 }
 
 /// Why `source`, written as `what`, is not a CEL expression.
-pub(crate) fn compile_problem(what: &str, source: &str) -> Option<String> {
-    compile_shared(source).err().map(|e| format!("{what}: {e}"))
+pub(crate) fn compile_problem(cel: &Cel, what: &str, source: &str) -> Option<String> {
+    cel.compile_shared(source)
+        .err()
+        .map(|e| format!("{what}: {e}"))
 }
 
 /// Why the `{{ cel }}` template `text`, written as `what`, is not well formed.
-pub(crate) fn template_problem(what: &str, text: &str) -> Option<String> {
+pub(crate) fn template_problem(cel: &Cel, what: &str, text: &str) -> Option<String> {
     match parse_template(text) {
         Err(problem) => Some(format!("{what}: {problem}")),
         Ok(parts) => parts.iter().find_map(|part| match part {
-            TemplatePart::Hole(source) => compile_problem(&format!("{what}: `{source}`"), source),
+            TemplatePart::Hole(source) => {
+                compile_problem(cel, &format!("{what}: `{source}`"), source)
+            }
             TemplatePart::Text(_) => None,
         }),
     }

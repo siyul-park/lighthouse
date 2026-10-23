@@ -4,14 +4,18 @@ use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
 
 fn bundled(id: &str) -> &'static Decision {
-    Catalog::bundled()
+    lighthouse_test_support::bundled()
         .decision(id)
         .unwrap_or_else(|| panic!("missing {id}"))
 }
 
 #[test]
 fn bundled_catalog_has_the_core_design_language_and_testing_packs() {
-    let ids: Vec<_> = Catalog::bundled().packs().iter().map(|p| &*p.id).collect();
+    let ids: Vec<_> = lighthouse_test_support::bundled()
+        .packs()
+        .iter()
+        .map(|p| &*p.id)
+        .collect();
     assert_eq!(ids, ["core", "design", "go", "rust", "testing"]);
 }
 
@@ -24,7 +28,7 @@ fn a_decision_is_keyed_by_its_uid_else_by_its_id() {
     assert!(named.is_key(uid) && named.is_key("core/file-size"));
     assert!(!named.is_key("core/other"));
     assert_eq!(named.metadata().name, named.id());
-    let plain = Catalog::from_files(base()).unwrap();
+    let plain = Catalog::from_files(base(), &lighthouse_test_support::cel()).unwrap();
     assert_eq!(plain.decision("p/a").unwrap().key(), "p/a");
 }
 
@@ -145,7 +149,10 @@ fn example_file_text() {
 
 #[test]
 fn checked_decisions_carry_runnable_examples() {
-    for decision in Catalog::bundled().decisions().filter(|d| d.automated()) {
+    for decision in lighthouse_test_support::bundled()
+        .decisions()
+        .filter(|d| d.automated())
+    {
         let invalid = decision.examples.iter().find(|e| !e.expect.is_empty());
         assert!(
             invalid.is_some(),
@@ -181,7 +188,7 @@ fn a_cel_check_lives_in_its_decision() {
 ";
     drop(rule);
     let files = files(&[("probe.yaml", decision("local/probe", probe))]);
-    let catalog = Catalog::from_local(files).unwrap();
+    let catalog = Catalog::from_local(files, &lighthouse_test_support::cel()).unwrap();
     let decision = catalog.decision("local/probe").unwrap();
     assert!(matches!(
         decision.check,
@@ -196,7 +203,7 @@ fn a_cel_check_lives_in_its_decision() {
 #[test]
 fn every_bundled_decision_has_its_own_uid() {
     let mut seen = std::collections::BTreeSet::new();
-    for decision in Catalog::bundled().decisions() {
+    for decision in lighthouse_test_support::bundled().decisions() {
         let uid = decision
             .uid()
             .unwrap_or_else(|| panic!("{} has no uid", decision.id()));
@@ -212,11 +219,15 @@ mod overlay {
 
     fn base_catalog() -> Catalog {
         let judged = format!("{SPEC}  severity: info\n  check:\n    type: model\n{OPTION}");
-        Catalog::from_files(with("p/s/a.yaml", &decision("p/a", &judged))).unwrap()
+        Catalog::from_files(
+            with("p/s/a.yaml", &decision("p/a", &judged)),
+            &lighthouse_test_support::cel(),
+        )
+        .unwrap()
     }
 
     fn local(entries: &[(&str, String)]) -> Catalog {
-        Catalog::from_files(files(entries)).unwrap()
+        Catalog::from_files(files(entries), &lighthouse_test_support::cel()).unwrap()
     }
 
     #[test]
@@ -255,10 +266,10 @@ mod overlay {
 
     #[test]
     fn a_project_document_of_a_layer_is_a_project_that_extends_can_name() {
-        let layer = Catalog::from_local(files(&[(
-            "team.yaml",
-            team("team/base", "  rules:\n    p/a: warn\n"),
-        )]))
+        let layer = Catalog::from_local(
+            files(&[("team.yaml", team("team/base", "  rules:\n    p/a: warn\n"))]),
+            &lighthouse_test_support::cel(),
+        )
         .unwrap();
         let merged = Catalog::overlay(&base_catalog(), &layer).unwrap();
 
@@ -271,20 +282,23 @@ mod overlay {
 
     #[test]
     fn a_project_that_extends_an_unknown_project_or_itself_is_refused() {
-        let unknown = Catalog::from_local(files(&[(
-            "team.yaml",
-            team("team/a", "  extends: [team/none]\n"),
-        )]))
+        let unknown = Catalog::from_local(
+            files(&[("team.yaml", team("team/a", "  extends: [team/none]\n"))]),
+            &lighthouse_test_support::cel(),
+        )
         .unwrap();
         let err = Catalog::overlay(&base_catalog(), &unknown).unwrap_err();
         assert!(
             err.to_string().contains("unknown project `team/none`"),
             "{err}"
         );
-        let circle = Catalog::from_local(files(&[
-            ("a.yaml", team("team/a", "  extends: [team/b]\n")),
-            ("b.yaml", team("team/b", "  extends: [team/a]\n")),
-        ]))
+        let circle = Catalog::from_local(
+            files(&[
+                ("a.yaml", team("team/a", "  extends: [team/b]\n")),
+                ("b.yaml", team("team/b", "  extends: [team/a]\n")),
+            ]),
+            &lighthouse_test_support::cel(),
+        )
         .unwrap();
         let err = Catalog::overlay(&base_catalog(), &circle).unwrap_err();
         assert!(err.to_string().contains("extends itself"), "{err}");
@@ -304,7 +318,9 @@ mod overlay {
     #[test]
     fn a_local_decision_needs_the_local_prefix_and_a_cel_check() {
         let probe = decision("p/x", SPEC);
-        let error = Catalog::from_local(files(&[("x.yaml", probe)])).unwrap_err();
+        let error =
+            Catalog::from_local(files(&[("x.yaml", probe)]), &lighthouse_test_support::cel())
+                .unwrap_err();
         assert!(error.to_string().contains("local/<name>"), "{error}");
     }
 }
@@ -323,7 +339,7 @@ fn the_authored_severity_follows_the_decision_else_what_was_reported() {
 
 #[test]
 fn checked_decisions_mark_one_canonical_example_per_language() {
-    for decision in Catalog::bundled().decisions() {
+    for decision in lighthouse_test_support::bundled().decisions() {
         for language in ["go", "rust"] {
             let valid = |e: &&lighthouse_spec::Example| {
                 e.language == language && e.kind == lighthouse_spec::ExampleKind::Valid
@@ -344,8 +360,11 @@ fn checked_decisions_mark_one_canonical_example_per_language() {
 #[test]
 fn decision_text_and_write_local_round_trip_through_the_local_layer() {
     let spec = "  title: Probe\n  context: A probe.\n  scope: { subject: file }\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n";
-    let layer =
-        Catalog::from_local(files(&[("probe.yaml", decision("local/probe", spec))])).unwrap();
+    let layer = Catalog::from_local(
+        files(&[("probe.yaml", decision("local/probe", spec))]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     let probe = layer.decision("local/probe").unwrap();
     let text = Catalog::decision_text(probe);
     assert!(text.contains("kind: Decision"), "{text}");
@@ -358,7 +377,11 @@ fn decision_text_and_write_local_round_trip_through_the_local_layer() {
     assert_eq!(written, text);
     assert!(!rules.join("probe.yaml.tmp").exists());
 
-    let layer = Catalog::from_local([("probe.yaml".to_owned(), written)].into()).unwrap();
+    let layer = Catalog::from_local(
+        [("probe.yaml".to_owned(), written)].into(),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     assert_eq!(layer.decision("local/probe"), Some(probe));
     assert!(Catalog::write_local(&rules.join("probe.yaml/x"), "y", "z").is_err());
 }
@@ -404,7 +427,11 @@ fn scope_applicability() {
 
 #[test]
 fn a_document_without_an_envelope_is_a_document_error() {
-    let error = Catalog::from_files(with("p/s/a.yaml", "id: p/a\n")).unwrap_err();
+    let error = Catalog::from_files(
+        with("p/s/a.yaml", "id: p/a\n"),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap_err();
     assert!(
         matches!(error, lighthouse_spec::Error::Document(_)),
         "{error}"

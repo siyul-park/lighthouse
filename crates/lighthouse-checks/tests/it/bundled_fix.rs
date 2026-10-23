@@ -52,13 +52,15 @@ fn catalog() -> Catalog {
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect();
-    Catalog::from_files(files).unwrap()
+    Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap()
 }
 
 fn registry() -> Registry {
-    let mut registry = lighthouse_checks::registry();
+    let mut registry = lighthouse_test_support::registry();
     registry
-        .register(&Checks::new("demo", &catalog()).unwrap())
+        .register(
+            &Checks::new(&lighthouse_test_support::composition(), "demo", &catalog()).unwrap(),
+        )
         .unwrap();
     registry
 }
@@ -67,10 +69,10 @@ fn registry() -> Registry {
 fn a_command_does_not_run_in_examples_until_the_project_is_trusted() {
     let catalog = catalog();
 
-    let denied = RuleTester::new(registry, &catalog)
+    let denied = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
         .trusted(false)
         .check_all();
-    let allowed = RuleTester::new(registry, &catalog)
+    let allowed = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
         .trusted(true)
         .check_all();
 

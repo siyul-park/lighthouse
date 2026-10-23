@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 
 use super::edits::{self, Lowered, Place};
 use crate::{
-    Error,
+    Composition, Error,
     builder::{Builder, span},
     eval::{Fact, cel_fact, compile, compile_shared, to_json},
     glob::slashed,
@@ -65,7 +65,8 @@ impl VariableResolver for FileValues {
 }
 
 impl CelFix {
-    pub(crate) fn new(decision: &Decision, edits: &str) -> Result<Self, Error> {
+    pub(crate) fn new(comp: &Composition, decision: &Decision, edits: &str) -> Result<Self, Error> {
+        let cel = comp.cel();
         let id = decision.id();
         let check = decision.check.as_ref().and_then(|check| match &check.kind {
             lighthouse_spec::CheckKind::Cel(cel) => Some(cel.clone()),
@@ -75,16 +76,16 @@ impl CelFix {
         let (variables, select) = check.as_ref().map_or((Vec::new(), None), |cel: &CelCheck| {
             (cel.variables.clone(), cel.selects(decision.scope.subject))
         });
-        let mut library = library::context().map_err(|e| Error::invalid(id, e))?;
-        let declared = library::declare_variables(id, &mut library, &variables)?;
+        let mut library = cel.context();
+        let declared = library::declare_variables(cel, id, &mut library, &variables)?;
         let (values, bodies) = (declared.values, declared.bodies);
-        let edits = compile(id, "fix edits", edits)?;
+        let edits = compile(cel, id, "fix edits", edits)?;
         let variables: Vec<(String, Arc<Program>)> = values
             .into_iter()
             .map(|v| {
                 Ok((
                     v.name.clone(),
-                    compile_shared(id, &format!("variable `{}`", v.name), &v.expression)?,
+                    compile_shared(cel, id, &format!("variable `{}`", v.name), &v.expression)?,
                 ))
             })
             .collect::<Result<_, Error>>()?;
@@ -95,7 +96,7 @@ impl CelFix {
                 .zip(&level)
                 .any(|((variable, _), file_level)| *file_level && variable == name)
         };
-        library::check_scope(id, &declared.functions, &bodies, &shared)?;
+        library::check_scope(cel, id, &declared.functions, &bodies, &shared)?;
         let mut per_finding = vec!["finding".to_owned()];
         let shared_by_finding: Vec<bool> = variables
             .iter()
@@ -114,7 +115,13 @@ impl CelFix {
             .chain(variables.iter().map(|(_, program)| program.as_ref()))
             .chain(bodies.iter().map(Arc::as_ref))
             .collect::<Vec<&Program>>();
-        library::check_calls(id, &library, &declared.functions, read.iter().copied())?;
+        library::check_calls(
+            comp,
+            id,
+            &library,
+            &declared.functions,
+            read.iter().copied(),
+        )?;
         let used = library::reached(&variables, &declared.functions, &bodies, &[&edits]);
         Ok(Self {
             needs: Needs::reading(read.iter().copied()),

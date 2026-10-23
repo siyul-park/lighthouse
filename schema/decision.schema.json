@@ -683,7 +683,7 @@
               "type": "integer"
             },
             "requires": {
-              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "description": "Provider capabilities the fix needs, besides those its edits imply\n([`Fix::needs`]); without them it is declined.",
               "items": {
                 "$ref": "#/$defs/Capability"
               },
@@ -726,7 +726,7 @@
               "type": "integer"
             },
             "requires": {
-              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "description": "Provider capabilities the fix needs, besides those its edits imply\n([`Fix::needs`]); without them it is declined.",
               "items": {
                 "$ref": "#/$defs/Capability"
               },
@@ -765,7 +765,7 @@
               ]
             },
             "requires": {
-              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "description": "Provider capabilities the fix needs, besides those its edits imply\n([`Fix::needs`]); without them it is declined.",
               "items": {
                 "$ref": "#/$defs/Capability"
               },
@@ -811,7 +811,7 @@
               "type": "integer"
             },
             "requires": {
-              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "description": "Provider capabilities the fix needs, besides those its edits imply\n([`Fix::needs`]); without them it is declined.",
               "items": {
                 "$ref": "#/$defs/Capability"
               },
@@ -840,7 +840,7 @@
           "type": "integer"
         },
         "requires": {
-          "description": "Provider capabilities the fix needs; without them it is declined.",
+          "description": "Provider capabilities the fix needs, besides those its edits imply\n([`Fix::needs`]); without them it is declined.",
           "items": {
             "$ref": "#/$defs/Capability"
           },

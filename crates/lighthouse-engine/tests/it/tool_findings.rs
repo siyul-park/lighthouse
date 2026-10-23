@@ -10,7 +10,7 @@ use lighthouse_plugin::{
     Context, Error as PluginError, LanguageProvider, Plugin, PluginManifest, Registry, Rule,
     RuleManifest,
 };
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 
 use crate::support::{Toy, project, toy};
 
@@ -86,7 +86,13 @@ fn a_finding_the_tool_suppressed_is_reported_suppressed_and_its_notices_reach_th
     let config =
         Config::parse_inline("plugins = [\"tool\"]\n[rules]\n\"tool/wrapped\" = \"error\"\n")
             .unwrap();
-    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
 
     let out = engine.check(&[], &[]).unwrap();
 

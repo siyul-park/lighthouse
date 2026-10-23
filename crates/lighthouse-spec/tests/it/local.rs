@@ -3,16 +3,24 @@
 #[test]
 fn load_local() {
     let root = tempfile::tempdir().unwrap();
-    assert!(lighthouse_spec::load_local(root.path()).unwrap().is_none());
+    assert!(
+        lighthouse_spec::load_local(root.path(), &lighthouse_test_support::cel())
+            .unwrap()
+            .is_none()
+    );
 
     let dir = root.path().join(".lighthouse/decisions");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("notes.txt"), "not a decision").unwrap();
     std::fs::write(dir.join("bad.yaml"), "id: other/x\n").unwrap();
-    assert!(lighthouse_spec::load_local(root.path()).is_err());
+    assert!(lighthouse_spec::load_local(root.path(), &lighthouse_test_support::cel()).is_err());
 
     std::fs::remove_file(dir.join("bad.yaml")).unwrap();
-    assert!(lighthouse_spec::load_local(root.path()).unwrap().is_some());
+    assert!(
+        lighthouse_spec::load_local(root.path(), &lighthouse_test_support::cel())
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[test]

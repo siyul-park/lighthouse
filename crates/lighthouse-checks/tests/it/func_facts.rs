@@ -58,8 +58,12 @@ pub(crate) fn flagged_in(
             _ => "symbol.name",
         },
     );
-    let catalog = Catalog::from_local(BTreeMap::from([("facts.yaml".to_owned(), text)])).unwrap();
-    let plugin = Checks::new("local", &catalog).unwrap();
+    let catalog = Catalog::from_local(
+        BTreeMap::from([("facts.yaml".to_owned(), text)]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    let plugin = Checks::new(&lighthouse_test_support::composition(), "local", &catalog).unwrap();
     world
         .diagnose_with(
             &catalog,

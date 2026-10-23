@@ -7,7 +7,7 @@ use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
 
 fn bundled(id: &str) -> &'static Decision {
-    Catalog::bundled()
+    lighthouse_test_support::bundled()
         .decision(id)
         .unwrap_or_else(|| panic!("missing {id}"))
 }
@@ -99,7 +99,7 @@ mod write {
             std::fs::write(target, text).unwrap();
         }
 
-        let catalog = Catalog::load(dir.path()).unwrap();
+        let catalog = Catalog::load(dir.path(), &lighthouse_test_support::cel()).unwrap();
 
         assert_eq!(catalog.decisions().count(), 1);
     }
@@ -117,7 +117,7 @@ mod write {
             Catalog::decision_text(&decision),
         );
 
-        let catalog = Catalog::from_files(files).unwrap();
+        let catalog = Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap();
         assert_eq!(catalog.decision("p/rich"), Some(&decision));
         let ids: Vec<_> = catalog.decisions().map(|d| d.id()).collect();
         assert_eq!(ids, ["p/a", "p/rich"]);
@@ -147,8 +147,11 @@ fn decision_version_changes_with_its_definition() {
 
 #[test]
 fn catalog_version_changes_with_any_decision() {
-    let catalog = Catalog::bundled();
-    assert_eq!(catalog.version(), Catalog::bundled().version());
+    let catalog = lighthouse_test_support::bundled();
+    assert_eq!(
+        catalog.version(),
+        lighthouse_test_support::bundled().version()
+    );
     assert_ne!(catalog.version(), Catalog::default().version());
 }
 

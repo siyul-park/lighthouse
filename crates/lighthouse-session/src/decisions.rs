@@ -205,6 +205,7 @@ pub(crate) fn test_catalog(
     language: Option<&str>,
 ) -> Result<DecisionTest> {
     let decisions = selected(catalog, ids)?;
+    let shipped = session.comp.cel().bundled()?;
     let (probe, registered) = session.registry()?;
     if let Some(gap) = registered.incomplete.first() {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());
@@ -237,10 +238,13 @@ pub(crate) fn test_catalog(
                 .map(|(registry, _)| registry)
                 .unwrap_or_else(|e| {
                     restart_error.borrow_mut().get_or_insert(e.to_string());
-                    lighthouse_checks::registry()
+                    session.in_process_registry().unwrap_or_else(|e| {
+                        restart_error.borrow_mut().get_or_insert(e.to_string());
+                        Registry::default()
+                    })
                 })
         };
-        let tester = RuleTester::new(fresh, catalog)
+        let tester = RuleTester::new(fresh, catalog, shipped)
             .language(language)
             .trusted(session.trusted());
         for decision in &decisions {

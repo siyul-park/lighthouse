@@ -209,6 +209,7 @@ spec:
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect(),
+        &lighthouse_test_support::cel(),
     )
     .unwrap()
 }
@@ -250,7 +251,8 @@ const HOLDING: &str = "  - name: flagged
 #[test]
 fn holding_examples_pass_through_the_engine() {
     let catalog = catalog(HOLDING);
-    let failures = RuleTester::new(registry, &catalog).check_all();
+    let failures =
+        RuleTester::new(registry, &catalog, lighthouse_test_support::bundled()).check_all();
     assert!(failures.is_empty(), "{failures:?}");
 }
 
@@ -292,7 +294,8 @@ fn broken_examples_report_the_decision_example_and_reason() {
       - line: 1
 ",
     );
-    let failures = RuleTester::new(registry, &catalog).check_all();
+    let failures =
+        RuleTester::new(registry, &catalog, lighthouse_test_support::bundled()).check_all();
     assert_eq!(failures.len(), 4, "{failures:?}");
     assert!(failures[0].starts_with(
         "fake/marker wrong-line: expected diagnostics at lines [1], got [2: found TODO]"
@@ -308,7 +311,12 @@ fn broken_examples_report_the_decision_example_and_reason() {
 #[test]
 fn engine_errors_in_an_example_are_failures_not_panics() {
     let catalog = catalog(HOLDING);
-    let failures = RuleTester::new(Registry::default, &catalog).check_all();
+    let failures = RuleTester::new(
+        Registry::default,
+        &catalog,
+        lighthouse_test_support::bundled(),
+    )
+    .check_all();
     assert_eq!(failures.len(), 3, "{failures:?}");
     assert!(
         failures[0].starts_with("fake/marker flagged: "),
@@ -321,11 +329,11 @@ fn rule_tester_check() {
     let catalog = catalog(HOLDING);
     let decision = catalog.decision("fake/marker").unwrap();
     assert!(
-        RuleTester::new(registry, &catalog)
+        RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
             .check(decision)
             .is_empty()
     );
-    let failures = RuleTester::new(registry, &catalog)
+    let failures = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
         .language("go")
         .check(decision);
     assert_eq!(failures, ["fake/marker: no example for language `go`"]);
@@ -371,7 +379,8 @@ fn fixing(fixed: &str, again: &str) -> Catalog {
 fn a_fix_example_passes_when_the_fix_gives_its_fixed_text_and_the_rule_stops_firing() {
     let catalog = fixing("          fine\n          DONE later", "          fine");
 
-    let failures = RuleTester::new(registry, &catalog).check_all();
+    let failures =
+        RuleTester::new(registry, &catalog, lighthouse_test_support::bundled()).check_all();
 
     assert!(failures.is_empty(), "{failures:?}");
 }
@@ -380,7 +389,8 @@ fn a_fix_example_passes_when_the_fix_gives_its_fixed_text_and_the_rule_stops_fir
 fn a_fix_example_fails_when_the_fixed_text_differs() {
     let catalog = fixing("          fine\n          TODO later", "          fine");
 
-    let failures = RuleTester::new(registry, &catalog).check_all();
+    let failures =
+        RuleTester::new(registry, &catalog, lighthouse_test_support::bundled()).check_all();
 
     assert_eq!(failures.len(), 1, "{failures:?}");
     assert!(
@@ -394,7 +404,12 @@ fn a_fix_example_fails_when_the_fixed_text_differs() {
 fn a_fix_example_fails_when_the_fixer_applies_nothing() {
     let catalog = fixing("          fine\n          DONE later", "          fine");
 
-    let failures = RuleTester::new(Registry::default, &catalog).check_all();
+    let failures = RuleTester::new(
+        Registry::default,
+        &catalog,
+        lighthouse_test_support::bundled(),
+    )
+    .check_all();
 
     assert!(
         failures

@@ -300,7 +300,7 @@ pub(crate) fn engine(dir: &TempDir, toml: &str) -> Result<Engine, Error> {
     Engine::new(
         registry("!"),
         Config::parse_inline(toml).unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         dir.path(),
     )
 }
@@ -399,7 +399,7 @@ fn unreadable_and_unindexed_files_are_incomplete_not_notices() {
     let engine = Engine::new(
         registry(".skip"),
         Config::parse_inline(ALL).unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -441,7 +441,7 @@ fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
     let engine = Engine::new(
         registry,
         Config::parse_inline("plugins = [\"bin\"]").unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -457,7 +457,7 @@ fn a_provider_with_an_execution_error_makes_its_whole_batch_incomplete_in_one_en
     let engine = Engine::new(
         registry,
         Config::parse_inline(ALL).unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -484,7 +484,7 @@ fn each_provider_is_called_once_with_all_its_files() {
     let engine = Engine::new(
         registry,
         Config::parse_inline(ALL).unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -567,7 +567,7 @@ fn outcome_exit_code() {
     let engine = Engine::new(
         registry(".skip"),
         Config::parse_inline(ALL).unwrap(),
-        Catalog::bundled(),
+        lighthouse_test_support::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -711,9 +711,12 @@ const TEAM: &str = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n 
 #[test]
 fn active_rules_are_those_a_configuration_enables() {
     let config = |toml: &str| Config::parse_inline(toml).unwrap();
-    let team =
-        Catalog::from_local(BTreeMap::from([("team.yaml".to_owned(), TEAM.to_owned())])).unwrap();
-    let overlaid = Catalog::overlay(Catalog::bundled(), &team).unwrap();
+    let team = Catalog::from_local(
+        BTreeMap::from([("team.yaml".to_owned(), TEAM.to_owned())]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    let overlaid = Catalog::overlay(lighthouse_test_support::bundled(), &team).unwrap();
     let projects = overlaid.projects();
     let from_project = lighthouse_engine::active(
         &config("plugins = [\"fake\"]\nextends = [\"fake/p\"]\n"),

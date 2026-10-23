@@ -1,7 +1,6 @@
 //! Every Clean Code item has exactly one outcome: a bundled decision derived
 //! from it, a reason it does not apply, or the fact (or phase) that unlocks it.
 
-use lighthouse_spec::Catalog;
 use std::collections::BTreeSet;
 
 /// The chapter 17 heuristics (Martin, Clean Code, 2008) and the rules of
@@ -225,7 +224,7 @@ const PROVENANCE_PREFIX: &str = "Martin, Clean Code (2008), ";
 
 /// The items the bundled decisions name in their provenance.
 fn covered() -> BTreeSet<&'static str> {
-    Catalog::bundled()
+    lighthouse_test_support::bundled()
         .decisions()
         .flat_map(|d| &d.spec().provenance.was_derived_from)
         .filter_map(|source| source.strip_prefix(PROVENANCE_PREFIX))

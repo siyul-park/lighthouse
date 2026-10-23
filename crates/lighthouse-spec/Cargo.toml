@@ -27,4 +27,3 @@ lighthouse-resource.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }
 insta.workspace = true
 tempfile.workspace = true
-ctor = "1.0.13"

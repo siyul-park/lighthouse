@@ -8,8 +8,6 @@ use lighthouse_protocol::Tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::environment::compile;
-
 /// The mapping of the lines of an agent's stdout to the events of a report.
 /// Each expression sees `line`, the JSON value of one stdout line (a line
 /// that is not JSON is skipped), and `tools`, the table below; the keys that
@@ -76,11 +74,14 @@ impl EventsSpec {
         .filter_map(|(key, source)| Some((key, source?)))
     }
 
-    /// Why the mapping cannot work: an expression that does not compile, or a
-    /// harness tool mapped to something that is not a tool.
+    /// Why the mapping cannot work: an expression that is not CEL, or a
+    /// harness tool mapped to something that is not a tool. Only the syntax is
+    /// read here, so that a configuration is judged without an environment; the
+    /// host compiles the expressions in its own when it runs the agent.
     pub fn problem(&self) -> Option<String> {
+        let syntax = cel::Env::stdlib();
         for (key, source) in self.expressions() {
-            if let Err(e) = compile(source) {
+            if let Err(e) = syntax.compile(source) {
                 return Some(format!("`events.{key}`: {e}"));
             }
         }

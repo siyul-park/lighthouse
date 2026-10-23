@@ -1,6 +1,5 @@
 //! Writing a verified fix: whole, or not at all.
 
-use lighthouse_spec::Catalog;
 use std::fs;
 
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy, Needs};
@@ -111,7 +110,13 @@ fn pair(dir: &tempfile::TempDir, extra: &str) -> (Engine, FixPlan) {
         },
     );
     (
-        Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap(),
+        Engine::new(
+            registry,
+            config,
+            lighthouse_test_support::bundled(),
+            dir.path(),
+        )
+        .unwrap(),
         plan.with_scope("pair/todo", FixScope::Files),
     )
 }
@@ -236,7 +241,13 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
     let config =
         Config::parse_inline("plugins = [\"nested\"]\n[rules]\n\"nested/todo\" = \"error\"\n")
             .unwrap();
-    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "nested/todo",
@@ -309,7 +320,13 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
     let config =
         Config::parse_inline("plugins = [\"plain\"]\n[rules]\n\"plain/todo\" = \"error\"\n")
             .unwrap();
-    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "plain/todo",

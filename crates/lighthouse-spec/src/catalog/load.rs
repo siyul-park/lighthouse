@@ -8,7 +8,7 @@ use include_dir::{Dir, DirEntry, include_dir};
 use lighthouse_resource::{Format, Resource, STATE_DIR, Spec, documents, kind_of, resource};
 
 use crate::{
-    Catalog, Decision, DecisionSpec, Error, PackSpec, ProjectSpec,
+    Catalog, Cel, Decision, DecisionSpec, Error, PackSpec, ProjectSpec,
     sources::{SourceLine, SourceMapSpec},
 };
 
@@ -26,7 +26,7 @@ pub(super) struct Loaded {
     pub(super) sources: Vec<SourceLine>,
 }
 
-pub(super) fn embedded() -> Files {
+pub(crate) fn embedded() -> Files {
     let mut files = Files::new();
     collect_embedded(&BUNDLED, &mut files);
     files
@@ -45,9 +45,9 @@ pub fn local_dir(root: &Path) -> PathBuf {
 
 /// The catalog layer of `<root>/.lighthouse/decisions/*.yaml`; `None` when the
 /// directory does not exist.
-pub fn load_local(root: &Path) -> Result<Option<Catalog>, Error> {
+pub fn load_local(root: &Path, cel: &Cel) -> Result<Option<Catalog>, Error> {
     match local_files(root)? {
-        Some(files) => Ok(Some(Catalog::from_local(files)?)),
+        Some(files) => Ok(Some(Catalog::from_local(files, cel)?)),
         None => Ok(None),
     }
 }

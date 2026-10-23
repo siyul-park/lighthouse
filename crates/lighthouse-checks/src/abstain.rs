@@ -9,7 +9,7 @@ use lighthouse_plugin::{
     Answered, Ask, Context, DecisionRef, Neighbor, RuleManifest, State, Subject,
 };
 use lighthouse_protocol::hash;
-use lighthouse_spec::{CelCheck, Decision, Select};
+use lighthouse_spec::{Cel, CelCheck, Decision, Select};
 use serde_json::{Value, json};
 
 use crate::{
@@ -48,6 +48,7 @@ pub(crate) struct Candidate {
 impl Abstain {
     /// Compiles the `abstain` of `check`; `None` for a check without one.
     pub(crate) fn new(
+        cel: &Cel,
         decision: &Decision,
         check: &CelCheck,
         select: Select,
@@ -61,8 +62,8 @@ impl Abstain {
             .map(hash::sha256)
             .map_err(|e| Error::invalid(id, format!("the abstain cannot be hashed: {e}")))?;
         Ok(Some(Self {
-            program: compile(id, "abstain", source)?,
-            fact: compile(id, "abstain", select.variable())?,
+            program: compile(cel, id, "abstain", source)?,
+            fact: compile(cel, id, "abstain", select.variable())?,
             select,
             decision: decision_ref,
             revision,

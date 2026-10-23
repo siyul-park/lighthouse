@@ -14,7 +14,7 @@ use lighthouse_plugin::{
     Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,
 };
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 use lighthouse_spec::{FixScope, Task};
 
 use crate::support::*;
@@ -369,7 +369,13 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
         .unwrap();
     let config =
         Config::parse_inline("plugins = [\"grow\"]\n[rules]\n\"grow/todo\" = \"warn\"\n").unwrap();
-    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "grow/todo",
@@ -408,9 +414,9 @@ fn findings_that_propose_the_same_edit_share_one_application() {
 
 #[test]
 fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
-    let catalog = lighthouse_spec::Catalog::bundled();
+    let catalog = lighthouse_test_support::bundled();
 
-    let plan = FixPlan::from_catalog(catalog);
+    let plan = FixPlan::from_catalog(catalog, lighthouse_test_support::bundled());
 
     let groups = plan.get("design/declaration-groups").unwrap();
     assert_eq!(
@@ -425,12 +431,16 @@ fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
 
 #[test]
 fn model_fixes_are_given_only_to_the_listed_rules_that_have_a_check_and_no_fix_of_their_own() {
-    let catalog = lighthouse_spec::Catalog::bundled();
+    let catalog = lighthouse_test_support::bundled();
     let listed: BTreeSet<String> = ["design/exported-doc", "design/declaration-groups"]
         .map(str::to_owned)
         .into();
 
-    let plan = FixPlan::from_catalog(catalog).with_model_fixes(catalog, &listed, FixScope::Files);
+    let plan = FixPlan::from_catalog(catalog, lighthouse_test_support::bundled()).with_model_fixes(
+        catalog,
+        &listed,
+        FixScope::Files,
+    );
 
     let documented = plan.get("design/exported-doc").unwrap();
     assert_eq!(documented.fixer, FixedBy::Model);

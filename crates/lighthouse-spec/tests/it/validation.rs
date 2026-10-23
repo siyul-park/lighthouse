@@ -34,7 +34,7 @@ fn a_uid_is_a_uuid_v4_and_belongs_to_one_decision() {
         "p/s/b.yaml".to_owned(),
         with_uid("p/b", "0b0c5d8e-77d1-4f0f-8b61-6a4d2e9c3f10"),
     );
-    assert!(Catalog::from_files(twice).is_ok());
+    assert!(Catalog::from_files(twice, &lighthouse_test_support::cel()).is_ok());
 }
 
 const EXAMPLE_PAIR: &str = "  examples:
@@ -49,7 +49,7 @@ const EXAMPLE_PAIR: &str = "  examples:
 ";
 
 fn rejected(files: Files, needle: &str) {
-    let err = Catalog::from_files(files).unwrap_err();
+    let err = Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap_err();
     assert!(
         err.to_string().contains(needle),
         "{err} should mention {needle}"
@@ -62,7 +62,7 @@ fn swap(from: &str, to: &str) -> Files {
 
 #[test]
 fn minimal_catalog_loads() {
-    let catalog = Catalog::from_files(base()).unwrap();
+    let catalog = Catalog::from_files(base(), &lighthouse_test_support::cel()).unwrap();
     assert_eq!(catalog.decision("p/a").unwrap().severity, None);
 }
 
@@ -71,7 +71,7 @@ fn identity_comes_from_metadata_not_from_where_the_file_lies() {
     let mut files = base();
     let text = files.remove("p/s/a.yaml").unwrap();
     files.insert("anywhere/at/all/renamed.yaml".to_owned(), text);
-    let catalog = Catalog::from_files(files).unwrap();
+    let catalog = Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap();
     assert_eq!(catalog.decision("p/a").unwrap().id(), "p/a");
 }
 
@@ -116,12 +116,16 @@ fn decision_rules_are_enforced() {
 fn checked_decisions_need_a_valid_and_an_invalid_example() {
     let checked = "  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n";
     rejected(decision_with(checked), "valid and an invalid example");
-    Catalog::from_files(decision_with(&format!("{checked}{EXAMPLE_PAIR}"))).unwrap();
+    Catalog::from_files(
+        decision_with(&format!("{checked}{EXAMPLE_PAIR}")),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     let judged = "  severity: info\n  check:\n    type: model\n";
-    Catalog::from_files(with(
-        "p/s/a.yaml",
-        &decision("p/a", &format!("{SPEC}{judged}")),
-    ))
+    Catalog::from_files(
+        with("p/s/a.yaml", &decision("p/a", &format!("{SPEC}{judged}"))),
+        &lighthouse_test_support::cel(),
+    )
     .unwrap();
 }
 
@@ -132,7 +136,11 @@ fn a_cel_check_must_compile_and_select_what_the_scope_runs_over() {
             "  check:\n    type: cel\n    select: {select}\n    where: \"{condition}\"\n    message: m\n{EXAMPLE_PAIR}"
         )
     };
-    Catalog::from_files(decision_with(&cel("file", "true"))).unwrap();
+    Catalog::from_files(
+        decision_with(&cel("file", "true")),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     rejected(decision_with(&cel("file", "1 +")), "check where");
     rejected(decision_with(&cel("module", "true")), "cannot run over");
     rejected(
@@ -159,7 +167,7 @@ fn at_most_one_canonical_example_per_language_and_kind() {
         example("a", "go", true),
         example("b", "rust", true)
     );
-    Catalog::from_files(decision_with(&one)).unwrap();
+    Catalog::from_files(decision_with(&one), &lighthouse_test_support::cel()).unwrap();
     let two = format!(
         "  examples:\n{}{}",
         example("a", "go", true),
@@ -171,7 +179,7 @@ fn at_most_one_canonical_example_per_language_and_kind() {
         example("a", "go", true),
         example("b", "go", false)
     );
-    Catalog::from_files(decision_with(&marked_once)).unwrap();
+    Catalog::from_files(decision_with(&marked_once), &lighthouse_test_support::cel()).unwrap();
 }
 
 #[test]
@@ -214,7 +222,7 @@ fn example_sources_resolve_next_to_the_decision_file() {
     rejected(decision_with(example), "does not exist");
     let mut files = decision_with(example);
     files.insert("p/s/examples/a.go".into(), "package a\n".into());
-    let catalog = Catalog::from_files(files).unwrap();
+    let catalog = Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap();
     assert_eq!(
         catalog.decision("p/a").unwrap().examples[0].files[0].text(),
         "package a\n"
@@ -233,8 +241,16 @@ fn options(kind: &str, default: &str, per_language: &str) -> String {
 
 #[test]
 fn option_values_match_their_type() {
-    Catalog::from_files(decision_with(&options("integer", "1", ""))).unwrap();
-    Catalog::from_files(decision_with(&options("array", "[a]", ""))).unwrap();
+    Catalog::from_files(
+        decision_with(&options("integer", "1", "")),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    Catalog::from_files(
+        decision_with(&options("array", "[a]", "")),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     rejected(
         decision_with(&options("integer", "one", "")),
         "not an integer",
@@ -268,7 +284,7 @@ fn option_values_match_their_type() {
 const LIMIT_OPTION: &str = "  options:\n    properties:\n      max:\n        $ref: '#/$defs/limit'\n        default: 3\n        description: d\n    additionalProperties: false\n";
 
 fn limit_decision() -> Decision {
-    Catalog::from_files(decision_with(LIMIT_OPTION))
+    Catalog::from_files(decision_with(LIMIT_OPTION), &lighthouse_test_support::cel())
         .unwrap()
         .decision("p/a")
         .unwrap()
@@ -315,7 +331,7 @@ fn a_limit_is_an_integer_or_an_object_of_integers() {
 #[test]
 fn one_of_accepts_exactly_one_matching_shape() {
     let both = "  options:\n    properties:\n      v:\n        oneOf:\n          - { type: number }\n          - { type: integer }\n        default: 1.5\n        description: d\n    additionalProperties: false\n";
-    let decision = Catalog::from_files(decision_with(both))
+    let decision = Catalog::from_files(decision_with(both), &lighthouse_test_support::cel())
         .unwrap()
         .decision("p/a")
         .unwrap()
@@ -359,7 +375,7 @@ fn files_that_are_not_documents_are_ignored() {
         "[package]\nname = \"x\"\n".into(),
     );
     files.insert("p/s/notes.md".into(), "# notes\n".into());
-    Catalog::from_files(files).unwrap();
+    Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap();
 }
 
 #[test]
@@ -369,7 +385,7 @@ fn the_same_catalog_reads_from_json_and_toml() {
     let mut files = Files::new();
     files.insert("p/pack.json".into(), json.into());
     files.insert("p/s/a.toml".into(), toml.into());
-    let catalog = Catalog::from_files(files).unwrap();
+    let catalog = Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap();
     assert_eq!(catalog.decision("p/a").unwrap().title, "A");
 }
 
@@ -384,7 +400,13 @@ fn several_documents_may_share_one_yaml_file() {
             decision("p/a", SPEC)
         ),
     );
-    assert_eq!(Catalog::from_files(files).unwrap().decisions().count(), 1);
+    assert_eq!(
+        Catalog::from_files(files, &lighthouse_test_support::cel())
+            .unwrap()
+            .decisions()
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -414,6 +436,10 @@ fn sources_map_to_decisions_or_carry_a_reason() {
             "apiVersion: lighthouse/v1alpha1\nkind: SourceMap\nmetadata:\n  name: sources\nspec:\n  sources:\n    {sources}"
         );
         let files = with("sources.yaml", &text);
-        assert_eq!(Catalog::from_files(files).is_ok(), ok, "{sources}");
+        assert_eq!(
+            Catalog::from_files(files, &lighthouse_test_support::cel()).is_ok(),
+            ok,
+            "{sources}"
+        );
     }
 }

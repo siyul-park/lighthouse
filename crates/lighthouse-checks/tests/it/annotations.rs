@@ -1,7 +1,6 @@
 //! Source annotations, finding identity and finding facts, through the engine
 //! and the Rust provider.
 
-use lighthouse_spec::Catalog;
 use std::fs;
 
 use lighthouse_engine::{Engine, Run};
@@ -25,12 +24,17 @@ pub(crate) fn check(source: &str, rules: &str) -> Run {
         plugin.to_str().unwrap()
     ))
     .unwrap();
-    let mut registry = lighthouse_checks::registry();
+    let mut registry = lighthouse_test_support::registry();
     lighthouse_rpc::register(&mut registry, &config, dir.path(), dir.path(), &[]).unwrap();
-    let outcome = Engine::new(registry, config, Catalog::bundled(), dir.path())
-        .unwrap()
-        .check(&[], &[])
-        .unwrap();
+    let outcome = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap()
+    .check(&[], &[])
+    .unwrap();
     assert!(outcome.incomplete.is_empty(), "{:?}", outcome.incomplete);
     outcome
 }

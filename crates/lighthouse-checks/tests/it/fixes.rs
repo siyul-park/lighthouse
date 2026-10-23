@@ -104,12 +104,15 @@ const CEL: &str = "  check:\n    type: cel\n    select: file\n    where: 'true'\
 /// A decision `local/probe` whose fix is `fix`.
 fn local_layer(fix: &str) -> Result<Catalog, lighthouse_spec::Error> {
     let text = document("local/probe", fix, CEL);
-    Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
+    Catalog::from_local(
+        BTreeMap::from([("probe.yaml".to_owned(), text)]),
+        &lighthouse_test_support::cel(),
+    )
 }
 
 fn fixer(fix: &str, pack: &str) -> Box<dyn Fixer> {
     let layer = local_layer(fix).unwrap();
-    let plugin = Checks::new(pack, &layer).unwrap();
+    let plugin = Checks::new(&lighthouse_test_support::composition(), pack, &layer).unwrap();
     plugin.fixers().remove(0)
 }
 
@@ -395,7 +398,10 @@ fn a_function_the_fix_never_calls_in_a_branch_no_example_takes_is_found_at_load(
     let fix = "safety: unsafe\ntype: cel\nedits: \"finding.file == 'x' ? [] : [remove(nope(1))]\"";
     let layer = local_layer(fix).unwrap();
 
-    let error = Checks::new("local", &layer).err().unwrap().to_string();
+    let error = Checks::new(&lighthouse_test_support::composition(), "local", &layer)
+        .err()
+        .unwrap()
+        .to_string();
 
     assert!(error.contains("`nope` is not a function"), "{error}");
 }
@@ -508,7 +514,12 @@ fn the_constructors_a_fix_calls_say_what_it_requires() {
 
 #[test]
 fn only_decisions_with_a_fix_have_fixers() {
-    let plugin = Checks::new("design", Catalog::bundled()).unwrap();
+    let plugin = Checks::new(
+        &lighthouse_test_support::composition(),
+        "design",
+        lighthouse_test_support::bundled(),
+    )
+    .unwrap();
 
     let ids: Vec<String> = plugin
         .fixers()
@@ -522,12 +533,16 @@ fn only_decisions_with_a_fix_have_fixers() {
 
 #[test]
 fn the_bundled_fixers_of_a_pack_are_those_of_its_decisions_with_a_fix() {
-    let ids: Vec<String> = Checks::new("testing", Catalog::bundled())
-        .unwrap()
-        .fixers()
-        .iter()
-        .map(|f| f.manifest().id.clone())
-        .collect();
+    let ids: Vec<String> = Checks::new(
+        &lighthouse_test_support::composition(),
+        "testing",
+        lighthouse_test_support::bundled(),
+    )
+    .unwrap()
+    .fixers()
+    .iter()
+    .map(|f| f.manifest().id.clone())
+    .collect();
 
     assert_eq!(ids, ["testing/file-layout"]);
 }

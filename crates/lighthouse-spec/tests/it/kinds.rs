@@ -76,7 +76,7 @@ fn a_cel_check_reads_its_select_where_message_and_evidence() {
 
 #[test]
 fn the_short_name_of_a_decision_is_its_name_inside_the_pack() {
-    let decision = lighthouse_spec::Catalog::bundled()
+    let decision = lighthouse_test_support::bundled()
         .decision("design/naming")
         .unwrap();
 

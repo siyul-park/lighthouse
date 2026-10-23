@@ -6,7 +6,7 @@ use lighthouse_model::{
     ucm::{File, Fragment, Project},
 };
 use lighthouse_plugin::{Context, Error, Facts, Workspace};
-use lighthouse_spec::{Catalog, Config, Rules};
+use lighthouse_spec::{Config, Rules};
 use serde_json::json;
 
 fn options(max: u64) -> Options {
@@ -18,7 +18,11 @@ fn options(max: u64) -> Options {
 fn preset(name: &str) -> Arc<Rules> {
     Config::parse_inline(&format!("extends = [\"{name}\"]"))
         .unwrap()
-        .resolve(Path::new(""), "", Catalog::bundled().projects())
+        .resolve(
+            Path::new(""),
+            "",
+            lighthouse_test_support::bundled().projects(),
+        )
         .unwrap()
 }
 
@@ -33,7 +37,7 @@ fn file() -> File {
 }
 
 fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagnostic>, Error> {
-    let registry = lighthouse_checks::registry();
+    let registry = lighthouse_test_support::registry();
     let file = file();
     let ws = Workspace::new(".");
     let project = Project::merge([Fragment::default()]);
@@ -57,7 +61,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
 
 #[test]
 fn registry_is_valid_and_exposes_core() {
-    let registry = lighthouse_checks::registry();
+    let registry = lighthouse_test_support::registry();
     registry.validate().unwrap();
     assert!(registry.has_plugin("core"));
     let meta = registry.rule("core/file-size").unwrap().manifest();
@@ -70,7 +74,7 @@ fn registry_is_valid_and_exposes_core() {
 
 #[test]
 fn a_rule_exists_for_a_decision_a_program_checks() {
-    let registry = lighthouse_checks::registry();
+    let registry = lighthouse_test_support::registry();
     let meta = registry.rule("core/file-size").unwrap().manifest();
     assert_eq!(meta.id, "core/file-size");
     assert_eq!(meta.severity, Severity::Warn);
@@ -82,7 +86,7 @@ fn a_rule_exists_for_a_decision_a_program_checks() {
 
 #[test]
 fn recommended_preset_derives_levels_from_rule_meta() {
-    let registry = lighthouse_checks::registry();
+    let registry = lighthouse_test_support::registry();
     let preset = preset("core/recommended");
     let want: BTreeMap<_, _> = registry
         .rules()
@@ -96,8 +100,8 @@ fn recommended_preset_derives_levels_from_rule_meta() {
 
 #[test]
 fn the_standard_projects_hold_exactly_the_rules_the_registry_has() {
-    let registry = lighthouse_checks::registry();
-    let catalog = Catalog::bundled();
+    let registry = lighthouse_test_support::registry();
+    let catalog = lighthouse_test_support::bundled();
     let projects = catalog.projects();
     for pack in catalog.packs() {
         let ours: Vec<String> = registry
@@ -132,7 +136,7 @@ fn rule_reports_lines_beyond_the_limit() {
 
 #[test]
 fn rule_validates_options() {
-    let registry = lighthouse_checks::registry();
+    let registry = lighthouse_test_support::registry();
     let rule = registry.rule("core/file-size").unwrap();
     rule.validate(&Options::new()).unwrap();
     rule.validate(&options(5)).unwrap();
@@ -144,8 +148,8 @@ fn rule_validates_options() {
 fn registered_rules_are_exactly_the_automated_catalog_decisions() {
     use lighthouse_spec::CheckKind;
 
-    let registry = lighthouse_checks::registry();
-    let catalog = lighthouse_spec::Catalog::bundled();
+    let registry = lighthouse_test_support::registry();
+    let catalog = lighthouse_test_support::bundled();
     let registered: std::collections::BTreeSet<_> =
         registry.rules().map(|r| r.manifest().id.clone()).collect();
     for id in &registered {
@@ -178,8 +182,8 @@ fn registered_rules_are_exactly_the_automated_catalog_decisions() {
 fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
     use lighthouse_spec::FixKind;
 
-    let registry = lighthouse_checks::registry();
-    let catalog = lighthouse_spec::Catalog::bundled();
+    let registry = lighthouse_test_support::registry();
+    let catalog = lighthouse_test_support::bundled();
     let mut fixable = std::collections::BTreeSet::new();
     for decision in catalog.decisions() {
         let Some(fix) = &decision.fix else { continue };
@@ -194,7 +198,11 @@ fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
             .fixer(id)
             .unwrap_or_else(|| panic!("{id} has a fix but no registered fixer"));
         assert_eq!(&fixer.manifest().id, id);
-        assert_eq!(fixer.manifest().requires, fix.requires, "{id}");
+        assert_eq!(
+            fixer.manifest().requires,
+            fix.needs(&lighthouse_test_support::cel()),
+            "{id}"
+        );
     }
     let registered: std::collections::BTreeSet<_> =
         registry.fixers().map(|f| f.manifest().id.clone()).collect();
@@ -204,7 +212,7 @@ fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
 
 #[test]
 fn the_bundled_fixes_say_what_each_rule_needs_to_be_fixed() {
-    let catalog = lighthouse_spec::Catalog::bundled();
+    let catalog = lighthouse_test_support::bundled();
     let safety = |id: &str| {
         catalog
             .decision(id)
@@ -232,7 +240,7 @@ fn default_limit_comes_from_the_catalog() {
 
 #[test]
 fn bundled_plugins_provide_only_the_fallback_text_language() {
-    let registry = lighthouse_checks::registry();
+    let registry = lighthouse_test_support::registry();
     let plugins: Vec<_> = registry.manifests().iter().map(|p| p.id.as_str()).collect();
     assert_eq!(
         plugins,
@@ -272,7 +280,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     let design: Vec<_> = design
         .into_iter()
         .filter(|id| {
-            Catalog::bundled()
+            lighthouse_test_support::bundled()
                 .decision(id)
                 .is_some_and(|d| d.automated())
         })

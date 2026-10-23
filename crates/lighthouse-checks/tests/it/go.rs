@@ -8,7 +8,7 @@ use lighthouse_checks::metrics::MEASURES;
 use lighthouse_engine::Engine;
 use lighthouse_model::ucm::{File, Project};
 use lighthouse_plugin::{Context, Facts, Registry, Source, Workspace};
-use lighthouse_spec::{Catalog, Config};
+use lighthouse_spec::Config;
 use serde_json::Value;
 
 /// The bundled plugins plus the Go plugin built from source; `None` after a
@@ -18,7 +18,7 @@ fn go_plugin() -> Option<PathBuf> {
 }
 
 fn registry(plugin: &Path) -> Registry {
-    let mut registry = lighthouse_checks::registry();
+    let mut registry = lighthouse_test_support::registry();
     let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-go\", path = {:?} }}]",
         plugin.to_str().unwrap()
@@ -287,7 +287,13 @@ fn write(root: &Path, path: &str, text: &str) {
 
 fn engine(plugin: &Path, root: &Path, extra: &str) -> Engine {
     let config = Config::parse_inline(&format!("{}{extra}", config(plugin))).unwrap();
-    Engine::new(registry(plugin), config, Catalog::bundled(), root).unwrap()
+    Engine::new(
+        registry(plugin),
+        config,
+        lighthouse_test_support::bundled(),
+        root,
+    )
+    .unwrap()
 }
 
 #[test]
@@ -460,9 +466,12 @@ fn every_checked_decision_passes_its_catalog_examples() {
         return;
     }
     let registry = || registry(&go_plugin().expect("checked above"));
-    let failures =
-        lighthouse_engine::RuleTester::new(registry, lighthouse_spec::Catalog::bundled())
-            .language("go")
-            .check_all();
+    let failures = lighthouse_engine::RuleTester::new(
+        registry,
+        lighthouse_test_support::bundled(),
+        lighthouse_test_support::bundled(),
+    )
+    .language("go")
+    .check_all();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

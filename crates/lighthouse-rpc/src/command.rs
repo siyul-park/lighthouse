@@ -19,7 +19,7 @@ use lighthouse_protocol::{
     canonical, hash,
     prompt::{json_in, noul_of},
 };
-use lighthouse_spec::{CommandProtocol, ModelProvider, Point, Program};
+use lighthouse_spec::{Cel, CommandProtocol, ModelProvider, Point, Program};
 use serde_json::{Value, json};
 
 use crate::events::{Events, NOTES_BYTES, Reading, Scrubber, tail};
@@ -45,6 +45,7 @@ impl CommandModel {
     /// reference), run from `dir` in the sandbox the project's `sandbox`
     /// says; `None` for a provider of another kind.
     pub fn new(
+        cel: &Cel,
         dir: &Path,
         name: &str,
         model: &str,
@@ -99,7 +100,7 @@ impl CommandModel {
             pointer: pointer.clone(),
             events: events
                 .as_deref()
-                .map(|spec| Events::new(spec).map(Arc::new)),
+                .map(|spec| Events::new(cel, spec).map(Arc::new)),
             dir: dir.to_owned(),
             policy: program.policy(sandbox),
         })

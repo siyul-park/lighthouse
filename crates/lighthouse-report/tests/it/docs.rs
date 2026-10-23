@@ -62,11 +62,14 @@ fn fixture() -> Catalog {
             "intro: x\n      decisions",
             "intro: Intro of the section.\n      decisions",
         );
-    Catalog::from_files(files(&[
-        ("demo/pack.yaml", demo),
-        ("demo/one/alpha.yaml", decision("demo/alpha", ALPHA)),
-        ("demo/one/beta.yaml", decision("demo/beta", BETA)),
-    ]))
+    Catalog::from_files(
+        files(&[
+            ("demo/pack.yaml", demo),
+            ("demo/one/alpha.yaml", decision("demo/alpha", ALPHA)),
+            ("demo/one/beta.yaml", decision("demo/beta", BETA)),
+        ]),
+        &lighthouse_test_support::cel(),
+    )
     .unwrap()
 }
 
@@ -108,7 +111,7 @@ fn decision_markdown_honours_heading_level() {
 #[test]
 fn committed_docs_match_the_bundled_catalog() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs");
-    for (path, text) in pages(Catalog::bundled()) {
+    for (path, text) in pages(lighthouse_test_support::bundled()) {
         let committed = fs::read_to_string(root.join(&path)).unwrap_or_default();
         assert!(
             committed == text,
@@ -153,12 +156,15 @@ fn fixed_fixture() -> Catalog {
       kind: valid
       files: [{ path: a.py, body: 'pass' }]
 ";
-    Catalog::from_files(files(&[
-        ("demo/pack.yaml", pack("demo", &[("one", &["gamma"])])),
-        ("demo/one/gamma.yaml", decision("demo/gamma", gamma)),
-        ("demo/one/testdata/bad.go", "first()\nsecond()\n".to_owned()),
-        ("demo/one/testdata/bad.rs", "first();\n".to_owned()),
-    ]))
+    Catalog::from_files(
+        files(&[
+            ("demo/pack.yaml", pack("demo", &[("one", &["gamma"])])),
+            ("demo/one/gamma.yaml", decision("demo/gamma", gamma)),
+            ("demo/one/testdata/bad.go", "first()\nsecond()\n".to_owned()),
+            ("demo/one/testdata/bad.rs", "first();\n".to_owned()),
+        ]),
+        &lighthouse_test_support::cel(),
+    )
     .unwrap()
 }
 

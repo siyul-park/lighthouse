@@ -2,7 +2,6 @@
 //! `TODO` and `BAD` are findings, and `BROKEN` makes a file unanalyzable.
 #![allow(dead_code)]
 
-use lighthouse_spec::Catalog;
 use std::{fs, sync::LazyLock};
 
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixedBy, Needs};
@@ -390,7 +389,13 @@ pub fn engine(dir: &TempDir, extra: &str) -> Engine {
         "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/bad\" = \"error\"\n{extra}"
     ))
     .unwrap();
-    Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap()
+    Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap()
 }
 
 pub fn project(text: &str) -> TempDir {

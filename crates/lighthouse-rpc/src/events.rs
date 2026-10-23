@@ -14,7 +14,7 @@ use std::{
 use cel::{Context, ExecutionError, FunctionContext, Program, Value};
 use lighthouse_process::Lines;
 use lighthouse_protocol::{Tool, ToolEvent};
-use lighthouse_spec::{EventsSpec, compile, context};
+use lighthouse_spec::{Cel, EventsSpec};
 use serde_json::json;
 
 use crate::shell;
@@ -56,13 +56,15 @@ pub(crate) struct Mapped {
 
 impl Events {
     /// Compiles `spec`, or says which expression does not.
-    pub(crate) fn new(spec: &EventsSpec) -> Result<Self, String> {
-        let compile =
-            |key: &str, source: &str| compile(source).map_err(|e| format!("`events.{key}`: {e}"));
+    pub(crate) fn new(cel: &Cel, spec: &EventsSpec) -> Result<Self, String> {
+        let compile = |key: &str, source: &str| {
+            cel.compile(source)
+                .map_err(|e| format!("`events.{key}`: {e}"))
+        };
         let optional = |key: &str, source: &Option<String>| {
             source.as_deref().map(|s| compile(key, s)).transpose()
         };
-        let mut base = context().map_err(|e| format!("`events`: {e}"))?;
+        let mut base = cel.context();
         base.add_function("commands", commands)
             .map_err(|e| format!("`events`: {e}"))?;
         let tools = cel::to_value(&spec.tools).map_err(|e| format!("`events.tools`: {e}"))?;

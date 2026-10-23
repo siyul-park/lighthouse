@@ -29,7 +29,13 @@ fn limits(kind: &str, overrides: Value) -> Value {
 /// The `(file, line)` of what the review of `design/prefer-method` offers a
 /// model for the kind `kind`: the same check with its `abstain` as `where`.
 fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)> {
-    let mut spec = serde_json::to_value(Catalog::bundled().decision(RULE).unwrap().spec()).unwrap();
+    let mut spec = serde_json::to_value(
+        lighthouse_test_support::bundled()
+            .decision(RULE)
+            .unwrap()
+            .spec(),
+    )
+    .unwrap();
     let review = spec["check"]["abstain"].take();
     spec["check"]["where"] = review;
     spec["check"].as_object_mut().unwrap().remove("abstain");
@@ -42,8 +48,12 @@ fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)>
     let text = format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/review\nspec: {spec}\n"
     );
-    let catalog = Catalog::from_local(BTreeMap::from([("review.yaml".to_owned(), text)])).unwrap();
-    let plugin = Checks::new("local", &catalog).unwrap();
+    let catalog = Catalog::from_local(
+        BTreeMap::from([("review.yaml".to_owned(), text)]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    let plugin = Checks::new(&lighthouse_test_support::composition(), "local", &catalog).unwrap();
     let options = json!({ "kinds": [kind], kind: limits(kind, overrides) });
     world
         .diagnose_with(

@@ -3,7 +3,7 @@
 
 use lighthouse_engine::{Availability, Needs};
 use lighthouse_model::Unavailable;
-use lighthouse_spec::{Catalog, Config, Models, Task};
+use lighthouse_spec::{Config, Models, Task};
 
 use crate::support::*;
 
@@ -14,7 +14,9 @@ fn models(extra: &str) -> Models {
         "[models]\nagent = \"agent/m\"\nclassification = \"local/m\"\n{extra}[models.providers.agent]\ncommand = [\"sh\", \"agent.sh\"]\n"
     ))
     .unwrap();
-    config.models(Catalog::bundled().projects()).unwrap()
+    config
+        .models(lighthouse_test_support::bundled().projects())
+        .unwrap()
 }
 
 fn edit(decision: &str) -> Needs {
@@ -55,7 +57,7 @@ fn an_agent_that_edits_is_a_program_and_needs_a_binding() {
     let bound = models("");
     let unbound = Config::parse_inline("")
         .unwrap()
-        .models(Catalog::bundled().projects())
+        .models(lighthouse_test_support::bundled().projects())
         .unwrap();
 
     assert_eq!(

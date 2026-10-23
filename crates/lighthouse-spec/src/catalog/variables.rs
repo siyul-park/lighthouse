@@ -4,14 +4,14 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    CheckKind, Decision, Error, FixKind, TemplatePart, Variable, identifiers, parse_template,
+    Cel, CheckKind, Decision, Error, FixKind, TemplatePart, Variable, identifiers, parse_template,
 };
 
 /// What is wrong with the shared variables of pack `pack`.
-pub(super) fn validate(pack: &str, shared: &[Variable]) -> Result<(), Error> {
+pub(super) fn validate(cel: &Cel, pack: &str, shared: &[Variable]) -> Result<(), Error> {
     let mut seen = BTreeSet::new();
     for variable in shared {
-        if let Some(problem) = variable.problem() {
+        if let Some(problem) = variable.problem(cel) {
             return Err(Error::invalid(pack, problem));
         }
         if !seen.insert(variable.name.as_str()) {
@@ -27,7 +27,11 @@ pub(super) fn validate(pack: &str, shared: &[Variable]) -> Result<(), Error> {
 /// `decision` with the shared variables it names, directly or through another
 /// shared variable, put before its own. A decision that defines a variable of
 /// the same name is refused: there are no overrides.
-pub(super) fn import(decision: Decision, shared: &[Variable]) -> Result<Decision, Error> {
+pub(super) fn import(
+    cel: &Cel,
+    decision: Decision,
+    shared: &[Variable],
+) -> Result<Decision, Error> {
     if shared.is_empty() {
         return Ok(decision);
     }
@@ -75,13 +79,13 @@ pub(super) fn import(decision: Decision, shared: &[Variable]) -> Result<Decision
     let mut names: BTreeSet<String> = sources
         .into_iter()
         .chain(holes.iter().map(String::as_str))
-        .flat_map(identifiers)
+        .flat_map(|source| identifiers(cel, source))
         .collect();
     // A shared variable may name the ones before it.
     let mut used = Vec::new();
     for variable in shared.iter().rev() {
         if names.contains(&variable.name) {
-            names.extend(identifiers(&variable.expression));
+            names.extend(identifiers(cel, &variable.expression));
             used.push(variable);
         }
     }

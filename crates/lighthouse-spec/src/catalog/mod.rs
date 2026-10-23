@@ -2,14 +2,13 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs,
     path::Path,
-    sync::OnceLock,
 };
 
 use lighthouse_protocol::hash;
 use lighthouse_resource::{Resource, SCHEMA_URL_BASE, Spec, header, to_yaml, write_atomic};
 
 use crate::{
-    Decision, DecisionSpec, Error, Pack, ProjectSpec, Projects, Section, project,
+    Cel, Decision, DecisionSpec, Error, Pack, ProjectSpec, Projects, Section, project,
     sources::{SourceLine, extract},
     validate,
 };
@@ -45,16 +44,9 @@ pub struct Catalog {
 }
 
 impl Catalog {
-    /// The catalog compiled into the binary.
-    pub fn bundled() -> &'static Self {
-        static BUNDLED: OnceLock<Catalog> = OnceLock::new();
-        BUNDLED
-            .get_or_init(|| Self::from_files(load::embedded()).expect("bundled catalog is valid"))
-    }
-
     /// Reads and validates the catalog under `dir`; see [`Catalog::from_files`].
-    pub fn load(dir: &Path) -> Result<Self, Error> {
-        Self::from_files(load::read_dir(dir)?)
+    pub fn load(dir: &Path, cel: &Cel) -> Result<Self, Error> {
+        Self::from_files(load::read_dir(dir)?, cel)
     }
 
     /// Builds a validated layer from files keyed by `/`-separated paths
@@ -62,7 +54,7 @@ impl Catalog {
     /// `testdata` directory holds documents of the kinds `Pack`, `Decision`,
     /// `Project` and `SourceMap`; a decision belongs to the pack its id
     /// names, and the pack lists it in a section.
-    pub fn from_files(files: Files) -> Result<Self, Error> {
+    pub fn from_files(files: Files, cel: &Cel) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut packs = Vec::new();
         let mut decisions: Vec<(String, Decision)> = Vec::new();
@@ -79,8 +71,8 @@ impl Catalog {
             catalog.sources.extend(loaded.sources);
         }
         packs.sort_by(|a, b| a.1.metadata.name.cmp(&b.1.metadata.name));
-        catalog.packs = assemble(&files, packs, decisions)?;
-        catalog.sealed(validate::layer)
+        catalog.packs = assemble(cel, &files, packs, decisions)?;
+        catalog.sealed(|layer| validate::layer(layer, cel))
     }
 
     /// Builds the project-local layer from the files of
@@ -88,7 +80,7 @@ impl Catalog {
     /// id `local/<name>` and a CEL check (or none); the loader lists it in the
     /// `local` pack. A `Project` is a shareable configuration that `extends`
     /// can name. Examples must be inline.
-    pub fn from_local(files: Files) -> Result<Self, Error> {
+    pub fn from_local(files: Files, cel: &Cel) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut decisions = Vec::new();
         for (name, text) in &files {
@@ -122,7 +114,7 @@ impl Catalog {
                 }],
             });
         }
-        catalog.sealed(validate::layer)
+        catalog.sealed(|layer| validate::layer(layer, cel))
     }
 
     /// `base` with `local` on top. Local packs, sections and decisions are

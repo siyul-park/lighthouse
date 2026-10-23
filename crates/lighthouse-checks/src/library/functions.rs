@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cel::{Context, ExecutionError, Program};
 use lighthouse_spec::{Call, Variable};
 
-use crate::{Error, compose};
+use crate::{Composition, Error, compose};
 
 /// Refuses a call of `programs` to a function that is neither of the `cel`
 /// crate, nor of a library of the catalog, nor one of `functions` (the
@@ -18,15 +18,16 @@ use crate::{Error, compose};
 /// given the wrong ones (the crate cannot list its functions, so the
 /// arguments of its own are not counted).
 pub(crate) fn check_calls<'a>(
+    comp: &Composition,
     id: &str,
     library: &Context<'static, 'static>,
     functions: &[&Variable],
     programs: impl IntoIterator<Item = &'a Program>,
 ) -> Result<(), Error> {
-    let catalog = compose::catalog().map_err(|e| Error::invalid(id, e))?;
+    let catalog = comp.functions();
     let calls: BTreeSet<Call> = programs
         .into_iter()
-        .flat_map(lighthouse_spec::program_calls)
+        .flat_map(|program| lighthouse_spec::program_calls(comp.cel(), program))
         .collect();
     let scope = library.new_inner_scope();
     for call in calls {
@@ -81,7 +82,7 @@ pub(crate) fn check_calls<'a>(
                 arity(&full, call.member, &known, call.args),
             ));
         }
-        let Ok(probe) = lighthouse_spec::compile(&source) else {
+        let Ok(probe) = comp.cel().compile(&source) else {
             continue;
         };
         if let Err(ExecutionError::UndeclaredReference(_)) = probe.execute(&scope) {
@@ -102,13 +103,14 @@ pub(crate) fn check_calls<'a>(
 /// library (`indexOf`) counts too, so the revision of a check may change
 /// without need, never the other way round.
 pub(crate) fn libraries_called<'a>(
+    comp: &Composition,
     programs: impl IntoIterator<Item = &'a Program>,
-) -> Result<BTreeMap<String, String>, String> {
-    let catalog = compose::catalog()?;
+) -> BTreeMap<String, String> {
+    let catalog = comp.functions();
     let mut used = BTreeMap::new();
     for call in programs
         .into_iter()
-        .flat_map(lighthouse_spec::program_calls)
+        .flat_map(|program| lighthouse_spec::program_calls(comp.cel(), program))
     {
         let full = full_name(&call);
         for entry in catalog.iter().filter(|e| {
@@ -119,7 +121,7 @@ pub(crate) fn libraries_called<'a>(
             used.insert(entry.library.clone(), entry.version.clone());
         }
     }
-    Ok(used)
+    used
 }
 
 fn full_name(call: &Call) -> String {

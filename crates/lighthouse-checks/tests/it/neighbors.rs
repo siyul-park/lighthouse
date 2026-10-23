@@ -184,8 +184,15 @@ struct Case {
 fn read(case: &Case, project: &Project) -> Value {
     let file = project.file(Path::new(case.file)).unwrap();
     ctx_run(project, Some(file), |ctx| match case.fact {
-        "private_reach" => probe::file_fact(ctx, file, "", case.fact),
-        _ => probe::symbol_fact(ctx, &symbol(project, case.subject), case.fact),
+        "private_reach" => {
+            probe::file_fact(&lighthouse_test_support::cel(), ctx, file, "", case.fact)
+        }
+        _ => probe::symbol_fact(
+            &lighthouse_test_support::cel(),
+            ctx,
+            &symbol(project, case.subject),
+            case.fact,
+        ),
     })
     .unwrap()
 }

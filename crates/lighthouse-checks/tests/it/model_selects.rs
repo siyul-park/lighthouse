@@ -63,15 +63,21 @@ fn selecting(spec: &Value, id: &str, subject: &str) -> String {
 /// What the model decision `id` selects in `world`, sorted: the names of its
 /// subjects (`symbol.name`, or `module.path` for a module decision).
 fn selected(world: &World, id: &str, subject: &str) -> Vec<String> {
-    let bundled = Catalog::bundled().decision(id).expect("a bundled decision");
+    let bundled = lighthouse_test_support::bundled()
+        .decision(id)
+        .expect("a bundled decision");
     let spec: Value = serde_json::to_value(bundled.spec()).unwrap();
     let text = if spec["check"]["type"] == "cel" {
         reviewed(spec)
     } else {
         selecting(&spec, id, subject)
     };
-    let catalog = Catalog::from_local(BTreeMap::from([("select.yaml".to_owned(), text)])).unwrap();
-    let plugin = Checks::new("local", &catalog).unwrap();
+    let catalog = Catalog::from_local(
+        BTreeMap::from([("select.yaml".to_owned(), text)]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    let plugin = Checks::new(&lighthouse_test_support::composition(), "local", &catalog).unwrap();
     let mut found: Vec<String> = world
         .diagnose_with(
             &catalog,
