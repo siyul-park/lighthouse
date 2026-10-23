@@ -42,10 +42,14 @@ spec:
     type: cel
     select: symbol
     variables:
+      - name: tests
+        expression: "file.symbols.filter(s, s.kind == 'test')"
       - name: first
-        expression: symbol.file_first_test
+        expression: "size(tests) > 0 ? tests[0] : {}"
       - name: user
-        expression: symbol.helper_user
+        expression: >-
+          cel.bind(c, (symbol.callers + symbol.references).filter(u, u.file == symbol.file && u.pos > symbol.pos),
+            size(c) > 0 ? c.sortBy(u, u.pos)[0] : {})
       - name: misplaced_fixture
         expression: symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
       - name: misplaced_helper

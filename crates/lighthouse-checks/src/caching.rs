@@ -50,14 +50,12 @@ pub const FACTS: &[(&str, Reach)] = &[
     // symbol reaches the others through what the symbols use.
     ("unit", Reach::Global),
     ("reach", Reach::Global),
-    ("file_first_test", Reach::Local),
     // The declarations of the subject's own file between it and the previous
     // method of its owner; and the function fact a symbol carries as `func`.
     ("gap", Reach::Local),
     ("func", Reach::Local),
     ("line_widths", Reach::Local),
     ("data_only", Reach::Neighbors),
-    ("helper_user", Reach::Neighbors),
     ("receiver_affinity", Reach::Neighbors),
     ("owner_home", Reach::Neighbors),
     ("envy", Reach::Neighbors),

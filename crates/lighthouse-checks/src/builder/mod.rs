@@ -5,7 +5,7 @@
 //! check over a file, and only when an expression asks for them.
 
 use std::{
-    cell::{OnceCell, RefCell},
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     rc::Rc,
@@ -70,7 +70,6 @@ pub(crate) struct Builder<'a> {
     indexes: Arc<Indexes>,
     annotations: Arc<Annotations>,
     allow_suffixes: Vec<String>,
-    first_test: OnceCell<Option<Value>>,
     declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
     related: RefCell<BTreeMap<SymbolId, Value>>,
     related_needs: Needs,
@@ -101,7 +100,6 @@ impl<'a> Builder<'a> {
             indexes: ctx.memo.slot(),
             annotations: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
-            first_test: OnceCell::new(),
             declared: RefCell::default(),
             related: RefCell::default(),
             related_needs: needs.of_related(),
@@ -129,7 +127,6 @@ impl<'a> Builder<'a> {
             indexes: Arc::default(),
             annotations: Arc::default(),
             allow_suffixes: strings(options.get("allowSuffixes")),
-            first_test: OnceCell::new(),
             declared: RefCell::default(),
             related: RefCell::default(),
             related_needs: needs.of_related(),
@@ -392,17 +389,8 @@ impl<'a> Builder<'a> {
                 json!(module_tested(project, symbol.id.module())),
             );
         }
-        if needs.field("file_first_test") {
-            map.insert(
-                "file_first_test".to_owned(),
-                self.first_test(symbol).unwrap_or_else(|| json!({})),
-            );
-        }
         if needs.field("gap") {
             map.insert("gap".to_owned(), self.gap(symbol));
-        }
-        if needs.field("helper_user") {
-            map.insert("helper_user".to_owned(), self.helper_user(symbol));
         }
     }
 
@@ -605,33 +593,6 @@ impl<'a> Builder<'a> {
             "flat_dispatch": measures.flat_dispatch,
             "measured": found.is_some(),
         })
-    }
-
-    /// The first test of the symbol's file, by position.
-    fn first_test(&self, symbol: &Symbol) -> Option<Value> {
-        self.first_test
-            .get_or_init(|| {
-                self.project
-                    .symbols_in(&symbol.file)
-                    .filter(|s| s.kind == SymbolKind::Test)
-                    .min_by(|a, b| (a.span.start, &a.id).cmp(&(b.span.start, &b.id)))
-                    .map(|s| self.node(s))
-            })
-            .clone()
-    }
-
-    /// The first symbol of the same file, after the helper, that calls or
-    /// references it.
-    fn helper_user(&self, symbol: &Symbol) -> Value {
-        let project = self.project;
-        project
-            .callers(&symbol.id)
-            .iter()
-            .chain(project.references(&symbol.id))
-            .filter_map(|id| project.symbol(id))
-            .filter(|user| user.file == symbol.file && user.span.start > symbol.span.start)
-            .min_by_key(|user| user.span.start)
-            .map_or_else(|| json!({}), |user| self.node(user))
     }
 
     /// The production callers of a private function in source order, when every

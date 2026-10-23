@@ -291,22 +291,6 @@ fn cases() -> Vec<Case> {
             edit: |w| find(w, "hidden").visibility = Visibility::Public,
             elsewhere: true,
         },
-        Case {
-            fact: "helper_user",
-            file: F1,
-            subject: "helper",
-            build: || {
-                let mut w = World::default();
-                let helper = w.func("m", "helper", F1);
-                let owner = w.symbol("m", "Owner", SymbolKind::Type, F2);
-                let user = w.member(&owner, "user", SymbolKind::Method, F1);
-                w.edge(EdgeKind::Calls, &user, &helper);
-                w
-            },
-            // The type of the user, in another file, becomes an interface.
-            edit: |w| find(w, "Owner").kind = SymbolKind::Interface,
-            elsewhere: false,
-        },
     ]
 }
 
@@ -349,7 +333,6 @@ fn a_fact_of_the_neighbors_that_changes_with_an_edit_elsewhere_changes_the_neigh
         "owner_home",
         "data_only",
         "private_reach",
-        "helper_user",
     ] {
         assert!(declared.contains(&fact) && tested.contains(&fact), "{fact}");
     }
