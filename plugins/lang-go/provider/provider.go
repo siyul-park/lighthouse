@@ -20,9 +20,13 @@ func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error
 		ProtocolVersion: sdk.ProtocolVersion,
 		ServerInfo:      sdk.Implementation{Name: p.id, Version: p.version},
 		Capabilities: sdk.ServerCapabilities{Languages: []sdk.ProviderManifest{{
-			ID:           language,
-			Globs:        []string{"**/*.go"},
-			Conventions:  sdk.Conventions{TestGlobs: []string{"**/*_test.go"}, ConstructorPrefixes: []string{"New", "new"}},
+			ID:    language,
+			Globs: []string{"**/*.go"},
+			Conventions: sdk.Conventions{
+				TestGlobs:           []string{"**/*_test.go"},
+				ConstructorPrefixes: []string{"New", "new"},
+				TestNaming:          sdk.TestNaming{Prefix: "Test", Variants: true},
+			},
 			Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays},
 		}}},
 	}, nil

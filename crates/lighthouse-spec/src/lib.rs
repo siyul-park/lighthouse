@@ -47,7 +47,8 @@ pub use project::{
     BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule, EnvironmentSpec, Evaluation,
     EventsSpec, FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GeneratedCheck, GlobSet, Layer,
     Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
-    RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, Task, glob_set,
+    RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, Task, TestNamingSpec,
+    glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 

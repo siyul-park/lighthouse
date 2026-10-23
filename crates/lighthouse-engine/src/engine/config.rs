@@ -9,7 +9,7 @@ use std::{
 };
 
 use lighthouse_model::{ModelRef, Options};
-use lighthouse_plugin::Registry;
+use lighthouse_plugin::{Registry, TestNaming};
 use lighthouse_spec::{Catalog, Config, ModelProvider, Models, Projects, Rules, Task, glob_set};
 
 use super::{Error, Language};
@@ -128,6 +128,34 @@ pub(super) fn constructors(registry: &Registry, config: &Config) -> BTreeMap<Str
         .collect();
     for (id, prefixes) in config.constructor_prefixes() {
         found.insert(id.to_owned(), prefixes.to_vec());
+    }
+    found
+}
+
+/// The test naming of each language: what its provider declares, with the
+/// parts the project replaces.
+pub(super) fn test_naming(registry: &Registry, config: &Config) -> BTreeMap<String, TestNaming> {
+    let mut found: BTreeMap<String, TestNaming> = registry
+        .languages()
+        .iter()
+        .map(|language| {
+            let manifest = language.provider.manifest();
+            (
+                manifest.id.clone(),
+                manifest.conventions.test_naming.clone(),
+            )
+        })
+        .collect();
+    for (id, spec) in config.test_naming() {
+        let Some(naming) = found.get_mut(id) else {
+            continue;
+        };
+        if let Some(prefix) = &spec.prefix {
+            naming.prefix.clone_from(prefix);
+        }
+        naming.snake_case = spec.snake_case.unwrap_or(naming.snake_case);
+        naming.variants = spec.variants.unwrap_or(naming.variants);
+        naming.ancestors = spec.ancestors.unwrap_or(naming.ancestors);
     }
     found
 }

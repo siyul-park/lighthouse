@@ -120,13 +120,14 @@ fn owner_test_counts_a_member_use_for_its_type_and_exempts_hooks() {
 
 #[test]
 fn single_owner_flags_variants_of_one_symbol() {
-    let (w, _) = package(&[
+    let (mut w, _) = package(&[
         ("TestGet", None),
         ("TestGet_Missing", None),
         ("TestPut", None),
     ]);
     assert_eq!(w.names(&duplicates(&w, json!({}))), ["Get"]);
-    let exact_only = duplicates(&w, json!({ "variantTests": false }));
+    w.naming = Some(json!({ "variants": false }));
+    let exact_only = duplicates(&w, json!({}));
     assert!(exact_only.is_empty());
 }
 
@@ -172,8 +173,8 @@ fn single_owner_reads_snake_case_names() {
         let test = w.symbol(module, "parse_header", SymbolKind::Test, "c/tests/a.ucm");
         w.test_case(&test, &[]);
     }
-    let options = json!({ "testPrefix": "", "snakeCase": true, "variantTests": false });
-    assert_eq!(w.names(&duplicates(&w, options)), ["parse_header"]);
+    w.naming = Some(json!({ "prefix": "", "snakeCase": true, "variants": false }));
+    assert_eq!(w.names(&duplicates(&w, json!({}))), ["parse_header"]);
 }
 
 /// A package with a private function reached by a test file of the package.
@@ -255,21 +256,25 @@ fn crate_with_submodule(tests: &[&str]) -> (World, Symbol) {
     (w, parse)
 }
 
-fn rust_naming() -> Value {
-    json!({ "testPrefix": "", "snakeCase": true, "variantTests": false, "ancestorTests": true })
+/// The crate with the naming convention of Rust.
+fn rust_crate(tests: &[&str]) -> (World, Symbol) {
+    let (mut w, parse) = crate_with_submodule(tests);
+    w.naming =
+        Some(json!({ "prefix": "", "snakeCase": true, "variants": false, "ancestors": true }));
+    (w, parse)
 }
 
 #[test]
 fn owner_test_credits_integration_tests_of_the_crate_root_to_its_submodules() {
-    let (w, _) = crate_with_submodule(&["parse"]);
-    assert!(check(&w, OWNER, rust_naming()).is_empty());
-    let (w, _) = crate_with_submodule(&["other"]);
-    assert_eq!(w.names(&check(&w, OWNER, rust_naming())), ["parse"]);
+    let (w, _) = rust_crate(&["parse"]);
+    assert!(check(&w, OWNER, json!({})).is_empty());
+    let (w, _) = rust_crate(&["other"]);
+    assert_eq!(w.names(&check(&w, OWNER, json!({}))), ["parse"]);
 }
 
 #[test]
 fn owner_test_accepts_a_heuristic_reference_from_test_code() {
-    let (mut w, parse) = crate_with_submodule(&["other"]);
+    let (mut w, parse) = rust_crate(&["other"]);
     let test = w
         .symbols
         .iter()
@@ -278,21 +283,20 @@ fn owner_test_accepts_a_heuristic_reference_from_test_code() {
         .clone();
     w.edge(EdgeKind::References, &test, &parse);
     w.edges.last_mut().unwrap().resolution = Resolution::Heuristic;
-    assert!(check(&w, OWNER, rust_naming()).is_empty());
+    assert!(check(&w, OWNER, json!({})).is_empty());
 }
 
 #[test]
 fn owner_test_credits_ancestor_tests_only_when_asked() {
-    let (w, _) = crate_with_submodule(&["parse"]);
-    let mut options = rust_naming();
-    options["ancestorTests"] = json!(false);
-    assert_eq!(w.names(&check(&w, OWNER, options)), ["parse"]);
+    let (mut w, _) = rust_crate(&["parse"]);
+    w.naming =
+        Some(json!({ "prefix": "", "snakeCase": true, "variants": false, "ancestors": false }));
+    assert_eq!(w.names(&check(&w, OWNER, json!({}))), ["parse"]);
 }
 
 #[test]
 fn single_owner_keeps_names_within_one_module() {
-    let (w, _) = crate_with_submodule(&["parse"]);
-    let mut options = rust_naming();
-    options.as_object_mut().unwrap().remove("ancestorTests");
-    assert!(duplicates(&w, options).is_empty());
+    let (mut w, _) = rust_crate(&["parse"]);
+    w.naming = Some(json!({ "prefix": "", "snakeCase": true, "variants": false }));
+    assert!(duplicates(&w, json!({})).is_empty());
 }

@@ -7,26 +7,9 @@ use std::{
 };
 
 use lighthouse_model::ucm::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
-use serde::Deserialize;
+use lighthouse_plugin::TestNaming;
 
 use crate::layout::contains;
-
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct Naming {
-    /// Prefix of an owner test's name (`Test` in Go); a test without it is
-    /// not an owner test.
-    pub test_prefix: String,
-    /// Names are compared in snake case (Rust tests are `snake_case`).
-    pub snake_case: bool,
-    /// `TestGet_Missing` is another owner of `Get`, not a case of it.
-    pub variant_tests: bool,
-    /// The tests of a module that tests an ancestor module also name the
-    /// symbols of the nested module (the integration tests of a crate test
-    /// all of it). Only owner-test reads it.
-    #[serde(default)]
-    pub ancestor_tests: bool,
-}
 
 /// How a test name maps to a symbol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,11 +27,11 @@ impl Match {
     }
 }
 
-/// The tests of a project by the convention of a [`Naming`]. The tests of a
+/// The tests of a project by the convention of a [`TestNaming`]. The tests of a
 /// set of modules are indexed by their names once per run, however many
 /// symbols and checks ask.
 pub(crate) struct Tests<'p> {
-    naming: Naming,
+    naming: TestNaming,
     project: &'p Project,
     indexes: Arc<Indexes>,
 }
@@ -67,7 +50,7 @@ struct Index {
 }
 
 impl<'p> Tests<'p> {
-    pub(crate) fn new(naming: Naming, project: &'p Project, indexes: Arc<Indexes>) -> Self {
+    pub(crate) fn new(naming: TestNaming, project: &'p Project, indexes: Arc<Indexes>) -> Self {
         Self {
             naming,
             project,
@@ -78,13 +61,13 @@ impl<'p> Tests<'p> {
     /// The tests of the modules that test `symbol`'s module from inside or
     /// outside, whose names map to `symbol`. Names resolve within the one
     /// module the symbol belongs to, so a name never maps to two symbols of
-    /// different modules. With `ancestorTests` also the tests of a module
+    /// different modules. With `ancestors` also the tests of a module
     /// that tests an ancestor of the symbol's module, so the integration tests
     /// of a crate root count for every module of the crate, including the
     /// private ones whose public items the root re-exports.
     pub(crate) fn credited_tests(&self, symbol: &Symbol) -> Vec<(&'p TestCase, Match)> {
         let module = symbol.id.module();
-        if !self.naming.ancestor_tests {
+        if !self.naming.ancestors {
             return self.mapped(symbol, testing_modules(self.project, module));
         }
         let modules = self
@@ -99,7 +82,7 @@ impl<'p> Tests<'p> {
 
     fn mapped(&self, symbol: &Symbol, modules: Vec<String>) -> Vec<(&'p TestCase, Match)> {
         let naming = &self.naming;
-        let Some(key) = naming.key(self.project, symbol) else {
+        let Some(key) = key(naming, self.project, symbol) else {
             return Vec::new();
         };
         let index = self.index(modules);
@@ -110,7 +93,7 @@ impl<'p> Tests<'p> {
             .iter()
             .take_while(|(rest, ..)| rest.starts_with(key.as_str()))
             .filter_map(|(rest, order, id)| {
-                let kind = naming.maps(self.project, rest, &key, symbol)?;
+                let kind = maps(naming, self.project, rest, &key, symbol)?;
                 Some((*order, self.project.test(id)?, kind))
             })
             .collect();
@@ -122,7 +105,7 @@ impl<'p> Tests<'p> {
     }
 
     fn index(&self, modules: Vec<String>) -> Arc<Index> {
-        let key = (self.naming.test_prefix.clone(), modules);
+        let key = (self.naming.prefix.clone(), modules);
         let mut indexes = self
             .indexes
             .0
@@ -135,7 +118,7 @@ impl<'p> Tests<'p> {
         for module in &key.1 {
             for test in self.project.tests_in(module) {
                 let rest = test_name(&test.symbol)
-                    .and_then(|name| name.strip_prefix(self.naming.test_prefix.as_str()));
+                    .and_then(|name| name.strip_prefix(self.naming.prefix.as_str()));
                 if let Some(rest) = rest {
                     names.push((rest.to_owned(), names.len(), test.symbol.clone()));
                 }
@@ -145,63 +128,6 @@ impl<'p> Tests<'p> {
         let index = Arc::new(Index { names });
         indexes.insert(key, Arc::clone(&index));
         index
-    }
-}
-
-impl Naming {
-    /// The naming convention a decision's options declare (`testPrefix`,
-    /// `snakeCase`, `variantTests`, `ancestorTests`); `None` for a decision
-    /// that declares none.
-    pub(crate) fn from_options(
-        options: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<Self> {
-        options.get("testPrefix")?;
-        serde_json::from_value(serde_json::Value::Object(options.clone())).ok()
-    }
-
-    /// How the test whose name is `rest` after the prefix maps to `symbol`,
-    /// whose name for tests is `key`.
-    fn maps(&self, project: &Project, rest: &str, key: &str, symbol: &Symbol) -> Option<Match> {
-        if rest == key {
-            return Some(Match::Exact);
-        }
-        let tail = rest.strip_prefix(key)?.strip_prefix('_')?;
-        if tail.is_empty() || !self.variant_tests || self.names_a_member(project, symbol, tail) {
-            return None;
-        }
-        Some(Match::Variant)
-    }
-
-    /// The name tests use for a symbol: the name, or `Owner_name` for a method.
-    fn key(&self, project: &Project, symbol: &Symbol) -> Option<String> {
-        let spell = |s: &str| {
-            if self.snake_case {
-                snake(s)
-            } else {
-                s.to_owned()
-            }
-        };
-        match (&symbol.owner, symbol.kind) {
-            (None, SymbolKind::Function | SymbolKind::Type | SymbolKind::Interface) => {
-                Some(spell(&symbol.name))
-            }
-            (Some(owner), SymbolKind::Method) => {
-                let owner = project.symbol(owner)?;
-                Some(format!("{}_{}", spell(&owner.name), spell(&symbol.name)))
-            }
-            _ => None,
-        }
-    }
-
-    /// Whether `tail` starts with the name of a method of `symbol`, so that
-    /// `TestStore_Get_Missing` belongs to `Get`, not to `Store`.
-    fn names_a_member(&self, project: &Project, symbol: &Symbol, tail: &str) -> bool {
-        let first = tail.split('_').next().unwrap_or(tail);
-        project.members(&symbol.id).iter().any(|id| {
-            project.symbol(id).is_some_and(|m| {
-                m.kind == SymbolKind::Method && (m.name == first || snake(&m.name) == first)
-            })
-        })
     }
 }
 
@@ -220,6 +146,57 @@ pub(crate) fn snake(name: &str) -> String {
         out.extend(c.to_lowercase());
     }
     out
+}
+
+/// How the test whose name is `rest` after the prefix maps to `symbol`, whose
+/// name for tests is `key`.
+fn maps(
+    naming: &TestNaming,
+    project: &Project,
+    rest: &str,
+    key: &str,
+    symbol: &Symbol,
+) -> Option<Match> {
+    if rest == key {
+        return Some(Match::Exact);
+    }
+    let tail = rest.strip_prefix(key)?.strip_prefix('_')?;
+    if tail.is_empty() || !naming.variants || names_a_member(project, symbol, tail) {
+        return None;
+    }
+    Some(Match::Variant)
+}
+
+/// The name tests use for a symbol: the name, or `Owner_name` for a method.
+fn key(naming: &TestNaming, project: &Project, symbol: &Symbol) -> Option<String> {
+    let spell = |s: &str| {
+        if naming.snake_case {
+            snake(s)
+        } else {
+            s.to_owned()
+        }
+    };
+    match (&symbol.owner, symbol.kind) {
+        (None, SymbolKind::Function | SymbolKind::Type | SymbolKind::Interface) => {
+            Some(spell(&symbol.name))
+        }
+        (Some(owner), SymbolKind::Method) => {
+            let owner = project.symbol(owner)?;
+            Some(format!("{}_{}", spell(&owner.name), spell(&symbol.name)))
+        }
+        _ => None,
+    }
+}
+
+/// Whether `tail` starts with the name of a method of `symbol`, so that
+/// `TestStore_Get_Missing` belongs to `Get`, not to `Store`.
+fn names_a_member(project: &Project, symbol: &Symbol, tail: &str) -> bool {
+    let first = tail.split('_').next().unwrap_or(tail);
+    project.members(&symbol.id).iter().any(|id| {
+        project.symbol(id).is_some_and(|m| {
+            m.kind == SymbolKind::Method && (m.name == first || snake(&m.name) == first)
+        })
+    })
 }
 
 /// Modules whose tests count for `module`: itself, and those that test it.

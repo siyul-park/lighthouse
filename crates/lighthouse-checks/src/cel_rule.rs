@@ -224,7 +224,7 @@ impl CelRule {
         ctx: &Context,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
-        let builder = Builder::new(ctx, &self.needs, options)?;
+        let builder = Builder::new(ctx, &self.needs)?;
         let reviewing = self.reviews() && ctx.models.asks(&meta.id);
         let run = Evaluation {
             rule: self,

@@ -149,7 +149,6 @@ impl CelFix {
             project,
             request.workspace,
             &self.needs,
-            &options,
             language.unwrap_or_default(),
         );
         let needs_file = self.needs.ident("file") || self.select == Some(Select::File);

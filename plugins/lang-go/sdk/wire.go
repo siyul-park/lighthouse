@@ -60,6 +60,20 @@ type Conventions struct {
 	TestGlobs []string `json:"test_globs"`
 	// ConstructorPrefixes are the name prefixes that make a function a constructor.
 	ConstructorPrefixes []string `json:"constructor_prefixes"`
+	// TestNaming is how tests are named after the symbols they own.
+	TestNaming TestNaming `json:"test_naming"`
+}
+
+// TestNaming ties a top-level test function to the public symbol it owns.
+type TestNaming struct {
+	// Prefix of an owner test's name; a test without it is not one.
+	Prefix string `json:"prefix"`
+	// SnakeCase compares names in snake case.
+	SnakeCase bool `json:"snake_case"`
+	// Variants makes TestGet_Missing a second owner of Get.
+	Variants bool `json:"variants"`
+	// Ancestors counts the tests of a module that tests an ancestor module.
+	Ancestors bool `json:"ancestors"`
 }
 
 // ProjectRef locates the project an index request refers to.

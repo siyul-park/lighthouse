@@ -85,7 +85,8 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   "serverInfo": { "name": "lang-go", "version": "0.1.0" },
   "capabilities": {
     "languages": [{ "id": "go", "globs": ["**/*.go"], "priority": 0,
-                    "conventions": { "test_globs": ["**/*_test.go"], "constructor_prefixes": ["New", "new"] },
+                    "conventions": { "test_globs": ["**/*_test.go"], "constructor_prefixes": ["New", "new"],
+                                     "test_naming": { "prefix": "Test", "snake_case": false, "variants": true, "ancestors": false } },
                     "capabilities": ["semantic-edges"] }] } }
 ```
 
@@ -102,6 +103,14 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   constructor (a name is one when it is a prefix, or a prefix followed by a new
   word). Every rule that tells constructors apart shares them; a project replaces
   them once in `[languages.<id>] constructorPrefixes`.
+- `conventions.test_naming` is how a top-level test is named after the public symbol it
+  owns, for `testing/owner`: `prefix` (`Test` in Go, none in Rust; a test without it is
+  no owner), `snake_case` (names compared in snake case, as Rust tests are written),
+  `variants` (`TestGet_Missing` is a second owner of `Get`, not a case of it) and
+  `ancestors` (the tests of a module that tests an ancestor module count for the nested
+  one: the integration tests of a crate test all of it). A provider that declares none
+  has Go's convention. A project replaces any part in
+  `[languages.<id>] testNaming = { prefix, snakeCase, variants, ancestors }`.
 - Each entry of `capabilities.languages` is the language's **provider manifest**
   (`ProviderManifest`): `id`, `globs`, `priority`, `fallback`, `conventions` and
   `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field

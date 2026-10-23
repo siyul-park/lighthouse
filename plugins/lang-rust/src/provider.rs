@@ -9,7 +9,7 @@ use std::{
 
 use lighthouse_protocol::{
     Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexParams, IndexResult,
-    InitializeParams, InitializeResult, ProviderManifest,
+    InitializeParams, InitializeResult, ProviderManifest, TestNaming,
 };
 use serde::Deserialize;
 
@@ -42,6 +42,14 @@ impl Handler for Provider {
                     "**/benches/**/*.rs".to_owned(),
                 ],
                 constructor_prefixes: vec!["new".to_owned()],
+                // Tests are small snake_case functions named after what they
+                // test, and the integration tests of a crate test all of it.
+                test_naming: TestNaming {
+                    prefix: String::new(),
+                    snake_case: true,
+                    variants: false,
+                    ancestors: true,
+                },
             },
             capabilities: ["extent", "reference-sites", "overlays"]
                 .map(str::to_owned)

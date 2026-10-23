@@ -46,7 +46,8 @@ use cached::RunCache;
 pub use client::CommandModels;
 pub use config::active;
 use config::{
-    Inherited, constructors, inheritance, io_error, load_languages, options_at, validate_config,
+    Inherited, constructors, inheritance, io_error, load_languages, options_at, test_naming,
+    validate_config,
 };
 use models::RunModels;
 pub(crate) use route::{Member, Refusal, Route, Usage};
@@ -336,6 +337,7 @@ impl Engine {
                 .map(|(id, options)| (id.to_owned(), options.clone()))
                 .collect(),
             constructors: constructors(&registry, &config),
+            test_naming: test_naming(&registry, &config),
             overlays: BTreeMap::new(),
             cache_dir: None,
             sandbox: config.sandbox().clone(),

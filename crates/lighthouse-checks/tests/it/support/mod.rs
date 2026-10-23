@@ -62,6 +62,7 @@ impl Plugin for Fixture {
             conventions: Conventions {
                 test_globs: vec!["**/*_test.ucm".to_owned()],
                 constructor_prefixes: vec!["New".to_owned(), "new".to_owned()],
+                ..Conventions::default()
             },
             ..ProviderManifest::new("wire", vec!["**/*.ucm".to_owned()])
         }))]
@@ -87,6 +88,9 @@ pub struct World {
     pub imports: Vec<(String, String)>,
     /// Imports written in a file of their own, which need not declare anything.
     pub file_imports: Vec<FileImport>,
+    /// The `[languages.wire] testNaming` the project sets, over what the
+    /// language declares.
+    pub naming: Option<Value>,
 }
 
 /// An import edge of module `from` to module `to` that comes from `file`,
@@ -437,6 +441,16 @@ impl World {
             vec!["fixture", "metrics", subject.id].into(),
         );
         root.insert("rules".to_owned(), rules.into());
+        if let Some(naming) = &self.naming {
+            let mut wire = toml::Table::new();
+            wire.insert(
+                "testNaming".to_owned(),
+                toml::Value::try_from(naming).unwrap(),
+            );
+            let mut languages = toml::Table::new();
+            languages.insert("wire".to_owned(), wire.into());
+            root.insert("languages".to_owned(), languages.into());
+        }
         let config = Config::parse_inline(&root.to_string()).unwrap();
         let mut registry = Registry::default();
         registry.register(&Fixture::new()).unwrap();

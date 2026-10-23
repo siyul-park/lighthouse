@@ -532,6 +532,23 @@ fn config_constructor_prefixes() {
 }
 
 #[test]
+fn config_test_naming() {
+    let config = Config::parse_inline(
+        "[languages.rust]\ntestNaming = { prefix = \"t_\", snakeCase = true }\n[languages.go]\ntags = 1\n",
+    )
+    .unwrap();
+
+    let naming: Vec<_> = config.test_naming().collect();
+
+    assert_eq!(naming.len(), 1);
+    assert_eq!(naming[0].0, "rust");
+    assert_eq!(naming[0].1.prefix.as_deref(), Some("t_"));
+    assert_eq!(naming[0].1.snake_case, Some(true));
+    assert_eq!(naming[0].1.variants, None);
+    assert!(!options(&config, "rust").contains_key("testNaming"));
+}
+
+#[test]
 fn object_options_merge_per_key_across_layers_in_toml() {
     let limits = RuleConfig {
         options: serde_json::from_value(json!({ "max": { "default": 5, "test": -1 } })).unwrap(),

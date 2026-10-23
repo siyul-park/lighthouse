@@ -202,6 +202,16 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "test_naming": {
+          "$ref": "#/$defs/TestNaming",
+          "default": {
+            "ancestors": false,
+            "prefix": "Test",
+            "snake_case": false,
+            "variants": true
+          },
+          "description": "How tests are named after the symbols they own. The project may\nreplace each part in `[languages.<id>] testNaming`."
         }
       },
       "type": "object"
@@ -1262,7 +1272,13 @@
           "$ref": "#/$defs/Conventions",
           "default": {
             "constructor_prefixes": [],
-            "test_globs": []
+            "test_globs": [],
+            "test_naming": {
+              "ancestors": false,
+              "prefix": "Test",
+              "snake_case": false,
+              "variants": true
+            }
           }
         },
         "fallback": {
@@ -1625,6 +1641,34 @@
         "nesting",
         "style",
         "targets"
+      ],
+      "type": "object"
+    },
+    "TestNaming": {
+      "description": "The convention that ties a top-level test function to the public symbol it\nowns: Go writes `TestGet` and `TestGet_Missing`, Rust writes `get` in\nsnake case and tests a whole crate from `tests/`.",
+      "properties": {
+        "ancestors": {
+          "description": "The tests of a module that tests an ancestor module also name the\nsymbols of the nested module: the integration tests of a crate test\nall of it.",
+          "type": "boolean"
+        },
+        "prefix": {
+          "description": "Prefix of an owner test's name (`Test` in Go); a test without it is\nnot an owner test.",
+          "type": "string"
+        },
+        "snake_case": {
+          "description": "Names are compared in snake case (Rust tests are `snake_case`).",
+          "type": "boolean"
+        },
+        "variants": {
+          "description": "`TestGet_Missing` is a second owner of `Get`, not a case of it.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "prefix",
+        "snake_case",
+        "variants",
+        "ancestors"
       ],
       "type": "object"
     },

@@ -25,7 +25,7 @@ use crate::{
     facts,
     layout::{self, contains},
     library::Needs,
-    naming::{Naming, Tests},
+    naming::Tests,
     table::Table,
 };
 
@@ -64,7 +64,7 @@ pub(crate) struct Builder<'a> {
     ws: &'a Workspace,
     needs: &'a Needs,
     language: String,
-    naming: Option<Tests<'a>>,
+    naming: Tests<'a>,
     measures: Option<BTreeMap<SymbolId, Measures>>,
     table: Arc<Table>,
     indexes: Arc<Indexes>,
@@ -75,25 +75,25 @@ pub(crate) struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
-    pub(crate) fn new(
-        ctx: &'a Context<'a>,
-        needs: &'a Needs,
-        options: &'a Map<String, Value>,
-    ) -> Result<Self, Error> {
+    pub(crate) fn new(ctx: &'a Context<'a>, needs: &'a Needs) -> Result<Self, Error> {
         let measures = if needs.field("metrics") {
             Some(ctx.fact(MEASURES)?)
         } else {
             None
         };
+        let language = ctx
+            .file
+            .map_or_else(String::new, |(file, _)| file.lang.clone());
         Ok(Self {
             project: ctx.project,
             ws: ctx.workspace,
             needs,
-            language: ctx
-                .file
-                .map_or_else(String::new, |(file, _)| file.lang.clone()),
-            naming: Naming::from_options(options)
-                .map(|naming| Tests::new(naming, ctx.project, ctx.memo.slot())),
+            naming: Tests::new(
+                ctx.workspace.test_naming(&language),
+                ctx.project,
+                ctx.memo.slot(),
+            ),
+            language,
             measures,
             table: ctx.memo.slot(),
             indexes: ctx.memo.slot(),
@@ -110,7 +110,6 @@ impl<'a> Builder<'a> {
         project: &'a Project,
         ws: &'a Workspace,
         needs: &'a Needs,
-        options: &'a Map<String, Value>,
         language: &str,
     ) -> Self {
         Self {
@@ -118,8 +117,7 @@ impl<'a> Builder<'a> {
             ws,
             needs,
             language: language.to_owned(),
-            naming: Naming::from_options(options)
-                .map(|naming| Tests::new(naming, project, Arc::default())),
+            naming: Tests::new(ws.test_naming(language), project, Arc::default()),
             measures: None,
             table: Arc::default(),
             indexes: Arc::default(),
@@ -555,11 +553,8 @@ impl<'a> Builder<'a> {
     /// The credited tests of a symbol, each a node with the way its name
     /// matched.
     fn tests(&self, symbol: &Symbol) -> Value {
-        let Some(naming) = &self.naming else {
-            return json!([]);
-        };
         Value::Array(
-            naming
+            self.naming
                 .credited_tests(symbol)
                 .into_iter()
                 .filter_map(|(case, kind)| {

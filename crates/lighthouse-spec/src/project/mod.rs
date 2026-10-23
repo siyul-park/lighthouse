@@ -43,7 +43,7 @@ use resolved::Resolved;
 pub use rules::{Level, RuleConfig, RuleSetting, Rules};
 pub use sandbox::SandboxSpec;
 use spec::PluginEntry;
-pub use spec::{GeneratedCheck, OverrideSpec, ProjectSpec};
+pub use spec::{GeneratedCheck, OverrideSpec, ProjectSpec, TestNamingSpec};
 
 pub(crate) use standard::standard;
 
@@ -85,6 +85,7 @@ struct LanguageConfig {
     /// Handed to the language's provider.
     options: Options,
     constructors: Option<Vec<String>>,
+    test_naming: Option<TestNamingSpec>,
 }
 
 impl PluginRef {
@@ -252,6 +253,7 @@ impl Config {
                 LanguageConfig {
                     options: language.options,
                     constructors: language.constructor_prefixes,
+                    test_naming: language.test_naming,
                 },
             );
         }
@@ -331,6 +333,14 @@ impl Config {
         self.languages
             .iter()
             .filter_map(|(id, l)| Some((id.as_str(), l.constructors.as_deref()?)))
+    }
+
+    /// The parts of the test naming convention the project replaces, per
+    /// language id.
+    pub fn test_naming(&self) -> impl Iterator<Item = (&str, &TestNamingSpec)> {
+        self.languages
+            .iter()
+            .filter_map(|(id, l)| Some((id.as_str(), l.test_naming.as_ref()?)))
     }
 
     /// Whether the project's `generated.files` name `path`.

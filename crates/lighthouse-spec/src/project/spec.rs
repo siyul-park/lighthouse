@@ -133,9 +133,36 @@ pub struct ProjectLanguage {
         skip_serializing_if = "Option::is_none"
     )]
     pub constructor_prefixes: Option<Vec<String>>,
+    /// The parts of the test naming convention this project replaces in this
+    /// language; the others stay what its provider declares.
+    #[serde(
+        rename = "testNaming",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub test_naming: Option<TestNamingSpec>,
     /// Everything else is handed to the language's provider.
     #[serde(flatten)]
     pub options: Options,
+}
+
+/// The parts of a language's test naming convention a project replaces.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TestNamingSpec {
+    /// Prefix of an owner test's name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    /// Names are compared in snake case.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snake_case: Option<bool>,
+    /// `TestGet_Missing` is a second owner of `Get`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variants: Option<bool>,
+    /// The tests of a module that tests an ancestor module count for the
+    /// nested module too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ancestors: Option<bool>,
 }
 
 /// Rules for the files and languages that match.

@@ -431,6 +431,17 @@
             "array",
             "null"
           ]
+        },
+        "testNaming": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TestNamingSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The parts of the test naming convention this project replaces in this\nlanguage; the others stay what its provider declares."
         }
       },
       "type": "object"
@@ -838,6 +849,41 @@
           "type": "string"
         }
       ]
+    },
+    "TestNamingSpec": {
+      "additionalProperties": false,
+      "description": "The parts of a language's test naming convention a project replaces.",
+      "properties": {
+        "ancestors": {
+          "description": "The tests of a module that tests an ancestor module count for the\nnested module too.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "prefix": {
+          "description": "Prefix of an owner test's name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snakeCase": {
+          "description": "Names are compared in snake case.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "variants": {
+          "description": "`TestGet_Missing` is a second owner of `Get`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
     },
     "program": {
       "description": "A program as the files write it. Where a program is a table of its own\n(a `check` or a `fix`), its fields stand beside the others.",

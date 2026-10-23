@@ -15,6 +15,11 @@ spec:
     public symbol that has two or more owner tests; keep one top-level test and
     make the rest cases of it. Evidence `owner_tests` lists the owners.
 
+    The naming convention is the language's, not a policy: its provider
+    declares it (`conventions.test_naming`) and a project replaces parts of it
+    in `[languages.<id>] testNaming` (`prefix`, `snakeCase`, `variants`,
+    `ancestors`).
+
     Go: The owner of a function or type is `TestName`, of a method
     `TestType_Method`. A symbol that no test names and no test code calls
     or references is reported; a type counts as tested when one of its
@@ -50,27 +55,6 @@ spec:
         items: { type: string, enum: [missing, duplicate] }
         default: [missing, duplicate]
         description: What to report.
-      testPrefix:
-        type: string
-        default: Test
-        description: "Prefix of the name of an owner test; a test without it is not one."
-      snakeCase:
-        type: boolean
-        default: false
-        description: "Compare names in snake case, as Rust tests are written."
-      variantTests:
-        type: boolean
-        default: true
-        description: >-
-          Count `TestGet_Missing` as a second owner of `Get`; a name that adds a
-          suffix to the symbol's own name restates the same contract.
-      ancestorTests:
-        type: boolean
-        default: false
-        description: >-
-          Count the tests of a module that tests an ancestor module as tests of
-          the nested module too: the integration tests of a Rust crate test all
-          of it, private modules whose items the root re-exports included.
       symbols:
         type: array
         items: { type: string, enum: [function, method, type] }
@@ -100,10 +84,6 @@ spec:
         includeInternal: true
     rust:
       options:
-        testPrefix: ""
-        snakeCase: true
-        variantTests: false
-        ancestorTests: true
         exemptMethods:
           - fmt
           - source

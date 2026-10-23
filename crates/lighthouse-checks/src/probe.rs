@@ -3,7 +3,7 @@
 
 use lighthouse_model::ucm::{File, Project, Symbol};
 use lighthouse_plugin::{Context, Error};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use lighthouse_spec::Cel;
 
@@ -17,8 +17,7 @@ pub fn symbol_fact(
     fact: &'static str,
 ) -> Result<Value, Error> {
     let needs = Needs::of(cel, [format!("x.{fact}").as_str()], []);
-    let options = Map::new();
-    let builder = Builder::new(ctx, &needs, &options)?;
+    let builder = Builder::new(ctx, &needs)?;
     Ok(builder.symbol(symbol)[fact].clone())
 }
 
@@ -31,8 +30,7 @@ pub fn file_fact(
     fact: &'static str,
 ) -> Result<Value, Error> {
     let needs = Needs::of(cel, [format!("x.{fact}").as_str()], []);
-    let options = Map::new();
-    let builder = Builder::new(ctx, &needs, &options)?;
+    let builder = Builder::new(ctx, &needs)?;
     Ok(builder.file(file, text)[fact].clone())
 }
 

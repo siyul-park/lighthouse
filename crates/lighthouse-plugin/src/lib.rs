@@ -27,7 +27,7 @@ pub use cel::{
     CatalogFunction, CelCatalog, CelLibrary, CelLibraryManifest, Function, Overload, Precedence,
 };
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
-pub use lighthouse_protocol::Conventions;
+pub use lighthouse_protocol::{Conventions, TestNaming};
 pub use memo::Memo;
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
@@ -93,6 +93,9 @@ pub struct Workspace {
     /// The name prefixes that make a function a constructor, by language id:
     /// what the provider declares, or the project's `constructorPrefixes`.
     pub constructors: BTreeMap<String, Vec<String>>,
+    /// How tests are named after the symbols they own, by language id: what
+    /// the provider declares, with the project's `testNaming` over it.
+    pub test_naming: BTreeMap<String, TestNaming>,
     /// Text that stands in for the file of the same project-relative path:
     /// what a provider must read instead of the disk. Empty for a normal run;
     /// a fix run checks candidate edits this way before anything is written.
@@ -146,6 +149,7 @@ impl Workspace {
             root: root.into(),
             languages: BTreeMap::new(),
             constructors: BTreeMap::new(),
+            test_naming: BTreeMap::new(),
             overlays: BTreeMap::new(),
             cache_dir: None,
             sandbox: Policy::default(),
@@ -160,6 +164,12 @@ impl Workspace {
         fs::read_to_string(self.root.join(path))
             .map(Cow::Owned)
             .map_err(|e| Error::Incomplete(format!("{}: {e}", path.display())))
+    }
+
+    /// The test naming of `language`; the default convention for a language
+    /// that declares none.
+    pub fn test_naming(&self, language: &str) -> TestNaming {
+        self.test_naming.get(language).cloned().unwrap_or_default()
     }
 
     /// The constructor prefixes of `language`; none for an unknown language.

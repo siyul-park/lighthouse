@@ -14,7 +14,7 @@ pub use language::{
         FileRef, Flow, FlowKind, Fragment, FunctionSummary, Implementation, Incomplete,
         IndexParams, IndexResult, InitializeParams, InitializeResult, Methods, Module, Node,
         Overlay, Position, ProjectRef, ProviderManifest, Resolution, ServerCapabilities, Signature,
-        Span, Symbol, SymbolKind, SymbolRole, TestCase, TestStyle, TypeRef, Visibility,
+        Span, Symbol, SymbolKind, SymbolRole, TestCase, TestNaming, TestStyle, TypeRef, Visibility,
         WorkspaceFolder,
     },
 };

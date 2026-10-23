@@ -174,6 +174,39 @@ pub struct Conventions {
     /// `[languages.<id>] constructorPrefixes`.
     #[serde(default)]
     pub constructor_prefixes: Vec<String>,
+    /// How tests are named after the symbols they own. The project may
+    /// replace each part in `[languages.<id>] testNaming`.
+    #[serde(default)]
+    pub test_naming: TestNaming,
+}
+
+/// The convention that ties a top-level test function to the public symbol it
+/// owns: Go writes `TestGet` and `TestGet_Missing`, Rust writes `get` in
+/// snake case and tests a whole crate from `tests/`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct TestNaming {
+    /// Prefix of an owner test's name (`Test` in Go); a test without it is
+    /// not an owner test.
+    pub prefix: String,
+    /// Names are compared in snake case (Rust tests are `snake_case`).
+    pub snake_case: bool,
+    /// `TestGet_Missing` is a second owner of `Get`, not a case of it.
+    pub variants: bool,
+    /// The tests of a module that tests an ancestor module also name the
+    /// symbols of the nested module: the integration tests of a crate test
+    /// all of it.
+    pub ancestors: bool,
+}
+
+impl Default for TestNaming {
+    fn default() -> Self {
+        Self {
+            prefix: "Test".to_owned(),
+            snake_case: false,
+            variants: true,
+            ancestors: false,
+        }
+    }
 }
 
 /// The project an index request belongs to.
