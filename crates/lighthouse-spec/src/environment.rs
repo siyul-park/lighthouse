@@ -8,12 +8,10 @@
 
 use std::{
     collections::{BTreeSet, HashMap},
-    sync::{Arc, Mutex, OnceLock, PoisonError},
+    sync::{Arc, Mutex, PoisonError},
 };
 
 use cel::{Context, DeclarationError, Env, Program, extensions};
-
-use crate::{Catalog, Error};
 
 /// The namespaces of the functions the `cel` crate ships (`lists.range`,
 /// `math.greatest`, ...). The libraries a plugin registers add their own.
@@ -27,8 +25,7 @@ type Extension = fn(&mut Env) -> Result<(), DeclarationError>;
 type Compiled = HashMap<String, Result<Arc<Program>, String>>;
 
 /// One CEL environment, with what is derived from it: the namespaces of its
-/// functions, the programs compiled in it and the bundled catalog validated
-/// against it. Clones share all of it.
+/// functions and the programs compiled in it. Clones share all of it.
 #[derive(Clone)]
 pub struct Cel(Arc<Inner>);
 
@@ -36,7 +33,6 @@ struct Inner {
     env: Arc<Env>,
     namespaces: BTreeSet<String>,
     compiled: Mutex<Compiled>,
-    bundled: OnceLock<Result<Catalog, String>>,
 }
 
 impl Cel {
@@ -47,7 +43,6 @@ impl Cel {
             env: Arc::new(env),
             namespaces: namespaces.into_iter().collect(),
             compiled: Mutex::default(),
-            bundled: OnceLock::new(),
         }))
     }
 
@@ -68,7 +63,9 @@ impl Cel {
 
     /// `source` compiled in the environment.
     pub fn compile(&self, source: &str) -> Result<Program, String> {
-        self.0.env.compile(source).map_err(|e| e.to_string())
+        self.environment()
+            .compile(source)
+            .map_err(|e| e.to_string())
     }
 
     /// `source` compiled in the environment, once: the same program is shared
@@ -79,27 +76,9 @@ impl Cel {
         if let Some(found) = self.compiled().get(source) {
             return found.clone();
         }
-        let made = self
-            .0
-            .env
-            .compile(source)
-            .map(Arc::new)
-            .map_err(|e| e.to_string());
+        let made = self.compile(source).map(Arc::new);
         self.compiled().insert(source.to_owned(), made.clone());
         made
-    }
-
-    /// The catalog compiled into the binary, validated against this
-    /// environment once.
-    pub fn bundled(&self) -> Result<&Catalog, Error> {
-        self.0
-            .bundled
-            .get_or_init(|| {
-                Catalog::from_files(crate::catalog::load::embedded(), self)
-                    .map_err(|e| e.to_string())
-            })
-            .as_ref()
-            .map_err(|why| Error::invalid("the bundled catalog", why.as_str()))
     }
 
     /// Whether `name` is the namespace of functions (`regex` of

@@ -5,10 +5,15 @@
 //! composition root builds one [`Composition`] and passes it to everything
 //! that compiles or runs an expression; nothing keeps it in a global.
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::{
+    collections::BTreeSet,
+    sync::{Arc, OnceLock},
+};
 
 use lighthouse_plugin::{Function, Registry};
-use lighthouse_spec::Cel;
+use lighthouse_spec::{Catalog, Cel};
+
+use crate::Error;
 
 /// A function of the catalog with the library that provides it.
 #[derive(Debug, Clone)]
@@ -24,12 +29,22 @@ pub struct Entry {
 pub struct Composition {
     cel: Cel,
     functions: Arc<[Entry]>,
+    bundled: Arc<OnceLock<Result<Catalog, String>>>,
 }
 
 impl Composition {
     /// The environment.
     pub fn cel(&self) -> &Cel {
         &self.cel
+    }
+
+    /// The catalog compiled into the binary, validated against the
+    /// environment once.
+    pub fn bundled(&self) -> Result<&Catalog, Error> {
+        self.bundled
+            .get_or_init(|| Catalog::embedded(&self.cel).map_err(|e| e.to_string()))
+            .as_ref()
+            .map_err(|why| Error::invalid("the bundled catalog", why.as_str()))
     }
 
     /// The function catalog of the libraries, sorted by name.
@@ -74,5 +89,6 @@ pub fn compose_from(registry: &Registry) -> Result<Composition, String> {
     Ok(Composition {
         cel: Cel::new(env, namespaces),
         functions: functions.into(),
+        bundled: Arc::default(),
     })
 }

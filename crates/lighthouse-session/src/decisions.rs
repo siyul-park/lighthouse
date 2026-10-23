@@ -205,7 +205,7 @@ pub(crate) fn test_catalog(
     language: Option<&str>,
 ) -> Result<DecisionTest> {
     let decisions = selected(catalog, ids)?;
-    let shipped = session.comp.cel().bundled()?;
+    let shipped = session.comp.bundled()?;
     let (probe, registered) = session.registry()?;
     if let Some(gap) = registered.incomplete.first() {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());

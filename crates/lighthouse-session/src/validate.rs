@@ -97,7 +97,7 @@ impl Sets {
         problems: &mut Vec<Problem>,
     ) -> Result<()> {
         let cel = session.comp.cel();
-        let bundled = cel.bundled()?;
+        let bundled = session.comp.bundled()?;
         let mut layered: Vec<(Catalog, Vec<String>)> = Vec::new();
         let known: BTreeSet<String> = session
             .catalog
@@ -283,12 +283,7 @@ fn naming(session: &Session, root: &Path, problems: &mut Vec<Problem>) -> Result
     let config = Config::parse_inline(&format!(
         "plugins = [\"core\"]\n[rules]\n\"{DECISION_NAMING}\" = \"warn\"\n"
     ))?;
-    let engine = Engine::new(
-        registry_of(session)?,
-        config,
-        session.comp.cel().bundled()?,
-        root,
-    )?;
+    let engine = Engine::new(registry_of(session)?, config, session.comp.bundled()?, root)?;
     let outcome = engine.check(&[], &[DECISION_NAMING.to_owned()])?;
     problems.extend(outcome.diagnostics.iter().map(|d| {
         let at = root.join(&d.file);

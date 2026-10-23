@@ -31,7 +31,7 @@ pub const AGENT_LOOP: &str = include_str!("agent-loop.md");
 /// the fix operations and the CEL functions.
 pub fn bundled_docs() -> Result<BTreeMap<String, String>> {
     let comp = crate::compose()?;
-    let mut pages = pages(comp.cel().bundled()?);
+    let mut pages = pages(comp.bundled()?);
     pages.insert(
         format!("{DOCS_DIR}/fix-operations.md"),
         fix_operations_markdown(),

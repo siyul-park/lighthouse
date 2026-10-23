@@ -46,8 +46,7 @@ impl Check {
                 command,
                 &decision.title,
                 decision.bundled(
-                    comp.cel()
-                        .bundled()
+                    comp.bundled()
                         .map_err(|e| Error::invalid(id, e.to_string()))?,
                 ),
             )?)),

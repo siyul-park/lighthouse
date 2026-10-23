@@ -17,10 +17,7 @@ pub fn cel() -> Cel {
 /// The bundled catalog, validated in one composition shared by the tests of a
 /// process, so that they do not validate it again each.
 pub fn bundled() -> &'static Catalog {
-    shared()
-        .cel()
-        .bundled()
-        .expect("the bundled catalog is valid")
+    shared().bundled().expect("the bundled catalog is valid")
 }
 
 /// The bundled plugins, compiled in the composition [`bundled`] belongs to.

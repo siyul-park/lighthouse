@@ -5,10 +5,11 @@
 
 use std::{collections::BTreeMap, path::Path};
 
+use lighthouse_checks::Composition;
 use lighthouse_engine::{Availability, FixPlan, Needs};
 use lighthouse_model::Safety;
 use lighthouse_report::{Aim, Apply, CheckBy, CheckInfo, Descriptor, FixBy, FixInfo};
-use lighthouse_spec::{Catalog, Cel, CheckKind, Decision, Models, Task};
+use lighthouse_spec::{Catalog, CheckKind, Decision, Models, Task};
 
 use crate::{Result, Session, active_decisions, permit::permitted};
 
@@ -20,7 +21,7 @@ pub struct Fixing {
     plan: FixPlan,
     models: Models,
     /// Tells a decision as it ships from one a project edited.
-    cel: Cel,
+    comp: Composition,
     trusted: bool,
     /// `[sandbox] enabled`: programs run in the sandbox, so it must work.
     sandboxed: bool,
@@ -32,14 +33,14 @@ impl Fixing {
     /// The state of `session`'s project.
     pub fn of(session: &Session) -> Result<Self> {
         let active = active_decisions(session)?;
-        let cel = session.comp.cel().clone();
+        let comp = session.comp.clone();
         // Read once, so that describing a decision cannot meet a bundled
         // catalog that does not load.
-        cel.bundled()?;
+        comp.bundled()?;
         Ok(Self {
             plan: fix_plan(session, &|id| active.contains(id))?,
             models: session.config.models(session.catalog.projects())?,
-            cel,
+            comp,
             trusted: session.trusted(),
             sandboxed: session.config.sandbox().enabled,
             unsafe_fixes: session.config.fix().unsafe_fixes,
@@ -67,7 +68,7 @@ impl Fixing {
         let id = decision.id();
         let (by, needs) = match &decision.check.as_ref()?.kind {
             CheckKind::Cel(_) => (CheckBy::Cel, Needs::Nothing),
-            CheckKind::Command(_) if self.cel.bundled().is_ok_and(|s| decision.bundled(s)) => {
+            CheckKind::Command(_) if self.comp.bundled().is_ok_and(|s| decision.bundled(s)) => {
                 (CheckBy::Command, Needs::Bundled)
             }
             CheckKind::Command(_) => (CheckBy::Command, Needs::Program),
@@ -120,7 +121,7 @@ pub(crate) fn fix_by(needs: &Needs) -> FixBy {
 pub(crate) fn fix_plan(session: &Session, active: &dyn Fn(&str) -> bool) -> Result<FixPlan> {
     let catalog = &session.catalog;
     let granted = permitted(&session.config, catalog, active)?;
-    let plan = FixPlan::from_catalog(catalog, session.comp.cel().bundled()?);
+    let plan = FixPlan::from_catalog(catalog, session.comp.bundled()?);
     let plan = if granted.ids.is_empty() {
         plan
     } else {

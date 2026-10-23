@@ -568,3 +568,14 @@ fn compose_from_names_the_library_that_cannot_register() {
         "{error}"
     );
 }
+
+#[test]
+fn bundled() {
+    let comp = lighthouse_checks::compose().unwrap();
+
+    let first = comp.bundled().unwrap();
+    let second = comp.bundled().unwrap();
+
+    assert!(first.decision("core/file-size").is_some());
+    assert!(std::ptr::eq(first, second), "validated once");
+}

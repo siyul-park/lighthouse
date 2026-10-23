@@ -16,7 +16,6 @@ pub fn registry(comp: &Composition) -> Result<Registry, Error> {
     let mut registry = Registry::default();
     register(&mut registry, &lighthouse_cel::Cel::new())?;
     let catalog = comp
-        .cel()
         .bundled()
         .map_err(|e| Error::invalid("bundled", e.to_string()))?;
     for pack in catalog.packs() {

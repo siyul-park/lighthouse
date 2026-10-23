@@ -508,3 +508,10 @@ fn decision_inheriting() {
         ["groups", "hooks"]
     );
 }
+
+#[test]
+fn embedded() {
+    let catalog = Catalog::embedded(&lighthouse_test_support::cel()).unwrap();
+
+    assert!(catalog.decision("core/file-size").is_some());
+}

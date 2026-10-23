@@ -135,7 +135,7 @@ impl Session {
             .transpose()?;
         let catalog = layered(&comp, local.as_ref())?;
         environment::check_local(&root, &personal, &catalog)?;
-        let commands = commands(&config, &catalog, comp.cel().bundled()?, &root)?;
+        let commands = commands(&config, &catalog, comp.bundled()?, &root)?;
         let basis = Basis::of(&root, text, &texts, &files.unwrap_or_default(), &commands);
         Ok(Self {
             config,
@@ -335,7 +335,7 @@ fn commands(
 }
 
 fn layered(comp: &Composition, local: Option<&Catalog>) -> Result<Catalog> {
-    let shipped = comp.cel().bundled()?;
+    let shipped = comp.bundled()?;
     match local {
         Some(local) => Ok(Catalog::overlay(shipped, local)?),
         None => Ok(shipped.clone()),

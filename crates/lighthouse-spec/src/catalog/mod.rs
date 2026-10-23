@@ -49,6 +49,11 @@ impl Catalog {
         Self::from_files(load::read_dir(dir)?, cel)
     }
 
+    /// The catalog compiled into the binary, validated against `cel`.
+    pub fn embedded(cel: &Cel) -> Result<Self, Error> {
+        Self::from_files(load::embedded(), cel)
+    }
+
     /// Builds a validated layer from files keyed by `/`-separated paths
     /// relative to the catalog root. Every YAML, TOML or JSON file outside a
     /// `testdata` directory holds documents of the kinds `Pack`, `Decision`,
