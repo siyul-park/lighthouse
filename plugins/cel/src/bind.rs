@@ -6,9 +6,28 @@ use cel::{
     common::ast::{ComprehensionExpr, Expr, IdedExpr, ListExpr, LiteralValue},
     parser::{Macro, MacroExprHelper, ParseError},
 };
+use lighthouse_plugin::{Overload, Precedence};
+
+use crate::{Library, function};
+
+/// The library: cel-go's bindings extension.
+pub(crate) fn library() -> Library {
+    Library::new(
+        "bind",
+        vec![function(
+            "cel.bind",
+            None,
+            vec![Overload::new(&["ident", "dyn", "dyn"], "dyn")],
+            "The body with the name bound to the value of the initializer, evaluated once.",
+            "cel.bind(a, 1, cel.bind(b, a + 1, a + b)) == 3",
+            Precedence::Official,
+        )],
+        install,
+    )
+}
 
 /// Registers the macro on `env`.
-pub(crate) fn install(env: &mut Env) -> Result<(), DeclarationError> {
+fn install(env: &mut Env) -> Result<(), DeclarationError> {
     env.add_macro(Macro::receiver("bind", 3, expand))
 }
 

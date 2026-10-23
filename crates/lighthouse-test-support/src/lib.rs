@@ -3,6 +3,13 @@
 
 pub mod catalog;
 
+/// Installs the CEL environment of the bundled libraries, as every entry point
+/// of the tool does before it reads a decision. A test binary calls it from a
+/// constructor, so that it runs before any test; it is idempotent.
+pub fn cel() {
+    lighthouse_checks::compose().expect("the bundled CEL libraries compose");
+}
+
 use std::{
     env, fs,
     path::{Path, PathBuf},

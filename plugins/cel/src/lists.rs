@@ -11,10 +11,42 @@ use cel::{
     },
 };
 
-use super::take_args;
+use lighthouse_plugin::{Overload, Precedence};
+
+use crate::{Library, function, take_args};
+
+/// The library: the Kubernetes CEL list functions.
+pub(crate) fn library() -> Library {
+    let list = |name: &str, doc: &str, example: &str| {
+        function(
+            name,
+            Some("list"),
+            vec![Overload::new(&["dyn"], "int")],
+            doc,
+            example,
+            Precedence::Official,
+        )
+    };
+    Library::new(
+        "lists",
+        vec![
+            list(
+                "indexOf",
+                "The index of the first element equal to the value, -1 when there is none.",
+                "['a', 'b', 'a'].indexOf('a') == 0",
+            ),
+            list(
+                "lastIndexOf",
+                "The index of the last element equal to the value, -1 when there is none.",
+                "['a', 'b', 'a'].lastIndexOf('a') == 2",
+            ),
+        ],
+        install,
+    )
+}
 
 /// Registers the overloads on `env`.
-pub(crate) fn install(env: &mut Env) -> Result<(), DeclarationError> {
+fn install(env: &mut Env) -> Result<(), DeclarationError> {
     env.add_member_overload(
         "indexOf",
         "list.indexOf(dyn)",

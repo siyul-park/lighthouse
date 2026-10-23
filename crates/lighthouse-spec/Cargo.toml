@@ -11,7 +11,6 @@ doctest = false
 [dependencies]
 cel.workspace = true
 globset.workspace = true
-regex.workspace = true
 include_dir.workspace = true
 schemars.workspace = true
 serde.workspace = true
@@ -28,3 +27,4 @@ lighthouse-resource.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }
 insta.workspace = true
 tempfile.workspace = true
+ctor = "1.0.13"

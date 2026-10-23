@@ -442,6 +442,12 @@ pub(super) fn named(model: &Model) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The CEL environment is installed before any test reads a decision.
+    #[ctor::ctor(unsafe)]
+    fn compose() {
+        lighthouse_test_support::cel();
+    }
     use lighthouse_plugin::{
         Capabilities, CreateFineTuningJobRequest, Error, FineTuningJob, Plugin, PluginManifest,
         Registry, Supports, SystemOneRequest, SystemOneResponse,

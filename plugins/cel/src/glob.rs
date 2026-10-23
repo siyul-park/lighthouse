@@ -15,11 +15,24 @@ use cel::{
     DeclarationError, Env,
     common::types::{CelBool, CelString},
 };
+use lighthouse_plugin::{Overload, Precedence};
 
-/// Registers the overload on `env`.
-pub(crate) fn install(env: &mut Env) -> Result<(), DeclarationError> {
-    cel::add_overload!(env, fn matches_glob: (CelString, CelString) -> CelBool,
-        name = "glob.matches")
+use crate::{Library, function};
+
+/// The library: module path globs.
+pub(crate) fn library() -> Library {
+    Library::new(
+        "glob",
+        vec![function(
+            "glob.matches",
+            None,
+            vec![Overload::new(&["string", "string"], "bool")],
+            "Whether a module path matches a glob, by segment: `*` is a run of characters inside one segment, `**` any number of segments. `::` reads as `/`.",
+            "glob.matches('app/http', 'app/*')",
+            Precedence::Designed,
+        )],
+        install,
+    )
 }
 
 /// Whether `path` matches `glob`.
@@ -29,6 +42,12 @@ pub fn matches(path: &str, glob: &str) -> bool {
     let path: Vec<&str> = path.split('/').collect();
     let glob: Vec<&str> = glob.split('/').collect();
     segments(&path, &glob)
+}
+
+/// Registers the overload on `env`.
+fn install(env: &mut Env) -> Result<(), DeclarationError> {
+    cel::add_overload!(env, fn matches_glob: (CelString, CelString) -> CelBool,
+        name = "glob.matches")
 }
 
 fn matches_glob(path: &CelString<'_>, pattern: &CelString<'_>) -> CelBool {

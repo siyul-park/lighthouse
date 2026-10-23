@@ -7,7 +7,6 @@ mod edit;
 mod environment;
 mod error;
 mod expression;
-mod ext;
 mod fix;
 mod model;
 mod model_check;
@@ -30,13 +29,12 @@ pub use check::{
 pub use command::CommandCheck;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
 pub use edit::KIND as EDIT_KIND;
-pub use environment::{compile, compile_shared, context, environment};
+pub use environment::{base, compile, compile_shared, context, environment, install};
 pub use error::Error;
 pub use expression::{
     Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, parse_template,
     program_calls, program_identifiers,
 };
-pub use ext::glob::matches as glob_matches;
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
 pub use model::{DecisionStatus, Example, ExampleFile, ExampleKind, Expect, Scope, Subject};
 pub use model_check::ModelCheck;

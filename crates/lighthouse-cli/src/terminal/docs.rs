@@ -10,7 +10,7 @@ use lighthouse_session::{DOCS_DIR, Session, bundled_docs, skill_for};
 use crate::terminal::{Result, reference};
 
 pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
-    let docs = generated();
+    let docs = generated()?;
     for orphan in orphans(out, &docs)? {
         fs::remove_file(&orphan)?;
         println!("removed {}", orphan.display());
@@ -27,11 +27,11 @@ pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
 
 /// The docs `out` holds, by path under it: the decision docs of the catalog,
 /// and the references of the commands and of the tools.
-fn generated() -> BTreeMap<String, String> {
-    let mut docs = bundled_docs();
+fn generated() -> Result<BTreeMap<String, String>> {
+    let mut docs = bundled_docs()?;
     docs.insert(reference::CLI_DOC.to_owned(), reference::cli());
     docs.insert(reference::MCP_DOC.to_owned(), reference::mcp());
-    docs
+    Ok(docs)
 }
 
 /// The agent skill of this project: its catalog and configuration.
@@ -40,7 +40,7 @@ pub fn skill_text(config: Option<&Path>) -> Result<String> {
 }
 
 pub fn check(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
-    let docs = generated();
+    let docs = generated()?;
     let mut problems = Vec::new();
     for (path, text) in &docs {
         let target = out.join(path);

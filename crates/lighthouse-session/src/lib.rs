@@ -49,3 +49,10 @@ pub use validate::{Problem, Validated, validate_paths};
 pub use lighthouse_engine::SKIPPED_DIRS;
 
 pub use lighthouse_model::Result;
+
+/// Installs the CEL environment of the bundled libraries, once per process:
+/// the composition root every way into the session goes through before a
+/// decision is read.
+pub(crate) fn compose() -> Result<()> {
+    lighthouse_checks::compose().map_err(Into::into)
+}

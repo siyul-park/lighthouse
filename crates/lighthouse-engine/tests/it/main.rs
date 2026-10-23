@@ -17,3 +17,9 @@ mod scope;
 mod support;
 mod tester;
 mod tool_findings;
+
+/// The CEL environment is installed before any test reads a decision.
+#[ctor::ctor(unsafe)]
+fn compose() {
+    lighthouse_test_support::cel();
+}

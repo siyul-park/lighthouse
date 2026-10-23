@@ -15,6 +15,7 @@ serde_json.workspace = true
 serde_norway.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
+lighthouse-cel.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-process.workspace = true
@@ -23,6 +24,7 @@ lighthouse-resource.workspace = true
 lighthouse-spec.workspace = true
 
 [dev-dependencies]
+ctor = "1.0.13"
 lighthouse-engine.workspace = true
 lighthouse-rpc.workspace = true
 tempfile.workspace = true

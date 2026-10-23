@@ -9,5 +9,6 @@ test = false
 doctest = false
 
 [dependencies]
+lighthouse-checks.workspace = true
 lighthouse-resource.workspace = true
 toml.workspace = true

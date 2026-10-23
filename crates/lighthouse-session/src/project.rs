@@ -113,6 +113,7 @@ impl Session {
     /// and the decision files read here, once: what is parsed is what trust is
     /// judged on.
     fn assemble(path: &Path, text: &str, root: PathBuf) -> Result<Self> {
+        crate::compose()?;
         let format = Format::of_path(path).unwrap_or(Format::Toml);
         let personal = environment::read(&root)?;
         let covered: Vec<(&str, String)> = personal
@@ -146,6 +147,7 @@ impl Session {
     /// decisions: for commands that must work on a project whose own files
     /// are broken or out of date.
     pub fn bare(root: PathBuf) -> Result<Self> {
+        crate::compose()?;
         Ok(Self {
             config: Config::parse(DEFAULT_CONFIG)?,
             store: root.clone(),
@@ -264,6 +266,7 @@ pub fn config_file(root: &Path) -> Option<PathBuf> {
 /// The catalog of the project at `root`: the bundled one with the project's
 /// layer on top. Fails when the project's layer is broken.
 pub fn catalog_at(root: &Path) -> Result<Catalog> {
+    crate::compose()?;
     layered(load_local(root)?.as_ref())
 }
 

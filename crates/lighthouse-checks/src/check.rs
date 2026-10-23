@@ -4,7 +4,7 @@
 //! The decision supplies id, severity, scope, options and the examples that
 //! `lighthouse decision test` runs.
 
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use lighthouse_model::{
     Diagnostic, Options, Reach, RunScope,
@@ -92,16 +92,12 @@ impl Check {
             meta.analyzers = rule.analyzers();
         }
         meta.capabilities.clone_from(&check.requires);
-        let revision = serde_json::to_vec(&(
-            decision.uid(),
-            &decision.check,
-            &decision.scope,
-            decision.severity,
-            &decision.options,
-            &decision.languages,
-        ))
-        .map(hash::sha256)
-        .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
+        let libraries = match &kind {
+            Kind::Cel(rule) => rule.libraries().clone(),
+            _ => BTreeMap::new(),
+        };
+        let revision = revision(decision, &libraries)
+            .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
         let (reach, positions) = match &kind {
             Kind::Cel(rule) => rule.reach(meta.scope),
             Kind::Cycle(_) => (Reach::Global, false),
@@ -129,6 +125,14 @@ impl Check {
             decision: decision.clone(),
             kind: Arc::new(kind),
         }))
+    }
+
+    /// The id and version of each CEL library the check's expressions call.
+    pub(crate) fn libraries(&self) -> BTreeMap<String, String> {
+        match &*self.kind {
+            Kind::Cel(rule) => rule.libraries().clone(),
+            _ => BTreeMap::new(),
+        }
     }
 
     /// The options of the focused file's language over the decision's defaults.
@@ -169,4 +173,23 @@ impl Rule for Check {
             Kind::Annotation => Ok(Vec::new()),
         }
     }
+}
+
+/// What the findings of `decision` depend on besides the code: the way it
+/// judges (check, scope, severity, options, language values) and the ids and
+/// versions of the CEL libraries its expressions call.
+pub(crate) fn revision(
+    decision: &Decision,
+    libraries: &BTreeMap<String, String>,
+) -> Result<String, serde_json::Error> {
+    serde_json::to_vec(&(
+        libraries,
+        decision.uid(),
+        &decision.check,
+        &decision.scope,
+        decision.severity,
+        &decision.options,
+        &decision.languages,
+    ))
+    .map(hash::sha256)
 }

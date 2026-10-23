@@ -1,14 +1,33 @@
-//! The extension libraries the `cel` crate lacks, against their upstream
-//! documentation: cel-go's `ext.Regex()` (the README examples of its `regex`
-//! section) and the list functions of the Kubernetes CEL library.
+//! The libraries of the plugin, against their upstream documentation: cel-go's
+//! `ext.Regex()` (the README examples of its `regex` section), the list
+//! functions of the Kubernetes CEL library, and cel-go's bindings.
 
-use cel::Value;
-use lighthouse_spec::{compile, context};
+use std::sync::{Arc, OnceLock};
+
+use cel::{Context, Env, Value};
+use lighthouse_cel::Cel;
+use lighthouse_plugin::Registry;
+
+/// The standard environment with every library of the plugin registered.
+pub(crate) fn environment() -> Arc<Env> {
+    static ENV: OnceLock<Arc<Env>> = OnceLock::new();
+    ENV.get_or_init(|| {
+        let mut registry = Registry::default();
+        registry.register(&Cel::new()).unwrap();
+        let mut env = lighthouse_spec::base().unwrap();
+        for library in registry.cel_libraries() {
+            library.register(&mut env).unwrap();
+        }
+        Arc::new(env)
+    })
+    .clone()
+}
 
 fn eval(source: &str) -> Result<Value, String> {
-    compile(source)
-        .unwrap()
-        .execute(&context().unwrap())
+    let env = environment();
+    env.compile(source)
+        .map_err(|e| e.to_string())?
+        .execute(&Context::with_env(env))
         .map_err(|e| e.to_string())
 }
 
@@ -126,53 +145,10 @@ fn matches() {
 }
 
 #[test]
-fn program_identifiers() {
-    let program = compile("regex.extract(a.b, c) + size(d)").unwrap();
-    let names = lighthouse_spec::program_identifiers(&program);
-    for name in ["a", "c", "d", "size", "regex"] {
-        assert!(names.contains(name), "{name}: {names:?}");
-    }
-}
-
-#[test]
-fn free_variables() {
-    let free = |source: &str| {
-        let program = compile(source).unwrap();
-        lighthouse_spec::free_variables(&program)
-            .into_iter()
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(free("x.exists(e, e > y)"), ["x", "y"]);
-    assert_eq!(free("cel.bind(a, b, a + c)"), ["b", "c"]);
-    assert_eq!(free("glob.matches(m, g)"), ["g", "m"]);
-}
-
-#[test]
 fn matches_does_not_backtrack_on_a_run_of_double_stars() {
     let path = ["a"; 40].join("/") + "/z";
     let pattern = ["**"; 30].join("/") + "/b";
     let started = std::time::Instant::now();
     is(&format!("glob.matches('{path}', '{pattern}')"), "false");
     assert!(started.elapsed().as_secs() < 2, "{:?}", started.elapsed());
-}
-
-#[test]
-fn program_calls() {
-    let program = compile("regex.extract(a, b) + size(c) + c.startsWith('x')").unwrap();
-
-    let calls: Vec<(String, Option<String>, bool, usize)> =
-        lighthouse_spec::program_calls(&program)
-            .into_iter()
-            .filter(|call| call.name.chars().all(|c| c.is_ascii_alphabetic()))
-            .map(|call| (call.name, call.namespace, call.member, call.args))
-            .collect();
-
-    assert_eq!(
-        calls,
-        [
-            ("extract".to_owned(), Some("regex".to_owned()), false, 2),
-            ("size".to_owned(), None, false, 1),
-            ("startsWith".to_owned(), None, true, 1),
-        ]
-    );
 }

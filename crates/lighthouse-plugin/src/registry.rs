@@ -3,7 +3,10 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
-use crate::{Analyzer, Error, Fixer, LanguageProvider, ModelClient, Plugin, PluginManifest, Rule};
+use crate::{
+    Analyzer, CatalogFunction, CelLibrary, Error, Fixer, LanguageProvider, ModelClient, Plugin,
+    PluginManifest, Rule,
+};
 
 /// A language provider with the id of the plugin that registered it.
 pub struct Language {
@@ -21,6 +24,7 @@ pub struct Registry {
     rules: BTreeMap<String, Box<dyn Rule>>,
     fixers: BTreeMap<String, Box<dyn Fixer>>,
     models: BTreeMap<String, Box<dyn ModelClient>>,
+    libraries: Vec<Box<dyn CelLibrary>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -49,6 +53,7 @@ impl Registry {
         let rules = plugin.rules();
         let fixers = plugin.fixers();
         let models = plugin.models();
+        let libraries = plugin.cel_libraries();
         let id = manifest.id.as_str();
         let own = |model: &str| model == id;
         let qualified = |item: &str| plugin_of(item) == id && item.contains('/');
@@ -83,6 +88,8 @@ impl Registry {
             id,
         )?;
 
+        self.check_libraries(&libraries, id)?;
+
         let id = manifest.id.clone();
         self.plugins.push(manifest);
         self.languages
@@ -111,7 +118,34 @@ impl Registry {
             .extend(fixers.into_iter().map(|f| (f.manifest().id.clone(), f)));
         self.models
             .extend(models.into_iter().map(|m| (m.manifest().id.clone(), m)));
+        self.libraries.extend(libraries);
         Ok(())
+    }
+
+    /// The CEL libraries of the registered plugins, in registration order.
+    pub fn cel_libraries(&self) -> impl Iterator<Item = &dyn CelLibrary> {
+        self.libraries.iter().map(Box::as_ref)
+    }
+
+    /// The one function catalog: the functions of every registered library,
+    /// sorted by name.
+    pub fn cel_functions(&self) -> Vec<CatalogFunction<'_>> {
+        let mut all: Vec<CatalogFunction<'_>> = self
+            .libraries
+            .iter()
+            .flat_map(|l| {
+                let manifest = l.manifest();
+                manifest.functions.iter().map(|function| CatalogFunction {
+                    library: manifest.id.as_str(),
+                    version: manifest.version.as_str(),
+                    function,
+                })
+            })
+            .collect();
+        all.sort_by(|a, b| {
+            (&a.function.name, &a.function.receiver).cmp(&(&b.function.name, &b.function.receiver))
+        });
+        all
     }
 
     /// The model with this id.
@@ -127,6 +161,63 @@ impl Registry {
     /// Sorted by id.
     pub fn fixers(&self) -> impl Iterator<Item = &dyn Fixer> {
         self.fixers.values().map(Box::as_ref)
+    }
+
+    /// The libraries of a plugin are named after it, and neither a library nor
+    /// a function (a name and the kind of value it is called on) is provided
+    /// twice, within the plugin or against the registered ones.
+    fn check_libraries(
+        &self,
+        libraries: &[Box<dyn CelLibrary>],
+        plugin: &str,
+    ) -> Result<(), Error> {
+        let mut ids = BTreeSet::new();
+        let mut functions: BTreeMap<(&str, Option<&str>), &str> = self
+            .cel_functions()
+            .into_iter()
+            .map(|c| {
+                (
+                    (c.function.name.as_str(), c.function.receiver.as_deref()),
+                    c.library,
+                )
+            })
+            .collect();
+        for library in libraries {
+            let manifest = library.manifest();
+            if plugin_of(&manifest.id) != plugin || !manifest.id.contains('/') {
+                return Err(Error::Prefix {
+                    plugin: plugin.to_owned(),
+                    id: manifest.id.clone(),
+                });
+            }
+            if !ids.insert(manifest.id.as_str())
+                || self
+                    .libraries
+                    .iter()
+                    .any(|l| l.manifest().id == manifest.id)
+            {
+                return Err(Error::Duplicate(manifest.id.clone()));
+            }
+            for function in &manifest.functions {
+                let key = (function.name.as_str(), function.receiver.as_deref());
+                if let Some(other) = functions.insert(key, manifest.id.as_str()) {
+                    return Err(Error::Failed(format!(
+                        "CEL function `{}` is provided by both `{other}` and `{}`",
+                        function.name, manifest.id
+                    )));
+                }
+                let mut seen = BTreeSet::new();
+                if let Some(o) = function.overloads.iter().find(|o| !seen.insert(&o.params)) {
+                    return Err(Error::Failed(format!(
+                        "CEL function `{}` of `{}` has the overload ({}) twice",
+                        function.name,
+                        manifest.id,
+                        o.params.join(", ")
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn check_languages(&self, languages: &[Box<dyn LanguageProvider>]) -> Result<(), Error> {

@@ -25,7 +25,10 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
+use lighthouse_plugin::{Function, Overload, Precedence};
 use regex::{Captures, Regex};
+
+use crate::{Library, function};
 
 /// One piece of a replacement string.
 enum Piece {
@@ -33,8 +36,50 @@ enum Piece {
     Group(usize),
 }
 
+/// The library: cel-go's regex extension.
+pub(crate) fn library() -> Library {
+    Library::new(
+        "regex",
+        vec![
+            regex_function(
+                "replace",
+                vec![
+                    Overload::new(&["string", "string", "string"], "string"),
+                    Overload::new(&["string", "string", "string", "int"], "string"),
+                ],
+                "Replaces the matches of the pattern: all of them, or the first `count` when it is not negative. The replacement writes a group as `\\1` and a backslash as `\\\\`.",
+                "regex.replace('banana', 'a', 'x', 2) == 'bxnxna'",
+            ),
+            regex_function(
+                "extract",
+                vec![Overload::new(&["string", "string"], "optional<string>")],
+                "The first match of the pattern (its capture group when it has one), as an optional.",
+                "regex.extract('item-A', 'item-([A-Z]+)') == optional.of('A')",
+            ),
+            regex_function(
+                "extractAll",
+                vec![Overload::new(&["string", "string"], "list<string>")],
+                "Every match of the pattern (its capture group when it has one).",
+                "regex.extractAll('id:1, id:22', 'id:([0-9]+)') == ['1', '22']",
+            ),
+        ],
+        install,
+    )
+}
+
+fn regex_function(name: &str, overloads: Vec<Overload>, doc: &str, example: &str) -> Function {
+    function(
+        &format!("regex.{name}"),
+        None,
+        overloads,
+        doc,
+        example,
+        Precedence::Official,
+    )
+}
+
 /// Registers the overloads on `env`.
-pub(crate) fn install(env: &mut Env) -> Result<(), DeclarationError> {
+fn install(env: &mut Env) -> Result<(), DeclarationError> {
     cel::add_overload!(env, fn replace: (CelString, CelString, CelString) -> Result<CelString>,
         name = "regex.replace")?;
     cel::add_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> Result<CelString>,

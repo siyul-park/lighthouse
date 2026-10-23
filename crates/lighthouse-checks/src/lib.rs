@@ -15,6 +15,7 @@ mod cel_rule;
 mod check;
 mod checks;
 pub mod command;
+mod compose;
 mod cycle;
 mod eval;
 mod facts;
@@ -33,6 +34,7 @@ mod text;
 
 pub use bundled::registry;
 pub use checks::Checks;
+pub use compose::{Entry, catalog, compose};
 
 impl Error {
     pub(crate) fn invalid(rule: &str, message: impl Into<String>) -> Self {

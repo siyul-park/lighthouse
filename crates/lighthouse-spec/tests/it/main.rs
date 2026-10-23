@@ -5,7 +5,6 @@ mod checks;
 mod clean_code;
 mod environment;
 mod events;
-mod ext;
 mod fixes;
 mod harness_free;
 mod kinds;
@@ -19,3 +18,9 @@ mod reference;
 mod sources;
 mod validation;
 mod versions;
+
+/// The CEL environment is installed before any test reads a decision.
+#[ctor::ctor(unsafe)]
+fn compose() {
+    lighthouse_test_support::cel();
+}

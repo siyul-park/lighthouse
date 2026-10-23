@@ -46,6 +46,8 @@ pub(crate) struct CelRule {
     /// through another: the others are not evaluated.
     used: Vec<bool>,
     library: cel::Context<'static, 'static>,
+    /// The libraries (id and version) whose functions the expressions call.
+    libraries: BTreeMap<String, String>,
 }
 
 struct At {
@@ -144,7 +146,10 @@ impl CelRule {
         library::check_calls(id, &library, &declared.functions, read.iter().copied())?;
         let roots: Vec<&Program> = read[variables.len() + bodies.len()..].to_vec();
         let used = library::reached(&variables, &declared.functions, &bodies, &roots);
+        let libraries =
+            library::libraries_called(read.iter().copied()).map_err(|e| Error::invalid(id, e))?;
         Ok(Self {
+            libraries,
             select,
             file_level: level,
             used,
@@ -158,6 +163,12 @@ impl CelRule {
             identity,
             library,
         })
+    }
+
+    /// The id and version of each library the expressions call: part of what
+    /// a stored finding depends on.
+    pub(crate) fn libraries(&self) -> &BTreeMap<String, String> {
+        &self.libraries
     }
 
     /// Whether the check has a route that puts subjects to the models.

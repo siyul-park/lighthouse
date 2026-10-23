@@ -73,6 +73,7 @@ impl CandidateFile {
 
 /// Runs the evaluation.
 pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
+    crate::compose()?;
     if request.model.is_some() && request.candidate.is_some() {
         return Err("--model and --candidate are exclusive".into());
     }

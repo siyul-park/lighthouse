@@ -99,3 +99,53 @@ fn compile_shared() {
     );
     assert!(lighthouse_spec::compile_shared("1 +").is_err());
 }
+
+#[test]
+fn program_identifiers() {
+    let program = compile("regex.extract(a.b, c) + size(d)").unwrap();
+    let names = lighthouse_spec::program_identifiers(&program);
+    for name in ["a", "c", "d", "size", "regex"] {
+        assert!(names.contains(name), "{name}: {names:?}");
+    }
+}
+
+#[test]
+fn free_variables() {
+    let free = |source: &str| {
+        let program = compile(source).unwrap();
+        lighthouse_spec::free_variables(&program)
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(free("x.exists(e, e > y)"), ["x", "y"]);
+    assert_eq!(free("cel.bind(a, b, a + c)"), ["b", "c"]);
+    assert_eq!(free("glob.matches(m, g)"), ["g", "m"]);
+}
+
+#[test]
+fn program_calls() {
+    let program = compile("regex.extract(a, b) + size(c) + c.startsWith('x')").unwrap();
+
+    let calls: Vec<(String, Option<String>, bool, usize)> =
+        lighthouse_spec::program_calls(&program)
+            .into_iter()
+            .filter(|call| call.name.chars().all(|c| c.is_ascii_alphabetic()))
+            .map(|call| (call.name, call.namespace, call.member, call.args))
+            .collect();
+
+    assert_eq!(
+        calls,
+        [
+            ("extract".to_owned(), Some("regex".to_owned()), false, 2),
+            ("size".to_owned(), None, false, 1),
+            ("startsWith".to_owned(), None, true, 1),
+        ]
+    );
+}
+
+#[test]
+fn install() {
+    let again = lighthouse_spec::install(lighthouse_spec::base().unwrap(), []);
+
+    assert!(again.unwrap_err().contains("installed already"));
+}

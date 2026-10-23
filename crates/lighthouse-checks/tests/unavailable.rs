@@ -82,3 +82,9 @@ fn a_command_check_and_a_bundled_one_leave_the_analysis_incomplete_when_the_sand
     );
     assert!(!dir.path().join("ran").exists(), "the program ran");
 }
+
+/// The CEL environment is installed before any test reads a decision.
+#[ctor::ctor(unsafe)]
+fn compose() {
+    lighthouse_test_support::cel();
+}

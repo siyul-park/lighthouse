@@ -24,3 +24,9 @@ fn a_program_does_not_run_where_the_sandbox_it_is_asked_for_does_not_work() {
         "a project that turned the sandbox off does not need it"
     );
 }
+
+/// The CEL environment is installed before any test reads a decision.
+#[ctor::ctor(unsafe)]
+fn compose() {
+    lighthouse_test_support::cel();
+}

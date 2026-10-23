@@ -194,6 +194,26 @@ fn error() {
             "select: symbol\nvariables:\n  - { name: plus, params: [n], expression: 'n + 1' }\nwhere: 'symbol.name == \"x\" ? true : plus(1, 2) > 0'\nmessage: x",
             "`plus` takes 1 argument(s), not 2",
         ),
+        (
+            "symbol",
+            "select: symbol\nwhere: \"symbol.name == 'x' || glob.matches(symbol.name)\"\nmessage: x",
+            "`glob.matches` takes 2 argument(s), not 1",
+        ),
+        (
+            "symbol",
+            "select: symbol\nwhere: \"symbol.name == 'x' || regex.replace(symbol.name, 'a') == ''\"\nmessage: x",
+            "`regex.replace` takes 3 or 4 argument(s), not 2",
+        ),
+        (
+            "symbol",
+            "select: symbol\nwhere: \"symbol.name == 'x' || [1].misplaced(2).size() > 0\"\nmessage: x",
+            "`misplaced` (called on a value) takes 0 argument(s), not 1",
+        ),
+        (
+            "symbol",
+            "select: symbol\nwhere: \"symbol.name == 'x' || misplaced([1]).size() > 0\"\nmessage: x",
+            "`misplaced` is not a function",
+        ),
     ];
     for (scope, rule, reason) in cases {
         let error = local(scope, rule).err().unwrap_or_default();
@@ -372,4 +392,101 @@ fn a_method_without_an_owner_is_not_hidden_by_it() {
     w.summarize(&open, 1, &[]);
 
     assert_eq!(w.names(&found(&plugin, &w)), ["orphan", "open"]);
+}
+
+/// The decision `local/probe` of `local`, as the catalog holds it.
+fn probe(scope: &str, check: &str) -> lighthouse_spec::Decision {
+    let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
+    let text = format!(
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: {scope}, tests: include }}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
+    );
+    let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)])).unwrap();
+    layer.decision("local/probe").unwrap().clone()
+}
+
+#[test]
+fn the_check_revision_names_the_libraries_its_expressions_call() {
+    let globs = probe(
+        "symbol",
+        "select: symbol\nwhere: \"glob.matches(symbol.module, 'a/**')\"\nmessage: x",
+    );
+    let (used, revision) = lighthouse_checks::probe::revision(&globs, |_| None).unwrap();
+    assert_eq!(
+        used.keys().collect::<Vec<_>>(),
+        ["cel/glob"],
+        "only the library it calls"
+    );
+
+    let (_, bumped) = lighthouse_checks::probe::revision(&globs, |id| {
+        (id == "cel/glob").then(|| "9.9.9".to_owned())
+    })
+    .unwrap();
+    assert_ne!(
+        revision, bumped,
+        "a used library's version is in the revision"
+    );
+
+    let (_, other) = lighthouse_checks::probe::revision(&globs, |id| {
+        (id == "cel/regex").then(|| "9.9.9".to_owned())
+    })
+    .unwrap();
+    assert_eq!(revision, other, "an unused library's version is not");
+}
+
+#[test]
+fn a_decision_that_calls_no_library_has_a_revision_no_library_changes() {
+    let plain = probe(
+        "symbol",
+        "select: symbol\nwhere: \"symbol.name.startsWith('a')\"\nmessage: x",
+    );
+    let (used, revision) = lighthouse_checks::probe::revision(&plain, |_| None).unwrap();
+    assert!(used.is_empty());
+    let (_, bumped) =
+        lighthouse_checks::probe::revision(&plain, |_| Some("9.9.9".to_owned())).unwrap();
+    assert_eq!(revision, bumped);
+}
+
+#[test]
+fn the_function_catalog_is_what_the_plugin_registers_and_the_runtime_has() {
+    let catalog = lighthouse_checks::catalog().unwrap();
+    let registry = lighthouse_checks::registry();
+    let registered: Vec<String> = registry
+        .cel_functions()
+        .iter()
+        .map(|c| {
+            format!(
+                "{} {} {:?}",
+                c.library, c.function.name, c.function.receiver
+            )
+        })
+        .collect();
+    let composed: Vec<String> = catalog
+        .iter()
+        .map(|c| {
+            format!(
+                "{} {} {:?}",
+                c.library, c.function.name, c.function.receiver
+            )
+        })
+        .collect();
+    assert_eq!(registered, composed);
+    for entry in catalog {
+        let call = match &entry.function.receiver {
+            Some(_) => format!("[1].{}", entry.function.name),
+            None => entry.function.name.clone(),
+        };
+        let args = entry.function.overloads[0].params.len();
+        if entry.function.name == "cel.bind" {
+            continue;
+        }
+        let args = vec!["null"; args].join(", ");
+        let source = format!("{call}({args})");
+        let outcome = lighthouse_spec::compile(&source)
+            .unwrap()
+            .execute(&lighthouse_spec::context().unwrap());
+        assert!(
+            !matches!(outcome, Err(cel::ExecutionError::UndeclaredReference(_))),
+            "{source}: {outcome:?}"
+        );
+    }
 }

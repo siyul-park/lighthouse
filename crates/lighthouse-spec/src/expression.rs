@@ -5,18 +5,12 @@ use std::collections::BTreeSet;
 
 use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr};
 
-use crate::environment::compile_shared;
+use crate::environment::{compile_shared, is_namespace};
 
 /// The variables a check can name for the value it judges, by `select`, and
 /// `node`, the one of a value related to it.
 pub const SUBJECT_VARIABLES: [&str; 10] = [
     "symbol", "func", "edge", "module", "file", "test", "comment", "event", "decision", "node",
-];
-
-/// The namespaces of the functions of the environment (`regex.extract`,
-/// `glob.matches`, `cel.bind`, ...): a name before a dot that is no variable.
-const NAMESPACES: [&str; 10] = [
-    "cel", "glob", "regex", "lists", "math", "strings", "base64", "optional", "sets", "encoders",
 ];
 
 /// One part of a `{{ cel }}` template: literal text, or the source of a hole.
@@ -87,7 +81,7 @@ pub fn program_calls(program: &cel::Program) -> BTreeSet<Call> {
                 .target
                 .as_deref()
                 .and_then(|target| match &target.expr {
-                    Expr::Ident(name) if NAMESPACES.contains(&name.as_str()) => Some(name.clone()),
+                    Expr::Ident(name) if is_namespace(name) => Some(name.clone()),
                     _ => None,
                 });
             into.insert(Call {
@@ -110,7 +104,7 @@ pub fn free_variables(program: &cel::Program) -> BTreeSet<String> {
     fn collect(expr: &IdedExpr, bound: &mut Vec<String>, into: &mut BTreeSet<String>) {
         match &expr.expr {
             Expr::Ident(name) => {
-                if !bound.contains(name) && !NAMESPACES.contains(&name.as_str()) {
+                if !bound.contains(name) && !is_namespace(name) {
                     into.insert(name.clone());
                 }
             }

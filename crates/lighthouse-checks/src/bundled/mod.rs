@@ -14,8 +14,11 @@ pub(crate) const CORE: &str = "core";
 
 /// Registry holding every bundled plugin.
 pub fn registry() -> Registry {
-    let catalog = Catalog::bundled();
     let mut registry = Registry::default();
+    register(&mut registry, &lighthouse_cel::Cel::new());
+    crate::compose::compose_from(&registry)
+        .unwrap_or_else(|e| panic!("the bundled CEL libraries compose: {e}"));
+    let catalog = Catalog::bundled();
     for pack in catalog.packs() {
         let checks = Checks::new(&pack.id, catalog)
             .unwrap_or_else(|e| panic!("bundled decisions of `{}` are valid: {e}", pack.id));

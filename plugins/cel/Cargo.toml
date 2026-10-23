@@ -1,0 +1,16 @@
+[package]
+name = "lighthouse-cel"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+cel.workspace = true
+regex.workspace = true
+lighthouse-plugin.workspace = true
+
+[dev-dependencies]
+lighthouse-spec.workspace = true

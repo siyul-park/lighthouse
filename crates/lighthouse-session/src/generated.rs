@@ -8,7 +8,9 @@ use std::{
 };
 
 use lighthouse_engine::active;
-use lighthouse_report::docs::{DOCS_DIR, fix_operations_markdown, pages};
+use lighthouse_report::docs::{
+    DOCS_DIR, FunctionDoc, cel_functions_markdown, fix_operations_markdown, pages,
+};
 use lighthouse_resource::{Descriptor, schema_file};
 use lighthouse_spec::{Catalog, authored_severity};
 
@@ -25,14 +27,19 @@ const HEAD: &str = include_str!("skill-head.md");
 pub const AGENT_LOOP: &str = include_str!("agent-loop.md");
 
 /// Every generated page by path under the docs directory: one per pack, and
-/// the fix operations.
-pub fn bundled_docs() -> BTreeMap<String, String> {
+/// the fix operations and the CEL functions.
+pub fn bundled_docs() -> Result<BTreeMap<String, String>> {
+    crate::compose()?;
     let mut pages = pages(Catalog::bundled());
     pages.insert(
         format!("{DOCS_DIR}/fix-operations.md"),
         fix_operations_markdown(),
     );
-    pages
+    pages.insert(
+        format!("{DOCS_DIR}/cel-functions.md"),
+        cel_functions_markdown(&function_docs()?),
+    );
+    Ok(pages)
 }
 
 /// Every kind with its schema, by kind name.
@@ -102,4 +109,25 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
         }
     }
     out
+}
+
+/// The function catalog of the bundled CEL libraries, as the docs page shows it.
+fn function_docs() -> Result<Vec<FunctionDoc>> {
+    Ok(lighthouse_checks::catalog()?
+        .iter()
+        .map(|entry| FunctionDoc {
+            library: entry.library.clone(),
+            version: entry.version.clone(),
+            name: entry.function.name.clone(),
+            signatures: entry
+                .function
+                .to_string()
+                .split("; ")
+                .map(str::to_owned)
+                .collect(),
+            doc: entry.function.doc.clone(),
+            example: entry.function.example.clone(),
+            step: entry.function.precedence.step(),
+        })
+        .collect())
 }

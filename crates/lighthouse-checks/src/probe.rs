@@ -35,3 +35,22 @@ pub fn node_fields(project: &Project, symbol: &Symbol) -> Vec<String> {
         .map(|fields| fields.keys().cloned().collect())
         .unwrap_or_default()
 }
+
+/// The libraries (id and version) a decision's expressions call, and its
+/// check revision with `versions` standing in for the versions of those
+/// libraries: what the stored findings of the rule depend on.
+pub fn revision(
+    decision: &lighthouse_spec::Decision,
+    versions: impl Fn(&str) -> Option<String>,
+) -> Result<(std::collections::BTreeMap<String, String>, String), String> {
+    let rule = crate::check::Check::new(decision)
+        .map_err(|e| e.to_string())?
+        .ok_or("the decision has no program check")?;
+    let used = rule.libraries();
+    let shown: std::collections::BTreeMap<String, String> = used
+        .iter()
+        .map(|(id, version)| (id.clone(), versions(id).unwrap_or_else(|| version.clone())))
+        .collect();
+    let revision = crate::check::revision(decision, &shown).map_err(|e| e.to_string())?;
+    Ok((used, revision))
+}

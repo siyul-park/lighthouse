@@ -1,3 +1,4 @@
+mod cel;
 mod fix;
 mod memo;
 mod models;
@@ -20,6 +21,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
 
+pub use cel::{CatalogFunction, CelLibrary, CelLibraryManifest, Function, Overload, Precedence};
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
 pub use lighthouse_protocol::Conventions;
 pub use memo::Memo;
@@ -358,6 +360,10 @@ pub trait Plugin {
     }
     /// The models of the plugin; each has the id of the plugin.
     fn models(&self) -> Vec<Box<dyn ModelClient>> {
+        Vec::new()
+    }
+    /// The CEL libraries of the plugin; each id is qualified with the plugin's.
+    fn cel_libraries(&self) -> Vec<Box<dyn CelLibrary>> {
         Vec::new()
     }
 }
