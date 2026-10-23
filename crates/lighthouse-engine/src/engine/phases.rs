@@ -331,14 +331,22 @@ impl Engine {
             return Ok(Vec::new());
         }
         let annotations = scene.memo.slot::<lighthouse_plugin::Annotations>();
+        let mut with_directives = BTreeSet::new();
         for input in scene.inputs {
             let path = &input.file.path;
-            annotations.insert(path.clone(), said.remove(path).unwrap_or_default());
+            let directives = said.remove(path).unwrap_or_default();
+            if !directives.is_empty() {
+                with_directives.insert(path);
+            }
+            annotations.insert(path.clone(), directives);
         }
+        // A rule that reads the directives judges them: a file that has none
+        // has nothing for it to find.
         let per_file: Vec<Result<Gathered, Error>> = in_pool(|| {
             scene
                 .inputs
                 .par_iter()
+                .filter(|input| with_directives.contains(&input.file.path))
                 .map(|input| self.apply_rules_of(scene, input, true))
                 .collect()
         });
