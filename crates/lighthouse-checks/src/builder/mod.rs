@@ -69,7 +69,6 @@ pub(crate) struct Builder<'a> {
     table: Arc<Table>,
     indexes: Arc<Indexes>,
     annotations: Arc<Annotations>,
-    allow_suffixes: Vec<String>,
     declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
     related: RefCell<BTreeMap<SymbolId, Value>>,
     related_needs: Needs,
@@ -99,7 +98,6 @@ impl<'a> Builder<'a> {
             table: ctx.memo.slot(),
             indexes: ctx.memo.slot(),
             annotations: ctx.memo.slot(),
-            allow_suffixes: strings(options.get("allowSuffixes")),
             declared: RefCell::default(),
             related: RefCell::default(),
             related_needs: needs.of_related(),
@@ -126,7 +124,6 @@ impl<'a> Builder<'a> {
             table: Arc::default(),
             indexes: Arc::default(),
             annotations: Arc::default(),
-            allow_suffixes: strings(options.get("allowSuffixes")),
             declared: RefCell::default(),
             related: RefCell::default(),
             related_needs: needs.of_related(),
@@ -682,16 +679,6 @@ pub(crate) fn span(file: &Path, span: Span) -> Value {
         "start": { "line": span.start.line, "col": span.start.col },
         "end": { "line": span.end.line, "col": span.end.col },
     })
-}
-
-/// The strings of an option that is a list of them; empty when it is not.
-fn strings(option: Option<&Value>) -> Vec<String> {
-    option
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|v| v.as_str().map(str::to_owned))
-        .collect()
 }
 
 /// Whether test code uses the symbol, or a member of it. Heuristic references

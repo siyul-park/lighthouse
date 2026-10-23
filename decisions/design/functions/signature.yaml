@@ -112,10 +112,14 @@ spec:
             'results': type(options.limits.results) == int ? options.limits.results : options.limits.results[?func.role].orValue(options.limits.results[?'default'].orValue(-1))}
       - name: subject
         expression: "func.role == 'constructor' ? func.built + ' needs' : func.name + ' has'"
-      - name: eff
-        expression: func.effective
+      - name: structs
+        expression: >-
+          func.param_structs.map(h, {'struct': h.struct,
+            'kept': h.fields.filter(o, !(options.allowSuffixes.exists(s, h.struct.endsWith(s)) && o))})
       - name: hidden
-        expression: eff.hidden
+        expression: "structs.map(g, {'struct': g.struct, 'fields': size(g.kept)})"
+      - name: eff_params
+        expression: "math.greatest(m.params - size(structs), 0) + size(structs.map(g, g.kept).flatten())"
       - name: note
         expression: >-
           size(hidden) == 0 ? ''
@@ -134,8 +138,8 @@ spec:
           : []
       - name: found
         expression: >-
-          (m.measured && 'params' in options.kinds && caps.params >= 0 && eff.params > caps.params
-            ? [{'kind': 'params', 'value': eff.params, 'max': caps.params, 'what': 'parameters',
+          (m.measured && 'params' in options.kinds && caps.params >= 0 && eff_params > caps.params
+            ? [{'kind': 'params', 'value': eff_params, 'max': caps.params, 'what': 'parameters',
                 'hint': func.role == 'constructor' ? 'split ' + func.built : 'split by responsibility'}] : [])
           + (m.measured && 'results' in options.kinds && caps.results >= 0 && m.results > caps.results
             ? [{'kind': 'results', 'value': m.results, 'max': caps.results, 'what': 'results',

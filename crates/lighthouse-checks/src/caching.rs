@@ -71,7 +71,7 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("touched_by_tests", Reach::Global),
     ("module_tested", Reach::Global),
     ("local_callers", Reach::Global),
-    ("effective", Reach::Global),
+    ("param_structs", Reach::Global),
     ("module_imports", Reach::Global),
     // The types of a module, with the cohesion of their methods; the types
     // that implement an interface, tests included.

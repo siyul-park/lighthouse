@@ -32,8 +32,11 @@ impl Builder<'_> {
                 json!(self.constructor_named(symbol)),
             );
         }
-        if needs.field("effective") {
-            map.insert("effective".to_owned(), self.effective(symbol, summary));
+        if needs.field("param_structs") {
+            map.insert(
+                "param_structs".to_owned(),
+                self.param_structs(symbol, summary),
+            );
         }
         if needs.field("role") || needs.field("built") {
             map.insert("role".to_owned(), json!(self.role(symbol, summary)));
