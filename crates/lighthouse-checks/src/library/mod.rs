@@ -15,7 +15,7 @@ mod needs;
 mod variables;
 pub(crate) use functions::check_calls;
 pub(crate) use needs::Needs;
-pub(crate) use variables::{check_scope, declare as declare_variables};
+pub(crate) use variables::{check_scope, declare as declare_variables, reached};
 
 /// A context of the shared CEL environment with the library installed.
 pub(crate) fn context() -> Result<Context<'static, 'static>, String> {

@@ -19,7 +19,8 @@ spec:
     `testing/file-layout`. Order: public types; private types; public
     constants; private constants; variables; all `init` functions; one block
     per type, in the order the types are declared, each with the constructors
-    of the type (functions named like `NewType`), then its exported methods,
+    of the type (a function named `NewType` where `Type` is a type declared in
+    the same file), then its exported methods,
     then its clone, conversion and interface hooks, then its unexported
     methods; public functions; private functions.
 
@@ -27,8 +28,10 @@ spec:
     type kept next to its impl blocks because that is how Rust code reads.
     Order: constants; statics; types, traits and their impl blocks (types
     and impls are one group, `owner-contiguity` keeps an owner's impls
-    together); public free functions; private free functions. The order of an
-    owner's own members is left to `design/layout`. Items of `#[cfg(test)]` modules are
+    together), where a constructor method (an associated function named like one)
+    comes before the other methods of its type; public free functions; private
+    free functions. The order of the other members of a type is left to
+    `design/layout`. Items of `#[cfg(test)]` modules are
     not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.
   scope:
     subject: file
@@ -37,14 +40,28 @@ spec:
   requirement: >-
     Top-level declarations in a file MUST follow the language's ownership-group
     order, from public contract to private mechanics. Initializers MUST stay
-    together and MUST precede non-initializer functions and methods. Where
-    methods are grouped by owner, a type's constructors MUST precede its
-    exported methods, and those MUST precede its unexported ones.
+    together and MUST precede non-initializer functions and methods. A
+    constructor MUST precede the other methods of its type; where methods are
+    grouped by owner, exported methods MUST precede unexported ones.
   severity: error
   options:
     properties:
       groups:
         type: array
+        items:
+          type: string
+          enum:
+            - public-type
+            - private-type
+            - type
+            - public-const
+            - private-const
+            - const
+            - var
+            - init
+            - method
+            - public-function
+            - private-function
         default:
           - public-type
           - private-type
@@ -94,45 +111,85 @@ spec:
     type: cel
     select: symbol
     variables:
-      # The declarations the order places, in file order; one value per file.
-      - name: placed
+      # The placed declarations of each module, in file order, each as
+      # [place, id, name].
+      - name: modules
         expression: >-
-          file.symbols.filter(s, s.declaration && !s.generated).map(s, {'id': s.id, 'module': s.module, 'name': s.name, 'key': declaration_group(s)})
-            .filter(p, p.key >= 0)
-      # Per module, the placed declarations that are not in a longest run
-      # already in order: the fewest that, moved, put the module in order.
-      # Each is to follow the first later declaration of an earlier place that
-      # stays in place, else the first such declaration.
+          slots.map(r, r[0]).distinct().map(m,
+            slots.filter(r, r[0] == m && r[1] >= 0).map(r, [r[1], r[2], r[3]]))
+      # Per module, the placed declarations that are misplaced: the fewest
+      # that, moved, put the module in order, each as
+      # [id, group, after, before, late]: it is to follow the first later
+      # declaration of an earlier place that stays in place, else the first
+      # such declaration.
       - name: displaced
         expression: >-
-          placed.map(s, s.module).distinct().map(m,
-            cel.bind(l, placed.filter(s, s.module == m),
-            cel.bind(g, l.map(s, s.key),
-            cel.bind(kept, lists.range(size(g)).filter(i, !(i in g.misplaced())),
-              lists.range(size(l)).filter(i, !(i in kept)).map(i,
-                {'id': l[i].id, 'group': g[i] / 1000000,
-                 'after': (
-                   lists.range(size(l)).filter(j, j > i && g[j] < g[i] && j in kept).map(j, l[j].name)
-                   + lists.range(size(l)).filter(j, j > i && g[j] < g[i]).map(j, l[j].name)
-                   + [''])[0]}))))).flatten()
+          modules.map(at,
+            cel.bind(g, at.map(r, r[0]),
+            cel.bind(moved, g.misplaced(),
+            cel.bind(kept, lists.range(size(g)).filter(i, !(i in moved)),
+            cel.bind(follows, g.anchors(),
+              moved.map(i,
+                [at[i][1], g[i] / 1000000,
+                 (kept.filter(j, j > i && g[j] < g[i]).map(j, at[j][2])
+                  + (follows[i] < 0 ? [] : at.slice(follows[i], follows[i] + 1).map(r, r[2]))
+                  + [''])[0], '', false])))))).flatten()
+      # The methods of the owners, in file order; one value per file, each as
+      # [id, name, owner and module, whether it is a constructor method (a
+      # public method named like a constructor), position].
+      - name: methods
+        expression: >-
+          placed.filter(s, s.kind == 'method' && s.owner_key != '')
+            .map(s, [s.id, s.name, s.owner_key + '|' + s.module,
+                     s.visibility != 'private' && s.constructor_named, s.pos])
+      # Where methods and types are one group, a constructor method that
+      # follows another method of its type: it is to come before the first of
+      # them.
+      - name: late
+        expression: >-
+          !('type' in groups) ? [] :
+          methods.filter(c, c[3]
+              && methods.exists(x, x[2] == c[2] && !x[3] && x[4] < c[4]))
+            .map(c, cel.bind(earlier, methods.filter(x, x[2] == c[2] && !x[3] && x[4] < c[4]),
+              [c[0], -1, earlier[0][1], earlier[0][0], true]))
+      # The declarations of the file in the order of their places, the argument
+      # of the reorder that fixes every finding of the file at once.
+      - name: ordered
+        expression: >-
+          slots.filter(r, r[1] >= 0).sortBy(r, r[1]).map(r, r[2])
+      # Every finding of the file, as [id, group, after, before, late], and
+      # the ids they are about.
+      - name: reported
+        expression: displaced + late
+      - name: reported_ids
+        expression: reported.map(d, d[0])
       - name: report
-        expression: displaced.filter(d, d.id == symbol.id)
+        expression: >-
+          symbol.id in reported_ids ? reported.filter(d, d[0] == symbol.id) : []
     where: size(report) > 0
     message: >-
-      {{ symbol.kind + ' ' + symbol.name + ' belongs to the `' + options.groups[report[0].group]
-         + '` group and must '
-         + (report[0].after != '' ? 'follow ' + report[0].after
-            : 'come before the declarations above it') }}
+      {{ report[0][4]
+         ? 'constructor ' + symbol.name + ' must precede the other methods of its type, such as '
+           + report[0][2]
+         : symbol.kind + ' ' + symbol.name + ' belongs to the `' + options.groups[report[0][1]]
+           + '` group and must '
+           + (report[0][2] != '' ? 'follow ' + report[0][2]
+              : 'come before the declarations above it') }}
     evidence:
       declaration: symbol.id
-      group: options.groups[report[0].group]
-      expected_after: "report[0].after != '' ? report[0].after : null"
+      group: "report[0][4] ? 'constructor' : options.groups[report[0][1]]"
+      expected_after: "!report[0][4] && report[0][2] != '' ? report[0][2] : null"
+      before: report[0][3]
     identity:
       subject: symbol.id
+      snippet: "report[0][4] ? 'clause 1' : ''"
   fix:
     safety: safe
     type: cel
-    edits: "[reorder(placed.sortBy(s, s.key))]"
+    edits: >-
+      finding.evidence.before != ''
+      ? [move(finding.evidence.declaration, before(finding.evidence.before))]
+      : [reorder(ordered)]
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), G24 Follow Standard Conventions"
@@ -361,6 +418,39 @@ spec:
             fn helper() -> u8 {
                 1
             }
+    - name: rust-constructor-after-behavior
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store;
+
+            impl Store {
+                pub fn new() -> Self {
+                    Store
+                }
+
+                pub fn get(&self) -> u8 {
+                    1
+                }
+            }
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store;
+
+            impl Store {
+                pub fn get(&self) -> u8 {
+                    1
+                }
+
+                pub fn new() -> Self {
+                    Store
+                }
+            }
+      expect:
+        - line: 8
     - name: test-fixtures-out-of-order
       language: go
       kind: invalid

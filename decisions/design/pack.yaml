@@ -10,76 +10,82 @@ spec:
     comments. Each decision states its requirement and how it is enforced;
     language-specific wording lives in its tuning.
   variables:
-    # A declaration the file-order decisions place: a type, constant,
-    # variable, function or method outside interfaces and function bodies.
-    # Test code and generated code are not placed, except the fixtures of a
-    # test file.
-    - name: is_placed
-      params: [n]
+    # The declarations the file-order decisions place, in file order: types,
+    # constants, variables, functions and methods outside interfaces and
+    # function bodies. Test code and generated code are not placed, except the
+    # fixtures of a test file. One value per file.
+    - name: placed
       expression: >-
-        n.declaration && !n.generated
-        && (n.file_test ? n.test_role == 'fixture' : !n.test)
+        file.symbols.filter(s, s.declaration && !s.generated
+          && (s.file_test ? s.test_role == 'fixture' : !s.test))
     # The types a file declares, and the owners its methods name, in the order
     # the owner blocks follow each other: the types in declaration order, then
     # the owners of types declared elsewhere in the order of their methods.
     - name: owner_types
       expression: >-
-        file.symbols.filter(s, is_placed(s) && (s.kind == 'type' || s.kind == 'interface'))
+        placed.filter(s, s.kind == 'type' || s.kind == 'interface')
           .map(s, {'id': s.id, 'name': s.name, 'module': s.module})
     - name: owners
       expression: >-
         (owner_types.map(t, t.id)
-          + file.symbols.filter(s, is_placed(s) && s.kind == 'method' && s.owner_key != '')
-              .map(s, s.owner_key)).distinct()
-    # The place of a node in the order of `design/declaration-groups`, a number
-    # to compare: the index in `options.groups` of the first of the node's
-    # candidate groups that the order names, times a million, plus, in the
-    # group `method`, the rank of the node in the block of its owner: 4 per
-    # owner block, and in the block its constructors, its exported methods, its
-    # hooks, its unexported methods. -1 when no group names the node (or it is
-    # no declaration that is judged). A decision that has no `groups` option,
-    # such as `design/layout`, reads the default order of its language.
-    - name: declaration_group
-      params: [n]
+          + placed.filter(s, s.kind == 'method' && s.owner_key != '').map(s, s.owner_key)).distinct()
+    # The group order and the hook names of the file: the options `groups` and
+    # `hooks` of `design/declaration-groups`, which `design/layout` reads from
+    # it (`options.from`), so that the project sets them once.
+    - name: groups
+      expression: options.groups
+    - name: hooks
+      expression: options.hooks
+    # The place of each placed declaration in the order of
+    # `design/declaration-groups`, a number to compare: the index in `groups`
+    # of the first of the declaration's candidate groups that the order names,
+    # times a million, plus, in the group `method`, the rank of the declaration
+    # in the block of its owner: 4 per owner block, and in the block its
+    # constructors, its exported methods, its hooks, its unexported methods.
+    # -1 when no group names the declaration.
+    - name: place
+      params: [s]
       expression: >-
-        !is_placed(n) ? -1
-        : cel.bind(open, n.visibility != 'private',
-          cel.bind(order, has(options.groups) ? options.groups
-              : n.lang == 'rust'
-              ? ['const', 'var', 'type', 'public-function', 'private-function']
-              : ['public-type', 'private-type', 'public-const', 'private-const', 'var', 'init',
-                 'method', 'public-function', 'private-function'],
-          cel.bind(hooks, has(options.hooks) ? options.hooks
-              : n.lang == 'rust' ? []
-              : ['Clone', 'String', 'GoString', 'Error', 'Unwrap', 'MarshalJSON', 'UnmarshalJSON',
-                 'MarshalText', 'UnmarshalText', 'MarshalBinary', 'UnmarshalBinary'],
-          cel.bind(owner, n.kind == 'method' ? n.owner_key
-              : n.kind == 'type' || n.kind == 'interface' ? n.id
-              : n.kind == 'function' && open && n.constructor_named
-              ? (owner_types.filter(t, t.name == n.built && t.module == n.module).map(t, t.id) + [''])[0]
-              : '',
-          cel.bind(inner,
-              open && n.constructor_named ? 0
-              : open && n.kind == 'method' && n.name in hooks ? 2
-              : open ? 1 : 3,
-          cel.bind(chosen, (
-              n.kind == 'type' || n.kind == 'interface'
-              ? [open ? 'public-type' : 'private-type', 'type']
-              : n.kind == 'const'
-              ? (n.owner_key != '' ? ['type'] : [open ? 'public-const' : 'private-const', 'const'])
-              : n.kind == 'var' ? ['var']
-              : n.kind == 'function'
-              ? (n.name == 'init' ? ['init'] : [])
-                + (owner != '' ? ['method'] : [])
-                + [open ? 'public-function' : 'private-function']
-              : n.kind == 'method' ? ['type', 'method']
-              : []
-            ).filter(c, c in order),
-            size(chosen) == 0 ? -1
-            : order.indexOf(chosen[0]) * 1000000
-              + (chosen[0] == 'method'
-                 ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 4 + inner
-                 : 0)))))))
+        cel.bind(open, s.visibility != 'private',
+        cel.bind(owner, s.kind == 'method' ? s.owner_key
+            : s.kind == 'type' || s.kind == 'interface' ? s.id
+            : s.kind == 'function' && open && s.constructor_named
+            ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id) + [''])[0]
+            : '',
+        cel.bind(inner,
+            open && s.kind == 'function' && s.constructor_named ? 0
+            : open && s.kind == 'method' && s.name in hooks ? 2
+            : open ? 1 : 3,
+        cel.bind(chosen, (
+            s.kind == 'type' || s.kind == 'interface'
+            ? [open ? 'public-type' : 'private-type', 'type']
+            : s.kind == 'const'
+            ? (s.owner_key != '' ? ['type'] : [open ? 'public-const' : 'private-const', 'const'])
+            : s.kind == 'var' ? ['var']
+            : s.kind == 'function'
+            ? (s.name == 'init' ? ['init'] : [])
+              + (owner != '' ? ['method'] : [])
+              + [open ? 'public-function' : 'private-function']
+            : s.kind == 'method' ? ['type', 'method']
+            : []
+          ).filter(c, c in groups),
+          size(chosen) == 0 ? -1
+          : groups.indexOf(chosen[0]) * 1000000
+            + (chosen[0] == 'method'
+               ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 4 + inner
+               : 0)))))
+    # Per placed declaration, [module, place, id, name].
+    - name: slots
+      expression: placed.map(s, [s.module, place(s), s.id, s.name])
+    - name: keys
+      expression: slots.map(r, r[1])
+    - name: placed_ids
+      expression: slots.map(r, r[2])
+    # The place of the declaration with this id, -1 when it is not placed.
+    - name: declaration_group
+      params: [id]
+      expression: >-
+        cel.bind(at, placed_ids.indexOf(id), at < 0 ? -1 : keys.slice(at, at + 1)[0])
   sections:
     - name: principles
       title: Principles

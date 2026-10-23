@@ -42,6 +42,9 @@ pub(crate) struct CelRule {
     /// Per variable: whether it reads nothing of the selected value (only the
     /// file, the options and variables like it), so a file has one value of it.
     file_level: Vec<bool>,
+    /// Per variable, whether an expression of the check reads it, directly or
+    /// through another: the others are not evaluated.
+    used: Vec<bool>,
     library: cel::Context<'static, 'static>,
 }
 
@@ -139,9 +142,12 @@ impl CelRule {
             .chain(abstain.iter().map(Abstain::program))
             .collect::<Vec<&Program>>();
         library::check_calls(id, &library, &declared.functions, read.iter().copied())?;
+        let roots: Vec<&Program> = read[variables.len() + bodies.len()..].to_vec();
+        let used = library::reached(&variables, &declared.functions, &bodies, &roots);
         Ok(Self {
             select,
             file_level: level,
+            used,
             needs: Needs::reading(read.iter().copied()),
             abstain,
             variables,
@@ -193,7 +199,7 @@ impl CelRule {
             meta,
             builder,
             candidates: RefCell::default(),
-            shared: Shared::new(self, cel_fact(&Value::Object(options.clone()))),
+            shared: Shared::new(self, meta.scope, cel_fact(&Value::Object(options.clone()))),
         };
         let mut found = match meta.scope {
             lighthouse_model::RunScope::File => run.check_file(ctx),
@@ -215,38 +221,68 @@ struct Evaluation<'a> {
     /// The subjects `abstain` picked, to be put to the models.
     candidates: RefCell<Vec<Candidate>>,
     /// What the judgments of the file read in place.
-    shared: Shared,
+    shared: Shared<'a>,
 }
 
 /// The values of one file that all its judgments read without holding a copy
 /// each: the file as a value, for expressions that name `file` while judging
-/// something in it, and the file-level variables, found when first asked. A
-/// frame sees them through its variable resolver.
-struct Shared {
+/// something in it, and the file-level variables, found when first read and
+/// never when nothing reads them. A frame sees them through its variable
+/// resolver.
+struct Shared<'a> {
+    rule: &'a CelRule,
     options: Fact,
     file: OnceLock<Fact>,
-    /// The name of each variable that is file-level.
+    /// The name of each variable that is file-level; none when the check runs
+    /// over the project, which has no file.
     names: Vec<Option<String>>,
-    values: Vec<OnceLock<Fact>>,
+    /// Their values, `None` when one could not be found: `failed` says why.
+    values: Vec<OnceLock<Option<Fact>>>,
+    failed: OnceLock<String>,
 }
 
-impl Shared {
-    fn new(rule: &CelRule, options: Fact) -> Self {
+impl<'a> Shared<'a> {
+    fn new(rule: &'a CelRule, scope: lighthouse_model::RunScope, options: Fact) -> Self {
+        let per_file = scope == lighthouse_model::RunScope::File;
         Self {
+            rule,
             options,
             file: OnceLock::new(),
+            failed: OnceLock::new(),
             names: rule
                 .variables
                 .iter()
                 .zip(&rule.file_level)
-                .map(|((name, _), level)| level.then(|| name.clone()))
+                .map(|((name, _), level)| (*level && per_file).then(|| name.clone()))
                 .collect(),
             values: rule.variables.iter().map(|_| OnceLock::new()).collect(),
         }
     }
+
+    /// The value of file-level variable number `at`, read through this
+    /// resolver as the expressions of a judgment read it.
+    fn compute(&self, at: usize) -> Option<Fact> {
+        let (name, program) = &self.rule.variables[at];
+        let mut scope = self.rule.library.new_inner_scope();
+        scope.set_variable_resolver(self);
+        let value = program
+            .execute(&scope)
+            .map_err(|e| format!("variable `{name}`: {e}"))
+            .and_then(|value| {
+                Fact::try_from(value)
+                    .map_err(|_| format!("variable `{name}`: the value cannot be held"))
+            });
+        match value {
+            Ok(fact) => Some(fact),
+            Err(message) => {
+                let _ = self.failed.set(message);
+                None
+            }
+        }
+    }
 }
 
-impl VariableResolver for Shared {
+impl VariableResolver for Shared<'_> {
     fn resolve<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
         let found = if variable == "options" {
             Some(&self.options)
@@ -257,7 +293,7 @@ impl VariableResolver for Shared {
                 .names
                 .iter()
                 .position(|name| name.as_deref() == Some(variable))?;
-            self.values[at].get()
+            self.values[at].get_or_init(|| self.compute(at)).as_ref()
         };
         found.map(|fact| CowVal::Borrowed(fact.as_ref()))
     }
@@ -277,6 +313,7 @@ impl Evaluation<'_> {
         match self.rule.select {
             Select::File if ctx.applies.admits_file(file) => {
                 let value = cel_fact(&self.builder.file(file, text));
+                let _ = self.shared.file.set(value.clone_as_boxed());
                 let anchor = Anchor {
                     file: file.path.clone(),
                     span: top_of_file(),
@@ -429,8 +466,22 @@ impl Evaluation<'_> {
     }
 
     /// Evaluates the rule for one selected value; a finding is reported at
-    /// `place` unless the check says otherwise.
+    /// `place` unless the check says otherwise. A variable of the file that
+    /// could not be found is the failure, not the expression that read it.
     fn judge(
+        &self,
+        value: Fact,
+        place: Anchor,
+        key: &str,
+    ) -> Result<Option<Diagnostic>, PluginError> {
+        self.judge_value(value, place, key).map_err(|error| {
+            self.shared.failed.get().map_or(error, |message| {
+                PluginError::Incomplete(format!("{}: execution error: {message}", self.meta.id))
+            })
+        })
+    }
+
+    fn judge_value(
         &self,
         value: Fact,
         place: Anchor,
@@ -441,7 +492,9 @@ impl Evaluation<'_> {
         frame.set_fact(rule.select.variable(), value);
         frame.share(&self.shared);
         for (at, (name, program)) in rule.variables.iter().enumerate() {
-            self.variable(&mut frame, at, name, program)?;
+            if rule.used[at] {
+                self.variable(&mut frame, at, name, program)?;
+            }
         }
         let found = frame.truth(&rule.condition)?;
         let abstain = rule.abstain.as_ref().filter(|_| self.reviewing);
@@ -512,12 +565,10 @@ impl Evaluation<'_> {
         let value = |frame: &Frame| {
             Fact::try_from(frame.run(program)?).map_err(|_| frame.fail("the value cannot be held"))
         };
-        if self.shared.names[at].is_none() || self.meta.scope != lighthouse_model::RunScope::File {
+        // A file-level variable is not held by the frame: whatever reads it
+        // finds it through the resolver, when it first does.
+        if self.shared.names[at].is_none() {
             frame.set_fact(name, value(frame)?);
-        } else if self.shared.values[at].get().is_none() {
-            // Not held by the frame: the next variable reads it through the
-            // resolver, once it is set.
-            let _ = self.shared.values[at].set(value(frame)?);
         }
         Ok(())
     }

@@ -47,6 +47,7 @@ spec:
     splits, wrappers, or duplicated helpers.
   severity: warn
   options:
+    from: design/declaration-groups
     properties:
       kinds:
         type: array
@@ -78,8 +79,9 @@ spec:
           'callers-first' in options.kinds
           && (func.kind == 'function' || func.kind == 'method') && size(local) > 0
           && func.pos <= anchor.pos
-          && !(declaration_group(func) >= 0 && declaration_group(anchor) >= 0
-               && declaration_group(func) < declaration_group(anchor))
+          && !cel.bind(own, declaration_group(func.id),
+              cel.bind(later, declaration_group(anchor.id),
+                own >= 0 && later >= 0 && own < later))
           && !(func.lang == 'rust' && func.kind == 'method' && !func.implementation
                && anchor.kind == 'method' && anchor.implementation)
       - name: separated

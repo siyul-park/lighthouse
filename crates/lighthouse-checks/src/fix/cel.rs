@@ -32,6 +32,9 @@ pub(crate) struct CelFix {
     /// Per variable, whether it reads nothing of the finding: its value is the
     /// same for every finding of one file.
     shared: Vec<bool>,
+    /// Per variable, whether the edits read it, directly or through another:
+    /// the others are not evaluated.
+    used: Vec<bool>,
     /// What the findings of the file last asked about are judged with.
     cached: Mutex<Option<Arc<FileValues>>>,
 }
@@ -112,8 +115,10 @@ impl CelFix {
             .chain(bodies.iter().map(Arc::as_ref))
             .collect::<Vec<&Program>>();
         library::check_calls(id, &library, &declared.functions, read.iter().copied())?;
+        let used = library::reached(&variables, &declared.functions, &bodies, &[&edits]);
         Ok(Self {
             needs: Needs::reading(read.iter().copied()),
+            used,
             edits,
             variables,
             select,
@@ -183,8 +188,10 @@ impl CelFix {
             scope.add_variable_as_val(select.variable(), subject.clone_as_boxed());
         }
         scope.add_variable_as_val("node", subject);
-        for ((name, program), shared) in self.variables.iter().zip(&self.shared) {
-            if *shared {
+        for (((name, program), shared), used) in
+            self.variables.iter().zip(&self.shared).zip(&self.used)
+        {
+            if *shared || !*used {
                 continue;
             }
             let bound = program
@@ -236,8 +243,10 @@ impl CelFix {
             scope.add_variable_as_val("file", file.clone_as_boxed());
         }
         let mut variables = Vec::new();
-        for ((name, program), shared) in self.variables.iter().zip(&self.shared) {
-            if !*shared {
+        for (((name, program), shared), used) in
+            self.variables.iter().zip(&self.shared).zip(&self.used)
+        {
+            if !*shared || !*used {
                 continue;
             }
             let bound = program

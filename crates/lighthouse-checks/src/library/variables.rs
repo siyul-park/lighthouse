@@ -82,6 +82,35 @@ pub(crate) fn check_scope(
     Ok(())
 }
 
+/// Per value variable, whether `roots` read it: by name, through another
+/// variable it is read by, or through a function variable they call. A
+/// variable that nothing reads is not evaluated.
+pub(crate) fn reached(
+    values: &[(String, Arc<Program>)],
+    functions: &[&Variable],
+    bodies: &[Arc<Program>],
+    roots: &[&Program],
+) -> Vec<bool> {
+    let mut used = vec![false; values.len()];
+    let mut called = vec![false; functions.len()];
+    let mut pending: Vec<&Program> = roots.to_vec();
+    while let Some(program) = pending.pop() {
+        for name in lighthouse_spec::program_identifiers(program) {
+            if let Some(at) = values.iter().position(|(n, _)| *n == name)
+                && !std::mem::replace(&mut used[at], true)
+            {
+                pending.push(values[at].1.as_ref());
+            }
+            if let Some(at) = functions.iter().position(|f| f.name == name)
+                && !std::mem::replace(&mut called[at], true)
+            {
+                pending.push(bodies[at].as_ref());
+            }
+        }
+    }
+    used
+}
+
 fn call(
     params: Vec<String>,
     body: Arc<Program>,

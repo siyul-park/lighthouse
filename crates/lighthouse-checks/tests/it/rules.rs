@@ -215,6 +215,37 @@ fn an_expression_with_an_execution_error_leaves_the_analysis_incomplete() {
 }
 
 #[test]
+fn a_variable_nothing_reads_is_not_evaluated() {
+    let plugin = local(
+        "symbol",
+        "select: symbol\nvariables:\n  - { name: per_symbol, expression: 'symbol.nothing' }\n  - { name: per_file, expression: '1 / 0' }\nwhere: 'true'\nmessage: x",
+    )
+    .unwrap();
+    let mut w = World::default();
+    w.func("m", "Run", "m/a.ucm");
+    assert_eq!(w.names(&found(&plugin, &w)), ["Run"]);
+}
+
+#[test]
+fn a_file_variable_that_fails_when_read_is_the_error_naming_it() {
+    let plugin = local(
+        "symbol",
+        "select: symbol\nvariables:\n  - { name: broken, expression: '1 / 0' }\nwhere: 'broken > 0'\nmessage: x",
+    )
+    .unwrap();
+    let mut w = World::default();
+    w.func("m", "Run", "m/a.ucm");
+    let failed =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| found(&plugin, &w))).unwrap_err();
+    let message = failed
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| failed.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+        .unwrap_or_default();
+    assert!(message.contains("variable `broken`"), "{message}");
+}
+
+#[test]
 fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
     let files = |text: &str| BTreeMap::from([("x.yaml".to_owned(), text.to_owned())]);
     let header = |name: &str| {
