@@ -347,7 +347,22 @@ impl Engine {
                 .inputs
                 .par_iter()
                 .filter(|input| with_directives.contains(&input.file.path))
-                .map(|input| self.apply_rules_of(scene, input, true))
+                .map(|input| {
+                    let mut gathered = self.apply_rules_of(scene, input, true)?;
+                    let resolved =
+                        self.config
+                            .resolve(&input.file.path, &input.file.lang, &self.projects)?;
+                    for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
+                        let Some(level) = resolved.get(&rule).and_then(|config| config.level)
+                        else {
+                            continue;
+                        };
+                        gathered
+                            .found
+                            .extend(found.into_iter().map(|d| answered(d, level)));
+                    }
+                    Ok(gathered)
+                })
                 .collect()
         });
         let mut all = Gathered::default();
@@ -394,6 +409,9 @@ impl Engine {
                     "{}: skipped for language `{}`, missing capability {missing}",
                     meta.id, input.file.lang
                 ));
+                gathered
+                    .unsettled
+                    .insert((meta.id.clone(), Some(input.file.path.clone())));
                 continue;
             }
             let at = Some((file, input.text.as_str()));
@@ -447,6 +465,7 @@ impl Engine {
                 "{}: skipped, missing capability {missing}",
                 meta.id
             ));
+            gathered.unsettled.insert((meta.id.clone(), None));
             return Ok(gathered);
         }
         let applies = self.applies(meta.applicability, config);
@@ -484,6 +503,11 @@ impl Engine {
         gathered.notices.extend(notices.take());
         *gathered.times.entry(meta.id.clone()).or_default() += started.elapsed();
         let at = file.map(|(file, _)| file.path.as_path());
+        if matches!(checked, Err(lighthouse_plugin::Error::Incomplete(_))) {
+            gathered
+                .unsettled
+                .insert((meta.id.clone(), at.map(Path::to_owned)));
+        }
         let found = unfinished(checked, &meta.id, at, &mut gathered.incomplete)?;
         gathered
             .found

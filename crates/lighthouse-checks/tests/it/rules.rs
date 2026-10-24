@@ -404,9 +404,16 @@ fn a_method_without_an_owner_is_not_hidden_by_it() {
 
 /// The decision `local/probe` of `local`, as the catalog holds it.
 fn probe(scope: &str, check: &str) -> lighthouse_spec::Decision {
+    probe_with_fix(scope, check, None)
+}
+
+fn probe_with_fix(scope: &str, check: &str, edits: Option<&str>) -> lighthouse_spec::Decision {
     let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
+    let fix = edits.map_or_else(String::new, |edits| {
+        format!("  fix:\n    safety: unsafe\n    type: cel\n    edits: {edits:?}\n")
+    });
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: {scope}, tests: include }}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: {scope}, tests: include }}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}{fix}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
     let layer = Catalog::from_local(
         BTreeMap::from([("probe.yaml".to_owned(), text)]),
@@ -414,6 +421,38 @@ fn probe(scope: &str, check: &str) -> lighthouse_spec::Decision {
     )
     .unwrap();
     layer.decision("local/probe").unwrap().clone()
+}
+
+#[test]
+fn a_member_call_with_a_known_wrong_receiver_is_rejected_at_load() {
+    let bad = probe(
+        "symbol",
+        "select: symbol\nwhere: \"'abc'.misplaced().size() > 0\"\nmessage: x",
+    );
+    let error =
+        lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &bad, |_| None)
+            .unwrap_err()
+            .to_string();
+    assert!(
+        error.contains("expects a `list` receiver, got `string`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn file_annotations_can_only_be_read_by_annotation_checks() {
+    let bad = probe(
+        "file",
+        "select: file\nwhere: file.annotations.size() > 0\nmessage: x",
+    );
+    let error =
+        lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &bad, |_| None)
+            .unwrap_err()
+            .to_string();
+    assert!(
+        error.contains("`file.annotations` is only available with `select: annotation`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -449,6 +488,46 @@ fn the_check_revision_names_the_libraries_its_expressions_call() {
         })
         .unwrap();
     assert_eq!(revision, other, "an unused library's version is not");
+}
+
+#[test]
+fn the_check_revision_includes_libraries_used_by_fixes_and_cel_bind() {
+    let decision = probe(
+        "symbol",
+        "select: symbol\nwhere: \"cel.bind(x, 1, x > 0)\"\nmessage: x",
+    )
+    .map_spec(|mut spec| {
+        spec.fix = Some(lighthouse_spec::Fix {
+            safety: lighthouse_model::Safety::Unsafe,
+            requires: Vec::new(),
+            priority: 0,
+            kind: lighthouse_spec::FixKind::Cel {
+                edits: "glob.matches(node.name, 'foo') ? [] : []".to_owned(),
+                scope: None,
+            },
+        });
+        spec
+    });
+    let (used, revision) = lighthouse_checks::probe::revision(
+        &lighthouse_test_support::composition(),
+        &decision,
+        |_| None,
+    )
+    .unwrap();
+    assert_eq!(
+        used.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["cel/bind", "cel/glob"]
+    );
+    let (_, changed) = lighthouse_checks::probe::revision(
+        &lighthouse_test_support::composition(),
+        &decision,
+        |id| (id == "cel/glob").then(|| "9.9.9".to_owned()),
+    )
+    .unwrap();
+    assert_ne!(
+        revision, changed,
+        "a fix's library version is part of checkRevision"
+    );
 }
 
 #[test]

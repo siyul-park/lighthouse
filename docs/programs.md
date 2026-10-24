@@ -72,7 +72,7 @@ No shell: the first element is the program, found on `PATH` or, when it has a `/
   | `{model}` | the model part of the reference | provider |
 
 - **A fact of a file** is read from the provider that indexed it. In a check with `{files}` the files are run in groups that share the value, one group per value, so a run has one; in a check with `{file}` and in a fix it is the value of the file. A file whose provider states no such fact is an error that names the file and the fact, never a run without a value. A check names `{file.<fact>}` only beside `{file}` or `{files}`.
-- **Batching follows the placeholders.** `{files}` runs over many files per run, `{file}` once per file, neither once over the project. A decision whose scope is `file` is run for one file at a time; its results are cached per file text only when the decision is bundled, has no `env`, and the program reads no other file.
+- **Batching follows the placeholders.** `{files}` runs over many files per run, `{file}` once per file, neither once over the project. A decision whose scope is `file` is run for one file at a time; the cache eligibility check requires a bundled decision with no `env`. Such bundled programs must not depend on other files for their result.
 - A program the project or a plugin names runs only in a project the user trusts (`lighthouse trust`); a plugin the project names by a `path`, wherever it points, is one, a plugin of the user's plugin directory is not; the trust covers the program and every argument that names a file inside the project, by content. The programs of bundled decisions (`go/formatted`, `rust/formatted`) need none.
 
 ## The environment

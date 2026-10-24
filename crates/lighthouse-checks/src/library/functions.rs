@@ -31,68 +31,21 @@ pub(crate) fn check_calls<'a>(
         .collect();
     let scope = library.new_inner_scope();
     for call in calls {
-        if let Some(own) = functions
-            .iter()
-            .find(|f| f.name == call.name && !call.member)
-        {
-            if own.params.len() != call.args {
-                return Err(Error::invalid(
-                    id,
-                    format!(
-                        "`{}` takes {} argument(s), not {}",
-                        call.name,
-                        own.params.len(),
-                        call.args
-                    ),
-                ));
-            }
-            continue;
-        }
-        // An operator (`_+_`) or an internal function (`@in`) has no source
-        // form; it is always there.
-        let named = call.name.starts_with(|c: char| c.is_ascii_alphabetic())
-            && call
-                .name
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_');
-        if !named {
+        if check_own(id, functions, &call)? || !named(&call) {
             continue;
         }
         let full = full_name(&call);
-        let known: Vec<&compose::Entry> = catalog
+        let candidates: Vec<&compose::Entry> = catalog
             .iter()
-            .filter(|e| e.function.name == full && e.function.receiver.is_some() == call.member)
+            .filter(|entry| {
+                entry.function.name == full && entry.function.receiver.is_some() == call.member
+            })
             .collect();
-        if known.iter().any(|e| e.function.accepts(call.args)) {
+        let known = known_functions(id, &call, candidates)?;
+        if known.iter().any(|entry| entry.function.accepts(call.args)) {
             continue;
         }
-        let source = match (&call.namespace, call.member) {
-            (Some(namespace), _) => format!("{namespace}.{}()", call.name),
-            (None, true) => format!("null.{}()", call.name),
-            (None, false) => format!("{}()", call.name),
-        };
-        if !known.is_empty() {
-            // A library function with other arguments than it takes; the
-            // `cel` crate may still have a function of the same name that does.
-            if provided_by_cel(&source)? {
-                continue;
-            }
-            return Err(Error::invalid(
-                id,
-                arity(&full, call.member, &known, call.args),
-            ));
-        }
-        let Ok(probe) = comp.cel().compile(&source) else {
-            continue;
-        };
-        if let Err(ExecutionError::UndeclaredReference(_)) = probe.execute(&scope) {
-            return Err(Error::invalid(
-                id,
-                format!(
-                    "`{full}` is not a function of CEL, of a library of the catalog or of the variables of the check"
-                ),
-            ));
-        }
+        check_other_call(id, comp, &scope, &call, &full, &known)?;
     }
     Ok(())
 }
@@ -124,6 +77,104 @@ pub(crate) fn libraries_called<'a>(
     used
 }
 
+fn check_own(id: &str, functions: &[&Variable], call: &Call) -> Result<bool, Error> {
+    let Some(own) = functions
+        .iter()
+        .find(|function| function.name == call.name && !call.member && call.namespace.is_none())
+    else {
+        return Ok(false);
+    };
+    if own.params.len() != call.args {
+        return Err(Error::invalid(
+            id,
+            format!(
+                "`{}` takes {} argument(s), not {}",
+                call.name,
+                own.params.len(),
+                call.args
+            ),
+        ));
+    }
+    Ok(true)
+}
+
+fn named(call: &Call) -> bool {
+    call.name.starts_with(|c: char| c.is_ascii_alphabetic())
+        && call
+            .name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn known_functions<'a>(
+    id: &str,
+    call: &Call,
+    candidates: Vec<&'a compose::Entry>,
+) -> Result<Vec<&'a compose::Entry>, Error> {
+    let Some(receiver) = call.receiver_type.as_deref() else {
+        return Ok(candidates);
+    };
+    let matching: Vec<_> = candidates
+        .iter()
+        .copied()
+        .filter(|entry| entry.function.receiver.as_deref() == Some(receiver))
+        .collect();
+    if matching.is_empty() && !candidates.is_empty() {
+        let expected: BTreeSet<&str> = candidates
+            .iter()
+            .filter_map(|entry| entry.function.receiver.as_deref())
+            .collect();
+        return Err(Error::invalid(
+            id,
+            format!(
+                "`{}` expects a `{}` receiver, got `{receiver}`",
+                full_name(call),
+                expected.into_iter().collect::<Vec<_>>().join("` or `")
+            ),
+        ));
+    }
+    Ok(matching)
+}
+
+fn check_other_call(
+    id: &str,
+    comp: &Composition,
+    scope: &Context<'_, '_>,
+    call: &Call,
+    full: &str,
+    known: &[&compose::Entry],
+) -> Result<(), Error> {
+    let source = match (&call.namespace, call.member) {
+        (Some(namespace), _) => format!("{namespace}.{}()", call.name),
+        (None, true) => format!("null.{}()", call.name),
+        (None, false) => format!("{}()", call.name),
+    };
+    if !known.is_empty() {
+        return if provided_by_cel(&source)? {
+            Ok(())
+        } else {
+            Err(Error::invalid(
+                id,
+                arity(full, call.member, known, call.args),
+            ))
+        };
+    }
+    let Ok(probe) = comp.cel().compile(&source) else {
+        return Ok(());
+    };
+    if matches!(
+        probe.execute(scope),
+        Err(ExecutionError::UndeclaredReference(_))
+    ) {
+        return Err(Error::invalid(
+            id,
+            format!(
+                "`{full}` is not a function of CEL, of a library of the catalog or of the variables of the check"
+            ),
+        ));
+    }
+    Ok(())
+}
 fn full_name(call: &Call) -> String {
     match &call.namespace {
         Some(namespace) => format!("{namespace}.{}", call.name),

@@ -61,8 +61,8 @@ impl<'p> Tests<'p> {
     /// The tests of the modules that test `symbol`'s module from inside or
     /// outside, whose names map to `symbol`. Names resolve within the one
     /// module the symbol belongs to, so a name never maps to two symbols of
-    /// different modules. With `ancestors` also the tests of a module
-    /// that tests an ancestor of the symbol's module, so the integration tests
+    /// different modules when `ancestors` is off. With `ancestors`, the same
+    /// test in an ancestor module may be credited to symbols in descendant modules, so the integration tests
     /// of a crate root count for every module of the crate, including the
     /// private ones whose public items the root re-exports.
     pub(crate) fn credited_tests(&self, symbol: &Symbol) -> Vec<(&'p TestCase, Match)> {

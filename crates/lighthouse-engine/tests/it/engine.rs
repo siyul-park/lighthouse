@@ -592,6 +592,10 @@ fn construction_validates_plugins_presets_rules_and_options() {
         Error::UnknownPlugin(_)
     ));
     assert!(matches!(
+        err("[languages.typo.testNaming]\nprefix = \"Test\""),
+        Error::UnknownLanguage(id) if id == "typo"
+    ));
+    assert!(matches!(
         err("plugins = [\"fake\"]\nextends = [\"fake/zzz\"]"),
         Error::Spec(_)
     ));

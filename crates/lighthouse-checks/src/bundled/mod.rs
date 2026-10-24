@@ -13,6 +13,12 @@ pub(crate) const CORE: &str = "core";
 
 /// Registry holding every bundled plugin, its decisions compiled in `comp`.
 pub fn registry(comp: &Composition) -> Result<Registry, Error> {
+    if !comp.is_built_in() {
+        return Err(Error::invalid(
+            "bundled",
+            "the bundled registry needs the composition from `compose()`",
+        ));
+    }
     let mut registry = Registry::default();
     register(&mut registry, &lighthouse_cel::Cel::new())?;
     let catalog = comp

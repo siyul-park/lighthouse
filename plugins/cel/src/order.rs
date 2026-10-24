@@ -1,4 +1,4 @@
-//! `keys.misplaced()` and `keys.anchors()`, members of a list of ints, for the
+//! `list.misplaced()` and `list.anchors()`, members of a list of ints, for the
 //! decisions that order siblings.
 //!
 //! Nothing official has them: the nearest precedents are `sort` and `sortBy`

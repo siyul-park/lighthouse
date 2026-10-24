@@ -99,9 +99,9 @@ impl Manifests {
         Ok(DEFAULT_EDITION.to_owned())
     }
 
-    /// The `[workspace.package] edition` of the nearest workspace above `from`.
+    /// The `[workspace.package] edition` of the nearest workspace at or above `from`.
     fn workspace_edition(&mut self, root: &Path, from: &Path) -> Result<String, String> {
-        let mut dir = from.parent().map(Path::to_owned);
+        let mut dir = Some(from.to_owned());
         while let Some(current) = dir.filter(|d| d.starts_with(root)) {
             if let Some(manifest) = self.manifest(&current)?
                 && let Some(workspace) = manifest.get("workspace").and_then(Value::as_table)

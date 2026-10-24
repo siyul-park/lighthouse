@@ -11,6 +11,8 @@ use lighthouse_model::{
 };
 use serde_json::{Value, json};
 
+use crate::engine::Unsettled;
+
 /// What the run knows about rules, which directives need to judge whether
 /// they are used.
 pub(crate) struct Gate<'a> {
@@ -18,6 +20,8 @@ pub(crate) struct Gate<'a> {
     pub active: &'a BTreeSet<String>,
     /// Rules that ran in this run.
     pub selected: &'a BTreeSet<String>,
+    /// The rules that did not finish, by file (`None`: the project).
+    pub unsettled: &'a Unsettled,
     /// The text of a file of the run.
     pub text: &'a dyn Fn(&Path) -> Option<&'a str>,
 }
@@ -61,6 +65,8 @@ struct Claim<'a> {
     at: &'a Located<'a>,
     /// The decision's current id.
     rule: String,
+    /// Its position in the directive's rule list.
+    rule_index: usize,
     coverage: Coverage,
 }
 
@@ -81,7 +87,7 @@ impl<'a> Reader<'a> {
     fn read(&mut self, at: &'a Located<'a>) {
         let directive = &at.directive;
         if directive.rules.is_empty() {
-            self.annotations.push(annotation(at, "", None));
+            self.annotations.push(annotation(at, "", None, None));
             return;
         }
         if directive.form == Form::Enable {
@@ -90,12 +96,13 @@ impl<'a> Reader<'a> {
         }
         if directive.reason.is_none() {
             // Ignored: it claims nothing, so it is neither used nor unused.
-            for rule in &directive.rules {
-                self.annotations.push(annotation(at, rule, None));
+            for (rule_index, rule) in directive.rules.iter().enumerate() {
+                self.annotations
+                    .push(annotation(at, rule, None, Some(rule_index)));
             }
             return;
         }
-        for id in &directive.rules {
+        for (rule_index, id) in directive.rules.iter().enumerate() {
             let rule = id.clone();
             let coverage = if directive.form == Form::Line {
                 Coverage::Line(at.line)
@@ -117,18 +124,27 @@ impl<'a> Reader<'a> {
                     .or_default()
                     .push(self.claims.len());
             }
-            self.claims.push(Claim { at, rule, coverage });
+            self.claims.push(Claim {
+                at,
+                rule,
+                rule_index,
+                coverage,
+            });
         }
     }
 
     /// `lighthouse-enable` ends the open ranges of the rules it names; one
     /// that closes nothing is reported.
     fn enable(&mut self, at: &'a Located<'a>) {
-        for id in &at.directive.rules {
+        for (rule_index, id) in at.directive.rules.iter().enumerate() {
             let rule = id.clone();
             let closed = self.open.remove(&rule);
-            self.annotations
-                .push(annotation(at, &rule, Some(closed.is_some())));
+            self.annotations.push(annotation(
+                at,
+                &rule,
+                Some(closed.is_some()),
+                Some(rule_index),
+            ));
             for range in closed.into_iter().flatten() {
                 if let Coverage::Range { to, .. } = &mut self.claims[range].coverage {
                     *to = Some(at.line);
@@ -192,7 +208,7 @@ pub(crate) fn apply<'g>(found: Vec<Diagnostic>, project: &Project, gate: &'g Gat
         let here = index.get(&file.path);
         for claim in &claims {
             let taken = take(&mut found, here, claim);
-            said.push(claimed(gate, claim, !taken.is_empty()));
+            said.push(claimed(gate, claim, &file.path, !taken.is_empty()));
             let reason = claim.at.directive.reason.clone().unwrap_or_default();
             allowed.extend(taken.into_iter().map(|diagnostic| Suppressed {
                 diagnostic,
@@ -229,10 +245,10 @@ fn locate<'a>(project: &'a Project, file: &Path) -> Vec<Located<'a>> {
 /// What a claim of a directive says, for the rules that judge directives:
 /// whether it suppressed a finding (`used`), and whether its rule could have
 /// fired (`settled`), so that a claim that suppressed nothing is stale.
-fn claimed(gate: &Gate, claim: &Claim, used: bool) -> Value {
-    let mut value = annotation(claim.at, &claim.rule, None);
+fn claimed(gate: &Gate, claim: &Claim, file: &Path, used: bool) -> Value {
+    let mut value = annotation(claim.at, &claim.rule, None, Some(claim.rule_index));
     value["used"] = json!(used);
-    value["settled"] = json!(unused(gate, &claim.rule));
+    value["settled"] = json!(settled(gate, &claim.rule, file));
     value["range"] = json!(matches!(claim.coverage, Coverage::Range { .. }));
     value
 }
@@ -278,10 +294,13 @@ fn documents(claim: &Claim, d: &Diagnostic) -> bool {
             .is_some_and(|id| d.symbol.as_deref() == Some(id.as_str()))
 }
 
-/// A directive for `rule` is unused when the rule could have fired: it ran,
-/// or the configuration does not enable it at all (so it never will).
-fn unused(gate: &Gate, rule: &str) -> bool {
-    gate.selected.contains(rule) || !gate.active.contains(rule)
+/// A directive for `rule` is unused when the rule could have fired: it ran
+/// and finished at `file` (and, if it judges the project, there), or the
+/// configuration does not enable it at all (so it never will).
+fn settled(gate: &Gate, rule: &str, file: &Path) -> bool {
+    let finished = |at: Option<PathBuf>| !gate.unsettled.contains(&(rule.to_owned(), at));
+    let ran = gate.selected.contains(rule) && finished(Some(file.to_owned())) && finished(None);
+    ran || !gate.active.contains(rule)
 }
 
 /// What one rule named by a directive, or a directive that names none (`rule`
@@ -289,10 +308,10 @@ fn unused(gate: &Gate, rule: &str) -> bool {
 /// when it gives none), the marker and form as written, and where it is. A
 /// claim is `used` when it suppressed something, `settled` when its rule could
 /// have fired, `range` when it covers a range; `closes` is for `enable`, true
-/// when it ended a range. `snippet` is what identifies it from one run to the
-/// next, `place` where a finding about it is reported and `extent` the text a
-/// fix removes.
-fn annotation(at: &Located, rule: &str, closes: Option<bool>) -> Value {
+/// when it ended a range. `snippet` identifies it between runs, `place` is
+/// where a finding about it is reported, `extent` is the whole directive, and
+/// `ruleExtent` is the span a fix removes for one rule.
+fn annotation(at: &Located, rule: &str, closes: Option<bool>, rule_index: Option<usize>) -> Value {
     let comment = at.comment;
     let mut snippet = squash(&comment.text);
     if at.index > 0 {
@@ -312,7 +331,64 @@ fn annotation(at: &Located, rule: &str, closes: Option<bool>) -> Value {
         "snippet": snippet,
         "place": place(at),
         "extent": annotation_span(at),
+        "ruleExtent": rule_span(at, rule_index),
     })
+}
+
+/// The span to remove for one rule claim. With multiple rules, remove only
+/// that id and its adjacent comma; the directive and the other ids stay.
+fn rule_span(at: &Located, index: Option<usize>) -> Span {
+    if at.directive.rules.len() <= 1 {
+        return annotation_span(at);
+    }
+    let Some(index) = index.filter(|index| *index < at.directive.rules.len()) else {
+        return annotation_span(at);
+    };
+    let line = at.comment.text.lines().nth(at.index).unwrap_or_default();
+    let Some(marker) = line.find(at.directive.marker) else {
+        return annotation_span(at);
+    };
+    let start = marker + at.directive.marker.len();
+    let tail = &line[start..];
+    let end = tail.find(" --").unwrap_or(tail.len());
+    let list = &tail[..end];
+    let leading = list.len() - list.trim_start().len();
+    let list = &list[leading..];
+    let mut ranges = Vec::new();
+    let mut offset = 0;
+    for item in list.split(',') {
+        let name = item.trim();
+        if name.is_empty() {
+            return annotation_span(at);
+        }
+        let item_start = item.find(name).unwrap_or_default();
+        let from = start + leading + offset + item_start;
+        ranges.push((from, from + name.len()));
+        offset += item.len() + 1;
+    }
+    let Some((from, to)) = ranges.get(index).copied() else {
+        return annotation_span(at);
+    };
+    let (from, to) = if index == 0 {
+        (from, ranges[1].0)
+    } else {
+        (ranges[index - 1].1, to)
+    };
+    let column = if at.index == 0 {
+        at.comment.span.start.col
+    } else {
+        1
+    };
+    Span {
+        start: Position {
+            line: at.line,
+            col: column.saturating_add(count(from)),
+        },
+        end: Position {
+            line: at.line,
+            col: column.saturating_add(count(to)),
+        },
+    }
 }
 
 /// Where a finding about the directive is reported: the comment, or, for a
@@ -371,9 +447,18 @@ fn first_code_line(project: &Project, file: &Path, text: &str) -> u32 {
     let covered = |line: u32, content: &str| {
         comments.iter().any(|c| {
             let (start, end) = (c.span.start, c.span.end);
-            let before = (content.len()).min(start.col.saturating_sub(1) as usize);
-            let standalone = start.line < line || content[..before].trim().is_empty();
-            line >= start.line && line <= end.line && standalone
+            if line < start.line || line > end.line {
+                return false;
+            }
+            // On the comment's first line, only a comment that starts the
+            // line covers it. The byte column may split a UTF-8 character;
+            // `get` below treats that as not covered instead of panicking.
+            start.line < line || {
+                let before = (content.len()).min(start.col.saturating_sub(1) as usize);
+                content
+                    .get(..before)
+                    .is_some_and(|text| text.trim().is_empty())
+            }
         })
     };
     text.lines()
@@ -386,4 +471,135 @@ fn first_code_line(project: &Project, file: &Path, text: &str) -> u32 {
 /// A line count as the `u32` positions are in; a comment is never that long.
 fn count(n: usize) -> u32 {
     u32::try_from(n).unwrap_or(u32::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn slice(text: &str, span: Span) -> &str {
+        &text[(span.start.col as usize - 1)..(span.end.col as usize - 1)]
+    }
+
+    #[test]
+    fn a_rule_claim_removes_only_its_id_from_a_multi_rule_directive() {
+        let text = "// lighthouse-disable-next-line a/x, b/y -- reason";
+        let comment = Comment {
+            file: PathBuf::from("x.go"),
+            span: Span {
+                start: Position { line: 1, col: 1 },
+                end: Position {
+                    line: 1,
+                    col: count(text.len()) + 1,
+                },
+            },
+            text: text.to_owned(),
+            attached_to: None,
+        };
+        let (index, directive) = annotation::directives(text).pop().unwrap();
+        let at = Located {
+            comment: &comment,
+            index,
+            line: 1,
+            directive,
+        };
+
+        assert_eq!(slice(text, rule_span(&at, Some(0))), "a/x, ");
+        assert_eq!(slice(text, rule_span(&at, Some(1))), ", b/y");
+    }
+
+    #[test]
+    fn a_rule_that_did_not_finish_keeps_its_suppression_unsettled() {
+        let file = PathBuf::from("x.go");
+        let active = BTreeSet::from(["design/x".to_owned()]);
+        let selected = active.clone();
+        let unsettled = BTreeSet::from([("design/x".to_owned(), Some(file.clone()))]);
+        let text = |_path: &Path| None;
+        let gate = Gate {
+            active: &active,
+            selected: &selected,
+            unsettled: &unsettled,
+            text: &text,
+        };
+
+        assert!(!settled(&gate, "design/x", &file));
+    }
+
+    #[test]
+    fn non_ascii_code_before_a_comment_does_not_panic_when_finding_the_file_top() {
+        let path = PathBuf::from("x.rs");
+        let comment_text = "          // lighthouse-disable-next-line a/x -- reason";
+        let project = Project::merge([lighthouse_model::ucm::Fragment {
+            comments: vec![Comment {
+                file: path.clone(),
+                span: Span {
+                    start: Position { line: 2, col: 11 },
+                    end: Position {
+                        line: 2,
+                        col: count(comment_text.len()) + 1,
+                    },
+                },
+                text: comment_text.to_owned(),
+                attached_to: None,
+            }],
+            ..Default::default()
+        }]);
+        let text =
+            "let s = \"é\";\n          // lighthouse-disable-next-line a/x -- reason\nfn f() {}\n";
+        assert_eq!(first_code_line(&project, &path, text), 1);
+    }
+
+    #[test]
+    fn a_multi_rule_enable_annotation_removes_only_the_unmatched_id() {
+        let text = "// lighthouse-enable a/x, b/y";
+        let comment = Comment {
+            file: PathBuf::from("x.go"),
+            span: Span {
+                start: Position { line: 1, col: 1 },
+                end: Position {
+                    line: 1,
+                    col: count(text.len()) + 1,
+                },
+            },
+            text: text.to_owned(),
+            attached_to: None,
+        };
+        let (index, directive) = annotation::directives(text).pop().unwrap();
+        let at = Located {
+            comment: &comment,
+            index,
+            line: 1,
+            directive,
+        };
+        let finding = annotation(&at, "b/y", Some(false), Some(1));
+        let span: Span = serde_json::from_value(finding["ruleExtent"].clone()).unwrap();
+
+        assert_eq!(slice(text, span), ", b/y");
+    }
+
+    #[test]
+    fn a_single_rule_claim_removes_the_whole_directive() {
+        let text = "// lighthouse-disable-next-line a/x -- reason";
+        let comment = Comment {
+            file: PathBuf::from("x.go"),
+            span: Span {
+                start: Position { line: 1, col: 1 },
+                end: Position {
+                    line: 1,
+                    col: count(text.len()) + 1,
+                },
+            },
+            text: text.to_owned(),
+            attached_to: None,
+        };
+        let (index, directive) = annotation::directives(text).pop().unwrap();
+        let at = Located {
+            comment: &comment,
+            index,
+            line: 1,
+            directive,
+        };
+
+        assert_eq!(slice(text, rule_span(&at, Some(0))), text);
+    }
 }

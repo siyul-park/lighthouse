@@ -231,6 +231,11 @@ fn compile(function: &str, pattern: &CelString<'_>) -> Result<Regex, ExecutionEr
     let regex = Regex::new(pattern.inner()).map_err(|e| {
         ExecutionError::function_error(function, format!("invalid regex string: {e}"))
     })?;
+    // Keep long-lived MCP processes bounded when projects supply distinct patterns.
+    const MAX_CACHED: usize = 256;
+    if cache.len() >= MAX_CACHED {
+        cache.clear();
+    }
     cache.insert(pattern.inner().to_string(), regex.clone());
     Ok(regex)
 }

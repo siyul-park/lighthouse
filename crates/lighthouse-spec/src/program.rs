@@ -275,7 +275,7 @@ impl Program {
         if first.is_none_or(str::is_empty) {
             return Some("`command` needs a program".to_owned());
         }
-        if first.is_some_and(|p| placeholder(p).is_some()) {
+        if first.is_some_and(|p| placeholder(p).is_some() || file_fact(p).is_some()) {
             return Some("the program cannot be a placeholder".to_owned());
         }
         self.command

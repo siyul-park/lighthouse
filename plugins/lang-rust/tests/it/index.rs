@@ -387,6 +387,32 @@ fn every_file_states_the_edition_of_the_crate_that_holds_it() {
 }
 
 #[test]
+fn a_root_package_can_inherit_the_workspace_edition_from_its_own_manifest() {
+    let dir = project(&[
+        (
+            "Cargo.toml",
+            "[package]
+name = \"demo\"
+version = \"0.1.0\"
+edition.workspace = true
+[workspace]
+[workspace.package]
+edition = \"2021\"
+",
+        ),
+        ("src/lib.rs", "pub fn demo() {}\n"),
+    ]);
+
+    let result = index(dir.path(), serde_json::json!({}));
+
+    assert!(reasons(&result).is_empty(), "{:?}", reasons(&result));
+    assert_eq!(
+        editions(&result),
+        [("src/lib.rs".to_owned(), "2021".to_owned())]
+    );
+}
+
+#[test]
 fn a_file_no_package_holds_has_the_default_edition() {
     let dir = project(&[("lone.rs", "pub fn lone() {}\n")]);
 

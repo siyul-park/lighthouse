@@ -73,6 +73,8 @@ pub enum Error {
     Io { path: PathBuf, source: io::Error },
     #[error("unknown plugin `{0}`")]
     UnknownPlugin(String),
+    #[error("unknown language `{0}` in `languages` configuration")]
+    UnknownLanguage(String),
     #[error("`{0}` belongs to a plugin not listed in `plugins`")]
     PluginNotListed(String),
     #[error("unknown model `{0}`: declare it under `[models.<name>]`")]
@@ -224,6 +226,12 @@ struct Scene<'a> {
     models: &'a dyn lighthouse_plugin::Models,
 }
 
+/// The rules that did not finish, by file (`None` for the project).
+pub(crate) type Unsettled = BTreeSet<(String, Option<PathBuf>)>;
+
+/// The findings of the rules, and the rules that did not finish.
+type Collected = (Vec<Diagnostic>, Unsettled);
+
 /// What some rule runs found and noted.
 #[derive(Default)]
 struct Gathered {
@@ -232,6 +240,10 @@ struct Gathered {
     incomplete: Vec<Incomplete>,
     /// The time spent in each rule.
     times: BTreeMap<String, Duration>,
+    /// The rules that did not finish where they were to judge, by file
+    /// (`None` for the whole project): incomplete, or skipped for a missing
+    /// capability. A directive for one of them is not known to be stale.
+    unsettled: Unsettled,
 }
 
 impl Gathered {
@@ -240,6 +252,7 @@ impl Gathered {
         self.found.extend(later.found);
         self.notices.extend(later.notices);
         self.incomplete.extend(later.incomplete);
+        self.unsettled.extend(later.unsettled);
         for (rule, time) in later.times {
             *self.times.entry(rule).or_default() += time;
         }

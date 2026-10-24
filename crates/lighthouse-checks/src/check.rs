@@ -16,6 +16,7 @@ use crate::{
     Composition, Error,
     cel_rule::CelRule,
     command::CommandRule,
+    library,
     manifest::{rule_manifest, rule_options, validate_options},
 };
 
@@ -25,6 +26,7 @@ pub(crate) struct Check {
     meta: RuleManifest,
     decision: Decision,
     kind: Arc<Kind>,
+    libraries: BTreeMap<String, String>,
 }
 
 enum Kind {
@@ -71,10 +73,30 @@ impl Check {
             meta.analyzers = rule.analyzers();
         }
         meta.capabilities.clone_from(&check.requires);
-        let libraries = match &kind {
+        let mut libraries = match &kind {
             Kind::Cel(rule) => rule.libraries().clone(),
             _ => BTreeMap::new(),
         };
+        let check_source = serde_json::to_string(&decision.check).unwrap_or_default();
+        let mut macro_source = check_source;
+        if let Some(fix) = &decision.fix
+            && let lighthouse_spec::FixKind::Cel { edits, .. } = &fix.kind
+        {
+            macro_source.push_str(edits);
+            if let Ok(program) = comp.cel().compile_shared(edits) {
+                libraries.extend(library::libraries_called(comp, [program.as_ref()]));
+            }
+        }
+        // `cel.bind` is expanded during parsing, so it is absent from the
+        // compiled AST used by the normal library-call walk.
+        if macro_source.contains("cel.bind")
+            && let Some(entry) = comp
+                .functions()
+                .iter()
+                .find(|entry| entry.function.name == "cel.bind")
+        {
+            libraries.insert(entry.library.clone(), entry.version.clone());
+        }
         let revision = revision(decision, &libraries)
             .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
         let (reach, positions) = match &kind {
@@ -104,15 +126,13 @@ impl Check {
             meta,
             decision: decision.clone(),
             kind: Arc::new(kind),
+            libraries,
         }))
     }
 
     /// The id and version of each CEL library the check's expressions call.
     pub(crate) fn libraries(&self) -> BTreeMap<String, String> {
-        match &*self.kind {
-            Kind::Cel(rule) => rule.libraries().clone(),
-            _ => BTreeMap::new(),
-        }
+        self.libraries.clone()
     }
 
     /// The options of the focused file's language over the decision's defaults.

@@ -42,7 +42,7 @@ spec:
     evidence:
       rules: annotation.rules
       reason: annotation.reason
-      annotation: annotation.extent
+      annotation: annotation.ruleExtent
   fix:
     safety: unsafe
     type: cel

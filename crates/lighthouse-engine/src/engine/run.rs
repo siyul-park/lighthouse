@@ -58,7 +58,7 @@ impl Engine {
             cache: run_cache.as_ref(),
             models: &models,
         };
-        let found = self.collect(&scene, &mut run)?;
+        let (found, unsettled) = self.collect(&scene, &mut run)?;
         run.questions = models.subjects();
         run.probabilities = models.probabilities();
         (run.model_calls, run.model_cost) = models.usage();
@@ -79,7 +79,7 @@ impl Engine {
             }
         }
         let started = Instant::now();
-        let found = self.suppress(found, &scene, &ran, &scopes, &mut run)?;
+        let found = self.suppress(found, &scene, (&ran, &unsettled), &scopes, &mut run)?;
         self.identify(found, &scene, &mut run)?;
         run.timings.fingerprints = started.elapsed();
         run.incomplete.sort();
@@ -140,7 +140,7 @@ impl Engine {
 
     /// Applies the rules and keeps what they found, noticed and could not
     /// finish.
-    fn collect(&self, scene: &Scene, run: &mut Run) -> Result<Vec<Diagnostic>, Error> {
+    fn collect(&self, scene: &Scene, run: &mut Run) -> Result<Collected, Error> {
         let started = Instant::now();
         let applied = self.apply(scene)?;
         run.timings.rules = started.elapsed();
@@ -149,7 +149,7 @@ impl Engine {
         run.incomplete.extend(applied.incomplete);
         let (reviews, found) = applied.found.into_iter().partition(|d| d.review.is_some());
         run.reviews = reviews;
-        Ok(found)
+        Ok((found, applied.unsettled))
     }
 
     /// Takes out what an `allow` annotation waives and what lies outside the
@@ -158,7 +158,7 @@ impl Engine {
         &self,
         found: Vec<Diagnostic>,
         scene: &Scene,
-        ran: &BTreeSet<String>,
+        (ran, unsettled): (&BTreeSet<String>, &Unsettled),
         scopes: &Scopes,
         run: &mut Run,
     ) -> Result<Vec<Diagnostic>, Error> {
@@ -171,6 +171,7 @@ impl Engine {
         let gate = annotations::Gate {
             active: &self.active,
             selected: ran,
+            unsettled,
             text: &text,
         };
         let applied = annotations::apply(found, scene.project, &gate);

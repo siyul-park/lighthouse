@@ -30,6 +30,9 @@ pub(crate) struct Needs {
     related_dynamic: bool,
     /// The variables the expressions name.
     idents: BTreeSet<String>,
+    /// Whether `file.annotations` is explicitly read (only available when
+    /// judging annotation subjects after suppression).
+    file_annotations: bool,
     /// The variables of the comprehensions being walked that run over
     /// `lists.range`: they hold positions in a list, never a field name.
     positions: Vec<String>,
@@ -85,6 +88,11 @@ impl Needs {
         self.idents.contains(name)
     }
 
+    /// Whether the source explicitly reads `file.annotations`.
+    pub(crate) fn reads_file_annotations(&self) -> bool {
+        self.file_annotations
+    }
+
     /// What a node related to another one needs: the fields read from
     /// anything but the subject of the check, and none of the others, so a
     /// related node is not built with what only the subject is asked for.
@@ -95,6 +103,7 @@ impl Needs {
             dynamic: self.related_dynamic,
             related_dynamic: self.related_dynamic,
             idents: BTreeSet::new(),
+            file_annotations: self.file_annotations,
             positions: Vec::new(),
             ranges: Vec::new(),
         }
@@ -149,6 +158,9 @@ impl Needs {
     /// The field `name` of `operand` is read.
     fn insert(&mut self, name: &str, operand: &IdedExpr) {
         self.fields.insert(name.to_owned());
+        if name == "annotations" && matches!(&operand.expr, Expr::Ident(name) if name == "file") {
+            self.file_annotations = true;
+        }
         if !is_subject(operand) {
             self.related.insert(name.to_owned());
         }

@@ -163,13 +163,20 @@ impl CelRule {
         )?;
         let roots: Vec<&Program> = read[variables.len() + bodies.len()..].to_vec();
         let used = library::reached(&variables, &declared.functions, &bodies, &roots);
+        let needs = Needs::reading(read.iter().copied());
+        if needs.reads_file_annotations() && select != Select::Annotation {
+            return Err(Error::invalid(
+                id,
+                "`file.annotations` is only available with `select: annotation`",
+            ));
+        }
         let libraries = library::libraries_called(comp, read.iter().copied());
         Ok(Self {
             libraries,
             select,
             file_level: level,
             used,
-            needs: Needs::reading(read.iter().copied()),
+            needs,
             abstain,
             variables,
             condition,

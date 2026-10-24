@@ -30,6 +30,7 @@ pub struct Composition {
     cel: Cel,
     functions: Arc<[Entry]>,
     bundled: Arc<OnceLock<Result<Catalog, String>>>,
+    built_in: bool,
 }
 
 impl Composition {
@@ -51,6 +52,12 @@ impl Composition {
     pub fn functions(&self) -> &[Entry] {
         &self.functions
     }
+
+    /// Whether this was composed from the bundled library registry and can
+    /// therefore build the matching bundled plugin registry.
+    pub(crate) fn is_built_in(&self) -> bool {
+        self.built_in
+    }
 }
 
 /// The composition of the bundled libraries: what every entry point builds
@@ -60,11 +67,15 @@ pub fn compose() -> Result<Composition, String> {
     registry
         .register(&lighthouse_cel::Cel::new())
         .map_err(|e| format!("the `cel` plugin: {e}"))?;
-    compose_from(&registry)
+    compose_with(&registry, true)
 }
 
 /// The composition of the libraries `registry` holds.
 pub fn compose_from(registry: &Registry) -> Result<Composition, String> {
+    compose_with(registry, false)
+}
+
+fn compose_with(registry: &Registry, built_in: bool) -> Result<Composition, String> {
     let mut env = lighthouse_spec::base()?;
     for library in registry.cel().libraries() {
         let id = &library.manifest().id;
@@ -90,5 +101,6 @@ pub fn compose_from(registry: &Registry) -> Result<Composition, String> {
         cel: Cel::new(env, namespaces),
         functions: functions.into(),
         bundled: Arc::default(),
+        built_in,
     })
 }

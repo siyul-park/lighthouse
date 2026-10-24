@@ -97,6 +97,15 @@ pub(super) fn validate_config(
         }
     }
     registry.validate()?;
+    for (id, _) in config.test_naming() {
+        if !registry
+            .languages()
+            .iter()
+            .any(|language| language.provider.manifest().id == id)
+        {
+            return Err(Error::UnknownLanguage(id.to_owned()));
+        }
+    }
     validate_models(registry, config, binding)?;
     let listed = |id: &str| config.lists(lighthouse_plugin::plugin_of(id));
     let entries = config.entries(projects)?;

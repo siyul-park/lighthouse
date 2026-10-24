@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr};
+use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr, LiteralValue};
 
 use crate::Cel;
 
@@ -38,6 +38,8 @@ pub struct Call {
     pub namespace: Option<String>,
     /// Whether it is called on a value (`list.size()`), not as `size(list)`.
     pub member: bool,
+    /// The statically known type of a literal receiver, when present.
+    pub receiver_type: Option<String>,
     /// The arguments it is given, not counting the value of a member call.
     pub args: usize,
 }
@@ -97,6 +99,11 @@ pub fn program_calls(cel: &Cel, program: &cel::Program) -> BTreeSet<Call> {
             into.insert(Call {
                 name: call.func_name.clone(),
                 member: call.target.is_some() && namespace.is_none(),
+                receiver_type: call
+                    .target
+                    .as_deref()
+                    .and_then(receiver_type)
+                    .map(str::to_owned),
                 namespace,
                 args: call.args.len(),
             });
@@ -201,4 +208,19 @@ fn entries(entries: &[IdedEntryExpr]) -> Vec<&IdedExpr> {
             EntryExpr::MapEntry(entry) => vec![&entry.key, &entry.value],
         })
         .collect()
+}
+
+fn receiver_type(expr: &IdedExpr) -> Option<&'static str> {
+    match &expr.expr {
+        Expr::Literal(LiteralValue::Boolean(_)) => Some("bool"),
+        Expr::Literal(LiteralValue::Bytes(_)) => Some("bytes"),
+        Expr::Literal(LiteralValue::Double(_)) => Some("double"),
+        Expr::Literal(LiteralValue::Int(_) | LiteralValue::UInt(_)) => Some("int"),
+        Expr::Literal(LiteralValue::Null) => Some("null_type"),
+        Expr::Literal(LiteralValue::String(_)) => Some("string"),
+        Expr::List(_) => Some("list"),
+        Expr::Map(_) => Some("map"),
+        Expr::Struct(_) => Some("object"),
+        _ => None,
+    }
 }
