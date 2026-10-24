@@ -12,6 +12,7 @@ use lighthouse_plugin::{
 pub mod glob;
 
 mod bind;
+mod language;
 mod lists;
 mod order;
 mod regex;
@@ -45,6 +46,10 @@ impl Default for Cel {
 impl Plugin for Cel {
     fn manifest(&self) -> &PluginManifest {
         &self.manifest
+    }
+
+    fn languages(&self) -> Vec<Box<dyn lighthouse_plugin::LanguageProvider>> {
+        vec![Box::new(language::Language::new())]
     }
 
     fn cel_libraries(&self) -> Vec<Box<dyn CelLibrary>> {

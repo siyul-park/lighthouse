@@ -98,8 +98,9 @@ spec:
               && symbol.visibility == 'private' && size(symbol.members) > 0
               && size(symbol.implementers) == 1
              ? ['interface'] : [])
-    where: size(matched) > 0
+    where: symbol.lang != 'cel' && size(matched) > 0
     abstain: >-
+      symbol.lang != 'cel' && (
       ('wrapper' in options.kinds && callable
         && symbol.visibility == 'private' && symbol.name != 'main' && symbol.name != 'init'
         && !symbol.implementation && size(symbol.func.callers.filter(c, !c.test)) == 1)
@@ -110,6 +111,7 @@ spec:
       || ('interface' in options.kinds && symbol.kind == 'interface'
           && symbol.visibility != 'private' && size(symbol.members) > 0
           && size(symbol.implementers) == 1)
+      )
     message: >-
       {{ size(matched) == 0 ? ''
          : matched[0] == 'wrapper'

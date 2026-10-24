@@ -240,7 +240,7 @@ fn default_limit_comes_from_the_catalog() {
 }
 
 #[test]
-fn bundled_plugins_provide_only_the_fallback_text_language() {
+fn bundled_plugins_provide_cel_and_fallback_text_languages() {
     let registry = lighthouse_test_support::registry();
     let plugins: Vec<_> = registry.manifests().iter().map(|p| p.id.as_str()).collect();
     assert_eq!(
@@ -252,7 +252,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
         .iter()
         .map(|l| l.provider.manifest().id.clone())
         .collect();
-    assert_eq!(languages, ["text"]);
+    assert_eq!(languages, ["cel", "text"]);
     let design: Vec<_> = registry
         .rules()
         .filter(|r| lighthouse_plugin::plugin_of(&r.manifest().id) == "design")

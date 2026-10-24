@@ -37,6 +37,7 @@ lint: plugins
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets -- -D warnings
 	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./...
+	cargo run -q -p lighthouse-cli -- check decisions/
 	cargo run -q -p lighthouse-cli -- check .
 
 # What CI runs.

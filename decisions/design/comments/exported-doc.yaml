@@ -68,7 +68,8 @@ spec:
       - name: visible
         expression: "options.includeInternal ? ['public', 'internal'] : ['public']"
     where: >-
-      options.kinds.exists(k, k == symbol.kind)
+      symbol.lang != 'cel'
+      && options.kinds.exists(k, k == symbol.kind)
       && symbol.visibility in visible
       && (owner == null || (owner.visibility in visible && owner.kind != 'interface'))
       && !(symbol.kind == 'method'

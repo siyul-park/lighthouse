@@ -100,6 +100,8 @@ pub struct Workspace {
     /// what a provider must read instead of the disk. Empty for a normal run;
     /// a fix run checks candidate edits this way before anything is written.
     pub overlays: BTreeMap<PathBuf, String>,
+    /// CEL libraries registered by the host, as manifests for language providers.
+    pub cel_libraries: Vec<CelLibraryManifest>,
     /// The directory the host keeps derived data in between runs
     /// (`.lighthouse/cache`), exactly when its result cache is on; a provider
     /// may keep its own under a directory named by its plugin. `None` when the
@@ -151,6 +153,7 @@ impl Workspace {
             constructors: BTreeMap::new(),
             test_naming: BTreeMap::new(),
             overlays: BTreeMap::new(),
+            cel_libraries: Vec::new(),
             cache_dir: None,
             sandbox: Policy::default(),
         }

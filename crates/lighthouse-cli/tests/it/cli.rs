@@ -661,7 +661,7 @@ fn decision_test_fails_when_an_example_does_not_hold() {
         .args(["decision", "test", "local/long-file"])
         .assert()
         .code(1)
-        .stdout(predicates_contains("FAIL [text] local/long-file long"));
+        .stdout(predicates_contains("FAIL [cel] local/long-file long"));
 }
 
 #[test]

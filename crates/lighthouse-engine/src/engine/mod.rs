@@ -352,6 +352,11 @@ impl Engine {
             constructors: constructors(&registry, &config),
             test_naming: test_naming(&registry, &config),
             overlays: BTreeMap::new(),
+            cel_libraries: registry
+                .cel()
+                .libraries()
+                .map(|library| library.manifest().clone())
+                .collect(),
             cache_dir: None,
             sandbox: config.sandbox().clone(),
         };
