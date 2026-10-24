@@ -158,7 +158,10 @@ impl Needs {
     /// The field `name` of `operand` is read.
     fn insert(&mut self, name: &str, operand: &IdedExpr) {
         self.fields.insert(name.to_owned());
-        if name == "annotations" && matches!(&operand.expr, Expr::Ident(name) if name == "file") {
+        // The file value can be passed through a CEL variable or function
+        // parameter. No other model value has this field; option lookups are
+        // separate and remain valid.
+        if name == "annotations" && !rooted_in_options(operand) {
             self.file_annotations = true;
         }
         if !is_subject(operand) {

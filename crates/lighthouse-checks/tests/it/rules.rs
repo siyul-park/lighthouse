@@ -456,6 +456,27 @@ fn file_annotations_can_only_be_read_by_annotation_checks() {
 }
 
 #[test]
+fn file_annotations_cannot_be_reached_through_a_variable_or_function() {
+    for check in [
+        "select: file\nvariables:\n  - name: source\n    expression: file\nwhere: source.annotations.size() > 0\nmessage: x",
+        "select: file\nvariables:\n  - name: has_annotations\n    params: [source]\n    expression: source.annotations.size() > 0\nwhere: has_annotations(file)\nmessage: x",
+    ] {
+        let bad = probe("file", check);
+        let error = lighthouse_checks::probe::revision(
+            &lighthouse_test_support::composition(),
+            &bad,
+            |_| None,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("`file.annotations` is only available with `select: annotation`"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
 fn the_check_revision_names_the_libraries_its_expressions_call() {
     let globs = probe(
         "symbol",

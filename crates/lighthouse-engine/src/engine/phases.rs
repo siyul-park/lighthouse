@@ -302,20 +302,7 @@ impl Engine {
     }
 
     fn apply_to_file(&self, scene: &Scene, input: &Input) -> Result<Gathered, Error> {
-        let mut gathered = self.apply_rules_of(scene, input, false)?;
-        let resolved = self
-            .config
-            .resolve(&input.file.path, &input.file.lang, &self.projects)?;
-        // The models answer what the file's rules queued, all at once.
-        for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
-            let Some(level) = resolved.get(&rule).and_then(|config| config.level) else {
-                continue;
-            };
-            gathered
-                .found
-                .extend(found.into_iter().map(|d| answered(d, level)));
-        }
-        Ok(gathered)
+        self.apply_rules_of(scene, input, false)
     }
 
     /// Judges the suppression directives, which the rules that read them
@@ -347,22 +334,7 @@ impl Engine {
                 .inputs
                 .par_iter()
                 .filter(|input| with_directives.contains(&input.file.path))
-                .map(|input| {
-                    let mut gathered = self.apply_rules_of(scene, input, true)?;
-                    let resolved =
-                        self.config
-                            .resolve(&input.file.path, &input.file.lang, &self.projects)?;
-                    for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
-                        let Some(level) = resolved.get(&rule).and_then(|config| config.level)
-                        else {
-                            continue;
-                        };
-                        gathered
-                            .found
-                            .extend(found.into_iter().map(|d| answered(d, level)));
-                    }
-                    Ok(gathered)
-                })
+                .map(|input| self.apply_rules_of(scene, input, true))
                 .collect()
         });
         let mut all = Gathered::default();
@@ -417,6 +389,15 @@ impl Engine {
             let at = Some((file, input.text.as_str()));
             let options = options_at(&self.inherited, &resolved, &meta.id, &config.options);
             self.run_one(scene, *rule, (&options, level, applies), at, &mut gathered)?;
+        }
+        // Settle the models queued by this phase with the same resolved levels.
+        for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
+            let Some(level) = resolved.get(&rule).and_then(|config| config.level) else {
+                continue;
+            };
+            gathered
+                .found
+                .extend(found.into_iter().map(|d| answered(d, level)));
         }
         Ok(gathered)
     }
