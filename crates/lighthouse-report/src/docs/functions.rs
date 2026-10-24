@@ -56,5 +56,6 @@ pub fn cel_functions_markdown(functions: &[FunctionDoc]) -> String {
             let _ = write!(out, "\n```text\n{}\n```\n\n", function.example);
         }
     }
+    out.pop();
     out
 }

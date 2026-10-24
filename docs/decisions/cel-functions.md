@@ -104,4 +104,3 @@ Replaces the matches of the pattern: all of them, or the first `count` when it i
 ```text
 regex.replace('banana', 'a', 'x', 2) == 'bxnxna'
 ```
-
