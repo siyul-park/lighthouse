@@ -67,6 +67,48 @@ fn command_new_runs_a_program_that_prints_the_answer() {
 }
 
 #[test]
+fn command_new_treats_an_omitted_answer_as_abstention() {
+    let dir = tempfile::tempdir().unwrap();
+    let provider = provider(r#"[ "sh", "-c", "cat >/dev/null; printf '{\\\"answers\\\":{}}'" ]"#);
+
+    let answer = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap()
+    .classify(&request())
+    .unwrap();
+
+    assert!(answer.answers.is_empty());
+}
+
+#[test]
+fn command_new_rejects_an_answer_with_an_unknown_type() {
+    let dir = tempfile::tempdir().unwrap();
+    let provider = provider(
+        r#"[ "sh", "-c", "cat >/dev/null; printf '{\\\"answers\\\":{\\\"d/x\\\":{\\\"type\\\":\\\"invalid\\\",\\\"noul\\\":0.9}}}'" ]"#,
+    );
+
+    let error = CommandModel::new(
+        &lighthouse_test_support::cel(),
+        dir.path(),
+        "p/m",
+        "m",
+        &provider,
+        &Policy::default(),
+    )
+    .unwrap()
+    .classify(&request())
+    .unwrap_err();
+
+    assert!(error.to_string().contains("unknown type"), "{error}");
+}
+
+#[test]
 fn command_new_fails_a_program_that_exits_with_an_error() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "exit 3"]"#);

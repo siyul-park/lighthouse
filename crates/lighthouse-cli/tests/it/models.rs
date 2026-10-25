@@ -373,10 +373,117 @@ fn a_request_moves_to_the_next_model_of_a_route_when_a_model_fails_and_a_failing
 }
 
 #[test]
+fn an_unusable_answer_falls_through_to_the_next_model() {
+    for mode in ["bad-type", "out-of-range"] {
+        let dir = routed(&[("bad", mode), ("good", "command")], "ordered", 0);
+        let report = routed_check(dir.path());
+        let bad = marks(dir.path(), "bad");
+        let good = marks(dir.path(), "good");
+        assert!(bad > 0, "{mode}: the invalid model was tried");
+        assert!(
+            good >= bad,
+            "{mode}: each failed request tries the next model"
+        );
+        assert!(
+            report["findings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|f| f["modelVersion"].as_str())
+                .any(|model| model.starts_with("good/m@")),
+            "{mode}: the next model's decision should be used: {report}"
+        );
+    }
+}
+
+#[test]
+fn a_missing_answer_is_an_abstention_not_a_model_failure() {
+    let dir = routed(
+        &[("missing", "missing"), ("unused", "command")],
+        "ordered",
+        0,
+    );
+    let report = routed_check(dir.path());
+    assert!(marks(dir.path(), "missing") > 0);
+    assert_eq!(marks(dir.path(), "unused"), 0);
+    assert!(
+        !report["messages"]
+            .to_string()
+            .contains("model missing/m failed"),
+        "{report}"
+    );
+}
+
+#[test]
+fn sarif_review_columns_use_utf16_for_review_only_files() {
+    let dir = routed(
+        &[("missing", "missing"), ("unused", "command")],
+        "ordered",
+        0,
+    );
+    let source = LIB
+        .replace("pub fn bad_one() {}\n", "")
+        .replace("pub fn maybe_bad() {}\n", "");
+    write(
+        dir.path(),
+        "src/lib.rs",
+        &format!("const PREFIX: &str = \"é😀\"; pub fn maybe_bad() {{}}\n{source}mod more;\n"),
+    );
+    let (_, out) = check(dir.path(), &["--no-cache"]);
+    let result = out["runs"][0]["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|result| result["message"]["text"] == "maybe_bad is banned")
+        .unwrap();
+    assert_eq!(result["kind"], "review");
+    assert_eq!(
+        result["locations"][0]["physicalLocation"]["region"]["startColumn"], 29,
+        "{result}"
+    );
+}
+
+#[test]
 fn round_robin_starts_each_request_at_the_next_model() {
     let dir = routed(&[("a", "command"), ("b", "command")], "round-robin", 1);
     routed_check(dir.path());
     assert_eq!((marks(dir.path(), "a"), marks(dir.path(), "b")), (2, 2));
+}
+
+#[test]
+fn round_robin_rotates_each_request_when_a_state_exceeds_the_question_limit() {
+    let dir = routed(&[("a", "command"), ("b", "command")], "round-robin", 0);
+    let mut rules = String::new();
+    for n in 0..40 {
+        let id = format!("local/naming-ban-{n}");
+        let document = DECISION.replace("local/naming-ban", &id);
+        write(
+            dir.path(),
+            &format!(".lighthouse/decisions/ban-{n}.yaml"),
+            &document,
+        );
+        rules.push_str(&format!("{id:?} = \"warn\"\n"));
+    }
+    let config = dir.path().join("lighthouse.toml");
+    let text = fs::read_to_string(&config).unwrap();
+    fs::write(
+        &config,
+        text.replace(
+            "\"local/naming-ban\" = \"warn\"\n",
+            &format!("\"local/naming-ban\" = \"warn\"\n{rules}"),
+        ),
+    )
+    .unwrap();
+    routed_check(dir.path());
+    let (a, b) = (marks(dir.path(), "a"), marks(dir.path(), "b"));
+    assert!(
+        a + b > 1,
+        "the fixture must split into multiple requests: {a}, {b}"
+    );
+    assert!(
+        a.abs_diff(b) <= 1,
+        "requests should rotate between models: {a}, {b}"
+    );
 }
 
 #[test]

@@ -104,7 +104,7 @@ impl<'a> RunModels<'a> {
     /// What a layer says about the subjects at `items`, which share a state:
     /// kept answers first, the rest in requests of at most [`MAX_QUESTIONS`].
     fn ask_group(&self, pending: &[Pending<'a>], layer: usize, items: &[At]) -> Vec<(At, Answer)> {
-        let order = pending[items[0].0].layers[layer].order(self.binding.routing);
+        let route = &pending[items[0].0].layers[layer];
         let mut out = Vec::new();
         let mut todo = Vec::new();
         for &at in items {
@@ -113,7 +113,7 @@ impl<'a> RunModels<'a> {
                 out.push((at, Err(Abstained::Undecided)));
                 continue;
             }
-            let kept = order.iter().find_map(|model| {
+            let kept = route.models().iter().find_map(|model| {
                 let manifest = model.manifest();
                 let noul = self.recall(manifest, item, at.1)?;
                 Some((noul, named(manifest)))
@@ -124,6 +124,7 @@ impl<'a> RunModels<'a> {
             }
         }
         for chunk in todo.chunks(MAX_QUESTIONS) {
+            let order = route.order(self.binding.routing);
             out.extend(self.send(&order, pending, chunk));
         }
         out
@@ -179,19 +180,31 @@ impl<'a> RunModels<'a> {
         let result = model
             .classify(&params)
             .map_err(|e| Miss::Failed(self.failure(manifest, e.to_string())))?;
+        if let Some(reason) = chunk.iter().find_map(|&(p, _)| {
+            let decision = &pending[p].ask.decision.id;
+            match result.answers.get(decision) {
+                Some(answer) if answer.kind != "noul" => {
+                    Some(format!("it gave an unusable answer type for `{decision}`"))
+                }
+                Some(answer) if !(0.0..=1.0).contains(&answer.noul) => {
+                    Some(format!("it gave an invalid probability for `{decision}`"))
+                }
+                _ => None,
+            }
+        }) {
+            return Err(Miss::Failed(self.failure(manifest, reason)));
+        }
         let by = named(manifest);
         Ok(chunk
             .iter()
             .map(|&at| {
                 let item = &pending[at.0];
                 let decision = &item.ask.decision.id;
-                let answer = match result.answers.get(decision) {
-                    Some(answer) if answer.kind == "noul" => Ok((answer.noul, by.clone())),
-                    _ => Err(Abstained::Failed(self.note_failure(
-                        manifest,
-                        format!("it gave no `noul` answer for `{decision}`"),
-                    ))),
-                };
+                let answer = result
+                    .answers
+                    .get(decision)
+                    .map(|answer| (answer.noul, by.clone()))
+                    .ok_or(Abstained::Undecided);
                 if let Ok((noul, _)) = answer {
                     self.keep(manifest, item, at.1, noul);
                 }

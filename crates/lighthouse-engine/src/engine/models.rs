@@ -68,6 +68,12 @@ impl<'a> Layer<'a> {
             .take(self.models.len())
             .collect()
     }
+
+    /// The configured model order, for looking up cached answers without
+    /// consuming a request turn.
+    pub(super) fn models(&self) -> &[Arc<dyn ModelClient + 'a>] {
+        &self.models
+    }
 }
 
 /// What the models of a run were asked and cost.
@@ -190,10 +196,7 @@ impl<'a> RunModels<'a> {
 
     /// Notes that `manifest`'s model failed, and returns the reason.
     pub(super) fn note_failure(&self, manifest: &Model, reason: String) -> String {
-        self.note(format!(
-            "model {} failed, its subjects are left to review: {reason}",
-            manifest.id
-        ));
+        self.note(format!("model {} failed: {reason}", manifest.id));
         reason
     }
 

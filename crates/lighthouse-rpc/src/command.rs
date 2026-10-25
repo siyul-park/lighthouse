@@ -15,10 +15,7 @@ use lighthouse_plugin::{
     SystemOneResponse,
 };
 use lighthouse_process::{Environment, Home, Job, Lines, Policy, Ran, referenced};
-use lighthouse_protocol::{
-    canonical, hash,
-    prompt::{json_in, noul_of},
-};
+use lighthouse_protocol::{canonical, hash, prompt::json_in};
 use lighthouse_spec::{Cel, CommandProtocol, ModelProvider, Point, Program};
 use serde_json::{Value, json};
 
@@ -185,22 +182,55 @@ impl ModelClient for CommandModel {
         asked.model.clone_from(&self.model);
         let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
         let (ran, _) = self.run(&self.dir, &input, false, |_| None)?;
-        let printed = printed_answer(&ran.stdout, self.pointer.as_deref());
+        let printed = printed_answer(&ran.stdout, self.pointer.as_deref())
+            .ok_or_else(|| failed("its output is not a JSON answer".to_owned()))?;
+        let answers = printed
+            .get("answers")
+            .map(|answers| {
+                answers
+                    .as_object()
+                    .ok_or_else(|| failed("its `answers` is not an object".to_owned()))
+            })
+            .transpose()?;
+        if answers.is_none() && printed.get("noul").is_none() {
+            return Err(failed(
+                "its output has no `answers` map or `noul` value".to_owned(),
+            ));
+        }
         let answers = params
             .questions
             .keys()
             .map(|id| {
-                let noul = printed
-                    .as_ref()
-                    .and_then(|printed| noul_of(printed, id))
-                    .ok_or_else(|| failed(format!("its output has no `noul` for `{id}`")))?;
-                let answer = Answer {
-                    kind: "noul".to_owned(),
-                    noul,
+                let value = match answers {
+                    Some(answers) => answers.get(id),
+                    None => Some(&printed),
                 };
-                Ok((id.clone(), answer))
+                let Some(value) = value else {
+                    return Ok(None);
+                };
+                if value
+                    .get("type")
+                    .is_some_and(|kind| kind.as_str() != Some("noul"))
+                {
+                    return Err(failed(format!("its answer for `{id}` has an unknown type")));
+                }
+                let noul = value
+                    .get("noul")
+                    .and_then(Value::as_f64)
+                    .filter(|p| (0.0..=1.0).contains(p))
+                    .ok_or_else(|| failed(format!("its output has no valid `noul` for `{id}`")))?;
+                Ok(Some((
+                    id.clone(),
+                    Answer {
+                        kind: "noul".to_owned(),
+                        noul,
+                    },
+                )))
             })
-            .collect::<Result<_, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?
+            .into_iter()
+            .flatten()
+            .collect();
         Ok(SystemOneResponse {
             model: self.manifest.id.clone(),
             answers,

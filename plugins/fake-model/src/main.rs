@@ -168,6 +168,8 @@ fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {
         Some("command") => command(),
         Some("weak") => weak(),
+        Some("missing") => missing_answer(),
+        Some("bad-type" | "out-of-range") => bad_answer(),
         Some("fail") => match mark() {
             Ok(()) => ExitCode::from(3),
             Err(_) => ExitCode::FAILURE,
@@ -224,6 +226,51 @@ fn mark_in(name: &str) -> std::io::Result<()> {
         .append(true)
         .open(name)
         .and_then(|mut file| file.write_all(b"x"))
+}
+
+/// A command model that omits every requested answer, an abstention by contract.
+fn missing_answer() -> ExitCode {
+    let mut input = String::new();
+    if stdin().read_to_string(&mut input).is_err() {
+        return ExitCode::FAILURE;
+    }
+    let Ok(request) = serde_json::from_str::<Value>(&input) else {
+        return ExitCode::FAILURE;
+    };
+    if mark().is_err() {
+        return ExitCode::FAILURE;
+    }
+    println!("{}", json!({"model": request["model"], "answers": {}}));
+    ExitCode::SUCCESS
+}
+
+/// A command model that returns an unusable answer for every question.
+fn bad_answer() -> ExitCode {
+    let mut input = String::new();
+    if stdin().read_to_string(&mut input).is_err() {
+        return ExitCode::FAILURE;
+    }
+    let Ok(request) = serde_json::from_str::<Value>(&input) else {
+        return ExitCode::FAILURE;
+    };
+    if mark().is_err() {
+        return ExitCode::FAILURE;
+    }
+    let mode = std::env::args().nth(1);
+    let (kind, noul) = if mode.as_deref() == Some("bad-type") {
+        ("invalid", 0.99)
+    } else {
+        ("noul", 1.5)
+    };
+    let answers: serde_json::Map<String, Value> = request["questions"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default()
+        .keys()
+        .map(|id| (id.clone(), json!({"type": kind, "noul": noul})))
+        .collect();
+    println!("{}", json!({"model": request["model"], "answers": answers}));
+    ExitCode::SUCCESS
 }
 
 /// A model that is unsure of everything, answering as text in an envelope.

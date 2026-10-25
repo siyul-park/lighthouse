@@ -267,6 +267,7 @@ impl Checked {
             .run
             .diagnostics
             .iter()
+            .chain(&self.run.reviews)
             .chain(self.suppressions.iter().map(|s| &s.diagnostic))
             .map(|d| d.file.as_path())
             .collect();
