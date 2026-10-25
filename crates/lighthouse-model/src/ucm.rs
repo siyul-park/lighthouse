@@ -63,6 +63,16 @@ pub struct File {
     pub facts: BTreeMap<String, String>,
 }
 
+impl File {
+    /// Language whose rules and conventions apply to this file. For embedded
+    /// code it is the analyzed language; otherwise it is the host language.
+    pub fn analysis_language(&self) -> &str {
+        self.facts
+            .get("analysisLanguage")
+            .map_or(&self.lang, String::as_str)
+    }
+}
+
 /// Package, directory or namespace.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Module {

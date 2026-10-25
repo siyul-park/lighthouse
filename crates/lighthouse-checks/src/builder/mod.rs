@@ -81,12 +81,9 @@ impl<'a> Builder<'a> {
         } else {
             None
         };
-        let language = ctx.file.map_or_else(String::new, |(file, _)| {
-            file.facts
-                .get("analysisLanguage")
-                .cloned()
-                .unwrap_or_else(|| file.lang.clone())
-        });
+        let language = ctx
+            .file
+            .map_or_else(String::new, |(file, _)| file.analysis_language().to_owned());
         Ok(Self {
             project: ctx.project,
             ws: ctx.workspace,

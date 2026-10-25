@@ -21,11 +21,12 @@ use lighthouse_spec::{Models as BoundModels, Routing, Task};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
-use super::{Engine, models::named};
+use super::{
+    Engine, MAX_FAILURES,
+    models::{Failures, named},
+    rotation_start,
+};
 use crate::cache::{Cache, Digest};
-
-/// Failures of a model, in one run, after which it is no longer asked.
-const MAX_FAILURES: usize = 3;
 
 /// One model of the route, as the route asks it.
 pub(crate) struct Member<'a> {
@@ -73,7 +74,7 @@ pub(crate) struct Route<'a> {
     cache: Option<Cache>,
     /// The answers of this run, which the cache may not keep.
     memo: Mutex<BTreeMap<Digest, Value>>,
-    failures: Mutex<BTreeMap<String, (usize, String)>>,
+    failures: Failures,
     spent: Mutex<Spent>,
     notes: Mutex<BTreeSet<String>>,
 }
@@ -127,7 +128,7 @@ impl Engine {
             budget: AtomicUsize::new(self.binding.budget),
             cache,
             memo: Mutex::default(),
-            failures: Mutex::default(),
+            failures: Failures::default(),
             spent: Mutex::default(),
             notes: Mutex::new(notes),
         })
@@ -146,7 +147,7 @@ impl<'a> Route<'a> {
             budget: AtomicUsize::new(usize::MAX),
             cache: None,
             memo: Mutex::default(),
-            failures: Mutex::default(),
+            failures: Failures::default(),
             spent: Mutex::default(),
             notes: Mutex::default(),
         }
@@ -231,12 +232,7 @@ impl Route<'_> {
             .iter()
             .filter_map(|reference| self.members.iter().find(|m| m.reference == *reference))
             .collect();
-        let start = match self.routing {
-            Routing::RoundRobin if !named.is_empty() => {
-                self.turn.fetch_add(1, Ordering::SeqCst) % named.len()
-            }
-            _ => 0,
-        };
+        let start = rotation_start(self.routing, named.len(), &self.turn);
         named
             .iter()
             .cycle()
@@ -284,23 +280,18 @@ impl Route<'_> {
 
     /// Why a model is skipped, when it failed [`MAX_FAILURES`] times.
     fn skipped(&self, model: &str) -> Option<String> {
-        let failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = failures.get(model)?;
-        (*count >= MAX_FAILURES).then(|| last.clone())
+        self.failures.skipped(model)
     }
 
     /// Notes that `model` failed; at [`MAX_FAILURES`] it is skipped for the
     /// rest of the run. Returns the reason.
     fn failure(&self, model: &str, reason: String) -> String {
+        let reached_limit = self.failures.record(model, &reason);
         let mut notes = self.notes.lock().unwrap_or_else(PoisonError::into_inner);
         notes.insert(format!(
             "model {model} failed, its fixes are declined: {reason}"
         ));
-        let mut failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = failures.entry(model.to_owned()).or_default();
-        *count += 1;
-        last.clone_from(&reason);
-        if *count == MAX_FAILURES {
+        if reached_limit {
             notes.insert(format!(
                 "model {model} failed {MAX_FAILURES} times; it is skipped for the rest of the run"
             ));

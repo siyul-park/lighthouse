@@ -141,12 +141,7 @@ impl Check {
         configured: &Options,
         ctx: &Context,
     ) -> Result<Map<String, Value>, PluginError> {
-        let language = ctx.file.map(|(file, _)| {
-            file.facts
-                .get("analysisLanguage")
-                .map(String::as_str)
-                .unwrap_or(file.lang.as_str())
-        });
+        let language = ctx.file.map(|(file, _)| file.analysis_language());
         rule_options(&self.decision, configured, language)
     }
 }

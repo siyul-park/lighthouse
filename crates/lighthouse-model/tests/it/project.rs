@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use lighthouse_model::{
     Document, Position, Span,
@@ -38,6 +41,23 @@ fn call(from: &Symbol, to: &str) -> Edge {
         resolution: Resolution::Syntactic,
         site: None,
     }
+}
+
+#[test]
+fn file_analysis_language_defaults_to_host_and_honors_embedded_override() {
+    let mut file = File {
+        path: PathBuf::from("settings.yaml"),
+        lang: "yaml".to_owned(),
+        hash: String::new(),
+        generated: false,
+        test: false,
+        facts: BTreeMap::new(),
+    };
+    assert_eq!(file.analysis_language(), "yaml");
+
+    file.facts
+        .insert("analysisLanguage".to_owned(), "cel".to_owned());
+    assert_eq!(file.analysis_language(), "cel");
 }
 
 #[test]

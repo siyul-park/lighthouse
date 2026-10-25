@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs, io,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
 
@@ -17,7 +18,7 @@ use lighthouse_plugin::{
 };
 use lighthouse_spec::{
     Attributes, Catalog, Config, Error as SpecError, GeneratedCheck, GlobSet,
-    Models as BoundModels, Projects, RuleConfig, Subject as DecisionSubject,
+    Models as BoundModels, Projects, Routing, RuleConfig, Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
@@ -61,6 +62,9 @@ pub const IGNORE_FILE: &str = ".lighthouseignore";
 
 /// Process exit code of a run whose analysis was incomplete.
 pub const EXIT_INCOMPLETE: u8 = 3;
+
+/// A model that fails this many requests is skipped for the rest of the run.
+const MAX_FAILURES: usize = 3;
 
 /// Why a run could not start or finish: invalid configuration, unknown or
 /// unlisted plugin or rule, or an unreadable path. Analysis gaps are not
@@ -473,5 +477,13 @@ impl Engine {
     pub fn check_files(&self, files: &[PathBuf], only: &[String]) -> Result<Run, Error> {
         self.validate_only(only)?;
         self.run(Scopes::files(files), Vec::new(), only, &Overlays::new())
+    }
+}
+
+/// The starting position shared by ordered and round-robin model bindings.
+fn rotation_start(routing: Routing, len: usize, turn: &AtomicUsize) -> usize {
+    match (routing, len) {
+        (Routing::RoundRobin, len) if len > 0 => turn.fetch_add(1, Ordering::SeqCst) % len,
+        _ => 0,
     }
 }

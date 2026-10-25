@@ -41,12 +41,9 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
             .or_insert((span.start.line, span.end.line));
         *first = (*first).min(span.start.line);
         *last = (*last).max(span.end.line);
-        let lang = project.file(&symbol.file).map_or_else(String::new, |file| {
-            file.facts
-                .get("analysisLanguage")
-                .cloned()
-                .unwrap_or_else(|| file.lang.clone())
-        });
+        let lang = project
+            .file(&symbol.file)
+            .map_or_else(String::new, |file| file.analysis_language().to_owned());
         let module = modules.entry(path).or_insert_with(|| Declared {
             anchor: symbol,
             lang,

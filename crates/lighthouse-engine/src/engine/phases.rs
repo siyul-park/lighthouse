@@ -305,15 +305,15 @@ impl Engine {
         parts: &mut Vec<Fragment>,
         run: &mut Run,
     ) {
-        let mut cel_files = BTreeSet::new();
-        let mut other_files = BTreeSet::new();
+        let mut destinations: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
         for (target, files) in &target_files {
-            let destinations = if self.provider(*target).manifest().id == "cel" {
-                &mut cel_files
-            } else {
-                &mut other_files
-            };
-            destinations.extend(files.keys().cloned());
+            let language = self.provider(*target).manifest().id.clone();
+            for path in files.keys() {
+                destinations
+                    .entry(path.clone())
+                    .or_default()
+                    .insert(language.clone());
+            }
         }
         let native_files: BTreeSet<PathBuf> = parts
             .iter()
@@ -327,22 +327,28 @@ impl Engine {
             })
             .flat_map(|part| part.files.iter().map(|file| file.path.clone()))
             .collect();
-        cel_files.retain(|path| !other_files.contains(path) && !native_files.contains(path));
+        let analysis_languages: BTreeMap<_, _> = destinations
+            .into_iter()
+            .filter(|(path, languages)| languages.len() == 1 && !native_files.contains(path))
+            .filter_map(|(path, mut languages)| {
+                languages.pop_first().map(|language| (path, language))
+            })
+            .collect();
         for part in parts.iter_mut() {
             for file in &mut part.files {
-                if cel_files.contains(&file.path) {
+                if let Some(language) = analysis_languages.get(&file.path) {
                     file.facts
-                        .insert("analysisLanguage".to_owned(), "cel".to_owned());
+                        .insert("analysisLanguage".to_owned(), language.clone());
                 }
             }
         }
 
         for (target, mut files) in target_files {
             for file in files.values_mut() {
-                if cel_files.contains(&file.file.path) {
+                if let Some(language) = analysis_languages.get(&file.file.path) {
                     file.file
                         .facts
-                        .insert("analysisLanguage".to_owned(), "cel".to_owned());
+                        .insert("analysisLanguage".to_owned(), language.clone());
                 }
             }
             let files: Vec<EmbeddedFile> = files.into_values().collect();

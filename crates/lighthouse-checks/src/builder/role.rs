@@ -75,12 +75,7 @@ impl Builder<'_> {
     pub(super) fn language_of(&self, symbol: &Symbol) -> &str {
         self.project
             .file(&symbol.file)
-            .map_or(self.language.as_str(), |file| {
-                file.facts
-                    .get("analysisLanguage")
-                    .map(String::as_str)
-                    .unwrap_or(file.lang.as_str())
-            })
+            .map_or(self.language.as_str(), |file| file.analysis_language())
     }
 
     /// What a function is for: the first role its flags give (see

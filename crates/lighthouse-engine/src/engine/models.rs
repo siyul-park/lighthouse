@@ -20,10 +20,30 @@ use lighthouse_plugin::{
 };
 use lighthouse_spec::{Models as BoundModels, Routing};
 
-use super::{Scopes, batch::Pending, client::Clients};
+use super::{MAX_FAILURES, Scopes, batch::Pending, client::Clients, rotation_start};
 
-/// Failures of a model, in one run, after which it is no longer asked.
-pub(super) const MAX_FAILURES: usize = 3;
+/// Failures shared by every binding of the same model in one run.
+#[derive(Default)]
+pub(super) struct Failures(Mutex<BTreeMap<String, (usize, String)>>);
+
+impl Failures {
+    /// Records a failed request and whether this is the threshold failure.
+    pub(super) fn record(&self, model: &str, reason: &str) -> bool {
+        let mut failures = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = failures.entry(model.to_owned()).or_default();
+        *count += 1;
+        last.clear();
+        last.push_str(reason);
+        *count == MAX_FAILURES
+    }
+
+    /// The last failure once a model has reached the per-run limit.
+    pub(super) fn skipped(&self, model: &str) -> Option<String> {
+        let failures = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = failures.get(model)?;
+        (*count >= MAX_FAILURES).then(|| last.clone())
+    }
+}
 
 /// A binding layer: the models one binding names, tried in turn.
 pub(super) struct Layer<'a> {
@@ -40,10 +60,7 @@ impl<'a> Layer<'a> {
     /// The models in the order a request tries them: as written, or rotated
     /// by one more than the request before.
     pub(super) fn order(&self, routing: Routing) -> Vec<&Arc<dyn ModelClient + 'a>> {
-        let start = match routing {
-            Routing::Ordered => 0,
-            Routing::RoundRobin => self.turn.fetch_add(1, Ordering::SeqCst) % self.models.len(),
-        };
+        let start = rotation_start(routing, self.models.len(), &self.turn);
         self.models
             .iter()
             .cycle()
@@ -86,7 +103,7 @@ pub(super) struct RunModels<'a> {
     /// the model that gave it: the answer of the last one that gave one.
     answered: Mutex<BTreeMap<String, (f64, String)>>,
     /// Failures of each model this run, and the last reason, by reference.
-    failures: Mutex<BTreeMap<String, (usize, String)>>,
+    failures: Failures,
     /// Requests that went through each layer, by layer id.
     turns: Mutex<BTreeMap<String, Arc<AtomicUsize>>>,
     notes: Mutex<BTreeSet<String>>,
@@ -138,7 +155,7 @@ impl<'a> RunModels<'a> {
             collect: options.collect,
             seen: Mutex::default(),
             answered: Mutex::default(),
-            failures: Mutex::default(),
+            failures: Failures::default(),
             turns: Mutex::default(),
             notes: Mutex::default(),
             built: Mutex::default(),
@@ -184,11 +201,7 @@ impl<'a> RunModels<'a> {
     /// the model is skipped for the rest of the run. Returns the reason.
     pub(super) fn failure(&self, manifest: &Model, reason: String) -> String {
         let reason = self.note_failure(manifest, reason);
-        let mut failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = failures.entry(manifest.id.clone()).or_default();
-        *count += 1;
-        last.clone_from(&reason);
-        if *count == MAX_FAILURES {
+        if self.failures.record(&manifest.id, &reason) {
             self.note(format!(
                 "model {} failed {MAX_FAILURES} times; it is skipped for the rest of the run",
                 manifest.id
@@ -199,9 +212,7 @@ impl<'a> RunModels<'a> {
 
     /// Why a model is skipped, when it failed [`MAX_FAILURES`] times.
     pub(super) fn skipped(&self, reference: &str) -> Option<String> {
-        let failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = failures.get(reference)?;
-        (*count >= MAX_FAILURES).then(|| last.clone())
+        self.failures.skipped(reference)
     }
 
     /// Counts a request that goes to a model.
@@ -448,6 +459,23 @@ mod tests {
         Registry, Supports, SystemOneRequest, SystemOneResponse,
     };
     use lighthouse_spec::Config;
+
+    #[test]
+    fn failure_limit_is_shared_by_every_binding_of_a_model() {
+        let failures = Failures::default();
+        assert_eq!(failures.skipped("provider/model"), None);
+        assert!(!failures.record("provider/model", "first"));
+        assert!(!failures.record("provider/model", "second"));
+        assert_eq!(failures.skipped("provider/model"), None);
+        assert!(failures.record("provider/model", "third"));
+        assert_eq!(failures.skipped("provider/model").as_deref(), Some("third"));
+        assert!(!failures.record("provider/model", "fourth"));
+        assert_eq!(
+            failures.skipped("provider/model").as_deref(),
+            Some("fourth")
+        );
+        assert_eq!(failures.skipped("another/model"), None);
+    }
 
     struct Echo(Model);
 
