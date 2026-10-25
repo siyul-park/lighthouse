@@ -109,6 +109,39 @@ impl Source {
     }
 }
 
+/// Coalesces adjacent byte mappings when both extents are one-to-one.
+/// `starts` and `ends` contain one original-source offset per byte of `text`.
+pub fn coalesce_text_map(text: &str, starts: &[u32], ends: &[u32]) -> Option<Vec<TextMapSegment>> {
+    if text.len() != starts.len() || text.len() != ends.len() {
+        return None;
+    }
+    let mut segments: Vec<TextMapSegment> = Vec::new();
+    for (offset, ch) in text.char_indices() {
+        let byte_end = offset + ch.len_utf8();
+        let text_start = u32::try_from(offset).ok()?;
+        let text_end = u32::try_from(byte_end).ok()?;
+        let source_start = starts[offset];
+        let source_end = ends[byte_end - 1];
+        let source_width = source_end.checked_sub(source_start)?;
+        if let Some(last) = segments.last_mut()
+            && last.text_range[1] == text_start
+            && last.source_range[1] == source_start
+            && last.text_range[1].checked_sub(last.text_range[0])?
+                == last.source_range[1].checked_sub(last.source_range[0])?
+            && text_end.checked_sub(text_start)? == source_width
+        {
+            last.text_range[1] = text_end;
+            last.source_range[1] = source_end;
+        } else {
+            segments.push(TextMapSegment {
+                text_range: [text_start, text_end],
+                source_range: [source_start, source_end],
+            });
+        }
+    }
+    Some(segments)
+}
+
 /// Parses a canonical JSON Pointer into its decoded path tokens.
 pub fn pointer_tokens(pointer: &str) -> Option<Vec<String>> {
     if pointer.is_empty() {
@@ -234,6 +267,33 @@ fn validate_text_map(
 #[cfg(test)]
 mod source_ast_tests {
     use super::*;
+
+    #[test]
+    fn coalescing_text_maps_keeps_non_linear_ranges_separate() {
+        let text = "é\"b";
+        let starts = [10, 10, 12, 14];
+        let ends = [12, 12, 14, 15];
+        let segments = coalesce_text_map(text, &starts, &ends).unwrap();
+        assert_eq!(
+            segments,
+            vec![
+                TextMapSegment {
+                    text_range: [0, 2],
+                    source_range: [10, 12],
+                },
+                TextMapSegment {
+                    text_range: [2, 3],
+                    source_range: [12, 14],
+                },
+                TextMapSegment {
+                    text_range: [3, 4],
+                    source_range: [14, 15],
+                },
+            ]
+        );
+        assert_eq!(coalesce_text_map("x", &[], &[]), None);
+        assert_eq!(coalesce_text_map("x", &[2], &[1]), None);
+    }
 
     #[test]
     fn source_value_at_reads_the_canonical_pointer() {

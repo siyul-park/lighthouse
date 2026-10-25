@@ -26,7 +26,7 @@ pub struct SelectorFilter {
 /// Scalar equality or inequality comparison against a candidate-relative path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectorComparison {
-    pub path: String,
+    pub path: Selector,
     pub equal: bool,
     pub value: Value,
 }
@@ -314,8 +314,7 @@ fn parse_comparison(source: &str) -> Result<SelectorComparison, String> {
     if !left.starts_with('@') {
         return Err("filter paths must start with '@'".to_owned());
     }
-    let path = "$".to_owned() + &left[1..];
-    Selector::parse(&path)?;
+    let path = Selector::parse(&("$".to_owned() + &left[1..]))?;
     let value = parse_scalar(right)?;
     Ok(SelectorComparison {
         path,
@@ -394,12 +393,12 @@ mod tests {
                 SelectorPart::Filter(SelectorFilter {
                     clauses: vec![vec![
                         SelectorComparison {
-                            path: "$.kind".to_owned(),
+                            path: Selector::parse("$.kind").unwrap(),
                             equal: true,
                             value: Value::String("Decision".to_owned()),
                         },
                         SelectorComparison {
-                            path: "$.enabled".to_owned(),
+                            path: Selector::parse("$.enabled").unwrap(),
                             equal: false,
                             value: Value::Bool(false),
                         },

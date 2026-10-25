@@ -1,9 +1,10 @@
 use std::{collections::BTreeMap, fs, ops::Range, path::PathBuf};
 
+use lighthouse_protocol::coalesce_text_map;
 use lighthouse_protocol::{
     Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexInput, IndexParams,
     IndexResult, InitializeParams, InitializeResult, Mapping, ProviderManifest, Source,
-    TextMapSegment, pointer_child,
+    pointer_child,
 };
 use serde_json::Value;
 use toml_edit::{Document, Item, TableLike, Value as TomlValue};
@@ -315,7 +316,7 @@ fn collect_value(
     } else if let Some(value) = value.as_float() {
         let number = serde_json::Number::from_f64(value)
             .map(Value::Number)
-            .unwrap_or(Value::Null);
+            .ok_or_else(|| format!("TOML float {value} cannot be represented in a JSON AST"))?;
         nodes.push(Node {
             path: path.clone(),
             kind: Kind::Number(number),
@@ -365,10 +366,12 @@ fn source_ast(nodes: &[Node], host: &str, path: &str) -> Result<Source, String> 
                 text_pointer: None,
                 text_map: None,
             };
-            if let Kind::String(text) = &node.kind
-                && let Ok(mapped) = map_string(host, span.clone(), text)
-            {
-                entry.text_map = text_segments(text, &mapped.starts, &mapped.ends);
+            if let Kind::String(text) = &node.kind {
+                let mapped = map_string(host, span.clone(), text)?;
+                entry.text_map = Some(
+                    coalesce_text_map(text, &mapped.starts, &mapped.ends)
+                        .ok_or_else(|| format!("invalid TOML text map at {pointer}"))?,
+                );
             }
             source_map.insert(pointer.clone(), entry);
         }
@@ -414,34 +417,6 @@ fn insert_path(root: &mut Value, path: &[Segment], value: Value) -> Result<(), S
         _ => return Err("TOML AST parent shape disagrees with parser path".to_owned()),
     }
     Ok(())
-}
-
-fn text_segments(text: &str, starts: &[u32], ends: &[u32]) -> Option<Vec<TextMapSegment>> {
-    if text.len() != starts.len() || starts.len() != ends.len() {
-        return None;
-    }
-    let mut segments: Vec<TextMapSegment> = Vec::new();
-    for (offset, ch) in text.char_indices() {
-        let text_end = offset + ch.len_utf8();
-        let source_start = starts[offset];
-        let source_end = ends[text_end - 1];
-        if let Some(last) = segments.last_mut()
-            && last.text_range[1] == offset as u32
-            && last.source_range[1] == source_start
-            && last.text_range[1] - last.text_range[0]
-                == last.source_range[1] - last.source_range[0]
-            && text_end as u32 - offset as u32 == source_end - source_start
-        {
-            last.text_range[1] = text_end as u32;
-            last.source_range[1] = source_end;
-        } else {
-            segments.push(TextMapSegment {
-                text_range: [offset as u32, text_end as u32],
-                source_range: [source_start, source_end],
-            });
-        }
-    }
-    Some(segments)
 }
 
 fn map_string(host: &str, range: Range<usize>, value: &str) -> Result<SourceOffsets, String> {

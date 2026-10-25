@@ -5,4 +5,5 @@ pub(crate) mod frame;
 pub mod selector;
 pub(crate) mod serve;
 mod source;
+pub use source::coalesce_text_map;
 pub(crate) mod wire;

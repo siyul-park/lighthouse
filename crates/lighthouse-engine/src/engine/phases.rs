@@ -230,6 +230,11 @@ impl Engine {
     }
 
     fn route_embedded(&self, embedded: Vec<EmbeddedFile>, run: &mut Run) -> EmbeddedTargets {
+        let providers: BTreeMap<_, _> = self
+            .providers
+            .iter()
+            .map(|&index| (self.provider(index).manifest().id.clone(), index))
+            .collect();
         let mut target_files: EmbeddedTargets = BTreeMap::new();
         for file in embedded {
             if file.sources.is_empty() {
@@ -258,12 +263,7 @@ impl Engine {
                     });
                     continue;
                 }
-                let Some(index) = self
-                    .providers
-                    .iter()
-                    .copied()
-                    .find(|&index| self.provider(index).manifest().id == source.provider)
-                else {
+                let Some(&index) = providers.get(&source.provider) else {
                     run.incomplete.push(Incomplete {
                         path: Some(path.clone()),
                         reason: format!(
@@ -277,26 +277,22 @@ impl Engine {
             }
             for (provider, sources) in by_provider {
                 let entries = target_files.entry(provider).or_default();
-                if let Some(existing) = entries.get_mut(&path) {
-                    if existing.file.hash != file.file.hash || existing.text != file.text {
-                        run.incomplete.push(Incomplete {
-                            path: Some(path.clone()),
-                            reason: "conflicting embedded-source owners for one host file"
-                                .to_owned(),
-                        });
-                        continue;
-                    }
-                    existing.sources.extend(sources);
-                } else {
-                    entries.insert(
-                        path.clone(),
-                        EmbeddedFile {
-                            file: file.file.clone(),
-                            text: file.text.clone(),
-                            sources,
-                        },
-                    );
+                if entries.contains_key(&path) {
+                    run.incomplete.push(Incomplete {
+                        path: Some(path.clone()),
+                        reason: "multiple embedded selections for one host file and provider"
+                            .to_owned(),
+                    });
+                    continue;
                 }
+                entries.insert(
+                    path.clone(),
+                    EmbeddedFile {
+                        file: file.file.clone(),
+                        text: file.text.clone(),
+                        sources,
+                    },
+                );
             }
         }
         target_files
@@ -309,7 +305,46 @@ impl Engine {
         parts: &mut Vec<Fragment>,
         run: &mut Run,
     ) {
-        for (target, files) in target_files {
+        let mut cel_files = BTreeSet::new();
+        let mut other_files = BTreeSet::new();
+        for (target, files) in &target_files {
+            let destinations = if self.provider(*target).manifest().id == "cel" {
+                &mut cel_files
+            } else {
+                &mut other_files
+            };
+            destinations.extend(files.keys().cloned());
+        }
+        let native_files: BTreeSet<PathBuf> = parts
+            .iter()
+            .filter(|part| {
+                !part.modules.is_empty()
+                    || !part.symbols.is_empty()
+                    || !part.edges.is_empty()
+                    || !part.functions.is_empty()
+                    || !part.tests.is_empty()
+                    || !part.comments.is_empty()
+            })
+            .flat_map(|part| part.files.iter().map(|file| file.path.clone()))
+            .collect();
+        cel_files.retain(|path| !other_files.contains(path) && !native_files.contains(path));
+        for part in parts.iter_mut() {
+            for file in &mut part.files {
+                if cel_files.contains(&file.path) {
+                    file.facts
+                        .insert("analysisLanguage".to_owned(), "cel".to_owned());
+                }
+            }
+        }
+
+        for (target, mut files) in target_files {
+            for file in files.values_mut() {
+                if cel_files.contains(&file.file.path) {
+                    file.file
+                        .facts
+                        .insert("analysisLanguage".to_owned(), "cel".to_owned());
+                }
+            }
             let files: Vec<EmbeddedFile> = files.into_values().collect();
             let sources: Vec<Source> = files
                 .iter()

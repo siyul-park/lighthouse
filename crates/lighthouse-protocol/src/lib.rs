@@ -7,6 +7,7 @@ pub mod stats;
 
 pub use canonical::canonical;
 pub use language::{
+    coalesce_text_map,
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
     serve::{Handler, ServeError, serve},
     wire::{

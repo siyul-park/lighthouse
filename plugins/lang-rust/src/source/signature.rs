@@ -1,33 +1,5 @@
 use super::*;
 
-pub(super) fn receiver_reference(
-    file: &SourceFile,
-    pointer: &str,
-    value: &Option<(syn::token::And, Option<syn::Lifetime>)>,
-    source_map: &mut BTreeMap<String, Mapping>,
-) -> Result<Value, String> {
-    let mut fields = Map::new();
-    match value {
-        None => {
-            fields.insert("present".into(), Value::Bool(false));
-        }
-        Some((and, lifetime)) => {
-            fields.insert("present".into(), Value::Bool(true));
-            fields.insert(
-                "ampersand".into(),
-                token_value(file, &child(pointer, "ampersand"), and, source_map)?,
-            );
-            fields.insert(
-                "lifetime".into(),
-                lifetime.as_ref().map_or(Ok(Value::Null), |lifetime| {
-                    token_value(file, &child(pointer, "lifetime"), lifetime, source_map)
-                })?,
-            );
-        }
-    }
-    Ok(Value::Object(fields))
-}
-
 pub(super) fn qself(
     file: &SourceFile,
     pointer: &str,
@@ -196,4 +168,32 @@ pub(super) fn signature(
         false,
         source_map,
     ))
+}
+
+pub(super) fn receiver_reference(
+    file: &SourceFile,
+    pointer: &str,
+    value: &Option<(syn::token::And, Option<syn::Lifetime>)>,
+    source_map: &mut BTreeMap<String, Mapping>,
+) -> Result<Value, String> {
+    let mut fields = Map::new();
+    match value {
+        None => {
+            fields.insert("present".into(), Value::Bool(false));
+        }
+        Some((and, lifetime)) => {
+            fields.insert("present".into(), Value::Bool(true));
+            fields.insert(
+                "ampersand".into(),
+                token_value(file, &child(pointer, "ampersand"), and, source_map)?,
+            );
+            fields.insert(
+                "lifetime".into(),
+                lifetime.as_ref().map_or(Ok(Value::Null), |lifetime| {
+                    token_value(file, &child(pointer, "lifetime"), lifetime, source_map)
+                })?,
+            );
+        }
+    }
+    Ok(Value::Object(fields))
 }

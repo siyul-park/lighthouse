@@ -158,16 +158,10 @@ fn add_source(
         .and_then(|value| metadata_string_opt(value, "name"))
         .or_else(|| metadata_string_opt(context, "name"))
         .unwrap_or_else(|| source_name(source));
-    let identity = context.get("identity");
-    let document = metadata_string_opt(context, "document").unwrap_or_else(|| {
-        identity
-            .and_then(|identity| serde_json::to_string(identity).ok())
-            .map(|identity| format!("{}:{}", identity, source.node_pointer))
-            .unwrap_or_else(|| format!("{}:{}", file.file.path.display(), source.node_pointer))
-    });
+    let document = source_document(context, &file.file.path, &source.node_pointer);
     let is_variable = variable.is_some();
     let declared = metadata_bool(context, "declared") && !is_variable;
-    let public = variable.is_some_and(|value| metadata_bool(value, "public"));
+    let shared = variable.is_some_and(|value| metadata_bool(value, "shared"));
     let mapped = mapped_source(source, &file.text);
     let kind = if is_variable {
         lighthouse_model::ucm::SymbolKind::Var
@@ -175,7 +169,7 @@ fn add_source(
         lighthouse_model::ucm::SymbolKind::Function
     };
     let id = SymbolId::new(&draft.module, &[&document, &source.id], "expression", kind);
-    let params = variable_decl(draft, file, source, &document, &name, public, &id);
+    let params = variable_decl(draft, file, source, &document, &name, shared, &id);
     if let Some(template) = template {
         for (index, (start, end)) in template.into_iter().enumerate() {
             let id = SymbolId::new(
@@ -251,7 +245,7 @@ fn variable_decl(
     source: &lighthouse_plugin::EmbeddedSource,
     document: &str,
     name: &str,
-    public: bool,
+    shared: bool,
     id: &SymbolId,
 ) -> Vec<Parameter> {
     let Some(value) = source.context.get("variable") else {
@@ -292,13 +286,23 @@ fn variable_decl(
     draft.variables.push(VariableDecl {
         doc_id: document.to_owned(),
         name: name.to_owned(),
-        public,
+        shared,
         id: id.clone(),
         span: span(&file.text, name_start, name_end),
         extent: span(&file.text, extent_start, extent_end),
         params: params.clone(),
     });
     params
+}
+
+fn source_document(context: &serde_json::Value, path: &std::path::Path, pointer: &str) -> String {
+    if let Some(document) = metadata_string_opt(context, "document") {
+        return document;
+    }
+    if let Some(identity) = context.get("identity") {
+        return identity.to_string();
+    }
+    format!("{}:{pointer}", path.display())
 }
 
 fn metadata_string_opt(value: &serde_json::Value, key: &str) -> Option<String> {
@@ -360,7 +364,7 @@ fn pack_variables(drafts: &[FileDraft]) -> PackVariables {
     let mut packs: PackVariables = BTreeMap::new();
     for draft in drafts {
         for variable in &draft.variables {
-            if variable.public {
+            if variable.shared {
                 packs.entry(variable.name.clone()).or_default().push((
                     variable.doc_id.clone(),
                     variable.id.clone(),
@@ -413,7 +417,9 @@ fn index_snippets(
                     &snippet.doc_id,
                     &snippet.params,
                 );
-                fragment.functions.push(summary);
+                if snippet.declared {
+                    fragment.functions.push(summary);
+                }
                 fragment.edges.extend(edges);
             }
             Err(error) => {
@@ -453,6 +459,94 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn sibling_source_fields_share_their_logical_document_identity() {
+        let context = json!({
+            "identity": {"kind": "Decision", "name": "design/symbols"}
+        });
+        let path = PathBuf::from("decisions/design/symbols.yaml");
+        let document = context["identity"].to_string();
+        assert_eq!(
+            source_document(&context, &path, "/spec/check/where"),
+            document
+        );
+        assert_eq!(
+            source_document(&context, &path, "/spec/check/message"),
+            document
+        );
+        assert_eq!(
+            source_document(
+                &json!({"identity": {"tenant": "test", "name": "example"}}),
+                &path,
+                "/where"
+            ),
+            r#"{"name":"example","tenant":"test"}"#
+        );
+        assert_eq!(
+            source_document(&json!({"document": "explicit"}), &path, "/where"),
+            "explicit"
+        );
+        assert_eq!(
+            source_document(&json!({}), &path, "/where"),
+            "decisions/design/symbols.yaml:/where"
+        );
+    }
+
+    #[test]
+    fn undeclared_source_expressions_keep_edges_without_becoming_functions() {
+        let host = "where: node.name != \"\"\n";
+        let expression = "node.name != \"\"";
+        let start = host.find(expression).unwrap();
+        let file = File {
+            path: PathBuf::from("decisions/example.yaml"),
+            lang: "yaml".to_owned(),
+            hash: String::new(),
+            generated: false,
+            test: false,
+            facts: Default::default(),
+        };
+        let embedded = EmbeddedFile {
+            file,
+            text: host.to_owned(),
+            sources: vec![EmbeddedSource {
+                id: "decision-where:decisions/example.yaml:0:$.where".to_owned(),
+                rule_id: "decision-where".to_owned(),
+                node_pointer: "/where".to_owned(),
+                source_pointer: "/where".to_owned(),
+                provider: "cel".to_owned(),
+                syntax: None,
+                context: json!({"identity":{"kind":"Decision","name":"example/check"}}),
+                text: expression.to_owned(),
+                source_range: [start as u32, (start + expression.len()) as u32],
+                text_map: Some(vec![lighthouse_plugin::TextMapSegment {
+                    text_range: [0, expression.len() as u32],
+                    source_range: [start as u32, (start + expression.len()) as u32],
+                }]),
+            }],
+        };
+        let source = Source {
+            file: &embedded.file,
+            text: &embedded.text,
+            regions: &embedded.sources,
+        };
+        let indexed = Language::new()
+            .index(&Workspace::new("/tmp"), &[source])
+            .unwrap();
+        assert!(indexed.incomplete.is_empty(), "{:?}", indexed.incomplete);
+        assert!(
+            indexed
+                .fragments
+                .iter()
+                .all(|fragment| fragment.functions.is_empty())
+        );
+        assert!(
+            indexed
+                .fragments
+                .iter()
+                .any(|fragment| !fragment.edges.is_empty())
+        );
+    }
 
     #[test]
     fn indexes_embedded_cel_at_original_host_coordinates() {

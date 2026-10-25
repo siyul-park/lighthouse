@@ -337,6 +337,23 @@ language = { provider = "cel", select = "$.language" }
         )
         .is_err()
     );
+    for language in [
+        r#"{ provider = "", select = "$.language" }"#,
+        r#"{ provider = "cel", select = "" }"#,
+    ] {
+        let source = format!(
+            r#"[[sources]]
+id = "condition"
+files = ["decisions/**/*.yaml"]
+select = "$.spec.check.where"
+language = {language}
+"#
+        );
+        assert!(
+            Config::parse_inline(&source).is_err(),
+            "empty source provider/select must be rejected: {language}"
+        );
+    }
     assert!(
         Config::parse_inline(
             r#"[[sources]]
@@ -353,6 +370,7 @@ language = { provider = "cel" }
         r#"{ variable = { name = "$.name" } }"#,
         r#"{ identity = {} }"#,
         r#"{ variable = { value = "$.expression", extra = true } }"#,
+        r#"{ variable = { value = "$.expression", shared = "yes" } }"#,
         r#"{ declared = { select = "$.kind", ignored = true } }"#,
     ] {
         let source = format!(

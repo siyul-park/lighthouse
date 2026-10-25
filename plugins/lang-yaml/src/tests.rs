@@ -35,7 +35,7 @@ fn escaped_unicode_keeps_a_non_linear_segment_separate() {
     let text = "雪x";
     let starts = [1, 1, 1, 7];
     let ends = [7, 7, 7, 8];
-    let segments = text_segments(text, &starts, &ends).unwrap();
+    let segments = coalesce_text_map(text, &starts, &ends).unwrap();
 
     assert_eq!(segments.len(), 2);
     assert_eq!(segments[0].text_range, [0, 3]);

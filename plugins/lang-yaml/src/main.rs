@@ -1,9 +1,10 @@
 use std::{collections::BTreeMap, fs, path::PathBuf};
 
+use lighthouse_protocol::coalesce_text_map;
 use lighthouse_protocol::{
     Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexInput, IndexParams,
     IndexResult, InitializeParams, InitializeResult, Mapping, ProviderManifest, Source,
-    TextMapSegment, pointer_child,
+    pointer_child,
 };
 use saphyr::{LoadableYamlNode, MarkedYaml, YamlData};
 use serde_json::Value;
@@ -212,15 +213,20 @@ fn yaml_value(
         return Ok(Value::Array(values));
     }
     if let Some(value) = node.data.as_str() {
-        if let Ok(mapped) = scalar_text(host, node, byte_offsets)
-            && let Some(entry) = source_map.get_mut(pointer)
-        {
-            entry.text_map = text_segments(&mapped.text, &mapped.map.starts, &mapped.map.ends);
-        }
+        let mapped = scalar_text(host, node, byte_offsets)?;
+        let segments = coalesce_text_map(&mapped.text, &mapped.map.starts, &mapped.map.ends)
+            .ok_or_else(|| format!("invalid YAML text map at {pointer}"))?;
+        source_map
+            .get_mut(pointer)
+            .expect("YAML node mapping was inserted above")
+            .text_map = Some(segments);
         return Ok(Value::String(value.to_owned()));
     }
 
-    let raw = host.get(start..end).unwrap_or("").trim();
+    let raw = host
+        .get(start..end)
+        .ok_or_else(|| format!("invalid YAML scalar range at {pointer}"))?
+        .trim();
     let value = if raw.is_empty() || matches!(raw.to_ascii_lowercase().as_str(), "null" | "~") {
         Value::Null
     } else if raw.eq_ignore_ascii_case("true") {
@@ -249,34 +255,6 @@ fn key_value(key: &MarkedYaml<'_>) -> Result<String, String> {
         .as_str()
         .map(str::to_owned)
         .ok_or_else(|| "YAML selector keys must be strings".to_owned())
-}
-
-fn text_segments(text: &str, starts: &[u32], ends: &[u32]) -> Option<Vec<TextMapSegment>> {
-    if text.len() != starts.len() || starts.len() != ends.len() {
-        return None;
-    }
-    let mut segments: Vec<TextMapSegment> = Vec::new();
-    for (offset, ch) in text.char_indices() {
-        let text_end = offset + ch.len_utf8();
-        let source_start = starts[offset];
-        let source_end = ends[text_end - 1];
-        if let Some(last) = segments.last_mut()
-            && last.text_range[1] == offset as u32
-            && last.source_range[1] == source_start
-            && last.text_range[1] - last.text_range[0]
-                == last.source_range[1] - last.source_range[0]
-            && text_end as u32 - offset as u32 == source_end - source_start
-        {
-            last.text_range[1] = text_end as u32;
-            last.source_range[1] = source_end;
-        } else {
-            segments.push(TextMapSegment {
-                text_range: [offset as u32, text_end as u32],
-                source_range: [source_start, source_end],
-            });
-        }
-    }
-    Some(segments)
 }
 
 fn scalar_text(

@@ -8,7 +8,7 @@ use std::{
 
 use lighthouse_model::Incomplete;
 
-use globset::Glob;
+use globset::{Glob, GlobSetBuilder};
 use lighthouse_plugin::{
     Error, Indexed, LanguageProvider, ModelClient, Plugin, PluginManifest, ProviderManifest,
     Source, Workspace,
@@ -234,6 +234,15 @@ impl Provider {
     /// were.
     fn request(&self, ws: &Workspace, files: &[Source]) -> (wire::IndexParams, Option<String>) {
         let overlays = overlays_of(ws, files);
+        let source_globs = self.source_ast.then(|| {
+            let mut builder = GlobSetBuilder::new();
+            for pattern in &ws.source_globs {
+                builder.add(Glob::new(pattern).expect("source globs are validated by Config"));
+            }
+            builder
+                .build()
+                .expect("source globs are validated by Config")
+        });
         let (cache, notice) = match overlays {
             Some(_) => (None, None),
             None => match self.cache_of(ws) {
@@ -246,12 +255,9 @@ impl Provider {
             .map(|source| {
                 if source.regions.is_empty() {
                     let path = source.file.path.to_string_lossy().replace('\\', "/");
-                    let source_ast = self.source_ast
-                        && ws.source_globs.iter().any(|pattern| {
-                            Glob::new(pattern).is_ok_and(|glob| {
-                                glob.compile_matcher().is_match(&source.file.path)
-                            })
-                        });
+                    let source_ast = source_globs
+                        .as_ref()
+                        .is_some_and(|globs| globs.is_match(&source.file.path));
                     wire::IndexInput::File {
                         file: wire::FileRef {
                             path,

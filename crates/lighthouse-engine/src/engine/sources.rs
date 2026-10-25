@@ -1,9 +1,9 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
-use globset::Glob;
+use globset::{Glob, GlobSetBuilder};
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{EmbeddedFile, EmbeddedSource};
 use lighthouse_protocol::Source;
@@ -22,6 +22,25 @@ struct Selected<'a> {
     pointer: String,
 }
 
+struct CompiledRule<'a> {
+    spec: &'a SourceRuleSpec,
+    select: Selector,
+    language_select: Option<Selector>,
+}
+
+impl<'a> CompiledRule<'a> {
+    fn new(spec: &'a SourceRuleSpec) -> Self {
+        Self {
+            spec,
+            select: Selector::parse(&spec.select)
+                .expect("source selectors are validated by Config"),
+            language_select: spec.language.select.as_deref().map(|selector| {
+                Selector::parse(selector).expect("source selectors are validated by Config")
+            }),
+        }
+    }
+}
+
 pub(super) fn select(
     rules: &[SourceRuleSpec],
     sources: Vec<Source>,
@@ -32,6 +51,18 @@ pub(super) fn select(
         .iter()
         .map(|input| (input.file.path.as_path(), input))
         .collect();
+    let rules: Vec<_> = rules.iter().map(CompiledRule::new).collect();
+    let mut matcher = GlobSetBuilder::new();
+    let mut owners = Vec::new();
+    for (index, rule) in rules.iter().enumerate() {
+        for pattern in &rule.spec.files {
+            matcher.add(Glob::new(pattern).expect("source globs are validated by Config"));
+            owners.push(index);
+        }
+    }
+    let matcher = matcher
+        .build()
+        .expect("source globs are validated by Config");
     let mut asts = BTreeMap::new();
     let mut seen = BTreeSet::new();
     let mut duplicates = BTreeSet::new();
@@ -66,76 +97,75 @@ pub(super) fn select(
         asts.insert(path, source_ast);
     }
 
-    for input in inputs {
-        let path = &input.file.path;
-        let matching: Vec<&str> = rules
-            .iter()
-            .filter(|rule| matches_file(rule, path))
-            .map(|rule| rule.id.as_str())
-            .collect();
-        if matching.is_empty() || asts.contains_key(path) {
-            continue;
-        }
-        if run
-            .incomplete
-            .iter()
-            .any(|gap| gap.path.as_deref() == Some(path.as_path()))
-        {
-            continue;
-        }
-        run.incomplete.push(Incomplete {
-            path: Some(path.clone()),
-            reason: format!(
-                "source rule(s) {} require a source AST, but the host provider returned none",
-                matching.join(", ")
-            ),
-        });
-    }
-
     let mut output = Vec::new();
-    for (path, source_ast) in asts {
-        let Some(input) = files.get(path.as_path()) else {
+    for (path, input) in files {
+        let matching: BTreeSet<_> = matcher
+            .matches(path)
+            .into_iter()
+            .map(|pattern| owners[pattern])
+            .collect();
+        if matching.is_empty() {
+            continue;
+        }
+
+        let Some(source_ast) = asts.get(path) else {
+            if !run
+                .incomplete
+                .iter()
+                .any(|gap| gap.path.as_deref() == Some(path))
+            {
+                run.incomplete.push(Incomplete {
+                    path: Some(path.to_path_buf()),
+                    reason: format!(
+                        "source rule(s) {} require a source AST, but the host provider returned none",
+                        matching
+                            .iter()
+                            .map(|index| rules[*index].spec.id.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                });
+            }
             continue;
         };
-        let matching = rules.iter().filter(|rule| matches_file(rule, &path));
-        let mut sources = Vec::new();
-        for rule in matching {
-            match select_rule(rule, &source_ast) {
-                Ok(regions) => sources.extend(regions),
+
+        let mut selected = Vec::new();
+        for index in matching {
+            let rule = &rules[index];
+            match select_rule(rule, source_ast) {
+                Ok(regions) => selected.extend(regions),
                 Err(reason) => run.incomplete.push(Incomplete {
-                    path: Some(path.clone()),
-                    reason: format!("source rule {}: {reason}", rule.id),
+                    path: Some(path.to_path_buf()),
+                    reason: format!("source rule {}: {reason}", rule.spec.id),
                 }),
             }
         }
-        if !sources.is_empty() {
+        if !selected.is_empty() {
             output.push(EmbeddedFile {
                 file: input.file.clone(),
                 text: input.text.clone(),
-                sources,
+                sources: selected,
             });
         }
     }
     output
 }
 
-fn matches_file(rule: &SourceRuleSpec, path: &Path) -> bool {
-    rule.files
-        .iter()
-        .any(|pattern| Glob::new(pattern).is_ok_and(|glob| glob.compile_matcher().is_match(path)))
-}
-
-fn select_rule(rule: &SourceRuleSpec, source_ast: &Source) -> Result<Vec<EmbeddedSource>, String> {
+fn select_rule(
+    rule: &CompiledRule<'_>,
+    source_ast: &Source,
+) -> Result<Vec<EmbeddedSource>, String> {
+    let spec = rule.spec;
     let mut output = Vec::new();
-    for candidate in evaluate(source_ast, "", &rule.select)? {
-        let provider = if let Some(provider) = &rule.language.provider {
+    for candidate in evaluate_selector(source_ast, "", &rule.select)? {
+        let provider = if let Some(provider) = &spec.language.provider {
             provider.clone()
         } else {
-            let selector =
-                rule.language.select.as_deref().ok_or_else(|| {
-                    "language requires exactly one of provider or select".to_owned()
-                })?;
-            let values = evaluate(source_ast, &candidate.pointer, selector)?;
+            let selector = rule
+                .language_select
+                .as_ref()
+                .ok_or_else(|| "language requires exactly one of provider or select".to_owned())?;
+            let values = evaluate_selector(source_ast, &candidate.pointer, selector)?;
             if values.len() != 1 {
                 return Err(format!(
                     "language.select returned {} values; expected exactly one provider key",
@@ -148,8 +178,8 @@ fn select_rule(rule: &SourceRuleSpec, source_ast: &Source) -> Result<Vec<Embedde
                 .ok_or_else(|| "language.select did not return a string provider key".to_owned())?
         };
 
-        let context = resolve_context(rule, source_ast, &candidate)?;
-        let source = resolve_source(rule, source_ast, &candidate)?;
+        let context = resolve_context(spec, source_ast, &candidate)?;
+        let source = resolve_source(spec, source_ast, &candidate)?;
         let source_text = source
             .value
             .as_str()
@@ -168,8 +198,8 @@ fn select_rule(rule: &SourceRuleSpec, source_ast: &Source) -> Result<Vec<Embedde
         let path = &source_ast.path;
         let id = format!(
             "{}:{}:{}:{}:{}:{}",
-            rule.id.len(),
-            rule.id,
+            spec.id.len(),
+            spec.id,
             path.len(),
             path,
             candidate.pointer.len(),
@@ -177,11 +207,11 @@ fn select_rule(rule: &SourceRuleSpec, source_ast: &Source) -> Result<Vec<Embedde
         );
         output.push(EmbeddedSource {
             id,
-            rule_id: rule.id.clone(),
+            rule_id: spec.id.clone(),
             node_pointer: candidate.pointer,
             source_pointer: source.pointer,
             provider,
-            syntax: rule.language.syntax.clone(),
+            syntax: spec.language.syntax.clone(),
             context,
             text: source_text.to_owned(),
             source_range,
@@ -257,13 +287,26 @@ fn resolve_context(
         return Ok(Value::Object(Map::new()));
     };
     let mut context = Map::new();
+    if let Some(identity) = configured.get("identity") {
+        context.insert(
+            "identity".to_owned(),
+            resolve_identity(source_ast, candidate, identity)?,
+        );
+    }
+    if let Some(variable) = configured.get("variable") {
+        context.insert(
+            "variable".to_owned(),
+            resolve_variable(source_ast, candidate, variable)?,
+        );
+    }
     for (key, value) in configured {
-        let resolved = match key.as_str() {
-            "identity" => resolve_identity(source_ast, candidate, value)?,
-            "variable" => resolve_variable(source_ast, candidate, value)?,
-            _ => resolve_projection(source_ast, candidate, key, value)?,
-        };
-        context.insert(key.clone(), resolved);
+        if matches!(key.as_str(), "identity" | "variable") {
+            continue;
+        }
+        context.insert(
+            key.clone(),
+            resolve_projection(source_ast, candidate, key, value)?,
+        );
     }
     Ok(Value::Object(context))
 }
@@ -427,7 +470,14 @@ fn evaluate<'a>(
     base_pointer: &str,
     query: &str,
 ) -> Result<Vec<Selected<'a>>, String> {
-    let selector = Selector::parse(query)?;
+    evaluate_selector(source_ast, base_pointer, &Selector::parse(query)?)
+}
+
+fn evaluate_selector<'a>(
+    source_ast: &'a Source,
+    base_pointer: &str,
+    selector: &Selector,
+) -> Result<Vec<Selected<'a>>, String> {
     let base = pointer_value(&source_ast.ast, base_pointer)
         .ok_or_else(|| format!("selector base pointer {base_pointer} does not resolve"))?;
     let mut current = vec![Selected {
@@ -436,30 +486,23 @@ fn evaluate<'a>(
     }];
 
     for part in selector.parts() {
-        if let SelectorPart::Filter(filter) = part {
-            let mut next = Vec::new();
-            for candidate in current {
-                if filter_matches(source_ast, &candidate, filter)? {
-                    next.push(candidate);
-                }
-            }
-            current = next;
-            continue;
-        }
         let mut next = Vec::new();
         for parent in current {
             match (part, parent.value) {
+                (SelectorPart::Filter(filter), _) => {
+                    next.extend(filter_matches(source_ast, &parent, filter)?.then_some(parent));
+                }
                 (SelectorPart::Key(key), Value::Object(object)) => {
-                    if let Some(value) = object.get(key) {
-                        let pointer = pointer_child(&parent.pointer, key);
-                        next.push(Selected { value, pointer });
-                    }
+                    next.extend(object.get(key).map(|value| Selected {
+                        value,
+                        pointer: pointer_child(&parent.pointer, key),
+                    }));
                 }
                 (SelectorPart::Index(index), Value::Array(array)) => {
-                    if let Some(value) = array.get(*index) {
-                        let pointer = pointer_child(&parent.pointer, &index.to_string());
-                        next.push(Selected { value, pointer });
-                    }
+                    next.extend(array.get(*index).map(|value| Selected {
+                        value,
+                        pointer: pointer_child(&parent.pointer, &index.to_string()),
+                    }));
                 }
                 (SelectorPart::Keys, Value::Object(object)) => {
                     let mut children: Vec<_> = object
@@ -518,7 +561,7 @@ fn compare(
     candidate: &Selected<'_>,
     comparison: &SelectorComparison,
 ) -> Result<bool, String> {
-    let values = evaluate(source_ast, &candidate.pointer, &comparison.path)?;
+    let values = evaluate_selector(source_ast, &candidate.pointer, &comparison.path)?;
     let matched = values
         .iter()
         .map(|item| scalar(item.value))
@@ -621,7 +664,7 @@ mod tests {
                 ..SourceLanguageSpec::default()
             },
         };
-        let result = select_rule(&rule, &ast).unwrap();
+        let result = select_rule(&CompiledRule::new(&rule), &ast).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].node_pointer, "/expr-node");
         assert_eq!(result[0].source_pointer, "/expr-node/source");
@@ -659,7 +702,7 @@ mod tests {
                 ..SourceLanguageSpec::default()
             },
         };
-        let result = select_rule(&rule, &ast).unwrap();
+        let result = select_rule(&CompiledRule::new(&rule), &ast).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].provider, "cel");
         assert_eq!(result[0].text, "x > 1");
@@ -716,7 +759,7 @@ mod tests {
             },
         };
         assert!(
-            select_rule(&rule, &ast)
+            select_rule(&CompiledRule::new(&rule), &ast)
                 .unwrap_err()
                 .contains("no explicit text_pointer")
         );

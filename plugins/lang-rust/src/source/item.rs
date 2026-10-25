@@ -84,13 +84,11 @@ pub(super) fn item_ast(
                 "ident".into(),
                 ident(file, &child(pointer, "ident"), &item.ident, source_map)?,
             );
-            fields.insert(
-                "rename".into(),
-                item.rename.as_ref().map_or(Value::Null, |(_, ident)| {
-                    ident_ast(file, &child(pointer, "rename"), ident, source_map)
-                        .unwrap_or(Value::Null)
-                }),
-            );
+            let rename = match &item.rename {
+                Some((_, ident)) => ident_ast(file, &child(pointer, "rename"), ident, source_map)?,
+                None => Value::Null,
+            };
+            fields.insert("rename".into(), rename);
         }
         Item::Fn(item) => {
             fields.insert(
@@ -138,13 +136,11 @@ pub(super) fn item_ast(
                     source_map,
                 )?,
             );
-            fields.insert(
-                "trait".into(),
-                item.trait_.as_ref().map_or(Value::Null, |(_, path, _)| {
-                    path_ast(file, &child(pointer, "trait"), path, source_map)
-                        .unwrap_or(Value::Null)
-                }),
-            );
+            let trait_ = match &item.trait_ {
+                Some((_, path, _)) => path_ast(file, &child(pointer, "trait"), path, source_map)?,
+                None => Value::Null,
+            };
+            fields.insert("trait".into(), trait_);
             fields.insert(
                 "self_ty".into(),
                 type_ast(file, &child(pointer, "self_ty"), &item.self_ty, source_map)?,
@@ -165,13 +161,11 @@ pub(super) fn item_ast(
                 "attrs".into(),
                 attributes(file, &child(pointer, "attrs"), &item.attrs, source_map)?,
             );
-            fields.insert(
-                "ident".into(),
-                item.ident.as_ref().map_or(Value::Null, |ident| {
-                    ident_ast(file, &child(pointer, "ident"), ident, source_map)
-                        .unwrap_or(Value::Null)
-                }),
-            );
+            let ident = match &item.ident {
+                Some(ident) => ident_ast(file, &child(pointer, "ident"), ident, source_map)?,
+                None => Value::Null,
+            };
+            fields.insert("ident".into(), ident);
             fields.insert(
                 "mac".into(),
                 macro_ast(file, &child(pointer, "mac"), &item.mac, source_map)?,

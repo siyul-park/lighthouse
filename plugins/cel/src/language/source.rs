@@ -40,7 +40,7 @@ impl FileDraft {
 pub(super) struct VariableDecl {
     pub(super) doc_id: String,
     pub(super) name: String,
-    pub(super) public: bool,
+    pub(super) shared: bool,
     pub(super) id: SymbolId,
     pub(super) span: Span,
     pub(super) extent: Span,
@@ -52,11 +52,7 @@ impl VariableDecl {
         Symbol {
             id: self.id.clone(),
             kind: SymbolKind::Var,
-            visibility: if self.public {
-                Visibility::Public
-            } else {
-                Visibility::Private
-            },
+            visibility: Visibility::Private,
             owner: None,
             file: file.path.clone(),
             span: self.span,

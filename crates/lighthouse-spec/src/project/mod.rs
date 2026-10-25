@@ -258,15 +258,12 @@ impl Config {
                 )));
             }
             let language = &source.language;
-            let fixed = language
-                .provider
-                .as_deref()
-                .is_some_and(|value| !value.is_empty());
-            let dynamic = language
-                .select
-                .as_deref()
-                .is_some_and(|value| !value.is_empty());
-            if fixed == dynamic {
+            let fixed = language.provider.is_some();
+            let dynamic = language.select.is_some();
+            if language.provider.as_deref().is_some_and(str::is_empty)
+                || language.select.as_deref().is_some_and(str::is_empty)
+                || fixed == dynamic
+            {
                 return Err(Error::Config(format!(
                     "sources[{at}].language requires exactly one non-empty provider or select"
                 )));
@@ -589,73 +586,78 @@ fn validate_source_context(context: &serde_json::Value, field: &str) -> Result<(
     let object = context
         .as_object()
         .ok_or_else(|| Error::Config(format!("{} must be an object", field)))?;
-    for (key, value) in object {
-        let nested = format!("{}.{}", field, key);
-        match key.as_str() {
-            "identity" => {
-                let identity = value.as_object().ok_or_else(|| {
-                    Error::Config(format!("{} must map identity fields to selectors", nested))
-                })?;
-                if identity.is_empty() {
-                    return Err(Error::Config(format!("{} must not be empty", nested)));
-                }
-                for (name, selector) in identity {
-                    let selector = selector.as_str().ok_or_else(|| {
+
+    if let Some(value) = object.get("identity") {
+        let nested = format!("{}.identity", field);
+        let identity = value.as_object().ok_or_else(|| {
+            Error::Config(format!("{} must map identity fields to selectors", nested))
+        })?;
+        if identity.is_empty() {
+            return Err(Error::Config(format!("{} must not be empty", nested)));
+        }
+        for (name, selector) in identity {
+            let selector = selector.as_str().ok_or_else(|| {
+                Error::Config(format!("{}.{} must be a selector string", nested, name))
+            })?;
+            validate_selector(selector, &format!("{}.{}", nested, name))?;
+        }
+    }
+
+    if let Some(value) = object.get("variable") {
+        let nested = format!("{}.variable", field);
+        let variable = value
+            .as_object()
+            .ok_or_else(|| Error::Config(format!("{} must be an object", nested)))?;
+        if !variable.contains_key("value") {
+            return Err(Error::Config(format!("{}.value is required", nested)));
+        }
+        for (name, setting) in variable {
+            match name.as_str() {
+                "value" | "name" | "params" => {
+                    let selector = setting.as_str().ok_or_else(|| {
                         Error::Config(format!("{}.{} must be a selector string", nested, name))
                     })?;
                     validate_selector(selector, &format!("{}.{}", nested, name))?;
                 }
-            }
-            "variable" => {
-                let variable = value
-                    .as_object()
-                    .ok_or_else(|| Error::Config(format!("{} must be an object", nested)))?;
-                if !variable.contains_key("value") {
-                    return Err(Error::Config(format!("{}.value is required", nested)));
-                }
-                for name in variable.keys() {
-                    if !matches!(name.as_str(), "value" | "name" | "params" | "public") {
-                        return Err(Error::Config(format!(
-                            "{}.{} is not a supported field",
-                            nested, name
-                        )));
-                    }
-                }
-                for name in ["value", "name", "params"] {
-                    if let Some(selector) = variable.get(name) {
-                        let selector = selector.as_str().ok_or_else(|| {
-                            Error::Config(format!("{}.{} must be a selector string", nested, name))
-                        })?;
-                        validate_selector(selector, &format!("{}.{}", nested, name))?;
-                    }
-                }
-                if variable
-                    .get("public")
-                    .is_some_and(|value| !value.is_boolean())
-                {
+                "shared" if setting.is_boolean() => {}
+                "shared" => {
                     return Err(Error::Config(format!(
-                        "{}.public must be a boolean literal",
+                        "{}.shared must be a boolean literal",
                         nested
                     )));
                 }
-            }
-            _ => {
-                if let Some(projection) = value.as_object()
-                    && let Some(selector) = projection.get("select")
-                {
-                    if projection.len() != 1 {
-                        return Err(Error::Config(format!(
-                            "{} projection must contain only select",
-                            nested
-                        )));
-                    }
-                    let selector = selector.as_str().ok_or_else(|| {
-                        Error::Config(format!("{}.select must be a selector string", nested))
-                    })?;
-                    validate_selector(selector, &format!("{}.select", nested))?;
+                _ => {
+                    return Err(Error::Config(format!(
+                        "{}.{} is not a supported field",
+                        nested, name
+                    )));
                 }
             }
         }
+    }
+
+    for (key, value) in object {
+        if matches!(key.as_str(), "identity" | "variable") {
+            continue;
+        }
+        let nested = format!("{}.{}", field, key);
+        let Some(projection) = value
+            .as_object()
+            .filter(|projection| projection.contains_key("select"))
+        else {
+            continue;
+        };
+        if projection.len() != 1 {
+            return Err(Error::Config(format!(
+                "{} projection must contain only select",
+                nested
+            )));
+        }
+        let selector = projection
+            .get("select")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| Error::Config(format!("{}.select must be a selector string", nested)))?;
+        validate_selector(selector, &format!("{}.select", nested))?;
     }
     Ok(())
 }
