@@ -65,7 +65,7 @@ impl Composition {
 pub fn compose() -> Result<Composition, String> {
     let mut registry = Registry::default();
     registry
-        .register(&lighthouse_cel::Cel::new())
+        .register(&lighthouse_lang_cel::Cel::new())
         .map_err(|e| format!("the `cel` plugin: {e}"))?;
     compose_with(&registry, true)
 }

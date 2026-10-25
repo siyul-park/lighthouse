@@ -1753,24 +1753,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "lighthouse-cel"
-version = "0.1.0"
-dependencies = [
- "cel",
- "lighthouse-model",
- "lighthouse-plugin",
- "lighthouse-spec",
- "regex",
- "serde_json",
-]
-
-[[package]]
 name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
  "cel",
- "lighthouse-cel",
  "lighthouse-engine",
+ "lighthouse-lang-cel",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
@@ -1841,6 +1829,18 @@ dependencies = [
  "tempfile",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "lighthouse-lang-cel"
+version = "0.1.0"
+dependencies = [
+ "cel",
+ "lighthouse-model",
+ "lighthouse-plugin",
+ "lighthouse-spec",
+ "regex",
+ "serde_json",
 ]
 
 [[package]]

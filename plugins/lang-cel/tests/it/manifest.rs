@@ -1,7 +1,7 @@
 //! The manifests against what the libraries register.
 
 use cel::{Context, ExecutionError, Value};
-use lighthouse_cel::Cel;
+use lighthouse_lang_cel::Cel;
 use lighthouse_plugin::Registry;
 
 use crate::ext::environment;

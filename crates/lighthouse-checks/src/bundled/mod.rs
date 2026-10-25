@@ -20,7 +20,7 @@ pub fn registry(comp: &Composition) -> Result<Registry, Error> {
         ));
     }
     let mut registry = Registry::default();
-    register(&mut registry, &lighthouse_cel::Cel::new())?;
+    register(&mut registry, &lighthouse_lang_cel::Cel::new())?;
     let catalog = comp
         .bundled()
         .map_err(|e| Error::invalid("bundled", e.to_string()))?;

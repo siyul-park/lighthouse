@@ -1,5 +1,5 @@
 [package]
-name = "lighthouse-cel"
+name = "lighthouse-lang-cel"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true

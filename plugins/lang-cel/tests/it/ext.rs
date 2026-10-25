@@ -5,7 +5,7 @@
 use std::sync::{Arc, OnceLock};
 
 use cel::{Context, Env, Value};
-use lighthouse_cel::Cel;
+use lighthouse_lang_cel::Cel;
 use lighthouse_plugin::Registry;
 
 /// The standard environment with every library of the plugin registered.
