@@ -62,7 +62,11 @@ impl Fixture {
         let sources: Vec<Source> = files
             .iter()
             .zip(&texts)
-            .map(|(file, text)| Source { file, text })
+            .map(|(file, text)| Source {
+                file,
+                text,
+                regions: &[],
+            })
             .collect();
         self.provider
             .index(&Workspace::new(&root), &sources)

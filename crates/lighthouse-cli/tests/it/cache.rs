@@ -8,7 +8,7 @@ use assert_cmd::Command;
 
 use crate::{
     cache_fixtures::{Fixture, go, project, rust, write},
-    checks::home,
+    checks::{home, trust},
 };
 
 const CACHE: &str = ".lighthouse/cache";
@@ -29,7 +29,9 @@ struct Timed {
 
 fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
-    cmd.current_dir(dir).envs(home(dir));
+    cmd.current_dir(dir)
+        .envs(home(dir))
+        .env_remove("LIGHTHOUSE_TRUST");
     cmd
 }
 
@@ -92,6 +94,7 @@ fn differential(fixture: &Fixture) {
 
     for edit in &fixture.edits {
         (edit.apply)(dir);
+        trust(dir);
         let expected = cold(dir);
         let got = warm(dir);
         let step = format!("{}: {}", fixture.name, edit.name);

@@ -141,7 +141,10 @@ spec:
       decisions: [design/prefer-method]
     - ref: "coding-patterns#functions-7ff6fb85"
       text: One function MUST stay at one abstraction level.
-      decisions: [design/complexity]
+      decisions: [design/abstraction-level]
+    - ref: "coding-patterns#physical-cohesion-7201ff97"
+      text: Direct implementation files and child modules SHOULD form one coherent abstraction level.
+      decisions: [design/module-layout]
     - ref: "coding-patterns#functions-2623228e"
       text: >-
         Declarations MUST be ordered for reading: callers before callees,

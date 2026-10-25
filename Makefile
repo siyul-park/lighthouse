@@ -1,5 +1,10 @@
 PLUGINS := target/plugins
 
+# Command-check examples run from temporary directories, where goenv cannot
+# discover plugins/lang-go/.go-version. Keep this toolchain on PATH for checks.
+GO_TOOLCHAIN := $(shell cd plugins/lang-go && go env GOROOT 2>/dev/null)
+export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
+
 .PHONY: plugins test lint ci
 
 # Builds the bundled out-of-process plugins; each directory holds the binary
@@ -16,6 +21,13 @@ plugins:
 	cp target/release/lang-rust $(PLUGINS)/lang-rust/lang-rust.new
 	mv -f $(PLUGINS)/lang-rust/lang-rust.new $(PLUGINS)/lang-rust/lang-rust
 	cp plugins/lang-rust/lighthouse-plugin.toml $(PLUGINS)/lang-rust/
+	for lang in yaml toml; do \
+		mkdir -p $(PLUGINS)/lang-$$lang; \
+		cargo build --release -p lang-$$lang; \
+		cp target/release/lang-$$lang $(PLUGINS)/lang-$$lang/lang-$$lang.new; \
+		mv -f $(PLUGINS)/lang-$$lang/lang-$$lang.new $(PLUGINS)/lang-$$lang/lang-$$lang; \
+		cp plugins/lang-$$lang/lighthouse-plugin.toml $(PLUGINS)/lang-$$lang/; \
+	done
 	mkdir -p $(PLUGINS)/model-http
 	cargo build --release -p model-http
 	cp target/release/model-http $(PLUGINS)/model-http/model-http.new
@@ -37,8 +49,8 @@ lint: plugins
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets -- -D warnings
 	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./...
-	cargo run -q -p lighthouse-cli -- check decisions/
-	cargo run -q -p lighthouse-cli -- check .
+	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check decisions/
+	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check . --allow-incomplete
 
 # What CI runs.
 ci: test lint

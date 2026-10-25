@@ -101,7 +101,7 @@ func dispatch(h Handler, m *Message, s *session) (result json.RawMessage, rerr *
 		return nil, &ResponseError{Code: codeNotInitialized, Message: fmt.Sprintf("`%s` before `initialize`", m.Method)}
 	case m.Method == MethodIndex:
 		var p IndexParams
-		if rerr := decode(m.Params, &p, "project", "language", "files"); rerr != nil {
+		if rerr := decode(m.Params, &p, "project", "language", "inputs"); rerr != nil {
 			return nil, rerr
 		}
 		return marshal(h.Index(p))

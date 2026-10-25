@@ -24,7 +24,7 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
       body=$(dd bs=1 count="$n" 2>/dev/null)
     }
     languages='[{"id":"fake","globs":["**/*.fake"],"capabilities":["semantic-edges","future-thing"]}]'
-    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.3}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
+    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.4}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
     fragment='{"file":{"path":"a.fake","generated":true},"modules":[{"path":"m"}],"symbols":[],"edges":[],"functions":[],"tests":[]}'
     recv
     case "$mode" in
@@ -120,7 +120,14 @@ pub(super) fn file(path: &str) -> File {
 
 pub(super) fn index(provider: &dyn LanguageProvider, ws: &Workspace, paths: &[&str]) -> Indexed {
     let files: Vec<File> = paths.iter().map(|p| file(p)).collect();
-    let sources: Vec<Source> = files.iter().map(|file| Source { file, text: "" }).collect();
+    let sources: Vec<Source> = files
+        .iter()
+        .map(|file| Source {
+            file,
+            text: "",
+            regions: &[],
+        })
+        .collect();
     provider.index(ws, &sources).unwrap()
 }
 

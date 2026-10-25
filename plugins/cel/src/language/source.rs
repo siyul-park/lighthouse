@@ -25,7 +25,7 @@ impl FileDraft {
                 files: vec![source.file.clone()],
                 modules: vec![Module {
                     path: module.clone(),
-                    name: Some("cel".to_owned()),
+                    name: Some(MODULE.to_owned()),
                     test_of: None,
                 }],
                 ..Fragment::default()
@@ -109,19 +109,17 @@ pub(super) struct Snippet {
 
 impl Snippet {
     pub(super) fn symbol(&self, file: &File) -> Symbol {
+        let span = self
+            .source
+            .span(0, self.source.text.len(), &self.source.host);
         Symbol {
             id: self.id.clone(),
             kind: SymbolKind::Function,
             visibility: Visibility::Private,
             owner: None,
             file: file.path.clone(),
-            span: self
-                .source
-                .span(0, self.source.text.len(), &self.source.host),
-            extent: Some(
-                self.source
-                    .span(0, self.source.text.len(), &self.source.host),
-            ),
+            span,
+            extent: Some(span),
             doc: None,
             name: self.name.clone(),
             role: None,
@@ -129,24 +127,6 @@ impl Snippet {
             type_ref: None,
         }
     }
-}
-
-#[derive(Clone)]
-pub(super) struct Doc {
-    pub(super) index: usize,
-    pub(super) kind: String,
-    pub(super) id: String,
-}
-
-#[derive(Clone)]
-pub(super) struct Scalar {
-    pub(super) doc: usize,
-    pub(super) path: Vec<String>,
-    pub(super) key: String,
-    pub(super) value: MappedText,
-    pub(super) source_start: usize,
-    pub(super) source_end: usize,
-    pub(super) item: Option<usize>,
 }
 
 #[derive(Clone)]
@@ -160,40 +140,11 @@ pub(super) struct MappedText {
 }
 
 impl MappedText {
-    pub(super) fn raw(host: &str, text: &str, at: usize) -> Self {
-        let mut starts = Vec::with_capacity(text.len());
-        let mut ends = Vec::with_capacity(text.len());
-        for offset in 0..text.len() {
-            starts.push(at + offset);
-            ends.push(at + offset + 1);
-        }
-        Self {
-            text: text.to_owned(),
-            starts,
-            ends,
-            source_start: at,
-            source_end: at + text.len(),
-            host: host.to_owned(),
-        }
-    }
-
-    pub(super) fn span(&self, start: usize, end: usize, host: &str) -> Span {
-        let start = start.min(self.text.len());
-        let end = end.min(self.text.len());
-        if start >= end {
-            return span(host, self.source_start, self.source_start);
-        }
-        let from = self.starts.get(start).copied().unwrap_or(self.source_start);
-        let to = self.ends.get(end - 1).copied().unwrap_or(self.source_end);
-        span(host, from, to.max(from))
-    }
-
     pub(super) fn slice(&self, start: usize, end: usize) -> Self {
         let start = start.min(self.text.len());
         let end = end.min(self.text.len()).max(start);
-        let text = self.text[start..end].to_owned();
         Self {
-            text,
+            text: self.text[start..end].to_owned(),
             starts: self.starts[start..end].to_vec(),
             ends: self.ends[start..end].to_vec(),
             source_start: self.starts.get(start).copied().unwrap_or(self.source_start),
@@ -205,51 +156,24 @@ impl MappedText {
             host: self.host.clone(),
         }
     }
+
+    pub(super) fn span(&self, start: usize, end: usize, host: &str) -> Span {
+        let start = start.min(self.text.len());
+        let end = end.min(self.text.len()).max(start);
+        if start == end {
+            return span(host, self.source_start, self.source_start);
+        }
+        let from = self.starts.get(start).copied().unwrap_or(self.source_start);
+        let to = self.ends.get(end - 1).copied().unwrap_or(self.source_end);
+        span(host, from, to.max(from))
+    }
 }
 
 pub(super) fn span(text: &str, start: usize, end: usize) -> Span {
     let index = LineIndex::new(text);
+    let start = start.min(text.len());
     Span {
-        start: index.position(start.min(text.len())),
-        end: index.position(end.min(text.len()).max(start.min(text.len()))),
+        start: index.position(start),
+        end: index.position(end.min(text.len()).max(start)),
     }
-}
-
-pub(super) fn path_starts_with(path: &[String], prefix: &[&str]) -> bool {
-    path.len() >= prefix.len()
-        && path
-            .iter()
-            .zip(prefix)
-            .all(|(part, expected)| part == expected)
-}
-
-pub(super) fn add_snippet(
-    draft: &mut FileDraft,
-    doc: &Doc,
-    scalar: &Scalar,
-    key: &str,
-    replacement: Option<MappedText>,
-    suffix: usize,
-) {
-    let path = scalar.path.join(".");
-    let owner = if suffix > 0 {
-        format!("{path}.{key}.{suffix}")
-    } else {
-        format!("{path}.{key}")
-    };
-    let id = SymbolId::new(
-        &draft.module,
-        &[&doc.id, &owner],
-        "expression",
-        SymbolKind::Function,
-    );
-    let mapped = replacement.unwrap_or_else(|| scalar.value.clone());
-    draft.snippets.push(Snippet {
-        doc_id: doc.id.clone(),
-        id,
-        source: mapped,
-        name: key.split('.').next().unwrap_or(key).to_owned(),
-        params: Vec::new(),
-        declared: true,
-    });
 }

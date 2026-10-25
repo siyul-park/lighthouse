@@ -9,13 +9,10 @@ use lighthouse_plugin::{
     CelLibrary, CelLibraryManifest, Error, Function, Overload, Plugin, PluginManifest, Precedence,
 };
 
-pub mod glob;
-
-mod bind;
 mod language;
-mod lists;
-mod order;
-mod regex;
+mod libraries;
+
+pub use libraries::glob;
 
 /// The plugin id, and the prefix of its libraries' ids.
 pub const ID: &str = "cel";
@@ -53,16 +50,7 @@ impl Plugin for Cel {
     }
 
     fn cel_libraries(&self) -> Vec<Box<dyn CelLibrary>> {
-        [
-            regex::library(),
-            lists::library(),
-            glob::library(),
-            bind::library(),
-            order::library(),
-        ]
-        .into_iter()
-        .map(|library| Box::new(library) as Box<dyn CelLibrary>)
-        .collect()
+        libraries::all()
     }
 }
 

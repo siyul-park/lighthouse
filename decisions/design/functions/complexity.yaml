@@ -48,9 +48,8 @@ spec:
     table in code form out of `cognitive` and `hub`, because counting them
     reports tables and visitors that read linearly.
 
-    A function that is not over a limit but has reached 60% of one is put to a
-    model for the abstraction level (`abstain`); a finding on a function is
-    never asked again.
+    Functions near a limit are judged by `design/abstraction-level`; metrics
+    alone do not decide whether the function is readable.
   scope:
     subject: symbol
   requirement: >-
@@ -60,11 +59,9 @@ spec:
     complexity is one path plus each `if`, `else if`, loop, error handler
     clause, non-default switch arm and boolean operator (`&&`, `||`). The
     remedy is simpler code or a concept that is reused, never the same body
-    moved elsewhere. One function MUST stay at one abstraction level: intent
-    and mechanics are not mixed in one body, so that it reads as a sequence of
-    steps one level below its name. Mechanical checks SHOULD be preferred for
-    directly expressible rules; heuristic signals SHOULD remain advisory and
-    use deliberately high thresholds.
+    moved elsewhere. Mechanical checks SHOULD be preferred for directly
+    expressible rules; heuristic signals SHOULD remain advisory and use
+    deliberately high thresholds.
   severity: warn
   options:
     properties:
@@ -181,13 +178,8 @@ spec:
           : {'kind': '', 'what': '', 'own': 0, 'max': 0, 'hint': '', 'value': 0}
       - name: named
         expression: u.helpers.map(h, h.name)
-      - name: near
-        expression: >-
-          m.measured && size(found) == 0
-          && (rows.exists(r, r.max > 0 && r.own * 10 >= r.max * 6)
-              || (caps.nesting > 0 && m.depth * 10 >= caps.nesting * 6))
     where: file.lang != 'cel' && size(found) > 0
-    abstain: file.lang != 'cel' && (near || (fold && size(via) > 0))
+    abstain: file.lang != 'cel' && fold && size(via) > 0
     message: >-
       {{ first.kind == ''
          ? (size(via) == 0 ? ''

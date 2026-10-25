@@ -297,6 +297,81 @@ fn config_languages() {
 }
 
 #[test]
+fn source_rules_use_one_language_field_for_provider_and_semantics() {
+    let config = Config::parse_inline(
+        r#"
+[[sources]]
+id = "condition"
+files = ["decisions/**/*.yaml"]
+language = { provider = "cel" }
+select = "$.spec.check.where"
+"#,
+    )
+    .unwrap();
+    assert_eq!(config.sources().len(), 1);
+    assert_eq!(
+        config.sources()[0].language.provider.as_deref(),
+        Some("cel")
+    );
+    assert!(
+        Config::parse_inline(
+            r#"
+[[sources]]
+id = "condition"
+files = ["decisions/**/*.yaml"]
+host = "yaml"
+language = { provider = "cel" }
+select = "$.spec.check.where"
+"#
+        )
+        .is_err()
+    );
+    assert!(
+        Config::parse_inline(
+            r#"[[sources]]
+id = "condition"
+files = ["decisions/**/*.yaml"]
+select = "$.spec.check.where"
+language = { provider = "cel", select = "$.language" }
+"#
+        )
+        .is_err()
+    );
+    assert!(
+        Config::parse_inline(
+            r#"[[sources]]
+id = "condition"
+files = ["decisions/**/*.yaml"]
+select = "$?(@.kind = 'Decision').spec.check.where"
+language = { provider = "cel" }
+"#
+        )
+        .is_err(),
+        "a malformed selector must fail config loading"
+    );
+    for context in [
+        r#"{ variable = { name = "$.name" } }"#,
+        r#"{ identity = {} }"#,
+        r#"{ variable = { value = "$.expression", extra = true } }"#,
+        r#"{ declared = { select = "$.kind", ignored = true } }"#,
+    ] {
+        let source = format!(
+            r#"
+[[sources]]
+id = "condition"
+files = ["decisions/**/*.yaml"]
+select = "$"
+language = {{ provider = "cel", context = {context} }}
+"#
+        );
+        assert!(
+            Config::parse_inline(&source).is_err(),
+            "invalid source context should fail config loading: {context}"
+        );
+    }
+}
+
+#[test]
 fn config_extends() {
     let config = Config::parse_inline("extends = [\"a/x\", \"b/y\"]").unwrap();
     assert_eq!(config.extends(), ["a/x", "b/y"]);

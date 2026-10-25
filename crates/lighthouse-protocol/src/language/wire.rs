@@ -9,6 +9,9 @@ use serde_json::Value;
 use url::Url;
 
 use super::frame::{ErrorObject, INVALID_PARAMS};
+pub use super::source::{
+    Mapping, Source, TextMapSegment, pointer_child, pointer_tokens, pointer_value,
+};
 
 /// Every method with its params and result. Exists to anchor the schema.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -156,8 +159,8 @@ pub struct ProviderManifest {
     #[serde(default)]
     pub conventions: Conventions,
     /// Known values: `semantic-edges`, `extent`, `reference-sites`,
-    /// `complete-references`. Hosts
-    /// ignore unknown values.
+    /// `complete-references`, `overlays`, and `source-ast`. Hosts ignore
+    /// unknown values.
     #[serde(default)]
     pub capabilities: Vec<String>,
 }
@@ -259,15 +262,28 @@ pub struct Context {
     pub cache: Option<CacheRef>,
 }
 
-/// Index request. A provider receives every file of one language in one
-/// request and decides which packages or modules it must load to analyze
-/// them; analysis scope is never narrowed to a subset of the project.
+/// One input to the common provider interface.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum IndexInput {
+    /// A physical file owned by this provider.
+    File {
+        file: FileRef,
+        /// Return the parsed tree for this file to the common source selector.
+        #[serde(default, skip_serializing_if = "is_false")]
+        source_ast: bool,
+    },
+    /// Regions already selected by the common source engine.
+    Regions { regions: EmbeddedFile },
+}
+
+/// Index request. File and extracted-region inputs use the same provider method.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct IndexParams {
     pub project: ProjectRef,
-    /// Id of the language the files belong to.
+    /// Registered provider key for this invocation (file or region inputs).
     pub language: String,
-    pub files: Vec<FileRef>,
+    pub inputs: Vec<IndexInput>,
     #[serde(default)]
     pub context: Context,
 }
@@ -278,6 +294,9 @@ pub struct IndexParams {
 pub struct IndexResult {
     /// One fragment per analyzed file, ordered by path.
     pub fragments: Vec<Fragment>,
+    /// Serialized ASTs and independent source-map sidecars requested for selection.
+    #[serde(default)]
+    pub sources: Vec<Source>,
     /// Messages that leave the analysis complete.
     #[serde(default)]
     pub notices: Vec<String>,
@@ -285,6 +304,44 @@ pub struct IndexResult {
     /// still have a fragment with whatever could be recovered.
     #[serde(default)]
     pub incomplete: Vec<Incomplete>,
+}
+
+/// One physical host document and regions selected for destination-provider analysis.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EmbeddedFile {
+    pub path: String,
+    pub hash: String,
+    pub text: String,
+    #[serde(default)]
+    pub generated: bool,
+    #[serde(default)]
+    pub test: bool,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub facts: BTreeMap<String, String>,
+    pub sources: Vec<EmbeddedSource>,
+}
+
+/// A source region produced by the core source engine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EmbeddedSource {
+    pub id: String,
+    pub rule_id: String,
+    /// JSON Pointer of the selected candidate in the host AST.
+    pub node_pointer: String,
+    /// JSON Pointer of the exact scalar whose text is analyzed.
+    pub source_pointer: String,
+    /// The exact registered destination provider key.
+    pub provider: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub syntax: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<Value>,
+    pub text: String,
+    /// Whole source-scalar range, used when text_map is absent.
+    pub source_range: [u32; 2],
+    /// Fine-grained mapping from text bytes to the physical host file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_map: Option<Vec<TextMapSegment>>,
 }
 
 /// Part of the request that was not analyzed; "not checked" is not "passed".

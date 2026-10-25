@@ -4,7 +4,7 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
-use crate::checks::home;
+use crate::checks::{home, trust};
 
 fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
@@ -395,6 +395,7 @@ fn go_project(source: &str) -> Option<(TempDir, std::path::PathBuf)> {
         )),
     )
     .unwrap();
+    trust(project.path());
     Some((project, config))
 }
 
@@ -484,6 +485,12 @@ fn config_flag_checks_the_current_directory_with_another_config_file() {
     )
     .unwrap();
     fs::remove_file(project.path().join("lighthouse.toml")).unwrap();
+    lighthouse(project.path())
+        .args(["--config"])
+        .arg(&config)
+        .args(["trust", "--yes"])
+        .assert()
+        .success();
     lighthouse(project.path())
         .args(["check", "--config"])
         .arg(&config)

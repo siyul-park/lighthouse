@@ -12,6 +12,7 @@ Design minimizes conceptual surface while keeping responsibility and ownership b
 | --- | --- | --- | --- | --- |
 | [`design/responsibility`](#one-responsibility-per-symbol-and-a-boundary-for-every-split) | One responsibility per symbol, and a boundary for every split | info · cel |  |  |
 | [`design/duplication`](#one-implementation-one-owner) | One implementation, one owner | info · model |  |  |
+| [`design/module-layout`](#a-module-groups-code-at-one-abstraction-level) | A module groups code at one abstraction level | warn · cel |  |  |
 
 ### One responsibility per symbol, and a boundary for every split
 
@@ -65,6 +66,44 @@ Also: rust
 Multiple implementations of the same behavior or rule MUST converge on one owner; syntax similarity alone MUST NOT trigger abstraction. Each behavior MUST have one implementation and each semantic rule MUST have one owner. Near-clone analysis SHOULD require meaningful body size and a semantic or naming relation. Symbols with substantially the same responsibility at the same abstraction level MUST be consolidated; one general symbol SHOULD be preferred over parallel variants, wrappers, aliases, or coordinators. Existing symbols and composition SHOULD be preferred before adding layers, extension points, policy knobs, or parallel mechanisms. Shared functionality MUST be generalized when extracted; it MUST NOT be moved downward merely to relocate complexity. Each concern, such as test contracts and structure or general test code style, MUST have exactly one owning document; other documents MUST reference it instead of restating it.
 
 Derived from: Jiang et al., Deckard 2007; Roy and Cordy 2007; Martin, Clean Code (2008), G5 Duplication; Martin, Clean Code (2008), ch. 3 DRY; Martin, Clean Code (2008), ch. 12 Beck's four rules
+
+### A module groups code at one abstraction level
+
+`design/module-layout` · module · warn · cel
+
+*A directory should make one cohesive concept easy to find. Mixing high-level orchestration with implementation-specific files beside a subdirectory for that implementation often leaves two competing ways to navigate the same concept. A module root may remain a small public facade or composition root; the concern is a sustained mixture of peer roles, not the mere presence of a child directory (Martin, Clean Code (2008), G34; Ousterhout, A Philosophy of Software Design, chs. 4 and 9).*
+
+A module's direct implementation files and its child modules SHOULD form one coherent abstraction level. A parent module that keeps direct code beside a nested `language` directory is a concrete warning candidate because the language implementation is usually a separate responsibility. Other mixed layouts need review rather than an automatic warning: a small facade or composition root may legitimately assemble its children.
+
+Derived from: Ousterhout, A Philosophy of Software Design, chs. 4 and 9
+
+| option | default | meaning |
+| --- | --- | --- |
+| `limits` | `{"directDeclarations":3}` | Direct declaration count above which code beside a language directory is a warning rather than a model-review candidate. |
+
+```go invalid engine.go
+package sample
+
+type Engine struct{}
+type Config struct{}
+const Version = "1"
+var Defaults = map[string]string{}
+func Run() int { return language.Analyze() }
+```
+
+```go valid go.mod
+module example.com/sample
+go 1.26
+```
+
+```go valid language/language.go
+package language
+
+func Analyze() int { return parse() }
+func parse() int { return 1 }
+```
+
+Also: rust
 
 ## Dependency Direction
 
@@ -140,6 +179,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`design/complexity`](#a-function-is-small-enough-to-read-at-one-level) | A function is small enough to read at one level | warn · cel |  |  |
+| [`design/abstraction-level`](#a-function-reads-at-one-level-of-abstraction) | A function reads at one level of abstraction | warn · model |  |  |
 | [`design/signature`](#a-signature-is-short-public-and-narrow) | A signature is short, public and narrow | warn · cel | unsafe |  |
 | [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel | unsafe |  |
 | [`design/symbols`](#every-symbol-earns-its-existence) | Every symbol earns its existence | warn · cel | unsafe |  |
@@ -148,9 +188,9 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 `design/complexity` · symbol · warn · cel
 
-*Size and branching are signals of a function doing too much, not proof of it: the limits are deliberately high, and one finding is reported per function (the kind that matched first, in the order below; all matched kinds are in the evidence). The limits measure the design, not its packaging: the remedy is simpler code or a concept that is reused, never the same body moved elsewhere (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man; Martin, Clean Code ch. 3: small functions that do one thing at one level of abstraction). Metrics MUST NOT define universal declaration order, justify automatic reordering or prove single responsibility. Kinds, in report order. `lines`: a function's lines (Go `funlen`; the default 60 for Go, 100 for Rust). `statements`: its statements (`funlen` statements, 40; Rust has no default limit). `cyclomatic`: gocyclo's `min-complexity` (30) for Go and Rust, where clippy's cyclomatic lint was removed; ESLint `complexity` (20), Sonar S1541 (10) and cyclop (10) are lower, which fits a review signal less well than a deliberately high limit. `cognitive`: SonarSource cognitive complexity (30 for Go, 25 for Rust). `nesting`: the deepest block nesting (4). `hub`: a dependency hub (many callers and many callees in a long function) or a high fan-out coordinator. `helpers`, an opt-in review route (off by default, on in the strict project): a function within a limit whose unit, the function together with the private functions only it calls, transitively (single-use helpers, which can be neither reused nor read apart from their caller), is over it, is put to a model: is the split a concept or a relocation? It is never a finding by itself, and each function keeps its own findings (lead decision 8). Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form, and a body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow. `ignoreDispatch` (on by default) leaves both out of `cyclomatic`, and a table in code form out of `cognitive` and `hub`, because counting them reports tables and visitors that read linearly. A function that is not over a limit but has reached 60% of one is put to a model for the abstraction level (`abstain`); a finding on a function is never asked again.*
+*Size and branching are signals of a function doing too much, not proof of it: the limits are deliberately high, and one finding is reported per function (the kind that matched first, in the order below; all matched kinds are in the evidence). The limits measure the design, not its packaging: the remedy is simpler code or a concept that is reused, never the same body moved elsewhere (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man; Martin, Clean Code ch. 3: small functions that do one thing at one level of abstraction). Metrics MUST NOT define universal declaration order, justify automatic reordering or prove single responsibility. Kinds, in report order. `lines`: a function's lines (Go `funlen`; the default 60 for Go, 100 for Rust). `statements`: its statements (`funlen` statements, 40; Rust has no default limit). `cyclomatic`: gocyclo's `min-complexity` (30) for Go and Rust, where clippy's cyclomatic lint was removed; ESLint `complexity` (20), Sonar S1541 (10) and cyclop (10) are lower, which fits a review signal less well than a deliberately high limit. `cognitive`: SonarSource cognitive complexity (30 for Go, 25 for Rust). `nesting`: the deepest block nesting (4). `hub`: a dependency hub (many callers and many callees in a long function) or a high fan-out coordinator. `helpers`, an opt-in review route (off by default, on in the strict project): a function within a limit whose unit, the function together with the private functions only it calls, transitively (single-use helpers, which can be neither reused nor read apart from their caller), is over it, is put to a model: is the split a concept or a relocation? It is never a finding by itself, and each function keeps its own findings (lead decision 8). Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form, and a body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow. `ignoreDispatch` (on by default) leaves both out of `cyclomatic`, and a table in code form out of `cognitive` and `hub`, because counting them reports tables and visitors that read linearly. Functions near a limit are judged by `design/abstraction-level`; metrics alone do not decide whether the function is readable.*
 
-A function SHOULD NOT exceed the limit of its role in lines, statements, cyclomatic complexity, cognitive complexity or nesting depth, and SHOULD NOT be a dependency hub or a high fan-out coordinator. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`). The remedy is simpler code or a concept that is reused, never the same body moved elsewhere. One function MUST stay at one abstraction level: intent and mechanics are not mixed in one body, so that it reads as a sequence of steps one level below its name. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds.
+A function SHOULD NOT exceed the limit of its role in lines, statements, cyclomatic complexity, cognitive complexity or nesting depth, and SHOULD NOT be a dependency hub or a high fan-out coordinator. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`). The remedy is simpler code or a concept that is reused, never the same body moved elsewhere. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds.
 
 Derived from: funlen lines 60: https://golangci-lint.run/usage/linters/#funlen; clippy too_many_lines 100: https://doc.rust-lang.org/clippy/lint_configuration.html; ESLint max-lines-per-function: https://eslint.org/docs/latest/rules/max-lines-per-function; funlen statements 40: https://golangci-lint.run/usage/linters/#funlen; ESLint max-statements: https://eslint.org/docs/latest/rules/max-statements; McCabe 1976, A Complexity Measure; gocyclo min-complexity 30: https://golangci-lint.run/usage/linters/#gocyclo; ESLint complexity: https://eslint.org/docs/latest/rules/complexity; Sonar S1541, cyclop; Campbell 2018, Cognitive Complexity (SonarSource); gocognit min-complexity 30: https://golangci-lint.run/usage/linters/#gocognit; clippy cognitive_complexity 25: https://doc.rust-lang.org/clippy/lint_configuration.html; Sonar S3776; ESLint max-depth 4: https://eslint.org/docs/latest/rules/max-depth; Sonar S134; Henry and Kafura 1981, information flow; funlen: https://golangci-lint.run/usage/linters/#funlen; SonarSource, Cognitive Complexity (2017); Martin, Clean Code (2008), G6 Code at Wrong Level of Abstraction; Martin, Clean Code (2008), G16 Obscured Intent; Martin, Clean Code (2008), G30 Functions Should Do One Thing; Martin, Clean Code (2008), G34 Functions Should Descend Only One Level of Abstraction; Martin, Clean Code (2008), ch. 3 Small functions; Martin, Clean Code (2008), ch. 3 Do one thing; Martin, Clean Code (2008), ch. 3 One level of abstraction; Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9; Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
 
@@ -186,6 +226,16 @@ func total(a, b int) int {
 ```
 
 Also: rust
+
+### A function reads at one level of abstraction
+
+`design/abstraction-level` · symbol · warn · model
+
+*A reader should be able to follow the intent of a function as a sequence of steps, without switching between policy and low-level mechanics. The test is semantic, not a line-count heuristic (Martin, Clean Code (2008), G34).*
+
+A function MUST stay at one level of abstraction: its steps SHOULD express either intent or mechanics, not alternate between the two. A high-level function SHOULD read as a sequence of steps one level below its name; a low-level function SHOULD perform one concrete operation without narrating higher-level policy.
+
+Derived from: Martin, Clean Code (2008), G34 Functions Should Descend Only One Level of Abstraction
 
 ### A signature is short, public and narrow
 

@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/abstraction-level
+  uid: d02206f3-5cc8-4167-9d90-756b5b8ec360
+spec:
+  title: A function reads at one level of abstraction
+  context: >-
+    A reader should be able to follow the intent of a function as a sequence of
+    steps, without switching between policy and low-level mechanics. The test
+    is semantic, not a line-count heuristic (Martin, Clean Code (2008), G34).
+  scope:
+    subject: symbol
+  requirement: >-
+    A function MUST stay at one level of abstraction: its steps SHOULD express
+    either intent or mechanics, not alternate between the two. A high-level
+    function SHOULD read as a sequence of steps one level below its name; a
+    low-level function SHOULD perform one concrete operation without narrating
+    higher-level policy.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+      - Martin, Clean Code (2008), G34 Functions Should Descend Only One Level of Abstraction

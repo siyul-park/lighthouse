@@ -8,8 +8,8 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexParams, IndexResult,
-    InitializeParams, InitializeResult, ProviderManifest, TestNaming,
+    Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexInput, IndexParams,
+    IndexResult, InitializeParams, InitializeResult, ProviderManifest, TestNaming,
 };
 use serde::Deserialize;
 
@@ -51,7 +51,7 @@ impl Handler for Provider {
                     ancestors: true,
                 },
             },
-            capabilities: ["extent", "reference-sites", "overlays"]
+            capabilities: ["extent", "reference-sites", "overlays", "source-ast"]
                 .map(str::to_owned)
                 .to_vec(),
         };
@@ -64,12 +64,34 @@ impl Handler for Provider {
     }
 
     fn index(&mut self, params: IndexParams) -> Result<IndexResult, ErrorObject> {
+        let regions: Vec<_> = params
+            .inputs
+            .iter()
+            .filter_map(|input| match input {
+                IndexInput::Regions { regions } => Some(regions),
+                IndexInput::File { .. } => None,
+            })
+            .collect();
+        if !regions.is_empty() {
+            return Ok(IndexResult {
+                incomplete: regions
+                    .iter()
+                    .map(|regions| Incomplete {
+                        path: Some(regions.path.clone()),
+                        reason: "Rust provider does not analyze selected source regions yet"
+                            .to_owned(),
+                    })
+                    .collect(),
+                ..IndexResult::default()
+            });
+        }
         let options = match params.context.options.get(LANGUAGE) {
             Some(raw) => match Options::deserialize(raw) {
                 Ok(options) => options,
                 Err(error) => {
                     return Ok(IndexResult {
                         fragments: Vec::new(),
+                        sources: Vec::new(),
                         notices: Vec::new(),
                         incomplete: vec![Incomplete {
                             path: None,
@@ -172,6 +194,17 @@ pub fn normalize(path: &Path) -> PathBuf {
 
 fn index_files(params: &IndexParams, options: &Options, provider: &str) -> IndexResult {
     let root = normalize(Path::new(&params.project.root));
+    let requested_asts: BTreeSet<String> = params
+        .inputs
+        .iter()
+        .filter_map(|input| match input {
+            IndexInput::File {
+                file,
+                source_ast: true,
+            } => Some(file.path.clone()),
+            _ => None,
+        })
+        .collect();
     let (skipped, files) = requested_files(params);
     let mut incomplete: BTreeSet<(Option<String>, String)> = BTreeSet::new();
     let mut editions = Manifests::default();
@@ -215,8 +248,25 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
     notices.extend(macros.notice());
     notices.extend(shared(&tree));
     notices.extend(cache.and_then(Cache::save));
+    let mut sources = Vec::new();
+    let mut seen_trees = BTreeSet::new();
+    for file in &tree.files {
+        if !requested_asts.contains(&file.rel) || !seen_trees.insert(file.rel.clone()) {
+            continue;
+        }
+        match crate::source::from_file(file) {
+            Ok(source_ast) => sources.push(source_ast),
+            Err(reason) => {
+                incomplete.insert((
+                    Some(file.rel.clone()),
+                    format!("cannot expose source: {reason}"),
+                ));
+            }
+        }
+    }
     IndexResult {
         fragments: fragments.into_values().collect(),
+        sources,
         notices,
         incomplete: incomplete
             .into_iter()
@@ -266,7 +316,14 @@ fn analyzed(
 /// The requested paths, sorted and deduplicated: the ones left alone, then
 /// the ones to analyze.
 fn requested_files(params: &IndexParams) -> (Vec<String>, Vec<String>) {
-    let mut files: Vec<String> = params.files.iter().map(|f| f.path.clone()).collect();
+    let mut files: Vec<String> = params
+        .inputs
+        .iter()
+        .filter_map(|input| match input {
+            IndexInput::File { file, .. } => Some(file.path.clone()),
+            IndexInput::Regions { .. } => None,
+        })
+        .collect();
     files.sort();
     files.dedup();
     files.into_iter().partition(|f| ignored(f))

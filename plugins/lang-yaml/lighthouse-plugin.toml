@@ -1,0 +1,11 @@
+apiVersion = "lighthouse/v1alpha1"
+kind = "Plugin"
+
+[metadata]
+name = "lang-yaml"
+
+[spec]
+version = "0.1.0"
+
+[spec.runtime]
+command = "./lang-yaml"

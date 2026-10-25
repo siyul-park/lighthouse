@@ -51,7 +51,13 @@ const GO: Lang = Lang {
     globs: &["**/*.go"],
     test_globs: &["**/*_test.go"],
     constructor_prefixes: &["New", "new"],
-    capabilities: &["semantic-edges", "extent", "reference-sites", "overlays"],
+    capabilities: &[
+        "semantic-edges",
+        "extent",
+        "reference-sites",
+        "overlays",
+        "source-ast",
+    ],
 };
 
 const RUST: Lang = Lang {
@@ -64,7 +70,7 @@ const RUST: Lang = Lang {
     globs: &["**/*.rs"],
     test_globs: &["**/tests/**/*.rs", "**/tests.rs", "**/benches/**/*.rs"],
     constructor_prefixes: &["new"],
-    capabilities: &["extent", "reference-sites", "overlays"],
+    capabilities: &["extent", "reference-sites", "overlays", "source-ast"],
 };
 
 const LANGS: [&Lang; 2] = [&GO, &RUST];
@@ -140,11 +146,14 @@ fn index_overlaid(
             root: root.to_string_lossy().into_owned(),
         },
         language: language.to_owned(),
-        files: files
+        inputs: files
             .iter()
-            .map(|path| wire::FileRef {
-                path: path.clone(),
-                hash: "unused".to_owned(),
+            .map(|path| wire::IndexInput::File {
+                file: wire::FileRef {
+                    path: path.clone(),
+                    hash: "unused".to_owned(),
+                },
+                source_ast: false,
             })
             .collect(),
         context: wire::Context {
@@ -391,11 +400,14 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
                 root: root.to_string_lossy().into_owned(),
             },
             language: lang.id.to_owned(),
-            files: files
+            inputs: files
                 .iter()
-                .map(|path| wire::FileRef {
-                    path: path.clone(),
-                    hash: "0".to_owned(),
+                .map(|path| wire::IndexInput::File {
+                    file: wire::FileRef {
+                        path: path.clone(),
+                        hash: "0".to_owned(),
+                    },
+                    source_ast: false,
                 })
                 .collect(),
             context: wire::Context {

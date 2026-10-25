@@ -243,3 +243,15 @@ func replies(t *testing.T, out string) []sdk.Message {
 		all = append(all, *m)
 	}
 }
+
+func TestIndexParamsFileInputs(t *testing.T) {
+	first := sdk.FileRef{Path: "a.go", Hash: "a"}
+	second := sdk.FileRef{Path: "b.go", Hash: "b"}
+	params := sdk.IndexParams{Inputs: []sdk.IndexInput{
+		{Kind: "file", File: &first},
+		{Kind: "regions", Regions: &sdk.EmbeddedFile{Path: "c.md"}},
+		{Kind: "file", File: &second},
+	}}
+
+	require.Equal(t, []sdk.FileRef{first, second}, params.FileInputs())
+}

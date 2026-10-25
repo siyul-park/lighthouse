@@ -31,6 +31,7 @@ Physical layout should make ownership and collaboration visible while preserving
 - Strongly related symbols MUST be physically close; direct collaborators SHOULD be adjacent.
 - Files and declaration order MUST make ownership, responsibility, and relationships easy to read.
 - Physical separation MUST represent a real responsibility, ownership, or abstraction boundary.
+- Direct implementation files and child modules SHOULD form one coherent abstraction level.
 
 ### Structural Rules
 

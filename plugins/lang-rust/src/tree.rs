@@ -22,7 +22,7 @@ pub struct SourceFile {
     pub text: String,
     pub ast: syn::File,
     pub generated: bool,
-    line_starts: Vec<usize>,
+    pub(crate) line_starts: Vec<usize>,
 }
 
 impl SourceFile {

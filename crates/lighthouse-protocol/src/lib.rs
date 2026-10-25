@@ -10,12 +10,13 @@ pub use language::{
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
     serve::{Handler, ServeError, serve},
     wire::{
-        CacheRef, Call, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind, FileInfo,
-        FileRef, Flow, FlowKind, Fragment, FunctionSummary, Implementation, Incomplete,
-        IndexParams, IndexResult, InitializeParams, InitializeResult, Methods, Module, Node,
-        Overlay, Position, ProjectRef, ProviderManifest, Resolution, ServerCapabilities, Signature,
-        Span, Symbol, SymbolKind, SymbolRole, TestCase, TestNaming, TestStyle, TypeRef, Visibility,
-        WorkspaceFolder,
+        CacheRef, Call, Comment, Context, Conventions, Edge, EdgeKind, EmbeddedFile,
+        EmbeddedSource, Event, EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment,
+        FunctionSummary, Implementation, Incomplete, IndexInput, IndexParams, IndexResult,
+        InitializeParams, InitializeResult, Mapping, Methods, Module, Node, Overlay, Position,
+        ProjectRef, ProviderManifest, Resolution, ServerCapabilities, Signature, Source, Span,
+        Symbol, SymbolKind, SymbolRole, TestCase, TestNaming, TestStyle, TextMapSegment, TypeRef,
+        Visibility, WorkspaceFolder, pointer_child, pointer_tokens, pointer_value,
     },
 };
 pub use model::{
@@ -35,7 +36,7 @@ pub use model::{
 pub use route::{FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
-pub const VERSION: &str = "0.3";
+pub const VERSION: &str = "0.4";
 
 /// Request: handshake; the first message of a session.
 pub const INITIALIZE: &str = "initialize";
@@ -78,3 +79,5 @@ fn merge_models(schema: &mut serde_json::Value, models: &serde_json::Value) {
         }
     }
 }
+
+pub use language::selector::{Selector, SelectorComparison, SelectorFilter, SelectorPart};

@@ -53,7 +53,7 @@ languages and editors are added.
 | Crate boundaries | 15 crates in layers, each one role, the edges enforced by `design/layers`; one name per concept across crates, protocol, schemas and docs (`Run`, `fingerprints`, `decision`) |
 | Hooks report the session's own changes | the first edit of a file records its findings; later hooks report only the findings the session introduced, and a turn with no edit is silent |
 | Stability signals | module stability, reach of functions and a stability probe on the reference repositories |
-| One concept model | a check abstains (the CEL field `abstain`); a provider names the `protocol` it speaks and its reach (`url`, `command` or `plugin`); chat classification always reads logprobs; the core is free of the code model, with `design/layers` keeping `lighthouse_model::ucm` out of core, store, ml, report and session; plugin protocol 0.3: `lighthouse/index`, `initialize` in MCP and LSP vocabulary (`workspaceFolders`, `serverInfo`, `capabilities`), LSP error codes, one method table with its HTTP twins, conformance transcripts replayed by every plugin and the Go sdk |
+| One concept model | a check abstains (the CEL field `abstain`); a provider names the `protocol` it speaks and its reach (`url`, `command` or `plugin`); chat classification always reads logprobs; the core is free of the code model, with `design/layers` keeping `lighthouse_model::ucm` out of core, store, ml, report and session; plugin protocol 0.4: `lighthouse/index`, `initialize` in MCP and LSP vocabulary (`workspaceFolders`, `serverInfo`, `capabilities`), LSP error codes, one method table with its HTTP twins, conformance transcripts replayed by every plugin and the Go sdk |
 
 ## Next
 

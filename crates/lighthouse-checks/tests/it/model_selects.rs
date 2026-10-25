@@ -124,6 +124,21 @@ fn naming_asks_about_a_one_letter_name_and_a_function_returning_a_bool() {
 }
 
 #[test]
+fn module_layout_reviews_only_modules_with_direct_code_and_children() {
+    let mut w = World::default();
+    w.module("pkg", None, None);
+    w.func("pkg", "run", "pkg/a.ucm");
+    w.module("pkg/language", None, None);
+    w.func("pkg/language", "analyze", "pkg/language/a.ucm");
+
+    w.module("facade", None, None);
+    w.module("facade/language", None, None);
+    w.func("facade/language", "analyze", "facade/language/a.ucm");
+
+    assert_eq!(selected(&w, "design/module-layout", "module"), ["pkg"]);
+}
+
+#[test]
 fn meaningful_separation_asks_about_a_small_module_with_one_user() {
     let mut w = World::default();
     for (path, name) in [

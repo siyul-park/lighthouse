@@ -12,6 +12,7 @@ mod macros;
 mod names;
 mod provider;
 mod signature;
+mod source;
 mod spans;
 mod syntax;
 mod testcase;

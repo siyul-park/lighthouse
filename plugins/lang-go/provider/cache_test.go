@@ -164,7 +164,7 @@ func indexWith(t *testing.T, g *provider.Provider, root, cache string, options m
 	params := sdk.IndexParams{
 		Project:  sdk.ProjectRef{Root: root},
 		Language: "go",
-		Files:    hashedGoFiles(t, root),
+		Inputs:   fileInputs(hashedGoFiles(t, root)),
 		Context:  sdk.Context{Options: options},
 	}
 	if cache != "" {

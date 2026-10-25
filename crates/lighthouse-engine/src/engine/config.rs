@@ -23,6 +23,13 @@ pub(super) struct Inherited {
     keys: Vec<String>,
 }
 
+pub(super) fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
+    |source| Error::Io {
+        path: path.to_owned(),
+        source,
+    }
+}
+
 /// The rules the configuration enables for at least one file: the projects it
 /// extends and the entries it sets, resolved over `projects`.
 pub fn active(config: &Config, projects: &Projects) -> Result<BTreeSet<String>, Error> {
@@ -107,6 +114,19 @@ pub(super) fn validate_config(
         }
     }
     validate_models(registry, config, binding)?;
+    for source in config.sources() {
+        let Some(provider) = source.language.provider.as_deref() else {
+            continue;
+        };
+        let language = registry
+            .languages()
+            .iter()
+            .find(|language| language.provider.manifest().id == provider)
+            .ok_or_else(|| Error::UnknownSourceProvider(provider.to_owned()))?;
+        if !config.lists(&language.plugin) {
+            return Err(Error::PluginNotListed(language.plugin.clone()));
+        }
+    }
     let listed = |id: &str| config.lists(lighthouse_plugin::plugin_of(id));
     let entries = config.entries(projects)?;
     for (id, config) in entries {
@@ -180,19 +200,14 @@ pub(super) fn load_languages(
         if config.lists(&entry.plugin) {
             providers.push(languages.len());
         }
+        let manifest = entry.provider.manifest();
+        let globs = manifest.globs.clone();
         languages.push(Language {
-            files: glob_set(&entry.provider.manifest().globs)?,
-            tests: glob_set(&entry.provider.manifest().conventions.test_globs)?,
+            files: glob_set(&globs)?,
+            tests: glob_set(&manifest.conventions.test_globs)?,
         });
     }
     Ok((providers, languages))
-}
-
-pub(super) fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
-    |source| Error::Io {
-        path: path.to_owned(),
-        source,
-    }
 }
 
 /// Rejects a binding to a model whose provider is unknown or does not serve the

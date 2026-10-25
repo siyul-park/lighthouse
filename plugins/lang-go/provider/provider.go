@@ -27,7 +27,7 @@ func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error
 				ConstructorPrefixes: []string{"New", "new"},
 				TestNaming:          sdk.TestNaming{Prefix: "Test", Variants: true},
 			},
-			Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays},
+			Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast"},
 		}}},
 	}, nil
 }
@@ -35,6 +35,16 @@ func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error
 // Index analyzes every requested file. Failures are reported as incomplete
 // entries; a bad request never ends the process.
 func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
+	for _, input := range params.Inputs {
+		if input.Kind == "regions" && input.Regions != nil {
+			result := emptyResult()
+			result.Incomplete = append(result.Incomplete, sdk.Incomplete{
+				Path:   input.Regions.Path,
+				Reason: "Go provider does not analyze selected source regions yet",
+			})
+			return result, nil
+		}
+	}
 	opts, err := newOptions(params.Context.Options)
 	if err != nil {
 		result := emptyResult()
@@ -43,7 +53,14 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 	}
 	r := newRun(params, opts)
 	p.last = RunStats{}
-	if !p.indexCached(r, params) {
+	astRequested := false
+	for _, input := range params.Inputs {
+		if input.Kind == "file" && input.File != nil && input.SourceAST {
+			astRequested = true
+			break
+		}
+	}
+	if astRequested || !p.indexCached(r, params) {
 		r = newRun(params, opts)
 		r.index()
 	}

@@ -186,10 +186,11 @@ func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan) (*run, bool)
 		}
 	}
 	subParams := params
-	subParams.Files = nil
-	for _, f := range params.Files {
+	subParams.Inputs = nil
+	for _, f := range params.FileInputs() {
 		if wanted[f.Path] {
-			subParams.Files = append(subParams.Files, f)
+			copy := f
+			subParams.Inputs = append(subParams.Inputs, sdk.IndexInput{Kind: "file", File: &copy})
 		}
 	}
 	sub := newRun(subParams, r.opts)

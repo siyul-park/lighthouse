@@ -100,8 +100,8 @@ fn handshake_declares_languages_and_index_converts_the_result() {
         fake.path().to_string_lossy().as_ref()
     );
     assert_eq!(
-        params["files"][0],
-        json!({ "path": "a.fake", "hash": "abc" })
+        params["inputs"][0],
+        json!({ "kind": "file", "file": { "path": "a.fake", "hash": "abc" } })
     );
     assert_eq!(params["context"]["options"]["fake"]["tags"][0], "x");
     assert!(params["context"].get("overlays").is_none());
@@ -124,7 +124,7 @@ fn handshake_refuses_other_protocol_versions_and_identities() {
         Err(e) => e.to_string(),
         Ok(_) => panic!("{mode} connected"),
     };
-    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.3"));
+    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.4"));
     assert!(message("identity").contains("identifies itself as `other`"));
     let early = message("crash_at_init");
     assert!(early.contains("plugin `fake`"), "{early}");

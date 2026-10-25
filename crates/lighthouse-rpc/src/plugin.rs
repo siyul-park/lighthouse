@@ -1,7 +1,14 @@
-use std::{collections::BTreeSet, fs, path::Path, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use lighthouse_model::Incomplete;
 
+use globset::Glob;
 use lighthouse_plugin::{
     Error, Indexed, LanguageProvider, ModelClient, Plugin, PluginManifest, ProviderManifest,
     Source, Workspace,
@@ -143,6 +150,10 @@ impl Plugin for RpcPlugin {
             .map(|language| {
                 Box::new(Provider {
                     language: language.id.clone(),
+                    source_ast: language
+                        .capabilities
+                        .iter()
+                        .any(|capability| capability == "source-ast"),
                     manifest: convert::provider_manifest(language),
                     client: Arc::clone(&self.client),
                     digest: self.digest.clone(),
@@ -154,6 +165,7 @@ impl Plugin for RpcPlugin {
 
 struct Provider {
     language: String,
+    source_ast: bool,
     manifest: ProviderManifest,
     client: Arc<Client>,
     digest: String,
@@ -168,11 +180,34 @@ impl LanguageProvider for Provider {
     /// incomplete entry next to the plugin's captured stderr.
     fn index(&self, ws: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
         let (request, cache_notice) = self.request(ws, files);
+        Ok(self.run_index(request, files, cache_notice))
+    }
+}
+
+impl Provider {
+    fn run_index(
+        &self,
+        request: wire::IndexParams,
+        files: &[Source],
+        cache_notice: Option<String>,
+    ) -> Indexed {
+        let required_asts: BTreeSet<_> = request
+            .inputs
+            .iter()
+            .filter_map(|input| match input {
+                wire::IndexInput::File {
+                    file,
+                    source_ast: true,
+                } => Some(PathBuf::from(&file.path)),
+                _ => None,
+            })
+            .collect();
+        let source_ast_provider = self.source_ast;
         let response = self
             .client
             .call::<_, wire::IndexResult>(wire::INDEX, request)
             .and_then(|result| {
-                convert::indexed(result, files).map_err(|e| {
+                convert::indexed(result, files, &required_asts, source_ast_provider).map_err(|e| {
                     format!(
                         "plugin `{}` sent a malformed result: {e}",
                         self.client.plugin()
@@ -188,7 +223,7 @@ impl LanguageProvider for Provider {
         });
         indexed.notices.extend(cache_notice);
         indexed.notices.extend(self.client.drain_stderr());
-        Ok(indexed)
+        indexed
     }
 }
 
@@ -206,18 +241,37 @@ impl Provider {
                 Err(reason) => (None, Some(reason)),
             },
         };
+        let inputs: Vec<wire::IndexInput> = files
+            .iter()
+            .map(|source| {
+                if source.regions.is_empty() {
+                    let path = source.file.path.to_string_lossy().replace('\\', "/");
+                    let source_ast = self.source_ast
+                        && ws.source_globs.iter().any(|pattern| {
+                            Glob::new(pattern).is_ok_and(|glob| {
+                                glob.compile_matcher().is_match(&source.file.path)
+                            })
+                        });
+                    wire::IndexInput::File {
+                        file: wire::FileRef {
+                            path,
+                            hash: source.file.hash.clone(),
+                        },
+                        source_ast,
+                    }
+                } else {
+                    wire::IndexInput::Regions {
+                        regions: embedded_wire(source),
+                    }
+                }
+            })
+            .collect();
         let params = wire::IndexParams {
             project: wire::ProjectRef {
                 root: ws.root.to_string_lossy().into_owned(),
             },
             language: self.language.clone(),
-            files: files
-                .iter()
-                .map(|s| wire::FileRef {
-                    path: s.file.path.to_string_lossy().replace('\\', "/"),
-                    hash: s.file.hash.clone(),
-                })
-                .collect(),
+            inputs,
             context: wire::Context {
                 options: ws
                     .languages
@@ -298,4 +352,32 @@ fn overlays_of(ws: &Workspace, files: &[Source]) -> Option<Vec<wire::Overlay>> {
         })
         .collect();
     (!found.is_empty()).then_some(found)
+}
+
+/// The generic embedded source request for an out-of-process analysis-language provider.
+fn embedded_wire(source: &Source<'_>) -> wire::EmbeddedFile {
+    wire::EmbeddedFile {
+        path: source.file.path.to_string_lossy().replace('\\', "/"),
+        hash: source.file.hash.clone(),
+        text: source.text.to_owned(),
+        generated: source.file.generated,
+        test: source.file.test,
+        facts: source.file.facts.clone(),
+        sources: source
+            .regions
+            .iter()
+            .map(|source| wire::EmbeddedSource {
+                id: source.id.clone(),
+                rule_id: source.rule_id.clone(),
+                node_pointer: source.node_pointer.clone(),
+                source_pointer: source.source_pointer.clone(),
+                provider: source.provider.clone(),
+                syntax: source.syntax.clone(),
+                context: Some(source.context.clone()),
+                text: source.text.clone(),
+                source_range: source.source_range,
+                text_map: source.text_map.clone(),
+            })
+            .collect(),
+    }
 }

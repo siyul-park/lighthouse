@@ -1,6 +1,6 @@
 use std::{env, fs, path::Path};
 
-const CHECKED_IN: &str = "../../protocol/schema/lighthouse-protocol-0.3.json";
+const CHECKED_IN: &str = "../../protocol/schema/lighthouse-protocol-0.4.json";
 
 fn rendered() -> String {
     let mut text = serde_json::to_string_pretty(&lighthouse_protocol::schema()).unwrap();
@@ -31,6 +31,6 @@ fn schema_covers_every_method_and_the_version_is_pinned() {
     let schema = lighthouse_protocol::schema();
     let methods = &schema["properties"];
     assert!(methods["initialize"].is_object() && methods["lighthouse/index"].is_object());
-    assert_eq!(lighthouse_protocol::VERSION, "0.3");
-    assert!(CHECKED_IN.ends_with("lighthouse-protocol-0.3.json"));
+    assert_eq!(lighthouse_protocol::VERSION, "0.4");
+    assert!(CHECKED_IN.ends_with("lighthouse-protocol-0.4.json"));
 }

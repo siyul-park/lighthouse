@@ -92,7 +92,7 @@ spec:
       intro: >-
         Design minimizes conceptual surface while keeping responsibility and
         ownership boundaries explicit.
-      decisions: [responsibility, duplication]
+      decisions: [responsibility, duplication, module-layout]
     - name: dependency-direction
       title: Dependency Direction
       intro: >-
@@ -105,7 +105,7 @@ spec:
         Function structure should make meaningful behavior reusable and
         readable, not merely make functions smaller. Structural metrics are
         review signals, not proof of a design violation.
-      decisions: [complexity, signature, prefer-method, symbols]
+      decisions: [complexity, abstraction-level, signature, prefer-method, symbols]
     - name: naming
       title: Naming
       intro: >-

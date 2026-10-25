@@ -7,14 +7,16 @@ use assert_cmd::Command;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use crate::checks::home;
+use crate::checks::{home, trust};
 
 pub(crate) const BIG: &str = "a\nb\nc\nd\ne\nf\n";
 const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
 
 pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
-    cmd.current_dir(dir).envs(home(dir));
+    cmd.current_dir(dir)
+        .envs(home(dir))
+        .env_remove("LIGHTHOUSE_TRUST");
     cmd
 }
 
@@ -50,6 +52,7 @@ fn rust_project(extra: &str, source: &str) -> TempDir {
     .unwrap();
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(dir.path().join("src/lib.rs"), source).unwrap();
+    trust(dir.path());
     dir
 }
 

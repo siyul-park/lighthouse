@@ -1,10 +1,10 @@
-# Plugin protocol 0.3
+# Plugin protocol 0.4
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.3.json`](../protocol/schema/lighthouse-protocol-0.3.json),
+[`protocol/schema/lighthouse-protocol-0.4.json`](../protocol/schema/lighthouse-protocol-0.4.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,7 +27,7 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.3"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.4"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
@@ -36,7 +36,7 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them remains valid in 0.3, and hosts ignore what they do not
+sends none of them remains valid in 0.4, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -46,8 +46,9 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Reserved for later versions, not implemented in 0.3: further methods for rules
-and analyzers.
+Protocol 0.4 uses one `lighthouse/index` interface for physical files and selected source regions. Each input is a tagged `IndexInput`: `{ kind: "file", file, source_ast }` asks a provider to analyze a physical file and, when `source_ast` is true, return its selectable AST; `{ kind: "regions", regions }` asks it to analyze source regions selected by the core. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
+
+The `source_ast` flag is per file, so a batch requests ASTs only where a source rule's file globs match. Providers that advertise the `source-ast` capability MUST return one `Source` per requested file, with `path`, provider-defined serialized `ast`, and a separate `mapping` keyed by canonical JSON Pointer. Each mapping entry can carry a half-open UTF-8 byte `range`, a descendant `text_pointer` for a node's source-text scalar, and optional `text_map` segments from extracted-text bytes to original-host bytes. ASTs retain the parser/provider's structural shape; locations live in the sidecar rather than injected into every node. Providers parse and map only: they do not receive or interpret `spec.sources`, selector filters, destination keys, or `language.context`. The shared core evaluates selectors, filters and context projections, validates mappings, resolves the destination provider key, and forwards each selected region through the same `lighthouse/index` method. Source rules are core configuration and are not transported through provider context.
 
 ## Methods
 
@@ -71,7 +72,7 @@ plugin. A future method, added with its first consumer: `lighthouse/embed` (`POS
 The shape is MCP's, with LSP's names for the workspace. Params:
 
 ```json
-{ "protocolVersion": "0.3",
+{ "protocolVersion": "0.4",
   "clientInfo": { "name": "lighthouse", "version": "0.1.0" },
   "workspaceFolders": [{ "uri": "file:///abs/root", "name": "root" }] }
 ```
@@ -81,7 +82,7 @@ percent-encoded as RFC 8089 and RFC 3986 say. A plugin turns the URI back into a
 in Rust, `net/url` in Go) and refuses anything else. Result:
 
 ```json
-{ "protocolVersion": "0.3",
+{ "protocolVersion": "0.4",
   "serverInfo": { "name": "lang-go", "version": "0.1.0" },
   "capabilities": {
     "languages": [{ "id": "go", "globs": ["**/*.go"], "priority": 0,
@@ -122,6 +123,9 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   `overlays`: the provider analyzes the `overlays` of an index request instead of the
   files on disk; a host declines fixes in files of a provider without it (bundled
   providers declare it).
+  `source-ast`: the provider can expose its serialized AST and per-pointer `mapping`
+  when `source_ast` is requested. The provider parses and maps; core evaluates selectors,
+  filters and context projections.
   `complete-references`: every reference to a symbol, in signatures, fields and
   receivers too, is an edge with a `site`, so a rename cannot miss one; no bundled
   provider declares it yet.
@@ -133,21 +137,50 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   guesses), which makes its caller and reference sets lower bounds; no separate
   capability announces that.
 
+### Common source selection (protocol 0.4)
+
+A provider that advertises `source-ast` supports the shared AST contract. For each
+file input whose `source_ast` is true, the provider MUST return a `Source` in
+`IndexResult.sources`. The flag belongs to each file input, not to the whole IndexParams
+batch. Each record holds the physical path, a provider-defined JSON-compatible AST with
+its original structure, and a separate `mapping` from canonical RFC 6901 JSON Pointers to
+source metadata. Each entry may contain a half-open UTF-8 byte `range`, a descendant
+`text_pointer` targeting a string scalar, and an optional `text_map` of extracted-text
+ranges to host-source ranges. Entries do not repeat their pointer; the pointer is the map
+key. Mapping ranges MUST be validated against the actual host text and MUST NOT be guessed
+by searching for equal source strings.
+
+The provider may expose several independent logical roots below one AST root, such as a
+YAML stream with a `documents` array. Selectors and identity resolution remain core-owned;
+identity values are scoped to the selected logical root when the root AST contains multiple
+documents. Each physical file is represented once even when multiple source rules select
+regions from it.
+
+The core owns selector parsing and evaluation. select and language.select use the same
+bounded path/filter grammar: $, named and quoted keys, numeric indices, dot-wildcard and array-wildcard,
+equality/inequality predicates, conjunction and disjunction. The host provider does not get the source
+rules and must not implement a private selection mode. The core resolves language.context
+projections and declaration context before it creates source-region inputs.
+
+A selected region carries a stable id, its `rule_id`, `node_pointer`, and `source_pointer`,
+the opaque destination provider key, optional syntax and resolved context, source text,
+optional `text_map`, and original host `source_range`. The destination receives these records inside an IndexInput with
+kind regions; it uses the same index method as for files. The host file path and original
+coordinates are retained so diagnostics point back to the physical host document. Each
+provider implements one interface; the host/target distinction is input data, not a separate
+provider API.
+
 ### `lighthouse/index` (request)
 
 Params:
 
 ```json
 { "project": { "root": "/abs/root" }, "language": "go",
-  "files": [{ "path": "pkg/a.go", "hash": "<sha256 hex>" }],
+  "inputs": [{ "kind": "file", "file": { "path": "pkg/a.go", "hash": "<sha256 hex>" } }],
   "context": { "options": { "go": { "tags": ["integration"] } } } }
 ```
 
-`files` are every project file of `language`, project-relative with `/`
-separators, sorted. The request is project-level: one call carries the whole
-batch and the provider decides which packages, modules or build units it must
-load to analyze them, reading files from disk. Analysis scope is never
-narrowed to the files a user asked to see; reporting is the host's concern.
+inputs contains every project file of the requested provider as a tagged file input, or a batch of already-selected source regions as region inputs. Physical paths are project-relative with slash separators. The request is project-level: one call carries the whole batch and the provider decides which packages, modules or build units it must load to analyze physical files, reading files from disk. Analysis scope is never narrowed to the files a user asked to see; reporting is the host's concern.
 `context.options` holds the `spec.languages.<id>` tables of `lighthouse.toml`
 for every language, as JSON; a provider reads its own entry and MUST reject
 unknown keys in it (as an `incomplete` entry, see below).
@@ -165,7 +198,7 @@ of what they depend on. Any doubt is a miss. A result with an `incomplete` entry
 never written. Conformance indexes every case cold, then warm, and compares the answer
 with an uncached run byte for byte. The field is optional.
 
-Result `{ fragments, notices, incomplete }`:
+Result `{ fragments, sources, notices, incomplete }`:
 
 - `fragments`: one per analyzed file, sorted by path, each
   `{ file: { path, generated?, facts? }, modules, symbols, edges, functions, tests, comments }`;
@@ -177,6 +210,9 @@ Result `{ fragments, notices, incomplete }`:
   fragment.
 - `notices`: messages that leave the analysis complete (for example files
   excluded by build constraints).
+- `sources`: provider-defined `Source` records for file inputs with `source_ast = true`.
+  Such requests are accepted only from providers advertising `source-ast`; the core
+  evaluates selection rules and later sends chosen regions to a destination provider.
 - `incomplete`: `{ path?, reason }` for every file, or without `path` every
   scope, that could not be analyzed fully: load, parse and type errors, missing
   dependencies. A file listed here MAY still have a fragment with what could be

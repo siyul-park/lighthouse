@@ -13,6 +13,8 @@ pub(crate) struct Declared<'p> {
     /// The symbol that sorts first by file and position; the findings of a
     /// project decision about the module are reported there.
     pub anchor: &'p Symbol,
+    /// Semantic language of the module, distinct from the physical host format.
+    pub lang: String,
     /// The files that declare a symbol of it.
     pub files: BTreeSet<&'p Path>,
     /// Lines from the first to the last declaration, summed over the module's
@@ -23,6 +25,8 @@ pub(crate) struct Declared<'p> {
     /// The declarations of the module: types, interfaces, constants,
     /// variables and functions at module level, without `init`.
     pub declares: usize,
+    /// Immediate child modules that declare symbols.
+    pub children: Vec<String>,
 }
 
 /// Every module that declares a symbol, by path, in one pass over the symbols.
@@ -37,12 +41,20 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
             .or_insert((span.start.line, span.end.line));
         *first = (*first).min(span.start.line);
         *last = (*last).max(span.end.line);
+        let lang = project.file(&symbol.file).map_or_else(String::new, |file| {
+            file.facts
+                .get("analysisLanguage")
+                .cloned()
+                .unwrap_or_else(|| file.lang.clone())
+        });
         let module = modules.entry(path).or_insert_with(|| Declared {
             anchor: symbol,
+            lang,
             files: BTreeSet::new(),
             lines: 0,
             dependents: BTreeSet::new(),
             declares: 0,
+            children: Vec::new(),
         });
         module.files.insert(symbol.file.as_path());
         if (&symbol.file, symbol.span.start) < (&module.anchor.file, module.anchor.span.start) {
@@ -66,6 +78,23 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
             && let Some(module) = modules.get_mut(to.as_str())
         {
             module.dependents.insert(from.clone());
+        }
+    }
+    let paths: Vec<String> = modules.keys().map(|path| (*path).to_owned()).collect();
+    let mut children: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for path in &paths {
+        if path == "." {
+            continue;
+        }
+        let parent = path.rsplit_once('/').map_or(".", |(parent, _)| parent);
+        children
+            .entry(parent.to_owned())
+            .or_default()
+            .push(path.clone());
+    }
+    for (path, children) in children {
+        if let Some(module) = modules.get_mut(path.as_str()) {
+            module.children = children;
         }
     }
     modules

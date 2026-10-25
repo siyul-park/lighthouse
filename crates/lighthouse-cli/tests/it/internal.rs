@@ -8,7 +8,7 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use crate::checks::home;
+use crate::checks::{home, trust};
 
 const DOC: &str = "design/exported-doc";
 const OWNER: &str = "testing/owner";
@@ -29,6 +29,7 @@ fn findings(dir: &Path) -> Vec<(String, String)> {
         .unwrap()
         .current_dir(dir)
         .envs(home(dir))
+        .env_remove("LIGHTHOUSE_TRUST")
         .args(["check", "--no-store", "--format", "json"])
         .output()
         .unwrap();
@@ -67,6 +68,7 @@ fn go_project() -> Option<TempDir> {
         )),
     );
     write(dir.path(), "go.mod", "module example.com/app\n\ngo 1.26\n");
+    trust(dir.path());
     Some(dir)
 }
 
@@ -130,6 +132,7 @@ fn rust_does_not_judge_crate_visible_items() {
         "tests/open.rs",
         "#[test]\nfn open() {\n    demo::open();\n}\n",
     );
+    trust(dir.path());
     let found = findings(dir.path());
     for rule in [DOC, OWNER, SINGLE] {
         let hit = messages(&found, rule);

@@ -7,7 +7,7 @@ use assert_cmd::Command;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use crate::checks::home;
+use crate::checks::{home, trust};
 
 const MISORDERED: &str = "pub fn run() -> u8 {\n    1\n}\n\npub struct Store;\n";
 const BANNER: &str = "// ===== Types =====\n\npub struct Store;\n";
@@ -33,6 +33,7 @@ fn project(source: &str) -> TempDir {
         "[package]\nname = \"demo\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
     );
     write("src/lib.rs", source);
+    trust(dir.path());
     dir
 }
 
@@ -41,6 +42,7 @@ fn check(dir: &TempDir, args: &[&str]) -> String {
         .unwrap()
         .current_dir(dir.path())
         .envs(home(dir.path()))
+        .env_remove("LIGHTHOUSE_TRUST")
         .args(["check", "--no-store"])
         .args(args)
         .output()

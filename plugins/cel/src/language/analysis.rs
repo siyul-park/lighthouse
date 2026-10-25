@@ -13,7 +13,7 @@ use lighthouse_model::{
 };
 use lighthouse_plugin::CelLibraryManifest;
 
-use super::host::{MappedText, Parameter, VariableDecl};
+use super::source::{MappedText, Parameter, VariableDecl};
 
 // Root values supplied by check, fix and recipe contexts, not by the host file.
 const CONTEXT_VARIABLES: [&str; 16] = [

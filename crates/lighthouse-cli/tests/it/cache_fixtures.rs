@@ -5,6 +5,8 @@ use std::{fs, path::Path};
 
 use tempfile::TempDir;
 
+use crate::checks::trust;
+
 /// One edit of the script: what it does to the project, and whether it leaves
 /// most of the findings of the rules where they were.
 pub(crate) struct Edit {
@@ -304,5 +306,6 @@ pub(crate) fn project(fixture: &Fixture) -> TempDir {
         ".lighthouse/decisions/probe.yaml",
         &probe("s", fixture.language),
     );
+    trust(dir.path());
     dir
 }

@@ -9,7 +9,8 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    self as wire, FileRef, IndexParams, IndexResult, Message, read_message, write_message,
+    self as wire, FileRef, IndexInput, IndexParams, IndexResult, Message, read_message,
+    write_message,
 };
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
@@ -34,6 +35,15 @@ pub(crate) fn index_with(
     options: serde_json::Value,
     cache: Option<&Path>,
 ) -> IndexResult {
+    index_with_sources(dir, options, cache, false)
+}
+
+pub(crate) fn index_with_sources(
+    dir: &Path,
+    options: serde_json::Value,
+    cache: Option<&Path>,
+    source_ast: bool,
+) -> IndexResult {
     let root = dir.canonicalize().unwrap();
     let mut paths = Vec::new();
     collect(&root, &root, &mut paths);
@@ -51,11 +61,14 @@ pub(crate) fn index_with(
             root: root.to_string_lossy().into_owned(),
         },
         language: "rust".to_owned(),
-        files: paths
+        inputs: paths
             .iter()
-            .map(|path| FileRef {
-                path: path.clone(),
-                hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
+            .map(|path| IndexInput::File {
+                source_ast,
+                file: FileRef {
+                    path: path.clone(),
+                    hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
+                },
             })
             .collect(),
         context: wire::Context {

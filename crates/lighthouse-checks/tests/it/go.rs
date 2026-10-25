@@ -55,6 +55,7 @@ fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
             &[Source {
                 file: &file,
                 text: source,
+                regions: &[],
             }],
         )
         .unwrap();

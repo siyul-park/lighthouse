@@ -390,6 +390,111 @@
       },
       "type": "object"
     },
+    "EmbeddedFile": {
+      "description": "One physical host document and regions selected for destination-provider analysis.",
+      "properties": {
+        "facts": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "generated": {
+          "default": false,
+          "type": "boolean"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/EmbeddedSource"
+          },
+          "type": "array"
+        },
+        "test": {
+          "default": false,
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "hash",
+        "text",
+        "sources"
+      ],
+      "type": "object"
+    },
+    "EmbeddedSource": {
+      "description": "A source region produced by the core source engine.",
+      "properties": {
+        "context": true,
+        "id": {
+          "type": "string"
+        },
+        "node_pointer": {
+          "description": "JSON Pointer of the selected candidate in the host AST.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "The exact registered destination provider key.",
+          "type": "string"
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "source_pointer": {
+          "description": "JSON Pointer of the exact scalar whose text is analyzed.",
+          "type": "string"
+        },
+        "source_range": {
+          "description": "Whole source-scalar range, used when text_map is absent.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "syntax": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "text_map": {
+          "description": "Fine-grained mapping from text bytes to the physical host file.",
+          "items": {
+            "$ref": "#/$defs/TextMapSegment"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "rule_id",
+        "node_pointer",
+        "source_pointer",
+        "provider",
+        "text",
+        "source_range"
+      ],
+      "type": "object"
+    },
     "Event": {
       "description": "One body event and where it is.",
       "properties": {
@@ -935,8 +1040,51 @@
       ],
       "type": "object"
     },
+    "IndexInput": {
+      "description": "One input to the common provider interface.",
+      "oneOf": [
+        {
+          "description": "A physical file owned by this provider.",
+          "properties": {
+            "file": {
+              "$ref": "#/$defs/FileRef"
+            },
+            "kind": {
+              "const": "file",
+              "type": "string"
+            },
+            "source_ast": {
+              "description": "Return the parsed tree for this file to the common source selector.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "file"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Regions already selected by the common source engine.",
+          "properties": {
+            "kind": {
+              "const": "regions",
+              "type": "string"
+            },
+            "regions": {
+              "$ref": "#/$defs/EmbeddedFile"
+            }
+          },
+          "required": [
+            "kind",
+            "regions"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "IndexParams": {
-      "description": "Index request. A provider receives every file of one language in one\nrequest and decides which packages or modules it must load to analyze\nthem; analysis scope is never narrowed to a subset of the project.",
+      "description": "Index request. File and extracted-region inputs use the same provider method.",
       "properties": {
         "context": {
           "$ref": "#/$defs/Context",
@@ -944,14 +1092,14 @@
             "options": {}
           }
         },
-        "files": {
+        "inputs": {
           "items": {
-            "$ref": "#/$defs/FileRef"
+            "$ref": "#/$defs/IndexInput"
           },
           "type": "array"
         },
         "language": {
-          "description": "Id of the language the files belong to.",
+          "description": "Registered provider key for this invocation (file or region inputs).",
           "type": "string"
         },
         "project": {
@@ -961,7 +1109,7 @@
       "required": [
         "project",
         "language",
-        "files"
+        "inputs"
       ],
       "type": "object"
     },
@@ -988,6 +1136,14 @@
           "description": "Messages that leave the analysis complete.",
           "items": {
             "type": "string"
+          },
+          "type": "array"
+        },
+        "sources": {
+          "default": [],
+          "description": "Serialized ASTs and independent source-map sidecars requested for selection.",
+          "items": {
+            "$ref": "#/$defs/Source"
           },
           "type": "array"
         }
@@ -1078,6 +1234,43 @@
         "object",
         "data"
       ],
+      "type": "object"
+    },
+    "Mapping": {
+      "description": "Location metadata for one AST value. Missing fields are meaningful only for\nsynthetic AST values; source-bearing scalars must have a range.",
+      "properties": {
+        "range": {
+          "description": "Original host UTF-8 byte extent, half-open.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "text_map": {
+          "description": "Optional mapping from extracted UTF-8 bytes to original host bytes.",
+          "items": {
+            "$ref": "#/$defs/TextMapSegment"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "text_pointer": {
+          "description": "JSON Pointer to a source-text string scalar inside this node's subtree.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
       "type": "object"
     },
     "Model": {
@@ -1262,7 +1455,7 @@
       "properties": {
         "capabilities": {
           "default": [],
-          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`. Hosts\nignore unknown values.",
+          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, and `source-ast`. Hosts ignore\nunknown values.",
           "items": {
             "type": "string"
           },
@@ -1386,6 +1579,31 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "Source": {
+      "description": "A provider-specific AST and its independent source-map sidecar.",
+      "properties": {
+        "ast": {
+          "description": "Structurally faithful, provider-defined serialization of its parser AST."
+        },
+        "mapping": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Mapping"
+          },
+          "description": "Original host locations keyed by canonical JSON Pointer into `ast`.",
+          "type": "object"
+        },
+        "path": {
+          "description": "Project-relative physical file path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "ast",
+        "mapping"
+      ],
       "type": "object"
     },
     "Span": {
@@ -1679,6 +1897,36 @@
         "scenario"
       ],
       "type": "string"
+    },
+    "TextMapSegment": {
+      "description": "One half-open UTF-8 byte range in the extracted source and its original text.",
+      "properties": {
+        "source_range": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "text_range": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "text_range",
+        "source_range"
+      ],
+      "type": "object"
     },
     "Tool": {
       "description": "What an agent did with a tool: the kinds of its work that a fix report\ntells apart.",

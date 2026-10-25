@@ -106,23 +106,77 @@ type Context struct {
 	Cache *CacheRef `json:"cache,omitempty"`
 }
 
-// IndexParams is the request of the `index` method.
+// IndexInput uses one provider interface for a file or selected source regions.
+type IndexInput struct {
+	Kind      string        `json:"kind"`
+	File      *FileRef      `json:"file,omitempty"`
+	Regions   *EmbeddedFile `json:"regions,omitempty"`
+	SourceAST bool          `json:"source_ast,omitempty"`
+}
+
+// IndexParams is the request of the index method.
 type IndexParams struct {
-	Project  ProjectRef `json:"project"`
-	Language string     `json:"language"`
-	Files    []FileRef  `json:"files"`
-	Context  Context    `json:"context"`
+	Project  ProjectRef   `json:"project"`
+	Language string       `json:"language"`
+	Inputs   []IndexInput `json:"inputs"`
+	Context  Context      `json:"context"`
 }
 
 // IndexResult is the response of the `index` method. Its lists must encode as
 // `[]` when empty, never `null`.
 type IndexResult struct {
 	Fragments  []Fragment   `json:"fragments"`
+	Sources    []Source     `json:"sources"`
 	Notices    []string     `json:"notices"`
 	Incomplete []Incomplete `json:"incomplete"`
 	// Encoded are fragments that are already JSON, merged in by path when the
 	// result is encoded; Fragments and Encoded never hold the same path.
 	Encoded []EncodedFragment `json:"-"`
+}
+
+// Source is the provider's structurally faithful AST plus its separate map.
+type Source struct {
+	Path    string             `json:"path"`
+	Ast     json.RawMessage    `json:"ast"`
+	Mapping map[string]Mapping `json:"mapping"`
+}
+
+// Mapping is keyed by JSON Pointer; it never repeats the pointer.
+type Mapping struct {
+	Range       *[2]uint32       `json:"range,omitempty"`
+	TextPointer *string          `json:"text_pointer,omitempty"`
+	TextMap     []TextMapSegment `json:"text_map,omitempty"`
+}
+
+// TextMapSegment maps an extracted-source byte range to original host bytes.
+type TextMapSegment struct {
+	TextRange   [2]uint32 `json:"text_range"`
+	SourceRange [2]uint32 `json:"source_range"`
+}
+
+// EmbeddedFile sends selected source regions to a analysis language provider.
+type EmbeddedFile struct {
+	Path      string            `json:"path"`
+	Hash      string            `json:"hash"`
+	Text      string            `json:"text"`
+	Generated bool              `json:"generated"`
+	Test      bool              `json:"test"`
+	Facts     map[string]string `json:"facts"`
+	Sources   []EmbeddedSource  `json:"sources"`
+}
+
+// EmbeddedSource carries selected text and its byte-by-byte mapping to the host.
+type EmbeddedSource struct {
+	ID            string           `json:"id"`
+	RuleID        string           `json:"rule_id"`
+	NodePointer   string           `json:"node_pointer"`
+	SourcePointer string           `json:"source_pointer"`
+	Provider      string           `json:"provider"`
+	Syntax        *string          `json:"syntax,omitempty"`
+	Context       json.RawMessage  `json:"context,omitempty"`
+	Text          string           `json:"text"`
+	SourceRange   []uint32         `json:"source_range"`
+	TextMap       []TextMapSegment `json:"text_map,omitempty"`
 }
 
 // Incomplete reports why a file, or the whole request when Path is empty, was
@@ -274,7 +328,7 @@ type Comment struct {
 }
 
 // ProtocolVersion is the wire protocol version this package implements.
-const ProtocolVersion = "0.3"
+const ProtocolVersion = "0.4"
 
 // SemanticEdges names the capability of reporting type-resolved edges.
 const SemanticEdges = "semantic-edges"
@@ -299,4 +353,15 @@ func (f WorkspaceFolder) Path() (string, error) {
 		return "", fmt.Errorf("%q is not a file URI", f.URI)
 	}
 	return filepath.Clean(filepath.FromSlash(u.Path)), nil
+}
+
+// FileInputs returns physical-file inputs, preserving the request order.
+func (p IndexParams) FileInputs() []FileRef {
+	var files []FileRef
+	for _, input := range p.Inputs {
+		if input.Kind == "file" && input.File != nil {
+			files = append(files, *input.File)
+		}
+	}
+	return files
 }

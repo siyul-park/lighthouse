@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "plugins/cel", "plugins/fake-model", "plugins/lang-rust", "plugins/model-http", "plugins/model-local"]
+members = ["crates/*", "plugins/cel", "plugins/fake-model", "plugins/lang-rust", "plugins/lang-yaml", "plugins/lang-toml", "plugins/model-http", "plugins/model-local"]
 
 [workspace.package]
 version = "0.1.0"
@@ -29,6 +29,7 @@ schemars = { version = "1", default-features = false, features = ["derive", "std
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_norway = "0.9"
+saphyr = "0.2.2"
 similar = "2"
 sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit"] }

@@ -12,7 +12,8 @@ use lighthouse_model::{
     ucm::{Applicability, File, Fragment, Project},
 };
 use lighthouse_plugin::{
-    Context, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, Source, Workspace,
+    Context, EmbeddedFile, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, Source,
+    Workspace,
 };
 use lighthouse_spec::{
     Attributes, Catalog, Config, Error as SpecError, GeneratedCheck, GlobSet,
@@ -40,6 +41,7 @@ mod phases;
 mod route;
 mod run;
 mod scopes;
+mod sources;
 
 pub use availability::{Availability, Needs};
 use cached::RunCache;
@@ -75,6 +77,8 @@ pub enum Error {
     UnknownPlugin(String),
     #[error("unknown language `{0}` in `languages` configuration")]
     UnknownLanguage(String),
+    #[error("unknown source provider `{0}` in sources[].language.provider")]
+    UnknownSourceProvider(String),
     #[error("`{0}` belongs to a plugin not listed in `plugins`")]
     PluginNotListed(String),
     #[error("unknown model `{0}`: declare it under `[models.<name>]`")]
@@ -345,6 +349,11 @@ impl Engine {
         let (attributes, notices) = Attributes::new(&root);
         let ws = Workspace {
             root,
+            source_globs: config
+                .sources()
+                .iter()
+                .flat_map(|source| source.files.iter().cloned())
+                .collect(),
             languages: config
                 .languages()
                 .map(|(id, options)| (id.to_owned(), options.clone()))

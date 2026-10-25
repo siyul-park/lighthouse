@@ -1493,5 +1493,6 @@
   "incomplete": [],
   "notices": [
     "1 file(s) belong to several crate targets (a `mod` shared by tests, for example) and are analyzed once, as part of the first target, e.g. tests/common/mod.rs"
-  ]
+  ],
+  "sources": []
 }

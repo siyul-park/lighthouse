@@ -16,9 +16,18 @@ import (
 )
 
 const (
-	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.3.json"
+	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.4.json"
 	casesGlob  = "../../../crates/lighthouse-rpc/tests/conformance/go/*"
 )
+
+func fileInputs(files []sdk.FileRef) []sdk.IndexInput {
+	inputs := make([]sdk.IndexInput, 0, len(files))
+	for _, file := range files {
+		copy := file
+		inputs = append(inputs, sdk.IndexInput{Kind: "file", File: &copy})
+	}
+	return inputs
+}
 
 func TestProviderInitialize(t *testing.T) {
 	t.Run("describes Go as the protocol schema defines it", func(t *testing.T) {
@@ -45,7 +54,7 @@ func TestProviderIndex(t *testing.T) {
 				result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
 					Project:  sdk.ProjectRef{Root: root},
 					Language: "go",
-					Files:    files,
+					Inputs:   fileInputs(files),
 					Context:  sdk.Context{Options: options},
 				})
 				require.NoError(t, err, "%s/%s", filepath.Base(dir), variant)
@@ -81,7 +90,7 @@ func helper(t *testing.T)             {}
 		result, err := g.Index(sdk.IndexParams{
 			Project:  sdk.ProjectRef{Root: root},
 			Language: "go",
-			Files:    []sdk.FileRef{{Path: "p_test.go"}, {Path: "p.go"}},
+			Inputs:   fileInputs([]sdk.FileRef{{Path: "p_test.go"}, {Path: "p.go"}}),
 		})
 
 		require.NoError(t, err)
@@ -115,7 +124,7 @@ func helper(t *testing.T)             {}
 		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
 			Project:  sdk.ProjectRef{Root: root},
 			Language: "go",
-			Files:    goFiles(t, root),
+			Inputs:   fileInputs(goFiles(t, root)),
 		})
 
 		require.NoError(t, err)
@@ -163,7 +172,7 @@ func helper(t *testing.T)             {}
 		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
 			Project:  sdk.ProjectRef{Root: root},
 			Language: "go",
-			Files:    goFiles(t, root),
+			Inputs:   fileInputs(goFiles(t, root)),
 		})
 
 		require.NoError(t, err)

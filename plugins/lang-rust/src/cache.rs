@@ -93,9 +93,14 @@ impl Cache {
             version,
             context: None,
             hashes: params
-                .files
+                .inputs
                 .iter()
-                .map(|f| (f.path.clone(), f.hash.clone()))
+                .filter_map(|input| match input {
+                    lighthouse_protocol::IndexInput::File { file, .. } => {
+                        Some((file.path.clone(), file.hash.clone()))
+                    }
+                    lighthouse_protocol::IndexInput::Regions { .. } => None,
+                })
                 .collect(),
             stored,
             fresh: BTreeMap::new(),

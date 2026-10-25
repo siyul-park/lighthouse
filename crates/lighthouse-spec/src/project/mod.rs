@@ -16,7 +16,7 @@ mod spec;
 mod standard;
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     sync::{
@@ -35,6 +35,7 @@ use globset::{GlobBuilder, GlobSetBuilder};
 pub use layers::{BUNDLED, Entry, Layer, Layers};
 use lighthouse_model::{Options, Severity};
 pub use lighthouse_process::Policy;
+use lighthouse_protocol::Selector;
 use lighthouse_resource::{Duration, documents, resource};
 pub use lighthouse_resource::{Format, Metadata, Resource};
 pub use models::{Evaluation, Models, Routing};
@@ -43,7 +44,9 @@ use resolved::Resolved;
 pub use rules::{Level, RuleConfig, RuleSetting, Rules};
 pub use sandbox::SandboxSpec;
 use spec::PluginEntry;
-pub use spec::{GeneratedCheck, OverrideSpec, ProjectSpec, TestNamingSpec};
+pub use spec::{
+    GeneratedCheck, OverrideSpec, ProjectSpec, SourceLanguageSpec, SourceRuleSpec, TestNamingSpec,
+};
 
 pub(crate) use standard::standard;
 
@@ -171,6 +174,7 @@ pub struct Config {
     name: String,
     plugins: Vec<PluginRef>,
     languages: BTreeMap<String, LanguageConfig>,
+    sources: Vec<SourceRuleSpec>,
     generated: Option<GlobSet>,
     generated_check: Option<GeneratedCheck>,
     models: Models,
@@ -246,6 +250,53 @@ impl Config {
                 })
             })
             .collect::<Result<_, Error>>()?;
+        let mut source_ids = BTreeSet::new();
+        for (at, source) in spec.sources.iter().enumerate() {
+            if source.id.is_empty() || source.select.is_empty() {
+                return Err(Error::Config(format!(
+                    "sources[{at}] requires non-empty id and select"
+                )));
+            }
+            let language = &source.language;
+            let fixed = language
+                .provider
+                .as_deref()
+                .is_some_and(|value| !value.is_empty());
+            let dynamic = language
+                .select
+                .as_deref()
+                .is_some_and(|value| !value.is_empty());
+            if fixed == dynamic {
+                return Err(Error::Config(format!(
+                    "sources[{at}].language requires exactly one non-empty provider or select"
+                )));
+            }
+            if language.syntax.as_deref().is_some_and(str::is_empty) {
+                return Err(Error::Config(format!(
+                    "sources[{at}].language.syntax must not be empty"
+                )));
+            }
+            validate_selector(&source.select, &format!("sources[{at}].select"))?;
+            if let Some(selector) = &language.select {
+                validate_selector(selector, &format!("sources[{at}].language.select"))?;
+            }
+            if let Some(context) = &language.context {
+                validate_source_context(context, &format!("sources[{at}].language.context"))?;
+            }
+            if source.files.is_empty() {
+                return Err(Error::Config(format!(
+                    "source `{}` requires at least one file glob",
+                    source.id
+                )));
+            }
+            if !source_ids.insert(&source.id) {
+                return Err(Error::Config(format!(
+                    "duplicate source id `{}`",
+                    source.id
+                )));
+            }
+            globs(&source.files)?;
+        }
         let mut languages = BTreeMap::new();
         for (id, language) in spec.languages {
             languages.insert(
@@ -265,6 +316,7 @@ impl Config {
                 .map(PluginRef::from_entry)
                 .collect(),
             languages,
+            sources: spec.sources,
             generated: globs(&spec.generated.files)?,
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
@@ -312,6 +364,11 @@ impl Config {
     /// Listed plugins in declaration order; bare ids become [`PluginRef::new`].
     pub fn plugins(&self) -> &[PluginRef] {
         &self.plugins
+    }
+
+    /// Embedded source rules; host formats are inferred by normal file routing.
+    pub fn sources(&self) -> &[SourceRuleSpec] {
+        &self.sources
     }
 
     /// Whether `id` is listed in `plugins`.
@@ -520,4 +577,85 @@ fn parse_project(format: Format, path: &str, text: &str) -> Result<Resource<Proj
         });
     }
     Ok(resource::<ProjectSpec>(path, &docs.remove(0))?)
+}
+
+fn validate_selector(selector: &str, field: &str) -> Result<(), Error> {
+    Selector::parse(selector)
+        .map(|_| ())
+        .map_err(|reason| Error::Config(format!("{} has an invalid selector: {}", field, reason)))
+}
+
+fn validate_source_context(context: &serde_json::Value, field: &str) -> Result<(), Error> {
+    let object = context
+        .as_object()
+        .ok_or_else(|| Error::Config(format!("{} must be an object", field)))?;
+    for (key, value) in object {
+        let nested = format!("{}.{}", field, key);
+        match key.as_str() {
+            "identity" => {
+                let identity = value.as_object().ok_or_else(|| {
+                    Error::Config(format!("{} must map identity fields to selectors", nested))
+                })?;
+                if identity.is_empty() {
+                    return Err(Error::Config(format!("{} must not be empty", nested)));
+                }
+                for (name, selector) in identity {
+                    let selector = selector.as_str().ok_or_else(|| {
+                        Error::Config(format!("{}.{} must be a selector string", nested, name))
+                    })?;
+                    validate_selector(selector, &format!("{}.{}", nested, name))?;
+                }
+            }
+            "variable" => {
+                let variable = value
+                    .as_object()
+                    .ok_or_else(|| Error::Config(format!("{} must be an object", nested)))?;
+                if !variable.contains_key("value") {
+                    return Err(Error::Config(format!("{}.value is required", nested)));
+                }
+                for name in variable.keys() {
+                    if !matches!(name.as_str(), "value" | "name" | "params" | "public") {
+                        return Err(Error::Config(format!(
+                            "{}.{} is not a supported field",
+                            nested, name
+                        )));
+                    }
+                }
+                for name in ["value", "name", "params"] {
+                    if let Some(selector) = variable.get(name) {
+                        let selector = selector.as_str().ok_or_else(|| {
+                            Error::Config(format!("{}.{} must be a selector string", nested, name))
+                        })?;
+                        validate_selector(selector, &format!("{}.{}", nested, name))?;
+                    }
+                }
+                if variable
+                    .get("public")
+                    .is_some_and(|value| !value.is_boolean())
+                {
+                    return Err(Error::Config(format!(
+                        "{}.public must be a boolean literal",
+                        nested
+                    )));
+                }
+            }
+            _ => {
+                if let Some(projection) = value.as_object()
+                    && let Some(selector) = projection.get("select")
+                {
+                    if projection.len() != 1 {
+                        return Err(Error::Config(format!(
+                            "{} projection must contain only select",
+                            nested
+                        )));
+                    }
+                    let selector = selector.as_str().ok_or_else(|| {
+                        Error::Config(format!("{}.select must be a selector string", nested))
+                    })?;
+                    validate_selector(selector, &format!("{}.select", nested))?;
+                }
+            }
+        }
+    }
+    Ok(())
 }

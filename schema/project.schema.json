@@ -500,6 +500,13 @@
         "sandbox": {
           "$ref": "#/$defs/SandboxSpec",
           "description": "The sandbox the programs of the project run in."
+        },
+        "sources": {
+          "description": "Embedded source rules. The host language is inferred by normal file routing.",
+          "items": {
+            "$ref": "#/$defs/SourceRuleSpec"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -833,6 +840,69 @@
           "type": "string"
         }
       ]
+    },
+    "SourceLanguageSpec": {
+      "additionalProperties": false,
+      "description": "Analysis destination for a source rule. Exactly one of provider and\nselect is required; select resolves a provider key from each candidate.",
+      "properties": {
+        "context": {
+          "description": "Optional provider-specific values and selector projections."
+        },
+        "provider": {
+          "description": "Fixed opaque key in the provider registry.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "select": {
+          "description": "Candidate-relative selector returning one provider key.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "syntax": {
+          "description": "Optional interpretation owned by the selected provider.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "SourceRuleSpec": {
+      "additionalProperties": false,
+      "description": "A source selection analyzed through a registered provider.",
+      "properties": {
+        "files": {
+          "description": "Project-relative physical host-file globs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Stable rule identity within spec.sources.",
+          "type": "string"
+        },
+        "language": {
+          "$ref": "#/$defs/SourceLanguageSpec",
+          "description": "Provider selection and provider-specific interpretation/context."
+        },
+        "select": {
+          "description": "One selector over the host provider's selectable tree.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "files",
+        "select",
+        "language"
+      ],
+      "type": "object"
     },
     "Stdin": {
       "description": "What a program is given on stdin.",

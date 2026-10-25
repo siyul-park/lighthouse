@@ -261,6 +261,7 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
     assert_eq!(
         design,
         [
+            "design/abstraction-level",
             "design/comments",
             "design/complexity",
             "design/concurrency",
@@ -270,6 +271,7 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
             "design/exported-doc",
             "design/layers",
             "design/layout",
+            "design/module-layout",
             "design/naming",
             "design/ownership",
             "design/prefer-method",

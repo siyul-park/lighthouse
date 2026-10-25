@@ -7,7 +7,7 @@
         "id": 1,
         "method": "initialize",
         "params": {
-          "protocolVersion": "0.3",
+          "protocolVersion": "0.4",
           "clientInfo": { "name": "conformance", "version": "0" },
           "workspaceFolders": [{ "uri": "file:///workspace", "name": "workspace" }]
         }
@@ -16,7 +16,7 @@
         "jsonrpc": "2.0",
         "id": 1,
         "result": {
-          "protocolVersion": "0.3",
+          "protocolVersion": "0.4",
           "serverInfo": { "name": "$string", "version": "$string" },
           "capabilities": "$any"
         }

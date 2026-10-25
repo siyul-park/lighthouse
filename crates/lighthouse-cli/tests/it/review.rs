@@ -7,7 +7,7 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use crate::checks::home;
+use crate::checks::{home, trust};
 
 pub(crate) const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
 const LONG_NAME: &str = "/// Runs.\npub fn run_the_whole_thing_now() {}\n";
@@ -15,7 +15,9 @@ const DOCUMENTED: &str = "/// Runs.\npub fn run(x: u8) -> u8 {\n    x + 1\n}\n";
 
 pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
-    cmd.current_dir(dir).envs(home(dir));
+    cmd.current_dir(dir)
+        .envs(home(dir))
+        .env_remove("LIGHTHOUSE_TRUST");
     cmd
 }
 
@@ -41,6 +43,7 @@ pub(crate) fn rust_project(files: &[(&str, &str)]) -> TempDir {
     for (path, text) in files {
         fs::write(dir.path().join(path), text).unwrap();
     }
+    trust(dir.path());
     dir
 }
 
@@ -344,6 +347,7 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
         )),
     )
     .unwrap();
+    trust(dir.path());
     lighthouse(dir.path()).arg("check").assert().success();
     let open = listing(&dir, "open");
     assert_eq!(open.len(), 1);
@@ -392,6 +396,7 @@ fn error_level(dir: &TempDir) {
         )),
     )
     .unwrap();
+    trust(dir.path());
 }
 
 /// The findings of any tier, mechanical included, in a status.
@@ -418,6 +423,7 @@ fn an_error_stays_reported_whatever_the_judgment() {
         )),
     )
     .unwrap();
+    trust(dir.path());
     lighthouse(dir.path()).arg("check").assert().code(1);
     let fingerprint = every(&dir, "all")
         .iter()
@@ -502,6 +508,7 @@ fn a_judgment_expires_when_the_evidence_it_judged_changes() {
         )),
     )
     .unwrap();
+    trust(dir.path());
     let out = lighthouse(dir.path())
         .args(["check", "--format", "json", "--detail", "full"])
         .output()
@@ -707,6 +714,7 @@ fn findings_of_a_rule_taken_out_of_the_config_are_inactive_and_can_be_pruned() {
         )),
     )
     .unwrap();
+    trust(dir.path());
     lighthouse(dir.path()).arg("check").assert().success();
     let inactive = listing(&dir, "inactive");
     assert_eq!(rules(&inactive), ["design/errors"]);
@@ -776,6 +784,7 @@ fn source_annotations_allow_findings_and_are_counted() {
         )),
     )
     .unwrap();
+    trust(dir.path());
     let stale = "// lighthouse-disable-next-line design/exported-doc -- stale\n/// Runs.\npub fn run() {}\n";
     write(&dir, "src/lib.rs", stale);
     let text = stdout(lighthouse(dir.path()).arg("check"));

@@ -31,6 +31,9 @@ pub struct ProjectSpec {
     /// goes to the language's provider.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub languages: BTreeMap<String, ProjectLanguage>,
+    /// Embedded source rules. The host language is inferred by normal file routing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<SourceRuleSpec>,
     /// Level and options per decision id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub rules: BTreeMap<String, RuleSetting>,
@@ -50,6 +53,39 @@ pub struct ProjectSpec {
     /// `.gitattributes` say, and whether it is checked.
     #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]
     pub generated: GeneratedSpec,
+}
+
+/// A source selection analyzed through a registered provider.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SourceRuleSpec {
+    /// Stable rule identity within spec.sources.
+    pub id: String,
+    /// Project-relative physical host-file globs.
+    pub files: Vec<String>,
+    /// One selector over the host provider's selectable tree.
+    pub select: String,
+    /// Provider selection and provider-specific interpretation/context.
+    pub language: SourceLanguageSpec,
+}
+
+/// Analysis destination for a source rule. Exactly one of provider and
+/// select is required; select resolves a provider key from each candidate.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SourceLanguageSpec {
+    /// Fixed opaque key in the provider registry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Candidate-relative selector returning one provider key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<String>,
+    /// Optional interpretation owned by the selected provider.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub syntax: Option<String>,
+    /// Optional provider-specific values and selector projections.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<Value>,
 }
 
 /// What a project says about generated code.

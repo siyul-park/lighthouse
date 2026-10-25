@@ -12,6 +12,8 @@ use super::*;
 
 /// Why a file the languages claim is not an input: a notice for binary data a
 /// fallback provider claims, otherwise a gap in the analysis.
+type EmbeddedTargets = BTreeMap<usize, BTreeMap<PathBuf, EmbeddedFile>>;
+
 enum Skipped {
     Notice(String),
     Incomplete(Incomplete),
@@ -180,6 +182,7 @@ impl Engine {
                         .map(|i| Source {
                             file: &i.file,
                             text: &i.text,
+                            regions: &[],
                         })
                         .collect();
                     let started = Instant::now();
@@ -189,6 +192,7 @@ impl Engine {
                 .collect()
         });
         let mut parts: Vec<Fragment> = Vec::new();
+        let mut sources = Vec::new();
         for ((language, batch), (indexed, spent)) in batches.iter().zip(indexed) {
             let provider = self.provider(*language);
             run.timings
@@ -197,6 +201,7 @@ impl Engine {
             match indexed {
                 Ok(indexed) => {
                     parts.extend(indexed.fragments);
+                    sources.extend(indexed.sources);
                     run.notices.extend(indexed.notices);
                     run.incomplete.extend(indexed.incomplete);
                 }
@@ -210,6 +215,9 @@ impl Engine {
                 }),
             }
         }
+        let regions = sources::select(self.config.sources(), sources, &inputs, run);
+        let target_files = self.route_embedded(regions, run);
+        self.index_regions(&ws, target_files, &mut parts, run);
         let started = Instant::now();
         let project = Project::merge(parts);
         run.timings.merge = started.elapsed();
@@ -219,6 +227,125 @@ impl Engine {
             .filter(|i| project.file(&i.file.path).is_some())
             .collect();
         (kept, project)
+    }
+
+    fn route_embedded(&self, embedded: Vec<EmbeddedFile>, run: &mut Run) -> EmbeddedTargets {
+        let mut target_files: EmbeddedTargets = BTreeMap::new();
+        for file in embedded {
+            if file.sources.is_empty() {
+                continue;
+            }
+            let path = file.file.path.clone();
+            let mut ids = BTreeSet::new();
+            let mut by_provider: BTreeMap<usize, Vec<lighthouse_plugin::EmbeddedSource>> =
+                BTreeMap::new();
+            for source in file.sources {
+                if source.id.is_empty()
+                    || source.rule_id.is_empty()
+                    || source.provider.is_empty()
+                    || !ids.insert(source.id.clone())
+                {
+                    run.incomplete.push(Incomplete {
+                        path: Some(path.clone()),
+                        reason: "empty or duplicate embedded source identity/provider".to_owned(),
+                    });
+                    continue;
+                }
+                if let Err(reason) = source.validate(&file.text) {
+                    run.incomplete.push(Incomplete {
+                        path: Some(path.clone()),
+                        reason: format!("embedded source {} is invalid: {reason}", source.id),
+                    });
+                    continue;
+                }
+                let Some(index) = self
+                    .providers
+                    .iter()
+                    .copied()
+                    .find(|&index| self.provider(index).manifest().id == source.provider)
+                else {
+                    run.incomplete.push(Incomplete {
+                        path: Some(path.clone()),
+                        reason: format!(
+                            "source {} selects provider {}, but that provider is not enabled",
+                            source.id, source.provider
+                        ),
+                    });
+                    continue;
+                };
+                by_provider.entry(index).or_default().push(source);
+            }
+            for (provider, sources) in by_provider {
+                let entries = target_files.entry(provider).or_default();
+                if let Some(existing) = entries.get_mut(&path) {
+                    if existing.file.hash != file.file.hash || existing.text != file.text {
+                        run.incomplete.push(Incomplete {
+                            path: Some(path.clone()),
+                            reason: "conflicting embedded-source owners for one host file"
+                                .to_owned(),
+                        });
+                        continue;
+                    }
+                    existing.sources.extend(sources);
+                } else {
+                    entries.insert(
+                        path.clone(),
+                        EmbeddedFile {
+                            file: file.file.clone(),
+                            text: file.text.clone(),
+                            sources,
+                        },
+                    );
+                }
+            }
+        }
+        target_files
+    }
+
+    fn index_regions(
+        &self,
+        ws: &Workspace,
+        target_files: BTreeMap<usize, BTreeMap<PathBuf, EmbeddedFile>>,
+        parts: &mut Vec<Fragment>,
+        run: &mut Run,
+    ) {
+        for (target, files) in target_files {
+            let files: Vec<EmbeddedFile> = files.into_values().collect();
+            let sources: Vec<Source> = files
+                .iter()
+                .map(|file| Source {
+                    file: &file.file,
+                    text: &file.text,
+                    regions: &file.sources,
+                })
+                .collect();
+            let started = Instant::now();
+            match self.provider(target).index(ws, &sources) {
+                Ok(indexed) => {
+                    run.timings.index.push((
+                        format!("{}:embedded", self.provider(target).manifest().id),
+                        started.elapsed(),
+                    ));
+                    parts.extend(indexed.fragments);
+                    run.notices.extend(indexed.notices);
+                    run.incomplete.extend(indexed.incomplete);
+                    if !indexed.sources.is_empty() {
+                        run.incomplete.push(Incomplete {
+                            path: None,
+                            reason: "destination provider unexpectedly returned source ASTs for embedded regions"
+                                .to_owned(),
+                        });
+                    }
+                }
+                Err(error) => run.incomplete.extend(files.iter().map(|file| Incomplete {
+                    path: Some(file.file.path.clone()),
+                    reason: format!(
+                        "language `{}` cannot analyze embedded sources: {error}",
+                        self.provider(target).manifest().id
+                    ),
+                })),
+            }
+        }
     }
 
     /// Computes the facts the rules read, analyzer by analyzer in dependency

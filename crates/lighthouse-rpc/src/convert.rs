@@ -55,7 +55,12 @@ pub(crate) fn provider_manifest(language: &wire::ProviderManifest) -> ProviderMa
 /// whose symbols or edges belong to another file are dropped with a notice; a
 /// requested file without an accepted fragment is incomplete. The `Err` side
 /// means the result is malformed.
-pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<Indexed, String> {
+pub(crate) fn indexed(
+    result: wire::IndexResult,
+    sources: &[Source],
+    required_asts: &BTreeSet<PathBuf>,
+    source_ast_provider: bool,
+) -> Result<Indexed, String> {
     let requested: BTreeMap<PathBuf, &core::File> = sources
         .iter()
         .map(|s| (s.file.path.clone(), s.file))
@@ -68,6 +73,17 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
     };
     let mut offered = BTreeSet::new();
     let mut accepted = BTreeSet::new();
+    let by_path: BTreeMap<PathBuf, &Source> = sources
+        .iter()
+        .map(|source| (source.file.path.clone(), source))
+        .collect();
+    source_records(
+        result.sources,
+        &by_path,
+        &mut out,
+        &mut incomplete,
+        required_asts,
+    );
     for fragment in result.fragments {
         let path = PathBuf::from(&fragment.file.path);
         let Some(file) = requested.get(&path) else {
@@ -101,6 +117,9 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
         out.fragments.push(converted);
     }
     for path in requested.keys().filter(|p| !accepted.contains(*p)) {
+        if source_ast_provider && !required_asts.contains(path) {
+            continue;
+        }
         incomplete.insert(Incomplete {
             path: Some(path.clone()),
             reason: "the plugin returned no usable fragment".to_owned(),
@@ -108,6 +127,53 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
     }
     out.incomplete = incomplete.into_iter().collect();
     Ok(out)
+}
+
+fn source_records(
+    sources: Vec<wire::Source>,
+    by_path: &BTreeMap<PathBuf, &Source>,
+    out: &mut Indexed,
+    incomplete: &mut BTreeSet<Incomplete>,
+    required: &BTreeSet<PathBuf>,
+) {
+    let mut seen = BTreeSet::new();
+    let mut seen_paths = BTreeSet::new();
+    for source_ast in sources {
+        let path = PathBuf::from(&source_ast.path);
+        let Some(source) = by_path.get(&path) else {
+            out.notices.push(format!(
+                "{}: ignored source AST, the file was not requested",
+                path.display()
+            ));
+            continue;
+        };
+        if !seen.insert(path.clone()) {
+            out.sources
+                .retain(|previous| previous.path != source_ast.path);
+            incomplete.insert(Incomplete {
+                path: Some(path.clone()),
+                reason: "duplicate source AST record for one physical file".to_owned(),
+            });
+            continue;
+        }
+        seen_paths.insert(path.clone());
+        if let Err(reason) = source_ast.validate(source.text) {
+            incomplete.insert(Incomplete {
+                path: Some(path.clone()),
+                reason: format!("invalid source AST: {reason}"),
+            });
+            continue;
+        }
+        out.sources.push(source_ast);
+    }
+    for path in required {
+        if by_path.contains_key(path) && !seen_paths.contains(path) {
+            incomplete.insert(Incomplete {
+                path: Some(path.clone()),
+                reason: "provider did not return a requested source AST".to_owned(),
+            });
+        }
+    }
 }
 
 /// Checks that a fragment describes only its own file: symbols are declared in

@@ -552,5 +552,6 @@
   "incomplete": [],
   "notices": [
     "macros are not expanded: 1 file(s) define `macro_rules!` macros and 1 macro invocation(s) were not read (item position, or arguments that are not expressions), e.g. src/lib.rs"
-  ]
+  ],
+  "sources": []
 }

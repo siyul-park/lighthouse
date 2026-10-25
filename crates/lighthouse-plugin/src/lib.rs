@@ -27,7 +27,7 @@ pub use cel::{
     CatalogFunction, CelCatalog, CelLibrary, CelLibraryManifest, Function, Overload, Precedence,
 };
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
-pub use lighthouse_protocol::{Conventions, TestNaming};
+pub use lighthouse_protocol::{Conventions, Mapping, TestNaming, TextMapSegment};
 pub use memo::Memo;
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
@@ -90,6 +90,8 @@ pub struct Workspace {
     pub root: PathBuf,
     /// Per-language options from the configuration, keyed by language id.
     pub languages: BTreeMap<String, Options>,
+    /// File globs that require serialized ASTs from their owning provider.
+    pub source_globs: Vec<String>,
     /// The name prefixes that make a function a constructor, by language id:
     /// what the provider declares, or the project's `constructorPrefixes`.
     pub constructors: BTreeMap<String, Vec<String>>,
@@ -150,6 +152,7 @@ impl Workspace {
         Self {
             root: root.into(),
             languages: BTreeMap::new(),
+            source_globs: Vec::new(),
             constructors: BTreeMap::new(),
             test_naming: BTreeMap::new(),
             overlays: BTreeMap::new(),
@@ -240,6 +243,9 @@ pub struct ProviderManifest {
 pub struct Source<'a> {
     pub file: &'a File,
     pub text: &'a str,
+    /// Empty for a physical file; populated when the same index interface
+    /// analyzes source regions selected from another provider's syntax tree.
+    pub regions: &'a [EmbeddedSource],
 }
 
 impl ProviderManifest {
@@ -257,10 +263,84 @@ impl ProviderManifest {
     }
 }
 
+/// One physical host file and the regions selected for another provider.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmbeddedFile {
+    pub file: File,
+    pub text: String,
+    pub sources: Vec<EmbeddedSource>,
+}
+
+/// A source region selected from a physical host document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmbeddedSource {
+    pub id: String,
+    pub rule_id: String,
+    pub node_pointer: String,
+    pub source_pointer: String,
+    pub provider: String,
+    pub syntax: Option<String>,
+    pub context: Value,
+    pub text: String,
+    pub source_range: [u32; 2],
+    pub text_map: Option<Vec<TextMapSegment>>,
+}
+
+impl EmbeddedSource {
+    /// Whether the original scalar range and optional decoded-text map are valid.
+    pub fn validate(&self, host: &str) -> Result<(), String> {
+        let [start, end] = self.source_range.map(|value| value as usize);
+        if start > end
+            || end > host.len()
+            || !host.is_char_boundary(start)
+            || !host.is_char_boundary(end)
+        {
+            return Err("source range is outside the host text or splits UTF-8".to_owned());
+        }
+        let Some(segments) = &self.text_map else {
+            return Ok(());
+        };
+        let mut text_offset = 0usize;
+        let mut prior_source_end = None;
+        for segment in segments {
+            let [text_start, text_end] = segment.text_range.map(|value| value as usize);
+            let [source_start, source_end] = segment.source_range.map(|value| value as usize);
+            if text_start != text_offset
+                || text_start > text_end
+                || text_end > self.text.len()
+                || !self.text.is_char_boundary(text_start)
+                || !self.text.is_char_boundary(text_end)
+            {
+                return Err("text map has a gap, overlap, invalid range, or UTF-8 split".to_owned());
+            }
+            if source_start > source_end
+                || source_start < start
+                || source_end > end
+                || !host.is_char_boundary(source_start)
+                || !host.is_char_boundary(source_end)
+                || prior_source_end.is_some_and(|previous| source_start < previous)
+            {
+                return Err("text map has an invalid or non-monotonic source range".to_owned());
+            }
+            text_offset = text_end;
+            prior_source_end = Some(source_end);
+        }
+        if text_offset != self.text.len() {
+            return Err(format!(
+                "text map covers {text_offset} of {} UTF-8 bytes",
+                self.text.len()
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// What a provider produced for a batch of files.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Indexed {
     pub fragments: Vec<Fragment>,
+    /// Serialized ASTs and source mappings returned for common source selection.
+    pub sources: Vec<lighthouse_protocol::Source>,
     /// Things the user should see that do not make the analysis incomplete.
     pub notices: Vec<String>,
     /// Files or scopes that could not be analyzed.
@@ -271,8 +351,8 @@ pub struct Indexed {
 /// be thread-safe, and `index` must not read outside `files` and `workspace`.
 pub trait LanguageProvider: Send + Sync {
     fn manifest(&self) -> &ProviderManifest;
-    /// Indexes every file of this provider in one call. An `Err` means the
-    /// whole batch failed; every file is then incomplete.
+    /// Indexes every physical file of this provider in one call. An `Err` means
+    /// the whole batch failed; every file is then incomplete.
     fn index(&self, workspace: &Workspace, files: &[Source]) -> Result<Indexed, Error>;
 }
 

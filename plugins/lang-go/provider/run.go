@@ -24,10 +24,11 @@ type run struct {
 	opts options
 
 	// overlays hold the text that stands in for a file, by absolute path.
-	overlays  map[string][]byte
-	requested map[string]sdk.FileRef
-	fragments map[string]*sdk.Fragment
-	claimed   map[string]bool
+	overlays     map[string][]byte
+	requested    map[string]sdk.FileRef
+	astRequested map[string]bool
+	fragments    map[string]*sdk.Fragment
+	claimed      map[string]bool
 	// problems holds one reason per file that could not be fully analyzed.
 	problems        map[string]string
 	excludedFiles   map[string]bool
@@ -108,6 +109,9 @@ func (r *run) finish() sdk.IndexResult {
 	for path, data := range r.encoded {
 		r.result.Encoded = append(r.result.Encoded, sdk.EncodedFragment{Path: path, JSON: data})
 	}
+	sort.Slice(r.result.Sources, func(i, j int) bool {
+		return r.result.Sources[i].Path < r.result.Sources[j].Path
+	})
 	for path, reason := range r.problems {
 		r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{Path: path, Reason: reason})
 	}
@@ -155,6 +159,7 @@ func (r *run) analyze(b *batch, l loaded) {
 	if !ok {
 		return
 	}
+	r.collectSources(pkgs)
 	res := newResolver(r.root, pkgs, r.localModule(b))
 	r.collectIgnored(pkgs)
 	r.implements(r.claim(pkgs, res))
@@ -485,6 +490,7 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		opts:          opts,
 		overlays:      map[string][]byte{},
 		requested:     map[string]sdk.FileRef{},
+		astRequested:  map[string]bool{},
 		fragments:     map[string]*sdk.Fragment{},
 		claimed:       map[string]bool{},
 		problems:      map[string]string{},
@@ -493,8 +499,13 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		encoded:       map[string]json.RawMessage{},
 		result:        emptyResult(),
 	}
-	for _, f := range params.Files {
+	for _, f := range params.FileInputs() {
 		r.requested[f.Path] = f
+	}
+	for _, input := range params.Inputs {
+		if input.Kind == "file" && input.File != nil && input.SourceAST {
+			r.astRequested[input.File.Path] = true
+		}
 	}
 	for _, o := range params.Context.Overlays {
 		r.overlays[filepath.Join(r.root, filepath.FromSlash(o.Path))] = []byte(o.Text)
@@ -599,6 +610,7 @@ func ignoredPath(rel string) bool {
 func emptyResult() sdk.IndexResult {
 	return sdk.IndexResult{
 		Fragments:  []sdk.Fragment{},
+		Sources:    []sdk.Source{},
 		Notices:    []string{},
 		Incomplete: []sdk.Incomplete{},
 	}

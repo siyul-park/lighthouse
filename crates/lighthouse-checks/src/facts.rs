@@ -63,9 +63,12 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
 }
 
 pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
-    let lang = project
-        .file(&s.file)
-        .map_or_else(String::new, |f| f.lang.clone());
+    let lang = project.file(&s.file).map_or_else(String::new, |f| {
+        f.facts
+            .get("analysisLanguage")
+            .cloned()
+            .unwrap_or_else(|| f.lang.clone())
+    });
     let module = project.module(s.id.module());
     let last = module.map_or_else(
         || {
@@ -170,11 +173,13 @@ pub(crate) fn module(m: &Module, declared: &Declared) -> Value {
     json!({
         "path": m.path,
         "name": m.name.clone().unwrap_or_else(|| m.path.clone()),
+        "lang": declared.lang,
         "test_of": m.test_of.clone().unwrap_or_default(),
         "files": declared.files.len(),
         "lines": declared.lines,
         "dependents": declared.dependents,
         "declares": declared.declares,
+        "children": declared.children,
     })
 }
 
@@ -185,7 +190,8 @@ pub(crate) fn file(project: &Project, f: &lighthouse_model::ucm::File, text: &st
         .count();
     json!({
         "path": path(&f.path),
-        "lang": f.lang,
+        "lang": f.facts.get("analysisLanguage").unwrap_or(&f.lang),
+        "host_lang": f.lang,
         "test": f.test,
         "generated": f.generated,
         "lines": text.lines().count(),
