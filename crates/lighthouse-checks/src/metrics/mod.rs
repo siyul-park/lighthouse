@@ -129,7 +129,12 @@ impl Analyzer for Metrics {
         let measures: BTreeMap<&SymbolId, Measures> = ctx
             .project
             .symbols_in(&file.path)
-            .filter(|symbol| matches!(symbol.kind, SymbolKind::Function | SymbolKind::Method))
+            .filter(|symbol| {
+                matches!(
+                    symbol.kind,
+                    SymbolKind::Function | SymbolKind::Method | SymbolKind::Var
+                )
+            })
             .filter_map(|symbol| {
                 let summary = ctx.project.function(&symbol.id)?;
                 Some((&symbol.id, Measures::of(ctx.project, symbol, summary)))

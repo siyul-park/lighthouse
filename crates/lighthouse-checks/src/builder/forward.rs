@@ -3,17 +3,18 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_model::ucm::{Node, Project, Symbol, SymbolId, Target, Visibility};
+use lighthouse_model::ucm::{Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility};
 
 /// The private target a private undocumented wrapper only forwards to. The
 /// wrapper must have exactly one caller, test callers included, and no use as
 /// a value; a method that implements a trait or interface method may be
-/// reached through it, so it is left alone.
+/// reached through it, so it is left alone. A variable is no callee: it is
+/// forwarded when exactly one symbol reads it.
 pub(super) fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'p SymbolId> {
     if wrapper.visibility != Visibility::Private
         || wrapper.doc.is_some()
-        || project.callers(&wrapper.id).len() != 1
-        || !project.references(&wrapper.id).is_empty()
+        || uses(project, wrapper) != 1
+        || (wrapper.kind != SymbolKind::Var && !project.references(&wrapper.id).is_empty())
     {
         return None;
     }
@@ -28,7 +29,7 @@ pub(super) fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'
     let eligible = callee.visibility == Visibility::Private
         && target.module() == wrapper.id.module()
         && callee.kind == wrapper.kind
-        && project.callers(target).len() == 1
+        && uses(project, callee) == 1
         && !reaches(project, target, &[&wrapper.id]);
     eligible.then_some(target)
 }
@@ -46,4 +47,14 @@ pub(super) fn reaches(project: &Project, from: &SymbolId, goals: &[&SymbolId]) -
         }
     }
     false
+}
+
+/// How many symbols use `symbol`: the callers of a function, the readers of a
+/// variable.
+fn uses(project: &Project, symbol: &Symbol) -> usize {
+    if symbol.kind == SymbolKind::Var {
+        project.references(&symbol.id).len()
+    } else {
+        project.callers(&symbol.id).len()
+    }
 }

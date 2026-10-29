@@ -7,6 +7,11 @@ use lighthouse_model::ucm::{
     Flow, FlowKind, FunctionSummary, Signature, SymbolId, Target, TypeRef,
 };
 
+/// The operators whose result CEL fixes to a boolean, whatever their operands.
+const BOOLEAN_OPERATORS: [&str; 10] = [
+    "_&&_", "_||_", "!_", "_==_", "_!=_", "_<_", "_<=_", "_>_", "_>=_", "@in",
+];
+
 #[derive(Default)]
 pub(super) struct Metrics {
     nodes: u32,
@@ -180,6 +185,14 @@ pub(super) fn token_count(source: &str) -> u32 {
         }
     }
     count
+}
+
+/// The type of an expression where its form fixes it, else `dyn`: a boolean
+/// literal, or a comparison or logical operator at the root.
+pub(super) fn result_type(expr: &IdedExpr) -> &'static str {
+    let boolean = is_boolean_literal(expr)
+        || matches!(&expr.expr, Expr::Call(call) if BOOLEAN_OPERATORS.contains(&call.func_name.as_str()));
+    if boolean { "bool" } else { "dyn" }
 }
 
 fn logic_run(expr: &IdedExpr, operator: &str) -> u32 {

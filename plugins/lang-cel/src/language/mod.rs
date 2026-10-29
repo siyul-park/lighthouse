@@ -170,6 +170,7 @@ fn add_source(
                 name: name.clone(),
                 params: params.clone(),
                 declared,
+                summarized: declared || is_variable,
             });
         }
     } else {
@@ -180,6 +181,7 @@ fn add_source(
             name,
             params,
             declared,
+            summarized: declared || is_variable,
         });
     }
     Ok(())
@@ -412,7 +414,7 @@ fn index_snippets(
                     &snippet.doc_id,
                     &snippet.params,
                 );
-                if snippet.declared {
+                if snippet.summarized {
                     fragment.functions.push(summary);
                 }
                 fragment.edges.extend(edges);

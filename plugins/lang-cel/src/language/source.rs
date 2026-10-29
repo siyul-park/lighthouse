@@ -126,6 +126,7 @@ pub(super) struct Snippet {
     pub(super) name: String,
     pub(super) params: Vec<Parameter>,
     pub(super) declared: bool,
+    pub(super) summarized: bool,
 }
 
 impl Snippet {
@@ -136,7 +137,7 @@ impl Snippet {
             ..Symbol::new(
                 self.id.clone(),
                 SymbolKind::Function,
-                Visibility::Private,
+                Visibility::Public,
                 file.path.clone(),
                 span,
                 &self.name,

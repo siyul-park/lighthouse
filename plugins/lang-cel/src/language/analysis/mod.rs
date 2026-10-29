@@ -103,12 +103,13 @@ impl<'a> Analysis<'a> {
         doc_id: &str,
         params: &[Parameter],
     ) -> (FunctionSummary, Vec<Edge>) {
-        let summary = Metrics::of(program.expression()).summary(
+        let mut summary = Metrics::of(program.expression()).summary(
             from.clone(),
             params.len() as u32,
             token_count(&mapped.text),
             self.forwards_to(program, from, doc_id),
         );
+        summary.signature.results[0].text = metrics::result_type(program.expression()).to_owned();
         let at = Expression {
             program,
             mapped,
