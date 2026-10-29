@@ -101,7 +101,6 @@ impl Walk<'_> {
         object.insert("info".to_owned(), json!(code.info));
         object.insert("lang".to_owned(), json!(info.lang));
         object.insert("attributes".to_owned(), json!(info.attributes));
-        object.insert("key".to_owned(), json!(info.key));
         object.insert("text".to_owned(), json!(code.literal));
         body::locate(
             &self.lines,

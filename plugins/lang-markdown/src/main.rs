@@ -24,6 +24,7 @@ fn main() {
             version: env!("CARGO_PKG_VERSION"),
             id: "markdown",
             name: "Markdown",
+            aliases: &["markdown", "md"],
             globs: &["**/*.md", "**/*.markdown"],
         },
         Markdown,

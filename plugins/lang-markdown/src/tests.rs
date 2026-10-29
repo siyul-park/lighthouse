@@ -105,9 +105,9 @@ fn tilde_and_backtick_fences_both_carry_their_text() {
     let found = blocks(&source);
     assert_eq!(found.len(), 2);
     assert_eq!(source.ast["children"][0]["fence"], "~~~");
-    assert_eq!(source.ast["children"][0]["key"], "yaml");
+    assert_eq!(source.ast["children"][0]["lang"], "yml");
     assert_eq!(source.ast["children"][1]["fence"], "```");
-    assert_eq!(source.ast["children"][1]["key"], "toml");
+    assert_eq!(source.ast["children"][1]["lang"], "toml");
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn indented_code_blocks_are_blocks_without_a_language() {
     let block = &blocks(&source)[0];
     let node = pointer_value(&source.ast, block).unwrap();
     assert_eq!(node["fenced"], false);
-    assert_eq!(node["key"], "");
+    assert_eq!(node["lang"], "");
     assert_eq!(
         mapped(&source, text, block),
         [
@@ -194,13 +194,12 @@ fn the_info_string_is_exposed_raw_and_split_as_rustdoc_reads_it() {
     assert_eq!(node(0)["lang"], "rust");
     assert_eq!(node(0)["attributes"], serde_json::json!(["ignore"]));
     assert_eq!(node(1)["lang"], "Rust");
-    assert_eq!(node(1)["key"], "rust");
     assert_eq!(
         node(1)["attributes"],
         serde_json::json!(["no_run", "edition2021"])
     );
-    assert_eq!(node(2)["key"], "go");
-    assert_eq!(node(3)["key"], "");
+    assert_eq!(node(2)["lang"], "golang");
+    assert_eq!(node(3)["lang"], "");
     assert_eq!(node(3)["attributes"], serde_json::json!([]));
 }
 
