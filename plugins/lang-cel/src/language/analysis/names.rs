@@ -96,17 +96,24 @@ const MATH: &[&str] = &[
     "least",
 ];
 
+/// A standard function a call names.
+pub(super) struct Standard {
+    pub(super) symbol: Symbol,
+    /// Whether the call is made on its namespace (`strings.quote(x)`), so the
+    /// target is no value to walk.
+    pub(super) namespaced: bool,
+}
+
+/// A library function a call names.
+pub(super) struct LibraryCall {
+    pub(super) symbol: Symbol,
+    /// Whether the call is made on its namespace (`regex.matches(a, b)`).
+    pub(super) namespaced: bool,
+}
+
 /// The namespaces of the standard functions, with the names in each.
 pub(super) fn namespaces() -> impl Iterator<Item = &'static str> {
     NAMESPACE_FUNCTIONS.iter().map(|(namespace, _)| *namespace)
-}
-
-/// The identifier a call is made on: `strings` of `strings.quote(x)`.
-fn call_namespace(call: &CallExpr) -> Option<&str> {
-    call.target.as_ref().and_then(|target| match &target.expr {
-        Expr::Ident(name) => Some(name.as_str()),
-        _ => None,
-    })
 }
 
 /// Every function the expressions can call, by symbol: the standard ones and
@@ -145,14 +152,6 @@ pub(in crate::language) fn external_module(symbol: &Symbol) -> String {
     symbol.id.module().to_owned()
 }
 
-/// A standard function a call names.
-pub(super) struct Standard {
-    pub(super) symbol: Symbol,
-    /// Whether the call is made on its namespace (`strings.quote(x)`), so the
-    /// target is no value to walk.
-    pub(super) namespaced: bool,
-}
-
 /// The standard function `call` names, if it is one.
 pub(super) fn standard_target(call: &CallExpr) -> Option<Standard> {
     let on_namespace = call_namespace(call).filter(|name| namespaces().any(|n| n == *name));
@@ -186,19 +185,6 @@ pub(super) fn standard_target(call: &CallExpr) -> Option<Standard> {
     })
 }
 
-fn standard_symbol(module: &str, owner: Option<&str>, name: &str) -> Symbol {
-    let owner = owner.into_iter().collect::<Vec<_>>();
-    let id = SymbolId::new(module, &owner, name, SymbolKind::Function);
-    external_symbol(id, SymbolKind::Function, name, None)
-}
-
-/// A library function a call names.
-pub(super) struct LibraryCall {
-    pub(super) symbol: Symbol,
-    /// Whether the call is made on its namespace (`regex.matches(a, b)`).
-    pub(super) namespaced: bool,
-}
-
 /// The function of `libraries` that `call` names: a global one by its name or
 /// qualified by the namespace the call is made on, or a member of a value.
 pub(super) fn library_target(
@@ -227,26 +213,6 @@ pub(super) fn library_target(
     None
 }
 
-fn library_symbol(library: &str, function: &Function) -> Symbol {
-    let receiver = function.receiver.as_deref().unwrap_or("global");
-    let id = SymbolId::new(
-        &format!("cel/library/{library}"),
-        &[receiver],
-        function_name(function),
-        SymbolKind::Function,
-    );
-    external_symbol(
-        id,
-        SymbolKind::Function,
-        function_name(function),
-        Some(&function.doc),
-    )
-}
-
-fn function_name(function: &Function) -> &str {
-    base_name(&function.name)
-}
-
 /// A symbol of the plugins' functions and of the environment, which no file
 /// of the project declares.
 pub(super) fn external_symbol(
@@ -269,4 +235,38 @@ pub(super) fn external_symbol(
             name,
         )
     }
+}
+
+/// The identifier a call is made on: `strings` of `strings.quote(x)`.
+fn call_namespace(call: &CallExpr) -> Option<&str> {
+    call.target.as_ref().and_then(|target| match &target.expr {
+        Expr::Ident(name) => Some(name.as_str()),
+        _ => None,
+    })
+}
+
+fn standard_symbol(module: &str, owner: Option<&str>, name: &str) -> Symbol {
+    let owner = owner.into_iter().collect::<Vec<_>>();
+    let id = SymbolId::new(module, &owner, name, SymbolKind::Function);
+    external_symbol(id, SymbolKind::Function, name, None)
+}
+
+fn library_symbol(library: &str, function: &Function) -> Symbol {
+    let receiver = function.receiver.as_deref().unwrap_or("global");
+    let id = SymbolId::new(
+        &format!("cel/library/{library}"),
+        &[receiver],
+        function_name(function),
+        SymbolKind::Function,
+    );
+    external_symbol(
+        id,
+        SymbolKind::Function,
+        function_name(function),
+        Some(&function.doc),
+    )
+}
+
+fn function_name(function: &Function) -> &str {
+    base_name(&function.name)
 }

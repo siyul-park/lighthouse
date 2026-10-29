@@ -138,25 +138,6 @@ impl Metrics {
     }
 }
 
-fn logic_run(expr: &IdedExpr, operator: &str) -> u32 {
-    match &expr.expr {
-        Expr::Call(call) if call.func_name == operator => {
-            1 + call
-                .target
-                .iter()
-                .map(Box::as_ref)
-                .chain(call.args.iter())
-                .map(|child| logic_run(child, operator))
-                .sum::<u32>()
-        }
-        _ => 0,
-    }
-}
-
-fn is_boolean_literal(expr: &IdedExpr) -> bool {
-    matches!(&expr.expr, Expr::Literal(LiteralValue::Boolean(_)))
-}
-
 /// How many tokens the source has: words, quoted strings, two-character
 /// operators and single characters, whatever their encoding.
 pub(super) fn token_count(source: &str) -> u32 {
@@ -199,4 +180,23 @@ pub(super) fn token_count(source: &str) -> u32 {
         }
     }
     count
+}
+
+fn logic_run(expr: &IdedExpr, operator: &str) -> u32 {
+    match &expr.expr {
+        Expr::Call(call) if call.func_name == operator => {
+            1 + call
+                .target
+                .iter()
+                .map(Box::as_ref)
+                .chain(call.args.iter())
+                .map(|child| logic_run(child, operator))
+                .sum::<u32>()
+        }
+        _ => 0,
+    }
+}
+
+fn is_boolean_literal(expr: &IdedExpr) -> bool {
+    matches!(&expr.expr, Expr::Literal(LiteralValue::Boolean(_)))
 }

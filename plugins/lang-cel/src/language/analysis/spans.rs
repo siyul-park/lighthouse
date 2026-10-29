@@ -7,20 +7,6 @@ use lighthouse_model::Span;
 
 use crate::language::source::MappedText;
 
-/// The half-open byte range of the text that `expr` covers, clamped to it; the
-/// whole text where the parser reports none.
-fn expr_bounds(program: &cel::Program, expr: &IdedExpr, mapped: &MappedText) -> (usize, usize) {
-    let len = mapped.text.len();
-    let (start, end) = program
-        .source_info()
-        .offset_for(expr.id)
-        .map_or((0, len), |(start, stop)| {
-            (start as usize, stop as usize + 1)
-        });
-    let start = start.min(len);
-    (start, end.min(len).max(start))
-}
-
 /// The last segment of a possibly qualified function name.
 pub(super) fn base_name(name: &str) -> &str {
     name.rsplit('.').next().unwrap_or(name)
@@ -91,4 +77,18 @@ pub(super) fn field_span(
         || mapped.span(start, end),
         |at| mapped.span(at, at + field.len()),
     )
+}
+
+/// The half-open byte range of the text that `expr` covers, clamped to it; the
+/// whole text where the parser reports none.
+fn expr_bounds(program: &cel::Program, expr: &IdedExpr, mapped: &MappedText) -> (usize, usize) {
+    let len = mapped.text.len();
+    let (start, end) = program
+        .source_info()
+        .offset_for(expr.id)
+        .map_or((0, len), |(start, stop)| {
+            (start as usize, stop as usize + 1)
+        });
+    let start = start.min(len);
+    (start, end.min(len).max(start))
 }

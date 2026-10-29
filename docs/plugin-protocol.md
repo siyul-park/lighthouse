@@ -601,6 +601,27 @@ type-checks with `go/types`.
 - Load, parse and type errors become `incomplete` entries per file, with
   `line:col: message`.
 
+## `lang-yaml` and `lang-toml`
+
+Host-file providers: they advertise only `source-ast` (globs `**/*.yaml`,
+`**/*.yml` and `**/*.toml`, priority 20) and return no code model, only a
+fragment with the file's path and, for each file whose `source_ast` is true, its
+`Source`. The core selects the regions other providers analyze (the CEL
+expressions of a decision, for `lang-cel`) from the tree, so the provider only
+parses and maps; the answers to `initialize` and `index` are the same for both
+(`lighthouse_protocol::serve_host`). A selected-regions input is an
+`incomplete` entry.
+
+- The tree is JSON: a YAML stream is `{"kind": "Stream", "documents": [...]}` and
+  a TOML document is its root table. Each mapping entry has the `range` of the
+  node; a string also has a `text_map` from its decoded bytes to the host bytes
+  (escapes, line folding and block scalars give several segments).
+- YAML plain scalars resolve as the core schema of YAML 1.2; TOML datetimes and
+  the floats JSON cannot hold are string nodes of their source text.
+- A document that does not parse, or a string that cannot be mapped to exact
+  host bytes, is an `incomplete` entry for the file, never a tree with a wrong
+  map.
+
 ## `lang-rust`
 
 Reports `extent` (from the first outer attribute or doc comment, or the plain
