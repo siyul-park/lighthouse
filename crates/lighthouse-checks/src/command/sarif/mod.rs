@@ -93,7 +93,7 @@ impl Reading<'_> {
             || sarif
                 .rules
                 .iter()
-                .any(|g| lighthouse_lang_cel::glob::matches(&id, g));
+                .any(|g| lighthouse_model::glob::matches(&id, g));
         let by_level = sarif.levels.is_empty() || sarif.levels.iter().any(|l| l == level);
         by_rule && by_level
     }

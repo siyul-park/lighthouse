@@ -489,13 +489,13 @@ fn the_check_revision_names_the_libraries_its_expressions_call() {
         .unwrap();
     assert_eq!(
         used.keys().collect::<Vec<_>>(),
-        ["cel/glob"],
+        ["lang-cel/glob"],
         "only the library it calls"
     );
 
     let (_, bumped) =
         lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &globs, |id| {
-            (id == "cel/glob").then(|| "9.9.9".to_owned())
+            (id == "lang-cel/glob").then(|| "9.9.9".to_owned())
         })
         .unwrap();
     assert_ne!(
@@ -505,7 +505,7 @@ fn the_check_revision_names_the_libraries_its_expressions_call() {
 
     let (_, other) =
         lighthouse_checks::probe::revision(&lighthouse_test_support::composition(), &globs, |id| {
-            (id == "cel/regex").then(|| "9.9.9".to_owned())
+            (id == "lang-cel/regex").then(|| "9.9.9".to_owned())
         })
         .unwrap();
     assert_eq!(revision, other, "an unused library's version is not");
@@ -537,12 +537,12 @@ fn the_check_revision_includes_libraries_used_by_fixes_and_cel_bind() {
     .unwrap();
     assert_eq!(
         used.keys().map(String::as_str).collect::<Vec<_>>(),
-        ["cel/bind", "cel/glob"]
+        ["lang-cel/bind", "lang-cel/glob"]
     );
     let (_, changed) = lighthouse_checks::probe::revision(
         &lighthouse_test_support::composition(),
         &decision,
-        |id| (id == "cel/glob").then(|| "9.9.9".to_owned()),
+        |id| (id == "lang-cel/glob").then(|| "9.9.9".to_owned()),
     )
     .unwrap();
     assert_ne!(

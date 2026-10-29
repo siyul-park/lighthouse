@@ -369,21 +369,6 @@ fn embedded_wire(source: &Source<'_>) -> wire::EmbeddedFile {
         generated: source.file.generated,
         test: source.file.test,
         facts: source.file.facts.clone(),
-        sources: source
-            .regions
-            .iter()
-            .map(|source| wire::EmbeddedSource {
-                id: source.id.clone(),
-                rule_id: source.rule_id.clone(),
-                node_pointer: source.node_pointer.clone(),
-                source_pointer: source.source_pointer.clone(),
-                provider: source.provider.clone(),
-                syntax: source.syntax.clone(),
-                context: Some(source.context.clone()),
-                text: source.text.clone(),
-                source_range: source.source_range,
-                text_map: source.text_map.clone(),
-            })
-            .collect(),
+        sources: source.regions.iter().map(|source| source.clone()).collect(),
     }
 }

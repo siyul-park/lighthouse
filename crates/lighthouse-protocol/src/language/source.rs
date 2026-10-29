@@ -4,6 +4,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::wire::EmbeddedSource;
+
 /// A provider-specific AST and its independent source-map sidecar.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Source {
@@ -202,6 +204,19 @@ fn decode_pointer_token(token: &str) -> Option<String> {
     }
     let canonical = decoded.replace('~', "~0").replace('/', "~1");
     (canonical == token).then_some(decoded)
+}
+
+impl EmbeddedSource {
+    /// Whether the original scalar range and the decoded-text map are valid
+    /// against the host text.
+    pub fn validate(&self, host: &str) -> Result<(), String> {
+        let pointer = self.source_pointer.as_str();
+        let range = validate_source_range(self.source_range, host, pointer)?;
+        match &self.text_map {
+            Some(segments) => validate_text_map(segments, &self.text, host, Some(range), pointer),
+            None => Ok(()),
+        }
+    }
 }
 
 fn validate_source_range(range: [u32; 2], host: &str, pointer: &str) -> Result<[usize; 2], String> {

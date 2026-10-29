@@ -301,7 +301,7 @@ impl Engine {
     fn index_regions(
         &self,
         ws: &Workspace,
-        target_files: BTreeMap<usize, BTreeMap<PathBuf, EmbeddedFile>>,
+        target_files: EmbeddedTargets,
         parts: &mut Vec<Fragment>,
         run: &mut Run,
     ) {

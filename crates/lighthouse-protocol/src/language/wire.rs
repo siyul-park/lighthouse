@@ -334,8 +334,8 @@ pub struct EmbeddedSource {
     pub provider: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<Value>,
+    #[serde(default)]
+    pub context: Value,
     pub text: String,
     /// Whole source-scalar range, used when text_map is absent.
     pub source_range: [u32; 2],

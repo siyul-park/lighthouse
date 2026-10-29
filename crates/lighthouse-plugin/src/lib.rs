@@ -27,7 +27,7 @@ pub use cel::{
     CatalogFunction, CelCatalog, CelLibrary, CelLibraryManifest, Function, Overload, Precedence,
 };
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
-pub use lighthouse_protocol::{Conventions, Mapping, TestNaming, TextMapSegment};
+pub use lighthouse_protocol::{Conventions, EmbeddedSource, Mapping, TestNaming, TextMapSegment};
 pub use memo::Memo;
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
@@ -269,70 +269,6 @@ pub struct EmbeddedFile {
     pub file: File,
     pub text: String,
     pub sources: Vec<EmbeddedSource>,
-}
-
-/// A source region selected from a physical host document.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EmbeddedSource {
-    pub id: String,
-    pub rule_id: String,
-    pub node_pointer: String,
-    pub source_pointer: String,
-    pub provider: String,
-    pub syntax: Option<String>,
-    pub context: Value,
-    pub text: String,
-    pub source_range: [u32; 2],
-    pub text_map: Option<Vec<TextMapSegment>>,
-}
-
-impl EmbeddedSource {
-    /// Whether the original scalar range and optional decoded-text map are valid.
-    pub fn validate(&self, host: &str) -> Result<(), String> {
-        let [start, end] = self.source_range.map(|value| value as usize);
-        if start > end
-            || end > host.len()
-            || !host.is_char_boundary(start)
-            || !host.is_char_boundary(end)
-        {
-            return Err("source range is outside the host text or splits UTF-8".to_owned());
-        }
-        let Some(segments) = &self.text_map else {
-            return Ok(());
-        };
-        let mut text_offset = 0usize;
-        let mut prior_source_end = None;
-        for segment in segments {
-            let [text_start, text_end] = segment.text_range.map(|value| value as usize);
-            let [source_start, source_end] = segment.source_range.map(|value| value as usize);
-            if text_start != text_offset
-                || text_start > text_end
-                || text_end > self.text.len()
-                || !self.text.is_char_boundary(text_start)
-                || !self.text.is_char_boundary(text_end)
-            {
-                return Err("text map has a gap, overlap, invalid range, or UTF-8 split".to_owned());
-            }
-            if source_start > source_end
-                || source_start < start
-                || source_end > end
-                || !host.is_char_boundary(source_start)
-                || !host.is_char_boundary(source_end)
-                || prior_source_end.is_some_and(|previous| source_start < previous)
-            {
-                return Err("text map has an invalid or non-monotonic source range".to_owned());
-            }
-            text_offset = text_end;
-            prior_source_end = Some(source_end);
-        }
-        if text_offset != self.text.len() {
-            return Err(format!(
-                "text map covers {text_offset} of {} UTF-8 bytes",
-                self.text.len()
-            ));
-        }
-        Ok(())
-    }
 }
 
 /// What a provider produced for a batch of files.

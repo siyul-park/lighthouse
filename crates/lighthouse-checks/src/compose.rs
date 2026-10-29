@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use lighthouse_plugin::{Function, Registry};
+use lighthouse_plugin::{Function, Plugin, Registry};
 use lighthouse_spec::{Catalog, Cel};
 
 use crate::Error;
@@ -63,11 +63,17 @@ impl Composition {
 /// The composition of the bundled libraries: what every entry point builds
 /// before it reads a decision.
 pub fn compose() -> Result<Composition, String> {
+    compose_with(&libraries()?, true)
+}
+
+/// A registry holding the plugin that provides the bundled libraries.
+pub(crate) fn libraries() -> Result<Registry, String> {
+    let plugin = lang_cel::Cel::new();
     let mut registry = Registry::default();
     registry
-        .register(&lighthouse_lang_cel::Cel::new())
-        .map_err(|e| format!("the `cel` plugin: {e}"))?;
-    compose_with(&registry, true)
+        .register(&plugin)
+        .map_err(|e| format!("the `{}` plugin: {e}", plugin.manifest().id))?;
+    Ok(registry)
 }
 
 /// The composition of the libraries `registry` holds.

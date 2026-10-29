@@ -249,7 +249,9 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
     let plugins: Vec<_> = registry.manifests().iter().map(|p| p.id.as_str()).collect();
     assert_eq!(
         plugins,
-        ["cel", "core", "metrics", "design", "go", "rust", "testing"]
+        [
+            "lang-cel", "core", "metrics", "design", "go", "rust", "testing"
+        ]
     );
     let languages: Vec<_> = registry
         .languages()

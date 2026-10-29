@@ -1,4 +1,4 @@
-//! The bundled `cel` plugin: the CEL functions Lighthouse implements beyond
+//! The bundled `lang-cel` plugin: the CEL functions Lighthouse implements beyond
 //! the `cel` crate, one library per module. The registry unions their
 //! manifests into the function catalog, and the composition root registers
 //! them into the shared environment. The functions are domain-free: node
@@ -12,10 +12,8 @@ use lighthouse_plugin::{
 mod language;
 mod libraries;
 
-pub use libraries::glob;
-
 /// The plugin id, and the prefix of its libraries' ids.
-pub const ID: &str = "cel";
+pub const ID: &str = "lang-cel";
 
 /// The plugin that provides the libraries.
 pub struct Cel {

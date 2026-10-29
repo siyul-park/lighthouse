@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "plugins/lang-cel", "plugins/fake-model", "plugins/lang-rust", "plugins/lang-yaml", "plugins/lang-toml", "plugins/model-http", "plugins/model-local"]
+members = ["crates/*", "plugins/fake-model", "plugins/lang-cel", "plugins/lang-rust", "plugins/lang-toml", "plugins/lang-yaml", "plugins/model-http", "plugins/model-local"]
 
 [workspace.package]
 version = "0.1.0"
@@ -41,7 +41,7 @@ toml_edit = "0.25"
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 
-lighthouse-lang-cel = { path = "plugins/lang-cel" }
+lang-cel = { path = "plugins/lang-cel" }
 lighthouse-checks = { path = "crates/lighthouse-checks" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }
 lighthouse-ml = { path = "crates/lighthouse-ml" }

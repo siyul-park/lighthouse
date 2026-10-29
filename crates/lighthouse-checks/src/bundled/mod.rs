@@ -5,7 +5,7 @@ pub(crate) mod core_pack;
 
 use lighthouse_plugin::{Plugin, Registry};
 
-use crate::{Checks, Composition, Error, metrics::Metrics};
+use crate::{Checks, Composition, Error, compose::libraries, metrics::Metrics};
 
 /// Pack whose plugin provides the fallback text language and that the
 /// `metrics` plugin is listed after.
@@ -19,8 +19,7 @@ pub fn registry(comp: &Composition) -> Result<Registry, Error> {
             "the bundled registry needs the composition from `compose()`",
         ));
     }
-    let mut registry = Registry::default();
-    register(&mut registry, &lighthouse_lang_cel::Cel::new())?;
+    let mut registry = libraries().map_err(|why| Error::invalid("bundled", why))?;
     let catalog = comp
         .bundled()
         .map_err(|e| Error::invalid("bundled", e.to_string()))?;

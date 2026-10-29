@@ -111,8 +111,11 @@ pub struct CelLibraryManifest {
     pub functions: Vec<Function>,
 }
 
-/// Registers the functions of its manifest into an environment (cel-go's
-/// `cel.Library`). `register` must install exactly what the manifest lists.
+/// Registers the functions of its manifest into an environment. cel-go's
+/// `cel.Library` contributes `EnvOption`s that the host composes into one
+/// environment; the `cel` crate registers by mutating its `Env`, so the host
+/// hands each library the same `Env` in turn. `register` must install exactly
+/// what the manifest lists.
 pub trait CelLibrary: Send + Sync {
     fn manifest(&self) -> &CelLibraryManifest;
     fn register(&self, env: &mut Env) -> Result<(), Error>;

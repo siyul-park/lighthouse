@@ -4,7 +4,7 @@
 
 Every check, fix, variable and event mapping is written in one CEL environment: the standard library of CEL and the extensions of the `cel` crate (strings, lists, math, encoders, optionals) exactly as shipped, the edit constructors of a fix ([fix operations](fix-operations.md)), and the libraries below, which plugins register. A function a decision calls that none provides, or calls with arguments no overload takes, is refused when the decision loads. The step is the rule of preference for a function a decision needs: 1, the `cel` crate provides it; 2, a CEL specification or an official extension defines it (implemented as defined, one library each); 3, nothing official, designed after the nearest precedent. A library's id and version are part of the revision of every check that calls it.
 
-## `cel/bind` 0.1.0
+## `lang-cel/bind` 0.1.0
 
 ### `cel.bind` (step 2)
 
@@ -16,7 +16,7 @@ The body with the name bound to the value of the initializer, evaluated once.
 cel.bind(a, 1, cel.bind(b, a + 1, a + b)) == 3
 ```
 
-## `cel/glob` 0.1.0
+## `lang-cel/glob` 0.1.0
 
 ### `glob.matches` (step 3)
 
@@ -28,7 +28,7 @@ Whether a module path matches a glob, by segment: `*` is a run of characters ins
 glob.matches('app/http', 'app/*')
 ```
 
-## `cel/lists` 0.1.0
+## `lang-cel/lists` 0.1.0
 
 ### `indexOf` (step 2)
 
@@ -50,7 +50,7 @@ The index of the last element equal to the value, -1 when there is none.
 ['a', 'b', 'a'].lastIndexOf('a') == 2
 ```
 
-## `cel/order` 0.1.0
+## `lang-cel/order` 0.1.0
 
 ### `anchors` (step 3)
 
@@ -72,7 +72,7 @@ The indexes of the elements of a list of ints that must move for the list to be 
 [3, 0, 1, 2].misplaced() == [0]
 ```
 
-## `cel/regex` 0.1.0
+## `lang-cel/regex` 0.1.0
 
 ### `regex.extract` (step 2)
 

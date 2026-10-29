@@ -6,6 +6,7 @@ mod clock;
 mod diagnostic;
 mod document;
 mod fix;
+pub mod glob;
 mod model_ref;
 mod review;
 mod scope;

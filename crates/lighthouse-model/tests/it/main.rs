@@ -5,6 +5,7 @@ mod clock;
 mod digest;
 mod fingerprint;
 mod fix;
+mod glob;
 mod model_ref;
 mod project;
 mod review;

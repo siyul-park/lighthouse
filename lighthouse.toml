@@ -9,7 +9,7 @@ plugins = [
   "core",
   "design",
   "testing",
-  "cel",
+  "lang-cel",
   "go",
   "rust",
   { id = "lang-go", path = "target/plugins/lang-go" },

@@ -16,28 +16,13 @@ plugins:
 	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
 	mv -f $(PLUGINS)/lang-go/lang-go.new $(PLUGINS)/lang-go/lang-go
 	cp plugins/lang-go/lighthouse-plugin.toml $(PLUGINS)/lang-go/
-	mkdir -p $(PLUGINS)/lang-rust
-	cargo build --release -p lang-rust
-	cp target/release/lang-rust $(PLUGINS)/lang-rust/lang-rust.new
-	mv -f $(PLUGINS)/lang-rust/lang-rust.new $(PLUGINS)/lang-rust/lang-rust
-	cp plugins/lang-rust/lighthouse-plugin.toml $(PLUGINS)/lang-rust/
-	for lang in yaml toml; do \
-		mkdir -p $(PLUGINS)/lang-$$lang; \
-		cargo build --release -p lang-$$lang; \
-		cp target/release/lang-$$lang $(PLUGINS)/lang-$$lang/lang-$$lang.new; \
-		mv -f $(PLUGINS)/lang-$$lang/lang-$$lang.new $(PLUGINS)/lang-$$lang/lang-$$lang; \
-		cp plugins/lang-$$lang/lighthouse-plugin.toml $(PLUGINS)/lang-$$lang/; \
+	for plugin in lang-rust lang-yaml lang-toml model-http model-local; do \
+		mkdir -p $(PLUGINS)/$$plugin; \
+		cargo build --release -p $$plugin; \
+		cp target/release/$$plugin $(PLUGINS)/$$plugin/$$plugin.new; \
+		mv -f $(PLUGINS)/$$plugin/$$plugin.new $(PLUGINS)/$$plugin/$$plugin; \
+		cp plugins/$$plugin/lighthouse-plugin.toml $(PLUGINS)/$$plugin/; \
 	done
-	mkdir -p $(PLUGINS)/model-http
-	cargo build --release -p model-http
-	cp target/release/model-http $(PLUGINS)/model-http/model-http.new
-	mv -f $(PLUGINS)/model-http/model-http.new $(PLUGINS)/model-http/model-http
-	cp plugins/model-http/lighthouse-plugin.toml $(PLUGINS)/model-http/
-	mkdir -p $(PLUGINS)/model-local
-	cargo build --release -p model-local
-	cp target/release/model-local $(PLUGINS)/model-local/model-local.new
-	mv -f $(PLUGINS)/model-local/model-local.new $(PLUGINS)/model-local/model-local
-	cp plugins/model-local/lighthouse-plugin.toml $(PLUGINS)/model-local/
 
 test: plugins
 	cargo test --workspace

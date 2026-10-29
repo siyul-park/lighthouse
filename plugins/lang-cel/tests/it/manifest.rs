@@ -1,7 +1,7 @@
 //! The manifests against what the libraries register.
 
 use cel::{Context, ExecutionError, Value};
-use lighthouse_lang_cel::Cel;
+use lang_cel::Cel;
 use lighthouse_plugin::Registry;
 
 use crate::ext::environment;
@@ -21,7 +21,7 @@ fn the_plugin_registers_without_a_duplicate_function() {
         registry
             .cel()
             .libraries()
-            .all(|l| l.manifest().id.starts_with("cel/"))
+            .all(|l| l.manifest().id.starts_with("lang-cel/"))
     );
 }
 
@@ -73,7 +73,7 @@ fn every_library_is_named_after_the_plugin_and_has_a_version() {
     let registry = registry();
     for library in registry.cel().libraries() {
         let manifest = library.manifest();
-        assert!(manifest.id.starts_with("cel/"), "{}", manifest.id);
+        assert!(manifest.id.starts_with("lang-cel/"), "{}", manifest.id);
         assert!(!manifest.version.is_empty());
     }
 }
