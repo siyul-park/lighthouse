@@ -15,6 +15,14 @@ use super::{regions::Views, *};
 /// fallback provider claims, otherwise a gap in the analysis.
 type EmbeddedTargets = BTreeMap<usize, BTreeMap<PathBuf, EmbeddedFile>>;
 
+/// What one provider is asked in a run: its files, and the regions of the host
+/// files that selected it.
+#[derive(Default)]
+struct Call<'a> {
+    files: Vec<&'a Input>,
+    regions: Vec<EmbeddedFile>,
+}
+
 enum Skipped {
     Notice(String),
     Incomplete(Incomplete),
@@ -156,9 +164,12 @@ impl Engine {
             .is_some_and(|provider| provider.manifest().capabilities.contains(&capability))
     }
 
-    /// Has each provider index its files in one batch, the providers side by
-    /// side, and merges the fragments. Files a provider did not index drop
-    /// out; the reason is recorded as incomplete.
+    /// Has each provider index its files in one call, the providers side by
+    /// side, and merges the fragments. The files that host source regions
+    /// (a source rule selects them) go first, so that a provider that analyzes
+    /// regions is asked once, for its own files and for the regions together:
+    /// what it loads for one it loads for both. Files a provider did not index
+    /// drop out; the reason is recorded as incomplete.
     pub(super) fn build_project(
         &self,
         inputs: Vec<Input>,
@@ -169,56 +180,40 @@ impl Engine {
             overlays: overlays.clone(),
             ..self.ws.clone()
         };
-        let mut batches: BTreeMap<usize, Vec<&Input>> = BTreeMap::new();
+        let hosts = self.hosts();
+        let mut host_calls: BTreeMap<usize, Call> = BTreeMap::new();
+        let mut file_calls: BTreeMap<usize, Call> = BTreeMap::new();
         for input in &inputs {
-            batches.entry(input.language).or_default().push(input);
+            let calls = match hosts.as_ref() {
+                Some(hosts) if hosts.is_match(&input.file.path) => &mut host_calls,
+                _ => &mut file_calls,
+            };
+            calls.entry(input.language).or_default().files.push(input);
         }
-        let batches: Vec<(usize, Vec<&Input>)> = batches.into_iter().collect();
-        let indexed: Vec<(Result<Indexed, lighthouse_plugin::Error>, Duration)> = in_pool(|| {
-            batches
-                .par_iter()
-                .map(|(language, batch)| {
-                    let sources: Vec<Source> = batch
-                        .iter()
-                        .map(|i| Source {
-                            file: &i.file,
-                            text: &i.text,
-                            regions: &[],
-                        })
-                        .collect();
-                    let started = Instant::now();
-                    let indexed = self.provider(*language).index(&ws, &sources);
-                    (indexed, started.elapsed())
-                })
-                .collect()
-        });
         let mut parts: Vec<Fragment> = Vec::new();
         let mut sources = Vec::new();
-        for ((language, batch), (indexed, spent)) in batches.iter().zip(indexed) {
-            let provider = self.provider(*language);
-            run.timings
-                .index
-                .push((provider.manifest().id.clone(), spent));
-            match indexed {
-                Ok(indexed) => {
-                    parts.extend(indexed.fragments);
-                    sources.extend(indexed.sources);
-                    run.notices.extend(indexed.notices);
-                    run.incomplete.extend(indexed.incomplete);
-                }
-                Err(e) => run.incomplete.push(Incomplete {
-                    path: None,
-                    reason: format!(
-                        "language `{}` had an execution error, {} file(s) not analyzed: {e}",
-                        provider.manifest().id,
-                        batch.len()
-                    ),
-                }),
-            }
-        }
-        let regions = sources::select(self.config.sources(), sources, &inputs, run);
+        self.index_calls(
+            &ws,
+            host_calls,
+            &Views::default(),
+            &mut parts,
+            Some(&mut sources),
+            run,
+        );
+        let named = |name: &str| {
+            let id = self.registry.language_named(name)?;
+            self.providers
+                .iter()
+                .any(|&index| self.provider(index).manifest().id == id)
+                .then(|| id.to_owned())
+        };
+        let regions = sources::select(self.config.sources(), sources, &inputs, &named, run);
         let target_files = self.route_embedded(regions, run);
-        self.index_regions(&ws, target_files, &mut parts, run);
+        let views = self.view_regions(&target_files, &mut parts);
+        for (target, files) in target_files {
+            file_calls.entry(target).or_default().regions = files.into_values().collect();
+        }
+        self.index_calls(&ws, file_calls, &views, &mut parts, None, run);
         let started = Instant::now();
         let project = Project::merge(parts);
         run.timings.merge = started.elapsed();
@@ -228,6 +223,98 @@ impl Engine {
             .filter(|i| project.file(&i.file.path).is_some())
             .collect();
         (kept, project)
+    }
+
+    /// The files source rules select, `None` when no rule does.
+    fn hosts(&self) -> Option<globset::GlobSet> {
+        if self.ws.source_globs.is_empty() {
+            return None;
+        }
+        let mut builder = globset::GlobSetBuilder::new();
+        for pattern in &self.ws.source_globs {
+            builder.add(globset::Glob::new(pattern).expect("source globs are validated by Config"));
+        }
+        Some(
+            builder
+                .build()
+                .expect("source globs are validated by Config"),
+        )
+    }
+
+    /// Has the providers index their calls side by side. A call that fails
+    /// leaves its files and regions incomplete.
+    fn index_calls(
+        &self,
+        ws: &Workspace,
+        calls: BTreeMap<usize, Call<'_>>,
+        views: &Views,
+        parts: &mut Vec<Fragment>,
+        mut asts: Option<&mut Vec<lighthouse_protocol::Source>>,
+        run: &mut Run,
+    ) {
+        let calls: Vec<(usize, Call<'_>)> = calls.into_iter().collect();
+        let indexed: Vec<(Result<Indexed, lighthouse_plugin::Error>, Duration)> = in_pool(|| {
+            calls
+                .par_iter()
+                .map(|(language, call)| {
+                    let sources: Vec<Source> = call
+                        .files
+                        .iter()
+                        .map(|i| Source {
+                            file: &i.file,
+                            text: &i.text,
+                            regions: &[],
+                        })
+                        .chain(call.regions.iter().map(|file| Source {
+                            file: &file.file,
+                            text: &file.text,
+                            regions: &file.sources,
+                        }))
+                        .collect();
+                    let started = Instant::now();
+                    let indexed = self.provider(*language).index(ws, &sources);
+                    (indexed, started.elapsed())
+                })
+                .collect()
+        });
+        for ((language, call), (indexed, spent)) in calls.iter().zip(indexed) {
+            let provider = self.provider(*language);
+            let id = provider.manifest().id.clone();
+            run.timings.index.push((id.clone(), spent));
+            match indexed {
+                Ok(mut indexed) => {
+                    views.stamp(&mut indexed.fragments, &id);
+                    parts.extend(indexed.fragments);
+                    run.notices.extend(indexed.notices);
+                    run.incomplete.extend(indexed.incomplete);
+                    match asts.as_deref_mut() {
+                        Some(asts) => asts.extend(indexed.sources),
+                        None if !indexed.sources.is_empty() => run.incomplete.push(Incomplete {
+                            path: None,
+                            reason: "provider unexpectedly returned source ASTs for files that host no regions"
+                                .to_owned(),
+                        }),
+                        None => {}
+                    }
+                }
+                Err(e) => {
+                    if !call.files.is_empty() {
+                        run.incomplete.push(Incomplete {
+                            path: None,
+                            reason: format!(
+                                "language `{id}` had an execution error, {} file(s) not analyzed: {e}",
+                                call.files.len()
+                            ),
+                        });
+                    }
+                    run.incomplete
+                        .extend(call.regions.iter().map(|file| Incomplete {
+                            path: Some(file.file.path.clone()),
+                            reason: format!("language `{id}` cannot analyze embedded sources: {e}"),
+                        }));
+                }
+            }
+        }
     }
 
     fn route_embedded(&self, embedded: Vec<EmbeddedFile>, run: &mut Run) -> EmbeddedTargets {
@@ -299,15 +386,12 @@ impl Engine {
         target_files
     }
 
-    fn index_regions(
-        &self,
-        ws: &Workspace,
-        target_files: EmbeddedTargets,
-        parts: &mut Vec<Fragment>,
-        run: &mut Run,
-    ) {
+    /// States on the host files what their regions are: the languages they
+    /// are in, and the one language a file of no code model of its own is
+    /// analyzed as. The views are what the providers' answers are stamped by.
+    fn view_regions(&self, target_files: &EmbeddedTargets, parts: &mut [Fragment]) -> Views {
         let mut views = Views::default();
-        for (target, files) in &target_files {
+        for (target, files) in target_files {
             let language = self.provider(*target).manifest().id.clone();
             for (path, file) in files {
                 views.add(path, &language, &file.sources);
@@ -341,52 +425,7 @@ impl Engine {
                 }
             }
         }
-
-        for (target, mut files) in target_files {
-            for file in files.values_mut() {
-                if let Some(language) = analysis_language(&file.file.path) {
-                    file.file
-                        .facts
-                        .insert("analysisLanguage".to_owned(), language);
-                }
-            }
-            let files: Vec<EmbeddedFile> = files.into_values().collect();
-            let sources: Vec<Source> = files
-                .iter()
-                .map(|file| Source {
-                    file: &file.file,
-                    text: &file.text,
-                    regions: &file.sources,
-                })
-                .collect();
-            let started = Instant::now();
-            match self.provider(target).index(ws, &sources) {
-                Ok(mut indexed) => {
-                    run.timings.index.push((
-                        format!("{}:embedded", self.provider(target).manifest().id),
-                        started.elapsed(),
-                    ));
-                    views.stamp(&mut indexed.fragments, &self.provider(target).manifest().id);
-                    parts.extend(indexed.fragments);
-                    run.notices.extend(indexed.notices);
-                    run.incomplete.extend(indexed.incomplete);
-                    if !indexed.sources.is_empty() {
-                        run.incomplete.push(Incomplete {
-                            path: None,
-                            reason: "destination provider unexpectedly returned source ASTs for embedded regions"
-                                .to_owned(),
-                        });
-                    }
-                }
-                Err(error) => run.incomplete.extend(files.iter().map(|file| Incomplete {
-                    path: Some(file.file.path.clone()),
-                    reason: format!(
-                        "language `{}` cannot analyze embedded sources: {error}",
-                        self.provider(target).manifest().id
-                    ),
-                })),
-            }
-        }
+        views
     }
 
     /// Computes the facts the rules read, analyzer by analyzer in dependency

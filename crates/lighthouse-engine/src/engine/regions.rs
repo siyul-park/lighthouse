@@ -67,7 +67,10 @@ impl Views {
             let Some(path) = fragment.files.first().map(|file| file.path.clone()) else {
                 continue;
             };
-            let example = self.example(&path, language);
+            let Some(views) = self.by_path.get(&path) else {
+                continue;
+            };
+            let example = views.get(language).copied().unwrap_or(false);
             for module in &mut fragment.modules {
                 module.language = Some(language.to_owned());
                 module.example = example;
@@ -81,15 +84,6 @@ impl Views {
                 }
             }
         }
-    }
-
-    /// Whether the regions of `path` in `language` are all example code.
-    fn example(&self, path: &Path, language: &str) -> bool {
-        self.by_path
-            .get(path)
-            .and_then(|views| views.get(language))
-            .copied()
-            .unwrap_or(false)
     }
 }
 

@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use globset::{Glob, GlobSetBuilder};
@@ -25,7 +25,7 @@ struct Selected<'a> {
 struct CompiledRule<'a> {
     spec: &'a SourceRuleSpec,
     select: Selector,
-    language_select: Option<Selector>,
+    language_from: Option<Selector>,
 }
 
 impl<'a> CompiledRule<'a> {
@@ -34,17 +34,22 @@ impl<'a> CompiledRule<'a> {
             spec,
             select: Selector::parse(&spec.select)
                 .expect("source selectors are validated by Config"),
-            language_select: spec.language.select.as_deref().map(|selector| {
+            language_from: spec.language.from.as_deref().map(|selector| {
                 Selector::parse(selector).expect("source selectors are validated by Config")
             }),
         }
     }
 }
 
+/// The id of the provider a language name stands for, when one that the run
+/// has enabled declares it.
+pub(super) type Named<'a> = &'a dyn Fn(&str) -> Option<String>;
+
 pub(super) fn select(
     rules: &[SourceRuleSpec],
     sources: Vec<Source>,
     inputs: &[Input],
+    named: Named<'_>,
     run: &mut Run,
 ) -> Vec<EmbeddedFile> {
     let files: BTreeMap<_, _> = inputs
@@ -63,40 +68,7 @@ pub(super) fn select(
     let matcher = matcher
         .build()
         .expect("source globs are validated by Config");
-    let mut asts = BTreeMap::new();
-    let mut seen = BTreeSet::new();
-    let mut duplicates = BTreeSet::new();
-
-    for source_ast in sources {
-        let path = PathBuf::from(&source_ast.path);
-        let Some(input) = files.get(path.as_path()) else {
-            run.notices.insert(format!(
-                "{}: ignored source AST for an unrequested file",
-                path.display()
-            ));
-            continue;
-        };
-        if !seen.insert(path.clone()) {
-            asts.remove(&path);
-            if duplicates.insert(path.clone()) {
-                run.incomplete.push(Incomplete {
-                    path: Some(path.clone()),
-                    reason: "provider returned duplicate source AST records for one physical file"
-                        .to_owned(),
-                });
-            }
-            continue;
-        }
-        if let Err(reason) = source_ast.validate(&input.text) {
-            run.incomplete.push(Incomplete {
-                path: Some(path),
-                reason: format!("invalid source AST: {reason}"),
-            });
-            continue;
-        }
-        asts.insert(path, source_ast);
-    }
-
+    let asts = accepted(sources, &files, run);
     let mut output = Vec::new();
     for (path, input) in files {
         let matching: BTreeSet<_> = matcher
@@ -132,7 +104,7 @@ pub(super) fn select(
         let mut selected = Vec::new();
         for index in matching {
             let rule = &rules[index];
-            match select_rule(rule, source_ast) {
+            match select_rule(rule, source_ast, named) {
                 Ok(regions) => selected.extend(regions),
                 Err(reason) => run.incomplete.push(Incomplete {
                     path: Some(path.to_path_buf()),
@@ -151,9 +123,53 @@ pub(super) fn select(
     output
 }
 
+/// The source ASTs the host providers returned that can be used: for a
+/// requested file, once, and valid against its text.
+fn accepted(
+    sources: Vec<Source>,
+    files: &BTreeMap<&Path, &Input>,
+    run: &mut Run,
+) -> BTreeMap<PathBuf, Source> {
+    let mut asts = BTreeMap::new();
+    let mut seen = BTreeSet::new();
+    let mut duplicates = BTreeSet::new();
+
+    for source_ast in sources {
+        let path = PathBuf::from(&source_ast.path);
+        let Some(input) = files.get(path.as_path()) else {
+            run.notices.insert(format!(
+                "{}: ignored source AST for an unrequested file",
+                path.display()
+            ));
+            continue;
+        };
+        if !seen.insert(path.clone()) {
+            asts.remove(&path);
+            if duplicates.insert(path.clone()) {
+                run.incomplete.push(Incomplete {
+                    path: Some(path.clone()),
+                    reason: "provider returned duplicate source AST records for one physical file"
+                        .to_owned(),
+                });
+            }
+            continue;
+        }
+        if let Err(reason) = source_ast.validate(&input.text) {
+            run.incomplete.push(Incomplete {
+                path: Some(path),
+                reason: format!("invalid source AST: {reason}"),
+            });
+            continue;
+        }
+        asts.insert(path, source_ast);
+    }
+    asts
+}
+
 fn select_rule(
     rule: &CompiledRule<'_>,
     source_ast: &Source,
+    named: Named<'_>,
 ) -> Result<Vec<EmbeddedSource>, String> {
     let spec = rule.spec;
     let mut output = Vec::new();
@@ -162,20 +178,19 @@ fn select_rule(
             provider.clone()
         } else {
             let selector = rule
-                .language_select
+                .language_from
                 .as_ref()
-                .ok_or_else(|| "language requires exactly one of provider or select".to_owned())?;
+                .ok_or_else(|| "language requires exactly one of provider or from".to_owned())?;
             let values = evaluate_selector(source_ast, &candidate.pointer, selector)?;
-            if values.len() != 1 {
-                return Err(format!(
-                    "language.select returned {} values; expected exactly one provider key",
-                    values.len()
-                ));
-            }
-            scalar(values[0].value)?
-                .as_str()
-                .map(str::to_owned)
-                .ok_or_else(|| "language.select did not return a string provider key".to_owned())?
+            // A candidate with no name, or one no enabled language answers
+            // to, is not code: it is text, and nothing is said of it.
+            let [value] = values.as_slice() else {
+                continue;
+            };
+            let Some(provider) = scalar(value.value)?.as_str().and_then(named) else {
+                continue;
+            };
+            provider
         };
 
         let context = resolve_context(spec, source_ast, &candidate)?;
@@ -612,215 +627,4 @@ fn scalar(value: &Value) -> Result<Value, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use lighthouse_protocol::TextMapSegment;
-    use lighthouse_spec::SourceLanguageSpec;
-    use std::collections::BTreeMap;
-
-    fn entry(range: [u32; 2]) -> lighthouse_plugin::Mapping {
-        lighthouse_plugin::Mapping {
-            range: Some(range),
-            text_pointer: None,
-            text_map: None,
-        }
-    }
-
-    #[test]
-    fn selectors_preserve_json_pointers_when_values_repeat() {
-        let ast = Source {
-            path: "doc.yaml".to_owned(),
-            ast: serde_json::json!({"items":["same", "same"]}),
-            mapping: BTreeMap::from([
-                ("".to_owned(), entry([0, 9])),
-                ("/items".to_owned(), entry([0, 9])),
-                ("/items/0".to_owned(), entry([0, 4])),
-                ("/items/1".to_owned(), entry([5, 9])),
-            ]),
-        };
-        let selected = evaluate(&ast, "", "$.items[*]").unwrap();
-        assert_eq!(
-            selected
-                .iter()
-                .map(|item| item.pointer.as_str())
-                .collect::<Vec<_>>(),
-            ["/items/0", "/items/1"]
-        );
-        assert_eq!(selected[0].value, selected[1].value);
-    }
-
-    #[test]
-    fn descendants_come_parents_first_with_their_pointers() {
-        let ast = Source {
-            path: "doc.md".to_owned(),
-            ast: serde_json::json!({
-                "kind": "document",
-                "children": [
-                    {"kind": "code_block", "attributes": []},
-                    {"kind": "list", "children": [
-                        {"kind": "item", "children": [
-                            {"kind": "code_block", "attributes": ["ignore"]}
-                        ]}
-                    ]}
-                ]
-            }),
-            mapping: BTreeMap::new(),
-        };
-        let blocks = evaluate(&ast, "", "$..?(@.kind == 'code_block')").unwrap();
-        let pointers: Vec<_> = blocks.iter().map(|item| item.pointer.as_str()).collect();
-        assert_eq!(
-            pointers,
-            ["/children/0", "/children/1/children/0/children/0"]
-        );
-        let kept = evaluate(
-            &ast,
-            "",
-            "$..?(@.kind == 'code_block' && @.attributes[*] != 'ignore')",
-        )
-        .unwrap();
-        let pointers: Vec<_> = kept.iter().map(|item| item.pointer.as_str()).collect();
-        assert_eq!(pointers, ["/children/0"]);
-    }
-
-    #[test]
-    fn source_projection_uses_text_pointer_without_searching_values() {
-        let host = "expr: x > 1";
-        let text_map = vec![TextMapSegment {
-            text_range: [0, 5],
-            source_range: [6, 11],
-        }];
-        let ast = Source {
-            path: "doc.yaml".to_owned(),
-            ast: serde_json::json!({"expr-node":{"kind":"Expression","source":"x > 1"}}),
-            mapping: BTreeMap::from([
-                ("".to_owned(), entry([0, 11])),
-                (
-                    "/expr-node".to_owned(),
-                    lighthouse_plugin::Mapping {
-                        range: Some([0, 11]),
-                        text_pointer: Some("/expr-node/source".to_owned()),
-                        text_map: None,
-                    },
-                ),
-                ("/expr-node/kind".to_owned(), entry([0, 0])),
-                (
-                    "/expr-node/source".to_owned(),
-                    lighthouse_plugin::Mapping {
-                        range: Some([6, 11]),
-                        text_pointer: None,
-                        text_map: Some(text_map),
-                    },
-                ),
-            ]),
-        };
-        assert!(ast.validate(host).is_ok());
-        let rule = SourceRuleSpec {
-            id: "embedded".to_owned(),
-            files: vec!["**/*.yaml".to_owned()],
-            select: "$.expr-node".to_owned(),
-            language: SourceLanguageSpec {
-                provider: Some("cel".to_owned()),
-                ..SourceLanguageSpec::default()
-            },
-        };
-        let result = select_rule(&CompiledRule::new(&rule), &ast).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].node_pointer, "/expr-node");
-        assert_eq!(result[0].source_pointer, "/expr-node/source");
-        assert_eq!(result[0].text, "x > 1");
-        assert_eq!(result[0].source_range, [6, 11]);
-    }
-
-    #[test]
-    fn context_selectors_use_the_documented_scopes() {
-        let text = "Decision cel x > 1";
-        let ast = Source {
-            path: "decisions/example.yaml".to_owned(),
-            ast: serde_json::json!({
-                "kind":"Decision",
-                "language":"cel",
-                "where":"x > 1",
-            }),
-            mapping: BTreeMap::from([
-                ("".to_owned(), entry([0, text.len() as u32])),
-                ("/kind".to_owned(), entry([0, 8])),
-                ("/language".to_owned(), entry([9, 12])),
-                ("/where".to_owned(), entry([13, 18])),
-            ]),
-        };
-        let rule = SourceRuleSpec {
-            id: "where".to_owned(),
-            files: vec!["decisions/**/*.yaml".to_owned()],
-            select: "$?(@.kind == 'Decision' && @.language == 'cel').where".to_owned(),
-            language: SourceLanguageSpec {
-                provider: Some("cel".to_owned()),
-                context: Some(serde_json::json!({
-                    "identity": {"kind":"$.kind"},
-                    "declared": true
-                })),
-                ..SourceLanguageSpec::default()
-            },
-        };
-        let result = select_rule(&CompiledRule::new(&rule), &ast).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].provider, "cel");
-        assert_eq!(result[0].text, "x > 1");
-        assert_eq!(result[0].context["identity"]["kind"], "Decision");
-    }
-
-    #[test]
-    fn root_identity_selectors_are_scoped_to_the_candidate_document() {
-        let ast = Source {
-            path: "multi.yaml".to_owned(),
-            ast: serde_json::json!({
-                "kind": "Stream",
-                "documents": [
-                    {"kind":"Decision","metadata":{"name":"first"},"spec":{"where":"one"}},
-                    {"kind":"Decision","metadata":{"name":"second"},"spec":{"where":"two"}}
-                ]
-            }),
-            mapping: BTreeMap::new(),
-        };
-        let candidate = Selected {
-            value: pointer_value(&ast.ast, "/documents/1/spec/where").unwrap(),
-            pointer: "/documents/1/spec/where".to_owned(),
-        };
-
-        let kinds = identity_values(&ast, &candidate, "$.documents[*].kind").unwrap();
-        let names = identity_values(&ast, &candidate, "$.documents[*].metadata.name").unwrap();
-
-        assert_eq!(kinds.len(), 1);
-        assert_eq!(kinds[0].pointer, "/documents/1/kind");
-        assert_eq!(kinds[0].value, "Decision");
-        assert_eq!(names.len(), 1);
-        assert_eq!(names[0].pointer, "/documents/1/metadata/name");
-        assert_eq!(names[0].value, "second");
-    }
-
-    #[test]
-    fn unsupported_composite_candidates_are_errors_not_empty_success() {
-        let ast = Source {
-            path: "doc.yaml".to_owned(),
-            ast: serde_json::json!({"expr":{"nested":"not an explicit source pointer"}}),
-            mapping: BTreeMap::from([
-                ("".to_owned(), entry([0, 10])),
-                ("/expr".to_owned(), entry([0, 10])),
-                ("/expr/nested".to_owned(), entry([2, 9])),
-            ]),
-        };
-        let rule = SourceRuleSpec {
-            id: "embedded".to_owned(),
-            files: vec!["**/*.yaml".to_owned()],
-            select: "$.expr".to_owned(),
-            language: SourceLanguageSpec {
-                provider: Some("cel".to_owned()),
-                ..SourceLanguageSpec::default()
-            },
-        };
-        assert!(
-            select_rule(&CompiledRule::new(&rule), &ast)
-                .unwrap_err()
-                .contains("no explicit text_pointer")
-        );
-    }
-}
+mod tests;
