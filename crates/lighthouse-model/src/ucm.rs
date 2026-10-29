@@ -201,6 +201,34 @@ pub struct Symbol {
     pub type_ref: Option<TypeRef>,
 }
 
+impl Symbol {
+    /// A declaration with nothing but what every one has: no owner, extent,
+    /// doc, role or type; set those with struct update.
+    pub fn new(
+        id: SymbolId,
+        kind: SymbolKind,
+        visibility: Visibility,
+        file: PathBuf,
+        span: Span,
+        name: impl Into<String>,
+    ) -> Self {
+        Self {
+            id,
+            kind,
+            visibility,
+            owner: None,
+            file,
+            span,
+            extent: None,
+            doc: None,
+            name: name.into(),
+            role: None,
+            optional: false,
+            type_ref: None,
+        }
+    }
+}
+
 /// A vertex of the dependency graph: a whole module or one symbol.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

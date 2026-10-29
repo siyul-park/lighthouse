@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use lighthouse_model::{
     LineIndex, Span,
     ucm::{File, Fragment, Module, Symbol, SymbolId, SymbolKind, Visibility},
@@ -6,11 +8,38 @@ use lighthouse_plugin::Source;
 
 pub(super) const MODULE: &str = "cel";
 
+/// The text of a host file with the offsets of its lines, which every
+/// expression of the file shares.
+pub(super) struct Host {
+    text: String,
+    starts: Vec<usize>,
+}
+
+impl Host {
+    pub(super) fn new(text: &str) -> Arc<Self> {
+        Arc::new(Self {
+            text: text.to_owned(),
+            starts: LineIndex::starts_of(text),
+        })
+    }
+
+    /// The span of the byte range `start..end`, clamped to the text.
+    pub(super) fn span(&self, start: usize, end: usize) -> Span {
+        let index = LineIndex::over(&self.text, &self.starts);
+        let start = start.min(self.text.len());
+        Span {
+            start: index.position(start),
+            end: index.position(end.min(self.text.len()).max(start)),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(super) struct FileDraft {
     pub(super) file: File,
     pub(super) module: String,
     pub(super) fragment: Fragment,
+    pub(super) host: Arc<Host>,
     pub(super) variables: Vec<VariableDecl>,
     pub(super) snippets: Vec<Snippet>,
 }
@@ -30,6 +59,7 @@ impl FileDraft {
                 }],
                 ..Fragment::default()
             },
+            host: Host::new(source.text),
             variables: Vec::new(),
             snippets: Vec::new(),
         }
@@ -50,18 +80,15 @@ pub(super) struct VariableDecl {
 impl VariableDecl {
     pub(super) fn symbol(&self, file: &File) -> Symbol {
         Symbol {
-            id: self.id.clone(),
-            kind: SymbolKind::Var,
-            visibility: Visibility::Private,
-            owner: None,
-            file: file.path.clone(),
-            span: self.span,
             extent: Some(self.extent),
-            doc: None,
-            name: self.name.clone(),
-            role: None,
-            optional: false,
-            type_ref: None,
+            ..Symbol::new(
+                self.id.clone(),
+                SymbolKind::Var,
+                Visibility::Private,
+                file.path.clone(),
+                self.span,
+                &self.name,
+            )
         }
     }
 }
@@ -77,18 +104,16 @@ pub(super) struct Parameter {
 impl Parameter {
     pub(super) fn symbol(&self, file: &File) -> Symbol {
         Symbol {
-            id: self.id.clone(),
-            kind: SymbolKind::Var,
-            visibility: Visibility::Private,
             owner: Some(self.owner.clone()),
-            file: file.path.clone(),
-            span: self.span,
             extent: Some(self.span),
-            doc: None,
-            name: self.name.clone(),
-            role: None,
-            optional: false,
-            type_ref: None,
+            ..Symbol::new(
+                self.id.clone(),
+                SymbolKind::Var,
+                Visibility::Private,
+                file.path.clone(),
+                self.span,
+                &self.name,
+            )
         }
     }
 }
@@ -105,26 +130,23 @@ pub(super) struct Snippet {
 
 impl Snippet {
     pub(super) fn symbol(&self, file: &File) -> Symbol {
-        let span = self
-            .source
-            .span(0, self.source.text.len(), &self.source.host);
+        let span = self.source.span(0, self.source.text.len());
         Symbol {
-            id: self.id.clone(),
-            kind: SymbolKind::Function,
-            visibility: Visibility::Private,
-            owner: None,
-            file: file.path.clone(),
-            span,
             extent: Some(span),
-            doc: None,
-            name: self.name.clone(),
-            role: None,
-            optional: false,
-            type_ref: None,
+            ..Symbol::new(
+                self.id.clone(),
+                SymbolKind::Function,
+                Visibility::Private,
+                file.path.clone(),
+                span,
+                &self.name,
+            )
         }
     }
 }
 
+/// The text of one expression, and where each of its bytes lies in the host
+/// file.
 #[derive(Clone)]
 pub(super) struct MappedText {
     pub(super) text: String,
@@ -132,7 +154,7 @@ pub(super) struct MappedText {
     pub(super) ends: Vec<usize>,
     pub(super) source_start: usize,
     pub(super) source_end: usize,
-    pub(super) host: String,
+    pub(super) host: Arc<Host>,
 }
 
 impl MappedText {
@@ -153,23 +175,15 @@ impl MappedText {
         }
     }
 
-    pub(super) fn span(&self, start: usize, end: usize, host: &str) -> Span {
+    /// The span in the host file of the bytes `start..end` of the text.
+    pub(super) fn span(&self, start: usize, end: usize) -> Span {
         let start = start.min(self.text.len());
         let end = end.min(self.text.len()).max(start);
         if start == end {
-            return span(host, self.source_start, self.source_start);
+            return self.host.span(self.source_start, self.source_start);
         }
         let from = self.starts.get(start).copied().unwrap_or(self.source_start);
         let to = self.ends.get(end - 1).copied().unwrap_or(self.source_end);
-        span(host, from, to.max(from))
-    }
-}
-
-pub(super) fn span(text: &str, start: usize, end: usize) -> Span {
-    let index = LineIndex::new(text);
-    let start = start.min(text.len());
-    Span {
-        start: index.position(start),
-        end: index.position(end.min(text.len()).max(start)),
+        self.host.span(from, to.max(from))
     }
 }

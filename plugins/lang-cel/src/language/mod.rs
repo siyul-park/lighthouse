@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 use cel::Env;
 use lighthouse_model::{
@@ -6,14 +9,15 @@ use lighthouse_model::{
     ucm::{Edge, EdgeKind, Fragment, Module, Node, Resolution, Symbol, SymbolId, Target},
 };
 use lighthouse_plugin::{
-    EmbeddedFile, Error, Indexed, LanguageProvider, ProviderManifest, Source, Workspace,
+    CelLibraryManifest, EmbeddedFile, EmbeddedSource, Error, Indexed, LanguageProvider,
+    ProviderManifest, Source, Workspace,
 };
 
 mod analysis;
 mod source;
 
 use analysis::{Analysis, PackVariables, external_module, function_catalog};
-use source::{FileDraft, MappedText, Parameter, Snippet, VariableDecl, span};
+use source::{FileDraft, Host, MappedText, Parameter, Snippet, VariableDecl};
 
 pub struct Language {
     manifest: ProviderManifest,
@@ -55,65 +59,46 @@ impl LanguageProvider for Language {
                 sources: source.regions.to_vec(),
             })
             .collect();
-        if embedded.is_empty() {
-            return Ok(Indexed::default());
-        }
         let mut output = Indexed::default();
-        self.index_embedded_sources(workspace, &embedded, &mut output)?;
+        if !embedded.is_empty() {
+            index_embedded_sources(&workspace.cel_libraries, &embedded, &mut output);
+        }
         Ok(output)
     }
 }
 
-impl Language {
-    fn index_embedded_sources(
-        &self,
-        workspace: &Workspace,
-        files: &[EmbeddedFile],
-        output: &mut Indexed,
-    ) -> Result<(), Error> {
-        let env = Env::stdlib();
-        let drafts = drafts(files, output);
-        let packs = pack_variables(&drafts);
-        let (fragments, external) =
-            self.index_drafts(&workspace.cel_libraries, &env, &drafts, &packs, output);
-        output.fragments.extend(fragments);
-        let modules: BTreeSet<String> = external.values().map(external_module).collect();
-        if !external.is_empty() || !modules.is_empty() {
-            output.fragments.push(Fragment {
-                modules: modules
-                    .into_iter()
-                    .map(|path| Module {
-                        name: path.rsplit('/').next().map(str::to_owned),
-                        path,
-                        test_of: None,
-                    })
-                    .collect(),
-                symbols: external.into_values().collect(),
-                ..Fragment::default()
-            });
-        }
-        Ok(())
+fn index_embedded_sources(
+    libraries: &[CelLibraryManifest],
+    files: &[EmbeddedFile],
+    output: &mut Indexed,
+) {
+    let env = Env::stdlib();
+    let drafts = drafts(files, output);
+    let packs = pack_variables(&drafts);
+    let mut external = function_catalog(libraries);
+    for draft in &drafts {
+        let mut fragment = draft.fragment.clone();
+        let mut analysis = Analysis::new(&draft.variables, &packs, libraries, &mut external);
+        declare_variables(&mut fragment, draft);
+        index_snippets(&env, &mut analysis, &mut fragment, draft, output);
+        output.fragments.push(fragment);
     }
-
-    fn index_drafts(
-        &self,
-        libraries: &[lighthouse_plugin::CelLibraryManifest],
-        env: &Env,
-        drafts: &[FileDraft],
-        packs: &PackVariables,
-        output: &mut Indexed,
-    ) -> (Vec<Fragment>, BTreeMap<SymbolId, Symbol>) {
-        let mut fragments = Vec::with_capacity(drafts.len());
-        let mut external = function_catalog(libraries);
-        for draft in drafts {
-            let mut fragment = draft.fragment.clone();
-            let mut analysis = Analysis::new(&draft.variables, packs, libraries, &mut external);
-            declare_variables(&mut fragment, draft);
-            index_snippets(env, &mut analysis, &mut fragment, draft, output);
-            fragments.push(fragment);
-        }
-        (fragments, external)
+    if external.is_empty() {
+        return;
     }
+    let modules: BTreeSet<String> = external.values().map(external_module).collect();
+    output.fragments.push(Fragment {
+        modules: modules
+            .into_iter()
+            .map(|path| Module {
+                name: path.rsplit('/').next().map(str::to_owned),
+                path,
+                test_of: None,
+            })
+            .collect(),
+        symbols: external.into_values().collect(),
+        ..Fragment::default()
+    });
 }
 
 fn drafts(files: &[EmbeddedFile], output: &mut Indexed) -> Vec<FileDraft> {
@@ -145,7 +130,7 @@ fn drafts(files: &[EmbeddedFile], output: &mut Indexed) -> Vec<FileDraft> {
 fn add_source(
     draft: &mut FileDraft,
     file: &EmbeddedFile,
-    source: &lighthouse_plugin::EmbeddedSource,
+    source: &EmbeddedSource,
 ) -> Result<(), String> {
     let template = match source.syntax.as_deref() {
         None => None,
@@ -162,14 +147,14 @@ fn add_source(
     let is_variable = variable.is_some();
     let declared = metadata_bool(context, "declared") && !is_variable;
     let shared = variable.is_some_and(|value| metadata_bool(value, "shared"));
-    let mapped = mapped_source(source, &file.text);
+    let mapped = mapped_source(source, &draft.host);
     let kind = if is_variable {
         lighthouse_model::ucm::SymbolKind::Var
     } else {
         lighthouse_model::ucm::SymbolKind::Function
     };
     let id = SymbolId::new(&draft.module, &[&document, &source.id], "expression", kind);
-    let params = variable_decl(draft, file, source, &document, &name, shared, &id);
+    let params = variable_decl(draft, source, &document, &name, shared, &id);
     if let Some(template) = template {
         for (index, (start, end)) in template.into_iter().enumerate() {
             let id = SymbolId::new(
@@ -200,7 +185,7 @@ fn add_source(
     Ok(())
 }
 
-fn mapped_source(source: &lighthouse_plugin::EmbeddedSource, host: &str) -> MappedText {
+fn mapped_source(source: &EmbeddedSource, host: &Arc<Host>) -> MappedText {
     let [source_start, source_end] = source.source_range.map(|n| n as usize);
     let mut starts = vec![source_start; source.text.len()];
     let mut ends = vec![source_end; source.text.len()];
@@ -235,14 +220,13 @@ fn mapped_source(source: &lighthouse_plugin::EmbeddedSource, host: &str) -> Mapp
         ends,
         source_start,
         source_end,
-        host: host.to_owned(),
+        host: host.clone(),
     }
 }
 
 fn variable_decl(
     draft: &mut FileDraft,
-    file: &EmbeddedFile,
-    source: &lighthouse_plugin::EmbeddedSource,
+    source: &EmbeddedSource,
     document: &str,
     name: &str,
     shared: bool,
@@ -274,7 +258,7 @@ fn variable_decl(
                     lighthouse_model::ucm::SymbolKind::Var,
                 ),
                 owner: id.clone(),
-                span: span(&file.text, start, end),
+                span: draft.host.span(start, end),
                 name,
             })
         })
@@ -288,8 +272,8 @@ fn variable_decl(
         name: name.to_owned(),
         shared,
         id: id.clone(),
-        span: span(&file.text, name_start, name_end),
-        extent: span(&file.text, extent_start, extent_end),
+        span: draft.host.span(name_start, name_end),
+        extent: draft.host.span(extent_start, extent_end),
         params: params.clone(),
     });
     params
@@ -300,9 +284,20 @@ fn source_document(context: &serde_json::Value, path: &std::path::Path, pointer:
         return document;
     }
     if let Some(identity) = context.get("identity") {
-        return identity.to_string();
+        return identity_document(identity);
     }
     format!("{}:{pointer}", path.display())
+}
+
+/// The document of an identity: `Kind:name` when it has both, which is how
+/// the analysis names the pack a decision belongs to (`Decision:<pack>/<name>`
+/// and `Pack:<pack>`); the identity as JSON otherwise.
+fn identity_document(identity: &serde_json::Value) -> String {
+    let field = |key| identity.get(key).and_then(serde_json::Value::as_str);
+    match (field("kind"), field("name")) {
+        (Some(kind), Some(name)) => format!("{kind}:{name}"),
+        _ => identity.to_string(),
+    }
 }
 
 fn metadata_string_opt(value: &serde_json::Value, key: &str) -> Option<String> {
@@ -312,7 +307,7 @@ fn metadata_string_opt(value: &serde_json::Value, key: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-fn source_name(source: &lighthouse_plugin::EmbeddedSource) -> String {
+fn source_name(source: &EmbeddedSource) -> String {
     source
         .node_pointer
         .rsplit('/')
@@ -423,10 +418,7 @@ fn index_snippets(
                 fragment.edges.extend(edges);
             }
             Err(error) => {
-                let at = snippet
-                    .source
-                    .span(0, snippet.source.text.len(), &snippet.source.host)
-                    .start;
+                let at = snippet.source.span(0, snippet.source.text.len()).start;
                 output.incomplete.push(Incomplete {
                     path: Some(draft.file.path.clone()),
                     reason: format!(
@@ -455,7 +447,7 @@ mod tests {
     use std::path::PathBuf;
 
     use lighthouse_model::ucm::File;
-    use lighthouse_plugin::{EmbeddedSource, Source, Workspace};
+    use lighthouse_plugin::{Source, Workspace};
     use serde_json::json;
 
     use super::*;
@@ -466,7 +458,7 @@ mod tests {
             "identity": {"kind": "Decision", "name": "design/no-unused-symbol"}
         });
         let path = PathBuf::from("decisions/design/no-unused-symbol.yaml");
-        let document = context["identity"].to_string();
+        let document = "Decision:design/no-unused-symbol";
         assert_eq!(
             source_document(&context, &path, "/spec/check/where"),
             document
@@ -638,6 +630,67 @@ mod tests {
                 .iter()
                 .all(|fragment| fragment.functions.is_empty()),
             "unsupported syntax must not be analyzed as direct CEL"
+        );
+    }
+
+    #[test]
+    fn a_decision_resolves_the_shared_variable_of_its_pack() {
+        let host = "pack: 'size(x) > 1'\nwhere: 'shared'\n";
+        let at = |text: &str| {
+            let start = host.find(text).unwrap();
+            [start as u32, (start + text.len()) as u32]
+        };
+        let region = |pointer: &str, text: &str, context: serde_json::Value| EmbeddedSource {
+            id: format!("rule:{pointer}"),
+            rule_id: "rule".to_owned(),
+            node_pointer: pointer.to_owned(),
+            source_pointer: pointer.to_owned(),
+            provider: "cel".to_owned(),
+            syntax: None,
+            context,
+            text: text.to_owned(),
+            source_range: at(text),
+            text_map: None,
+        };
+        let sources = vec![
+            region(
+                "/pack",
+                "size(x) > 1",
+                json!({"identity": {"kind": "Pack", "name": "design"},
+                       "variable": {"name": "shared", "shared": true}}),
+            ),
+            region(
+                "/where",
+                "shared",
+                json!({"identity": {"kind": "Decision", "name": "design/x"}}),
+            ),
+        ];
+        let file = File {
+            path: PathBuf::from("decisions/x.yaml"),
+            lang: "yaml".to_owned(),
+            hash: String::new(),
+            generated: false,
+            test: false,
+            facts: Default::default(),
+        };
+        let source = Source {
+            file: &file,
+            text: host,
+            regions: &sources,
+        };
+        let indexed = Language::new()
+            .index(&Workspace::new("/tmp"), &[source])
+            .unwrap();
+        let project = lighthouse_model::ucm::Project::merge(indexed.fragments);
+        let shared = project
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name == "shared")
+            .expect("the pack declares the variable");
+        assert!(
+            !project.references(&shared.id).is_empty(),
+            "no reference to {}",
+            shared.id.as_str()
         );
     }
 
