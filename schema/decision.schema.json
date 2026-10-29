@@ -468,7 +468,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/LanguageSpec"
           },
-          "description": "What each language changes: option values and wording, by language id.",
+          "description": "The languages the decision applies to, by language id, with what each\nchanges: option values and the programs of a command. Absent or empty,\nit applies to every language; otherwise to exactly these, and `{}` lists\na language that changes nothing.",
           "type": "object"
         },
         "options": {

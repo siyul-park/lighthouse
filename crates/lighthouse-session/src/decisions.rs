@@ -210,22 +210,23 @@ pub(crate) fn test_catalog(
     if let Some(gap) = registered.incomplete.first() {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());
     }
-    let languages: BTreeSet<String> = match language {
-        Some(language) => BTreeSet::from([language.to_owned()]),
-        None => probe
-            .languages()
-            .iter()
-            .map(|l| l.provider.manifest().id.clone())
-            .filter(|l| l != NEUTRAL)
-            .collect(),
-    };
+    let registered: BTreeSet<String> = probe
+        .languages()
+        .iter()
+        .map(|l| l.provider.manifest().id.clone())
+        .filter(|l| l != NEUTRAL)
+        .collect();
     drop(probe);
+    let languages = match language {
+        Some(language) => BTreeSet::from([language.to_owned()]),
+        None => registered.clone(),
+    };
     let languages = if languages.is_empty() {
         BTreeSet::from([NEUTRAL.to_owned()])
     } else {
         languages
     };
-    let mut failures = Vec::new();
+    let mut failures = unregistered(&decisions, &registered);
     let mut runs = 0;
     let restart_error = RefCell::new(None);
     for language in &languages {
@@ -245,9 +246,10 @@ pub(crate) fn test_catalog(
                 })
         };
         let tester = RuleTester::new(fresh, catalog, shipped)
+            .sources(session.config.sources())
             .language(language)
             .trusted(session.trusted());
-        for decision in &decisions {
+        for decision in decisions.iter().filter(|d| tester.applies(d)) {
             runs += 1;
             failures.extend(
                 tester
@@ -266,6 +268,23 @@ pub(crate) fn test_catalog(
         runs,
         failures,
     })
+}
+
+/// One failure for each decision whose languages name no registered provider:
+/// nothing would ever run it.
+fn unregistered(decisions: &[&Decision], registered: &BTreeSet<String>) -> Vec<String> {
+    decisions
+        .iter()
+        .filter(|d| !d.languages.is_empty() && !d.languages.keys().any(|l| registered.contains(l)))
+        .map(|d| {
+            let listed: Vec<&str> = d.languages.keys().map(String::as_str).collect();
+            format!(
+                "{}: applies to {}, which no registered provider serves",
+                d.id(),
+                listed.join(", ")
+            )
+        })
+        .collect()
 }
 
 fn status(decision: &Decision, registry: &Registry) -> Implementation {

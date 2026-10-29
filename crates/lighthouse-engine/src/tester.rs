@@ -3,7 +3,9 @@ use std::{fmt::Write as _, fs, path::Path};
 use tempfile::TempDir;
 
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, Fix};
+use lighthouse_spec::{
+    Catalog, CheckKind, Config, Decision, Example, ExampleKind, Fix, SourceRuleSpec,
+};
 use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
@@ -19,6 +21,7 @@ pub struct RuleTester<'a> {
     catalog: &'a Catalog,
     shipped: &'a Catalog,
     language: Option<String>,
+    sources: Vec<SourceRuleSpec>,
     trusted: bool,
 }
 
@@ -35,6 +38,7 @@ impl<'a> RuleTester<'a> {
             catalog,
             shipped,
             language: None,
+            sources: Vec::new(),
             trusted: false,
         }
     }
@@ -52,6 +56,12 @@ impl<'a> RuleTester<'a> {
         self
     }
 
+    /// Configures embedded-source selections used by the real project.
+    pub fn sources(mut self, sources: &[SourceRuleSpec]) -> Self {
+        self.sources = sources.to_vec();
+        self
+    }
+
     /// Failures of every checked decision; empty when all examples hold.
     pub fn check_all(&self) -> Vec<String> {
         self.catalog
@@ -62,12 +72,16 @@ impl<'a> RuleTester<'a> {
     }
 
     /// Failures of one decision's examples, each prefixed `<id> <example>:`.
-    /// With a language filter, a decision that has no example for that language
-    /// (and no language-neutral `text` example) is itself a failure: a checked
-    /// rule must show what it does in every language under test. A command
-    /// check that names the `files` it is run for is the exception: it has
-    /// examples for the languages of those files only.
+    /// With a language filter, a decision that does not apply to that language
+    /// has nothing to show; one that does and has no example for it (and no
+    /// language-neutral `text` example) is itself a failure: a checked rule
+    /// must show what it does in every language it applies to. A command check
+    /// that names the `files` it is run for is the exception: it has examples
+    /// for the languages of those files only.
     pub fn check(&self, decision: &Decision) -> Vec<String> {
+        if !self.applies(decision) {
+            return Vec::new();
+        }
         let selected: Vec<&Example> = decision
             .examples
             .iter()
@@ -105,6 +119,14 @@ impl<'a> RuleTester<'a> {
             .collect()
     }
 
+    /// Whether the decision applies to the language under test, always when
+    /// there is none.
+    pub fn applies(&self, decision: &Decision) -> bool {
+        self.language
+            .as_deref()
+            .is_none_or(|language| decision.applies_to(language))
+    }
+
     fn selects(&self, example: &Example) -> bool {
         self.language
             .as_ref()
@@ -114,7 +136,7 @@ impl<'a> RuleTester<'a> {
     fn run(&self, decision: &Decision, example: &Example) -> Result<(), String> {
         let dir = materialize(example)?;
         let registry = (self.registry)();
-        let config = config(&registry, decision, example)?;
+        let config = config(&registry, decision, example, &self.sources)?;
         let engine = Engine::new(registry, config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted);
@@ -244,7 +266,12 @@ fn found(run: &Run) -> Vec<(u32, &str)> {
         .collect()
 }
 
-fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result<Config, String> {
+fn config(
+    registry: &Registry,
+    decision: &Decision,
+    example: &Example,
+    sources: &[SourceRuleSpec],
+) -> Result<Config, String> {
     let level = decision
         .severity
         .ok_or_else(|| "a decision without severity has no rule".to_owned())?;
@@ -267,6 +294,13 @@ fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result
     let mut root = toml::Table::new();
     root.insert("plugins".to_owned(), plugins.into());
     root.insert("rules".to_owned(), rules.into());
+    let sources: Vec<toml::Value> = sources
+        .iter()
+        .map(|source| toml::Value::try_from(source).map_err(|e| e.to_string()))
+        .collect::<Result<_, _>>()?;
+    if !sources.is_empty() {
+        root.insert("sources".to_owned(), sources.into());
+    }
     Config::parse_inline(&root.to_string()).map_err(|e| e.to_string())
 }
 

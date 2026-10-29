@@ -59,20 +59,21 @@ fn the_design_decisions_have_rust_examples() {
     }
 }
 
+/// A decision that lists languages owes no example to another one, and one that
+/// lists none has examples that run in any language (`text`).
 #[test]
-fn a_language_without_examples_is_a_failure_not_silence() {
-    let failures = lighthouse_engine::RuleTester::new(
-        registry,
-        lighthouse_test_support::bundled(),
-        lighthouse_test_support::bundled(),
-    )
-    .language("cobol")
-    .check_all();
+fn a_language_a_decision_does_not_list_asks_nothing_of_it() {
+    let catalog = lighthouse_test_support::bundled();
+    let failures =
+        lighthouse_engine::RuleTester::new(registry, catalog, lighthouse_test_support::bundled())
+            .language("cobol")
+            .check_all();
+    assert!(failures.is_empty(), "{failures:?}");
     assert!(
-        failures
-            .iter()
-            .any(|f| f.contains("no example for language `cobol`")),
-        "{failures:?}"
+        catalog
+            .decisions()
+            .filter(|d| d.automated() && !d.languages.is_empty())
+            .all(|d| !d.applies_to("cobol"))
     );
 }
 

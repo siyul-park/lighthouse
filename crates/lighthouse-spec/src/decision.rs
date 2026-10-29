@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use lighthouse_model::{Safety, Severity, squash};
+use lighthouse_model::{Safety, Severity, squash, ucm::Applicability};
 use lighthouse_resource::{Metadata, Resource, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -81,7 +81,10 @@ pub struct DecisionSpec {
     /// Tunable values, as a JSON Schema object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<OptionsSchema>,
-    /// What each language changes: option values and wording, by language id.
+    /// The languages the decision applies to, by language id, with what each
+    /// changes: option values and the programs of a command. Absent or empty,
+    /// it applies to every language; otherwise to exactly these, and `{}` lists
+    /// a language that changes nothing.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub languages: BTreeMap<String, LanguageSpec>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -217,6 +220,20 @@ impl Decision {
         hash::short(&text, 8)
     }
 
+    /// Whether the decision applies to code in `language`: it lists no
+    /// language, or lists this one.
+    pub fn applies_to(&self, language: &str) -> bool {
+        self.languages.is_empty() || self.languages.contains_key(language)
+    }
+
+    /// What the decision's subjects may be: its scope's code, in the languages
+    /// it applies to.
+    pub fn applicability(&self) -> Applicability {
+        self.scope
+            .applicability()
+            .only(self.languages.keys().cloned())
+    }
+
     /// The id of the decision whose options this one reads (`options.from`).
     pub fn options_from(&self) -> Option<&str> {
         self.options.as_ref()?.from.as_deref()
@@ -225,7 +242,7 @@ impl Decision {
     /// The same decision over the options of `source`: the options `source`
     /// declares and this does not, with their defaults and the values the
     /// languages of `source` set, are this decision's too, and listed in
-    /// `options.inherited`.
+    /// `options.inherited`; the languages it applies to stay its own.
     #[must_use]
     pub fn inheriting(&self, source: &Decision) -> Self {
         let mut spec = self.spec().clone();
@@ -242,10 +259,10 @@ impl Decision {
         for (language, source_language) in &source.languages {
             for (key, value) in &source_language.options {
                 if schema.inherited.contains(key) {
-                    spec.languages
+                    schema
+                        .inherited_languages
                         .entry(language.clone())
                         .or_default()
-                        .options
                         .insert(key.clone(), value.clone());
                 }
             }
@@ -273,11 +290,15 @@ impl Decision {
                 .check(value, &format!("option `{key}`"))
                 .map_err(|problem| Error::invalid(id, problem))?;
         }
-        let overrides = language.and_then(|l| spec.languages.get(l));
+        let own = language
+            .and_then(|l| spec.languages.get(l))
+            .map(|l| &l.options);
+        let inherited = language.and_then(|l| schema.inherited_languages.get(l));
         let mut resolved = Map::new();
         for (key, property) in &schema.properties {
             let layers = [
-                overrides.and_then(|l| l.options.get(key)),
+                own.and_then(|options| options.get(key)),
+                inherited.and_then(|options| options.get(key)),
                 configured.get(key),
             ];
             let value = layers

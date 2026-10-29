@@ -193,7 +193,7 @@ impl RunCache<'_> {
         ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
-        let tag = tag(ctx.applies, options);
+        let tag = tag(&ctx.applies, options);
         let file = ctx.file.map(|(file, _)| file);
         let Some(key) = self.key(prefix, &tag, file) else {
             return rule.check(ctx, options);
@@ -230,7 +230,7 @@ impl RunCache<'_> {
         ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
-        let tag = tag(ctx.applies, options);
+        let tag = tag(&ctx.applies, options);
         let row = self.row(prefix);
         let loaded = row.loaded.get(&file.path).filter(|entry| entry.tag == tag);
         self.cache.count(loaded.is_some());
@@ -312,7 +312,7 @@ impl RunCache<'_> {
 /// What a unit was judged with besides the project: the applicability and the
 /// options the configuration resolved. The options are a sorted map, so their
 /// JSON is the same for the same options.
-fn tag(applies: Applicability, options: &Options) -> String {
+fn tag(applies: &Applicability, options: &Options) -> String {
     let scope = match applies.tests {
         TestScope::Exclude => '0',
         TestScope::Include => '1',

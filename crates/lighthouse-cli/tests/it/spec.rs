@@ -71,6 +71,29 @@ fn validate_finds_a_function_that_does_not_exist_in_a_branch_nothing_takes() {
 }
 
 #[test]
+fn validate_refuses_a_decision_that_lists_a_language_no_plugin_provides() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_test_support::project("plugins = [\"core\"]\n"),
+    );
+    write(
+        dir.path(),
+        ".lighthouse/decisions/typo.yaml",
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/typo\n  uid: 6f1c2b9e-3d4a-4e5f-8a7b-9c0d1e2f3a4b\nspec:\n  title: Typo\n  context: A typo.\n  scope: { subject: file }\n  languages: { gol: {} }\n  requirement: A file MUST hold.\n  severity: warn\n  check:\n    type: cel\n    select: file\n    where: file.lines > 1\n    message: m\n  examples:\n    - { name: bad, language: text, kind: invalid, files: [{ path: a.txt, body: \"x\\ny\" }], expect: [{ line: 1 }] }\n    - { name: good, language: text, kind: valid, files: [{ path: a.txt, body: y }] }\n",
+    );
+
+    lighthouse(dir.path())
+        .args(["spec", "validate"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains(
+            "local/typo: `languages` lists `gol`, which no plugin of the project provides",
+        ));
+}
+
+#[test]
 fn schema_prints_a_kind_in_any_case_and_lists_them() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())

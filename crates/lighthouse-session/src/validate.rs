@@ -41,6 +41,9 @@ pub struct Validated {
     pub problems: Vec<Problem>,
 }
 
+/// The languages the project's plugins provide, or why that is not known.
+type Served = std::result::Result<BTreeSet<String>, String>;
+
 /// The documents found, by what is done with them.
 #[derive(Default)]
 struct Sets {
@@ -111,18 +114,27 @@ impl Sets {
         }
         let mut roots = BTreeSet::new();
         let mut named = BTreeSet::new();
+        let mut served: Option<Served> = None;
         for (dir, files) in &self.catalogs {
             let at = self.catalog_root(dir).unwrap_or_else(|| dir.clone());
-            let loaded = match self.catalog_root(dir) {
+            let (loaded, shipped) = match self.catalog_root(dir) {
                 Some(root) if !roots.insert(root.clone()) => continue,
-                Some(root) => Catalog::load(&root, cel).map(|c| (root.display().to_string(), c)),
-                None => Catalog::from_local(by_file_name(files), cel)
-                    .and_then(|local| Catalog::overlay(bundled, &local))
-                    .map(|c| (dir.display().to_string(), c)),
+                Some(root) => (
+                    Catalog::load(&root, cel).map(|c| (root.display().to_string(), c)),
+                    None,
+                ),
+                None => (
+                    Catalog::from_local(by_file_name(files), cel)
+                        .and_then(|local| Catalog::overlay(bundled, &local))
+                        .map(|c| (dir.display().to_string(), c)),
+                    Some(bundled),
+                ),
             };
             match loaded {
                 Ok((place, catalog)) => {
                     uids(&catalog, &place, problems);
+                    let served = served.get_or_insert_with(|| served_languages(session));
+                    languages(&catalog, shipped, (served, &place), problems);
                     if named.insert(at.clone()) {
                         naming(session, &at, problems)?;
                     }
@@ -327,6 +339,60 @@ fn by_file_name(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
             (name, text.clone())
         })
         .collect()
+}
+
+/// The ids of the languages the project's plugins provide, started for the
+/// purpose, or why that is not known.
+fn served_languages(session: &Session) -> Served {
+    let (registry, registered) = session.registry().map_err(|e| e.to_string())?;
+    if let Some(gap) = registered.incomplete.first() {
+        return Err(format!("a language plugin did not start: {}", gap.reason));
+    }
+    Ok(registry
+        .languages()
+        .iter()
+        .map(|language| language.provider.manifest().id.clone())
+        .collect())
+}
+
+/// A decision lists only languages a plugin provides, as a rule lists only the
+/// languages its linter supports. The decisions of `shipped` are not asked,
+/// since a project need not run every language they cover.
+fn languages(
+    catalog: &Catalog,
+    shipped: Option<&Catalog>,
+    (served, place): (&Served, &str),
+    problems: &mut Vec<Problem>,
+) {
+    let listed = catalog
+        .decisions()
+        .filter(|d| !d.languages.is_empty())
+        .filter(|d| shipped.is_none_or(|s| s.decision(d.id()).is_none()))
+        .collect::<Vec<_>>();
+    if listed.is_empty() {
+        return;
+    }
+    let served = match served {
+        Ok(served) => served,
+        Err(why) => {
+            problems.push(problem(
+                place,
+                format!("`languages` cannot be checked: {why}"),
+            ));
+            return;
+        }
+    };
+    for decision in listed {
+        for language in decision.languages.keys().filter(|l| !served.contains(*l)) {
+            problems.push(problem(
+                place,
+                format!(
+                    "{}: `languages` lists `{language}`, which no plugin of the project provides",
+                    decision.id()
+                ),
+            ));
+        }
+    }
 }
 
 /// Every decision has the `uid` its findings are identified by.

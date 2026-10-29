@@ -418,6 +418,29 @@ fn write_local_refuses_names_and_targets_that_leave_the_directory() {
 }
 
 #[test]
+fn decision_language_keys_are_applicability_even_when_they_hold_options() {
+    let all = bundled("core/decision-naming");
+    for language in ["go", "rust", "cel", "yaml", "toml"] {
+        assert!(all.applies_to(language), "{language}");
+    }
+
+    let options = bundled("design/abbreviations");
+    assert!(options.applies_to("go"));
+    assert!(options.applies_to("rust"));
+    assert!(options.applies_to("cel"));
+    assert!(!options.applies_to("yaml"));
+    assert!(!options.applies_to("toml"));
+
+    let empty = options.clone().map_spec(|mut spec| {
+        spec.languages.clear();
+        spec
+    });
+    for language in ["go", "rust", "cel", "yaml", "toml"] {
+        assert!(empty.applies_to(language), "empty map: {language}");
+    }
+}
+
+#[test]
 fn scope_applicability() {
     let scope = bundled("testing/public-boundary").scope;
     assert_eq!(

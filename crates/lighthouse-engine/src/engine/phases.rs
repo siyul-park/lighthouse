@@ -536,7 +536,7 @@ impl Engine {
                 continue;
             };
             let Some(level) = config.level else { continue };
-            let applies = self.applies(meta.applicability, config);
+            let applies = self.applies(&meta.applicability, config);
             if applies.excludes(scene.project, file) {
                 continue;
             }
@@ -617,7 +617,7 @@ impl Engine {
             gathered.unsettled.insert((meta.id.clone(), None));
             return Ok(gathered);
         }
-        let applies = self.applies(meta.applicability, config);
+        let applies = self.applies(&meta.applicability, config);
         let options = options_at(&self.inherited, resolved, &meta.id, &config.options);
         self.run_one(scene, rule, (&options, level, applies), None, &mut gathered)?;
         Ok(gathered)
@@ -667,14 +667,14 @@ impl Engine {
     /// What code a rule may report on at a file: the decision's scope, unless
     /// the project says otherwise for all its decisions (`generated.check`)
     /// or for this rule (`generated`).
-    fn applies(&self, declared: Applicability, rule: &RuleConfig) -> Applicability {
+    fn applies(&self, declared: &Applicability, rule: &RuleConfig) -> Applicability {
         let project = self
             .config
             .generated_check()
             .map(|c| c == GeneratedCheck::Include);
         Applicability {
             generated: rule.generated.or(project).unwrap_or(declared.generated),
-            ..declared
+            ..declared.clone()
         }
     }
 }

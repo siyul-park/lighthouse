@@ -85,8 +85,8 @@ fn missing_owner_judges_only_modules_with_tests_and_public_symbols() {
         .unwrap()
         .visibility = Visibility::Internal;
     assert!(
-        check(&w, MISSING, json!({})).is_empty(),
-        "internal by default"
+        check(&w, MISSING, json!({ "includeInternal": false })).is_empty(),
+        "internal when the option is off"
     );
     assert_eq!(
         w.names(&check(&w, MISSING, json!({ "includeInternal": true }))),
@@ -139,7 +139,10 @@ fn duplicate_owner_judges_internal_symbols_only_when_asked() {
         .find(|s| s.id == get.id)
         .unwrap()
         .visibility = Visibility::Internal;
-    assert!(duplicates(&w, json!({})).is_empty(), "internal by default");
+    assert!(
+        duplicates(&w, json!({ "includeInternal": false })).is_empty(),
+        "internal when the option is off"
+    );
     assert_eq!(
         w.names(&duplicates(&w, json!({ "includeInternal": true }))),
         ["Get"]

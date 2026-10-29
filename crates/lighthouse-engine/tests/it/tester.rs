@@ -339,6 +339,18 @@ fn rule_tester_check() {
     assert_eq!(failures, ["fake/marker: no example for language `go`"]);
 }
 
+#[test]
+fn a_decision_has_nothing_to_show_in_a_language_it_does_not_apply_to() {
+    let catalog = catalog_with("languages:\n  notes: {}\n", HOLDING);
+    let decision = catalog.decision("fake/marker").unwrap();
+    let tester = || RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
+
+    assert!(tester().language("go").check(decision).is_empty());
+    assert!(!tester().language("go").applies(decision));
+    assert!(tester().language("notes").applies(decision));
+    assert!(tester().language("notes").check(decision).is_empty());
+}
+
 const FIX: &str = "fix:
   safety: unsafe
   type: cel

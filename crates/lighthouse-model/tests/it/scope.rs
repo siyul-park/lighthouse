@@ -35,7 +35,11 @@ fn symbol(path: &str, name: &str) -> Symbol {
 }
 
 fn by(generated: bool, tests: TestScope) -> Applicability {
-    Applicability { generated, tests }
+    Applicability {
+        generated,
+        tests,
+        ..Applicability::default()
+    }
 }
 
 #[test]
@@ -176,4 +180,60 @@ fn applicability_admits_module() {
     assert!(standard.admits_module(&module(None), &[&generated, &prod]));
     assert!(by(false, TestScope::Only).admits_module(&module(Some("n")), &[&prod]));
     assert!(by(true, TestScope::Include).admits_module(&module(None), &[&generated]));
+}
+
+#[test]
+fn applicability_admits_only_its_languages() {
+    let go = file("a.go", false, false);
+    let yaml = File {
+        lang: "yaml".to_owned(),
+        ..file("a.yaml", false, false)
+    };
+    let cel = File {
+        facts: [("analysisLanguage".to_owned(), "cel".to_owned())].into(),
+        ..yaml.clone()
+    };
+    let project = Project::merge([Fragment {
+        files: vec![go.clone(), yaml.clone(), cel.clone()],
+        symbols: vec![symbol("a.go", "InGo")],
+        ..Fragment::default()
+    }]);
+    let module = Module {
+        path: "m".to_owned(),
+        name: None,
+        test_of: None,
+    };
+    let any = Applicability::default();
+    let go_only = Applicability::default().only(["go".to_owned()]);
+    let none = Applicability::default().only([]);
+
+    assert!(any.admits_language("cel") && none.admits_language("cel"));
+    assert!(go_only.admits_language("go") && !go_only.admits_language("yaml"));
+    assert!(go_only.admits_file(&go) && !go_only.admits_file(&yaml));
+    assert!(!go_only.admits_file(&cel), "the analyzed language counts");
+    assert!(go_only.excludes(&project, &yaml) && !go_only.excludes(&project, &go));
+    assert!(go_only.admits_comment(Some(&go)) && !go_only.admits_comment(Some(&yaml)));
+    let host_toml_with_embedded_cel = File {
+        path: "config.toml".into(),
+        lang: "toml".to_owned(),
+        facts: [("analysisLanguage".to_owned(), "cel".to_owned())].into(),
+        ..file("config.toml", false, false)
+    };
+    let toml_only = Applicability::default().only(["toml".to_owned()]);
+    assert!(toml_only.admits_file(&host_toml_with_embedded_cel));
+    assert!(toml_only.admits_comment(Some(&host_toml_with_embedded_cel)));
+    assert!(!go_only.admits_file(&host_toml_with_embedded_cel));
+    assert!(go_only.admits_module(&module, &[&go, &yaml]));
+    assert!(!go_only.admits_module(&module, &[&yaml]));
+    assert!(go_only.admits_module(&module, &[]));
+    let symbol = project
+        .symbols_in(std::path::Path::new("a.go"))
+        .next()
+        .unwrap();
+    assert!(go_only.admits_symbol(&project, symbol));
+    assert!(
+        !Applicability::default()
+            .only(["rust".to_owned()])
+            .admits_symbol(&project, symbol)
+    );
 }

@@ -65,6 +65,7 @@ impl Scope {
         Applicability {
             generated: self.generated,
             tests: self.tests,
+            languages: None,
         }
     }
 }

@@ -57,6 +57,7 @@ impl Plugin for Fixture {
     fn manifest(&self) -> &PluginManifest {
         &self.0
     }
+    // The world is a Go project in a made-up syntax: decisions apply to the languages they list.
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         vec![Box::new(Wire(ProviderManifest {
             conventions: Conventions {
@@ -64,7 +65,7 @@ impl Plugin for Fixture {
                 constructor_prefixes: vec!["New".to_owned(), "new".to_owned()],
                 ..Conventions::default()
             },
-            ..ProviderManifest::new("wire", vec!["**/*.ucm".to_owned()])
+            ..ProviderManifest::new("go", vec!["**/*.ucm".to_owned()])
         }))]
     }
 }
@@ -88,7 +89,7 @@ pub struct World {
     pub imports: Vec<(String, String)>,
     /// Imports written in a file of their own, which need not declare anything.
     pub file_imports: Vec<FileImport>,
-    /// The `[languages.wire] testNaming` the project sets, over what the
+    /// The `[languages.go] testNaming` the project sets, over what the
     /// language declares.
     pub naming: Option<Value>,
 }
@@ -325,7 +326,7 @@ impl World {
             .map(|(path, generated)| {
                 let file = File {
                     path: path.into(),
-                    lang: "wire".to_owned(),
+                    lang: "go".to_owned(),
                     hash: String::new(),
                     generated: *generated,
                     test: path.ends_with("_test.ucm"),
@@ -448,7 +449,7 @@ impl World {
                 toml::Value::try_from(naming).unwrap(),
             );
             let mut languages = toml::Table::new();
-            languages.insert("wire".to_owned(), wire.into());
+            languages.insert("go".to_owned(), wire.into());
             root.insert("languages".to_owned(), languages.into());
         }
         let config = Config::parse_inline(&root.to_string()).unwrap();

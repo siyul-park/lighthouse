@@ -132,6 +132,12 @@ pub struct OptionsSchema {
     #[serde(skip)]
     #[schemars(skip)]
     pub inherited: Vec<String>,
+    /// The values the languages of that decision give those options, by
+    /// language: its own `languages` entries stay as authored, since they say
+    /// where it applies.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub inherited_languages: BTreeMap<String, Map<String, Value>>,
 }
 
 impl OptionsSchema {
@@ -142,6 +148,7 @@ impl OptionsSchema {
             additional_properties: false,
             from: None,
             inherited: Vec::new(),
+            inherited_languages: BTreeMap::new(),
         }
     }
 }
