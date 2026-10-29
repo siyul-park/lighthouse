@@ -58,18 +58,20 @@ mod tests {
     use super::*;
     use syn::parse_file;
 
-    #[test]
-    fn rust_ast_keeps_nested_items_and_pointer_ranges() {
-        let text = "pub fn greet(person: &str) { let value = person.trim(); println!(\"hello {value}\"); }\nstruct Person { name: String }\n";
-        let mut line_starts = vec![0];
-        line_starts.extend(text.match_indices('\n').map(|(at, _)| at + 1));
-        let file = SourceFile {
+    fn file(text: &str) -> SourceFile {
+        SourceFile {
             rel: "src/lib.rs".to_owned(),
             text: text.to_owned(),
             ast: parse_file(text).unwrap(),
             generated: false,
-            line_starts,
-        };
+            line_starts: crate::tree::line_starts(text),
+        }
+    }
+
+    #[test]
+    fn rust_ast_keeps_nested_items_and_pointer_ranges() {
+        let text = "pub fn greet(person: &str) { let value = person.trim(); println!(\"hello {value}\"); }\nstruct Person { name: String }\n";
+        let file = file(text);
         let serialized = from_file(&file).unwrap();
         let function = serialized.value_at("/items/0").unwrap();
         assert_eq!(function["kind"], "ItemFn");
@@ -92,15 +94,7 @@ mod tests {
     #[test]
     fn identical_nested_expressions_keep_distinct_pointers_and_ranges() {
         let text = "fn pair() { consume(\"same\", \"same\"); }\n";
-        let mut line_starts = vec![0];
-        line_starts.extend(text.match_indices('\n').map(|(at, _)| at + 1));
-        let file = SourceFile {
-            rel: "src/lib.rs".to_owned(),
-            text: text.to_owned(),
-            ast: parse_file(text).unwrap(),
-            generated: false,
-            line_starts,
-        };
+        let file = file(text);
         let ast = from_file(&file).unwrap();
         let first = ast
             .mapping

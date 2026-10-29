@@ -43,7 +43,7 @@ func (r *run) collectSources(pkgs []*packages.Package) {
 					continue
 				}
 			}
-			source, err := source(rel, file, pkg.Fset, string(host))
+			source, err := sourceAST(rel, file, pkg.Fset, string(host))
 			if err != nil {
 				r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{
 					Path: rel, Reason: fmt.Sprintf("cannot expose Go source AST: %v", err),
@@ -55,7 +55,9 @@ func (r *run) collectSources(pkgs []*packages.Package) {
 	}
 }
 
-func source(rel string, file *ast.File, fset *token.FileSet, host string) (sdk.Source, error) {
+// sourceAST is the serialized syntax tree of one file, with the byte range of
+// each node in the host text.
+func sourceAST(rel string, file *ast.File, fset *token.FileSet, host string) (sdk.Source, error) {
 	if !utf8.ValidString(host) {
 		return sdk.Source{}, fmt.Errorf("host text is not valid UTF-8")
 	}
@@ -109,9 +111,7 @@ func astValue(value reflect.Value, pointer string, fset *token.FileSet, host str
 						SourceRange: rangeValue,
 					}},
 				}
-				if object, ok := serialized.(map[string]any); ok {
-					object["source"] = text
-				}
+				serialized["source"] = text
 			}
 			return serialized, nil
 		}
@@ -147,26 +147,30 @@ func astValue(value reflect.Value, pointer string, fset *token.FileSet, host str
 		}
 		return items, nil
 	case reflect.Struct:
-		return astStructValue(value, pointer, fset, host, sourceMap)
+		fields, err := astStructValue(value, pointer, fset, host, sourceMap)
+		if err != nil {
+			return nil, err
+		}
+		return fields, nil
 	default:
 		return nil, nil
 	}
 }
 
-func astNodeValue(value reflect.Value, pointer string, fset *token.FileSet, host string, sourceMap map[string]sdk.Mapping) (any, error) {
+func astNodeValue(value reflect.Value, pointer string, fset *token.FileSet, host string, sourceMap map[string]sdk.Mapping) (map[string]any, error) {
 	kind := value.Type().Name()
 	object := map[string]any{"kind": kind}
 	fields, err := astStructValue(value, pointer, fset, host, sourceMap)
 	if err != nil {
 		return nil, err
 	}
-	for key, field := range fields.(map[string]any) {
+	for key, field := range fields {
 		object[key] = field
 	}
 	return object, nil
 }
 
-func astStructValue(value reflect.Value, pointer string, fset *token.FileSet, host string, sourceMap map[string]sdk.Mapping) (any, error) {
+func astStructValue(value reflect.Value, pointer string, fset *token.FileSet, host string, sourceMap map[string]sdk.Mapping) (map[string]any, error) {
 	object := make(map[string]any, value.NumField())
 	typeOf := value.Type()
 	for i := 0; i < value.NumField(); i++ {

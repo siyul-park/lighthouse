@@ -175,7 +175,7 @@ type EmbeddedSource struct {
 	Syntax        *string          `json:"syntax,omitempty"`
 	Context       json.RawMessage  `json:"context,omitempty"`
 	Text          string           `json:"text"`
-	SourceRange   []uint32         `json:"source_range"`
+	SourceRange   [2]uint32        `json:"source_range"`
 	TextMap       []TextMapSegment `json:"text_map,omitempty"`
 }
 

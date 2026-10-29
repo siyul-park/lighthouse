@@ -29,18 +29,16 @@ impl SourceFile {
     /// 1-based line and byte column of a proc-macro2 position (0-based
     /// character column).
     pub fn position(&self, line: usize, col: usize) -> (u32, u32) {
-        let Some(&start) = self.line_starts.get(line.wrapping_sub(1)) else {
-            return (u32::try_from(line).unwrap_or(u32::MAX), 1);
+        let line_number = u32::try_from(line).unwrap_or(u32::MAX);
+        let (Some(offset), Some(&start)) = (
+            self.offset(line, col),
+            self.line_starts.get(line.wrapping_sub(1)),
+        ) else {
+            return (line_number, 1);
         };
-        let rest = &self.text[start..];
-        let line_text = rest.split('\n').next().unwrap_or("");
-        let bytes = line_text
-            .char_indices()
-            .nth(col)
-            .map_or(line_text.len(), |(at, _)| at);
         (
-            u32::try_from(line).unwrap_or(u32::MAX),
-            u32::try_from(bytes + 1).unwrap_or(u32::MAX),
+            line_number,
+            u32::try_from(offset - start + 1).unwrap_or(u32::MAX),
         )
     }
 }
@@ -462,7 +460,7 @@ fn empty_file() -> syn::File {
     }
 }
 
-fn line_starts(text: &str) -> Vec<usize> {
+pub(crate) fn line_starts(text: &str) -> Vec<usize> {
     let mut starts = vec![0];
     starts.extend(text.match_indices('\n').map(|(at, _)| at + 1));
     starts

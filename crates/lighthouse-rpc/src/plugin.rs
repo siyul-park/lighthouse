@@ -369,6 +369,6 @@ fn embedded_wire(source: &Source<'_>) -> wire::EmbeddedFile {
         generated: source.file.generated,
         test: source.file.test,
         facts: source.file.facts.clone(),
-        sources: source.regions.iter().map(|source| source.clone()).collect(),
+        sources: source.regions.to_vec(),
     }
 }

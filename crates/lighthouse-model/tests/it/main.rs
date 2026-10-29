@@ -11,4 +11,5 @@ mod project;
 mod review;
 mod scope;
 mod sites;
+mod symbol;
 mod text;
