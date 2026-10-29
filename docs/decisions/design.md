@@ -22,7 +22,7 @@ Design minimizes conceptual surface while keeping responsibility and ownership b
 
 `design/single-responsibility` · module · info · cel
 
-*A type that owns unrelated behaviors is difficult to name, test and change. Public-method count is only a signal; review the semantic responsibilities rather than splitting by size alone.*
+*A type that owns unrelated behaviors is difficult to name, test and change. Two signals, reported once per module at its first type that matches (the first is members). Members counts the public methods of a type (Sonar S1448). Cohesion finds a type with at least `minMethods` methods that fall in more than one connected group, where two methods are joined by a field they both use or by a call between them (LCOM4, Hitz and Montazeri 1995). Both are only signals; review the semantic responsibilities rather than splitting by size alone.*
 
 A symbol SHOULD have one coherent responsibility and a narrow contract; a symbol with too many public methods SHOULD be reviewed for multiple reasons to change.
 
@@ -31,6 +31,7 @@ Derived from: Martin, Clean Code (2008), ch. 10 Classes should be small; Martin,
 | option | default | meaning |
 | --- | --- | --- |
 | `maxMembers` | `10` | Most public methods a type may have. |
+| `minMethods` | `4` | Fewest methods a type has to have for its cohesion to be judged. |
 
 ```go invalid
 package sample
@@ -68,31 +69,24 @@ A module SHOULD be separate from its users only when it provides an independent 
 
 Derived from: Lighthouse, coding-patterns#structural-rules-dbd77a89; Lighthouse, coding-patterns#physical-cohesion-9cf2f03b; Martin, Clean Code (2008), ch. 10 Single responsibility and cohesion
 
-```go invalid
-package sample
+```go invalid main.go
+package main
 
-type Store struct {
-	items []int
-	names []string
-}
+import "example.com/sample/helper"
 
-func (s *Store) AddItem(x int)    { s.items = append(s.items, x) }
-func (s *Store) CountItems() int  { return len(s.items) }
-func (s *Store) AddName(n string) { s.names = append(s.names, n) }
-func (s *Store) CountNames() int  { return len(s.names) }
+func main() { helper.Run() }
 ```
 
-```go valid
-package sample
+```go invalid helper/helper.go
+package helper
 
-type Store struct {
-	items []int
-}
+func Run() {}
+```
 
-func (s *Store) Add(x int)   { s.items = append(s.items, x) }
-func (s *Store) Count() int  { return len(s.items) }
-func (s *Store) First() int  { return s.items[0] }
-func (s *Store) Last() int   { return s.items[len(s.items)-1] }
+```go valid main.go
+package main
+
+func main() {}
 ```
 
 Also: rust

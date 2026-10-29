@@ -7,8 +7,12 @@ metadata:
 spec:
   title: Symbols have one responsibility
   context: A type that owns unrelated behaviors is difficult to name, test and change.
-    Public-method count is only a signal; review the semantic responsibilities rather
-    than splitting by size alone.
+    Two signals, reported once per module at its first type that matches (the first
+    is members). Members counts the public methods of a type (Sonar S1448). Cohesion
+    finds a type with at least `minMethods` methods that fall in more than one connected
+    group, where two methods are joined by a field they both use or by a call between
+    them (LCOM4, Hitz and Montazeri 1995). Both are only signals; review the semantic
+    responsibilities rather than splitting by size alone.
   scope:
     subject: module
   requirement: A symbol SHOULD have one coherent responsibility and a narrow contract;
@@ -21,6 +25,10 @@ spec:
         type: integer
         default: 10
         description: Most public methods a type may have.
+      minMethods:
+        type: integer
+        default: 4
+        description: Fewest methods a type has to have for its cohesion to be judged.
     additionalProperties: false
   check:
     type: cel
@@ -28,19 +36,27 @@ spec:
     variables:
     - name: crowded
       expression: module.types.filter(t, t.public_methods > options.maxMembers)
-    where: size(crowded) > 0
-    message: "{{ crowded[0].name + ' has ' + string(crowded[0].public_methods) + '
-      public methods (max ' + string(options.maxMembers) + '): review whether it has
-      several responsibilities; split by responsibility' }}"
+    - name: split
+      expression: module.types.filter(t, t.methods >= options.minMethods && t.lcom4 > 1)
+    - name: more
+      expression: size(crowded) + size(split.filter(t, !crowded.exists(c, c.id == t.id)))
+        - 1
+    where: size(crowded) + size(split) > 0
+    message: "{{ (size(crowded) > 0 ? crowded[0].name + ' has ' + string(crowded[0].public_methods)
+      + ' public methods (max ' + string(options.maxMembers) + '): review whether it
+      has several responsibilities; split by responsibility' : split[0].name + \"'s
+      methods form \" + string(split[0].lcom4) + ' unrelated groups (' + split[0].groups.map(g,
+      g.join(', ')).join(' | ') + '); split ' + split[0].name + ' along them') + (more
+      > 0 ? ' (+' + string(more) + ' more types)' : '') }}"
     evidence:
-      kind: "'members'"
-      types: crowded.map(t,t.id)
+      kind: "size(crowded) > 0 ? 'members' : 'cohesion'"
+      types: "(crowded + split.filter(t, !crowded.exists(c, c.id == t.id))).map(t, t.id)"
     at:
-      symbol: crowded[0].id
+      symbol: "size(crowded) > 0 ? crowded[0].id : split[0].id"
     identity:
       subject: module.path
     abstain: |-
-      size(crowded) == 0 && module.lines < 600
+      size(crowded) + size(split) == 0 && module.lines < 600
       && (size(module.dependents) == 1 || module.declares == 0
           || (size(module.dependents) == 0 && module.name != 'main'
               && !module.path.contains('[bin:')))
@@ -125,3 +141,73 @@ spec:
     options:
       maxMembers: 3
     canonical: true
+  - name: cohesion-go-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct {
+        	items []int
+        	names []string
+        }
+
+        func (s *Store) AddItem(x int)    { s.items = append(s.items, x) }
+        func (s *Store) CountItems() int  { return len(s.items) }
+        func (s *Store) AddName(n string) { s.names = append(s.names, n) }
+        func (s *Store) CountNames() int  { return len(s.names) }
+    expect:
+    - line: 3
+  - name: cohesion-go-valid
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct {
+        	items []int
+        }
+
+        func (s *Store) Add(x int)   { s.items = append(s.items, x) }
+        func (s *Store) Count() int  { return len(s.items) }
+        func (s *Store) First() int  { return s.items[0] }
+        func (s *Store) Last() int   { return s.items[len(s.items)-1] }
+  - name: cohesion-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+            names: Vec<String>,
+        }
+
+        impl Store {
+            fn add_item(&mut self, x: i32) { self.items.push(x); }
+            fn count_items(&self) -> usize { self.items.len() }
+            fn add_name(&mut self, n: String) { self.names.push(n); }
+            fn count_names(&self) -> usize { self.names.len() }
+        }
+    expect:
+    - line: 1
+  - name: cohesion-rust-valid
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+        }
+
+        impl Store {
+            fn add(&mut self, x: i32) { self.items.push(x); }
+            fn count(&self) -> usize { self.items.len() }
+            fn first(&self) -> i32 { self.items[0] }
+            fn last(&self) -> i32 { self.items[self.items.len() - 1] }
+        }

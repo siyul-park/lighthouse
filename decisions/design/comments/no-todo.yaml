@@ -50,12 +50,10 @@ spec:
       expression: "!documentation && !comment.text.contains('```') && !directive"
     - name: matched
       expression: 'options.enabled && prose && size(bodies) > 0 && options.todoKeywords.exists(k,
-        bodies[0] == k || bodies[0].startsWith(k + '':'') || bodies[0].startsWith(k
-        + '' '')) ? [''todo''] : []'
+        bodies[0].matches(''^'' + k + ''\\b'')) ? [''todo''] : []'
     where: size(matched) > 0
-    message: "{{ options.todoKeywords.filter(k, bodies[0] == k || bodies[0].startsWith(k
-      + ':') || bodies[0].startsWith(k + ' '))[0] + ' comment: do it, file it, or
-      delete it' }}"
+    message: "{{ options.todoKeywords.filter(k, bodies[0].matches('^' + k + '\\\\b'))[0]
+      + ' comment: do it, file it, or delete it' }}"
     evidence:
       kind: "'todo'"
       comment: comment.text
@@ -92,6 +90,32 @@ spec:
     - line: 3
     options:
       enabled: true
+  - name: todo-owner-go-invalid
+    language: go
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        // TODO(alice): remove temporary fallback
+        func Load() {}
+    expect:
+    - line: 3
+  - name: todo-word-go-valid
+    language: go
+    kind: valid
+    options:
+      enabled: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        // TODOS live in the tracker, not in comments.
+        func Load() {}
   - name: todo-valid
     language: go
     kind: valid
