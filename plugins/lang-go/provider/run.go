@@ -41,6 +41,11 @@ type run struct {
 	encoded map[string]json.RawMessage
 	// loads counts the batches the run had the go command load.
 	loads int
+	// chain is where the go command keeps its libraries, once read.
+	chain *toolchain
+	// fenceFiles are the files that stand for the fences of host files: they
+	// are analysed with the rest but are no files of the request.
+	fenceFiles map[string]bool
 	// regionModules gives the module path of the unit of a fence by its file,
 	// where the unit's directory is not its own.
 	regionModules map[string]string
@@ -106,7 +111,9 @@ func (r *run) index() {
 func (r *run) finish() sdk.IndexResult {
 	paths := make([]string, 0, len(r.fragments))
 	for path := range r.fragments {
-		paths = append(paths, path)
+		if !r.fenceFiles[path] {
+			paths = append(paths, path)
+		}
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
@@ -119,6 +126,9 @@ func (r *run) finish() sdk.IndexResult {
 		return r.result.Sources[i].Path < r.result.Sources[j].Path
 	})
 	for path, reason := range r.problems {
+		if r.fenceFiles[path] {
+			continue
+		}
 		r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{Path: path, Reason: reason})
 	}
 	sort.Slice(r.result.Incomplete, func(i, j int) bool {
@@ -292,6 +302,7 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 			}
 			r.claimed[rel] = true
 			u := newUnit(rel, file, pkg, src, res)
+			u.fence = r.fenceFiles[rel]
 			if module, ok := r.regionModules[rel]; ok {
 				u.module = module
 				u.frag.Modules[0].Path = module
@@ -508,6 +519,7 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		failed:        map[string]int{},
 		encoded:       map[string]json.RawMessage{},
 		regionModules: map[string]string{},
+		fenceFiles:    map[string]bool{},
 		result:        emptyResult(),
 	}
 	for _, f := range params.FileInputs() {

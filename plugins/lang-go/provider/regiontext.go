@@ -16,10 +16,14 @@ type regionText struct {
 // remap puts the spans of the fragment of a fence's file where the host file
 // shows them.
 type remap struct {
-	text   regionText
-	lines  []int
-	host   []int
+	text  regionText
+	lines []int
+	host  []int
+	// module is the module the fence declares its symbols in, and shared
+	// says that it is one of the project's: the imports of the fence are then
+	// no imports of the module.
 	module string
+	shared bool
 }
 
 // unmapped marks the bytes of a fence's file that the host does not show: the
@@ -76,8 +80,26 @@ func (m remap) fragment(f *sdk.Fragment, path string) *sdk.Fragment {
 		Edges:     m.edges(f.Edges, dropped),
 		Functions: m.functions(f.Functions, dropped),
 		Tests:     tests,
-		Comments:  []sdk.Comment{},
+		Comments:  m.comments(f.Comments, dropped),
 	}
+}
+
+// comments are the comment groups the host shows, at their place. The text is
+// the fence's: what the host shows without the indentation of a list item.
+func (m remap) comments(all []sdk.Comment, dropped map[string]bool) []sdk.Comment {
+	shown := make([]sdk.Comment, 0, len(all))
+	for _, comment := range all {
+		span, ok := m.span(comment.Span)
+		if !ok {
+			continue
+		}
+		comment.Span = span
+		if dropped[comment.AttachedTo] {
+			comment.AttachedTo = ""
+		}
+		shown = append(shown, comment)
+	}
+	return shown
 }
 
 // symbols are the symbols the host shows, at their place, and the ids of the
@@ -131,7 +153,7 @@ func (m remap) functions(all []sdk.FunctionSummary, dropped map[string]bool) []s
 func (m remap) edges(all []sdk.Edge, dropped map[string]bool) []sdk.Edge {
 	shown := make([]sdk.Edge, 0, len(all))
 	for _, edge := range all {
-		if dropped[edge.To] {
+		if dropped[edge.To] || (m.shared && edge.Kind == edgeImports && edge.From.Symbol == "") {
 			continue
 		}
 		if dropped[edge.From.Symbol] {

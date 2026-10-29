@@ -60,6 +60,36 @@ func TestProviderIndexRegions(t *testing.T) {
 		require.Len(t, onlyFragment(t, result).Edges, 2*4, "per fence: three imports (fmt, the module, the package it lacked) and a call")
 	})
 
+	t.Run("a name the prose defines is a syntactic edge to the bare name, and a notice", func(t *testing.T) {
+		root := regionProject(t)
+
+		result, _ := indexFences(t, root, []fence{{body: "fmt.Println(ql.Parse(text), Hello)\n"}})
+
+		require.Empty(t, result.Incomplete)
+		require.True(t, hasNotice(result, "do not type-check"), "%v", result.Notices)
+		var found []string
+		for _, edge := range onlyFragment(t, result).Edges {
+			if edge.Resolution == "syntactic" {
+				found = append(found, edge.Kind+" "+edge.To)
+				require.NotNil(t, edge.Site)
+				require.Equal(t, 2, edge.Site.Start.Line)
+			}
+		}
+		require.ElementsMatch(t, []string{"calls Parse", "references text", "references Hello"}, found)
+	})
+
+	t.Run("the comments of a fence are the host's, at their place", func(t *testing.T) {
+		root := regionProject(t)
+
+		result, _ := indexFences(t, root, []fence{{body: "// shows the greeting\nfmt.Println(m.Hello())\n"}})
+
+		comments := onlyFragment(t, result).Comments
+		require.Len(t, comments, 1)
+		require.Equal(t, "// shows the greeting", comments[0].Text)
+		require.Equal(t, 2, comments[0].Span.Start.Line)
+		require.Equal(t, 1, comments[0].Span.Start.Col)
+	})
+
 	t.Run("the wrapper of statements is no symbol and no place", func(t *testing.T) {
 		root := regionProject(t)
 
@@ -120,14 +150,41 @@ func TestProviderIndexRegions(t *testing.T) {
 		require.True(t, hasNotice(result, "README.md:2: the Go fence is not valid Go"), "%v", result.Notices)
 	})
 
-	t.Run("the package context puts the fence in the package, where unexported names resolve", func(t *testing.T) {
+	t.Run("the package context puts the fence in the package: its names resolve, its symbols are the package's", func(t *testing.T) {
 		root := regionProject(t)
 
-		result, _ := indexFences(t, root, []fence{{body: "helper()\n", context: `{"package":"."}`}})
+		result, _ := indexFences(t, root, []fence{{body: "func extra() { helper() }\n", context: `{"package":"."}`}})
 
 		require.Empty(t, result.Incomplete)
 		call := edgeTo(t, result, "helper")
-		require.Equal(t, sdk.Position{Line: 2, Col: 1}, call.Site.Start)
+		require.Equal(t, sdk.Position{Line: 2, Col: 16}, call.Site.Start)
+		fragment := onlyFragment(t, result)
+		require.Len(t, fragment.Modules, 1)
+		require.Equal(t, ".", fragment.Modules[0].Path, "the module of the package, not one of the fence")
+		var extra *sdk.Symbol
+		for i := range fragment.Symbols {
+			if fragment.Symbols[i].Name == "extra" {
+				extra = &fragment.Symbols[i]
+			}
+		}
+		require.NotNil(t, extra)
+		require.Equal(t, "README.md", extra.File)
+		require.Contains(t, extra.ID, ".::extra", "owned by the package")
+		require.Equal(t, call.From.Symbol, extra.ID)
+	})
+
+	t.Run("the fences ride the load of the files of the request", func(t *testing.T) {
+		root := regionProject(t)
+
+		result, g := indexMixed(t, root, []fence{{body: "fmt.Println(m.Hello())\n"}, {body: "fmt.Println(m.Hello())\n"}})
+
+		require.Empty(t, result.Incomplete)
+		require.Equal(t, 1, g.Stats().Loads)
+		var paths []string
+		for _, f := range result.Fragments {
+			paths = append(paths, f.File.Path)
+		}
+		require.Equal(t, []string{"README.md", "m.go"}, paths, "the fences have no fragment of their own")
 	})
 
 	t.Run("a directory without a Go package is a gap", func(t *testing.T) {
@@ -181,6 +238,17 @@ func regionProject(t *testing.T) string {
 // indexFences indexes the fences of README.md, written one after the other.
 func indexFences(t *testing.T, root string, fences []fence) (sdk.IndexResult, *provider.Provider) {
 	t.Helper()
+	return index(t, root, fences, nil)
+}
+
+// indexMixed indexes m.go and the fences of README.md in one request.
+func indexMixed(t *testing.T, root string, fences []fence) (sdk.IndexResult, *provider.Provider) {
+	t.Helper()
+	return index(t, root, fences, []sdk.IndexInput{{Kind: "file", File: &sdk.FileRef{Path: "m.go"}}})
+}
+
+func index(t *testing.T, root string, fences []fence, files []sdk.IndexInput) (sdk.IndexResult, *provider.Provider) {
+	t.Helper()
 	var host strings.Builder
 	var sources []sdk.EmbeddedSource
 	for i, f := range fences {
@@ -208,12 +276,13 @@ func indexFences(t *testing.T, root string, fences []fence) (sdk.IndexResult, *p
 		host.WriteString("```\n\n")
 	}
 	g := provider.New("lang-go", "test")
+	inputs := append(files, sdk.IndexInput{Kind: "regions", Regions: &sdk.EmbeddedFile{
+		Path: "README.md", Text: host.String(), Sources: sources,
+	}})
 	result, err := g.Index(sdk.IndexParams{
 		Project:  sdk.ProjectRef{Root: root},
 		Language: "go",
-		Inputs: []sdk.IndexInput{{Kind: "regions", Regions: &sdk.EmbeddedFile{
-			Path: "README.md", Text: host.String(), Sources: sources,
-		}}},
+		Inputs:   inputs,
 	})
 	require.NoError(t, err)
 	return result, g

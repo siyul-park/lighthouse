@@ -47,7 +47,10 @@ type ServerCapabilities struct {
 // ProviderManifest is what a language provider declares: the language a
 // plugin serves, how files select it and what it guarantees.
 type ProviderManifest struct {
-	ID           string      `json:"id"`
+	ID string `json:"id"`
+	// Aliases are the names the language goes by in a document, as GitHub
+	// Linguist's aliases are: what a fenced code block may call it.
+	Aliases      []string    `json:"aliases,omitempty"`
 	Globs        []string    `json:"globs"`
 	Priority     int         `json:"priority"`
 	Fallback     bool        `json:"fallback,omitempty"`

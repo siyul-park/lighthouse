@@ -20,8 +20,9 @@ func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error
 		ProtocolVersion: sdk.ProtocolVersion,
 		ServerInfo:      sdk.Implementation{Name: p.id, Version: p.version},
 		Capabilities: sdk.ServerCapabilities{Languages: []sdk.ProviderManifest{{
-			ID:    language,
-			Globs: []string{"**/*.go"},
+			ID:      language,
+			Aliases: []string{"go", "golang"},
+			Globs:   []string{"**/*.go"},
 			Conventions: sdk.Conventions{
 				TestGlobs:           []string{"**/*_test.go"},
 				ConstructorPrefixes: []string{"New", "new"},
@@ -32,14 +33,11 @@ func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error
 	}, nil
 }
 
-// Index analyzes every requested file. Failures are reported as incomplete
-// entries; a bad request never ends the process.
+// Index analyzes every requested file, and the regions of host files, which
+// are loaded with them: what the go command loads for one it loads for both.
+// Failures are reported as incomplete entries; a bad request never ends the
+// process.
 func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
-	for _, input := range params.Inputs {
-		if input.Kind == "regions" && input.Regions != nil {
-			return p.indexRegions(params), nil
-		}
-	}
 	opts, err := newOptions(params.Context.Options)
 	if err != nil {
 		result := emptyResult()
@@ -48,6 +46,7 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 	}
 	r := newRun(params, opts)
 	p.last = RunStats{}
+	snippets := r.fences(params)
 	astRequested := false
 	for _, input := range params.Inputs {
 		if input.Kind == "file" && input.File != nil && input.SourceAST {
@@ -55,11 +54,23 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 			break
 		}
 	}
-	if astRequested || !p.indexCached(r, params) {
-		r = newRun(params, opts)
-		r.index()
+	var analysed *run
+	cached := false
+	if !astRequested {
+		analysed, cached = p.indexCached(r, params, snippets)
 	}
-	return r.finish(), nil
+	if !cached {
+		r = newRun(params, opts)
+		r.admit(snippets)
+		r.index()
+		p.last = RunStats{Loads: r.loads}
+		analysed = r
+	}
+	result := r.finish()
+	if len(snippets) > 0 {
+		result = analysed.regionResult(result, snippets)
+	}
+	return result, nil
 }
 
 // Stats says which units the last index request read from the cache and which

@@ -41,23 +41,26 @@ type cachePlan struct {
 // indexCached answers the request from the cache where it can and analyzes
 // only the units it cannot. It changes r only when it answers; false means the
 // caller must run uncached.
-func (p *Provider) indexCached(r *run, params sdk.IndexParams) bool {
+func (p *Provider) indexCached(r *run, params sdk.IndexParams, snippets []*snippet) (*run, bool) {
 	if params.Context.Cache == nil || params.Context.Cache.Dir == "" || len(params.Context.Overlays) > 0 {
-		return false
+		return nil, false
 	}
 	store := &cacheStore{dir: params.Context.Cache.Dir}
 	pl := &planner{r: r, used: map[string]fileFacts{}, units: map[string]*cacheUnit{}}
 	plan, ok := p.prepare(pl, store, params)
 	if !ok {
-		return false
+		return nil, false
 	}
-	sub, ok := analyzeMisses(r, params, plan)
+	sub, ok := analyzeMisses(r, params, plan, snippets)
 	if !ok {
-		return false
+		return nil, false
 	}
 	p.finish(r, store, plan, sub, pl)
 	p.last = plan.stats()
-	return true
+	if sub != nil {
+		p.last.Loads = sub.loads
+	}
+	return sub, true
 }
 
 // finish installs the answer into r and keeps what the analysis learned.
@@ -175,8 +178,8 @@ func unitAPIKey(base string, u *cacheUnit) string {
 // units that declare interfaces so that types are matched against all of them.
 // It returns false when that run failed as a whole, which the cold run would
 // report differently.
-func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan) (*run, bool) {
-	if len(plan.misses) == 0 {
+func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan, snippets []*snippet) (*run, bool) {
+	if len(plan.misses) == 0 && len(snippets) == 0 {
 		return nil, true
 	}
 	// The interface units are always analyzed along: a method is an
@@ -197,6 +200,7 @@ func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan) (*run, bool)
 		}
 	}
 	sub := newRun(subParams, r.opts)
+	sub.admit(snippets)
 	sub.index()
 	if !sameFailures(r, sub) {
 		return sub, false

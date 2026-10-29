@@ -17,13 +17,15 @@ import (
 // unit is one requested file together with the package that type-checked it
 // and the fragment being built from it.
 type unit struct {
-	rel  string
-	file *ast.File
-	pkg  *packages.Package
-	fset *token.FileSet
-	src  []byte
-	res  *resolver
-	frag *sdk.Fragment
+	// fence marks the file of a fence of a document.
+	fence bool
+	rel   string
+	file  *ast.File
+	pkg   *packages.Package
+	fset  *token.FileSet
+	src   []byte
+	res   *resolver
+	frag  *sdk.Fragment
 
 	module   string
 	testOf   string
@@ -54,6 +56,9 @@ func (u *unit) fragment() *sdk.Fragment {
 		case *ast.GenDecl:
 			u.general(d)
 		}
+	}
+	if u.fence {
+		u.unresolved()
 	}
 	u.comments()
 	return u.frag
@@ -355,6 +360,11 @@ func (u *unit) edge(kind string, from sdk.Node, to string) { u.edgeAt(kind, from
 
 // edgeAt emits an edge once per distinct relation and site.
 func (u *unit) edgeAt(kind string, from sdk.Node, to string, site *sdk.Span) {
+	u.edgeAs(kind, from, to, site, resolutionSemantic)
+}
+
+// edgeAs emits an edge whose target is as reliable as resolution says.
+func (u *unit) edgeAs(kind string, from sdk.Node, to string, site *sdk.Span, resolution string) {
 	key := edgeKey{kind: kind, from: from, to: to}
 	if site != nil {
 		key.site, key.sited = *site, true
@@ -364,7 +374,7 @@ func (u *unit) edgeAt(kind string, from sdk.Node, to string, site *sdk.Span) {
 	}
 	u.edges[key] = true
 	u.frag.Edges = append(u.frag.Edges, sdk.Edge{
-		Kind: kind, From: from, To: to, Resolution: resolutionSemantic, Site: site,
+		Kind: kind, From: from, To: to, Resolution: resolution, Site: site,
 	})
 }
 

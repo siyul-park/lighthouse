@@ -35,6 +35,8 @@ type snippet struct {
 	form func(imports string) regionText
 	uses []string
 	dir  string
+	// shared says that the fence stands in a package of the project.
+	shared bool
 }
 
 // importSpec is one import of a declaration.
@@ -51,19 +53,11 @@ const snippetsDir = ".lighthouse-snippets"
 // directory instead of in a package of its own.
 const packageKey = "package"
 
-// indexRegions analyses the Go fences of host files, each a unit of its own
-// that uses the module around the Markdown file from outside, as an importer
-// does. The units of a module are loaded together, so N fences cost one load.
-// A fence that is only a fragment is a notice and not a gap: the names it
-// defines in prose do not resolve, and what does is reported.
-func (p *Provider) indexRegions(params sdk.IndexParams) sdk.IndexResult {
-	opts, err := newOptions(params.Context.Options)
-	if err != nil {
-		result := emptyResult()
-		result.Incomplete = append(result.Incomplete, sdk.Incomplete{Reason: err.Error()})
-		return result
-	}
-	r := newRun(params, opts)
+// fences are the units of the Go fences of the host files of the request: each
+// a unit of its own that uses the module around the Markdown file from outside,
+// as an importer does, or a file of the package a source rule names. Their
+// imports are completed for all of them at once.
+func (r *run) fences(params sdk.IndexParams) []*snippet {
 	var snippets []*snippet
 	for _, input := range params.Inputs {
 		if input.Kind == "regions" && input.Regions != nil {
@@ -71,17 +65,23 @@ func (p *Provider) indexRegions(params sdk.IndexParams) sdk.IndexResult {
 		}
 	}
 	r.complete(snippets)
+	return snippets
+}
+
+// admit has the run analyse the fences with its files, in the loads it makes
+// for them: a fence is a file that stands in a directory beside its host.
+func (r *run) admit(snippets []*snippet) {
 	for _, s := range snippets {
 		if s.note != "" {
 			continue
 		}
 		r.requested[s.rel] = sdk.FileRef{Path: s.rel}
 		r.overlays[filepath.Join(r.root, filepath.FromSlash(s.rel))] = s.text.text
-		r.regionModules[s.rel] = s.module
+		r.fenceFiles[s.rel] = true
+		if s.module != "" {
+			r.regionModules[s.rel] = s.module
+		}
 	}
-	r.index()
-	p.last = RunStats{Loads: r.loads}
-	return r.regionResult(snippets)
 }
 
 // snippets are the units of the fences of one host file, in the order of the
@@ -104,7 +104,7 @@ func (r *run) snippets(host *sdk.EmbeddedFile) []*snippet {
 		if into := contextString(source, packageKey); into != "" {
 			pkg, wrapper = r.packageName(into), fmt.Sprintf("snippet%d", i+1)
 			s.rel = path.Join(into, "zz_lighthouse_"+sanitize(name)+".go")
-			s.module = path.Join(into, snippetsDir, name)
+			s.module, s.shared = "", true
 			if pkg == "" {
 				s.note = fmt.Sprintf("names `%s` in `language.context.%s`, which holds no Go package", into, packageKey)
 				out = append(out, s)
@@ -186,7 +186,7 @@ func (r *run) complete(snippets []*snippet) {
 	}
 	sort.Strings(dirs)
 	for _, dir := range dirs {
-		declarations := importDeclarations(dir, groups[dir])
+		declarations := r.importDeclarations(dir, groups[dir])
 		for _, s := range groups[dir] {
 			if declaration := declarations[strings.Join(s.uses, ",")]; declaration != "" {
 				s.text = s.form(declaration)
@@ -195,12 +195,11 @@ func (r *run) complete(snippets []*snippet) {
 	}
 }
 
-// regionResult reports the fragments of the units in the host's coordinates,
-// one fragment per host file.
-func (r *run) regionResult(snippets []*snippet) sdk.IndexResult {
+// regionResult adds to the result the fragments of the fences in the host's
+// coordinates, one fragment per host file.
+func (r *run) regionResult(result sdk.IndexResult, snippets []*snippet) sdk.IndexResult {
 	merged := map[string]*sdk.Fragment{}
 	var untyped []string
-	result := r.result
 	// A host file with no fence worth reading has a fragment all the same.
 	for _, s := range snippets {
 		mergeFragment(merged, emptyFragment(sdk.FileInfo{Path: s.host.Path}), s.host.Path)
@@ -222,7 +221,7 @@ func (r *run) regionResult(snippets []*snippet) sdk.IndexResult {
 		if fragment == nil || len(fragment.Modules) == 0 {
 			continue
 		}
-		m := remap{text: s.text, lines: lineStarts(s.text.text), host: lineStarts([]byte(s.host.Text)), module: s.module}
+		m := remap{text: s.text, lines: lineStarts(s.text.text), host: lineStarts([]byte(s.host.Text)), module: fragment.Modules[0].Path, shared: s.shared}
 		mergeFragment(merged, m.fragment(fragment, s.host.Path), s.host.Path)
 	}
 	if len(untyped) > 0 {
@@ -230,37 +229,39 @@ func (r *run) regionResult(snippets []*snippet) sdk.IndexResult {
 			"%d Go fence(s) do not type-check (names the prose defines, or code that is not meant to compile); what resolves is reported, e.g. %s",
 			len(untyped), untyped[0]))
 	}
-	paths := make([]string, 0, len(merged))
-	for p := range merged {
-		paths = append(paths, p)
+	for _, f := range merged {
+		result.Fragments = append(result.Fragments, *f)
 	}
-	sort.Strings(paths)
-	result.Fragments = result.Fragments[:0]
-	for _, p := range paths {
-		result.Fragments = append(result.Fragments, *merged[p])
-	}
+	sort.Slice(result.Fragments, func(i, j int) bool { return result.Fragments[i].File.Path < result.Fragments[j].File.Path })
 	return result
 }
 
 // importDeclarations is the import declaration of each set of uses of the
-// fences, by the uses joined with commas. When the names of all the uses
-// settle to one import each, the sets are read from it; otherwise each set is
-// asked for on its own.
-func importDeclarations(dir string, fences []*snippet) map[string]string {
+// fences, by the uses joined with commas. A name that the standard library or
+// the module holds once, or the root package of a module it requires, is
+// settled at once. The names a requirement may have further down are asked of
+// goimports, which scans the module and its dependencies for every call, so
+// the uses of all the fences go in one file; when the names of its answer are
+// not the ones the uses make, each set is asked for on its own. A name no one
+// of these knows is left unresolved: prose defines names, and a fence that
+// uses them is a fragment.
+func (r *run) importDeclarations(dir string, fences []*snippet) map[string]string {
 	sets := map[string]*snippet{}
 	union := map[string]bool{}
+	names := map[string]bool{}
 	for _, s := range fences {
 		sets[strings.Join(s.uses, ",")] = s
 		for _, use := range s.uses {
 			union[use] = true
+			names[packageOf(use)] = true
 		}
 	}
-	names := map[string]bool{}
-	for use := range union {
-		names[packageOf(use)] = true
+	byName, pending, pendingNames := r.fromTables(dir, union, names)
+	asked, ok := ask(dir, pending, pendingNames)
+	for name, spec := range asked {
+		byName[name] = spec
 	}
 	out := map[string]string{}
-	byName, ok := importsByName(goimports(dir, probe(union)), names)
 	for key, s := range sets {
 		if !ok {
 			out[key] = declaration(goimports(dir, s.text.text))
@@ -278,6 +279,59 @@ func importDeclarations(dir string, fences []*snippet) map[string]string {
 		out[key] = declaration(specs)
 	}
 	return out
+}
+
+// fromTables settles the names that the standard library, the module or a
+// requirement's root package has once, and returns the uses and names that
+// only goimports can settle.
+func (r *run) fromTables(dir string, union, names map[string]bool) (byName map[string]importSpec, pending, pendingNames map[string]bool) {
+	byName = map[string]importSpec{}
+	pending = map[string]bool{}
+	pendingNames = map[string]bool{}
+	held := r.knownPackages(dir)
+	for name := range names {
+		if candidates := held[name]; len(candidates) == 1 {
+			byName[name] = candidates[0]
+		}
+	}
+	for use := range union {
+		if _, settled := byName[packageOf(use)]; !settled {
+			pending[use] = true
+			pendingNames[packageOf(use)] = true
+		}
+	}
+	if len(pending) == 0 {
+		return byName, pending, pendingNames
+	}
+	settled, plausible := r.required(dir, pendingNames)
+	for name, spec := range settled {
+		byName[name] = spec
+	}
+	for name := range pendingNames {
+		if len(held[name]) > 1 {
+			plausible[name] = true
+		}
+	}
+	for use := range pending {
+		if !plausible[packageOf(use)] {
+			delete(pending, use)
+		}
+	}
+	for name := range pendingNames {
+		if !plausible[name] {
+			delete(pendingNames, name)
+		}
+	}
+	return byName, pending, pendingNames
+}
+
+// ask has goimports settle the uses in one file; false when the names of its
+// answer are not the ones the uses make.
+func ask(dir string, pending, pendingNames map[string]bool) (map[string]importSpec, bool) {
+	if len(pending) == 0 {
+		return nil, true
+	}
+	return importsByName(goimports(dir, probe(pending)), pendingNames)
 }
 
 // packageOf is the package name of a use, `name.Selected`.
@@ -311,13 +365,7 @@ func importsByName(specs []importSpec, names map[string]bool) (map[string]import
 	for _, spec := range specs {
 		name := spec.name
 		if name == "" {
-			name = path.Base(spec.path)
-			if i := strings.LastIndex(name, "."); i > 0 && isMajor(name[i+1:]) {
-				name = name[:i]
-			}
-			if isMajor(name) {
-				name = path.Base(path.Dir(spec.path))
-			}
+			name = importName(spec.path)
 		}
 		if _, dup := byName[name]; dup || !names[name] {
 			return nil, false
@@ -325,6 +373,20 @@ func importsByName(specs []importSpec, names map[string]bool) (map[string]import
 		byName[name] = spec
 	}
 	return byName, true
+}
+
+// importName is the name a file uses the package of an import path under, as
+// the path shows it: the last element, the one before it for a major version,
+// and none of a `.vN` suffix.
+func importName(importPath string) string {
+	name := path.Base(importPath)
+	if i := strings.LastIndex(name, "."); i > 0 && isMajor(name[i+1:]) {
+		name = name[:i]
+	}
+	if isMajor(name) {
+		name = path.Base(path.Dir(importPath))
+	}
+	return name
 }
 
 // isMajor reports whether the element is a major version suffix, v2 and up.
@@ -370,6 +432,7 @@ func mergeFragment(merged map[string]*sdk.Fragment, f *sdk.Fragment, host string
 	into.Edges = append(into.Edges, f.Edges...)
 	into.Functions = append(into.Functions, f.Functions...)
 	into.Tests = append(into.Tests, f.Tests...)
+	into.Comments = append(into.Comments, f.Comments...)
 }
 
 // goimports asks the vendor tool which imports the text lacks, as its module
