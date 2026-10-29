@@ -12,6 +12,7 @@ mod provider;
 mod resolved;
 mod rules;
 mod sandbox;
+mod signals;
 mod spec;
 mod standard;
 
@@ -43,6 +44,7 @@ pub use provider::{CommandProtocol, ModelProvider, ProviderSpec, RESERVED_PROVID
 use resolved::Resolved;
 pub use rules::{Level, RuleConfig, RuleSetting, Rules};
 pub use sandbox::SandboxSpec;
+pub use signals::{SignalsSpec, Surface};
 use spec::PluginEntry;
 pub use spec::{
     GeneratedCheck, OverrideSpec, ProjectSpec, SourceLanguageSpec, SourceRuleSpec, TestNamingSpec,
@@ -180,6 +182,7 @@ pub struct Config {
     models: Models,
     sandbox: Policy,
     fix: FixPolicy,
+    signals: SignalsSpec,
     extends: Vec<String>,
     rules: Rules,
     /// The model bindings of single decisions the personal layers set: they
@@ -276,6 +279,7 @@ impl Config {
             models: Models::new(&spec.models),
             sandbox: spec.sandbox.into(),
             fix: FixPolicy::new(spec.fix),
+            signals: spec.signals,
             extends: spec.extends,
             rules: rules(spec.rules),
             environment: BTreeMap::new(),
@@ -398,6 +402,11 @@ impl Config {
     /// the programs that must pass after them.
     pub fn fix(&self) -> &FixPolicy {
         &self.fix
+    }
+
+    /// What the project says about session signals.
+    pub fn signals(&self) -> &SignalsSpec {
+        &self.signals
     }
 
     /// Project names named in `extends`, in declaration order.

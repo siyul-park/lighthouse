@@ -9,7 +9,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;
 
-use super::{fixing::FixSpec, models::ModelsSpec, rules::RuleSetting, sandbox::SandboxSpec};
+use super::{
+    fixing::FixSpec, models::ModelsSpec, rules::RuleSetting, sandbox::SandboxSpec,
+    signals::SignalsSpec,
+};
 
 /// A project's configuration, and the shape of a shareable one: `extends`
 /// names any project, the way an ESLint config extends a shareable config.
@@ -49,6 +52,10 @@ pub struct ProjectSpec {
     /// What fixes may do, and how fixes by models are checked beyond the rules.
     #[serde(default, skip_serializing_if = "FixSpec::is_empty")]
     pub fix: FixSpec,
+    /// How long session signals are kept, and whether the agent hears about
+    /// them.
+    #[serde(default, skip_serializing_if = "SignalsSpec::is_empty")]
+    pub signals: SignalsSpec,
     /// Which files are generated code, beyond what the providers and
     /// `.gitattributes` say, and whether it is checked.
     #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]
