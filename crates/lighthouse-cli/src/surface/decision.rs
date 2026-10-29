@@ -173,13 +173,17 @@ pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Re
         for failure in &report.ran.failures {
             let _ = writeln!(out, "FAIL {failure}");
         }
+        for skipped in &report.ran.skipped {
+            let _ = writeln!(out, "SKIP {skipped}");
+        }
         let _ = writeln!(
             out,
-            "decision test: {} decision(s) in {} language(s), {} run(s), {} failure(s)",
+            "decision test: {} decision(s) in {} language(s), {} run(s), {} failure(s), {} skipped",
             report.ran.decisions,
             report.ran.languages,
             report.ran.runs,
-            report.ran.failures.len()
+            report.ran.failures.len(),
+            report.ran.skipped.len()
         );
         out
     })?;

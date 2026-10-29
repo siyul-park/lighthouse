@@ -339,6 +339,62 @@ fn rule_tester_check() {
     assert_eq!(failures, ["fake/marker: no example for language `go`"]);
 }
 
+const MISSING_TOOL: &str = "apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: fake/tool
+spec:
+  title: Tool
+  context: A program judges the file.
+  scope: { subject: file }
+  requirement: A file MUST satisfy the tool.
+  severity: warn
+  check:
+    type: command
+    files: [\"**/*.txt\"]
+  languages:
+    notes:
+      check:
+        command: [lighthouse-no-such-tool, \"{file}\"]
+        output: status
+  examples:
+    - name: bad
+      language: notes
+      kind: invalid
+      files: [{ path: a.txt, body: bad }]
+      expect: [{ line: 1 }]
+    - name: good
+      language: notes
+      kind: valid
+      files: [{ path: a.txt, body: good }]
+";
+
+#[test]
+fn rule_tester_skipped() {
+    let pack = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: fake\nspec:\n  title: Fake\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [tool]\n";
+    let catalog = Catalog::from_files(
+        [("fake/pack.yaml", pack), ("fake/s/tool.yaml", MISSING_TOOL)]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+    let tester = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
+
+    let failures = tester.check_all();
+    let skipped = tester.skipped(catalog.decision("fake/tool").unwrap());
+
+    assert!(failures.is_empty(), "{failures:?}");
+    assert_eq!(
+        skipped,
+        [
+            "fake/tool bad: `lighthouse-no-such-tool` is not installed",
+            "fake/tool good: `lighthouse-no-such-tool` is not installed"
+        ]
+    );
+}
+
 #[test]
 fn a_decision_has_nothing_to_show_in_a_language_it_does_not_apply_to() {
     let catalog = catalog_with("languages:\n  notes: {}\n", HOLDING);

@@ -62,6 +62,9 @@ pub struct DecisionTest {
     pub runs: usize,
     /// One line per failing example; empty when every example holds.
     pub failures: Vec<String>,
+    /// One line per example that was not run because the program its command
+    /// check names is not installed; they are not failures.
+    pub skipped: Vec<String>,
 }
 
 /// The decisions the registry has a rule for, with their catalog titles; with
@@ -227,6 +230,7 @@ pub(crate) fn test_catalog(
         languages
     };
     let mut failures = unregistered(&decisions, &registered);
+    let mut skipped = Vec::new();
     let mut runs = 0;
     let restart_error = RefCell::new(None);
     for language in &languages {
@@ -251,6 +255,12 @@ pub(crate) fn test_catalog(
             .trusted(session.trusted());
         for decision in decisions.iter().filter(|d| tester.applies(d)) {
             runs += 1;
+            skipped.extend(
+                tester
+                    .skipped(decision)
+                    .into_iter()
+                    .map(|f| format!("[{language}] {f}")),
+            );
             failures.extend(
                 tester
                     .check(decision)
@@ -267,6 +277,7 @@ pub(crate) fn test_catalog(
         languages: languages.len(),
         runs,
         failures,
+        skipped,
     })
 }
 

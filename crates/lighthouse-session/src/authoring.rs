@@ -169,6 +169,7 @@ fn commit(
             languages: 0,
             runs: 0,
             failures: Vec::new(),
+            skipped: Vec::new(),
         }
     };
     if !test.failures.is_empty() {

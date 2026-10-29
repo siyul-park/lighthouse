@@ -113,8 +113,33 @@ impl<'a> RuleTester<'a> {
                 if model_only && example.kind == ExampleKind::Invalid {
                     return None;
                 }
+                if absent(decision, example).is_some() {
+                    return None;
+                }
                 let failure = self.run(decision, example).err()?;
                 Some(format!("{} {}: {failure}", decision.id(), example.name))
+            })
+            .collect()
+    }
+
+    /// The examples of `decision` that cannot run here because the program of
+    /// its command check is not installed, one line each. They are not failures:
+    /// the tool is the user's to install, and the decision says which it needs.
+    pub fn skipped(&self, decision: &Decision) -> Vec<String> {
+        if !self.applies(decision) {
+            return Vec::new();
+        }
+        decision
+            .examples
+            .iter()
+            .filter(|example| self.selects(example))
+            .filter_map(|example| {
+                let program = absent(decision, example)?;
+                Some(format!(
+                    "{} {}: `{program}` is not installed",
+                    decision.id(),
+                    example.name
+                ))
             })
             .collect()
     }
@@ -347,4 +372,29 @@ fn exempt(decision: &Decision, language: &str) -> bool {
         }
         _ => false,
     }
+}
+
+/// The program of `decision`'s command check for the language of `example`
+/// when it is not on the `PATH`.
+fn absent(decision: &Decision, example: &Example) -> Option<String> {
+    let Some(CheckKind::Command(command)) = decision.check.as_ref().map(|check| &check.kind) else {
+        return None;
+    };
+    let program = command
+        .programs(decision)
+        .of(&example.language)?
+        .command
+        .first()?
+        .clone();
+    if program.contains('/') || on_path(&program) {
+        return None;
+    }
+    Some(program)
+}
+
+fn on_path(program: &str) -> bool {
+    std::env::var_os("PATH").is_some_and(|path| {
+        std::env::split_paths(&path)
+            .any(|dir| fs::metadata(dir.join(program)).is_ok_and(|meta| meta.is_file()))
+    })
 }

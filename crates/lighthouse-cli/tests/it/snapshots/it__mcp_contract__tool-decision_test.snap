@@ -64,6 +64,13 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "format": "uint",
         "minimum": 0,
         "type": "integer"
+      },
+      "skipped": {
+        "description": "One line per example that was not run because the program its command\ncheck names is not installed; they are not failures.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       }
     },
     "required": [
@@ -71,7 +78,8 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "decisions",
       "languages",
       "runs",
-      "failures"
+      "failures",
+      "skipped"
     ],
     "title": "DecisionTest",
     "type": "object"
