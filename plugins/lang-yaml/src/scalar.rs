@@ -15,7 +15,7 @@ pub(crate) fn map_scalar(
     value: &str,
 ) -> Result<MappedScalar, String> {
     let leading = raw.len() - raw.trim_start().len();
-    let trim = raw.trim();
+    let trim = quoted_extent(raw.trim());
     let at = start + leading;
     if trim == value {
         let mut offsets = TextOffsets::with_capacity(value.len());
@@ -39,6 +39,33 @@ pub(crate) fn map_scalar(
         "cannot map decoded scalar to exact host bytes: raw={trim:?}, value={value:?}, span={start}..{}",
         start + raw.len()
     ))
+}
+
+/// A quoted scalar up to its closing quote: the parser ends the span of one
+/// at the next token, so a comment after it is in the span. Anything else is
+/// returned as it is.
+fn quoted_extent(trim: &str) -> &str {
+    let Some(quote) = trim.chars().next().filter(|ch| matches!(ch, '"' | '\'')) else {
+        return trim;
+    };
+    let mut chars = trim.char_indices().skip(1);
+    while let Some((at, ch)) = chars.next() {
+        match ch {
+            '\\' if quote == '"' => {
+                chars.next();
+            }
+            ch if ch == quote => {
+                let next = trim[at + 1..].chars().next();
+                if quote == '\'' && next == Some('\'') {
+                    chars.next();
+                } else {
+                    return &trim[..at + 1];
+                }
+            }
+            _ => {}
+        }
+    }
+    trim
 }
 
 fn mapped(text: &str, offsets: TextOffsets) -> MappedScalar {

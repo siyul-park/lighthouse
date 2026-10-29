@@ -31,6 +31,20 @@ fn serialized_ast_keeps_decoded_scalar_and_json_pointer_source_map() {
 }
 
 #[test]
+fn a_comment_after_a_quoted_scalar_is_not_part_of_it() {
+    let host = "model:\n  prompt: \"Rename, do not delete.\"   # optional: added\n  rpc: {}\n";
+    let tree = tree_of(host);
+    let entry = tree.mapping.get("/documents/0/model/prompt").unwrap();
+    let segments = entry.text_map.as_ref().unwrap();
+    let end = segments.last().unwrap().source_range[1] as usize;
+    assert_eq!(&host[..end], &host[..host.find("\"   #").unwrap()]);
+    assert_eq!(
+        tree.ast["documents"][0]["model"]["prompt"],
+        "Rename, do not delete."
+    );
+}
+
+#[test]
 fn escaped_unicode_keeps_a_non_linear_segment_separate() {
     let text = "雪x";
     let starts = [1, 1, 1, 7];
