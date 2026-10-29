@@ -202,12 +202,11 @@ impl Provider {
                 _ => None,
             })
             .collect();
-        let source_ast_provider = self.source_ast;
         let response = self
             .client
             .call::<_, wire::IndexResult>(wire::INDEX, request)
             .and_then(|result| {
-                convert::indexed(result, files, &required_asts, source_ast_provider).map_err(|e| {
+                convert::indexed(result, files, &required_asts).map_err(|e| {
                     format!(
                         "plugin `{}` sent a malformed result: {e}",
                         self.client.plugin()

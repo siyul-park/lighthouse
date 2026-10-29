@@ -167,6 +167,7 @@ pub(crate) fn parse(text: &str) -> Result<HostTree, HostError> {
     Ok(HostTree {
         ast: json!({"kind": "Stream", "documents": values}),
         mapping: walk.mapping,
+        comments: Vec::new(),
     })
 }
 

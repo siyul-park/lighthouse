@@ -22,6 +22,7 @@ impl HostParser for Lines {
         Ok(HostTree {
             ast: json!({"text": text}),
             mapping: BTreeMap::new(),
+            comments: Vec::new(),
         })
     }
 }
@@ -83,7 +84,7 @@ fn the_provider_announces_its_language_and_the_source_ast_capability() {
     let manifest = &answer.capabilities.languages[0];
     assert_eq!(manifest.id, "lines");
     assert_eq!(manifest.globs, ["**/*.lines"]);
-    assert_eq!(manifest.capabilities, ["source-ast"]);
+    assert_eq!(manifest.capabilities, ["source-ast", "overlays"]);
 }
 
 #[test]
@@ -93,7 +94,13 @@ fn a_file_asked_for_its_tree_has_one_and_a_fragment() {
     assert_eq!(result.sources.len(), 1, "a file not asked for has no tree");
     assert_eq!(result.sources[0].path, "a.lines");
     assert_eq!(result.sources[0].ast, json!({"text": "x=1"}));
-    assert_eq!(result.fragments.len(), 1);
+    assert_eq!(
+        result.fragments.len(),
+        2,
+        "every host file is a file subject"
+    );
+    assert_eq!(result.fragments[0].file.path, "a.lines");
+    assert_eq!(result.fragments[1].file.path, "b.lines");
     assert!(result.incomplete.is_empty());
 }
 

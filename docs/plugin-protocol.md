@@ -603,10 +603,12 @@ type-checks with `go/types`.
 
 ## `lang-yaml` and `lang-toml`
 
-Host-file providers: they advertise only `source-ast` (globs `**/*.yaml`,
-`**/*.yml` and `**/*.toml`, priority 20) and return no code model, only a
-fragment with the file's path and, for each file whose `source_ast` is true, its
-`Source`. The core selects the regions other providers analyze (the CEL
+Host-file providers: they advertise `source-ast` and `overlays` (globs
+`**/*.yaml`, `**/*.yml` and `**/*.toml`, priority 20) and return no code model,
+only a fragment for every requested file (so file decisions such as
+`core/max-lines` see it) with the comments the parser retains (TOML: `toml_edit`
+keeps them; YAML: the parser drops them, so none) and, for each file whose
+`source_ast` is true, its `Source`. The core selects the regions other providers analyze (the CEL
 expressions of a decision, for `lang-cel`) from the tree, so the provider only
 parses and maps; the answers to `initialize` and `index` are the same for both
 (`lighthouse_protocol::serve_host`). A selected-regions input is an

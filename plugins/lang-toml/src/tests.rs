@@ -84,6 +84,44 @@ fn escapes_and_multiline_strings_map_to_their_source_bytes() {
 }
 
 #[test]
+fn comments_are_read_from_decorations_with_host_spans() {
+    let host = "# lighthouse:allow test
+# because this fixture is intentional
+[section] # section note
+key = \"value\" # inline note
+";
+    let tree = tree_of(host);
+    let comments = tree.comments;
+    assert_eq!(comments.len(), 3, "{comments:?}");
+    assert_eq!(
+        comments[0].text,
+        "# lighthouse:allow test\n# because this fixture is intentional"
+    );
+    assert_eq!(comments[0].span.start.line, 1);
+    assert_eq!(comments[0].span.start.col, 1);
+    assert_eq!(comments[0].span.end.line, 2);
+    assert_eq!(comments[1].text, "# section note");
+    assert_eq!(comments[1].span.start.line, 3);
+    assert_eq!(comments[2].text, "# inline note");
+    assert_eq!(comments[2].span.start.line, 4);
+}
+
+#[test]
+fn comments_at_the_end_of_the_file_and_inside_arrays_are_read() {
+    let host = "list = [\n  1, # one\n  # last\n]\n# the end\n";
+    let comments = tree_of(host).comments;
+    let texts: Vec<&str> = comments.iter().map(|c| c.text.as_str()).collect();
+    assert_eq!(texts, ["# one", "# last", "# the end"], "{comments:?}");
+    assert_eq!(comments[2].span.start.line, 5);
+}
+
+#[test]
+fn a_hash_inside_a_string_is_no_comment() {
+    let host = "a = \"# not a comment\"\nb = 'x # y'\n";
+    assert!(tree_of(host).comments.is_empty());
+}
+
+#[test]
 fn an_invalid_document_is_a_syntax_error() {
     assert!(matches!(tree::parse("a = \n"), Err(HostError::Syntax(_))));
 }

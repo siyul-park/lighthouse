@@ -16,12 +16,17 @@ use serde_json::Value;
 
 use super::serve::Handler;
 use crate::{
-    Conventions, ErrorObject, FileInfo, Fragment, Incomplete, IndexInput, IndexParams, IndexResult,
-    InitializeParams, InitializeResult, Mapping, ProviderManifest, Source, serve,
+    Comment, Conventions, ErrorObject, FileInfo, FileRef, Fragment, Incomplete, IndexInput,
+    IndexParams, IndexResult, InitializeParams, InitializeResult, Mapping, ProviderManifest,
+    Source, serve,
 };
 
 /// The capability of a provider that exposes syntax trees.
 const SOURCE_AST: &str = "source-ast";
+
+/// The capability of a provider that reads the overlays of a request instead of
+/// the files on disk.
+const OVERLAYS: &str = "overlays";
 
 /// The priority of such a provider among those that match a file.
 const PRIORITY: i32 = 20;
@@ -32,6 +37,8 @@ const PRIORITY: i32 = 20;
 pub struct HostTree {
     pub ast: Value,
     pub mapping: BTreeMap<String, Mapping>,
+    /// Comments the parser can locate in the host document.
+    pub comments: Vec<Comment>,
 }
 
 /// Why a file has no tree.
@@ -68,18 +75,21 @@ struct HostProvider<P> {
 
 impl<P: HostParser> HostProvider<P> {
     /// The tree of the file at `path` with `text`, or what is missing of it.
-    fn tree(&self, path: &str, text: &str) -> Result<Source, Incomplete> {
+    fn tree(&self, path: &str, text: &str) -> Result<(Source, Vec<Comment>), Incomplete> {
         let name = self.language.name;
         let gap = |reason: String| Incomplete {
             path: Some(path.to_owned()),
             reason,
         };
         match self.parser.parse(text) {
-            Ok(tree) => Ok(Source {
-                path: path.to_owned(),
-                ast: tree.ast,
-                mapping: tree.mapping,
-            }),
+            Ok(tree) => Ok((
+                Source {
+                    path: path.to_owned(),
+                    ast: tree.ast,
+                    mapping: tree.mapping,
+                },
+                tree.comments,
+            )),
             Err(HostError::Syntax(error)) => Err(gap(format!("invalid {name}: {error}"))),
             Err(HostError::Tree(reason)) => {
                 Err(gap(format!("cannot expose {name} syntax tree: {reason}")))
@@ -104,7 +114,7 @@ impl<P: HostParser> Handler for HostProvider<P> {
                 priority: PRIORITY,
                 fallback: false,
                 conventions: Conventions::default(),
-                capabilities: vec![SOURCE_AST.to_owned()],
+                capabilities: vec![SOURCE_AST.to_owned(), OVERLAYS.to_owned()],
             }],
             Vec::new(),
         ))
@@ -120,12 +130,8 @@ impl<P: HostParser> Handler for HostProvider<P> {
             .map(|overlay| (overlay.path.as_str(), overlay.text.as_str()))
             .collect();
         for input in &params.inputs {
-            let file = match input {
-                IndexInput::File {
-                    file,
-                    source_ast: true,
-                } => file,
-                IndexInput::File { .. } => continue,
+            let (file, source_ast) = match input {
+                IndexInput::File { file, source_ast } => (file, *source_ast),
                 IndexInput::Regions { regions } => {
                     result.incomplete.push(Incomplete {
                         path: Some(regions.path.clone()),
@@ -144,28 +150,32 @@ impl<P: HostParser> Handler for HostProvider<P> {
             let text = match text {
                 Ok(text) => text,
                 Err(error) => {
-                    result.incomplete.push(Incomplete {
-                        path: Some(file.path.clone()),
-                        reason: format!(
-                            "cannot read {} host document: {error}",
-                            self.language.name
-                        ),
-                    });
+                    if source_ast {
+                        result.incomplete.push(Incomplete {
+                            path: Some(file.path.clone()),
+                            reason: format!(
+                                "cannot read {} host document: {error}",
+                                self.language.name
+                            ),
+                        });
+                    }
+                    result.fragments.push(fragment_of(file, Vec::new()));
                     continue;
                 }
             };
             match self.tree(&file.path, &text) {
-                Ok(source) => {
-                    result.sources.push(source);
-                    result.fragments.push(Fragment {
-                        file: FileInfo {
-                            path: file.path.clone(),
-                            ..FileInfo::default()
-                        },
-                        ..Fragment::default()
-                    });
+                Ok((source, comments)) => {
+                    if source_ast {
+                        result.sources.push(source);
+                    }
+                    result.fragments.push(fragment_of(file, comments));
                 }
-                Err(gap) => result.incomplete.push(gap),
+                Err(gap) => {
+                    if source_ast {
+                        result.incomplete.push(gap);
+                    }
+                    result.fragments.push(fragment_of(file, Vec::new()));
+                }
             }
         }
         Ok(result)
@@ -188,5 +198,18 @@ pub fn serve_host(
     let mut provider = host_handler(language, parser);
     if let Err(error) = serve(reader, writer, &mut provider) {
         eprintln!("{}: {error}", language.plugin);
+    }
+}
+
+/// The fragment of a host file: the file alone, since the provider has no code
+/// model, so that file rules see it whether or not its tree is wanted.
+fn fragment_of(file: &FileRef, comments: Vec<Comment>) -> Fragment {
+    Fragment {
+        file: FileInfo {
+            path: file.path.clone(),
+            ..FileInfo::default()
+        },
+        comments,
+        ..Fragment::default()
     }
 }

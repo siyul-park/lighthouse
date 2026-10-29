@@ -59,7 +59,6 @@ pub(crate) fn indexed(
     result: wire::IndexResult,
     sources: &[Source],
     required_asts: &BTreeSet<PathBuf>,
-    source_ast_provider: bool,
 ) -> Result<Indexed, String> {
     let requested: BTreeMap<PathBuf, &core::File> = sources
         .iter()
@@ -117,9 +116,6 @@ pub(crate) fn indexed(
         out.fragments.push(converted);
     }
     for path in requested.keys().filter(|p| !accepted.contains(*p)) {
-        if source_ast_provider && !required_asts.contains(path) {
-            continue;
-        }
         incomplete.insert(Incomplete {
             path: Some(path.clone()),
             reason: "the plugin returned no usable fragment".to_owned(),
