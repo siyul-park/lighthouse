@@ -108,7 +108,8 @@ fn durations_need_a_unit_and_a_span() {
     assert_eq!(parse("1h"), Some(time::Duration::from_secs(3600)));
     assert_eq!(parse("30"), None);
     assert_eq!(parse("s"), None);
-    assert_eq!(parse("3d"), None);
+    assert_eq!(parse("3d"), Some(time::Duration::from_secs(259_200)));
+    assert_eq!(parse("3w"), None);
     assert_eq!(parse("0s"), None);
     assert_eq!(Duration::from_secs(90).get(), time::Duration::from_secs(90));
 }
@@ -119,6 +120,7 @@ fn a_duration_is_written_in_the_largest_exact_unit_and_read_back() {
         ("90s", "90s"),
         ("60s", "1m"),
         ("7200s", "2h"),
+        ("172800s", "2d"),
         ("1500ms", "1500ms"),
     ] {
         let duration: Duration = text.parse().unwrap();

@@ -4,7 +4,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
-/// A span of time written as a number and a unit: `500ms`, `30s`, `2m`, `1h`.
+/// A span of time written as a number and a unit: `500ms`, `30s`, `2m`, `1h`, `30d`.
 /// A bare number has no unit and a zero span is no limit at all: both are
 /// refused where the document is read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -43,6 +43,7 @@ impl FromStr for Duration {
             "s" => Some(time::Duration::from_secs(n)),
             "m" => n.checked_mul(60).map(time::Duration::from_secs),
             "h" => n.checked_mul(3600).map(time::Duration::from_secs),
+            "d" => n.checked_mul(86_400).map(time::Duration::from_secs),
             _ => None,
         };
         span.filter(|span| !span.is_zero())
@@ -56,6 +57,7 @@ impl fmt::Display for Duration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let millis = self.0.as_millis();
         match millis {
+            m if m % 86_400_000 == 0 => write!(f, "{}d", m / 86_400_000),
             m if m % 3_600_000 == 0 => write!(f, "{}h", m / 3_600_000),
             m if m % 60_000 == 0 => write!(f, "{}m", m / 60_000),
             m if m % 1000 == 0 => write!(f, "{}s", m / 1000),
