@@ -14,6 +14,7 @@ mod log;
 mod record;
 mod records;
 mod schema;
+mod signal;
 mod standings;
 mod store;
 
@@ -29,7 +30,8 @@ pub use record::{
     State, StatusFilter, Subject, Unchecked, Versions,
 };
 pub use records::{Records, append_revision};
-pub use store::Store;
+pub use signal::{NewSignal, Proposal, Signal, SignalFilter};
+pub use store::{Ranked, Store};
 
 /// The JSON Schema of every record kind the decision log holds.
 pub fn descriptors() -> Vec<Descriptor> {

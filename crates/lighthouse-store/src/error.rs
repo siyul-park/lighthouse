@@ -49,4 +49,19 @@ pub enum Error {
     EmptyJustification,
     #[error("a suppression goes with a `fail`, not with `{0}`")]
     SuppressionWithoutFail(Judgment),
+    #[error("no recorded signal matches `{0}`")]
+    UnknownSignal(String),
+    #[error(
+        "`{0}` is too short for a signal id: give at least {min} characters",
+        min = Fingerprint::MIN_PREFIX
+    )]
+    ShortSignal(String),
+    #[error(
+        "`{prefix}` matches several signals; retry with a longer prefix. Candidates: {}",
+        candidates.join(", ")
+    )]
+    AmbiguousSignal {
+        prefix: String,
+        candidates: Vec<String>,
+    },
 }

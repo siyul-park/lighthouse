@@ -10,6 +10,7 @@ pub mod glob;
 mod model_ref;
 mod review;
 mod scope;
+mod signal;
 mod text;
 pub mod ucm;
 
@@ -23,6 +24,7 @@ pub use fix::{Preview, PreviewEdit, PreviewFile, Safety, Unavailable};
 pub use model_ref::ModelRef;
 pub use review::{AgentKind, Attribution, Judgment, Label, Role};
 pub use scope::{ExampleScope, Reach, RunScope, TestScope};
+pub use signal::{SignalClass, SignalStatus};
 pub use text::{
     ColumnUnit, LineIndex, Position, Span, byte_position, eol_of, squash, utf16_position,
 };

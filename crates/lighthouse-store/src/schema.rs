@@ -6,7 +6,7 @@ use crate::Error;
 /// is a cache of the decision log and of what runs saw, so it has no migration
 /// chain: one with another version is dropped and built again, and the
 /// judgments come back from `decisions.jsonl`.
-pub(crate) const VERSION: i64 = 11;
+pub(crate) const VERSION: i64 = 12;
 
 /// Findings with the judgments and suppressions on them. Locators, evidence and
 /// facts are JSON text, so nothing here assumes the artifact is code.
@@ -87,6 +87,34 @@ CREATE TABLE suppressions (
     generated_at   TEXT NOT NULL
 );
 CREATE INDEX suppressions_judgment ON suppressions (judgment_id);
+
+-- Local Evidence that is not in the decision log: what a session told
+-- Lighthouse, and the proposals agents made from it. Neither is committed.
+CREATE TABLE signals (
+    signal_id    TEXT PRIMARY KEY,
+    session      TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    event        TEXT NOT NULL,
+    class        TEXT NOT NULL CHECK (class IN ('directive', 'correction', 'preference', 'finding', 'none', 'abstain')),
+    excerpt      TEXT NOT NULL,
+    features     TEXT NOT NULL,
+    rule         TEXT NOT NULL,
+    agent_type   TEXT NOT NULL CHECK (agent_type IN ('Person', 'SoftwareAgent')),
+    agent_id     TEXT,
+    agent_role   TEXT CHECK (agent_role IN ('agent', 'model')),
+    status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'recorded', 'linked', 'dismissed')),
+    detail       TEXT,
+    settled_by   TEXT,
+    asked        INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX signals_session ON signals (session, generated_at);
+
+CREATE TABLE proposals (
+    decision_uid TEXT PRIMARY KEY,
+    decision     TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    duplicates   TEXT NOT NULL
+);
 ";
 
 /// The guards that keep a record from being edited or deleted while the cache

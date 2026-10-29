@@ -294,6 +294,21 @@ pub(super) fn io(path: &Path, source: std::io::Error) -> Error {
     }
 }
 
+pub(super) fn parse<T: std::str::FromStr>(text: &str) -> rusqlite::Result<T>
+where
+    T::Err: std::error::Error + Send + Sync + 'static,
+{
+    text.parse().map_err(conversion)
+}
+
+pub(super) fn conversion(error: impl std::error::Error + Send + Sync + 'static) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
+}
+
+pub(super) fn role_of(text: Option<String>) -> rusqlite::Result<Option<Role>> {
+    text.map(|text| parse(&text)).transpose()
+}
+
 fn judgment_event(row: &Row) -> rusqlite::Result<JudgmentEvent> {
     Ok(JudgmentEvent {
         id: row.get("judgment_id")?,
@@ -332,19 +347,4 @@ fn severity(row: &Row, name: &str) -> rusqlite::Result<Severity> {
 fn json_column(row: &Row, name: &str) -> rusqlite::Result<Value> {
     let text: String = row.get(name)?;
     serde_json::from_str(&text).map_err(conversion)
-}
-
-fn parse<T: std::str::FromStr>(text: &str) -> rusqlite::Result<T>
-where
-    T::Err: std::error::Error + Send + Sync + 'static,
-{
-    text.parse().map_err(conversion)
-}
-
-fn conversion(error: impl std::error::Error + Send + Sync + 'static) -> rusqlite::Error {
-    rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
-}
-
-fn role_of(text: Option<String>) -> rusqlite::Result<Option<Role>> {
-    text.map(|text| parse(&text)).transpose()
 }

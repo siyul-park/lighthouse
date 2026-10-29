@@ -19,8 +19,11 @@ use crate::{
     RunSummary, Subject, SuppressionEvent, Unchecked, Versions, log, schema,
 };
 
+mod lexical;
 mod rows;
+mod signals;
 
+pub use lexical::Ranked;
 use rows::*;
 
 /// File name of the database inside the store directory.
