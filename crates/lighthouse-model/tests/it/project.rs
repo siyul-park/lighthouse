@@ -627,3 +627,133 @@ fn project_with_documents_keeps_them_in_file_order_and_project_documents_lists_t
         .collect();
     assert_eq!(names, ["p/a", "p/z", "p/b"]);
 }
+
+fn host(facts: &[(&str, &str)]) -> Fragment {
+    Fragment {
+        files: vec![File {
+            path: PathBuf::from("README.md"),
+            lang: "markdown".to_owned(),
+            hash: String::new(),
+            generated: false,
+            test: false,
+            facts: facts
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+                .collect(),
+        }],
+        ..Fragment::default()
+    }
+}
+
+#[test]
+fn what_the_readers_of_regions_state_of_a_host_file_wins_over_what_the_host_states() {
+    let project = Project::merge([
+        host(&[("edition", "2015"), ("keep", "host")]),
+        host(&[("edition", "2021")]),
+    ]);
+
+    let facts = &project.file(Path::new("README.md")).unwrap().facts;
+    assert_eq!(facts["edition"], "2021");
+    assert_eq!(facts["keep"], "host");
+}
+
+#[test]
+fn a_module_a_region_shares_with_the_project_is_the_projects() {
+    let module = |example: bool, language: Option<&str>| Fragment {
+        modules: vec![Module {
+            path: "pkg".to_owned(),
+            name: None,
+            test_of: None,
+            language: language.map(str::to_owned),
+            example,
+        }],
+        ..Fragment::default()
+    };
+
+    let project = Project::merge([module(true, Some("go")), module(false, None)]);
+
+    let module = project.module("pkg").unwrap();
+    assert!(!module.example);
+    assert_eq!(module.language, None);
+}
+
+#[test]
+fn code_in_a_host_file_of_examples_is_example_code_in_any_module() {
+    let f = symbol("pkg", "f");
+    let g = symbol("pkg", "g");
+    let mut shown = symbol("pkg", "shown");
+    shown.file = PathBuf::from("README.md");
+    let fence_call = Edge {
+        kind: EdgeKind::Calls,
+        from: Node::Symbol(shown.id.clone()),
+        to: Target::Path(f.id.as_str().to_owned()),
+        resolution: Resolution::Semantic,
+        site: None,
+    };
+    let own_call = Edge {
+        kind: EdgeKind::Calls,
+        from: Node::Symbol(g.id.clone()),
+        to: Target::Path(f.id.as_str().to_owned()),
+        resolution: Resolution::Semantic,
+        site: None,
+    };
+    let project = Project::merge([
+        host(&[("regions", "go:example")]),
+        Fragment {
+            symbols: vec![f.clone(), g.clone(), shown.clone()],
+            edges: vec![fence_call, own_call],
+            files: vec![file_of(&f)],
+            ..Fragment::default()
+        },
+    ]);
+
+    assert!(project.in_example(&shown.id));
+    assert!(!project.in_example(&f.id));
+    assert_eq!(project.callers(&f.id), std::slice::from_ref(&g.id));
+}
+
+#[test]
+fn a_syntactic_edge_to_a_bare_name_reaches_the_one_symbol_of_the_project_so_named() {
+    let f = symbol("pkg", "Parse");
+    let twin_a = symbol("a", "Twin");
+    let twin_b = symbol("b", "Twin");
+    let user = symbol("pkg", "user");
+    let to = |name: &str| Edge {
+        kind: EdgeKind::Calls,
+        from: Node::Symbol(user.id.clone()),
+        to: Target::Path(name.to_owned()),
+        resolution: Resolution::Syntactic,
+        site: None,
+    };
+    let project = Project::merge([Fragment {
+        symbols: vec![f.clone(), twin_a, twin_b, user.clone()],
+        edges: vec![to("Parse"), to("Twin"), to("Missing")],
+        ..Fragment::default()
+    }]);
+
+    let targets: Vec<&Target> = project.edges.iter().map(|edge| &edge.to).collect();
+    assert!(targets.contains(&&Target::Resolved(Node::Symbol(f.id))));
+    assert!(targets.contains(&&Target::Path("Twin".to_owned())));
+    assert!(targets.contains(&&Target::Path("Missing".to_owned())));
+}
+
+#[test]
+fn file_is_example_when_every_region_of_it_is_example_code() {
+    let file = |regions: Option<&str>| File {
+        path: PathBuf::from("README.md"),
+        lang: "markdown".to_owned(),
+        hash: String::new(),
+        generated: false,
+        test: false,
+        facts: regions
+            .map(|r| BTreeMap::from([("regions".to_owned(), r.to_owned())]))
+            .unwrap_or_default(),
+    };
+
+    assert!(file(Some("go:example,yaml:example")).is_example());
+    assert!(!file(Some("go:example,yaml:code")).is_example());
+    assert!(
+        !file(None).is_example(),
+        "a file with no regions is not a host"
+    );
+}

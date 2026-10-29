@@ -7,7 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-use super::{EdgeKind, Fragment, Node, Site, Symbol, SymbolId, SymbolKind, Target};
+use super::{EdgeKind, Fragment, Node, Resolution, Site, Symbol, SymbolId, SymbolKind, Target};
 
 /// A run of consecutive edges that came from one fragment: how many, and the
 /// file of the fragment when it is about one.
@@ -17,6 +17,9 @@ struct Resolver<'a> {
     symbols: BTreeSet<&'a str>,
     bare: BTreeMap<&'a str, Vec<(&'a SymbolId, SymbolKind)>>,
     modules: BTreeSet<&'a str>,
+    /// The symbols of the project's own code by the name they are declared
+    /// under, for the edges that name no more than that.
+    named: BTreeMap<&'a str, Vec<&'a SymbolId>>,
     ambiguous: Cell<usize>,
 }
 
@@ -29,17 +32,33 @@ impl<'a> Resolver<'a> {
                 .or_default()
                 .push((&symbol.id, symbol.kind));
         }
+        let examples: BTreeSet<&str> = all
+            .modules
+            .iter()
+            .filter(|m| m.example)
+            .map(|m| m.path.as_str())
+            .collect();
+        let mut named: BTreeMap<&str, Vec<&SymbolId>> = BTreeMap::new();
+        for symbol in &all.symbols {
+            if !examples.contains(symbol.id.module()) {
+                named
+                    .entry(symbol.name.as_str())
+                    .or_default()
+                    .push(&symbol.id);
+            }
+        }
         Self {
             symbols: all.symbols.iter().map(|s| s.id.as_str()).collect(),
             bare,
             modules: all.modules.iter().map(|m| m.path.as_str()).collect(),
+            named,
             ambiguous: Cell::new(0),
         }
     }
 
     /// A kind-less path naming several symbols resolves only for a call that
     /// matches exactly one function or method; otherwise it stays a path.
-    fn resolve(&self, target: &Target, call: bool) -> Target {
+    fn resolve(&self, target: &Target, call: bool, by_name: bool) -> Target {
         let Target::Path(path) = target else {
             return target.clone();
         };
@@ -51,6 +70,15 @@ impl<'a> Resolver<'a> {
             return Target::Resolved(Node::Module(path.clone()));
         }
         let Some(found) = self.bare.get(path.as_str()) else {
+            // An edge that names a symbol and no module is read by the name
+            // alone: it is the symbol of the project that is called so, when
+            // one is.
+            if by_name
+                && !path.contains("::")
+                && let Some([only]) = self.named.get(path.as_str()).map(Vec::as_slice)
+            {
+                return symbol(only.as_str());
+            }
             return target.clone();
         };
         if let [(only, _)] = found.as_slice() {
@@ -77,7 +105,13 @@ pub(super) fn resolve_all(all: &mut Fragment) -> usize {
     let resolved: Vec<Target> = all
         .edges
         .iter()
-        .map(|e| resolver.resolve(&e.to, e.kind == EdgeKind::Calls))
+        .map(|e| {
+            resolver.resolve(
+                &e.to,
+                e.kind == EdgeKind::Calls,
+                e.resolution == Resolution::Syntactic,
+            )
+        })
         .collect();
     let targets: Vec<Vec<Target>> = all
         .tests
@@ -85,14 +119,18 @@ pub(super) fn resolve_all(all: &mut Fragment) -> usize {
         .map(|t| {
             t.targets
                 .iter()
-                .map(|x| resolver.resolve(x, false))
+                .map(|x| resolver.resolve(x, false, false))
                 .collect()
         })
         .collect();
     let forwards: Vec<Option<Target>> = all
         .functions
         .iter()
-        .map(|f| f.forwards_to.as_ref().map(|t| resolver.resolve(t, true)))
+        .map(|f| {
+            f.forwards_to
+                .as_ref()
+                .map(|t| resolver.resolve(t, true, false))
+        })
         .collect();
     let ambiguous = resolver.ambiguous.get();
     for (edge, to) in all.edges.iter_mut().zip(resolved) {
@@ -205,9 +243,28 @@ pub(super) fn sorted_union(
         all.comments.extend(part.comments);
     }
     all.files.sort_by(|a, b| a.path.cmp(&b.path));
-    all.files.dedup_by(|a, b| a.path == b.path);
+    // What the providers that read the regions of a host file state of it
+    // wins over what the host states: they come after it.
+    all.files.dedup_by(|later, kept| {
+        let same = later.path == kept.path;
+        if same {
+            kept.facts.append(&mut later.facts);
+        }
+        same
+    });
     all.modules.sort_by(|a, b| a.path.cmp(&b.path));
-    all.modules.dedup_by(|a, b| a.path == b.path);
+    // A module that a region declares and a file of the project does too is
+    // the project's: example code and a language the host states are not its.
+    all.modules.dedup_by(|later, kept| {
+        let same = later.path == kept.path;
+        if same {
+            kept.example &= later.example;
+            if kept.language != later.language {
+                kept.language = None;
+            }
+        }
+        same
+    });
     all.symbols.sort_by(|a, b| a.id.cmp(&b.id));
     let notices = duplicate_notice(&all.symbols).into_iter().collect();
     all.symbols.dedup_by(|a, b| a.id == b.id);

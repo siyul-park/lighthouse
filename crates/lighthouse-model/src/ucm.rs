@@ -75,6 +75,12 @@ impl File {
             .map_or(&self.lang, String::as_str)
     }
 
+    /// Whether the file is a host whose regions are all example code.
+    pub fn is_example(&self) -> bool {
+        let mut regions = self.regions().peekable();
+        regions.peek().is_some() && regions.all(|(_, example)| example)
+    }
+
     /// The languages of the regions the host routed to other providers, each
     /// with whether the region is example code, from the fact the host states
     /// as `language:example` or `language:code`, comma separated.
@@ -558,10 +564,16 @@ impl Project {
                 .is_some_and(|m| m.test_of.is_some())
     }
 
-    /// Whether the symbol is example code: declared in a module that example
-    /// code declares, which documentation shows and the project does not use.
+    /// Whether the symbol is example code, which documentation shows and the
+    /// project does not use: declared in a module that example code declares,
+    /// or in a host file all of whose regions are example code (a fence in
+    /// the package of a project module declares no module of its own).
     pub fn in_example(&self, id: &SymbolId) -> bool {
         self.module(id.module()).is_some_and(|m| m.example)
+            || self
+                .symbol(id)
+                .and_then(|symbol| self.file(&symbol.file))
+                .is_some_and(File::is_example)
     }
 
     /// The language the symbol is in: the one its module's host stated, else
@@ -709,6 +721,12 @@ impl Index {
             .filter(|m| m.example)
             .map(|m| m.path.as_str())
             .collect();
+        let example_files: BTreeSet<&Path> = all
+            .files
+            .iter()
+            .filter(|file| file.is_example())
+            .map(|file| file.path.as_path())
+            .collect();
         for (at, edge) in all.edges.iter().enumerate() {
             let Node::Symbol(from) = &edge.from else {
                 continue;
@@ -716,7 +734,11 @@ impl Index {
             self.edges_from.entry(from.clone()).or_default().push(at);
             // An example uses nothing: its edges stay as sites of use, and are
             // not callers, references or implementers of what they name.
-            if examples.contains(from.module()) {
+            let in_example_file = self
+                .symbols
+                .get(from)
+                .is_some_and(|&at| example_files.contains(all.symbols[at].file.as_path()));
+            if examples.contains(from.module()) || in_example_file {
                 continue;
             }
             let Target::Resolved(Node::Symbol(to)) = &edge.to else {
