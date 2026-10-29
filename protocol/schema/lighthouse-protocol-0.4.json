@@ -434,7 +434,9 @@
     "EmbeddedSource": {
       "description": "A source region produced by the core source engine.",
       "properties": {
-        "context": true,
+        "context": {
+          "default": null
+        },
         "id": {
           "type": "string"
         },

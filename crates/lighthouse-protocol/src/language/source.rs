@@ -111,6 +111,54 @@ impl Source {
     }
 }
 
+/// Where each byte of a decoded text came from: the offsets in the original
+/// source of the start and end of the bytes that stand for it, one entry for
+/// each byte of the text.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TextOffsets {
+    starts: Vec<u32>,
+    ends: Vec<u32>,
+}
+
+impl TextOffsets {
+    /// The offsets of a text of `len` bytes.
+    pub fn with_capacity(len: usize) -> Self {
+        Self {
+            starts: Vec::with_capacity(len),
+            ends: Vec::with_capacity(len),
+        }
+    }
+
+    /// Adds the character `ch`, decoded from the source bytes `from..to`.
+    pub fn push(&mut self, ch: char, from: usize, to: usize) {
+        self.starts
+            .extend(std::iter::repeat_n(from as u32, ch.len_utf8()));
+        self.ends
+            .extend(std::iter::repeat_n(to as u32, ch.len_utf8()));
+    }
+
+    /// How many bytes of the text have an offset.
+    pub fn len(&self) -> usize {
+        self.starts.len()
+    }
+
+    /// Whether no byte has an offset.
+    pub fn is_empty(&self) -> bool {
+        self.starts.is_empty()
+    }
+
+    /// Removes the offset of the last byte.
+    pub fn pop(&mut self) {
+        self.starts.pop();
+        self.ends.pop();
+    }
+
+    /// The map of `text`, which these offsets belong to, in segments.
+    pub fn text_map(&self, text: &str) -> Option<Vec<TextMapSegment>> {
+        coalesce_text_map(text, &self.starts, &self.ends)
+    }
+}
+
 /// Coalesces adjacent byte mappings when both extents are one-to-one.
 /// `starts` and `ends` contain one original-source offset per byte of `text`.
 pub fn coalesce_text_map(text: &str, starts: &[u32], ends: &[u32]) -> Option<Vec<TextMapSegment>> {

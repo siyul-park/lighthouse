@@ -2,8 +2,10 @@
 
 mod agent;
 mod canonical;
+mod embedded;
 mod frame;
 mod hash;
+mod host;
 mod model;
 mod openai;
 mod route;
