@@ -14,6 +14,7 @@ spec:
     subject: file
     generated: false
     tests: include
+    examples: exclude
   requirement: Source files MUST equal the output of their language standard formatter.
   severity: error
   check:

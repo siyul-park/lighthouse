@@ -3,12 +3,13 @@
 
 use std::sync::OnceLock;
 
-use lighthouse_model::ucm::Capability;
+use lighthouse_model::ucm::{Capability, REGIONS};
+use lighthouse_plugin::RuleManifest;
 
 use lighthouse_protocol::hash;
 use rayon::ThreadPool;
 
-use super::*;
+use super::{regions::Views, *};
 
 /// Why a file the languages claim is not an input: a notice for binary data a
 /// fallback provider claims, otherwise a gap in the analysis.
@@ -305,14 +306,11 @@ impl Engine {
         parts: &mut Vec<Fragment>,
         run: &mut Run,
     ) {
-        let mut destinations: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
+        let mut views = Views::default();
         for (target, files) in &target_files {
             let language = self.provider(*target).manifest().id.clone();
-            for path in files.keys() {
-                destinations
-                    .entry(path.clone())
-                    .or_default()
-                    .insert(language.clone());
+            for (path, file) in files {
+                views.add(path, &language, &file.sources);
             }
         }
         let native_files: BTreeSet<PathBuf> = parts
@@ -327,28 +325,29 @@ impl Engine {
             })
             .flat_map(|part| part.files.iter().map(|file| file.path.clone()))
             .collect();
-        let analysis_languages: BTreeMap<_, _> = destinations
-            .into_iter()
-            .filter(|(path, languages)| languages.len() == 1 && !native_files.contains(path))
-            .filter_map(|(path, mut languages)| {
-                languages.pop_first().map(|language| (path, language))
-            })
-            .collect();
+        let analysis_language = |path: &Path| {
+            views
+                .analysis_language(path)
+                .filter(|_| !native_files.contains(path))
+                .map(str::to_owned)
+        };
         for part in parts.iter_mut() {
             for file in &mut part.files {
-                if let Some(language) = analysis_languages.get(&file.path) {
-                    file.facts
-                        .insert("analysisLanguage".to_owned(), language.clone());
+                if let Some(language) = analysis_language(&file.path) {
+                    file.facts.insert("analysisLanguage".to_owned(), language);
+                }
+                if let Some(regions) = views.regions(&file.path) {
+                    file.facts.insert(REGIONS.to_owned(), regions);
                 }
             }
         }
 
         for (target, mut files) in target_files {
             for file in files.values_mut() {
-                if let Some(language) = analysis_languages.get(&file.file.path) {
+                if let Some(language) = analysis_language(&file.file.path) {
                     file.file
                         .facts
-                        .insert("analysisLanguage".to_owned(), language.clone());
+                        .insert("analysisLanguage".to_owned(), language);
                 }
             }
             let files: Vec<EmbeddedFile> = files.into_values().collect();
@@ -362,11 +361,12 @@ impl Engine {
                 .collect();
             let started = Instant::now();
             match self.provider(target).index(ws, &sources) {
-                Ok(indexed) => {
+                Ok(mut indexed) => {
                     run.timings.index.push((
                         format!("{}:embedded", self.provider(target).manifest().id),
                         started.elapsed(),
                     ));
+                    views.stamp(&mut indexed.fragments, &self.provider(target).manifest().id);
                     parts.extend(indexed.fragments);
                     run.notices.extend(indexed.notices);
                     run.incomplete.extend(indexed.incomplete);
@@ -522,7 +522,6 @@ impl Engine {
         let resolved = self
             .config
             .resolve(&input.file.path, &input.file.lang, &self.projects)?;
-        let provider = self.provider(input.language);
         // What the merged model says of the file: a provider may know it is
         // generated where the host, reading it, did not.
         let file = scene.project.file(&input.file.path).unwrap_or(&input.file);
@@ -540,14 +539,10 @@ impl Engine {
             if applies.excludes(scene.project, file) {
                 continue;
             }
-            if let Some(missing) = meta
-                .capabilities
-                .iter()
-                .find(|c| !provider.manifest().capabilities.contains(c))
-            {
+            if let Some((language, missing)) = self.lacking(meta, &applies, file) {
                 gathered.notices.insert(format!(
-                    "{}: skipped for language `{}`, missing capability {missing}",
-                    meta.id, input.file.lang
+                    "{}: skipped for language `{language}`, missing capability {missing}",
+                    meta.id
                 ));
                 gathered
                     .unsettled
@@ -568,6 +563,33 @@ impl Engine {
                 .extend(found.into_iter().map(|d| answered(d, level)));
         }
         Ok(gathered)
+    }
+
+    /// The first language the rule looks at in `file` whose provider lacks a
+    /// capability the rule requires, and the capability: the language of the
+    /// file itself, when the rule covers it, and that of each of its regions
+    /// the rule covers.
+    fn lacking(
+        &self,
+        meta: &RuleManifest,
+        applies: &Applicability,
+        file: &File,
+    ) -> Option<(String, Capability)> {
+        let host = (applies.admits_language(&file.lang)
+            || applies.admits_language(file.analysis_language()))
+        .then_some(file.lang.as_str());
+        let regions = file
+            .regions()
+            .filter(|(language, example)| {
+                applies.admits_language(language) && applies.examples.admits(*example)
+            })
+            .map(|(language, _)| language);
+        host.into_iter().chain(regions).find_map(|language| {
+            meta.capabilities
+                .iter()
+                .find(|capability| !self.provides(language, **capability))
+                .map(|capability| (language.to_owned(), *capability))
+        })
     }
 
     fn apply_project_rules(&self, scene: &Scene) -> Result<Gathered, Error> {

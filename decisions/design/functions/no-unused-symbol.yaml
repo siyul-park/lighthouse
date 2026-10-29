@@ -12,6 +12,7 @@ spec:
     understands type positions and macro arguments.
   scope:
     subject: symbol
+    examples: exclude
   requirement: An unused private function, method, variable or other configured symbol
     MUST be removed unless it is a fixture, an entry point, or a declaration implemented
     elsewhere.

@@ -10,8 +10,8 @@ spec:
     A line that can be wrapped should be wrapped (ESLint `max-len`,
     Checkstyle `LineLength`). A comment that is one URL, a single string
     literal and an import line cannot be wrapped and are not counted. Only
-    source files of a language provider are counted; prose and data have no
-    syntax to wrap at.
+    source files of a language provider are counted; prose (text and Markdown)
+    and data have no syntax to wrap at.
   scope:
     subject: file
     generated: true
@@ -37,7 +37,7 @@ spec:
     variables:
     - name: wide
       expression: >-
-        options.enabled && file.lang != 'text'
+        options.enabled && !(file.lang in ['text', 'markdown'])
         ? file.line_widths.filter(l, l.width > options.maxWidth && !l.exempt)
         : []
     where: size(wide) > 0
@@ -197,3 +197,13 @@ spec:
             select: symbol
             where: symbol.name == 'x'
             message: Example
+  - name: wide-markdown
+    language: markdown
+    kind: valid
+    options: { enabled: true, maxWidth: 10 }
+    files:
+    - path: wide.md
+      body: |-
+        # Title
+
+        A paragraph is wrapped by its renderer, so a line of it is as wide as the author likes.

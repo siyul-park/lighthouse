@@ -19,6 +19,7 @@ spec:
     subject: file
     generated: true
     tests: include
+    examples: exclude
   requirement: >-
     A file SHOULD stay at or below the configured line limit (option `max`).
   severity: warn
@@ -178,3 +179,24 @@ spec:
         kind: Decision
         metadata: { name: example/decision }
         spec: { title: Example, context: Short, scope: { subject: symbol }, requirement: 'Names stay clear.', severity: warn, check: { type: cel, select: symbol, where: symbol.name == 'x', message: Example } }
+  - name: markdown-over-limit
+    language: markdown
+    kind: invalid
+    options: { max: 2 }
+    files:
+    - path: big.md
+      body: |-
+        # Title
+        Text.
+        More.
+    expect: [{ line: 3 }]
+  - name: markdown-within-limit
+    language: markdown
+    kind: valid
+    canonical: true
+    options: { max: 2 }
+    files:
+    - path: small.md
+      body: |-
+        # Title
+        Text.

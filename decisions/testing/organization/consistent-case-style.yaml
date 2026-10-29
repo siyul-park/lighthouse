@@ -11,6 +11,7 @@ spec:
   scope:
     subject: test
     tests: only
+    examples: exclude
   languages:
     go: {}
   requirement: A test level SHOULD use either data-driven table cases or individually

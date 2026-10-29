@@ -56,6 +56,8 @@ impl FileDraft {
                     path: module.clone(),
                     name: Some(MODULE.to_owned()),
                     test_of: None,
+                    language: None,
+                    example: false,
                 }],
                 ..Fragment::default()
             },

@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::cache::{Cache, Digest, Digests, KeyBuilder, Stored};
-use lighthouse_model::{Reach, TestScope};
+use lighthouse_model::{ExampleScope, Reach, TestScope};
 use lighthouse_plugin::Models;
 use serde::{Deserialize, Serialize};
 
@@ -318,8 +318,14 @@ fn tag(applies: &Applicability, options: &Options) -> String {
         TestScope::Include => '1',
         TestScope::Only => '2',
     };
+    let examples = match applies.examples {
+        ExampleScope::Exclude => '0',
+        ExampleScope::Include => '1',
+        ExampleScope::Only => '2',
+    };
     let mut tag = String::from(if applies.generated { '1' } else { '0' });
     tag.push(scope);
+    tag.push(examples);
     if !options.is_empty() {
         tag.push_str(&serde_json::to_string(options).unwrap_or_default());
     }

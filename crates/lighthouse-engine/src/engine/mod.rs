@@ -39,6 +39,7 @@ mod client;
 mod config;
 mod models;
 mod phases;
+mod regions;
 mod route;
 mod run;
 mod scopes;

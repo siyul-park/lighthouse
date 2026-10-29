@@ -21,6 +21,7 @@ spec:
     its children.
   scope:
     subject: module
+    examples: exclude
   languages:
     go: {}
     rust: {}

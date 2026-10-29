@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lighthouse_model::{RunScope, TestScope, ucm::Applicability};
+use lighthouse_model::{ExampleScope, RunScope, TestScope, ucm::Applicability};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -33,7 +33,7 @@ impl Subject {
 }
 
 /// Where a decision applies: what it is about, and which code its subjects
-/// may be in. Generated and test code are told apart by the host (the
+/// may be in. Generated, test and example code are told apart by the host (the
 /// provider's marker, `.gitattributes`, the project's `generated` globs), and
 /// the engine leaves the subjects out that the scope excludes before any
 /// check runs.
@@ -48,6 +48,10 @@ pub struct Scope {
     /// `only`.
     #[serde(default, skip_serializing_if = "TestScope::is_default")]
     pub tests: TestScope,
+    /// Which example code is a subject, the code documentation shows:
+    /// `include` (the default), `exclude` or `only`.
+    #[serde(default, skip_serializing_if = "ExampleScope::is_default")]
+    pub examples: ExampleScope,
 }
 
 impl Scope {
@@ -57,6 +61,7 @@ impl Scope {
             subject,
             generated: false,
             tests: TestScope::Exclude,
+            examples: ExampleScope::Include,
         }
     }
 
@@ -65,6 +70,7 @@ impl Scope {
         Applicability {
             generated: self.generated,
             tests: self.tests,
+            examples: self.examples,
             languages: None,
         }
     }

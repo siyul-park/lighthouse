@@ -13,6 +13,7 @@ spec:
     type until another implementation exists.'
   scope:
     subject: symbol
+    examples: exclude
   languages:
     go: {}
     rust: {}

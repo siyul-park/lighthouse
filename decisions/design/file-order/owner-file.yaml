@@ -12,6 +12,7 @@ spec:
     boundary.
   scope:
     subject: symbol
+    examples: exclude
   languages:
     go: {}
     rust: {}

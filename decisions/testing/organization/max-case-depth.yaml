@@ -11,6 +11,7 @@ spec:
   scope:
     subject: test
     tests: only
+    examples: exclude
   languages:
     go: {}
   requirement: 'Nested test cases SHOULD be limited to two levels: a test function

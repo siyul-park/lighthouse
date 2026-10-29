@@ -74,8 +74,8 @@ impl Builder<'_> {
 
     pub(super) fn language_of(&self, symbol: &Symbol) -> &str {
         self.project
-            .file(&symbol.file)
-            .map_or(self.language.as_str(), |file| file.analysis_language())
+            .language_of(symbol)
+            .unwrap_or(self.language.as_str())
     }
 
     /// What a function is for: the first role its flags give (see

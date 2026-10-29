@@ -37,6 +37,7 @@ spec:
     subject: file
     generated: true
     tests: include
+    examples: exclude
   requirement: >-
     Top-level declarations in a file MUST follow the language's ownership-group
     order, from public contract to private mechanics. Initializers MUST stay

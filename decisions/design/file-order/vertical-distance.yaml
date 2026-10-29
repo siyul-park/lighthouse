@@ -11,6 +11,7 @@ spec:
     its peers.
   scope:
     subject: symbol
+    examples: exclude
   languages:
     go: {}
     rust: {}

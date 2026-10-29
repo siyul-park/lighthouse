@@ -636,8 +636,18 @@ fn validate_source_context(context: &serde_json::Value, field: &str) -> Result<(
         }
     }
 
+    if object
+        .get("example")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        return Err(Error::Config(format!(
+            "{}.example must be a boolean literal",
+            field
+        )));
+    }
+
     for (key, value) in object {
-        if matches!(key.as_str(), "identity" | "variable") {
+        if matches!(key.as_str(), "identity" | "variable" | "example") {
             continue;
         }
         let nested = format!("{}.{}", field, key);

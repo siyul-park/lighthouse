@@ -1,7 +1,8 @@
 use lighthouse_model::{
-    Position, Span, TestScope,
+    ExampleScope, Position, Span, TestScope,
     ucm::{
-        Applicability, File, Fragment, Module, Project, Symbol, SymbolId, SymbolKind, Visibility,
+        Applicability, Edge, EdgeKind, File, Fragment, Module, Node, Project, Resolution, Symbol,
+        SymbolId, SymbolKind, Target, Visibility,
     },
 };
 
@@ -55,6 +56,31 @@ fn test_scope_is_default() {
     assert!(TestScope::Exclude.is_default());
     assert!(!TestScope::Include.is_default());
     assert!(!TestScope::Only.is_default());
+}
+
+#[test]
+fn example_scope() {
+    assert_eq!(ExampleScope::default(), ExampleScope::Include);
+    assert_eq!(serde_json::to_value(ExampleScope::Only).unwrap(), "only");
+    let parsed: ExampleScope = serde_json::from_value("exclude".into()).unwrap();
+    assert_eq!(parsed, ExampleScope::Exclude);
+}
+
+#[test]
+fn example_scope_is_default() {
+    assert!(ExampleScope::Include.is_default());
+    assert!(!ExampleScope::Exclude.is_default());
+    assert!(!ExampleScope::Only.is_default());
+}
+
+#[test]
+fn example_scope_admits() {
+    assert!(ExampleScope::Exclude.admits(false));
+    assert!(!ExampleScope::Exclude.admits(true));
+    assert!(ExampleScope::Include.admits(false));
+    assert!(ExampleScope::Include.admits(true));
+    assert!(!ExampleScope::Only.admits(false));
+    assert!(ExampleScope::Only.admits(true));
 }
 
 #[test]
@@ -147,6 +173,8 @@ fn applicability_excludes() {
             path: "m".to_owned(),
             name: None,
             test_of: Some("n".to_owned()),
+            language: None,
+            example: false,
         }],
         symbols: vec![plain.clone(), inline.clone()],
         ..Fragment::default()
@@ -167,6 +195,8 @@ fn applicability_admits_module() {
         path: "m".to_owned(),
         name: None,
         test_of: test_of.map(str::to_owned),
+        language: None,
+        example: false,
     };
     let prod = file("a.go", false, false);
     let generated = file("g.go", true, false);
@@ -202,6 +232,8 @@ fn applicability_admits_only_its_languages() {
         path: "m".to_owned(),
         name: None,
         test_of: None,
+        language: None,
+        example: false,
     };
     let any = Applicability::default();
     let go_only = Applicability::default().only(["go".to_owned()]);
@@ -236,4 +268,130 @@ fn applicability_admits_only_its_languages() {
             .only(["rust".to_owned()])
             .admits_symbol(&project, symbol)
     );
+}
+
+fn in_module(module: &str, name: &str) -> Symbol {
+    Symbol {
+        id: SymbolId::new(module, &[], name, SymbolKind::Function),
+        ..symbol("doc.md", name)
+    }
+}
+
+/// A host file with a snippet module whose function calls a function of the
+/// project.
+fn with_example() -> (Project, Symbol, Symbol) {
+    let used = symbol("a.go", "Used");
+    let snippet = in_module("doc.0", "main");
+    let project = Project::merge([Fragment {
+        files: vec![
+            file("a.go", false, false),
+            File {
+                lang: "markdown".to_owned(),
+                facts: [("regions".to_owned(), "go:example".to_owned())].into(),
+                ..file("doc.md", false, false)
+            },
+        ],
+        modules: vec![Module {
+            path: "doc.0".to_owned(),
+            name: None,
+            test_of: None,
+            language: Some("go".to_owned()),
+            example: true,
+        }],
+        symbols: vec![used.clone(), snippet.clone()],
+        edges: vec![Edge {
+            kind: EdgeKind::Calls,
+            from: Node::Symbol(snippet.id.clone()),
+            to: Target::Resolved(Node::Symbol(used.id.clone())),
+            resolution: Resolution::Semantic,
+            site: Some(Span {
+                start: Position { line: 3, col: 2 },
+                end: Position { line: 3, col: 6 },
+            }),
+        }],
+        ..Fragment::default()
+    }]);
+    (project, used, snippet)
+}
+
+#[test]
+fn an_example_is_a_site_of_use_and_no_caller() {
+    let (project, used, snippet) = with_example();
+    assert!(project.in_example(&snippet.id));
+    assert!(!project.in_example(&used.id));
+    assert!(project.callers(&used.id).is_empty());
+    assert!(project.callees(&snippet.id).is_empty());
+    assert!(project.uses(&snippet.id).is_empty());
+    assert!(project.references(&used.id).is_empty());
+    assert_eq!(project.sites(&used.id).len(), 1);
+    assert_eq!(project.edges_from(&snippet.id).count(), 1);
+}
+
+#[test]
+fn the_examples_scope_decides_whether_an_example_is_a_subject() {
+    let (project, used, snippet) = with_example();
+    let scope = |examples| Applicability {
+        examples,
+        ..Applicability::default()
+    };
+    assert_eq!(ExampleScope::default(), ExampleScope::Include);
+    assert!(ExampleScope::Include.is_default());
+    assert!(scope(ExampleScope::Include).admits_symbol(&project, &snippet));
+    assert!(!scope(ExampleScope::Exclude).admits_symbol(&project, &snippet));
+    assert!(scope(ExampleScope::Exclude).admits_symbol(&project, &used));
+    assert!(scope(ExampleScope::Only).admits_symbol(&project, &snippet));
+    assert!(!scope(ExampleScope::Only).admits_symbol(&project, &used));
+}
+
+#[test]
+fn a_symbol_is_in_the_language_its_module_says() {
+    let (project, used, snippet) = with_example();
+    assert_eq!(project.language_of(&snippet), Some("go"));
+    assert_eq!(project.language_of(&used), Some("go"));
+    let rust = Applicability::default().only(["rust".to_owned()]);
+    assert!(!rust.admits_symbol(&project, &snippet));
+}
+
+#[test]
+fn a_host_file_is_a_subject_through_the_regions_it_holds() {
+    let (project, _, _) = with_example();
+    let host = project.file(std::path::Path::new("doc.md")).unwrap();
+    assert_eq!(host.regions().collect::<Vec<_>>(), [("go", true)]);
+    let go = Applicability::default().only(["go".to_owned()]);
+    assert!(!go.excludes(&project, host));
+    assert!(!go.admits_file(host), "the file itself is Markdown");
+    let outside = Applicability {
+        examples: ExampleScope::Exclude,
+        ..go.clone()
+    };
+    assert!(outside.excludes(&project, host));
+    let rust = Applicability::default().only(["rust".to_owned()]);
+    assert!(rust.excludes(&project, host));
+    let only = Applicability {
+        examples: ExampleScope::Only,
+        ..Applicability::default()
+    };
+    assert!(!only.excludes(&project, host));
+    assert!(only.excludes(
+        &project,
+        project.file(std::path::Path::new("a.go")).unwrap()
+    ));
+}
+
+#[test]
+fn applicability_admits_an_example_module_as_the_scope_says() {
+    let module = Module {
+        path: "doc.0".to_owned(),
+        name: None,
+        test_of: None,
+        language: Some("go".to_owned()),
+        example: true,
+    };
+    let scope = |examples| Applicability {
+        examples,
+        ..Applicability::default()
+    };
+    assert!(scope(ExampleScope::Include).admits_module(&module, &[]));
+    assert!(!scope(ExampleScope::Exclude).admits_module(&module, &[]));
+    assert!(scope(ExampleScope::Only).admits_module(&module, &[]));
 }

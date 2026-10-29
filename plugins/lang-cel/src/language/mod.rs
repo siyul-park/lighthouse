@@ -94,6 +94,8 @@ fn index_embedded_sources(
                 name: path.rsplit('/').next().map(str::to_owned),
                 path,
                 test_of: None,
+                language: None,
+                example: false,
             })
             .collect(),
         symbols: external.into_values().collect(),

@@ -20,7 +20,8 @@ pub(crate) struct Declared<'p> {
     /// Lines from the first to the last declaration, summed over the module's
     /// files: file lengths are not part of the code model.
     pub lines: u32,
-    /// The distinct production modules that import the module.
+    /// The distinct production modules that import the module; examples are
+    /// not.
     pub dependents: BTreeSet<String>,
     /// The declarations of the module: types, interfaces, constants,
     /// variables and functions at module level, without `init`.
@@ -42,8 +43,8 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
         *first = (*first).min(span.start.line);
         *last = (*last).max(span.end.line);
         let lang = project
-            .file(&symbol.file)
-            .map_or_else(String::new, |file| file.analysis_language().to_owned());
+            .language_of(symbol)
+            .map_or_else(String::new, str::to_owned);
         let module = modules.entry(path).or_insert_with(|| Declared {
             anchor: symbol,
             lang,
@@ -69,7 +70,9 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
         else {
             continue;
         };
-        let production = project.module(from).is_some_and(|m| m.test_of.is_none());
+        let production = project
+            .module(from)
+            .is_some_and(|m| m.test_of.is_none() && !m.example);
         if from != to
             && production
             && let Some(module) = modules.get_mut(to.as_str())
@@ -80,7 +83,7 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
     let paths: Vec<String> = modules.keys().map(|path| (*path).to_owned()).collect();
     let mut children: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for path in &paths {
-        if path == "." {
+        if path == "." || project.module(path).is_some_and(|m| m.example) {
             continue;
         }
         let parent = path.rsplit_once('/').map_or(".", |(parent, _)| parent);

@@ -248,6 +248,8 @@ impl World {
             path: path.to_owned(),
             name: name.map(str::to_owned),
             test_of: test_of.map(str::to_owned),
+            language: None,
+            example: false,
         });
     }
 

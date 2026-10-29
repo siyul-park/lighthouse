@@ -16,9 +16,9 @@ use serde_json::Value;
 
 use super::serve::Handler;
 use crate::{
-    Comment, Conventions, ErrorObject, FileInfo, FileRef, Fragment, Incomplete, IndexInput,
-    IndexParams, IndexResult, InitializeParams, InitializeResult, Mapping, ProviderManifest,
-    Source, serve,
+    Comment, Conventions, EmbeddedFile, ErrorObject, FileInfo, FileRef, Fragment, Incomplete,
+    IndexInput, IndexParams, IndexResult, InitializeParams, InitializeResult, Mapping,
+    ProviderManifest, Source, serve,
 };
 
 /// The capability of a provider that exposes syntax trees.
@@ -98,6 +98,38 @@ impl<P: HostParser> HostProvider<P> {
     }
 }
 
+impl<P: HostParser> HostProvider<P> {
+    /// Reads the regions that other files embed as documents of the language.
+    /// The provider has no code model to give them, so a region is read as far
+    /// as there is anything to say: one that is not a document is a notice,
+    /// since what a file writes in a fence is not always the language's.
+    fn regions(&self, regions: &EmbeddedFile, result: &mut IndexResult) {
+        result.fragments.push(Fragment {
+            file: FileInfo {
+                path: regions.path.clone(),
+                ..FileInfo::default()
+            },
+            ..Fragment::default()
+        });
+        for source in &regions.sources {
+            match self.parser.parse(&source.text) {
+                Ok(_) => {}
+                Err(HostError::Syntax(error)) => result.notices.push(format!(
+                    "{}: the {} at {} is not a valid {} document: {error}",
+                    regions.path, self.language.id, source.node_pointer, self.language.name
+                )),
+                Err(HostError::Tree(reason)) => result.incomplete.push(Incomplete {
+                    path: Some(regions.path.clone()),
+                    reason: format!(
+                        "cannot expose the {} at {}: {reason}",
+                        self.language.name, source.node_pointer
+                    ),
+                }),
+            }
+        }
+    }
+}
+
 impl<P: HostParser> Handler for HostProvider<P> {
     fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
         let language = self.language;
@@ -133,13 +165,7 @@ impl<P: HostParser> Handler for HostProvider<P> {
             let (file, source_ast) = match input {
                 IndexInput::File { file, source_ast } => (file, *source_ast),
                 IndexInput::Regions { regions } => {
-                    result.incomplete.push(Incomplete {
-                        path: Some(regions.path.clone()),
-                        reason: format!(
-                            "{} provider does not analyze selected source regions",
-                            self.language.id
-                        ),
-                    });
+                    self.regions(regions, &mut result);
                     continue;
                 }
             };

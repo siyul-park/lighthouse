@@ -11,6 +11,7 @@ spec:
   scope:
     subject: test
     tests: only
+    examples: exclude
   languages:
     go: {}
     rust: {}

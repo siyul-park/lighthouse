@@ -160,6 +160,8 @@ fn module_paths_and_duplicate_edges_are_handled() {
             path: module.to_owned(),
             name: None,
             test_of: None,
+            language: None,
+            example: false,
         }],
         edges: vec![import.clone()],
         ..Fragment::default()
@@ -274,6 +276,8 @@ fn project_indexes_answer_by_file_symbol_and_call_graph() {
             path: "m".to_owned(),
             name: None,
             test_of: None,
+            language: None,
+            example: false,
         }],
         symbols: vec![a.clone(), b.clone(), c.clone()],
         edges: vec![

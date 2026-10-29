@@ -65,8 +65,8 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
 
 pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
     let lang = project
-        .file(&s.file)
-        .map_or_else(String::new, |file| file.analysis_language().to_owned());
+        .language_of(s)
+        .map_or_else(String::new, str::to_owned);
     let module = project.module(s.id.module());
     let last = module.map_or_else(
         || {

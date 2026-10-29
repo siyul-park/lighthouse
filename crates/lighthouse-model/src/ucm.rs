@@ -20,6 +20,9 @@ pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, Type
 use crate::{Document, Span};
 use merge::{dedup_edges, resolve_all, sites_of, sorted_union};
 
+/// The fact of a file that lists its regions, see [`File::regions`].
+pub const REGIONS: &str = "regions";
+
 /// Provider feature that rules may require.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -71,6 +74,18 @@ impl File {
             .get("analysisLanguage")
             .map_or(&self.lang, String::as_str)
     }
+
+    /// The languages of the regions the host routed to other providers, each
+    /// with whether the region is example code, from the fact the host states
+    /// as `language:example` or `language:code`, comma separated.
+    pub fn regions(&self) -> impl Iterator<Item = (&str, bool)> {
+        self.facts
+            .get(REGIONS)
+            .map_or("", String::as_str)
+            .split(',')
+            .filter_map(|region| region.split_once(':'))
+            .map(|(language, kind)| (language, kind == "example"))
+    }
 }
 
 /// Package, directory or namespace.
@@ -83,6 +98,16 @@ pub struct Module {
     /// The module whose public surface this one tests from outside.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub test_of: Option<String>,
+    /// The language of the regions of a host file that declare the module,
+    /// stated by the host that routed them; `None` for a module of a file of
+    /// its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    /// The module is declared by example code: what documentation shows, not
+    /// part of the project. Its calls and references are sites of use, and
+    /// nothing is used, owned or tested because of them.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub example: bool,
 }
 
 /// Project-stable identity: `module::owner::name#kind`.
@@ -533,6 +558,21 @@ impl Project {
                 .is_some_and(|m| m.test_of.is_some())
     }
 
+    /// Whether the symbol is example code: declared in a module that example
+    /// code declares, which documentation shows and the project does not use.
+    pub fn in_example(&self, id: &SymbolId) -> bool {
+        self.module(id.module()).is_some_and(|m| m.example)
+    }
+
+    /// The language the symbol is in: the one its module's host stated, else
+    /// the language analyzed in its file; `None` for a file the model does not
+    /// know.
+    pub fn language_of(&self, symbol: &Symbol) -> Option<&str> {
+        self.module(symbol.id.module())
+            .and_then(|m| m.language.as_deref())
+            .or_else(|| self.file(&symbol.file).map(File::analysis_language))
+    }
+
     /// The module with this path.
     pub fn module(&self, path: &str) -> Option<&Module> {
         let at = self
@@ -658,16 +698,27 @@ impl Index {
     }
 
     /// Indexes the edges by source, the implementers of interfaces, and the
-    /// calls, uses and references between resolved symbols.
+    /// calls, uses and references between resolved symbols of project code.
     fn link_edges(&mut self, all: &Fragment) {
         let mut calls = BTreeSet::new();
         let mut references = BTreeSet::new();
         let mut uses = BTreeSet::new();
+        let examples: BTreeSet<&str> = all
+            .modules
+            .iter()
+            .filter(|m| m.example)
+            .map(|m| m.path.as_str())
+            .collect();
         for (at, edge) in all.edges.iter().enumerate() {
             let Node::Symbol(from) = &edge.from else {
                 continue;
             };
             self.edges_from.entry(from.clone()).or_default().push(at);
+            // An example uses nothing: its edges stay as sites of use, and are
+            // not callers, references or implementers of what they name.
+            if examples.contains(from.module()) {
+                continue;
+            }
             let Target::Resolved(Node::Symbol(to)) = &edge.to else {
                 continue;
             };

@@ -49,3 +49,33 @@ impl TestScope {
         *self == Self::Exclude
     }
 }
+
+/// Which example code a decision applies to: the code that documentation
+/// shows, which is analyzed like any other and is not part of the project.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ExampleScope {
+    /// Project code only.
+    Exclude,
+    /// Project code and examples.
+    #[default]
+    Include,
+    /// Examples only.
+    Only,
+}
+
+impl ExampleScope {
+    /// Whether this is the default, left out of written files.
+    pub fn is_default(&self) -> bool {
+        *self == Self::Include
+    }
+
+    /// Whether code that is an example (or is not) is a subject.
+    pub fn admits(self, example: bool) -> bool {
+        match self {
+            Self::Exclude => !example,
+            Self::Include => true,
+            Self::Only => example,
+        }
+    }
+}

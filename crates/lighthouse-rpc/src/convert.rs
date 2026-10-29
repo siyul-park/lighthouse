@@ -235,6 +235,8 @@ fn module(m: wire::Module) -> core::Module {
         path: m.path,
         name: m.name,
         test_of: m.test_of,
+        language: None,
+        example: false,
     }
 }
 

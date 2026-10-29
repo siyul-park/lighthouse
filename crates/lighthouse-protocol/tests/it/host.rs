@@ -4,8 +4,9 @@
 use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
-    Context, FileRef, Handler, HostError, HostLanguage, HostParser, HostTree, IndexInput,
-    IndexParams, InitializeParams, Overlay, ProjectRef, TextOffsets, host_handler,
+    Context, EmbeddedFile, EmbeddedSource, FileRef, Handler, HostError, HostLanguage, HostParser,
+    HostTree, IndexInput, IndexParams, InitializeParams, Overlay, ProjectRef, TextOffsets,
+    host_handler,
 };
 use serde_json::json;
 
@@ -122,6 +123,47 @@ fn a_file_that_cannot_be_read_or_parsed_is_a_gap() {
     assert_eq!(
         empty.incomplete[0].reason,
         "cannot expose Lines syntax tree: nothing to select"
+    );
+}
+
+fn region(pointer: &str, text: &str) -> EmbeddedSource {
+    EmbeddedSource {
+        id: pointer.to_owned(),
+        rule_id: "fence".to_owned(),
+        node_pointer: pointer.to_owned(),
+        source_pointer: format!("{pointer}/text"),
+        provider: "lines".to_owned(),
+        syntax: None,
+        context: json!({}),
+        text: text.to_owned(),
+        source_range: [0, text.len() as u32],
+        text_map: None,
+    }
+}
+
+#[test]
+fn regions_that_are_documents_are_read_and_the_others_are_a_notice() {
+    let mut handler = host_handler(LANGUAGE, Lines);
+    let mut request = params(&[]);
+    request.inputs = vec![IndexInput::Regions {
+        regions: EmbeddedFile {
+            path: "doc.md".to_owned(),
+            hash: String::new(),
+            text: String::new(),
+            generated: false,
+            test: false,
+            facts: BTreeMap::new(),
+            sources: vec![region("/children/0", "x=1"), region("/children/1", "x!")],
+        },
+    }];
+    let result = handler.index(request).unwrap();
+    assert!(result.incomplete.is_empty(), "{:?}", result.incomplete);
+    assert_eq!(result.fragments.len(), 1);
+    assert_eq!(result.fragments[0].file.path, "doc.md");
+    assert!(result.fragments[0].symbols.is_empty());
+    assert_eq!(
+        result.notices,
+        ["doc.md: the lines at /children/1 is not a valid Lines document: a bang"]
     );
 }
 

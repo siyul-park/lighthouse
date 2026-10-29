@@ -28,6 +28,7 @@ spec:
     different test crates, or inline and in `tests/`, are duplicate owners.
   scope:
     subject: test
+    examples: exclude
   requirement: >-
     A public symbol MUST NOT have multiple semantic owner test functions.
   severity: error

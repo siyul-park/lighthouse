@@ -31,6 +31,7 @@ spec:
     methods and types without methods do not require a missing-owner test.
   scope:
     subject: test
+    examples: exclude
   requirement: >-
     A public symbol SHOULD have one top-level owner test function.
   severity: warn

@@ -22,7 +22,7 @@ pub use document::Document;
 pub use fix::{Preview, PreviewEdit, PreviewFile, Safety, Unavailable};
 pub use model_ref::ModelRef;
 pub use review::{AgentKind, Attribution, Judgment, Label, Role};
-pub use scope::{Reach, RunScope, TestScope};
+pub use scope::{ExampleScope, Reach, RunScope, TestScope};
 pub use text::{
     ColumnUnit, LineIndex, Position, Span, byte_position, eol_of, squash, utf16_position,
 };

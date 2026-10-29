@@ -11,6 +11,7 @@ spec:
     justified exceptions are listed in the project options.'
   scope:
     subject: edge
+    examples: exclude
   languages:
     go: {}
     rust: {}
