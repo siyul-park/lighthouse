@@ -11,6 +11,9 @@ spec:
     justified exceptions are listed in the project options.'
   scope:
     subject: edge
+  languages:
+    go: {}
+    rust: {}
   requirement: A module MUST NOT depend on a module in a higher layer, and modules
     of one layer MUST remain independent when the layer contract says they are peers.
   severity: error

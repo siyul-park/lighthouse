@@ -13,6 +13,10 @@ spec:
     type until another implementation exists.'
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
+    cel: {}
   requirement: A symbol SHOULD earn its existence by naming reusable behavior, a contract,
     an invariant, or a real abstraction; a forwarding wrapper or one-implementation
     private interface SHOULD be consolidated when it adds no distinct responsibility.
@@ -36,15 +40,14 @@ spec:
     select: symbol
     variables:
     - name: callable
-      expression: symbol.func != null && (symbol.kind == 'function' || symbol.kind
-        == 'method')
+      expression: symbol.func != null && symbol.kind in ['function', 'method', 'var']
     - name: matched
       expression: |-
         ('wrapper' in options.kinds && callable && symbol.func.forwards_only ? ['wrapper'] : [])
         + ('interface' in options.kinds && symbol.kind == 'interface'
             && symbol.visibility == 'private' && size(symbol.members) > 0
             && size(symbol.implementers) == 1 ? ['interface'] : [])
-    where: symbol.lang != 'cel' && size(matched) > 0
+    where: size(matched) > 0
     abstain: |-
       symbol.lang != 'cel' && symbol.visibility == 'private'
       && symbol.kind in ['function','method'] && symbol.func != null
@@ -54,7 +57,9 @@ spec:
     message: |-
       {{ size(matched) == 0 ? ''
          : matched[0] == 'wrapper'
-         ? 'private helper ' + symbol.name + ' is a single-use forwarding wrapper; inline it'
+         ? (symbol.lang == 'cel'
+           ? 'private variable ' + symbol.name + ' only forwards another variable; inline it'
+           : 'private helper ' + symbol.name + ' is a single-use forwarding wrapper; inline it')
          : matched[0] == 'dead'
          ? symbol.name + ' is never used; delete it'
          : symbol.name + ' has one implementation (' + symbol.implementers[0].name + '); use '
@@ -82,6 +87,58 @@ spec:
     - Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9
     - Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
   examples:
+  - name: cel-forwarding-variable
+    language: cel
+    kind: invalid
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Avoid single-use forwarding variables.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: originalValue
+              expression: '1'
+            - name: aliasValue
+              expression: originalValue
+            where: aliasValue == 1
+            message: Example
+    expect: [{ line: 16 }]
+  - name: cel-computed-variable
+    language: cel
+    kind: valid
+    canonical: true
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Avoid single-use forwarding variables.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: originalValue
+              expression: '1'
+            - name: computedValue
+              expression: originalValue + 1
+            where: computedValue == 2
+            message: Example
   - name: invalid
     language: go
     kind: invalid

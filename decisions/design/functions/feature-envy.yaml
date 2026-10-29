@@ -13,6 +13,9 @@ spec:
     explicitly opts them in.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: A function SHOULD live with the type or module whose behavior it principally
     uses; a function SHOULD NOT be placed elsewhere merely by historical accident.
   severity: info

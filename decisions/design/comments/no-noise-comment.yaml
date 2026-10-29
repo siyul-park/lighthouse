@@ -13,6 +13,9 @@ spec:
   scope:
     subject: file
     tests: include
+  languages:
+    go: {}
+    rust: {}
   requirement: Comments SHOULD NOT label sections, preserve commented-out code, record
     history, or restate a block closing; prefer code structure and version control.
   severity: warn

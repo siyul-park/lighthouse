@@ -15,6 +15,10 @@ spec:
     subject: file
     generated: true
     tests: include
+  languages:
+    go: {}
+    rust: {}
+    toml: {}
   requirement: >-
     An allow annotation SHOULD suppress a finding; one whose rule no longer
     fires there, or is not enabled, SHOULD be removed.
@@ -52,6 +56,28 @@ spec:
       - "Martin, Clean Code (2008), G4 Overridden Safeties"
       - "Martin, Clean Code (2008), G12 Clutter"
   examples:
+    - name: toml-stale-allow
+      language: toml
+      kind: invalid
+      fixed:
+        - path: example.toml
+          body: "key = 'value'"
+      files:
+        - path: example.toml
+          body: |-
+            # lighthouse-disable-next-line design/exported-doc -- stale
+            key = 'value'
+      expect:
+        - line: 1
+    - name: toml-plain-comment
+      language: toml
+      kind: valid
+      canonical: true
+      files:
+        - path: example.toml
+          body: |-
+            # configuration documentation
+            key = 'value'
     - name: go-stale-allow
       language: go
       kind: invalid

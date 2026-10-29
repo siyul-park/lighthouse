@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: Tests SHOULD NOT be added solely to exercise implementation structure
     when they cannot establish an externally meaningful contract.
   severity: info

@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: A test case SHOULD specify one behavior and contain the actions and
     assertions that establish that behavior.
   severity: warn

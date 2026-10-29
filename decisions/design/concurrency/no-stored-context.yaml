@@ -10,6 +10,8 @@ spec:
     on a reusable object hides which operation owns that lifetime.
   scope:
     subject: symbol
+  languages:
+    go: {}
   requirement: A type SHOULD NOT store `context.Context` in a field; pass the context
     to the operation that uses it.
   severity: warn
@@ -74,21 +76,3 @@ spec:
 
         type Holder struct{ cancel context.CancelFunc }
     canonical: false
-  - name: stored-context-rust-is-judged-by-review
-    language: rust
-    kind: valid
-    files:
-    - path: src/lib.rs
-      body: |-
-        pub struct Ctx;
-
-        pub struct Worker {
-            ctx: Ctx,
-        }
-
-        impl Worker {
-            pub fn new(ctx: Ctx) -> Self {
-                Self { ctx }
-            }
-        }
-    canonical: true

@@ -10,6 +10,9 @@ spec:
     carry only the context needed to classify and diagnose failure.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: An error SHOULD expose the failed operation and cause, not secrets,
     mutable internal objects, or private implementation state.
   severity: warn

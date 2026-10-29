@@ -10,6 +10,9 @@ spec:
     and keep error semantics consistent across layers.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Failures that callers must distinguish SHOULD use named error values
     or types rather than repeated ad hoc strings.
   severity: warn

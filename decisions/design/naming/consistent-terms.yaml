@@ -10,6 +10,9 @@ spec:
     types are appropriate only when they represent the same concept.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: One term SHOULD represent one concept across packages, and one concept
     SHOULD have one term; unrelated exported types SHOULD NOT share a name.
   severity: warn
@@ -83,3 +86,22 @@ spec:
         pub mod second {
             pub struct Ledger;
         }
+
+  - name: rust-inconsistent-public-terms
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Customer { pub id: u64 }
+        pub fn find_client(id: u64) -> Option<Customer> { None }
+        pub fn save_user(value: Customer) { let _ = value; }
+  - name: rust-consistent-public-terms
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Customer { pub id: u64 }
+        pub fn find_customer(id: u64) -> Option<Customer> { None }
+        pub fn save_customer(value: Customer) { let _ = value; }

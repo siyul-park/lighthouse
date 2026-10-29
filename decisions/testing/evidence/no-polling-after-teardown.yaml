@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: A polling assertion SHOULD finish before the resource it observes is
     torn down, and teardown SHOULD NOT race with a still-running poll.
   severity: warn

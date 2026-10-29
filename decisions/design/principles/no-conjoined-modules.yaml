@@ -11,6 +11,9 @@ spec:
     shape from private reach and parent calls.
   scope:
     subject: module
+  languages:
+    go: {}
+    rust: {}
   requirement: Modules SHOULD NOT be split when the parent and child share private implementation
     and call into each other.
   severity: info
@@ -90,3 +93,17 @@ spec:
 
         func Work() int { return sample.API() }
 
+  - name: go-unrelated-responsibilities-share-package
+    language: go
+    kind: invalid
+    files:
+    - path: http.go
+      body: |-
+        package app
+        type Handler struct{}
+        func (Handler) Serve() {}
+    - path: storage.go
+      body: |-
+        package app
+        type Repository struct{}
+        func (Repository) Migrate() {}

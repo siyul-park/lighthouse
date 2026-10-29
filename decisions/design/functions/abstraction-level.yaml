@@ -15,6 +15,9 @@ spec:
     higher-level policy.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: >-
     A function SHOULD stay at one level of abstraction: its steps express
     either intent or mechanics, not both.

@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: Architecture-specific contracts SHOULD have evidence that exercises
     the relevant architecture boundary rather than only a generic success path.
   severity: info

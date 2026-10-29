@@ -10,6 +10,8 @@ spec:
     owner makes mutation and synchronization explicit.
   scope:
     subject: symbol
+  languages:
+    go: {}
   requirement: Mutable global variables SHOULD NOT be used for application state;
     state should be owned by an instance with a clear synchronization strategy.
   severity: warn
@@ -63,10 +65,3 @@ spec:
         var defaults = map[string]string{}
 
         const Limit = 3
-  - name: global-rust-valid
-    language: rust
-    kind: valid
-    canonical: true
-    files:
-    - path: src/lib.rs
-      body: 'pub static LIMIT: u8 = 3;'

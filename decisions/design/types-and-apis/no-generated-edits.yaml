@@ -11,6 +11,9 @@ spec:
     the change can judge it.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Generated files MUST be changed through their generator or source definition,
     not by editing generated output directly.
   severity: error

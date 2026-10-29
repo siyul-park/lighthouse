@@ -10,6 +10,9 @@ spec:
     races.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: A resource SHOULD have one explicit owner responsible for releasing
     it exactly once on every exit path.
   severity: warn

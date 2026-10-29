@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: The lowest test layer that can prove a contract SHOULD be used, while
     integration tests remain for contracts that cross component boundaries.
   severity: info

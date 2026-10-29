@@ -11,6 +11,8 @@ spec:
     for this contract.
   scope:
     subject: symbol
+  languages:
+    go: {}
   requirement: An exported function or a method of an exported type SHOULD NOT expose
     an unexported type in its parameters or results.
   severity: warn
@@ -129,19 +131,3 @@ spec:
         func (s *Server) Config() config { return config{} }
     expect:
     - line: 7
-  - name: unexported-rust-is-checked-by-the-compiler
-    language: rust
-    kind: valid
-    files:
-    - path: src/lib.rs
-      body: |-
-        struct Config;
-
-        fn new() -> Config {
-            Config
-        }
-
-        pub fn run() {
-            let _ = new();
-        }
-    canonical: true

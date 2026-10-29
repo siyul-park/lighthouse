@@ -70,3 +70,111 @@ spec:
       body: |-
         a
         b
+  - name: go-over-limit
+    language: go
+    kind: invalid
+    options: { max: 2 }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+        var one = 1
+        var two = 2
+    expect: [{ line: 3 }]
+  - name: go-within-limit
+    language: go
+    kind: valid
+    canonical: true
+    options: { max: 2 }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+        var one = 1
+  - name: rust-over-limit
+    language: rust
+    kind: invalid
+    options: { max: 2 }
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn one() {}
+        pub fn two() {}
+        pub fn three() {}
+    expect: [{ line: 3 }]
+  - name: rust-within-limit
+    language: rust
+    kind: valid
+    canonical: true
+    options: { max: 2 }
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn one() {}
+        pub fn two() {}
+  - name: yaml-over-limit
+    language: yaml
+    kind: invalid
+    options: { max: 2 }
+    files:
+    - path: example.yaml
+      body: |-
+        one: 1
+        two: 2
+        three: 3
+    expect: [{ line: 3 }]
+  - name: yaml-within-limit
+    language: yaml
+    kind: valid
+    canonical: true
+    options: { max: 2 }
+    files:
+    - path: example.yaml
+      body: |-
+        one: 1
+        two: 2
+  - name: toml-over-limit
+    language: toml
+    kind: invalid
+    options: { max: 2 }
+    files:
+    - path: example.toml
+      body: |-
+        one = 1
+        two = 2
+        three = 3
+    expect: [{ line: 3 }]
+  - name: toml-within-limit
+    language: toml
+    kind: valid
+    canonical: true
+    options: { max: 2 }
+    files:
+    - path: example.toml
+      body: |-
+        one = 1
+        two = 2
+  - name: cel-host-over-limit
+    language: cel
+    kind: invalid
+    options: { max: 2 }
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec: { title: Example, context: Short, scope: { subject: symbol }, requirement: 'Names stay clear.', severity: warn, check: { type: cel, select: symbol, where: symbol.name == 'x', message: Example } }
+    expect: [{ line: 3 }]
+  - name: cel-host-within-limit
+    language: cel
+    kind: valid
+    canonical: true
+    options: { max: 4 }
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec: { title: Example, context: Short, scope: { subject: symbol }, requirement: 'Names stay clear.', severity: warn, check: { type: cel, select: symbol, where: symbol.name == 'x', message: Example } }

@@ -20,10 +20,14 @@ spec:
     select: symbol
     variables:
     - name: spelled
-      expression: "!symbol.generated ? options.initialisms.filter(w, symbol.name.matches('(^|[a-z0-9])'
-        + w.substring(0, 1) + w.substring(1).lowerAscii() + '([A-Z0-9_]|$)')) : []"
+      expression: "!symbol.generated ? options.initialisms.filter(w, options.style == 'lowerCamel'
+        ? symbol.name.matches('[a-z0-9]' + w + '([A-Z0-9_]|$)')
+        : symbol.name.matches('(^|[a-z0-9])' + w.substring(0, 1) + w.substring(1).lowerAscii()
+          + '([A-Z0-9_]|$)')) : []"
     where: size(spelled) > 0
-    message: "{{ symbol.name + ' spells the initialism ' + spelled[0] + ' in lower case; write it ' + spelled[0] }}"
+    message: "{{ symbol.name + (options.style == 'lowerCamel' ? ' uses the upper-case initialism '
+      + spelled[0] + '; write it in lower camel case' : ' spells the initialism ' + spelled[0]
+      + ' in lower case; write it ' + spelled[0]) }}"
     evidence:
       name: symbol.name
       initialism: spelled[0]
@@ -34,6 +38,11 @@ spec:
     - 'Lighthouse, coding-patterns#naming-49da70c5'
   options:
     properties:
+      style:
+        type: string
+        enum: [upper, lowerCamel]
+        default: upper
+        description: Whether initialisms must be uppercase or follow lowerCamelCase.
       initialisms:
         type: array
         items:
@@ -80,9 +89,13 @@ spec:
         description: Initialisms that must be written in capitals, as upper-case words.
     additionalProperties: false
   languages:
+    go: {}
     rust:
       options:
         initialisms: []
+    cel:
+      options:
+        style: lowerCamel
   examples:
   - name: lower-case-initialism
     language: go
@@ -118,3 +131,61 @@ spec:
             pub http_url: String,
             pub uuid: String,
         }
+  - name: cel-upper-case-initialism
+    language: cel
+    kind: invalid
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Names stay clear.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: httpURL
+              expression: 'true'
+            where: symbol.name == 'example'
+            message: Example
+    expect: [{ line: 14 }]
+  - name: cel-lower-camel-initialism
+    language: cel
+    kind: valid
+    canonical: true
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Names stay clear.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: httpUrl
+              expression: 'true'
+            where: symbol.name == 'example'
+            message: Example
+
+  - name: rust-configured-initialism
+    language: rust
+    kind: invalid
+    options:
+      initialisms: [HTTP]
+    files:
+    - path: src/lib.rs
+      body: 'pub struct HttpClient;'
+    expect: [{ line: 1 }]

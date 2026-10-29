@@ -42,6 +42,7 @@ spec:
     go:
       options:
         includeInternal: true
+    rust: {}
   check:
     type: cel
     select: symbol

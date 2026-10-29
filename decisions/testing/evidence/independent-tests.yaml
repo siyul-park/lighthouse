@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: Each test SHOULD produce the same result regardless of execution order
     and SHOULD NOT depend on mutable state left by another test.
   severity: warn

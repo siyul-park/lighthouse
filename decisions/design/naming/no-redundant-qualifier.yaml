@@ -63,9 +63,11 @@ spec:
           is reported.
     additionalProperties: false
   languages:
+    go: {}
     rust:
       options:
         symbols: []
+    cel: {}
   check:
     type: cel
     select: symbol
@@ -92,10 +94,14 @@ spec:
       expression: options.affix && symbol.kind in ['type', 'interface'] && size(members)
         >= options.minMembers && (size(prefix) > 0 || size(suffix) > 0)
     - name: matched
-      expression: "(symbol.owner == null && symbol.visibility != 'private' && options.symbols.exists(k,k
-        == symbol.kind) && !(symbol.kind == 'function' && symbol.name == 'main') &&
-        size(repeated)>0 ? ['qualifier'] : []) + (member_repeated ? ['member'] : [])
-        + (affixed ? ['affix'] : [])"
+      expression: >-
+        (symbol.owner == null
+          && (symbol.visibility != 'private' || symbol.lang == 'cel')
+          && options.symbols.exists(k, k == symbol.kind)
+          && !(symbol.kind == 'function' && symbol.name == 'main')
+          && size(repeated) > 0 ? ['qualifier'] : [])
+        + (member_repeated ? ['member'] : [])
+        + (affixed ? ['affix'] : [])
     where: size(matched)>0
     message: "{{ matched[0] == 'qualifier' ? symbol.kind + ' ' + symbol.name + ' repeats
       its module name `' + repeated[0].name + '`; callers already write it' : matched[0]
@@ -259,6 +265,54 @@ spec:
             Dir,
             Link,
         }
+  - name: cel-repeated-module-name
+    language: cel
+    kind: invalid
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Names stay clear.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: celValue
+              expression: 'true'
+            where: symbol.name == 'example'
+            message: Example
+    expect: [{ line: 14 }]
+  - name: cel-unqualified-name
+    language: cel
+    kind: valid
+    canonical: true
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Names stay clear.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: value
+              expression: 'true'
+            where: symbol.name == 'example'
+            message: Example
   fix:
     safety: unsafe
     type: model

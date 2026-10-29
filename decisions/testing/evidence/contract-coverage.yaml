@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: Tests SHOULD cover applicable success, failure, boundaries, ownership,
     lifecycle, and compatibility dimensions of each public contract.
   severity: info

@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: Each behaviorally distinct scenario SHOULD have its own named case
     rather than being hidden inside a long test body.
   severity: warn

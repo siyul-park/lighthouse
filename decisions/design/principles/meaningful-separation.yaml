@@ -10,6 +10,9 @@ spec:
     implementation detail. Evaluate the contract and dependencies, not size alone.
   scope:
     subject: module
+  languages:
+    go: {}
+    rust: {}
   requirement: A module SHOULD be separate from its users only when it provides an
     independent responsibility, invariant, lifecycle, or reusable abstraction.
   severity: info

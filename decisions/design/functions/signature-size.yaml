@@ -133,6 +133,7 @@ spec:
     identity:
       subject: func.id
   languages:
+    go: {}
     rust:
       options:
         limits:

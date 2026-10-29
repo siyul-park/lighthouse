@@ -18,6 +18,9 @@ spec:
     because the comment may have been meant for the section rather than the declaration.
   scope:
     subject: file
+  languages:
+    go: {}
+    rust: {}
   requirement: A comment that describes a declaration SHOULD be adjacent to it, without
     intervening blank lines.
   severity: warn

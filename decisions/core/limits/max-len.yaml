@@ -117,3 +117,83 @@ spec:
       body: |-
         fn open() {}
         // https://example.com/a/very/long/address
+  - name: yaml-wide-line
+    language: yaml
+    kind: invalid
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: example.yaml
+      body: |-
+        key: this value makes the line much too wide
+    expect: [{ line: 1 }]
+  - name: yaml-short-lines
+    language: yaml
+    kind: valid
+    canonical: true
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: example.yaml
+      body: |-
+        key: short
+  - name: toml-wide-line
+    language: toml
+    kind: invalid
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: example.toml
+      body: |-
+        key = 'this value makes the line much too wide'
+    expect: [{ line: 1 }]
+  - name: toml-short-lines
+    language: toml
+    kind: valid
+    canonical: true
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: example.toml
+      body: |-
+        key = 'short'
+  - name: cel-host-wide-line
+    language: cel
+    kind: invalid
+    options: { enabled: true, maxWidth: 100 }
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: This context line is deliberately longer than the width limit and is the one expected finding in this example.
+          scope: { subject: symbol }
+          requirement: Keep names clear.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            where: symbol.name == 'x'
+            message: Example
+    expect: [{ line: 6 }]
+  - name: cel-host-short-lines
+    language: cel
+    kind: valid
+    canonical: true
+    options: { enabled: true, maxWidth: 100 }
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Short context.
+          scope: { subject: symbol }
+          requirement: Keep names clear.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            where: symbol.name == 'x'
+            message: Example

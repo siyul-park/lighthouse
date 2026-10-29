@@ -12,6 +12,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: Tests SHOULD assert outcomes with the standard testing-library or language-native
     assertions rather than manually comparing values and failing without a useful
     diagnostic.

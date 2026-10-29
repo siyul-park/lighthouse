@@ -10,6 +10,8 @@ spec:
     type assertions and formatting with `%v` discard or bypass that identity.
   scope:
     subject: symbol
+  languages:
+    go: {}
   requirement: 'Error checks SHOULD preserve and compare semantic identity: use errors.Is/errors.As
     and wrap causes with `%w` instead of string formatting.'
   severity: warn
@@ -300,21 +302,3 @@ spec:
             return err == ErrNotFound
         }
     canonical: false
-  - name: rust-is-judged-by-review
-    language: rust
-    kind: valid
-    canonical: true
-    files:
-    - path: src/lib.rs
-      body: |-
-        #[derive(PartialEq)]
-        pub enum Failure {
-            Missing,
-        }
-
-        pub fn is_missing(err: &Failure) -> bool {
-            *err == Failure::Missing
-        }
-    options:
-      kinds:
-      - compare

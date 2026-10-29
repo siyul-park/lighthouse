@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: A test SHOULD make the production call and its asserted result visible;
     helpers SHOULD NOT hide the target call, result, or expected value.
   severity: warn

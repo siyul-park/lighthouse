@@ -11,6 +11,8 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
   requirement: 'Nested test cases SHOULD be limited to two levels: a test function
     and its direct cases.'
   severity: warn
@@ -68,14 +70,3 @@ spec:
         package sample
         import "testing"
         func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { if got := Get(); got != 1 { t.Fatal() } }) }
-  - name: rust-flat-test
-    language: rust
-    kind: valid
-    files:
-    - path: src/lib.rs
-      body: |-
-        #[test]
-        fn loads() {
-            assert_eq!(2 + 2, 4);
-        }
-    canonical: true

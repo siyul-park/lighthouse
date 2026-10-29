@@ -13,6 +13,9 @@ spec:
     so they are one decision.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Public inputs SHOULD use the narrowest reusable abstraction that fully
     expresses the contract; outputs SHOULD use the most concrete public type unless
     polymorphism is part of the contract.

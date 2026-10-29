@@ -11,6 +11,8 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
   requirement: A test level SHOULD use either data-driven table cases or individually
     named scenario cases, not a mixture for the same behavior.
   severity: warn
@@ -102,17 +104,4 @@ spec:
         			}
         		})
         	}
-        }
-  - name: one-style-rust
-    language: rust
-    kind: valid
-    canonical: true
-    files:
-    - path: src/lib.rs
-      body: |
-        #[test]
-        fn lengths() {
-            for (input, want) in [("", 0), ("a", 1)] {
-                assert_eq!(input.len(), want);
-            }
         }

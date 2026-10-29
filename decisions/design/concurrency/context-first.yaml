@@ -10,6 +10,8 @@ spec:
     visible at the call site. Framework types may be explicitly exempted.
   scope:
     subject: symbol
+  languages:
+    go: {}
   requirement: A Go function that accepts `context.Context` SHOULD take it as its
     first parameter, except for explicitly allowed framework types.
   severity: warn
@@ -125,16 +127,3 @@ spec:
         func (c *Client) Get(url string, ctx context.Context) error { return ctx.Err() }
     expect:
     - line: 7
-  - name: context-first-rust-is-judged-by-review
-    language: rust
-    kind: valid
-    canonical: true
-    files:
-    - path: src/lib.rs
-      body: |-
-        pub struct Ctx;
-
-        pub fn fetch(url: &str, ctx: &Ctx) -> usize {
-            let _ = ctx;
-            url.len()
-        }

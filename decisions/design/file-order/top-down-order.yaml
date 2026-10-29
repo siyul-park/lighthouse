@@ -11,6 +11,9 @@ spec:
     it.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: A private function SHOULD be declared after the production callers
     that explain why it exists; public entry points and wiring remain in their appropriate
     declaration groups.

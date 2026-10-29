@@ -10,6 +10,9 @@ spec:
     callers to implementation details.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: A type SHOULD NOT mix behavior-bearing object responsibilities with
     unrelated data-transfer structure.
   severity: warn

@@ -11,6 +11,9 @@ spec:
     functions are explicit exceptions.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Production code SHOULD return errors instead of panicking or unwrapping
     fallible results, except for explicitly named Must constructors and entry points.
   severity: warn

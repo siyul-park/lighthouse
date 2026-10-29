@@ -10,6 +10,9 @@ spec:
     tell the caller which fact the function asks.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Predicate names SHOULD use HasX for containment, IsX for a state, MatchX
     for comparison or validation, AtX for position or time, and bare X for a direct
     boolean value.
@@ -45,3 +48,19 @@ spec:
         func IsValid() bool { return true }
         func HasUser() bool { return true }
         func AtEnd() bool { return true }
+
+  - name: rust-action-named-predicate
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn validate(input: &str) -> bool { !input.is_empty() }
+  - name: rust-state-named-predicate
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn is_valid(input: &str) -> bool { !input.is_empty() }

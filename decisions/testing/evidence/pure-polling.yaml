@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: A polling predicate SHOULD observe state without mutating it or consuming
     a one-shot result.
   severity: warn

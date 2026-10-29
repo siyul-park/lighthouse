@@ -10,6 +10,9 @@ spec:
     when the existing API expresses the behavior without weakening boundaries.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Existing symbols and composition SHOULD be preferred over new layers,
     extension points, policy knobs, aliases, and parallel mechanisms unless a distinct
     contract requires them.

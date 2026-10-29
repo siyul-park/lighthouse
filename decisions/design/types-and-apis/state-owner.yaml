@@ -10,6 +10,9 @@ spec:
     race behavior difficult to reason about.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Each mutable state value SHOULD have one owner and one explicit synchronization
     strategy.
   severity: warn

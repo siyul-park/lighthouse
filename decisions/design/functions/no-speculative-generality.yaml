@@ -11,6 +11,9 @@ spec:
     real caller or invariant requires them; a hypothetical future use is not a responsibility.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: A symbol SHOULD NOT expose generic options, extension points, aliases,
     or parallel mechanisms without a distinct contract and a current use that needs
     them.

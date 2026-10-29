@@ -10,6 +10,9 @@ spec:
     policy or a specific lifecycle pulls unstable semantics into a reusable layer.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Lower-level or reusable symbols SHOULD express their responsibility
     in the most general form that fits it and SHOULD NOT depend on caller-specific
     policy, types, lifecycle, or semantics.

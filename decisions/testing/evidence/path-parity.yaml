@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: When multiple execution paths implement the same public contract, tests
     SHOULD prove parity across those paths.
   severity: info

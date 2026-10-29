@@ -39,6 +39,10 @@ spec:
     subject: file
     generated: true
     tests: include
+  languages:
+    go: {}
+    rust: {}
+    toml: {}
   requirement: >-
     An allow annotation MUST give a reason after `--`; an annotation without
     one is ignored and reported.
@@ -168,3 +172,21 @@ spec:
     - path: src/lib.rs
       body: pub fn open() {} // lighthouse-disable-line design/exported-doc -- re-exported
         and documented at its origin
+  - name: toml-missing-reason
+    language: toml
+    kind: invalid
+    files:
+    - path: example.toml
+      body: |-
+        # lighthouse-disable-next-line design/exported-doc
+        key = 'value'
+    expect: [{ line: 1 }]
+  - name: toml-with-reason
+    language: toml
+    kind: valid
+    canonical: true
+    files:
+    - path: example.toml
+      body: |-
+        # lighthouse-disable-next-line design/exported-doc -- generated configuration
+        key = 'value'

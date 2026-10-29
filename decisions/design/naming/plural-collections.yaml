@@ -10,6 +10,9 @@ spec:
     inspecting the type or return expression.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Names for collections and stores SHOULD be plural; names for a single
     capability or value SHOULD be singular.
   severity: warn
@@ -38,3 +41,19 @@ spec:
         package sample
         type Store struct { items []Item; user User }
         func (s Store) GetItems() []Item { return s.items }
+
+  - name: rust-singular-collection-name
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store { pub item: Vec<String> }
+  - name: rust-plural-collection-name
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store { pub items: Vec<String> }

@@ -11,6 +11,10 @@ spec:
     similarity alone is not enough to require abstraction.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
+    cel: {}
   requirement: Semantically equivalent behavior SHOULD have one implementation and
     one owner.
   severity: info
@@ -43,3 +47,48 @@ spec:
         { return \"\" }\n\treturn strings.TrimSpace(s)\n}\nfunc parseName(s string)
         string { return normalizeName(s) }\nfunc parseKey(s string) string { return
         normalizeName(s) }\n"
+
+  - name: cel-repeated-expression
+    language: cel
+    kind: invalid
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Reuse repeated expressions.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            where: size(symbol.name) > 0 && size(symbol.name) > 1
+            message: Example
+  - name: cel-shared-expression
+    language: cel
+    kind: valid
+    canonical: true
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Reuse repeated expressions.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: name_length
+              expression: size(symbol.name)
+            where: name_length > 0 && name_length > 1
+            message: Example

@@ -11,6 +11,9 @@ spec:
     are named.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Required constructor values SHOULD be explicit arguments; optional configuration
     SHOULD be grouped into a named options value or functional options.
   severity: warn

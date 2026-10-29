@@ -12,6 +12,10 @@ spec:
     not only a name prefix.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
+    cel: {}
   requirement: Configured action verbs SHOULD name actions or state transitions, not
     queries that return a boolean or report current state.
   severity: warn
@@ -92,3 +96,53 @@ spec:
     - path: src/lib.rs
       body: |
         pub fn is_cache_enabled() -> bool { true }
+  - name: cel-action-verb-returns-bool
+    language: cel
+    kind: invalid
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Names stay clear.
+          severity: warn
+          check:
+            type: cel
+            select: function
+            variables:
+            - name: buildUser
+              params: [user]
+              expression: 'true'
+            where: buildUser('user')
+            message: Example
+    expect: [{ line: 14 }]
+  - name: cel-query-name
+    language: cel
+    kind: valid
+    canonical: true
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Names stay clear.
+          severity: warn
+          check:
+            type: cel
+            select: function
+            variables:
+            - name: hasUser
+              params: [user]
+              expression: 'true'
+            where: hasUser('user')
+            message: Example

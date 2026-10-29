@@ -30,6 +30,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: >-
     A test file MUST declare its fixtures (test types, constants, variables and
     the functions that build them without the test framework's handle) above its

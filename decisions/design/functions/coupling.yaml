@@ -11,6 +11,9 @@ spec:
     defect.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: A function SHOULD NOT be a high fan-in/fan-out dependency hub or an
     oversized coordinator; such functions deserve review for responsibility and change
     propagation.
@@ -52,9 +55,6 @@ spec:
     variables:
     - name: m
       expression: func.metrics
-    - name: subject
-      expression: 'func.role == ''constructor'' ? func.built + '' needs'' : func.name
-        + '' has'''
     - name: hub_role
       expression: |-
         (m.fan_in >= options.hub.fanIn && m.fan_out >= options.hub.fanOut
@@ -173,3 +173,27 @@ spec:
             service::serve();
         }
     canonical: true
+
+  - name: rust-hub
+    language: rust
+    kind: invalid
+    options:
+      hub:
+        fanIn: 2
+        fanOut: 2
+        statements: 1
+        coordinatorFanOut: 100
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 100
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn hub() {
+            left();
+            right();
+        }
+        pub fn left() {}
+        pub fn right() {}
+        pub fn first() { hub(); }
+        pub fn second() { hub(); }
+    expect: [{ line: 1 }]

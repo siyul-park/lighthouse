@@ -27,6 +27,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: >-
     Contract tests MUST live outside the target's private scope and MUST NOT
     reference its private symbols.

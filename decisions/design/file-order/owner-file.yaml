@@ -12,6 +12,9 @@ spec:
     boundary.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Symbols with one owner and a cohesive responsibility SHOULD share a
     file.
   severity: warn

@@ -10,6 +10,8 @@ spec:
     creates leaks and races during teardown.
   scope:
     subject: symbol
+  languages:
+    go: {}
   requirement: A background task SHOULD have a defined cancellation signal and a way
     to wait for termination before its owner is released.
   severity: warn

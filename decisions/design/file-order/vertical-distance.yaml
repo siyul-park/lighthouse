@@ -11,6 +11,9 @@ spec:
     its peers.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Related functions and methods SHOULD be physically close, and direct
     collaborators and symmetric siblings SHOULD be adjacent when practical.
   severity: warn
@@ -23,8 +26,6 @@ spec:
         b.kind != ''method'' || b.owner_key != func.owner_key) : []'
     - name: separated
       expression: size(separators) > 0
-    - name: matched
-      expression: 'separated ? [''gap''] : []'
     where: separated
     message: "{{ 'method ' + func.name + ' is separated from the other methods of
       its type by ' + string(size(separators)) + ' other declaration(s) (' + separators[0].name

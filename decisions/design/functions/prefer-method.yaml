@@ -13,6 +13,9 @@ spec:
     decisions.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Methods SHOULD express receiver-owned behavior; a private free function
     called only by methods of one type SHOULD be a method of that type unless it is
     a genuine reusable helper.
@@ -40,8 +43,6 @@ spec:
       expression: free && func.visibility == 'private' && !func.constructor_named
         && size(func.references) == 0 && size(affinity) > 0 && (affinity.takes_owner_param
         || affinity.uses_owner) && !(options.requireOwnerParam && !affinity.takes_owner_param)
-    - name: matched
-      expression: 'method ? [''method''] : []'
     where: method
     message: "{{ 'private function ' + func.name + ' is called only by methods of
       ' + affinity.owner_name + '; consider making it a method of ' + affinity.owner_name

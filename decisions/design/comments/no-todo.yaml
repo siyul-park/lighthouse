@@ -11,6 +11,10 @@ spec:
   scope:
     subject: file
     tests: include
+  languages:
+    go: {}
+    rust: {}
+    toml: {}
   requirement: TODO, FIXME, BUG, HACK and XXX comments SHOULD be completed, filed
     as actionable work, or removed rather than left without a disposition.
   severity: info
@@ -148,3 +152,27 @@ spec:
         /// Reads the configured record.
         pub fn load() {}
     canonical: true
+  - name: todo-toml-invalid
+    language: toml
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: example.toml
+      body: |-
+        # TODO: set the real address
+        address = "localhost"
+    expect:
+    - line: 1
+  - name: todo-toml-valid
+    language: toml
+    kind: valid
+    canonical: true
+    options:
+      enabled: true
+    files:
+    - path: example.toml
+      body: |-
+        # The address the service listens on.
+        address = "localhost"
+        note = "TODO: this string is data, not a comment"

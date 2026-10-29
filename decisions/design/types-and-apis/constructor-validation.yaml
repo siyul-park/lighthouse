@@ -10,6 +10,9 @@ spec:
     invalid objects should not escape and depend on every caller to validate them.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: A constructor SHOULD reject invalid required inputs and establish the
     invariants that all constructed values rely on.
   severity: warn

@@ -15,6 +15,9 @@ spec:
     responsibilities rather than splitting by size alone.
   scope:
     subject: module
+  languages:
+    go: {}
+    rust: {}
   requirement: A symbol SHOULD have one coherent responsibility and a narrow contract;
     a symbol with too many public methods SHOULD be reviewed for multiple reasons
     to change.

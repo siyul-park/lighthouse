@@ -11,6 +11,9 @@ spec:
   scope:
     subject: test
     tests: only
+  languages:
+    go: {}
+    rust: {}
   requirement: A test SHOULD fail or pass from assertions over observable outcomes
     and SHOULD NOT require a person to inspect output manually.
   severity: warn

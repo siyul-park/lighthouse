@@ -10,6 +10,9 @@ spec:
     constraints harder to audit.
   scope:
     subject: symbol
+  languages:
+    go: {}
+    rust: {}
   requirement: Platform-specific behavior SHOULD be isolated behind a narrow interface
     or implementation boundary.
   severity: warn

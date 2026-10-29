@@ -10,6 +10,8 @@ spec:
     enforced by undocumented caller discipline.
   scope:
     subject: symbol
+  languages:
+    rust: {}
   requirement: A borrowed value SHOULD NOT escape the lifetime or ownership boundary
     that makes its referent valid.
   severity: warn

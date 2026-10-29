@@ -103,6 +103,7 @@ spec:
           to ones that are never ordinary behavior.
     additionalProperties: false
   languages:
+    go: {}
     rust:
       options:
         groups: [const, var, type, public-function, private-function]

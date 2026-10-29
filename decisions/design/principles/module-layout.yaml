@@ -21,6 +21,9 @@ spec:
     its children.
   scope:
     subject: module
+  languages:
+    go: {}
+    rust: {}
   requirement: >-
     A module's direct implementation files and its child modules SHOULD form
     one coherent abstraction level.

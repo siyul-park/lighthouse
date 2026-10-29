@@ -109,7 +109,7 @@ spec:
     - name: first
       expression: 'size(found) > 0 ? found[0] : {''kind'': '''', ''what'': '''', ''own'':
         0, ''max'': 0, ''hint'': '''', ''value'': 0}'
-    where: file.lang != 'cel' && size(found) > 0
+    where: size(found) > 0
     message: "{{ size(found) == 0 ? '' : subject + ' ' + string(first.value) + ' '
       + first.what + ' (max ' + string(first.max) + '): ' + first.hint }}"
     evidence:
@@ -121,14 +121,24 @@ spec:
     identity:
       subject: func.id
   languages:
+    go: {}
     rust:
       options:
         limits:
           lines: 100
           statements: -1
           cognitive: 25
+    cel:
+      options:
+        limits:
+          lines: -1
+          statements: 250
+          cyclomatic: 40
+          cognitive: 100
+          nesting: 10
   provenance:
     wasDerivedFrom:
+    - 'Lighthouse catalog: the CEL limits are the largest values among the expressions of the bundled decisions when CEL was first measured; lower them as those expressions are simplified'
     - 'funlen lines 60: https://golangci-lint.run/usage/linters/#funlen'
     - 'clippy too_many_lines 100: https://doc.rust-lang.org/clippy/lint_configuration.html'
     - 'ESLint max-lines-per-function: https://eslint.org/docs/latest/rules/max-lines-per-function'
@@ -535,3 +545,55 @@ spec:
         cyclomatic: 30
         cognitive: 30
         nesting: 1
+  - name: cel-complex-expression
+    language: cel
+    kind: invalid
+    options:
+      limits: { lines: -1, statements: 100, cyclomatic: 2, cognitive: 100, nesting: 100 }
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Keep expressions small.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: complexValue
+              expression: '1 > 0 ? (2 > 1 ? 1 : 2) : (3 > 2 ? 3 : 4)'
+            where: symbol.name == 'example'
+            message: Example
+    expect: [{ line: 14 }]
+  - name: cel-simple-expression
+    language: cel
+    kind: valid
+    canonical: true
+    options:
+      limits: { lines: -1, statements: 100, cyclomatic: 2, cognitive: 100, nesting: 100 }
+    files:
+    - path: decisions/example.yaml
+      body: |-
+        apiVersion: lighthouse/v1alpha1
+        kind: Decision
+        metadata: { name: example/decision }
+        spec:
+          title: Example
+          context: Example
+          scope: { subject: symbol }
+          requirement: Keep expressions small.
+          severity: warn
+          check:
+            type: cel
+            select: symbol
+            variables:
+            - name: simpleValue
+              expression: '1 > 0 ? 1 : 2'
+            where: symbol.name == 'example'
+            message: Example
