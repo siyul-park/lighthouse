@@ -380,7 +380,7 @@ fn a_relation_of_a_related_node_is_an_error_not_a_missing_value() {
 
 #[test]
 fn a_method_without_an_owner_is_not_hidden_by_it() {
-    // What `design/signature` asks: a method is reachable unless its owner is
+    // What `design/signature-size` asks: a method is reachable unless its owner is
     // private. With no owner there is nothing to hide it, as it was when the
     // owner of a node without one had an empty visibility.
     let plugin = local(
@@ -676,6 +676,6 @@ fn bundled() {
     let first = comp.bundled().unwrap();
     let second = comp.bundled().unwrap();
 
-    assert!(first.decision("core/file-size").is_some());
+    assert!(first.decision("core/max-lines").is_some());
     assert!(std::ptr::eq(first, second), "validated once");
 }

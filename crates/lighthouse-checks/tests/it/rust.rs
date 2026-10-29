@@ -28,6 +28,7 @@ fn every_checked_decision_passes_its_rust_examples() {
         lighthouse_test_support::bundled(),
     )
     .language("rust")
+    .trusted(true)
     .check_all();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
@@ -39,7 +40,7 @@ fn the_design_decisions_have_rust_examples() {
         "design/complexity",
         "design/complexity",
         "design/exported-doc",
-        "design/symbols",
+        "design/no-redundant-symbol",
     ] {
         let decision = catalog.decision(id).unwrap();
         let rust: Vec<_> = decision

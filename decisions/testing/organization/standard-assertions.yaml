@@ -1,0 +1,136 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/standard-assertions
+  uid: bde3ec8d-e5d2-4ed6-8877-639ab9a2e39e
+spec:
+  title: Tests use standard assertions
+  context: Assertions centralize failure messages and keep tests concise. The configured
+    third-party assertion imports are the boundary for the Go check; tests that do
+    not use one are not judged by the deterministic arm.
+  scope:
+    subject: test
+    tests: only
+  requirement: Tests SHOULD assert outcomes with the standard testing-library or language-native
+    assertions rather than manually comparing values and failing without a useful
+    diagnostic.
+  severity: warn
+  options:
+    properties:
+      libraries:
+        type: array
+        items:
+          type: string
+        default:
+        - github.com/stretchr/testify
+        description: Import paths (or their prefixes) of the assertion libraries;
+          project-local packages are named by their resolved module paths. A
+          module that imports none of them is not judged.
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    variables:
+    - name: manual
+      expression: func.manual_assertions > 0 && !func.name.startsWith('Benchmark')
+        && func.module_imports.exists(i, options.libraries.exists(l, i == l || i.startsWith(l
+        + '/')))
+    where: manual
+    message: |-
+      {{ !manual ? ''
+         : (func.kind == 'test' ? 'test' : func.test_role == 'test-helper' ? 'test helper' : 'function')
+           + ' ' + func.name + ' compares and fails by hand ' + string(func.manual_assertions)
+           + " time(s); use the project's assertion library" }}
+    evidence:
+      kind: 'manual ? ''manual'' : '''''
+      kinds: 'manual ? [''manual''] : []'
+      symbol: func.id
+      manual_assertions: func.manual_assertions
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - Meszaros, xUnit Test Patterns, Obscure Test
+    - Martin, Clean Code (2008), ch. 9 Clean tests
+    - Martin, Clean Code (2008), ch. 9 Single concept per test
+    - Martin, Clean Code (2008), ch. 9 One assert per test
+  examples:
+  - name: hand-written-comparison
+    language: go
+    kind: invalid
+    options:
+      libraries:
+      - assertions
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: assertions/assertions.go
+      body: |-
+        package assertions
+
+        func Equal(got, want int) bool { return got == want }
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+    - path: store_test.go
+      body: |-
+        package store_test
+
+        import (
+            "testing"
+
+            "example.com/store"
+            "example.com/store/assertions"
+        )
+
+        func TestGet(t *testing.T) {
+            _ = assertions.Equal(store.Get(), 1)
+            if got := store.Get(); got != 1 {
+                t.Fatalf("got %d", got)
+            }
+        }
+    expect:
+    - line: 10
+  - name: no-assertion-library-in-use
+    language: go
+    kind: valid
+    options:
+      libraries:
+      - assertions
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif got := store.Get(); got != 1 {\n\t\tt.Fatalf(\"got
+        %d\", got)\n\t}\n}"
+    canonical: true
+  - name: rust-native-assertion
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        #[test]
+        fn checks_the_result() {
+            assert_eq!(2 + 2, 4);
+        }
+    canonical: true
+  fix:
+    safety: unsafe
+    type: model
+    scope: symbol

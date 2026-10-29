@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-state-in-errors
+  uid: 7b709bb0-926f-40a2-aae1-f6cf3f6736da
+spec:
+  title: Errors do not expose private state
+  context: Errors often cross package or process boundaries and are logged; they should
+    carry only the context needed to classify and diagnose failure.
+  scope:
+    subject: symbol
+  requirement: An error SHOULD expose the failed operation and cause, not secrets,
+    mutable internal objects, or private implementation state.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#errors-c039c75d'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        type StoreError struct { Password string; DB *sql.DB; Err error }
+        func (e StoreError) Error() string { return e.Err.Error() }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        type StoreError struct { Op string; Err error }
+        func (e StoreError) Error() string { return e.Op + ": " + e.Err.Error() }

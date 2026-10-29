@@ -1,0 +1,41 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/resource-owner
+  uid: cbdc7999-4734-4481-bc0e-350328f98b2e
+spec:
+  title: Resources have one release owner
+  context: Ambiguous resource ownership leads to leaks, double-close bugs and shutdown
+    races.
+  scope:
+    subject: symbol
+  requirement: A resource SHOULD have one explicit owner responsible for releasing
+    it exactly once on every exit path.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#ownership-91d95023'
+    - 'Martin, Clean Code (2008), ch. 13 Concurrency: SRP, limit shared data'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func Read(path string) ([]byte, error) { f, _ := os.Open(path); defer f.Close(); go func(){ defer f.Close() }(); return io.ReadAll(f) }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func Read(path string) ([]byte, error) { f, err := os.Open(path); if err != nil { return nil, err }; defer f.Close(); return io.ReadAll(f) }

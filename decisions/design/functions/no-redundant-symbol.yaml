@@ -1,0 +1,486 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-redundant-symbol
+  uid: 603a09cc-212a-40df-a376-34816e591436
+spec:
+  title: Redundant symbols are removed or consolidated
+  context: 'One-use helpers are reviewed semantically: extract them only when they
+    name a concept, remove duplication, isolate an abstraction level, serve as a function
+    value, or provide a test seam. A private forwarding wrapper that adds no policy
+    is inlined; a private interface with one implementation is replaced with the concrete
+    type until another implementation exists.'
+  scope:
+    subject: symbol
+  requirement: A symbol SHOULD earn its existence by naming reusable behavior, a contract,
+    an invariant, or a real abstraction; a forwarding wrapper or one-implementation
+    private interface SHOULD be consolidated when it adds no distinct responsibility.
+  severity: warn
+  options:
+    properties:
+      kinds:
+        type: array
+        items:
+          type: string
+          enum:
+          - wrapper
+          - interface
+        default:
+        - wrapper
+        - interface
+        description: What to report.
+    additionalProperties: false
+  check:
+    type: cel
+    select: symbol
+    variables:
+    - name: callable
+      expression: symbol.func != null && (symbol.kind == 'function' || symbol.kind
+        == 'method')
+    - name: matched
+      expression: |-
+        ('wrapper' in options.kinds && callable && symbol.func.forwards_only ? ['wrapper'] : [])
+        + ('interface' in options.kinds && symbol.kind == 'interface'
+            && symbol.visibility == 'private' && size(symbol.members) > 0
+            && size(symbol.implementers) == 1 ? ['interface'] : [])
+    where: symbol.lang != 'cel' && size(matched) > 0
+    abstain: |-
+      symbol.lang != 'cel' && symbol.visibility == 'private'
+      && symbol.kind in ['function','method'] && symbol.func != null
+      && size(symbol.func.callers.filter(c, !c.test)) == 1
+      && !symbol.func.forwards_only && !symbol.implementation
+      && !(symbol.name in ['main','init','_'])
+    message: |-
+      {{ size(matched) == 0 ? ''
+         : matched[0] == 'wrapper'
+         ? 'private helper ' + symbol.name + ' is a single-use forwarding wrapper; inline it'
+         : matched[0] == 'dead'
+         ? symbol.name + ' is never used; delete it'
+         : symbol.name + ' has one implementation (' + symbol.implementers[0].name + '); use '
+           + symbol.implementers[0].name + ' directly until a second one exists' }}
+    evidence:
+      kind: 'size(matched) > 0 ? matched[0] : '''''
+      kinds: matched
+      callee: "'wrapper' in matched ? symbol.func.forward_target : null"
+      callers: "'wrapper' in matched ? size(symbol.func.callers) : null"
+      implementer: "'interface' in matched ? symbol.implementers[0].id : null"
+      stateless: "'interface' in matched ? symbol.implementers[0].members.filter(m,
+        m.kind == 'field').size() == 0 : null"
+    identity:
+      subject: symbol.id
+  fix:
+    safety: unsafe
+    type: model
+    scope: symbol
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), G9 Dead Code
+    - Martin, Clean Code (2008), F4 Dead Function
+    - Martin, Clean Code (2008), G12 Clutter
+    - Martin, Clean Code (2008), ch. 12 Beck's four rules
+    - Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9
+    - Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
+  examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct{ data map[string][]byte }
+
+        func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+        func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+        func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+    expect:
+    - line: 5
+  - name: valid
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\tclosed bool\n\tdata   map[string][]byte\n}\n\nvar ErrClosed error\n\nfunc
+        (s *Store) load(k string) ([]byte, error) {\n\tif s.closed {\n\t\treturn nil,
+        ErrClosed\n\t}\n\treturn s.read(k)\n}\n\nfunc (s *Store) read(k string) ([]byte,
+        error) { return s.data[k], nil }\n\nfunc (s *Store) Get(k string) ([]byte,
+        error) { return s.load(k) }"
+    canonical: true
+  - name: used-as-value
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct{ data map[string][]byte }
+
+        func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+        func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+        func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+
+        func (s *Store) Loader() func(string) ([]byte, error) { return s.load }
+  - name: adds-an-argument
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct{ data map[string][]byte }
+
+        func (s *Store) load(k string) ([]byte, error) { return s.read(k, true) }
+
+        func (s *Store) read(k string, fresh bool) ([]byte, error) { return s.data[k], nil }
+
+        func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+  - name: called-from-a-test
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct{ data map[string][]byte }
+
+        func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+        func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+        func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+    - path: example_test.go
+      body: "package sample\n\nimport \"testing\"\n\nfunc TestLoad(t *testing.T) {\n\ts
+        := &Store{}\n\ts.load(\"k\")\n}"
+  - name: rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            data: Vec<u8>,
+        }
+
+        impl Store {
+            fn load(&self, k: usize) -> u8 {
+                self.read(k)
+            }
+
+            fn read(&self, k: usize) -> u8 {
+                self.data[k]
+            }
+
+            pub fn get(&self, k: usize) -> u8 {
+                self.load(k)
+            }
+        }
+    expect:
+    - line: 6
+  - name: rust-valid
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            closed: bool,
+            data: Vec<u8>,
+        }
+
+        impl Store {
+            fn load(&self, k: usize) -> u8 {
+                if self.closed {
+                    return 0;
+                }
+                self.read(k)
+            }
+
+            fn read(&self, k: usize) -> u8 {
+                self.data[k]
+            }
+
+            pub fn get(&self, k: usize) -> u8 {
+                self.load(k)
+            }
+        }
+    canonical: true
+  - name: rust-used-as-value
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            data: Vec<u8>,
+        }
+
+        impl Store {
+            fn load(&self, k: usize) -> u8 {
+                self.read(k)
+            }
+
+            fn read(&self, k: usize) -> u8 {
+                self.data[k]
+            }
+
+            pub fn get(&self, k: usize) -> u8 {
+                self.load(k)
+            }
+
+            pub fn loader(&self) -> fn(&Store, usize) -> u8 {
+                Store::load
+            }
+        }
+  - name: rust-adds-an-argument
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            data: Vec<u8>,
+        }
+
+        impl Store {
+            fn load(&self, k: usize) -> u8 {
+                self.read(k, true)
+            }
+
+            fn read(&self, k: usize, fresh: bool) -> u8 {
+                if fresh { self.data[k] } else { 0 }
+            }
+
+            pub fn get(&self, k: usize) -> u8 {
+                self.load(k)
+            }
+        }
+  - name: rust-called-from-a-test
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            data: Vec<u8>,
+        }
+
+        impl Store {
+            fn load(&self, k: usize) -> u8 {
+                self.read(k)
+            }
+
+            fn read(&self, k: usize) -> u8 {
+                self.data[k]
+            }
+
+            pub fn get(&self, k: usize) -> u8 {
+                self.load(k)
+            }
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            #[test]
+            fn loads() {
+                let s = Store { data: vec![1] };
+                s.load(0);
+            }
+        }
+  - name: rust-trait-method
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub trait Reader {
+            fn read_one(&self, k: usize) -> u8;
+        }
+
+        pub struct Store {
+            data: Vec<u8>,
+        }
+
+        impl Reader for Store {
+            fn read_one(&self, k: usize) -> u8 {
+                self.read(k)
+            }
+        }
+
+        impl Store {
+            fn read(&self, k: usize) -> u8 {
+                self.data[k]
+            }
+        }
+
+        pub fn use_it(r: &dyn Reader) -> u8 {
+            r.read_one(0)
+        }
+  - name: interface-go-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype store interface {\n\tGet() int\n\tPut(x int)\n}\n\ntype
+        memory struct{ n int }\n\nfunc (m *memory) Get() int  { return m.n }\nfunc
+        (m *memory) Put(x int) { m.n = x }\n\nfunc Use() int {\n\tm := &memory{}\n\tm.Put(1)\n\treturn
+        m.Get()\n}"
+    expect:
+    - line: 3
+  - name: interface-go-valid
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype store interface {\n\tGet() int\n\tPut(x int)\n}\n\ntype
+        memory struct{ n int }\n\nfunc (m *memory) Get() int  { return m.n }\nfunc
+        (m *memory) Put(x int) { m.n = x }\n\nfunc Use() int {\n\tm := &memory{}\n\tm.Put(1)\n\treturn
+        m.Get()\n}\n\ntype disk struct{ n int }\n\nfunc (d *disk) Get() int  { return
+        d.n }\nfunc (d *disk) Put(x int) { d.n = x }"
+  - name: interface-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        trait Store {
+            fn get(&self) -> i32;
+            fn put(&mut self, x: i32);
+        }
+
+        struct Memory {
+            n: i32,
+        }
+
+        impl Store for Memory {
+            fn get(&self) -> i32 {
+                self.n
+            }
+
+            fn put(&mut self, x: i32) {
+                self.n = x;
+            }
+        }
+
+        pub fn run() -> i32 {
+            let mut m = Memory { n: 0 };
+            m.put(1);
+            m.get()
+        }
+    expect:
+    - line: 1
+  - name: interface-rust-valid
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        trait Store {
+            fn get(&self) -> i32;
+            fn put(&mut self, x: i32);
+        }
+
+        struct Memory {
+            n: i32,
+        }
+
+        impl Store for Memory {
+            fn get(&self) -> i32 {
+                self.n
+            }
+
+            fn put(&mut self, x: i32) {
+                self.n = x;
+            }
+        }
+
+        pub fn run() -> i32 {
+            let mut m = Memory { n: 0 };
+            m.put(1);
+            m.get()
+        }
+
+        struct Disk {
+            n: i32,
+        }
+
+        impl Store for Disk {
+            fn get(&self) -> i32 {
+                self.n
+            }
+
+            fn put(&mut self, x: i32) {
+                self.n = x;
+            }
+        }
+  - name: helpers-go-put-to-a-model
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func total(a, b int) int {
+            sum := add(a, b)
+            return scale(sum)
+        }
+
+        func add(a, b int) int {
+            return a + b
+        }
+
+        func scale(n int) int {
+            return n * 2
+        }
+  - name: helpers-go-reused-stay-apart
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func total(a, b int) int {
+            sum := add(a, b)
+            return scale(sum)
+        }
+
+        func double(n int) int {
+            return scale(n)
+        }
+
+        func add(a, b int) int {
+            return a + b
+        }
+
+        func scale(n int) int {
+            return n * 2
+        }
+  - name: helpers-rust-put-to-a-model
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn total(a: i32, b: i32) -> i32 {
+            scale(add(a, b))
+        }
+
+        fn add(a: i32, b: i32) -> i32 {
+            a + b
+        }
+
+        fn scale(n: i32) -> i32 {
+            n * 2
+        }

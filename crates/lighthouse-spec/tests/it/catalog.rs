@@ -21,11 +21,11 @@ fn bundled_catalog_has_the_core_design_language_and_testing_packs() {
 
 #[test]
 fn a_decision_is_keyed_by_its_uid_else_by_its_id() {
-    let named = bundled("core/file-size");
+    let named = bundled("core/max-lines");
     let uid = named.uid().unwrap();
 
     assert_eq!(named.key(), uid);
-    assert!(named.is_key(uid) && named.is_key("core/file-size"));
+    assert!(named.is_key(uid) && named.is_key("core/max-lines"));
     assert!(!named.is_key("core/other"));
     assert_eq!(named.metadata().name, named.id());
     let plain = Catalog::from_files(base(), &lighthouse_test_support::cel()).unwrap();
@@ -42,7 +42,7 @@ fn a_finding_asks_for_review_unless_its_decision_authored_an_error_or_a_judgment
         assert_eq!(authored.needs_review(false), asks, "{authored}");
         assert!(!authored.needs_review(true), "{authored} judged");
     }
-    let warn = bundled("design/errors");
+    let warn = bundled("design/error-identity");
     assert!(authored_severity(Severity::Error, Some(warn)).needs_review(false));
     let definitive = bundled("design/declaration-groups");
     assert!(!authored_severity(Severity::Warn, Some(definitive)).needs_review(false));
@@ -66,7 +66,7 @@ fn subject_run_scope() {
 
 #[test]
 fn decision_resolve_options() {
-    let decision = bundled("core/file-size").clone().map_spec(|mut spec| {
+    let decision = bundled("core/max-lines").clone().map_spec(|mut spec| {
         spec.languages
             .entry("go".to_owned())
             .or_default()
@@ -139,10 +139,10 @@ fn shape() {
 
 #[test]
 fn example_file_text() {
-    let files = &bundled("design/errors").examples[0].files;
+    let files = &bundled("design/error-identity").examples[0].files;
     assert!(files[0].source().is_some());
     assert!(files[0].text().contains("fmt.Errorf"));
-    let inline = &bundled("design/symbols").examples[0].files[0];
+    let inline = &bundled("design/no-redundant-symbol").examples[0].files[0];
     assert!(inline.source().is_none());
     assert_eq!(ExampleFile::inline("a.go", "package a").text(), "package a");
 }
@@ -153,10 +153,15 @@ fn checked_decisions_carry_runnable_examples() {
         .decisions()
         .filter(|d| d.automated())
     {
-        let invalid = decision.examples.iter().find(|e| !e.expect.is_empty());
+        let model_route = decision.check.as_ref().is_some_and(|check| {
+            matches!(&check.kind, lighthouse_spec::CheckKind::Cel(cel) if cel.abstain.is_some())
+        });
+        let invalid = decision.examples.iter().find(|e| {
+            e.kind == lighthouse_spec::ExampleKind::Invalid && (!e.expect.is_empty() || model_route)
+        });
         assert!(
             invalid.is_some(),
-            "{} has no invalid example with expectations",
+            "{} has no invalid example or model-review candidate",
             decision.id()
         );
     }
@@ -327,7 +332,7 @@ mod overlay {
 
 #[test]
 fn the_authored_severity_follows_the_decision_else_what_was_reported() {
-    let warn = bundled("design/errors");
+    let warn = bundled("design/error-identity");
     assert_eq!(
         authored_severity(Severity::Error, Some(warn)),
         Severity::Warn
@@ -420,7 +425,7 @@ fn scope_applicability() {
         lighthouse_model::TestScope::Only
     );
     assert!(!scope.applicability().generated);
-    let all = bundled("core/file-size").scope.applicability();
+    let all = bundled("core/max-lines").scope.applicability();
     assert!(all.generated);
     assert_eq!(all.tests, lighthouse_model::TestScope::Include);
 }
@@ -440,14 +445,14 @@ fn a_document_without_an_envelope_is_a_document_error() {
 
 #[test]
 fn with_uid_gives_a_decision_the_identity_it_keeps_across_renames() {
-    let decision = bundled("core/allow").clone();
+    let decision = bundled("core/allow-reason").clone();
     let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
     assert_eq!(decision.with_uid(uid).uid(), Some(uid));
 }
 
 #[test]
 fn an_object_limit_merges_over_the_default_and_the_language() {
-    let decision = bundled("design/signature");
+    let decision = bundled("design/signature-size");
     let none = Map::new();
     let params = |options: &Map<String, serde_json::Value>, language| {
         decision.resolve_options(options, language).unwrap()["limits"]["params"].clone()
@@ -477,7 +482,7 @@ fn an_option_schema_refuses_keys_it_does_not_know() {
 #[test]
 fn decision_options_from() {
     assert_eq!(
-        bundled("design/layout").options_from(),
+        bundled("design/top-down-order").options_from(),
         Some("design/declaration-groups")
     );
     assert_eq!(bundled("design/declaration-groups").options_from(), None);
@@ -485,7 +490,7 @@ fn decision_options_from() {
 
 #[test]
 fn decision_inheriting() {
-    let layout = bundled("design/layout");
+    let layout = bundled("design/top-down-order");
     let source = bundled("design/declaration-groups");
 
     let over = layout.inheriting(source);
@@ -502,7 +507,10 @@ fn decision_inheriting() {
         "the values of the language of the source"
     );
     assert_eq!(resolved["hooks"], json!([]));
-    assert!(resolved.contains_key("kinds"), "its own stay");
+    assert!(
+        resolved.contains_key("sharedAfterLastCaller"),
+        "its own option stays"
+    );
     assert_eq!(
         over.options.as_ref().unwrap().inherited,
         ["groups", "hooks"]
@@ -513,5 +521,5 @@ fn decision_inheriting() {
 fn embedded() {
     let catalog = Catalog::embedded(&lighthouse_test_support::cel()).unwrap();
 
-    assert!(catalog.decision("core/file-size").is_some());
+    assert!(catalog.decision("core/max-lines").is_some());
 }

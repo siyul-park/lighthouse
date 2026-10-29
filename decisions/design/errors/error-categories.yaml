@@ -1,0 +1,44 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/error-categories
+  uid: d2f4fe32-3755-45a2-8996-337aa61ebe57
+spec:
+  title: Errors use semantic categories
+  context: Named categories let callers handle a failure without parsing message text
+    and keep error semantics consistent across layers.
+  scope:
+    subject: symbol
+  requirement: Failures that callers must distinguish SHOULD use named error values
+    or types rather than repeated ad hoc strings.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#errors-b0da56b2'
+    - Martin, Clean Code (2008), ch. 7 Define exceptions by the caller's needs
+    - Martin, Clean Code (2008), G2 Obvious Behavior Is Unimplemented
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        return fmt.Errorf("bad input")
+        return fmt.Errorf("not found")
+        return fmt.Errorf("permission denied")
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        var ErrBadInput = errors.New("bad input")
+        var ErrNotFound = errors.New("not found")
+        var ErrPermissionDenied = errors.New("permission denied")

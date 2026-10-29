@@ -367,14 +367,18 @@ fn the_bundled_decisions_a_model_may_fix_declare_how_far_it_may_go_or_take_refer
         FixKind::Model { scope, .. } => *scope,
         other => panic!("{id}: a model fix expected, found {other:?}"),
     };
-    for id in ["design/exported-doc", "design/symbols", "testing/cases"] {
+    for id in [
+        "design/exported-doc",
+        "design/no-redundant-symbol",
+        "testing/standard-assertions",
+    ] {
         assert_eq!(scope_of(id), Some(FixScope::Symbol), "{id}");
     }
     for id in [
-        "design/errors",
-        "design/signature",
+        "design/no-panic",
+        "design/signature-size",
         "design/prefer-method",
-        "design/naming",
+        "design/no-redundant-qualifier",
     ] {
         assert_eq!(scope_of(id), None, "{id}: the default, `references`");
     }

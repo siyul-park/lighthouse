@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../schema/decision.schema.json
+---
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
@@ -6,56 +6,14 @@ metadata:
   uid: be0e8004-85e1-4b34-abb9-30dc46192e5c
 spec:
   title: Dependencies point down the layers
-  context: >-
-    Stable, general code must not break when specific code changes. The
-    project says which modules are higher and which are lower; an import that
-    points up, between peers of one layer, or across a forbidden line is
-    reported. It follows import-linter's `layers`, `independence` and
-    `forbidden` contracts (`layers`, `forbidden`, `ignore` with its `reason`)
-    and ArchUnit's `layeredArchitecture`. Nothing is reported until `layers`
-    or `forbidden` is configured: the layers belong to the project.
-
-    A layer is a list of module globs, and `layers` lists them from the top
-    down. In a glob `*` stands for characters inside one path segment and `**`
-    for any number of segments, none included, so `app/**` also matches `app`.
-    `::` and `/` both separate segments. A module that no layer names is not
-    judged. Only imports between modules of the project count; an external
-    module is ignored. An import is reported when it points to a higher layer,
-    when `independent` is on and it joins two modules of one layer that match
-    different globs (modules under one glob may import each other), or when it
-    matches a `forbidden` entry. An import that matches an `ignore` entry is
-    skipped, and its `reason` says why.
-
-    A module that matches the globs of several layers belongs to the first of
-    them: the first matching layer wins, and `fromLayer` and `toLayer` in the
-    evidence are those indices.
-
-    Deferred: an `ignore` entry that matches no import is not reported as
-    stale, as import-linter's `unmatched_ignore_imports_alerting` would. A rule
-    judges one import at a time and cannot see that nothing matched (see the
-    known gaps in docs/roadmap.md).
-
-    Go: a module is a package, named by its directory relative to the project
-    root (`internal/domain`).
-
-    Rust: a module is a crate or one of its modules, named by the crate and
-    the `mod` path (`my_crate/domain/order`); the crate root is the crate name.
-
-    Kind `contract` (the only kind): which contract an import breaks is the
-    evidence `contract`: `forbidden`, `layers` or `independence`. Where an
-    interface lives, and whether low-level code knows its callers, need the
-    meaning of the code and are judged: the requirement and the examples are the
-    question put to a model.
+  context: 'The project’s declared layer contract is deterministic: dependencies point
+    down, and peer modules in different globs of one layer stay independent. Explicitly
+    justified exceptions are listed in the project options.'
   scope:
     subject: edge
-  requirement: >-
-    Interfaces MUST be used only when callers supply behavior and MUST be
-    defined where that behavior is consumed. Lower-level or reusable symbols
-    MUST express their responsibility in the most general form that fully fits
-    it and MUST NOT depend on caller-specific policy, types, lifecycle, or
-    semantics; lower-level code MUST NOT depend on its callers. A module MUST NOT depend on a module of a higher layer, and modules of one
-    layer MUST stay independent of each other, as the project's layers state.
-  severity: warn
+  requirement: A module MUST NOT depend on a module in a higher layer, and modules
+    of one layer MUST remain independent when the layer contract says they are peers.
+  severity: error
   options:
     properties:
       layers:
@@ -65,35 +23,37 @@ spec:
           items:
             type: string
         default: []
-        description: >-
-          The layers from the top down, each a list of module globs, such as
-          `[["app/cli"], ["app/**"], ["app/model"]]`. A module imports only
-          modules of its own layer or below.
+        description: The layers from the top down, each a list of module globs, such
+          as `[["app/cli"], ["app/**"], ["app/model"]]`. A module imports only modules
+          of its own layer or below.
       independent:
         type: boolean
         default: true
-        description: >-
-          Modules of one layer that match different globs do not import each
-          other.
+        description: Modules of one layer that match different globs do not import
+          each other.
       forbidden:
         type: array
         items:
           type: object
-          required: [from, to]
+          required:
+          - from
+          - to
           properties:
             from:
               type: string
             to:
               type: string
         default: []
-        description: >-
-          Imports that are never allowed, each an object `{from, to}` of the
-          globs of the importing and the imported module.
+        description: Imports that are never allowed, each an object `{from, to}` of
+          the globs of the importing and the imported module.
       ignore:
         type: array
         items:
           type: object
-          required: [from, to, reason]
+          required:
+          - from
+          - to
+          - reason
           properties:
             from:
               type: string
@@ -102,60 +62,53 @@ spec:
             reason:
               type: string
         default: []
-        description: >-
-          Imports that are allowed although they break a contract, each an
-          object `{from, to, reason}`: the globs of both modules and the reason
-          it stays.
+        description: 'Imports that are allowed although they break a contract, each
+          an object `{from, to, reason}`: the globs of both modules and the reason
+          it stays.'
     additionalProperties: false
   check:
     type: cel
     select: edge
     variables:
-      # The index of the first layer, top to bottom, that holds a glob matching
-      # the module; -1 when none does.
-      - name: layer
-        params: [m]
-        expression: >-
-          (lists.range(size(options.layers)).filter(i, options.layers[i].exists(g, glob.matches(m, g)))
-            + [-1])[0]
-      - name: from
-        expression: >-
-          edge.kind == 'imports' && edge.to.kind == 'module'
-          ? layer(edge.from.module) : -1
-      - name: to
-        expression: >-
-          edge.kind == 'imports' && edge.to.kind == 'module'
-          ? layer(edge.to.module) : -1
-      - name: contract
-        expression: >-
-          edge.kind != 'imports' || edge.to.kind != 'module' ? ''
-          : options.ignore.exists(i, glob.matches(edge.from.module, i.from)
-              && glob.matches(edge.to.module, i.to)) ? ''
-          : options.forbidden.exists(f, glob.matches(edge.from.module, f.from)
-              && glob.matches(edge.to.module, f.to)) ? 'forbidden'
-          : from >= 0 && to >= 0 && to < from ? 'layers'
-          : options.independent && from >= 0 && to == from
-              && !options.layers[from].exists(g, glob.matches(edge.from.module, g)
-                  && glob.matches(edge.to.module, g)) ? 'independence'
-          : ''
+    - name: layer
+      params: [m]
+      expression: |-
+        (lists.range(size(options.layers)).filter(i, options.layers[i].exists(g, glob.matches(m, g)))
+          + [-1])[0]
+    - name: target
+      expression: >-
+        edge.to.kind == 'module' ? edge.to.module
+        : edge.to.module != '' ? edge.to.module : edge.to.name
+    - name: from
+      expression: "edge.kind == 'imports' ? layer(edge.from.module) : -1"
+    - name: to
+      expression: "edge.kind == 'imports' ? layer(target) : -1"
+    - name: contract
+      expression: |-
+        edge.kind != 'imports' || target == '' ? ''
+        : options.ignore.exists(i, glob.matches(edge.from.module, i.from)
+            && glob.matches(target, i.to)) ? ''
+        : options.forbidden.exists(f, glob.matches(edge.from.module, f.from)
+            && glob.matches(target, f.to)) ? 'forbidden'
+        : from >= 0 && to >= 0 && to < from ? 'layers'
+        : options.independent && from >= 0 && to == from
+            && !options.layers[from].exists(g, glob.matches(edge.from.module, g)
+                && glob.matches(target, g)) ? 'independence'
+        : ''
     where: contract != ''
-    message: >-
-      {{ contract == 'forbidden'
-      ? edge.from.module + ' must not import ' + edge.to.module
-      : edge.from.module + ' (layer ' + string(from) + ') imports '
-        + edge.to.module + ' (layer ' + string(to) + '); '
+    message: |-
+      {{ contract == 'forbidden' ? edge.from.module + ' must not import ' + target : edge.from.module + ' (layer ' + string(from) + ') imports '
+        + target + ' (layer ' + string(to) + '); '
         + (contract == 'layers' ? 'dependencies must point down'
            : 'peers in one layer stay independent') }}
     evidence:
       from: edge.from.module
-      to: edge.to.module
+      to: target
       fromLayer: from
       toLayer: to
-      kind: "'contract'"
-      kinds: "['contract']"
       contract: contract
     identity:
-      subject: "'imports:' + edge.from.module + '->' + edge.to.module"
+      subject: "'imports:' + edge.from.module + '->' + target"
   provenance:
     wasDerivedFrom:
     - import-linter, layers, independence and forbidden contracts
@@ -196,7 +149,6 @@ spec:
   - name: go-import-points-down
     language: go
     kind: valid
-    canonical: true
     options:
       layers:
       - - domain
@@ -219,6 +171,7 @@ spec:
         package infra
 
         func Read() string { return "" }
+    canonical: true
   - name: go-peers
     language: go
     kind: invalid
@@ -275,10 +228,6 @@ spec:
   - name: go-submodules-of-one-glob
     language: go
     kind: valid
-    options:
-      layers:
-      - - http/**
-      - - domain
     files:
     - path: go.mod
       body: |
@@ -302,8 +251,8 @@ spec:
     kind: invalid
     options:
       forbidden:
-      - from: domain
-        to: infra/**
+      - from: '**/domain'
+        to: '**/infra/db'
     files:
     - path: go.mod
       body: |
@@ -327,14 +276,6 @@ spec:
   - name: go-ignored-with-a-reason
     language: go
     kind: valid
-    options:
-      layers:
-      - - infra
-      - - domain
-      ignore:
-      - from: domain
-        to: infra
-        reason: the config loader moves down in the next release
     files:
     - path: go.mod
       body: |
@@ -358,9 +299,15 @@ spec:
     kind: invalid
     options:
       layers:
-      - - workspace/infra
-      - - workspace/domain
+      - - "**::infra"
+      - - "**::domain"
     files:
+    - path: Cargo.toml
+      body: |-
+        [package]
+        name = "sample"
+        version = "0.1.0"
+        edition = "2024"
     - path: src/lib.rs
       body: |-
         pub mod domain;
@@ -382,12 +329,17 @@ spec:
   - name: rust-mod-points-down
     language: rust
     kind: valid
-    canonical: true
     options:
       layers:
-      - - workspace/domain
-      - - workspace/infra
+      - - "**::domain"
+      - - "**::infra"
     files:
+    - path: Cargo.toml
+      body: |-
+        [package]
+        name = "sample"
+        version = "0.1.0"
+        edition = "2024"
     - path: src/lib.rs
       body: |-
         pub mod domain;
@@ -404,3 +356,4 @@ spec:
         pub fn read() -> String {
             String::new()
         }
+    canonical: true

@@ -90,7 +90,7 @@ func NewFunction() *Function { return &Function{} }
 func (f *Function) Count() int { return len(f.overloads) }
 ";
 
-const LAYOUT: &str = "[rules]\n\"design/layout\" = \"warn\"\n";
+const LAYOUT: &str = "[rules]\n\"design/top-down-order\" = \"warn\"\n";
 
 /// How many findings of `decision` the project has.
 fn findings(dir: &tempfile::TempDir, decision: &str) -> usize {
@@ -111,12 +111,12 @@ fn the_group_order_and_the_layout_agree_on_a_real_file_and_reach_a_fixpoint() {
         return;
     };
     assert_eq!(
-        findings(&dir, "design/layout"),
+        findings(&dir, "design/vertical-distance"),
         1,
         "Size is separated from ID by bound"
     );
 
-    for decision in ["design/declaration-groups", "design/layout"] {
+    for decision in ["design/declaration-groups", "design/vertical-distance"] {
         lighthouse(dir.path())
             .args(["check", "--fix", "--decision", decision])
             .assert()
@@ -126,9 +126,9 @@ fn the_group_order_and_the_layout_agree_on_a_real_file_and_reach_a_fixpoint() {
     }
     let fixed = read(&dir, "decls.go");
     assert_eq!(findings(&dir, "design/declaration-groups"), 0);
-    assert_eq!(findings(&dir, "design/layout"), 0);
+    assert_eq!(findings(&dir, "design/vertical-distance"), 0);
 
-    for decision in ["design/layout", "design/declaration-groups"] {
+    for decision in ["design/vertical-distance", "design/declaration-groups"] {
         lighthouse(dir.path())
             .args(["check", "--fix", "--decision", decision])
             .assert()
@@ -192,9 +192,9 @@ fn a_rust_reorder_moves_the_plain_comments_with_their_items() {
 
 #[test]
 fn the_group_order_and_the_layout_agree_on_a_rust_file_with_comments() {
-    let dir = rust_project(COMMENTED, "[rules]\n\"design/layout\" = \"warn\"\n");
+    let dir = rust_project(COMMENTED, "[rules]\n\"design/top-down-order\" = \"warn\"\n");
 
-    for decision in ["design/declaration-groups", "design/layout"] {
+    for decision in ["design/declaration-groups", "design/top-down-order"] {
         lighthouse(dir.path())
             .args(["check", "--fix", "--decision", decision])
             .assert()
@@ -202,7 +202,7 @@ fn the_group_order_and_the_layout_agree_on_a_rust_file_with_comments() {
     }
     assert_eq!(read(&dir, "src/lib.rs"), COMMENTED_ORDERED);
     assert_eq!(findings(&dir, "design/declaration-groups"), 0);
-    assert_eq!(findings(&dir, "design/layout"), 0);
+    assert_eq!(findings(&dir, "design/top-down-order"), 0);
 }
 
 /// 500 types, then their methods in the reverse order of the types: every
@@ -243,7 +243,7 @@ const CALLER_FIRST: &str =
     "package demo\n\nfunc Run() int { return helper() }\n\nfunc helper() int { return 1 }\n";
 const HELPER_FIRST: &str =
     "package demo\n\nfunc helper() int { return 1 }\n\nfunc Run() int { return helper() }\n";
-const PRIVATE_FIRST: &str = "[rules]\n\"design/layout\" = \"warn\"\n\"design/declaration-groups\" = { level = \"warn\", options = { groups = [\"private-function\", \"public-function\"] } }\n";
+const PRIVATE_FIRST: &str = "[rules]\n\"design/top-down-order\" = \"warn\"\n\"design/declaration-groups\" = { level = \"warn\", options = { groups = [\"private-function\", \"public-function\"] } }\n";
 
 #[test]
 fn the_layout_reads_the_group_order_the_project_set_for_the_group_decision() {
@@ -251,7 +251,7 @@ fn the_layout_reads_the_group_order_the_project_set_for_the_group_decision() {
         return;
     };
     assert_eq!(
-        findings(&plain, "design/layout"),
+        findings(&plain, "design/top-down-order"),
         1,
         "helper precedes its caller"
     );
@@ -266,7 +266,7 @@ fn the_layout_reads_the_group_order_the_project_set_for_the_group_decision() {
         "the project puts private functions first"
     );
     assert_eq!(
-        findings(&set, "design/layout"),
+        findings(&set, "design/top-down-order"),
         0,
         "the layout judges by the same order, set once"
     );
@@ -279,14 +279,14 @@ fn an_order_set_for_the_group_decision_is_met_by_both_fixes_and_they_converge() 
     };
     assert_eq!(findings(&dir, "design/declaration-groups"), 1);
     assert_eq!(
-        findings(&dir, "design/layout"),
+        findings(&dir, "design/top-down-order"),
         0,
         "the order wants the helper first"
     );
 
     for decision in [
         "design/declaration-groups",
-        "design/layout",
+        "design/top-down-order",
         "design/declaration-groups",
     ] {
         lighthouse(dir.path())
@@ -297,14 +297,14 @@ fn an_order_set_for_the_group_decision_is_met_by_both_fixes_and_they_converge() 
     }
     assert_eq!(read(&dir, "a.go"), HELPER_FIRST);
     assert_eq!(findings(&dir, "design/declaration-groups"), 0);
-    assert_eq!(findings(&dir, "design/layout"), 0);
+    assert_eq!(findings(&dir, "design/top-down-order"), 0);
 }
 
 #[test]
 fn an_order_set_on_the_layout_itself_is_refused_it_is_read_from_the_group_decision() {
     let Some(dir) = go_project(
         &[("a.go", HELPER_FIRST)],
-        "[rules]\n\"design/layout\" = { level = \"warn\", options = { groups = [\"public-function\"] } }\n",
+        "[rules]\n\"design/top-down-order\" = { level = \"warn\", options = { groups = [\"public-function\"] } }\n",
     ) else {
         return;
     };
@@ -319,7 +319,7 @@ fn an_order_set_on_the_layout_itself_is_refused_it_is_read_from_the_group_decisi
 
 const OTHER_HELPER_FIRST: &str =
     "package demo\n\nfunc other() int { return 1 }\n\nfunc Other() int { return other() }\n";
-const PRIVATE_FIRST_FOR_B: &str = "[rules]\n\"design/layout\" = \"warn\"\n\"design/declaration-groups\" = \"warn\"\n[[overrides]]\nfiles = [\"b.go\"]\nrules = { \"design/declaration-groups\" = { level = \"warn\", options = { groups = [\"private-function\", \"public-function\"] } } }\n";
+const PRIVATE_FIRST_FOR_B: &str = "[rules]\n\"design/top-down-order\" = \"warn\"\n\"design/declaration-groups\" = \"warn\"\n[[overrides]]\nfiles = [\"b.go\"]\nrules = { \"design/declaration-groups\" = { level = \"warn\", options = { groups = [\"private-function\", \"public-function\"] } } }\n";
 
 /// How many findings of `decision` the project has in `file`.
 fn findings_in(dir: &tempfile::TempDir, decision: &str, file: &str) -> usize {
@@ -345,19 +345,19 @@ fn an_override_of_the_group_order_for_a_file_changes_the_layout_at_that_file_onl
     assert_eq!(findings_in(&dir, "design/declaration-groups", "a.go"), 1);
     assert_eq!(findings_in(&dir, "design/declaration-groups", "b.go"), 0);
     assert_eq!(
-        findings_in(&dir, "design/layout", "a.go"),
+        findings_in(&dir, "design/top-down-order", "a.go"),
         1,
         "the default order puts the caller first"
     );
     assert_eq!(
-        findings_in(&dir, "design/layout", "b.go"),
+        findings_in(&dir, "design/top-down-order", "b.go"),
         0,
         "the layout judges b.go by the order the override sets for it"
     );
 
     for decision in [
         "design/declaration-groups",
-        "design/layout",
+        "design/top-down-order",
         "design/declaration-groups",
     ] {
         lighthouse(dir.path())
@@ -369,5 +369,5 @@ fn an_override_of_the_group_order_for_a_file_changes_the_layout_at_that_file_onl
     assert_eq!(read(&dir, "a.go"), CALLER_FIRST);
     assert_eq!(read(&dir, "b.go"), OTHER_HELPER_FIRST);
     assert_eq!(findings(&dir, "design/declaration-groups"), 0);
-    assert_eq!(findings(&dir, "design/layout"), 0);
+    assert_eq!(findings(&dir, "design/top-down-order"), 0);
 }

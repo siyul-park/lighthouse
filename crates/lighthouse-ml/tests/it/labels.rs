@@ -6,7 +6,7 @@ use lighthouse_ml::{
 };
 use lighthouse_model::{AgentKind, Attribution, Judgment};
 
-const RULE: &str = "core/file-size";
+const RULE: &str = "core/max-lines";
 
 fn judged(fingerprint: &str, judgment: Judgment, by: Attribution, meaning: &str) -> Judged {
     Judged {
@@ -166,7 +166,7 @@ fn name_is_what_a_dataset_line_calls_the_source() {
 fn label_example_is_a_subject_of_the_decision_with_the_outcome_the_check_gave() {
     let label = Label::example(
         RULE,
-        "example:core/file-size:fail:1".to_owned(),
+        "example:core/max-lines:fail:1".to_owned(),
         Judgment::Fail,
         Outcome::Fail,
         None,

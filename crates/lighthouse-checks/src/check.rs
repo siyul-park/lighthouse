@@ -46,6 +46,7 @@ impl Check {
             CheckKind::Cel(cel) => Kind::Cel(Box::new(CelRule::new(comp, decision, cel)?)),
             CheckKind::Command(command) => Kind::Command(Box::new(CommandRule::new(
                 command,
+                command.programs(decision),
                 &decision.title,
                 decision.bundled(
                     comp.bundled()

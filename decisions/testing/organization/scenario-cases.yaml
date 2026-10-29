@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/scenario-cases
+  uid: 3680c03c-94f3-4bfd-a2c6-35450896dd06
+spec:
+  title: Distinct scenarios have distinct cases
+  context: Named scenarios make failure output state which contract path failed and
+    keep the top-level test readable.
+  scope:
+    subject: test
+    tests: only
+  requirement: Each behaviorally distinct scenario SHOULD have its own named case
+    rather than being hidden inside a long test body.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#organization-bd4d8f2c'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestAccount(t *testing.T) { a := NewAccount(); a.Deposit(2); a.Withdraw(1); a.Close(); if a.Balance() != 1 { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestDeposit(t *testing.T) { a := NewAccount(); a.Deposit(2); if a.Balance() != 2 { t.Fatal() } }
+        func TestWithdraw(t *testing.T) { a := NewAccount(); a.Deposit(2); a.Withdraw(1); if a.Balance() != 1 { t.Fatal() } }

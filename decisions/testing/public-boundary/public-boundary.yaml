@@ -8,7 +8,9 @@ spec:
   title: Contract tests live outside the target
   context: >-
     Living outside the target makes private access impossible rather than
-    discouraged.
+    discouraged. A test shows public usage and promised behavior; a private
+    symbol is tested through the public boundary, never by exposing internals
+    solely for tests.
 
     Go: Tests live in `package <target>_test`. A test file inside the
     target package is reported when it uses an unexported symbol of that
@@ -26,11 +28,8 @@ spec:
     subject: test
     tests: only
   requirement: >-
-    Feature contract tests MUST use only the target's public symbols and MUST
-    live outside the target's private scope. Tests MUST NOT reference private
-    symbols of the target; private-symbol testing MUST be resolved at the public
-    boundary rather than by exposing internals solely for tests. A test MUST show
-    public usage and promised behavior.
+    Contract tests MUST live outside the target's private scope and MUST NOT
+    reference its private symbols.
   severity: error
   check:
     type: cel

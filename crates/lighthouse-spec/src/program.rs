@@ -172,7 +172,10 @@ pub struct Program {
     /// The program and its arguments, run without a shell. `{file}`,
     /// `{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole
     /// arguments where the binding point accepts them; they say how many
-    /// files a run is given.
+    /// files a run is given. A decision's `check` and `fix` may leave it out
+    /// when each language it covers gives its own program under
+    /// `languages.<id>`.
+    #[serde(default)]
     pub command: Vec<String>,
     /// Variables the program is given besides the one allowlist. A value may
     /// hold `${NAME}`, the user's variable `NAME`, which is never written
@@ -381,6 +384,50 @@ impl From<ProgramSpec> for Program {
             ProgramSpec::Command(command) => Self::of(command),
             ProgramSpec::Program(program) => program,
         }
+    }
+}
+
+/// The programs a decision binds at one point: its own, and the ones of the
+/// languages that give their own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Programs {
+    own: Program,
+    languages: BTreeMap<String, Program>,
+}
+
+impl Programs {
+    pub(crate) fn new(own: &Program, languages: BTreeMap<String, Program>) -> Self {
+        Self {
+            own: own.clone(),
+            languages,
+        }
+    }
+
+    /// The program for the files of `language`: the one the language gives,
+    /// else the decision's own; `None` where neither has a command.
+    pub fn of(&self, language: &str) -> Option<&Program> {
+        self.languages
+            .get(language)
+            .or_else(|| (!self.own.command.is_empty()).then_some(&self.own))
+    }
+
+    /// Whether `language` gives a program of its own.
+    pub fn is_language(&self, language: &str) -> bool {
+        self.languages.contains_key(language)
+    }
+
+    /// The decision's own program, which has no command when every language
+    /// gives its own.
+    pub fn own(&self) -> &Program {
+        &self.own
+    }
+
+    /// Every program, the decision's own first when it has a command.
+    pub fn all(&self) -> impl Iterator<Item = &Program> {
+        (!self.own.command.is_empty())
+            .then_some(&self.own)
+            .into_iter()
+            .chain(self.languages.values())
     }
 }
 

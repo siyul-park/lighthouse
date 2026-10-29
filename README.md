@@ -56,7 +56,7 @@ so docs, linter and agent cannot disagree.
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
-  name: design/symbols
+  name: design/no-redundant-symbol
 spec:
   title: Inline single-use wrappers
   context: A forwarding wrapper adds a name without adding meaning.
@@ -101,11 +101,11 @@ A hook runs `lighthouse check` on what the agent just changed and returns feedba
 agent can act on:
 
 ```text
-design/errors  info (heuristic)  src/lib.rs:2:7
+design/no-panic  warn  src/lib.rs:2:7
   owner:       demo::run#function
   message:     .unwrap() can panic in run: return an error instead
-  requirement: Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
-  context:     Panics bypass the caller's control flow.
+  requirement: Production code SHOULD return errors instead of panicking or unwrapping fallible results, except for explicitly named Must constructors and entry points.
+  context:     Panics and unwraps convert ordinary failures into process or task failure.
   evidence:    function=run kind=unwrap
   expected:    canonical rust example (src/lib.rs)
                  pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> { text.parse() }
@@ -134,7 +134,7 @@ make plugins                                  # language plugins into target/plu
 lighthouse init                               # writes lighthouse.toml
 lighthouse check                              # analyze the project
 lighthouse check --changed --format json      # what the working tree changed, for an agent
-lighthouse decision show design/symbols  # context, requirement, examples
+lighthouse decision show design/no-redundant-symbol  # context, requirement, examples
 lighthouse review list                        # findings Lighthouse remembers
 lighthouse decision test                      # run every decision's examples
 ```
@@ -151,7 +151,7 @@ plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }, "design"]
 extends = ["design/recommended"]
 
 [spec.rules]
-"design/signature" = { level = "warn", options = { max = { default = 6, constructor = 8 } } }
+"design/signature-size" = { level = "warn", options = { limits = { params = { default = 6, constructor = 8 } } } }
 ```
 
 Exit codes: `0` clean, `1` an error (a warning too with `--strict` or `--max-warnings N`), `2` usage or configuration error, `3` analysis

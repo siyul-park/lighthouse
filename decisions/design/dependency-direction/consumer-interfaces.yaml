@@ -1,0 +1,64 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/consumer-interfaces
+  uid: 29c8c80d-b2af-4329-bb10-818b298474a7
+spec:
+  title: Interfaces live with their consumers
+  context: Defining an interface before a consumer needs substitution creates an unnecessary
+    abstraction; the consumer should own the narrow contract.
+  scope:
+    subject: symbol
+  requirement: An interface SHOULD be defined at the point that consumes behavior,
+    and SHOULD exist only when callers need to supply an implementation.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#types-and-apis-99a0c39c'
+  examples:
+  - name: go-import-points-up
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
+
+        import "example.com/app/infra"
+
+        func Load() string { return infra.Read() }
+    - path: infra/infra.go
+      body: |
+        package infra
+
+        func Read() string { return "" }
+  - name: go-import-points-down
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
+
+        import "example.com/app/infra"
+
+        func Load() string { return infra.Read() }
+    - path: infra/infra.go
+      body: |
+        package infra
+
+        func Read() string { return "" }
+    canonical: true

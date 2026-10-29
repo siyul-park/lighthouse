@@ -1,0 +1,170 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/allow-reason
+  uid: cd28a077-d029-4c54-b691-6ede8c9c6c9c
+spec:
+  title: Allow a finding in source, with a reason
+  context: >-
+    A decision to accept a finding belongs next to the code it is about,
+    where a reviewer sees it change, and an exception without a reason cannot
+    be reviewed or revisited. A silenced check is the smell Martin calls
+    Overridden Safeties, so the way to silence one is narrow and explained.
+
+    The forms are ESLint's directives, with ESLint's `--` before the
+    description, which is required here on every form that disables, and
+    there is no form without ids (ESLint `eslint-comments/require-description`,
+    golangci `nolintlint` with `require-explanation`, clippy
+    `allow_attributes_without_reason`). `lighthouse-disable-next-line <id>[, <id>]
+    -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line
+    <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>`
+    everything from the comment to a matching `lighthouse-enable <id>` or to
+    the end of the file (the whole file above the first line that is neither
+    blank nor a comment; imports are code).
+
+
+    ` -- ` separates the ids from the reason, as in ESLint, and ids are
+    separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation
+    comment (`///`, `//!`, `/** */`) never holds a directive.
+
+    The check reports a directive that gives no reason (kind `reason`); the
+    directive is then ignored. One that suppresses nothing is
+    `core/no-unused-allow`.
+
+    A finding that is right to leave in place MAY be allowed this way: the
+    comment suppresses the named rules there, whatever their severity, and
+    allowed findings are counted in the report.
+  scope:
+    subject: file
+    generated: true
+    tests: include
+  requirement: >-
+    An allow annotation MUST give a reason after `--`; an annotation without
+    one is ignored and reported.
+  severity: error
+  check:
+    type: cel
+    select: annotation
+    # One finding per directive that names rules: at the first of them.
+    where: >-
+      annotation.reason == null && annotation.form != 'enable' &&
+      annotation.rules.size() > 0 && annotation.rule == annotation.rules[0]
+    message: "`{{ annotation.marker }}` needs a reason: write `{{ annotation.marker }} <rule> -- <why>`; the annotation is ignored"
+    evidence:
+      rules: annotation.rules
+      reason: annotation.reason
+      annotation: annotation.extent
+  provenance:
+    wasDerivedFrom:
+    - 'ESLint eslint-comments/require-description: https://eslint-community.github.io/eslint-plugin-eslint-comments/rules/require-description.html'
+    - 'golangci-lint nolintlint require-explanation: https://golangci-lint.run/usage/linters/#nolintlint'
+    - 'clippy allow_attributes_without_reason: https://rust-lang.github.io/rust-clippy/master/index.html#allow_attributes_without_reason'
+    - Martin, Clean Code (2008), G4 Overridden Safeties
+  examples:
+  - name: go-missing-reason
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // lighthouse-disable-next-line design/exported-doc
+        func Open() {}
+    expect:
+    - line: 3
+  - name: go-with-reason
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // lighthouse-disable-next-line design/exported-doc -- generated shim
+        func Open() {}
+  - name: rust-missing-reason
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc
+        pub fn open() {}
+    expect:
+    - line: 1
+  - name: rust-with-reason
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc -- re-exported shim
+        pub fn open() {}
+  - name: rust-disable-missing-reason
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        // lighthouse-disable design/exported-doc
+        pub fn open() {}
+    expect:
+    - line: 1
+  - name: rust-disable-line-missing-reason
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: pub fn open() {} // lighthouse-disable-line design/exported-doc
+    expect:
+    - line: 1
+  - name: rust-disable-next-line-with-reason
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc -- re-exported shim
+        pub fn open() {}
+  - name: go-allow
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // lighthouse-disable-next-line design/exported-doc -- generated shim, documented in the generator
+        func Open() {}
+  - name: rust-allow
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc -- re-exported and documented at its origin
+        pub fn open() {}
+  - name: go-disable-range
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // lighthouse-disable design/exported-doc -- generated shims, documented in the generator
+        func Open() {}
+
+        func Close() {}
+        // lighthouse-enable design/exported-doc
+  - name: rust-disable-line
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: pub fn open() {} // lighthouse-disable-line design/exported-doc -- re-exported
+        and documented at its origin

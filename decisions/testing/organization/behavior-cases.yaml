@@ -1,0 +1,43 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/behavior-cases
+  uid: c8fa02e4-f183-45a5-9f89-557291b9c540
+spec:
+  title: Each test case specifies one behavior
+  context: A test that mixes unrelated behaviors is hard to interpret when it fails.
+    Fixtures and setup may be shared, but a case should state one outcome.
+  scope:
+    subject: test
+    tests: only
+  requirement: A test case SHOULD specify one behavior and contain the actions and
+    assertions that establish that behavior.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#readability-71cbc25a'
+    - 'Martin, Clean Code (2008), ch. 9 Single concept per test'
+    - Martin, Clean Code (2008), ch. 9 Clean tests
+    - Martin, Clean Code (2008), ch. 9 Single concept per test
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestStore(t *testing.T) { store.Open(); store.Close(); if store.Status() != "closed" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestStoreOpen(t *testing.T) { store.Open(); if !store.IsOpen() { t.Fatal() } }
+        func TestStoreClose(t *testing.T) { store.Close(); if store.IsOpen() { t.Fatal() } }

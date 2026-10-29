@@ -199,8 +199,9 @@ type Fragment struct {
 
 // FileInfo identifies the file of a Fragment.
 type FileInfo struct {
-	Path      string `json:"path"`
-	Generated bool   `json:"generated,omitempty"`
+	Path      string            `json:"path"`
+	Generated bool              `json:"generated,omitempty"`
+	Facts     map[string]string `json:"facts,omitempty"`
 }
 
 // Module is a unit of dependency such as a package or directory.

@@ -11,7 +11,7 @@ use std::{collections::BTreeMap, path::Path};
 use lighthouse_model::{Diagnostic, Safety};
 use lighthouse_process::{Environment, Home, Job, Ran, context, expand};
 use lighthouse_protocol::hash;
-use lighthouse_spec::{FixScope, Output, Point, Stdin, file_fact};
+use lighthouse_spec::{FixScope, Output, Point, Program, Stdin, file_fact};
 use serde_json::json;
 
 use super::{
@@ -36,7 +36,8 @@ type Failure = (Class, String);
 
 /// What a run of the program is given.
 struct Launch<'a> {
-    fix: &'a CommandFix,
+    /// The program of the language of the finding's file.
+    program: &'a Program,
     finding: &'a Diagnostic,
     /// The text of the finding's file as it stands.
     text: &'a str,
@@ -76,6 +77,10 @@ impl Proposer<'_> {
                 "language `{language}` lacks the capability `{missing}` the fix needs"
             )));
         }
+        let program = fix
+            .programs
+            .of(language)
+            .ok_or_else(|| fail(format!("the fix has no program for language `{language}`")))?;
         let text = sources.text(&finding.file).map_err(fail)?;
         let options = outcome
             .options
@@ -84,7 +89,7 @@ impl Proposer<'_> {
             .unwrap_or_default();
         let world = World::new(&engine.ws.root, outcome, texts);
         let launch = Launch {
-            fix,
+            program,
             finding,
             text: text.as_str(),
             options: &options,
@@ -167,7 +172,7 @@ impl Proposer<'_> {
 
     /// Runs the program for the finding and gathers what it changed.
     fn rewrite(&self, launch: &Launch<'_>, world: &World<'_>) -> Result<Changes, Failure> {
-        let program = &launch.fix.program;
+        let program = launch.program;
         let filter = program.stdin == Stdin::File && program.output(Point::Fix) == Output::Stdout;
         if filter {
             let ran = self.launch(launch, &self.engine.ws.root, None)?;
@@ -202,8 +207,7 @@ impl Proposer<'_> {
     ) -> Result<Ran, Failure> {
         let fail = |reason: String| (Class::Unanswered, reason);
         let engine = self.engine;
-        let (fix, finding) = (launch.fix, launch.finding);
-        let program = &fix.program;
+        let (program, finding) = (launch.program, launch.finding);
         let shown = program.shown();
         if let Some(fact) = program
             .command

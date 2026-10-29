@@ -1,0 +1,681 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/signature-size
+  uid: 8c96f16b-a955-4cfd-b871-79f50bbd3f6b
+spec:
+  title: Signatures stay within their size limits
+  context: Parameter and result limits follow the dominant language linter and the
+    function’s role. Receivers, tests, entry points and interface implementations
+    have specific exemptions; structs used only by one function count by their required
+    fields. A constructor assembles a type, so its limit is higher; a signature is
+    simplified rather than hidden in a one-use parameter object.
+  scope:
+    subject: symbol
+  requirement: A function SHOULD NOT exceed the configured number of parameters or
+    results for its role.
+  severity: warn
+  options:
+    properties:
+      kinds:
+        type: array
+        items:
+          type: string
+          enum:
+          - params
+          - results
+        default:
+        - params
+        - results
+        description: What to report; a function is reported once, with every kind
+          that matched in the evidence.
+      limits:
+        type: object
+        properties:
+          params:
+            "$ref": "#/$defs/limit"
+          results:
+            "$ref": "#/$defs/limit"
+        default:
+          params:
+            default: 8
+            constructor: 9
+            implementation: -1
+            entrypoint: -1
+            test: -1
+          results:
+            default: 3
+            constructor: -1
+            implementation: -1
+            test: -1
+        description: 'The most each signature part may have: an integer for every
+          role, or an object with `default` and one entry per role (`function`, `method`,
+          `constructor`, `implementation`, `entrypoint`, `test`); a role left out
+          takes `default`, and -1 is no limit. A project that sets an object replaces
+          the whole option. `params`: Most parameters a function may have. `results`:
+          Most results a function may have.'
+      allowSuffixes:
+        type: array
+        items:
+          type: string
+        default:
+        - Options
+        - Opts
+        - Config
+        description: 'Name endings of a struct that only carries settings: when a
+          struct used only by one function ends in one of these, only its required
+          fields (not a pointer, slice, map, function, channel or interface in Go;
+          not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust) count toward
+          the limit.'
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    variables:
+    - name: m
+      expression: func.metrics
+    - name: caps
+      expression: |-
+        {'params': type(options.limits.params) == int ? options.limits.params : options.limits.params[?func.role].orValue(options.limits.params[?'default'].orValue(-1)),
+          'results': type(options.limits.results) == int ? options.limits.results : options.limits.results[?func.role].orValue(options.limits.results[?'default'].orValue(-1))}
+    - name: subject
+      expression: 'func.role == ''constructor'' ? func.built + '' needs'' : func.name
+        + '' has'''
+    - name: structs
+      expression: |-
+        func.param_structs.map(h, {'struct': h.struct,
+          'kept': h.fields.filter(o, !(options.allowSuffixes.exists(s, h.struct.endsWith(s)) && o))})
+    - name: hidden
+      expression: 'structs.map(g, {''struct'': g.struct, ''fields'': size(g.kept)})'
+    - name: eff_params
+      expression: math.greatest(m.params - size(structs), 0) + size(structs.map(g,
+        g.kept).flatten())
+    - name: note
+      expression: |-
+        size(hidden) == 0 ? '' : ' (' + hidden.map(h, string(h.fields) + ' in ' + h.struct).join(', ')
+          + ' counted from structs used only here)'
+    - name: reachable
+      expression: |-
+        func.lang == 'go' && func.visibility != 'private' && (func.kind == 'function'
+            || (func.kind == 'method' && (func.owner == null || func.owner.visibility != 'private')))
+    - name: exposed
+      expression: |-
+        reachable ? (func.params + func.results)
+            .filter(t, t.symbol != '' && !t.exported)
+        : []
+    - name: found
+      expression: |-
+        (m.measured && 'params' in options.kinds && caps.params >= 0 && eff_params > caps.params
+          ? [{'kind':'params','value':eff_params,'max':caps.params,'what':'parameters',
+              'hint':func.role == 'constructor' ? 'split ' + func.built : 'split by responsibility'}] : [])
+        + (m.measured && 'results' in options.kinds && caps.results >= 0 && m.results > caps.results
+          ? [{'kind':'results','value':m.results,'max':caps.results,'what':'results',
+              'hint':'split by responsibility'}] : [])
+    - name: first
+      expression: 'size(found) > 0 ? found[0] : {''kind'': '''', ''value'': 0, ''max'':
+        0, ''what'': '''', ''hint'': ''''}'
+    where: size(found) > 0
+    message: |-
+      {{ first.kind == '' ? ''
+         : first.kind == 'unexported'
+         ? 'exported ' + func.name + ' exposes unexported type ' + exposed[0].text
+         : subject + ' ' + string(first.value) + ' ' + first.what + ' (max ' + string(first.max) + ')'
+           + (first.kind == 'params' ? note : '') + ': ' + first.hint }}
+    evidence:
+      kind: first.kind
+      kinds: found.map(f, f.kind)
+      value: first.value
+      max: first.max
+      role: func.role
+      hidden: hidden
+      types: exposed.map(t, t.text)
+    identity:
+      subject: func.id
+  languages:
+    rust:
+      options:
+        limits:
+          params:
+            default: 7
+            constructor: 8
+            implementation: -1
+            entrypoint: -1
+            test: -1
+  provenance:
+    wasDerivedFrom:
+    - 'revive argument-limit 8: https://revive.run/r#argument-limit'
+    - 'clippy too_many_arguments 7: https://doc.rust-lang.org/clippy/lint_configuration.html'
+    - Sonar S107 7; detekt LongParameterList 5 and 6; ESLint max-params 3
+    - 'revive function-result-limit 3: https://revive.run/r#function-result-limit'
+    - 'gocritic tooManyResultsChecker 5: https://go-critic.com/overview.html#toomanyresultschecker'
+    - 'revive unexported-return: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-return'
+    - 'rustc private_interfaces: https://doc.rust-lang.org/rustc/lints/listing/warn-by-default.html#private-interfaces'
+    - Martin, Clean Code (2008), F1 Too Many Arguments
+    - Martin, Clean Code (2008), G8 Too Much Information
+    - Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9
+    - Fowler, Refactoring (2nd ed., 2018), Introduce Parameter Object, Middle Man
+  examples:
+  - name: params-too-many-parameters
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func build(a, b, c, d, e, f, g, h, i int) int {
+            return a
+        }
+    expect:
+    - line: 3
+    options:
+      kinds:
+      - params
+  - name: params-within-the-limit
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func build(a, b, c, d, e, f, g, h int) int {
+            return a
+        }
+    options:
+      kinds:
+      - params
+  - name: params-constructor-at-its-limit
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Server struct{}
+
+        func NewServer(a, b, c, d, e, f, g, h, i int) *Server {
+            return &Server{}
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-constructor-over-its-limit
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Server struct{}
+
+        func NewServer(a, b, c, d, e, f, g, h, i, j int) *Server {
+            return &Server{}
+        }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - params
+  - name: params-interface-implementation
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Writer interface {
+            Write(a, b, c, d, e, f, g, h, i int)
+        }
+
+        type file struct{}
+
+        func (file) Write(a, b, c, d, e, f, g, h, i int) {}
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-single-use-struct-counts-its-fields
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Request struct{ A, B, C int }
+
+        func build(a, b, c, d, e, f int, r Request) int {
+            return a + r.A
+        }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - params
+  - name: params-struct-shared-by-two-functions
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Request struct{ A, B, C int }
+
+        func build(a, b, c, d, e, f int, r Request) int {
+            return a + r.A
+        }
+
+        func other(r Request) int {
+            return r.B
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-single-use-struct-by-pointer-counts-its-fields
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type request struct{ A, B, C int }
+
+        func build(a, b, c, d, e, f int, r *request) int {
+            return a + r.A
+        }
+
+        func run() int {
+            return build(1, 2, 3, 4, 5, 6, &request{A: 1})
+        }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - params
+  - name: params-struct-by-pointer-shared-by-two-functions
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type request struct{ A, B, C int }
+
+        func build(a, b, c, d, e, f int, r *request) int {
+            return a + r.A
+        }
+
+        func other(r *request) int {
+            return r.B
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-single-use-struct-counts-once-per-parameter
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Request struct{ A, B, C int }
+
+        func build(a, b, c int, x, y Request) int {
+            return a + x.A + y.B
+        }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - params
+  - name: params-options-struct-of-optional-fields
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type BuildOptions struct{ A, B, C *int }
+
+        func build(a, b, c, d, e, f, g int, o BuildOptions) int {
+            return a + *o.A
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-rust-within-the-limit
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) -> i32 {
+            a
+        }
+    options:
+      kinds:
+      - params
+  - name: params-rust-too-many-parameters
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) -> i32 {
+            a
+        }
+    expect:
+    - line: 1
+    options:
+      kinds:
+      - params
+  - name: params-rust-constructor-over-its-limit
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Server;
+
+        impl Server {
+            pub fn new(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32) -> Self {
+                Server
+            }
+        }
+    expect:
+    - line: 4
+    options:
+      kinds:
+      - params
+  - name: params-rust-the-receiver-is-not-counted
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Server;
+
+        impl Server {
+            pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-rust-method-over-the-limit
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Server;
+
+        impl Server {
+            pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) {}
+        }
+    expect:
+    - line: 4
+    options:
+      kinds:
+      - params
+  - name: params-rust-single-use-struct-counts-its-fields
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Request {
+            pub a: i32,
+            pub b: i32,
+            pub c: i32,
+        }
+
+        pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, r: Request) -> i32 {
+            a + r.a
+        }
+    expect:
+    - line: 7
+    options:
+      kinds:
+      - params
+  - name: params-rust-struct-shared-by-two-functions
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Request {
+            pub a: i32,
+            pub b: i32,
+            pub c: i32,
+        }
+
+        pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, r: Request) -> i32 {
+            a + r.a
+        }
+
+        pub fn other(r: Request) -> i32 {
+            r.b
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-rust-single-use-struct-counts-once-per-parameter
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Request {
+            pub a: i32,
+            pub b: i32,
+            pub c: i32,
+        }
+
+        pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, x: Request, y: Request) -> i32 {
+            a + x.a + y.b
+        }
+    expect:
+    - line: 7
+    options:
+      kinds:
+      - params
+  - name: params-rust-options-struct-of-optional-fields
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct BuildOptions {
+            pub a: Option<i32>,
+            pub b: Vec<i32>,
+            pub c: Option<String>,
+        }
+
+        pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, o: BuildOptions) -> i32 {
+            a + o.b.len() as i32
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-rust-options-struct-with-a-default-container
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        #[serde(default)]
+        pub struct BuildOptions {
+            pub a: i32,
+            pub b: i32,
+            pub c: i32,
+        }
+
+        pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, o: BuildOptions) -> i32 {
+            a + o.b
+        }
+    options:
+      kinds:
+      - params
+    canonical: false
+  - name: params-role-limits-merge-with-the-default
+    language: go
+    kind: invalid
+    options:
+      kinds:
+      - params
+      limits:
+        params:
+          default: 5
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Server struct{}
+
+        func NewServer(a, b, c, d, e, f, g, h, i, j int) *Server {
+            return &Server{}
+        }
+    expect:
+    - line: 5
+  - name: results-too-many-results
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func split() (int, int, int, int) {
+            return 0, 0, 0, 0
+        }
+    expect:
+    - line: 3
+    options:
+      kinds:
+      - results
+  - name: results-constructor-is-not-limited
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Parser struct{}
+
+        func NewParser() (*Parser, int, int, error) {
+            return &Parser{}, 0, 0, nil
+        }
+    options:
+      kinds:
+      - results
+    canonical: false
+  - name: results-interface-implementation
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Reader interface {
+            Read() (int, int, int, error)
+        }
+
+        type file struct{}
+
+        func (file) Read() (int, int, int, error) {
+            return 0, 0, 0, nil
+        }
+    options:
+      kinds:
+      - results
+    canonical: false
+  - name: results-a-named-struct-is-one-result
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        type Pair struct{ A, B, C, D int }
+
+        func split() Pair {
+            return Pair{}
+        }
+    options:
+      kinds:
+      - results
+    canonical: false
+  - name: results-rust-too-many-results
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn split() -> (i32, i32, i32, i32) {
+            (0, 0, 0, 0)
+        }
+    expect:
+    - line: 1
+    options:
+      kinds:
+      - results
+  - name: results-rust-result-counts-its-ok-value
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn split() -> Result<(i32, i32, i32, i32), String> {
+            Ok((0, 0, 0, 0))
+        }
+    expect:
+    - line: 1
+    options:
+      kinds:
+      - results
+  - name: results-rust-a-named-struct-is-one-result
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Pair {
+            pub a: i32,
+            pub b: i32,
+            pub c: i32,
+            pub d: i32,
+        }
+
+        pub fn split() -> Pair {
+            Pair { a: 0, b: 0, c: 0, d: 0 }
+        }
+    options:
+      kinds:
+      - results
+    canonical: false
+  fix:
+    safety: unsafe
+    type: model

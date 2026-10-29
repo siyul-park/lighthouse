@@ -1,0 +1,43 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/constructor-validation
+  uid: 1efe8cd3-f5e9-4554-85bf-272508e3cd69
+spec:
+  title: Constructors validate their inputs
+  context: Validation is simplest at the boundary where values enter the owning type;
+    invalid objects should not escape and depend on every caller to validate them.
+  scope:
+    subject: symbol
+  requirement: A constructor SHOULD reject invalid required inputs and establish the
+    invariants that all constructed values rely on.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#types-and-apis-411f8630'
+    - Martin, Clean Code (2008), ch. 11 Separate construction from use
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Store struct { path string }
+        func NewStore(path string) *Store { return &Store{path: path} }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Store struct { path string }
+        func NewStore(path string) (*Store, error) { if path == "" { return nil, errors.New("empty path") }; return &Store{path: path}, nil }

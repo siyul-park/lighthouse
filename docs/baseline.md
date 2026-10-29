@@ -88,6 +88,10 @@ is at 83–95%. Where the time goes in the edit run (phases, ms; cold `--no-cach
 A reviewer read each sampled finding against the decision's requirement and called it true (TP) or false (FP).
 The interval is Wilson 95%. Rows that are not warn or error rules, or that sample little, are indications only.
 Sample files are `labels/<pack>/<decision>.tsv` (fingerprint, repo, location, verdict, reason).
+Decision ids are those of the review's time. The catalog split of wave 5b renamed them: `design/errors` is now
+`design/error-identity` and `design/no-panic`, `testing/owner` is `testing/no-missing-owner` and
+`testing/no-duplicate-owner`, `design/naming` is `design/no-redundant-qualifier` and its siblings, `design/layout` is
+`design/top-down-order` and `design/vertical-distance` (see [decisions](decisions/design.md)).
 
 | decision | review | TP / sample | precision | Wilson 95% | samples |
 | --- | --- | ---: | ---: | --- | --- |
@@ -96,17 +100,17 @@ Sample files are `labels/<pack>/<decision>.tsv` (fingerprint, repo, location, ve
 | design/complexity | R3a | 19 / 20 | 95% | 76-99 | retained |
 | design/complexity | R3a | 20 / 20 | 100% | 84-100 | retained |
 | design/complexity | R3a | 20 / 20 | 100% | 84-100 | retained |
-| design/signature | R3a | 18 / 19 | 95% | 75-99 | retained |
-| design/signature | R3a | 20 / 20 | 100% | 84-100 | retained |
+| design/signature-size | R3a | 18 / 19 | 95% | 75-99 | retained |
+| design/signature-size | R3a | 20 / 20 | 100% | 84-100 | retained |
 | design/errors | R3b | 34 / 35 | 97% | 85.5-99.5 | retained (all findings) |
-| design/signature | R3b | 8 / 8 | 100% | 67.6-100 | retained (all findings) |
-| design/concurrency | R3b | 1 / 2 | 50% | 9.5-90.5 | retained (one debatable) |
+| design/signature-size | R3b | 8 / 8 | 100% | 67.6-100 | retained (all findings) |
+| design/context-first | R3b | 1 / 2 | 50% | 9.5-90.5 | retained (one debatable) |
 | design/errors (Go) | R3b | 20 / 20 | 100% | 83.9-100 (not comparable) | not retained; 20 of 104 |
 | design/errors (Rust) | R3b | 21 / 21 | 100% | 84.5-100 (not comparable) | not retained; 21 of 41 |
 | design/prefer-method | R4 | 11 / 27 | 41% | 25-59 | all findings, after the refinements |
 | design/prefer-method | R4 | 9 / 36 | 25% | 14-41 | all findings, after the refinements |
 | design/errors | R4 | 23 / 24 | 96% | 80-99 | 24 of the 107 the R3b sample missed (seed 11) |
-| testing/cases | R4 | 13 / 13 | 100% | 77-100 | all findings, after the refinements |
+| testing/standard-assertions | R4 | 13 / 13 | 100% | 77-100 | all findings, after the refinements |
 | testing/owner | R4 | 17 / 22 | 77% | 57-90 | 22 of 651 (seed 5); the other 5 are unclear |
 
 Retired in R4 (a deterministic check below 20% is not a signal; the wording lives on in a model decision,
@@ -114,11 +118,11 @@ whose `select` is the old condition, widened for recall; the TSVs keep the evide
 
 | retired | became | TP / sample | Wilson 95% |
 | --- | --- | ---: | --- |
-| design/private-helper-callers | `select` of design/symbols | 1 / 24 | 1-20 |
-| design/unique-type-names | `select` of design/naming | 1 / 27 | 1-18 |
-| design/tiny-modules | `select` of design/responsibility | 0 / 20 | 0-16 |
-| design/layout | model check, `select` of its own | 0 / 22 | 0-15 |
-| testing/cases (before the fix) | kept; creation helpers no longer followed | 0 / 7 | 0-35 |
+| design/private-helper-callers | `select` of design/no-redundant-symbol | 1 / 24 | 1-20 |
+| design/unique-type-names | `select` of design/no-redundant-qualifier | 1 / 27 | 1-18 |
+| design/tiny-modules | `select` of design/meaningful-separation | 0 / 20 | 0-16 |
+| design/vertical-distance | model check, `select` of its own | 0 / 22 | 0-15 |
+| testing/standard-assertions (before the fix) | kept; creation helpers no longer followed | 0 / 7 | 0-35 |
 
 - "Not comparable" marks an interval whose samples are not retained: a later review cannot be set against it
   sample by sample, and it counts "real panic site" or "violation of the definition" as the reviewer then meant it.
@@ -134,7 +138,7 @@ whose `select` is the old condition, widened for recall; the TSVs keep the evide
   assertion library); exported-doc 971 to 415 in qlbridge and 206 to 154 in minivm (interface implementations
   are exempt); testing/owner 537 to 516 in qlbridge and 139 to 134 in cel (the implementation flag knows every
   interface of the project and of the import closure).
-- `design/complexity` and `design/signature` count one false positive each: a benchmark fixture that emits a
+- `design/complexity` and `design/signature-size` count one false positive each: a benchmark fixture that emits a
   byte program, and a method that implements an interface outside the project.
 - R2 samples were five per decision and kept by name; where a finding still exists in the R3b run the TSV carries
   its fingerprint, else `-`. R3a fingerprints are those of the reviewed run, and R3b's are from the final run.

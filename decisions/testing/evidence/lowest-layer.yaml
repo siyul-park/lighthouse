@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/lowest-layer
+  uid: ab8f3021-ba64-4713-9984-8aa3a435c16a
+spec:
+  title: Tests use the lowest proving layer
+  context: Lower-level tests localize failures and run faster; choosing a higher layer
+    is justified only when the contract itself crosses that boundary.
+  scope:
+    subject: test
+    tests: only
+  requirement: The lowest test layer that can prove a contract SHOULD be used, while
+    integration tests remain for contracts that cross component boundaries.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#tdd-9cd4d927'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }

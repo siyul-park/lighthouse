@@ -10,12 +10,12 @@ use lighthouse_model::ucm::{EdgeKind, Symbol, SymbolKind, Visibility};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
-const RULE: &str = "design/prefer-method";
+const RULE: &str = "design/feature-envy";
 
 /// The limits of the kind `kind` (`envy` or `module`) as `overrides` change
 /// them from the defaults of the decision.
 fn limits(kind: &str, overrides: Value) -> Value {
-    let mut base = if kind == "envy" {
+    let mut base = if kind == "type" {
         json!({ "minMembers": 3, "minStatements": 3, "includeExported": false })
     } else {
         json!({ "minUses": 3, "minStatements": 3, "includeExported": false })
@@ -45,6 +45,7 @@ fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)>
         { "name": "good", "language": "text", "kind": "valid",
           "files": [{ "path": "a.txt", "body": "x" }] },
     ]);
+    spec["provenance"] = json!({});
     let text = format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/review\nspec: {spec}\n"
     );
@@ -54,7 +55,8 @@ fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)>
     )
     .unwrap();
     let plugin = Checks::new(&lighthouse_test_support::composition(), "local", &catalog).unwrap();
-    let options = json!({ "kinds": [kind], kind: limits(kind, overrides) });
+    let key = if kind == "type" { "envy" } else { "module" };
+    let options = json!({ "kinds": [kind], key: limits(kind, overrides) });
     world
         .diagnose_with(
             &catalog,
@@ -71,7 +73,7 @@ fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)>
 }
 
 fn envy(world: &World, overrides: Value) -> Vec<(String, u32)> {
-    candidates(world, "envy", overrides)
+    candidates(world, "type", overrides)
 }
 
 fn misplaced(world: &World, overrides: Value) -> Vec<(String, u32)> {

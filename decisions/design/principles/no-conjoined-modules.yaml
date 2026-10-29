@@ -1,0 +1,92 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-conjoined-modules
+  uid: ef32fa12-0012-49a8-af54-c0205c9bffb6
+spec:
+  title: Modules do not share private implementation
+  context: Mutually dependent modules that share private state are not an ownership
+    boundary; merge them or extract a single owner. The check identifies the conjoined
+    shape from private reach and parent calls.
+  scope:
+    subject: module
+  requirement: Modules SHOULD NOT be split when the parent and child share private implementation
+    and call into each other.
+  severity: info
+  check:
+    type: cel
+    select: module
+    variables:
+    - name: tied
+      expression: module.parent != null && module.parent.sole_user && module.parent.called
+        && size(module.parent.reaches) > 0
+    where: tied
+    message: "{{ module.name + ' and ' + module.parent.path + ' share private implementation
+      (' + module.parent.reaches[0].name + '); merge them, or move what both use behind
+      one owner' }}"
+    evidence:
+      kind: "'conjoined'"
+      parent: module.parent.path
+      reaches: module.parent.reaches.map(r, r.id)
+    identity:
+      subject: module.path
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#structural-rules-dbd77a89'
+    - 'Lighthouse, coding-patterns#design-b19af147'
+  examples:
+  - name: conjoined-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |
+        mod part;
+
+        fn secret() -> i32 { 1 }
+
+        pub fn run() -> i32 { part::work() }
+    - path: src/part.rs
+      body: |
+        pub fn work() -> i32 { super::secret() + 1 }
+    expect:
+    - line: 1
+  - name: conjoined-rust-valid
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |
+        mod part;
+
+        pub fn api() -> i32 { 1 }
+
+        pub fn run() -> i32 { part::work() }
+    - path: src/part.rs
+      body: |
+        pub fn work() -> i32 { super::api() + 1 }
+  - name: go-modules-with-public-boundary
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/sample
+
+        go 1.26
+    - path: sample.go
+      body: |-
+        package sample
+
+        func API() int { return 1 }
+    - path: part/part.go
+      body: |-
+        package part
+
+        import "example.com/sample"
+
+        func Work() int { return sample.API() }
+

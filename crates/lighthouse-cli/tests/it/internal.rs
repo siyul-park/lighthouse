@@ -11,8 +11,8 @@ use tempfile::TempDir;
 use crate::checks::{home, trust};
 
 const DOC: &str = "design/exported-doc";
-const OWNER: &str = "testing/owner";
-const SINGLE: &str = "testing/owner";
+const MISSING: &str = "testing/no-missing-owner";
+const DUPLICATE: &str = "testing/no-duplicate-owner";
 
 const PACKS: &str = "\"core\", \"design\", \"testing\"";
 const PRESETS: &str = "[\"core/recommended\", \"design/recommended\", \"testing/recommended\"]";
@@ -93,12 +93,12 @@ fn go_judges_the_exported_symbols_of_an_internal_package() {
         messages(&found, DOC).is_empty(),
         "exported-doc keeps skipping internal symbols: {found:?}"
     );
-    let untested = messages(&found, OWNER);
+    let untested = messages(&found, MISSING);
     assert!(
         untested.iter().any(|m| m.contains("type Store")),
         "{found:?}"
     );
-    let doubled = messages(&found, SINGLE);
+    let doubled = messages(&found, DUPLICATE);
     assert!(
         doubled.iter().any(|m| m.contains("function Open")),
         "{found:?}"
@@ -134,7 +134,7 @@ fn rust_does_not_judge_crate_visible_items() {
     );
     trust(dir.path());
     let found = findings(dir.path());
-    for rule in [DOC, OWNER, SINGLE] {
+    for rule in [DOC, MISSING, DUPLICATE] {
         let hit = messages(&found, rule);
         assert!(
             hit.iter()

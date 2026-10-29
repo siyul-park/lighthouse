@@ -73,6 +73,10 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("local_callers", Reach::Global),
     ("param_structs", Reach::Global),
     ("module_imports", Reach::Global),
+    // The exported types of other modules that carry the subject's name.
+    ("homonyms", Reach::Global),
+    // Whether the subject's file holds tests of both case styles at its level.
+    ("style_mix", Reach::Local),
     // The types of a module, with the cohesion of their methods; the types
     // that implement an interface, tests included.
     ("types", Reach::Global),

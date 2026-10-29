@@ -1,0 +1,147 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-private-types
+  uid: 1731488e-173c-49e0-be25-67782915782e
+spec:
+  title: Public signatures expose public types
+  context: External callers cannot name a private type even when the function or receiver
+    is exported. Go is checked deterministically; Rust already has a compiler lint
+    for this contract.
+  scope:
+    subject: symbol
+  requirement: An exported function or a method of an exported type SHOULD NOT expose
+    an unexported type in its parameters or results.
+  severity: warn
+  check:
+    type: cel
+    select: function
+    variables:
+    - name: reachable
+      expression: func.lang == 'go' && func.visibility != 'private' && (func.kind
+        == 'function' || (func.kind == 'method' && (func.owner == null || func.owner.visibility
+        != 'private')))
+    - name: exposed
+      expression: 'reachable ? (func.params + func.results).filter(t, t.symbol !=
+        '''' && !t.exported) : []'
+    where: size(exposed)>0
+    message: "{{ 'exported ' + func.name + ' exposes unexported type ' + exposed[0].text
+      }}"
+    evidence:
+      types: exposed.map(t,t.text)
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#types-and-apis-aed3aa66'
+  examples:
+  - name: unexported-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type config struct{}
+
+        func New() config { return config{} }
+    expect:
+    - line: 5
+  - name: unexported-valid
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Config struct{}
+
+        func New() Config { return Config{} }
+    canonical: true
+  - name: unexported-parameter
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type options struct{ verbose bool }
+
+        func Run(o *options) error { return nil }
+    expect:
+    - line: 5
+  - name: unexported-exported-alias
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type option struct{}
+
+        type Option = option
+
+        func New() Option { return option{} }
+    canonical: false
+  - name: unexported-private-function
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type config struct{}
+
+        func newConfig() config { return config{} }
+    canonical: false
+  - name: unexported-method-of-an-unexported-type
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type config struct{}
+
+        type server struct{}
+
+        func (s *server) Config() config { return config{} }
+    canonical: false
+  - name: unexported-exported-method
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type config struct{}
+
+        type Server struct{}
+
+        func (s *Server) Config() config { return config{} }
+    expect:
+    - line: 7
+  - name: unexported-rust-is-checked-by-the-compiler
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        struct Config;
+
+        fn new() -> Config {
+            Config
+        }
+
+        pub fn run() {
+            let _ = new();
+        }
+    canonical: true

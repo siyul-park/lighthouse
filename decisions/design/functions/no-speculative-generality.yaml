@@ -1,0 +1,47 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-speculative-generality
+  uid: d3ad2bac-ac37-4dbc-8a43-99e1ca9c4f0d
+spec:
+  title: Abstractions are not speculative
+  context: Optional configuration, public extension points, generic wrappers and parallel
+    mechanisms all create contracts that must be maintained. Add them only when a
+    real caller or invariant requires them; a hypothetical future use is not a responsibility.
+  scope:
+    subject: symbol
+  requirement: A symbol SHOULD NOT expose generic options, extension points, aliases,
+    or parallel mechanisms without a distinct contract and a current use that needs
+    them.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), G12 Clutter
+    - Ousterhout, A Philosophy of Software Design (2018), chapters 4 and 9
+  examples:
+  - name: speculative-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Store struct{}
+        type StoreOptions struct { FutureMode bool; RetryPolicy string }
+        type StoreExtension interface { BeforeOpen(); AfterOpen() }
+        type StoreV2 = Store
+  - name: speculative-valid
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Store struct{}
+        func (Store) Open() error { return nil }

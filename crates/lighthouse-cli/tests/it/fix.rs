@@ -40,7 +40,7 @@ pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir>
     go_project_in(files, extra, "")
 }
 
-/// The same, with the pack `go` and its recommended decisions: `go/formatted`.
+/// The same, with the pack `go` and its recommended decisions: `core/formatted`.
 fn go_formatted_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
     go_project_in(files, extra, "go")
 }
@@ -81,7 +81,7 @@ pub(crate) fn rust_project(source: &str, extra: &str) -> TempDir {
 }
 
 /// The same, with the pack `rust` and its recommended decisions:
-/// `rust/formatted`.
+/// `core/formatted`.
 fn rust_formatted_project(source: &str, extra: &str) -> TempDir {
     rust_project_in(source, extra, "rust")
 }
@@ -166,7 +166,7 @@ fn fix_applies_safe_fixes_and_reports_what_is_left() {
 
 #[test]
 fn unsafe_fixes_are_previewed_until_asked_for() {
-    let banner = "package demo\n\n// ---- Helpers ----\n\nfunc helper() int { return 1 }\n";
+    let banner = "package demo\n\nfunc main() { _ = helper() }\n\n// ---- Helpers ----\nfunc helper() int { return 1 }\n";
     let Some(dir) = go_project(&[("a.go", banner)], "") else {
         return;
     };
@@ -176,7 +176,7 @@ fn unsafe_fixes_are_previewed_until_asked_for() {
         .assert()
         .success()
         .stderr(predicate::str::contains(
-            "preview design/comments [unsafe] a.go",
+            "preview design/no-noise-comment [unsafe] a.go",
         ))
         .stderr(predicate::str::contains("-// ---- Helpers ----"))
         .stderr(predicate::str::contains(
@@ -189,10 +189,12 @@ fn unsafe_fixes_are_previewed_until_asked_for() {
         .args(["check", "--fix", "--unsafe-fixes"])
         .assert()
         .success()
-        .stderr(predicate::str::contains("fixed design/comments [unsafe]"));
+        .stderr(predicate::str::contains(
+            "fixed design/no-noise-comment [unsafe]",
+        ));
     assert_eq!(
         read(&dir, "a.go"),
-        "package demo\n\nfunc helper() int { return 1 }\n"
+        "package demo\n\nfunc main() { _ = helper() }\n\nfunc helper() int { return 1 }\n"
     );
 }
 
@@ -238,19 +240,19 @@ fn an_unformatted_go_file_is_a_finding_and_its_fix_makes_gofmt_clean() {
             "--detail",
             "full",
             "--decision",
-            "go/formatted",
+            "core/formatted",
         ])
         .output()
         .unwrap();
     let report: serde_json::Value = serde_json::from_slice(&found.stdout).unwrap();
     assert_eq!(
-        report["findings"][0]["decision"], "go/formatted",
+        report["findings"][0]["decision"], "core/formatted",
         "{report}"
     );
     assert_eq!(report["findings"][0]["severity"], "error", "{report}");
 
     lighthouse(dir.path())
-        .args(["check", "--fix", "--decision", "go/formatted"])
+        .args(["check", "--fix", "--decision", "core/formatted"])
         .assert()
         .success();
 
@@ -693,7 +695,7 @@ fn a_replace_inserts_a_doc_line_in_rust() {
 
 #[test]
 fn a_run_without_the_store_still_honors_the_committed_decisions() {
-    let banner = "package demo\n\n// ---- Helpers ----\n\nfunc helper() int { return 1 }\n";
+    let banner = "package demo\n\nfunc main() { _ = helper() }\n\n// ---- Helpers ----\nfunc helper() int { return 1 }\n";
     let Some(dir) = go_project(&[("a.go", banner)], "") else {
         return;
     };
@@ -705,7 +707,7 @@ fn a_run_without_the_store_still_honors_the_committed_decisions() {
             "--detail",
             "full",
             "--decision",
-            "design/comments",
+            "design/no-noise-comment",
         ])
         .output()
         .unwrap();

@@ -1,0 +1,90 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/owner-file
+  uid: 829bb319-11bb-4047-8b03-0a2dc7216560
+spec:
+  title: One owner has one cohesive file
+  context: Files are navigational boundaries. Splitting an owner from its closely
+    related methods adds indirection unless the split expresses a meaningful boundary;
+    physical separation corresponds to a real responsibility, ownership, or abstraction
+    boundary.
+  scope:
+    subject: symbol
+  requirement: Symbols with one owner and a cohesive responsibility SHOULD share a
+    file.
+  severity: warn
+  check:
+    type: cel
+    select: function
+    where: 'false'
+    abstain: >-
+      !func.test && !func.generated
+      && (func.kind == 'method' || func.kind == 'function')
+      && !func.implementation && size(func.owner_home) > 0
+      && func.owner_home.owner_file != func.file
+    message: "{{ 'review whether ' + func.name + ' should live with its owner in ' + func.owner_home.owner_file }}"
+    evidence:
+      kind: "'owner-file'"
+      owner_file: func.owner_home.owner_file
+      file: func.file
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#physical-cohesion-547f3a8e'
+  examples:
+  - name: go-invalid-owner-file
+    language: go
+    kind: invalid
+    files:
+    - path: store.go
+      body: |-
+        package sample
+
+        type Store struct{}
+    - path: total.go
+      body: |-
+        package sample
+
+        func (s *Store) Total() int { return 1 }
+  - name: go-valid-owner-file
+    language: go
+    kind: valid
+    files:
+    - path: store.go
+      body: |-
+        package sample
+
+        type Store struct{}
+
+        func (s *Store) Total() int { return 1 }
+    canonical: true
+  - name: rust-invalid-owner-file
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store;
+        mod total;
+    - path: src/total.rs
+      body: |-
+        use crate::Store;
+
+        impl Store {
+            pub fn total(&self) -> u8 { 1 }
+        }
+  - name: rust-valid-owner-file
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store;
+
+        impl Store {
+            pub fn total(&self) -> u8 { 1 }
+        }
+    canonical: true

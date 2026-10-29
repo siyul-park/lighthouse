@@ -71,8 +71,8 @@ safety = "safe"                                    # trust the agent on this dec
   a decision may say `fix: {type: model, prompt: "...", scope: symbol | file | references | files}` to add an
   instruction and a scope (see [fixer spec](fixer-spec.md)); it has `references` when it declares none, and is narrowed to `[fix] scope`, never widened by it. The
   bundled decisions declare one where their fix has a natural reach: `symbol` for `design/exported-doc`,
-  `design/symbols` and `testing/cases`, and `references` (the default) for `design/errors`, `design/signature`,
-  `design/prefer-method` and `design/naming`, whose callers change too. Listing them in `[fix] decisions`
+  `design/no-redundant-symbol` and `testing/standard-assertions`, and `references` (the default) for `design/error-identity`, `design/no-panic`, `design/signature-size`,
+  `design/prefer-method` and `design/no-redundant-qualifier`, whose callers change too. Listing them in `[fix] decisions`
   is still what grants a model the fix.
 - **Agent or review, no router.** Where a finding gets a model fix it is made by the `agent`; with none bound
   it stays a review task that carries the brief (MCP `review_show` returns it as `brief`, `review

@@ -8,7 +8,7 @@ use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Severity, Sp
 use lighthouse_spec::Evaluation;
 use serde_json::json;
 
-const RULE: &str = "core/file-size";
+const RULE: &str = "core/max-lines";
 
 fn graded(repo: &str, labels: &[Label], found: &Found, candidate: Option<Candidate>) -> RepoResult {
     grade(RULE, None, Some(repo), policy(), labels, found, candidate)

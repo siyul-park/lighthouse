@@ -1,0 +1,47 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-hybrid-type
+  uid: 71f93f36-1269-40e0-9c4c-e08874be3eb3
+spec:
+  title: A type is an object or a data structure
+  context: Hybrid types expose internal state while also owning behavior, coupling
+    callers to implementation details.
+  scope:
+    subject: symbol
+  requirement: A type SHOULD NOT mix behavior-bearing object responsibilities with
+    unrelated data-transfer structure.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#types-and-apis-0e075b7e'
+    - 'Martin, Clean Code (2008), ch. 6 Hybrids'
+    - Martin, Clean Code (2008), ch. 6 Data/object anti-symmetry
+    - Martin, Clean Code (2008), ch. 6 DTOs, active records
+    - Martin, Clean Code (2008), ch. 6 Hybrids
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type User struct { ID string; Name string; validate func() error; cached *User }
+        func (u *User) Save() error { return u.validate() }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type User struct { ID string; Name string }
+        type UserStore struct { db *sql.DB }
+        func (s UserStore) Save(u User) error { return nil }

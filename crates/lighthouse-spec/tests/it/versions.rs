@@ -48,6 +48,7 @@ mod write {
                 "go".to_owned(),
                 LanguageSpec {
                     options: Map::from_iter([("max".to_owned(), json!(4))]),
+                    ..LanguageSpec::default()
                 },
             )]
             .into(),
@@ -135,7 +136,7 @@ mod write {
 
 #[test]
 fn decision_version_changes_with_its_definition() {
-    let decision = bundled("core/file-size");
+    let decision = bundled("core/max-lines");
     assert_eq!(decision.version().len(), 16);
     assert_eq!(decision.version(), decision.clone().version());
     let edited = decision.clone().map_spec(|mut spec| {

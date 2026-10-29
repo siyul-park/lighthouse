@@ -142,12 +142,12 @@ fn two_runs_over_one_file_are_undone_newest_first_and_the_first_stays() {
 
 #[test]
 fn a_fix_that_leaves_one_of_its_files_as_it_was_is_still_previewed_under_ask() {
-    // The agent unformats the second file, and `rust/formatted` writes it back
+    // The agent unformats the second file, and `core/formatted` writes it back
     // as it was.
     let agent = format!(
         "{FIX_OWN_FILE}sed 's/other()/other( )/' src/other.rs > src/other.rs.new && mv src/other.rs.new src/other.rs\n"
     );
-    let (dir, _agent) = agent_project("\"rust/formatted\" = \"error\"\n", &agent, &listed("", ""));
+    let (dir, _agent) = agent_project("\"core/formatted\" = \"error\"\n", &agent, &listed("", ""));
     write(dir.path(), ".lighthouse/decisions/ban.yaml", WIDE);
     write(
         dir.path(),
@@ -252,7 +252,7 @@ fn the_preview_of_an_edit_shows_the_text_the_safe_fixes_left() {
 
 #[test]
 fn an_edit_with_unformatted_output_is_judged_with_its_formatting_follow_up() {
-    let (dir, scripts, _told) = reorder_project(ALLOW, "\"rust/formatted\" = \"error\"\n");
+    let (dir, scripts, _told) = reorder_project(ALLOW, "\"core/formatted\" = \"error\"\n");
     let agent = scripts.path().join("agent.sh");
     let script = fs::read_to_string(&agent).unwrap();
     fs::write(

@@ -1,0 +1,412 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-noise-comment
+  uid: 1f6d2560-4bdd-43ed-843e-c50e13bc5555
+spec:
+  title: Comments add no noise
+  context: Banners, commented-out code, history and closing-brace narration duplicate
+    information that code structure or version control already carries. Other explanatory
+    comments remain review candidates when they repeat code or fail to state a necessary
+    fact.
+  scope:
+    subject: file
+    tests: include
+  requirement: Comments SHOULD NOT label sections, preserve commented-out code, record
+    history, or restate a block closing; prefer code structure and version control.
+  severity: warn
+  options:
+    properties:
+      kinds:
+        type: array
+        items:
+          type: string
+          enum:
+          - banner
+          - commented-code
+          - journal
+          - closing
+        default:
+        - banner
+        - commented-code
+        description: What to report.
+      minRun:
+        type: integer
+        default: 3
+        description: Rule characters in a row that make a banner line.
+      ruleChars:
+        type: string
+        default: "-=*~_+"
+        description: Characters a banner rule is drawn with, as the body of a regular-expression
+          character class (escape `]`, `\\` and `^`).
+      labels:
+        type: array
+        default:
+        - 'MARK:'
+        - "#region"
+        - "#endregion"
+        description: Line prefixes that label a section on their own.
+      codePatterns:
+        type: array
+        default:
+        - "[;{]$|^}"
+        - "^(if|for|switch|select|return|func|fn|let|var|const|import|package|use|match|defer|go|impl|pub|struct|type)\\b.*[({=;]"
+        - "^[A-Za-z_][\\w.]*(\\[[^\\]]*\\])?\\s*(:=|=|\\+=|-=|\\*=)\\s*\\S"
+        - ^[A-Za-z_][\w.]*\(.*["'`0-9].*\)[;,]?$
+        description: Regular expressions a line of commented-out code matches.
+      historyPatterns:
+        type: array
+        default:
+        - "(?i)^(changed|modified|added|removed|fixed|updated)\\s+(by|on)\\b"
+        - "(?i)^(author|created by|modified by|written by)\\s*:"
+        - "^\\d{4}-\\d{2}-\\d{2}\\b.*(?i:\\b(added|changed|fixed|removed|by)\\b)"
+        description: Regular expressions a line that records history matches.
+    additionalProperties: false
+  check:
+    type: cel
+    select: comment
+    variables:
+    - name: documentation
+      expression: |-
+        comment.text.split("\n").exists(l,
+          (l.trim().startsWith('///') && !l.trim().startsWith('////'))
+          || l.trim().startsWith('//!'))
+    - name: rule
+      expression: "'[' + options.ruleChars + ']'"
+    - name: bodies
+      expression: |-
+        comment.text.split("\n")
+          .map(l, l.trim())
+          .map(l, regex.replace(l, '^(//)+', ''))
+          .map(l, l.startsWith('/*') ? l.substring(2) : l)
+          .map(l, l.endsWith('*/') ? l.substring(0, size(l) - 2) : l)
+          .map(l, regex.replace(l, '^#+', '').trim())
+          .filter(b, b != '')
+    - name: texts
+      expression: |-
+        bodies.map(b,
+          options.labels.exists(m, b.startsWith(m))
+          ? b.substring(size(options.labels.filter(m, b.startsWith(m))[0])).trim()
+          : regex.replace(regex.replace(b, '^' + rule + '+', '').trim(), rule + '+$', '').trim())
+    - name: named
+      expression: texts.filter(t, t != '')
+    - name: directive
+      expression: |-
+        size(bodies) > 0 && (['go:', '+build', 'nolint', 'lint:', 'lighthouse-', '#[', 'SAFETY:', 'noqa']
+              .exists(p, bodies[0].startsWith(p))
+            || bodies[0].matches('^[a-z]+:[a-z]'))
+    - name: prose
+      expression: "!documentation && !comment.text.contains('```') && !directive"
+    - name: matched
+      expression: |-
+        ('banner' in options.kinds && comment.standalone && !documentation && size(bodies) > 0
+          && bodies.all(b, options.labels.exists(m, b.startsWith(m))
+                           || b.matches('^' + rule + '{' + string(options.minRun) + ',}'))
+          ? ['banner'] : [])
+        + ('commented-code' in options.kinds && prose && comment.standalone && !comment.attached && size(bodies) >= 1
+          && bodies.all(b, options.codePatterns.exists(p, b.matches(p)))
+          ? ['commented-code'] : [])
+        + ('journal' in options.kinds
+          && bodies.exists(b, options.historyPatterns.exists(p, b.matches(p)))
+          ? ['journal'] : [])
+        + ('closing' in options.kinds && comment.before == '}' && size(bodies) == 1
+          && bodies[0].matches('(?i)^(end\\b|(if|else|for|switch|select|case|func|fn|loop|match|while|impl|mod|struct|try)\\b)')
+          ? ['closing'] : [])
+    where: size(matched) > 0
+    abstain: "!comment.generated && !comment.attached && !documentation && size(bodies)
+      > 0 && !bodies[0].startsWith('lighthouse-')"
+    message: |-
+      {{ size(matched) == 0 ? ''
+         : matched[0] == 'banner'
+         ? 'comment labels a section instead of stating a fact; name the code or split it instead'
+         : matched[0] == 'code'
+         ? 'comment holds code; delete it, version control keeps history'
+         : matched[0] == 'history'
+         ? 'comment records history or authorship; version control keeps it'
+         : matched[0] == 'closing'
+         ? 'comment marks a closing brace; shorten the block instead'
+         : '' }}
+    evidence:
+      kind: 'size(matched) > 0 ? matched[0] : '''''
+      kinds: matched
+      comment: comment.text
+      label: 'size(named) > 0 ? named[0] : '''''
+    identity:
+      subject: comment.file
+      snippet: comment.text
+  fix:
+    safety: unsafe
+    type: cel
+    edits: 'finding.evidence.kind in [''banner'', ''commented-code''] ? [remove(finding.span)]
+      : []'
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), C1 Inappropriate Information
+    - Martin, Clean Code (2008), C2 Obsolete Comment
+    - Martin, Clean Code (2008), C3 Redundant Comment
+    - Martin, Clean Code (2008), C4 Poorly Written Comment
+    - Martin, Clean Code (2008), C5 Commented-Out Code
+    - Martin, Clean Code (2008), ch. 4 Position markers
+    - Martin, Clean Code (2008), ch. 4 Redundant and noise comments
+    - Martin, Clean Code (2008), ch. 4 Misleading comments
+    - Martin, Clean Code (2008), ch. 4 Good comments
+    - Martin, Clean Code (2008), ch. 4 TODO comments
+    - Martin, Clean Code (2008), ch. 4 Journal comments
+    - Martin, Clean Code (2008), ch. 4 Closing brace comments
+    - Martin, Clean Code (2008), ch. 4 Commented-out code
+  examples:
+  - name: banner-invalid
+    language: go
+    kind: invalid
+    fixed:
+    - path: example.go
+      body: |-
+        package sample
+
+        func helper() int { return 1 }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // ---- Helpers ----
+
+        func helper() int { return 1 }
+    expect:
+    - line: 3
+  - name: banner-marker
+    language: go
+    kind: invalid
+    fixed:
+    - path: example.go
+      body: |-
+        package sample
+
+        func helper() int { return 1 }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // MARK: - Helpers
+
+        func helper() int { return 1 }
+    expect:
+    - line: 3
+  - name: banner-valid
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: example.go
+      body: "package sample\n\n// Parse reads the header.\n//\n// The layout is\n//\n//\t---\n//\tname:
+        value\n//\t---\nfunc Parse() int { return 1 }\n\nvar x = 1 // --- not a banner:
+        it trails code"
+  - name: banner-rust-invalid
+    language: rust
+    kind: invalid
+    fixed:
+    - path: src/lib.rs
+      body: pub struct Store;
+    files:
+    - path: src/lib.rs
+      body: |-
+        // ===== Types =====
+
+        pub struct Store;
+    expect:
+    - line: 1
+  - name: banner-rust-valid
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Store of values.
+        ///
+        /// ---
+        pub struct Store;
+  - name: code-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds:
+      - commented-code
+    fixed:
+    - path: example.go
+      body: |-
+        package sample
+
+        func run() {}
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // total := compute(a, b)
+        // fmt.Println("total", total)
+
+        func run() {}
+    expect:
+    - line: 3
+  - name: code-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds:
+      - commented-code
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // The total is computed once: compute(a, b) is costly.
+
+        func run() {}
+    canonical: false
+  - name: code-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds:
+      - commented-code
+    fixed:
+    - path: src/lib.rs
+      body: pub struct Store;
+    files:
+    - path: src/lib.rs
+      body: |-
+        // let total = compute(a, b);
+
+        pub struct Store;
+    expect:
+    - line: 1
+  - name: code-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds:
+      - commented-code
+    files:
+    - path: src/lib.rs
+      body: |-
+        // The total is computed once because compute is costly.
+
+        pub struct Store;
+    canonical: false
+  - name: history-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds:
+      - journal
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // Modified by jdoe on 2020-01-01
+
+        func run() {}
+    expect:
+    - line: 3
+  - name: history-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds:
+      - journal
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // The format changed in version 2; readers accept both.
+
+        func run() {}
+    canonical: false
+  - name: history-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds:
+      - journal
+    files:
+    - path: src/lib.rs
+      body: |-
+        // Author: jdoe
+
+        pub struct Store;
+    expect:
+    - line: 1
+  - name: history-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds:
+      - journal
+    files:
+    - path: src/lib.rs
+      body: |-
+        // The author field is optional on the wire.
+
+        pub struct Store;
+    canonical: false
+  - name: closing-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds:
+      - closing
+    files:
+    - path: example.go
+      body: "package sample\n\nfunc run(x int) int {\n\tif x > 0 {\n\t\treturn x\n\t}
+        // end if\n\treturn 0\n}"
+    expect:
+    - line: 6
+  - name: closing-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds:
+      - closing
+    files:
+    - path: example.go
+      body: "package sample\n\nfunc run(x int) int {\n\tif x > 0 {\n\t\treturn x\n\t}
+        // a negative value falls back to zero\n\treturn 0\n}"
+    canonical: false
+  - name: closing-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds:
+      - closing
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn run(x: i32) -> i32 {
+            if x > 0 {
+                return x;
+            } // end if
+            0
+        }
+    expect:
+    - line: 4
+  - name: closing-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds:
+      - closing
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn run(x: i32) -> i32 {
+            if x > 0 {
+                return x;
+            } // a negative value falls back to zero
+            0
+        }
+    canonical: false

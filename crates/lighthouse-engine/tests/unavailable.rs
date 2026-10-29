@@ -16,7 +16,7 @@ fn a_program_does_not_run_where_the_sandbox_it_is_asked_for_does_not_work() {
 
     assert_eq!(
         Availability::new(true, true, &models).of(&Needs::Program),
-        Err(Unavailable::SandboxUnavailable)
+        Err(Unavailable::NoSandbox)
     );
     assert_eq!(
         Availability::new(true, false, &models).of(&Needs::Program),

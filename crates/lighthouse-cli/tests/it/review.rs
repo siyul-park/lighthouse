@@ -29,7 +29,7 @@ pub(crate) fn rust_project(files: &[(&str, &str)]) -> TempDir {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/errors\" = \"info\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/no-panic\" = \"info\"\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -96,10 +96,10 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
     let open = listing(&dir, "open");
-    assert_eq!(rules(&open), ["design/errors", "design/exported-doc"]);
+    assert_eq!(rules(&open), ["design/exported-doc", "design/no-panic"]);
     let helper = open
         .iter()
-        .find(|f| f["decision"] == "design/errors")
+        .find(|f| f["decision"] == "design/no-panic")
         .unwrap();
     assert_eq!(helper["symbol"], "demo::run#function");
     assert_eq!(helper["locator"]["span"]["start"]["line"], 2);
@@ -131,7 +131,7 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
 fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/errors");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
 
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint[..12]])
@@ -147,7 +147,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
 
     let out = lighthouse(dir.path()).arg("check").output().unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(!text.contains("design/errors"), "{text}");
+    assert!(!text.contains("design/no-panic"), "{text}");
     assert!(text.contains("design/exported-doc"), "{text}");
     let notice = String::from_utf8(out.stderr).unwrap();
     assert!(
@@ -159,7 +159,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
     ))[0];
     assert_eq!(report["counts"]["suppressed"], 1, "{report}");
 
-    assert_eq!(rules(&listing(&dir, "suppressed")), ["design/errors"]);
+    assert_eq!(rules(&listing(&dir, "suppressed")), ["design/no-panic"]);
     assert_eq!(rules(&listing(&dir, "open")), ["design/exported-doc"]);
 
     let history = records(&stdout(lighthouse(dir.path()).args([
@@ -196,7 +196,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
         .assert()
         .success();
     let again = stdout(lighthouse(dir.path()).arg("check"));
-    assert!(again.contains("design/errors"), "{again}");
+    assert!(again.contains("design/no-panic"), "{again}");
 }
 
 #[test]
@@ -303,7 +303,7 @@ fn a_run_resolves_only_findings_inside_its_report_scope() {
     assert_eq!(open[0]["path"], "src/b.rs");
 
     lighthouse(dir.path())
-        .args(["check", "--decision", "design/errors", "src/b.rs"])
+        .args(["check", "--decision", "design/no-panic", "src/b.rs"])
         .assert()
         .success();
     assert_eq!(listing(&dir, "open").len(), 1);
@@ -322,13 +322,13 @@ fn no_store_neither_records_nor_applies_judgments() {
     assert!(!dir.path().join(".lighthouse").exists());
 
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/errors");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint, "--judgment", "pass"])
         .assert()
         .success();
     let out = stdout(lighthouse(dir.path()).args(["check", "--no-store"]));
-    assert!(out.contains("design/errors"), "{out}");
+    assert!(out.contains("design/no-panic"), "{out}");
 }
 
 #[test]
@@ -427,7 +427,7 @@ fn an_error_stays_reported_whatever_the_judgment() {
     lighthouse(dir.path()).arg("check").assert().code(1);
     let fingerprint = every(&dir, "all")
         .iter()
-        .find(|f| f["decision"] == "core/allow")
+        .find(|f| f["decision"] == "core/allow-reason")
         .map(|f| f["fingerprint"].as_str().unwrap().to_owned())
         .unwrap();
     let out = lighthouse(dir.path())
@@ -490,7 +490,7 @@ fn a_warn_decision_configured_as_error_is_hidden_by_a_judgment() {
 fn a_judgment_expires_when_the_evidence_it_judged_changes() {
     let dir = rust_project(&[("src/lib.rs", LONG_NAME)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/naming");
+    let fingerprint = fingerprint_of(&dir, "design/max-name-words");
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint, "--judgment", "pass"])
         .assert()
@@ -503,7 +503,7 @@ fn a_judgment_expires_when_the_evidence_it_judged_changes() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/naming\" = {{ level = \"warn\", options = {{ maxWords = 4 }} }}\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/max-name-words\" = {{ level = \"warn\", options = {{ enabled = true, maxWords = 4 }} }}\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -530,7 +530,7 @@ fn a_judgment_expires_when_the_evidence_it_judged_changes() {
 fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/errors");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     let resolve = |envs: &[(&str, &str)], flags: &[&str]| {
         let mut cmd = lighthouse(dir.path());
         cmd.env_remove("LIGHTHOUSE_ATTRIBUTED_TO")
@@ -585,7 +585,7 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
 fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
     let author = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(author.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&author, "design/errors");
+    let fingerprint = fingerprint_of(&author, "design/no-panic");
     lighthouse(author.path())
         .args([
             "review",
@@ -606,7 +606,7 @@ fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
     fs::write(clone.path().join(".lighthouse/decisions.jsonl"), &log).unwrap();
     let out = lighthouse(clone.path()).arg("check").output().unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(!text.contains("design/errors"), "{text}");
+    assert!(!text.contains("design/no-panic"), "{text}");
     assert!(
         String::from_utf8(out.stderr)
             .unwrap()
@@ -629,7 +629,7 @@ fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
 fn resolve_refuses_a_finding_that_was_seen_again_and_warns_about_a_resolved_one() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/errors");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     lighthouse(dir.path())
         .args([
             "review",
@@ -662,7 +662,7 @@ fn resolve_refuses_a_finding_that_was_seen_again_and_warns_about_a_resolved_one(
 fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/errors");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     lighthouse(dir.path())
         .args(["review", "history", &fingerprint])
         .assert()
@@ -709,7 +709,7 @@ fn findings_of_a_rule_taken_out_of_the_config_are_inactive_and_can_be_pruned() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n[rules]\n\"design/errors\" = \"off\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n[rules]\n\"design/no-panic\" = \"off\"\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -717,7 +717,7 @@ fn findings_of_a_rule_taken_out_of_the_config_are_inactive_and_can_be_pruned() {
     trust(dir.path());
     lighthouse(dir.path()).arg("check").assert().success();
     let inactive = listing(&dir, "inactive");
-    assert_eq!(rules(&inactive), ["design/errors"]);
+    assert_eq!(rules(&inactive), ["design/no-panic"]);
     assert_eq!(rules(&listing(&dir, "open")), ["design/exported-doc"]);
     let out = stdout(lighthouse(dir.path()).args(["review", "list", "--status", "inactive"]));
     assert!(out.contains("\tinactive\t"), "{out}");
@@ -734,7 +734,7 @@ fn changed_resolves_the_findings_of_a_deleted_file() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/file-size\" = { level = \"warn\", options = { max = 5 } }\n"),
+        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 5 } }\n"),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\n").unwrap();

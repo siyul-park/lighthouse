@@ -31,7 +31,7 @@ spec:
     together), where a constructor method (an associated function named like one)
     comes before the other methods of its type; public free functions; private
     free functions. The order of the other members of a type is left to
-    `design/layout`. Items of `#[cfg(test)]` modules are
+    `design/top-down-order`. Items of `#[cfg(test)]` modules are
     not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.
   scope:
     subject: file

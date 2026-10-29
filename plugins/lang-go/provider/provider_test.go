@@ -63,6 +63,27 @@ func TestProviderIndex(t *testing.T) {
 		}
 	})
 
+	t.Run("indexes standalone files without a module", func(t *testing.T) {
+		root := t.TempDir()
+		path := filepath.Join(root, "p.go")
+		require.NoError(t, os.WriteFile(path, []byte("package p\n\nfunc Run() {}\n"), 0o644))
+
+		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+			Project:  sdk.ProjectRef{Root: root},
+			Language: "go",
+			Inputs:   fileInputs([]sdk.FileRef{{Path: "p.go"}}),
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, result.Incomplete)
+		require.Len(t, result.Fragments, 1)
+		var names []string
+		for _, symbol := range result.Fragments[0].Symbols {
+			names = append(names, symbol.Name)
+		}
+		require.Contains(t, names, "Run")
+	})
+
 	t.Run("classifies entry points the way go test does", func(t *testing.T) {
 		root := t.TempDir()
 		write := func(name, body string) {

@@ -14,7 +14,7 @@ use std::{
 
 use crate::metrics::{MEASURES, Measures, propagation::System};
 use lighthouse_model::{
-    Span,
+    Position, Span,
     ucm::{Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
 use lighthouse_plugin::{Annotations, Context, Error, Workspace};
@@ -35,11 +35,13 @@ mod cycle;
 mod effective;
 mod forward;
 mod gap;
+mod homonyms;
 mod imports;
 mod ownership;
 mod parent;
 mod role;
 mod stability;
+mod style;
 mod unit;
 mod widths;
 
@@ -53,6 +55,7 @@ pub(crate) struct Indexes {
     imports: OnceLock<BTreeMap<String, Vec<String>>>,
     cycles: OnceLock<BTreeMap<String, Vec<String>>>,
     types: OnceLock<BTreeMap<String, Vec<Value>>>,
+    names: OnceLock<BTreeMap<String, Vec<SymbolId>>>,
     parents: OnceLock<parent::Uses>,
     modules: OnceLock<System>,
     symbols: OnceLock<System>,
@@ -147,6 +150,55 @@ impl<'a> Builder<'a> {
             .get(..comment.span.start.col.saturating_sub(1) as usize)
             .unwrap_or("")
             .trim();
+        let end = comment.span.end.line;
+        let next = comment
+            .attached_to
+            .as_ref()
+            .and_then(|id| self.project.symbol(id))
+            .or_else(|| {
+                self.project
+                    .symbols_in(&comment.file)
+                    .filter(|symbol| symbol.span.start.line > end)
+                    .min_by_key(|symbol| (symbol.span.start, &symbol.id))
+            });
+        let bodies: Vec<&str> = comment
+            .text
+            .lines()
+            .map(str::trim)
+            .map(|line| line.trim_start_matches('/').trim())
+            .filter(|line| !line.is_empty())
+            .collect();
+        let directive = bodies.first().is_some_and(|body| {
+            [
+                "go:",
+                "+build",
+                "nolint",
+                "lint:",
+                "lighthouse-",
+                "#!",
+                "Code generated",
+            ]
+            .iter()
+            .any(|prefix| body.starts_with(prefix))
+        });
+        let banner = !bodies.is_empty()
+            && bodies.iter().all(|body| {
+                body.chars().all(|ch| "-=*~_+".contains(ch))
+                    || ["MARK:", "#region", "#endregion"]
+                        .iter()
+                        .any(|prefix| body.starts_with(prefix))
+            });
+        let gap = next.map_or(0, |symbol| blank_lines(text, end, symbol.span.start.line));
+        let blank = Span {
+            start: Position {
+                line: end + 1,
+                col: 1,
+            },
+            end: Position {
+                line: end + gap + 1,
+                col: 1,
+            },
+        };
         json!({
             "file": comment.file.to_string_lossy(),
             "text": comment.text,
@@ -157,6 +209,13 @@ impl<'a> Builder<'a> {
             "before": before,
             "generated": self.project.file(&comment.file).is_none_or(|f| f.generated),
             "attached": comment.attached_to.is_some(),
+            "directive": directive,
+            "banner": banner,
+            "top": comment.span.start.line == 1,
+            "gap": gap,
+            "blank": span(&comment.file, blank),
+            "next": next.map_or("", |symbol| symbol.id.as_str()),
+            "next_name": next.map_or("", |symbol| symbol.name.as_str()),
             "span": span(&comment.file, comment.span),
         })
     }
@@ -398,6 +457,12 @@ impl<'a> Builder<'a> {
         }
         if needs.field("owner_home") {
             map.insert("owner_home".to_owned(), self.owner_home(symbol));
+        }
+        if needs.field("style_mix") {
+            map.insert("style_mix".to_owned(), json!(self.style_mix(symbol)));
+        }
+        if needs.field("homonyms") {
+            map.insert("homonyms".to_owned(), self.homonyms(symbol));
         }
         if needs.field("module_imports") {
             map.insert("module_imports".to_owned(), self.module_imports(symbol));
@@ -674,6 +739,18 @@ pub(crate) fn span(file: &Path, span: Span) -> Value {
         "start": { "line": span.start.line, "col": span.start.col },
         "end": { "line": span.end.line, "col": span.end.col },
     })
+}
+
+/// The number of blank lines between line `after` and line `before` (1-based,
+/// both outside the count), and zero when anything else sits between them.
+fn blank_lines(text: &str, after: u32, before: u32) -> u32 {
+    let count = before.saturating_sub(after).saturating_sub(1);
+    let blank = text
+        .lines()
+        .skip(after as usize)
+        .take(count as usize)
+        .all(|line| line.trim().is_empty());
+    if blank { count } else { 0 }
 }
 
 /// Whether test code uses the symbol, or a member of it. Heuristic references

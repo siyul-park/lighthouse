@@ -9,18 +9,80 @@ spec:
   context: >-
     A reader should be able to follow the intent of a function as a sequence of
     steps, without switching between policy and low-level mechanics. The test
-    is semantic, not a line-count heuristic (Martin, Clean Code (2008), G34).
+    is semantic, not a line-count heuristic (Martin, Clean Code (2008), G34). A
+    high-level function reads as a sequence of steps one level below its name; a
+    low-level function performs one concrete operation without narrating
+    higher-level policy.
   scope:
     subject: symbol
   requirement: >-
-    A function MUST stay at one level of abstraction: its steps SHOULD express
-    either intent or mechanics, not alternate between the two. A high-level
-    function SHOULD read as a sequence of steps one level below its name; a
-    low-level function SHOULD perform one concrete operation without narrating
-    higher-level policy.
+    A function SHOULD stay at one level of abstraction: its steps express
+    either intent or mechanics, not both.
   severity: warn
   check:
     type: model
   provenance:
     wasDerivedFrom:
       - Martin, Clean Code (2008), G34 Functions Should Descend Only One Level of Abstraction
+  examples:
+  - name: mixed-level-go
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func Publish(order Order) error {
+            if err := validate(order); err != nil {
+                return err
+            }
+            buf := make([]byte, 0, 64)
+            buf = append(buf, order.ID...)
+            buf = append(buf, 0)
+            for i := range order.Lines {
+                buf = binary.BigEndian.AppendUint32(buf, uint32(order.Lines[i].Qty))
+            }
+            return queue.Send(buf)
+        }
+  - name: one-level-go
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func Publish(order Order) error {
+            if err := validate(order); err != nil {
+                return err
+            }
+            return queue.Send(encode(order))
+        }
+  - name: mixed-level-rust
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |
+        pub fn publish(order: &Order) -> Result<(), Error> {
+            validate(order)?;
+            let mut buf = Vec::with_capacity(64);
+            buf.extend_from_slice(order.id.as_bytes());
+            buf.push(0);
+            for line in &order.lines {
+                buf.extend_from_slice(&line.qty.to_be_bytes());
+            }
+            queue::send(&buf)
+        }
+  - name: one-level-rust
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |
+        pub fn publish(order: &Order) -> Result<(), Error> {
+            validate(order)?;
+            queue::send(&encode(order))
+        }

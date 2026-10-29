@@ -6,7 +6,8 @@ use lighthouse_model::ucm::{EdgeKind, Resolution, Symbol, SymbolKind, Visibility
 use serde_json::{Value, json};
 
 const EXTERNAL: &str = "testing/public-boundary";
-const OWNER: &str = "testing/owner";
+const MISSING: &str = "testing/no-missing-owner";
+const DUPLICATE: &str = "testing/no-duplicate-owner";
 
 fn check(w: &World, rule: &str, options: Value) -> Vec<(String, u32)> {
     let testing = Checks::new(
@@ -25,11 +26,9 @@ fn check(w: &World, rule: &str, options: Value) -> Vec<(String, u32)> {
     )
 }
 
-/// What `testing/owner` reports of kind `duplicate`: a name more than one test
-/// owns.
-fn duplicates(w: &World, mut options: Value) -> Vec<(String, u32)> {
-    options["kinds"] = json!(["duplicate"]);
-    check(w, OWNER, options)
+/// What `testing/no-duplicate-owner` reports: a symbol with more than one owner test.
+fn duplicates(w: &World, options: Value) -> Vec<(String, u32)> {
+    check(w, DUPLICATE, options)
 }
 
 /// A package `m` with public `Get` and `Put`, an external test module `m[test]`
@@ -58,50 +57,50 @@ fn package(tests: &[(&str, Option<&str>)]) -> (World, Vec<Symbol>) {
 }
 
 #[test]
-fn owner_test_flags_a_public_symbol_no_test_touches() {
+fn missing_owner_flags_a_public_symbol_no_test_touches() {
     let (w, _) = package(&[("TestGet", Some("Get"))]);
-    assert_eq!(w.names(&check(&w, OWNER, json!({}))), ["Put"]);
+    assert_eq!(w.names(&check(&w, MISSING, json!({}))), ["Put"]);
 }
 
 #[test]
-fn owner_test_accepts_a_named_owner_or_a_test_that_uses_the_symbol() {
+fn missing_owner_accepts_a_named_owner_or_a_test_that_uses_the_symbol() {
     let (w, _) = package(&[("TestGet", None), ("TestPutFlow", Some("Put"))]);
-    assert!(check(&w, OWNER, json!({})).is_empty());
+    assert!(check(&w, MISSING, json!({})).is_empty());
 }
 
 #[test]
-fn owner_test_judges_only_modules_with_tests_and_public_symbols() {
+fn missing_owner_judges_only_modules_with_tests_and_public_symbols() {
     let mut w = World::default();
     w.module("m", None, None);
     w.func("m", "Get", "m/a.ucm");
-    assert!(check(&w, OWNER, json!({})).is_empty(), "no tests at all");
+    assert!(check(&w, MISSING, json!({})).is_empty(), "no tests at all");
 
     let (mut w, made) = package(&[("TestGet", Some("Get"))]);
     let put = made[1].clone();
     w.private(&put);
-    assert!(check(&w, OWNER, json!({})).is_empty(), "private symbol");
+    assert!(check(&w, MISSING, json!({})).is_empty(), "private symbol");
     w.symbols
         .iter_mut()
         .find(|s| s.id == put.id)
         .unwrap()
         .visibility = Visibility::Internal;
     assert!(
-        check(&w, OWNER, json!({})).is_empty(),
+        check(&w, MISSING, json!({})).is_empty(),
         "internal by default"
     );
     assert_eq!(
-        w.names(&check(&w, OWNER, json!({ "includeInternal": true }))),
+        w.names(&check(&w, MISSING, json!({ "includeInternal": true }))),
         ["Put"]
     );
 }
 
 #[test]
-fn owner_test_counts_a_member_use_for_its_type_and_exempts_hooks() {
+fn missing_owner_counts_a_member_use_for_its_type_and_exempts_hooks() {
     let (mut w, _) = package(&[("TestGet", None)]);
     let ty = w.symbol("m", "Store", SymbolKind::Type, "m/a.ucm");
     let method = w.member(&ty, "Load", SymbolKind::Method, "m/a.ucm");
     w.member(&ty, "String", SymbolKind::Method, "m/a.ucm");
-    let found = w.names(&check(&w, OWNER, json!({})));
+    let found = w.names(&check(&w, MISSING, json!({})));
     assert_eq!(found, ["Put", "Store", "Load"]);
     let test = w
         .symbols
@@ -110,7 +109,7 @@ fn owner_test_counts_a_member_use_for_its_type_and_exempts_hooks() {
         .unwrap()
         .clone();
     w.edge(EdgeKind::Calls, &test, &method);
-    let found = w.names(&check(&w, OWNER, json!({})));
+    let found = w.names(&check(&w, MISSING, json!({})));
     assert_eq!(
         found,
         ["Put"],
@@ -119,7 +118,7 @@ fn owner_test_counts_a_member_use_for_its_type_and_exempts_hooks() {
 }
 
 #[test]
-fn single_owner_flags_variants_of_one_symbol() {
+fn duplicate_owner_flags_variants_of_one_symbol() {
     let (mut w, _) = package(&[
         ("TestGet", None),
         ("TestGet_Missing", None),
@@ -132,7 +131,7 @@ fn single_owner_flags_variants_of_one_symbol() {
 }
 
 #[test]
-fn single_owner_judges_internal_symbols_only_when_asked() {
+fn duplicate_owner_judges_internal_symbols_only_when_asked() {
     let (mut w, made) = package(&[("TestGet", None), ("TestGet_Missing", None)]);
     let get = made[0].clone();
     w.symbols
@@ -148,7 +147,7 @@ fn single_owner_judges_internal_symbols_only_when_asked() {
 }
 
 #[test]
-fn single_owner_lets_a_longer_name_belong_to_the_method() {
+fn duplicate_owner_lets_a_longer_name_belong_to_the_method() {
     let mut w = World::default();
     w.module("m", None, None);
     w.module("m[test]", None, Some("m"));
@@ -163,7 +162,7 @@ fn single_owner_lets_a_longer_name_belong_to_the_method() {
 }
 
 #[test]
-fn single_owner_reads_snake_case_names() {
+fn duplicate_owner_reads_snake_case_names() {
     let mut w = World::default();
     w.module("c", None, None);
     w.module("c[test:a]", None, Some("c"));
@@ -216,7 +215,7 @@ fn external_accepts_external_packages_and_public_use() {
 }
 
 #[test]
-fn owner_test_exempts_data_types_and_trait_impl_methods() {
+fn missing_owner_exempts_data_types_and_trait_impl_methods() {
     let (mut w, _) = package(&[("TestGet", Some("Get")), ("TestPut", Some("Put"))]);
     let data = w.symbol("m", "Data", SymbolKind::Type, "m/a.ucm");
     w.member(&data, "field", SymbolKind::Field, "m/a.ucm");
@@ -231,13 +230,13 @@ fn owner_test_exempts_data_types_and_trait_impl_methods() {
     *w.symbols.last_mut().unwrap() = via_trait.clone();
     w.summarize(&via_trait, 1, &[]);
     w.summaries.last_mut().unwrap().implementation = true;
-    let found = w.names(&check(&w, OWNER, json!({})));
+    let found = w.names(&check(&w, MISSING, json!({})));
     assert_eq!(
         found,
         ["Object"],
         "Data has no methods; fmt is a trait impl"
     );
-    let all = w.names(&check(&w, OWNER, json!({ "includeDataTypes": true })));
+    let all = w.names(&check(&w, MISSING, json!({ "includeDataTypes": true })));
     assert_eq!(all, ["Data", "Object"]);
 }
 
@@ -265,15 +264,15 @@ fn rust_crate(tests: &[&str]) -> (World, Symbol) {
 }
 
 #[test]
-fn owner_test_credits_integration_tests_of_the_crate_root_to_its_submodules() {
+fn missing_owner_credits_integration_tests_of_the_crate_root_to_its_submodules() {
     let (w, _) = rust_crate(&["parse"]);
-    assert!(check(&w, OWNER, json!({})).is_empty());
+    assert!(check(&w, MISSING, json!({})).is_empty());
     let (w, _) = rust_crate(&["other"]);
-    assert_eq!(w.names(&check(&w, OWNER, json!({}))), ["parse"]);
+    assert_eq!(w.names(&check(&w, MISSING, json!({}))), ["parse"]);
 }
 
 #[test]
-fn owner_test_accepts_a_heuristic_reference_from_test_code() {
+fn missing_owner_accepts_a_heuristic_reference_from_test_code() {
     let (mut w, parse) = rust_crate(&["other"]);
     let test = w
         .symbols
@@ -283,19 +282,19 @@ fn owner_test_accepts_a_heuristic_reference_from_test_code() {
         .clone();
     w.edge(EdgeKind::References, &test, &parse);
     w.edges.last_mut().unwrap().resolution = Resolution::Heuristic;
-    assert!(check(&w, OWNER, json!({})).is_empty());
+    assert!(check(&w, MISSING, json!({})).is_empty());
 }
 
 #[test]
-fn owner_test_credits_ancestor_tests_only_when_asked() {
+fn missing_owner_credits_ancestor_tests_only_when_asked() {
     let (mut w, _) = rust_crate(&["parse"]);
     w.naming =
         Some(json!({ "prefix": "", "snakeCase": true, "variants": false, "ancestors": false }));
-    assert_eq!(w.names(&check(&w, OWNER, json!({}))), ["parse"]);
+    assert_eq!(w.names(&check(&w, MISSING, json!({}))), ["parse"]);
 }
 
 #[test]
-fn single_owner_keeps_names_within_one_module() {
+fn duplicate_owner_keeps_names_within_one_module() {
     let (mut w, _) = rust_crate(&["parse"]);
     w.naming = Some(json!({ "prefix": "", "snakeCase": true, "variants": false }));
     assert!(duplicates(&w, json!({})).is_empty());

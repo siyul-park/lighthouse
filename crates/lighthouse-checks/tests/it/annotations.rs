@@ -76,11 +76,15 @@ fn an_allow_annotation_suppresses_the_finding_it_is_attached_to() {
 #[test]
 fn an_allow_annotation_covers_every_severity_and_names_the_rules_it_does_not_use() {
     let outcome = check(
-        "// lighthouse-disable-next-line design/exported-doc, design/ownership -- generated\npub fn open() {}\n",
-        "\"design/exported-doc\" = \"error\"\n\"design/ownership\" = \"warn\"\n",
+        "// lighthouse-disable-next-line design/exported-doc, design/no-mutable-globals -- generated\npub fn open() {}\n",
+        "\"design/exported-doc\" = \"error\"\n\"design/no-mutable-globals\" = \"warn\"\n",
     );
     assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
-    assert!(outcome.diagnostics[0].message.contains("design/ownership"));
+    assert!(
+        outcome.diagnostics[0]
+            .message
+            .contains("design/no-mutable-globals")
+    );
     assert_eq!(outcome.suppressed.len(), 1);
     assert_eq!(outcome.suppressed[0].diagnostic.severity, Severity::Error);
     assert_eq!(outcome.exit_code(false, false), 0);
@@ -92,7 +96,10 @@ fn an_annotation_without_a_reason_is_ignored_and_reported() {
         "// lighthouse-disable-next-line design/exported-doc\npub fn open() {}\n",
         DOC_RULE,
     );
-    assert_eq!(rules_of(&outcome), ["core/allow", "design/exported-doc"]);
+    assert_eq!(
+        rules_of(&outcome),
+        ["core/allow-reason", "design/exported-doc"]
+    );
     assert!(outcome.suppressed.is_empty());
     assert_eq!(outcome.diagnostics[0].severity, Severity::Error);
     assert_eq!(outcome.diagnostics[0].span.start.line, 1);
@@ -135,7 +142,7 @@ fn banner_in(name: &str) -> String {
 
 #[test]
 fn identical_findings_in_different_symbols_keep_their_fingerprints_when_one_goes() {
-    let rules = "\"design/comments\" = \"warn\"\n";
+    let rules = "\"design/no-noise-comment\" = \"warn\"\n\"core/formatted\" = \"off\"\n";
     let all = check(
         &format!("{}{}{}", banner_in("a"), banner_in("b"), banner_in("c")),
         rules,
@@ -159,7 +166,7 @@ fn identical_findings_in_different_symbols_keep_their_fingerprints_when_one_goes
 fn identical_findings_in_one_symbol_rest_on_an_ordinal_and_say_so() {
     let outcome = check(
         "fn a() {\n    // ======== helpers ========\n    let _ = 1;\n    // ======== helpers ========\n    let _ = 2;\n}\n",
-        "\"design/comments\" = \"warn\"\n",
+        "\"design/no-noise-comment\" = \"warn\"\n",
     );
     assert_eq!(outcome.diagnostics.len(), 2);
     for d in &outcome.diagnostics {
@@ -183,12 +190,12 @@ fn facts_describe_the_subject_with_callers_split_and_file_measures() {
     let long = "// a\n".repeat(5);
     let lines = check(
         &format!("{long}pub fn open() {{}}\n"),
-        "\"core/file-size\" = { level = \"warn\", options = { max = 2 } }\n",
+        "\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
     );
     let finding = lines
         .diagnostics
         .iter()
-        .find(|d| d.rule_id == "core/file-size" && d.file.ends_with("lib.rs"))
+        .find(|d| d.rule_id == "core/max-lines" && d.file.ends_with("lib.rs"))
         .unwrap();
     let file = &lines.facts[&finding.fingerprint]["file"];
     assert_eq!(file["lines"], 6);
@@ -199,10 +206,10 @@ fn facts_describe_the_subject_with_callers_split_and_file_measures() {
 fn outcome_lists_configured_rules_and_the_options_each_finding_ran_with() {
     let outcome = check(
         "pub fn open() {}\n",
-        "\"design/exported-doc\" = \"warn\"\n\"core/file-size\" = { level = \"warn\", options = { max = 1 } }\n",
+        "\"design/exported-doc\" = \"warn\"\n\"core/max-lines\" = { level = \"warn\", options = { max = 1 } }\n",
     );
     assert!(outcome.active.contains(&"design/exported-doc".to_owned()));
-    assert!(outcome.active.contains(&"core/file-size".to_owned()));
+    assert!(outcome.active.contains(&"core/max-lines".to_owned()));
     let doc = outcome
         .diagnostics
         .iter()

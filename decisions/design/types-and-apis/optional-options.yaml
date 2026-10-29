@@ -1,0 +1,44 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/optional-options
+  uid: 8b4b9eba-ccdd-45de-9c1d-8f1f4af3a431
+spec:
+  title: Constructors separate required arguments from options
+  context: A long positional list hides which values are required and makes optional
+    settings hard to evolve. Required arguments define the contract; optional settings
+    are named.
+  scope:
+    subject: symbol
+  requirement: Required constructor values SHOULD be explicit arguments; optional configuration
+    SHOULD be grouped into a named options value or functional options.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#types-and-apis-6bc1728e'
+    - Martin, Clean Code (2008), ch. 11 Dependency injection
+    - Martin, Clean Code (2008), ch. 11 Separate construction from use
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func NewClient(url string, timeout time.Duration, retries int, insecure bool, logger *log.Logger, cache bool) *Client { return nil }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type ClientOptions struct { Timeout time.Duration; Retries int; Insecure bool }
+        func NewClient(url string, opts ClientOptions) *Client { return nil }

@@ -40,6 +40,7 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
     json!({
         "id": s.id.as_str(),
         "name": s.name,
+        "name_key": text::key(&s.name),
         "kind": s.kind.as_str(),
         "visibility": visibility(s.visibility),
         "owner_kind": owner.map_or("", |o| o.kind.as_str()),

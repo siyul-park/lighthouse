@@ -424,7 +424,7 @@ fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
         FixedBy::Fixer("design/declaration-groups".to_owned())
     );
     assert_eq!(groups.cap, Safety::Safe);
-    let banners = plan.get("design/comments").unwrap();
+    let banners = plan.get("design/no-noise-comment").unwrap();
     assert_eq!(banners.cap, Safety::Unsafe);
     assert!(plan.get("design/exported-doc").is_none());
 }
@@ -460,7 +460,7 @@ fn model_fixes_are_given_only_to_the_listed_rules_that_have_a_check_and_no_fix_o
         "a fix of its own stays"
     );
     assert!(
-        plan.get("design/naming").is_none(),
+        plan.get("design/no-redundant-qualifier").is_none(),
         "a rule nobody listed has no model fix"
     );
 }

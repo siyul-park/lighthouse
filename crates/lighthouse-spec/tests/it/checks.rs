@@ -26,7 +26,7 @@ fn check_is_deterministic_unless_a_model_answers_it() {
 
 #[test]
 fn check_kind_name_is_the_type_as_written() {
-    let cel = bundled("core/file-size").check.as_ref().unwrap();
+    let cel = bundled("core/max-lines").check.as_ref().unwrap();
     assert_eq!(cel.kind.name(), "cel");
 }
 
@@ -178,15 +178,13 @@ fn model_check() {
 
 #[test]
 fn decision_spec_enforced_needs_an_accepted_status_and_a_check() {
-    let decision = bundled("core/file-size");
+    let decision = bundled("core/max-lines");
     assert!(decision.enforced());
     let proposed = decision.clone().map_spec(|mut s| {
         s.status = DecisionStatus::Proposed;
         s
     });
     assert!(!proposed.enforced());
-    let doc = bundled("testing/validation");
-    assert!(!doc.enforced());
 }
 
 #[test]
@@ -368,7 +366,7 @@ fn a_program_is_a_list_or_a_table() {
 
 #[test]
 fn a_decision_of_the_catalog_as_it_ships_is_bundled_and_an_edited_one_is_not() {
-    let shipped = bundled("go/formatted");
+    let shipped = bundled("core/formatted");
     assert!(shipped.bundled(lighthouse_test_support::bundled()));
 
     let mut value = serde_json::to_value(shipped).unwrap();

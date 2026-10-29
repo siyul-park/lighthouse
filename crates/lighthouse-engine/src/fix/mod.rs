@@ -27,7 +27,7 @@ use std::{
 
 use lighthouse_model::{Fingerprint, Preview, Safety, ucm::Capability};
 use lighthouse_plugin::FixDecision;
-use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Program, Task};
+use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Programs, Task};
 use serde::{Deserialize, Serialize};
 
 pub use edits::unified_diff;
@@ -71,7 +71,7 @@ pub struct FixBinding {
 /// finding, through the rewrite path it shares with an agent.
 #[derive(Debug, Clone)]
 pub(super) struct CommandFix {
-    program: Program,
+    programs: Programs,
     /// How far its change may go.
     scope: FixScope,
     /// What the language of the file must provide for the fix to be made.
@@ -138,7 +138,7 @@ impl FixPlan {
                 plan.commands.insert(
                     decision.id().to_owned(),
                     CommandFix {
-                        program: command.program.clone(),
+                        programs: command.programs(decision),
                         scope: FixScope::of_fix(decision.fix.as_ref(), FixScope::Files),
                         requires: fix.requires.clone(),
                         description: decision.title.clone(),

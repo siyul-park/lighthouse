@@ -30,7 +30,7 @@ spec:
         (owner_types.map(t, t.id)
           + placed.filter(s, s.kind == 'method' && s.owner_key != '').map(s, s.owner_key)).distinct()
     # The group order and the hook names of the file: the options `groups` and
-    # `hooks` of `design/declaration-groups`, which `design/layout` reads from
+    # `hooks` of `design/declaration-groups`, which `design/top-down-order` reads from
     # it (`options.from`), so that the project sets them once.
     - name: groups
       expression: options.groups
@@ -92,54 +92,54 @@ spec:
       intro: >-
         Design minimizes conceptual surface while keeping responsibility and
         ownership boundaries explicit.
-      decisions: [responsibility, duplication, module-layout]
+      decisions: [single-responsibility, meaningful-separation, no-conjoined-modules, no-duplication, prefer-reuse, general-extraction, module-layout]
     - name: dependency-direction
       title: Dependency Direction
       intro: >-
         Dependency direction keeps stable, general code independent from
         specific policy and context.
-      decisions: [layers]
+      decisions: [layers, consumer-interfaces, no-caller-dependency]
     - name: functions
       title: Functions
       intro: >-
         Function structure should make meaningful behavior reusable and
         readable, not merely make functions smaller. Structural metrics are
         review signals, not proof of a design violation.
-      decisions: [complexity, abstraction-level, signature, prefer-method, symbols]
+      decisions: [complexity, coupling, abstraction-level, signature-size, no-private-types, narrow-inputs, prefer-method, feature-envy, no-unused-symbol, no-redundant-symbol, no-speculative-generality]
     - name: naming
       title: Naming
       intro: >-
         Names should expose role, contract, or ownership with the smallest
         vocabulary that preserves the required distinction.
-      decisions: [naming]
+      decisions: [no-redundant-qualifier, max-name-words, no-type-encoding, plural-collections, predicate-names, reserved-verbs, short-names, abbreviations, consistent-terms]
     - name: types-and-apis
       title: Types and APIs
       intro: >-
         Public APIs are stable contracts: expose the minimum caller-facing
         abstraction and keep implementation state, and the ownership of mutable
         state and resources, behind its owner.
-      decisions: [constructors, ownership]
+      decisions: [constructor-validation, optional-options, no-mutable-globals, state-owner, encapsulated-state, no-hybrid-type, resource-owner, scoped-borrows, stateless-layout, no-generated-edits, encapsulated-platform]
     - name: concurrency
       title: Concurrency
       intro: >-
         Concurrency rules prevent races and leaks by making shared state and
         shutdown ownership explicit.
-      decisions: [concurrency]
+      decisions: [context-first, no-stored-context, task-shutdown]
     - name: errors
       title: Errors
       intro: >-
         Errors are contracts: callers should be able to classify failures,
         preserve causes, and avoid leaking implementation state.
-      decisions: [errors]
+      decisions: [error-identity, no-panic, error-categories, error-translation, no-state-in-errors]
     - name: file-order
       title: File Order
       intro: >-
         Declaration order should let a reader follow ownership and behavior from
         public concepts to implementation mechanics.
-      decisions: [layout, declaration-groups]
+      decisions: [top-down-order, vertical-distance, owner-file, declaration-groups]
     - name: comments
       title: Comments
       intro: >-
         Comments preserve facts that code cannot express; they should not
         narrate code that is already visible.
-      decisions: [exported-doc, comments]
+      decisions: [exported-doc, no-noise-comment, no-detached-comment, no-todo]

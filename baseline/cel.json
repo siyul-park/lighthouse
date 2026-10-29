@@ -28,23 +28,27 @@
   ],
   "exitCode": 3,
   "findings": {
-    "core/file-size": 60,
-    "design/comments": 2,
-    "design/complexity": 174,
+    "core/max-lines": 60,
+    "design/comments": 25,
+    "design/complexity": 78,
     "design/concurrency": 1,
-    "design/declaration-groups": 970,
+    "design/declaration-groups": 944,
     "design/errors": 33,
     "design/exported-doc": 1,
-    "design/layout": 100,
+    "design/layout": 90,
     "design/naming": 623,
     "design/ownership": 96,
     "design/prefer-method": 6,
+    "design/responsibility": 9,
     "design/signature": 4,
+    "design/symbols": 14,
+    "go/formatted": 7,
     "testing/file-layout": 118,
-    "testing/owner": 145,
+    "testing/no-duplicate-owner": 11,
+    "testing/no-missing-owner": 134,
     "testing/public-boundary": 48
   },
-  "findingsTotal": 2381,
+  "findingsTotal": 2302,
   "incomplete": 40,
   "repo": "cel",
   "sources": {
@@ -53,24 +57,94 @@
       "lines": 267726
     }
   },
+  "system": {
+    "coreShare": 0.0,
+    "cycles": 0,
+    "hotspots": [
+      {
+        "cognitive": 39,
+        "id": "common/ast::visit#function",
+        "score": 0.5635,
+        "vfi": 53
+      },
+      {
+        "cognitive": 32,
+        "id": "parser::unescapeChar#function",
+        "score": 0.3315,
+        "vfi": 38
+      },
+      {
+        "cognitive": 59,
+        "id": "common/types::nativeToValue#function",
+        "score": 0.3217,
+        "vfi": 20
+      },
+      {
+        "cognitive": 17,
+        "id": "common/types::MergeUnknowns#function",
+        "score": 0.3013,
+        "vfi": 65
+      },
+      {
+        "cognitive": 23,
+        "id": "common/decls::FunctionDecl::AddOverload#method",
+        "score": 0.301,
+        "vfi": 48
+      },
+      {
+        "cognitive": 11,
+        "id": "common/types::Type::isTypeInternal#method",
+        "score": 0.2699,
+        "vfi": 90
+      },
+      {
+        "cognitive": 36,
+        "id": "common/runes::newBufferWithLimit#function",
+        "score": 0.265,
+        "vfi": 27
+      },
+      {
+        "cognitive": 7,
+        "id": "common/types::Type::defaultIsAssignableType#method",
+        "score": 0.2557,
+        "vfi": 134
+      },
+      {
+        "cognitive": 25,
+        "id": "parser::unescape#function",
+        "score": 0.2522,
+        "vfi": 37
+      },
+      {
+        "cognitive": 42,
+        "id": "checker::checker::resolveOverload#method",
+        "score": 0.2405,
+        "vfi": 21
+      }
+    ],
+    "largestScc": {
+      "members": [],
+      "size": 0
+    },
+    "modules": 26,
+    "propagationCost": 0.3462,
+    "symbolPropagationCost": 0.0036,
+    "symbols": 3668
+  },
   "timingsMs": {
     "median": {
-      "analyzer metrics/cognitive": 2.1,
-      "analyzer metrics/cyclomatic": 2.0,
-      "analyzer metrics/fan": 5.6,
-      "analyzer metrics/nesting": 2.0,
-      "analyzer metrics/size": 2.4,
-      "hashing": 58.4,
-      "identity": 18.9,
-      "index go": 822.0,
+      "analyzer metrics/function": 1.4,
+      "fingerprints": 14.8,
+      "hashing": 50.7,
+      "index go": 991.6,
       "index text": 0.0,
-      "merge": 61.6,
-      "read": 44.6,
-      "report": 1.6,
-      "rules": 80.1,
-      "setup": 9.9,
+      "merge": 52.1,
+      "read": 34.1,
+      "report": 23.2,
+      "rules": 64.6,
+      "setup": 24.3,
       "store": 0.0,
-      "total": 1130.4
+      "total": 1300.4
     },
     "runs": 3
   }

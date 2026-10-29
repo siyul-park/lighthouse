@@ -119,7 +119,7 @@ fn sarif_carries_no_fix() {
 fn an_unsafe_fix_is_marked_with_whether_it_is_written_and_a_brief() {
     let dir = project(BANNER);
     let compact = report(&dir, &[]);
-    let group = group(&compact, "design/comments");
+    let group = group(&compact, "design/no-noise-comment");
     assert_eq!(group["fix"]["safety"], "unsafe", "{group}");
     assert_eq!(group["fix"]["written"], false, "{group}");
     assert!(

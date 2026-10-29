@@ -9,7 +9,7 @@
   ],
   "exitCode": 0,
   "findings": {
-    "core/file-size": 14,
+    "core/max-lines": 14,
     "design/errors": 20,
     "design/naming": 6
   },

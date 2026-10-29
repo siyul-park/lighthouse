@@ -1,0 +1,127 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/single-responsibility
+  uid: fe4e9489-782b-4118-87f3-88c1140bef17
+spec:
+  title: Symbols have one responsibility
+  context: A type that owns unrelated behaviors is difficult to name, test and change.
+    Public-method count is only a signal; review the semantic responsibilities rather
+    than splitting by size alone.
+  scope:
+    subject: module
+  requirement: A symbol SHOULD have one coherent responsibility and a narrow contract;
+    a symbol with too many public methods SHOULD be reviewed for multiple reasons
+    to change.
+  severity: info
+  options:
+    properties:
+      maxMembers:
+        type: integer
+        default: 10
+        description: Most public methods a type may have.
+    additionalProperties: false
+  check:
+    type: cel
+    select: module
+    variables:
+    - name: crowded
+      expression: module.types.filter(t, t.public_methods > options.maxMembers)
+    where: size(crowded) > 0
+    message: "{{ crowded[0].name + ' has ' + string(crowded[0].public_methods) + '
+      public methods (max ' + string(options.maxMembers) + '): review whether it has
+      several responsibilities; split by responsibility' }}"
+    evidence:
+      kind: "'members'"
+      types: crowded.map(t,t.id)
+    at:
+      symbol: crowded[0].id
+    identity:
+      subject: module.path
+    abstain: |-
+      size(crowded) == 0 && module.lines < 600
+      && (size(module.dependents) == 1 || module.declares == 0
+          || (size(module.dependents) == 0 && module.name != 'main'
+              && !module.path.contains('[bin:')))
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), ch. 10 Classes should be small
+    - Martin, Clean Code (2008), ch. 10 Single responsibility and cohesion
+    - Martin, Clean Code (2008), ch. 10 Organize for change
+    - Martin, Clean Code (2008), G30 Functions Should Do One Thing
+    - 'Hitz and Montazeri, Measuring Coupling and Cohesion in Object-Oriented Systems
+      (1995): LCOM4'
+    - Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9
+    - Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
+  examples:
+  - name: members-go-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct{}
+
+        func (s *Store) Get() int { return 1 }
+
+        func (s *Store) Put() int { return 2 }
+
+        func (s *Store) Drop() int { return 3 }
+    options:
+      maxMembers: 2
+    expect:
+    - line: 3
+  - name: members-go-valid
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Store struct{}
+
+        func (s *Store) Get() int { return 1 }
+
+        func (s *Store) Put() int { return 2 }
+
+        func (s *Store) Drop() int { return 3 }
+    options:
+      maxMembers: 3
+    canonical: true
+  - name: members-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store;
+
+        impl Store {
+            pub fn get(&self) -> i32 { 1 }
+            pub fn put(&self) -> i32 { 2 }
+            pub fn drop_all(&self) -> i32 { 3 }
+        }
+    options:
+      maxMembers: 2
+    expect:
+    - line: 1
+  - name: members-rust-valid
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store;
+
+        impl Store {
+            pub fn get(&self) -> i32 { 1 }
+            pub fn put(&self) -> i32 { 2 }
+            pub fn drop_all(&self) -> i32 { 3 }
+        }
+    options:
+      maxMembers: 3
+    canonical: true

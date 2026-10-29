@@ -58,7 +58,7 @@ fn exported_doc_skips_exempt_methods_interface_members_private_owners_and_kinds(
     member(&mut w, &public, "Flagged", SymbolKind::Method);
     let found = w.check(DOC, json!({}));
     assert_eq!(w.names(&found), ["Flagged"]);
-    let methods = w.check(DOC, json!({ "exemptMethods": [], "kinds": ["method"] }));
+    let methods = w.check(DOC, json!({ "exemptMethods": [], "symbols": ["method"] }));
     assert_eq!(w.names(&methods), ["String", "Flagged"]);
 }
 
@@ -91,7 +91,7 @@ fn exported_doc_skips_generated_and_test_files() {
     assert!(w.check(DOC, json!({})).is_empty());
 }
 
-const WRAP: &str = "design/symbols";
+const WRAP: &str = "design/no-redundant-symbol";
 
 /// `Get` calls the wrapper `load`, which only forwards to `read`.
 fn wrapped() -> (World, Symbol, Symbol, Symbol) {
@@ -183,7 +183,7 @@ fn branches(n: usize) -> Vec<Flow> {
 const COGNITIVE: &str = "design/complexity";
 const STATEMENTS: &str = "design/complexity";
 const DEPTH: &str = "design/complexity";
-const PARAMS: &str = "design/signature";
+const PARAMS: &str = "design/signature-size";
 
 /// The options that report one kind of `design/complexity` at `limit`.
 fn only(kind: &str, limit: Value) -> Value {
@@ -193,7 +193,7 @@ fn only(kind: &str, limit: Value) -> Value {
     limits[kind] = limit;
     json!({ "kinds": [kind], "limits": limits })
 }
-const RESULTS: &str = "design/signature";
+const RESULTS: &str = "design/signature-size";
 
 #[test]
 fn complexity_is_one_independent_limit() {
@@ -391,7 +391,7 @@ fn a_limit_refuses_what_is_not_a_limit() {
     }
 }
 
-const COUPLE: &str = "design/complexity";
+const COUPLE: &str = "design/coupling";
 
 fn hub_options() -> Value {
     hub(json!({ "fanIn": 2, "fanOut": 2, "statements": 1 }))
@@ -406,7 +406,7 @@ fn hub(overrides: Value) -> Value {
     for (key, value) in overrides.as_object().unwrap() {
         hub[key] = value.clone();
     }
-    json!({ "kinds": ["hub"], "hub": hub })
+    json!({ "hub": hub })
 }
 
 fn hub_world() -> (World, Symbol) {
@@ -619,19 +619,19 @@ fn no_panic_reports_each_event_at_its_place() {
     let must = w.func("m", "must_run", "m/a.ucm");
     with_events(&mut w, &must, &[(EventKind::Panic, 20, "panic")]);
     assert!(
-        w.check("design/errors", json!({})).is_empty(),
+        w.check("design/no-panic", json!({})).is_empty(),
         "off by default"
     );
     let both = json!({ "kinds": ["panic", "unwrap"] });
-    let found = w.check("design/errors", both);
+    let found = w.check("design/no-panic", both);
     assert_eq!(
         found,
         [("m/a.ucm".to_owned(), 7), ("m/a.ucm".to_owned(), 9)]
     );
-    let found = w.check("design/errors", json!({ "kinds": ["panic"] }));
+    let found = w.check("design/no-panic", json!({ "kinds": ["panic"] }));
     assert_eq!(found, [("m/a.ucm".to_owned(), 9)]);
     let all = json!({ "kinds": ["panic", "unwrap"], "allowPrefixes": [] });
-    let found = w.check("design/errors", all);
+    let found = w.check("design/no-panic", all);
     assert_eq!(found.len(), 3, "the prefix is what exempts must_run");
 }
 
@@ -648,7 +648,7 @@ fn an_event_keeps_its_identity_when_a_different_event_comes_before_it() {
         ],
     );
     let both = json!({ "kinds": ["panic", "unwrap"] });
-    let before = w.fingerprints("design/errors", both.clone());
+    let before = w.fingerprints("design/no-panic", both.clone());
     with_events(
         &mut w,
         &run,
@@ -658,7 +658,7 @@ fn an_event_keeps_its_identity_when_a_different_event_comes_before_it() {
             (EventKind::Unwrap, 9, "unwrap"),
         ],
     );
-    let after = w.fingerprints("design/errors", both);
+    let after = w.fingerprints("design/no-panic", both);
     assert_eq!(after.len(), 3);
     assert_eq!(before.len(), 2);
     assert_eq!(

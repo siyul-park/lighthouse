@@ -175,7 +175,7 @@ fn a_fix_that_overlaps_the_formatter_wins_and_the_formatting_follows_it() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"local\", \"rust\"]\n[rules]\n\"rust/formatted\" = \"error\"\n\"local/rename\" = \"error\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"local\", \"rust\"]\n[rules]\n\"core/formatted\" = \"error\"\n\"local/rename\" = \"error\"\n",
             plugin.to_str().unwrap()
         )),
     );
@@ -209,5 +209,5 @@ fn a_fix_that_overlaps_the_formatter_wins_and_the_formatting_follows_it() {
         .iter()
         .map(|a| &a["decision"])
         .collect();
-    assert_eq!(applied, ["local/rename", "rust/formatted"], "{fixed}");
+    assert_eq!(applied, ["local/rename", "core/formatted"], "{fixed}");
 }

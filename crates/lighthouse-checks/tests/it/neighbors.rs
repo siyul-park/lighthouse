@@ -71,9 +71,10 @@ fn pair() -> World {
 type Edit = fn(&mut World);
 
 /// How each field of a node (but the positions) is changed in the callee.
-const NODE_FIELDS: [(&str, Edit); 15] = [
+const NODE_FIELDS: [(&str, Edit); 16] = [
     ("id", |w| rename(w, "b", "n", "b")),
     ("name", |w| rename(w, "b", "m", "renamed")),
+    ("name_key", |w| rename(w, "b", "m", "renamed")),
     ("kind", |w| find(w, "b").kind = SymbolKind::Method),
     ("visibility", |w| {
         find(w, "b").visibility = Visibility::Private

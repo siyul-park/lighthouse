@@ -463,9 +463,9 @@ mod tests {
     #[test]
     fn sibling_source_fields_share_their_logical_document_identity() {
         let context = json!({
-            "identity": {"kind": "Decision", "name": "design/symbols"}
+            "identity": {"kind": "Decision", "name": "design/no-unused-symbol"}
         });
-        let path = PathBuf::from("decisions/design/symbols.yaml");
+        let path = PathBuf::from("decisions/design/no-unused-symbol.yaml");
         let document = context["identity"].to_string();
         assert_eq!(
             source_document(&context, &path, "/spec/check/where"),
@@ -489,7 +489,7 @@ mod tests {
         );
         assert_eq!(
             source_document(&json!({}), &path, "/where"),
-            "decisions/design/symbols.yaml:/where"
+            "decisions/design/no-unused-symbol.yaml:/where"
         );
     }
 

@@ -1,0 +1,46 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/prefer-reuse
+  uid: 318a9c57-40ac-424e-bf44-8fb9b453fe5d
+spec:
+  title: Reuse precedes new abstractions
+  context: New abstractions add concepts and long-lived contracts. Reuse is preferred
+    when the existing API expresses the behavior without weakening boundaries.
+  scope:
+    subject: symbol
+  requirement: Existing symbols and composition SHOULD be preferred over new layers,
+    extension points, policy knobs, aliases, and parallel mechanisms unless a distinct
+    contract requires them.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#structural-rules-8036b176'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type StoreFactory interface { New() *Store }
+        type DefaultStoreFactory struct{}
+        func (DefaultStoreFactory) New() *Store { return &Store{} }
+        type Store struct{}
+        func Open() *Store { return DefaultStoreFactory{}.New() }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Store struct{}
+        func Open() *Store { return &Store{} }

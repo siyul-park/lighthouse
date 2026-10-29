@@ -12,7 +12,7 @@ use serde_json::json;
 
 use crate::layer_support::{Memorizer, manifest};
 
-const RULE: &str = "core/file-size";
+const RULE: &str = "core/max-lines";
 
 fn decision() -> DecisionRef {
     lighthouse_test_support::bundled()

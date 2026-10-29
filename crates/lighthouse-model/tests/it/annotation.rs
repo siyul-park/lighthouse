@@ -82,7 +82,7 @@ fn parse_reports_a_missing_reason_and_ignores_prose() {
     assert!(parse("// lighthouse-disables design/a -- no").is_none());
     assert!(parse("// lighthouse-disable-next-liner design/a -- no").is_none());
     assert!(parse("// just a comment").is_none());
-    assert_eq!(ANNOTATION_REASON, "core/allow");
+    assert_eq!(ANNOTATION_REASON, "core/allow-reason");
     assert_eq!(UNUSED_ALLOW, "core/no-unused-allow");
 }
 

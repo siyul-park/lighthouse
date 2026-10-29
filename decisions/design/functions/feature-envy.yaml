@@ -1,0 +1,428 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/feature-envy
+  uid: 34721c4f-e430-4b9a-863a-4ac3f8c96174
+spec:
+  title: Functions belong with the behavior they use
+  context: A free function that uses several members of one type may be that type's
+    behavior, and a function that uses only one other module may be misplaced. These
+    are low-precision review candidates, not deterministic findings. Constructors
+    and entry points are excluded; exported functions are excluded unless a project
+    explicitly opts them in.
+  scope:
+    subject: symbol
+  requirement: A function SHOULD live with the type or module whose behavior it principally
+    uses; a function SHOULD NOT be placed elsewhere merely by historical accident.
+  severity: info
+  options:
+    properties:
+      kinds:
+        type: array
+        items:
+          type: string
+          enum:
+          - type
+          - module
+        default: []
+        description: Review feature envy against a type (`type`) or placement in another
+          module (`module`).
+      envy:
+        type: object
+        properties:
+          minMembers:
+            type: integer
+          minStatements:
+            type: integer
+          includeExported:
+            type: boolean
+        default:
+          minMembers: 3
+          minStatements: 3
+          includeExported: false
+        description: 'What makes a function a candidate for `envy`. `minMembers`:
+          Fewest distinct members of the type the function must use. `minStatements`:
+          Fewest statements a function must have to be judged. `includeExported`:
+          Also judge exported functions, whose callers outside the module would have
+          to change.'
+      module:
+        type: object
+        properties:
+          minUses:
+            type: integer
+          minStatements:
+            type: integer
+          includeExported:
+            type: boolean
+        default:
+          minUses: 3
+          minStatements: 3
+          includeExported: false
+        description: 'What makes a function a candidate for `module`. `minUses`: Fewest
+          distinct symbols of the other module the function must use. `minStatements`:
+          Fewest statements a function must have to be judged. `includeExported`:
+          Also judge exported functions, whose callers would have to change.'
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    variables:
+    - name: envy
+      expression: "('type' in options.kinds || 'module' in options.kinds) ? func.envy
+        : {}"
+    - name: free
+      expression: func.kind == 'function' && func.name != 'main' && func.name != 'init'
+    - name: envied
+      expression: "'type' in options.kinds && free && (func.visibility == 'private'
+        || options.envy.includeExported) && func.role != 'constructor' && size(func.references)
+        == 0 && func.statements >= options.envy.minStatements && size(envy) > 0 &&
+        !envy.entry && envy.count >= options.envy.minMembers && size(envy.others)
+        == 0 && envy.same_module"
+    - name: misplaced
+      expression: "'module' in options.kinds && free && (func.visibility == 'private'
+        || options.module.includeExported) && size(func.references) == 0 && func.statements
+        >= options.module.minStatements && size(envy) > 0 && !envy.entry && size(envy.module_target)
+        > 0 && size(envy.module_uses) >= options.module.minUses && envy.own_uses ==
+        0"
+    - name: matched
+      expression: "(envied ? ['type'] : []) + (misplaced ? ['module'] : [])"
+    where: 'false'
+    abstain: envied || misplaced
+    message: |-
+      {{ envied
+         ? func.name + ' depends on ' + envy.target_name + "'s members (" + envy.member_names.join(', ')
+           + ') only; consider a method of ' + envy.target_name
+         : misplaced
+         ? func.name + ' uses only ' + envy.module_target + ' (' + envy.module_use_names.join(', ')
+           + '); consider moving it to ' + envy.module_target
+         : '' }}
+    evidence:
+      kind: 'size(matched)>0 ? matched[0] : '''''
+      target: 'envied ? envy.target : '''''
+      members: 'envied ? envy.member_names : []'
+      module: 'misplaced ? envy.module_target : '''''
+      uses: 'misplaced ? envy.module_uses : []'
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - Fowler, Refactoring 2nd ed., Feature Envy
+    - Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006, Feature Envy
+      detection strategy
+    - Fowler, Refactoring 2nd ed., Move Function
+    - Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006
+    - Martin, Clean Code (2008), G14 Feature Envy
+    - Martin, Clean Code (2008), G17 Misplaced Responsibility
+    - Martin, Clean Code (2008), G18 Inappropriate Static
+  examples:
+  - name: envy-go-uses-three-fields-of-one-type
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
+        int\n}\n\nfunc (s *Store) Reset() { s.items = nil }\n\nfunc summary(s *Store)
+        int {\n\tn := len(s.items)\n\tn += s.total\n\tn += s.extra\n\treturn n\n}"
+    expect: []
+    options:
+      kinds:
+      - type
+  - name: envy-go-uses-members-of-two-types
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
+        int\n}\n\ntype Cache struct{ hits int }\n\nfunc summary(s *Store, c *Cache)
+        int {\n\tn := len(s.items)\n\tn += s.total + s.extra\n\tn += c.hits\n\treturn
+        n\n}"
+    options:
+      kinds:
+      - type
+    canonical: true
+  - name: envy-go-uses-too-few-members
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n}\n\nfunc
+        (s *Store) Total() int { return s.total }\n\nfunc report(s *Store) int {\n\tn
+        := s.total\n\tn += len(s.items)\n\treturn n + format(s)\n}\n\nfunc format(s
+        *Store) int { return len(s.items) }"
+    options:
+      kinds:
+      - type
+    canonical: false
+  - name: envy-rust-uses-three-fields-of-one-type
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+            total: i32,
+            extra: i32,
+        }
+
+        impl Store {
+            pub fn reset(&mut self) {
+                self.items.clear();
+            }
+        }
+
+        fn summary(store: &Store) -> i32 {
+            let mut n = store.items.len() as i32;
+            n += store.total;
+            n += store.extra;
+            n
+        }
+    expect: []
+    options:
+      kinds:
+      - type
+  - name: envy-rust-matches-over-the-variants-of-an-enum
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub enum Level {
+            Error,
+            Warn,
+            Info,
+        }
+
+        impl Level {
+            pub fn name(&self) -> &'static str {
+                "level"
+            }
+        }
+
+        fn rank(text: &str) -> Option<Level> {
+            let lower = text.to_lowercase();
+            match lower.as_str() {
+                "error" => Some(Level::Error),
+                "warn" => Some(Level::Warn),
+                _ => Some(Level::Info),
+            }
+        }
+    options:
+      kinds:
+      - type
+    canonical: true
+  - name: envy-go-names-the-type-itself
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
+        int\n}\n\nfunc (s *Store) Reset() { s.items = nil }\n\nfunc snapshot(items
+        []int) int {\n\ts := Store{items: items}\n\tn := len(s.items)\n\tn += s.total\n\tn
+        += s.extra\n\treturn n\n}"
+    options:
+      kinds:
+      - type
+    canonical: false
+  - name: envy-rust-free-function-builds-the-type
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+            total: i32,
+            extra: i32,
+        }
+
+        impl Store {
+            pub fn reset(&mut self) {
+                self.items.clear();
+            }
+        }
+
+        fn open(items: Vec<i32>) -> Store {
+            let mut store = Store { items, total: 0, extra: 0 };
+            store.total = store.items.len() as i32;
+            store.extra = store.total;
+            store
+        }
+    options:
+      kinds:
+      - type
+    canonical: false
+  - name: envy-rust-names-the-type-but-returns-another-value
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+            total: i32,
+            extra: i32,
+        }
+
+        impl Store {
+            pub fn reset(&mut self) {
+                self.items.clear();
+            }
+        }
+
+        fn measure(items: Vec<i32>) -> i32 {
+            let store = Store { items, total: 0, extra: 0 };
+            let mut n = store.items.len() as i32;
+            n += store.total;
+            n += store.extra;
+            n
+        }
+    options:
+      kinds:
+      - type
+    canonical: false
+  - name: module-go-uses-only-another-package
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return
+        load() }\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count()\n\tc
+        := store.Scan()\n\treturn a + b + c\n}\n"
+    - path: store/store.go
+      body: |
+        package store
+
+        func Read() int { return 1 }
+
+        func Count() int { return 2 }
+
+        func Scan() int { return 3 }
+    expect: []
+    options:
+      kinds:
+      - module
+  - name: module-go-uses-its-own-package-too
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return
+        load() }\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count() +
+        store.Scan()\n\treturn a + b + local()\n}\n\nfunc local() int { return 0 }\n"
+    - path: store/store.go
+      body: |
+        package store
+
+        func Read() int { return 1 }
+
+        func Count() int { return 2 }
+
+        func Scan() int { return 3 }
+    options:
+      kinds:
+      - module
+    canonical: false
+  - name: module-go-wired-up-by-a-variable
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: "package app\n\nimport \"example.com/app/store\"\n\nvar total = load()\n\nfunc
+        load() int {\n\ta := store.Read()\n\tb := store.Count()\n\tc := store.Scan()\n\treturn
+        a + b + c\n}\n"
+    - path: store/store.go
+      body: |
+        package store
+
+        func Read() int { return 1 }
+
+        func Count() int { return 2 }
+
+        func Scan() int { return 3 }
+    options:
+      kinds:
+      - module
+    canonical: false
+  - name: module-rust-uses-only-another-module
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod store;
+
+        use crate::store::{count, read, scan};
+
+        pub fn run() -> i32 {
+            load()
+        }
+
+        fn load() -> i32 {
+            let a = read();
+            let b = count();
+            let c = scan();
+            a + b + c
+        }
+    - path: src/store.rs
+      body: |-
+        pub fn read() -> i32 {
+            1
+        }
+
+        pub fn count() -> i32 {
+            2
+        }
+
+        pub fn scan() -> i32 {
+            3
+        }
+    expect: []
+    options:
+      kinds:
+      - module
+  - name: module-rust-uses-one-symbol-of-another-module
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod store;
+
+        use crate::store::read;
+
+        pub fn run() -> i32 {
+            load()
+        }
+
+        fn load() -> i32 {
+            read()
+        }
+    - path: src/store.rs
+      body: |-
+        pub fn read() -> i32 {
+            1
+        }
+    options:
+      kinds:
+      - module
+    canonical: false
+  fix:
+    safety: unsafe
+    type: model

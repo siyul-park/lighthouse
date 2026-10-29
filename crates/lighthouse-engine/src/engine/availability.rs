@@ -59,7 +59,7 @@ impl<'a> Availability<'a> {
             Needs::Program => self.program(),
             Needs::Bundled => self.sandbox(),
             Needs::Model { decision, task } => self.route(decision, *task),
-            Needs::Unserved => Err(Unavailable::ProviderUnavailable),
+            Needs::Unserved => Err(Unavailable::NoProvider),
         }
     }
 
@@ -75,7 +75,7 @@ impl<'a> Availability<'a> {
     /// A sandbox that works, when the project asks for one.
     fn sandbox(&self) -> Result<(), Unavailable> {
         if self.sandboxed && sandbox_available().is_err() {
-            return Err(Unavailable::SandboxUnavailable);
+            return Err(Unavailable::NoSandbox);
         }
         Ok(())
     }
@@ -87,7 +87,7 @@ impl<'a> Availability<'a> {
                 self.models
                     .route(decision)
                     .unwrap_or(&self.models.classification),
-                Unavailable::ProviderUnavailable,
+                Unavailable::NoProvider,
             ),
         };
         let mut first = None;
@@ -107,7 +107,7 @@ impl<'a> Availability<'a> {
     fn member(&self, reference: &str) -> Result<(), Unavailable> {
         let provider = ModelRef::parse(reference)
             .and_then(|model| self.models.provider(model.provider))
-            .ok_or(Unavailable::ProviderUnavailable)?;
+            .ok_or(Unavailable::NoProvider)?;
         let (costs, program) = match provider {
             ModelProvider::Command { cost, .. } => (cost > 0.0, true),
             ModelProvider::Rpc { cost, .. } => (cost != Some(0.0), false),

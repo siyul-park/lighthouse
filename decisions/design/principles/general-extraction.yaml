@@ -1,0 +1,45 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/general-extraction
+  uid: 23431299-d2bb-43de-afb1-c7bb7204eb81
+spec:
+  title: Extracted behavior is general
+  context: Moving code into a helper without generalizing its contract relocates complexity
+    and adds indirection rather than creating a useful abstraction.
+  scope:
+    subject: symbol
+  requirement: An extracted symbol SHOULD express a reusable responsibility in the
+    most general form that fully fits it, without caller-specific policy or lifecycle.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#dependency-direction-53be7fb8'
+    - 'Martin, Clean Code (2008), G30 Functions Should Do One Thing'
+    - 'Fowler, Refactoring (2nd ed., 2018), Extract Function'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func buildUserURL(userID string) string { return "/users/" + userID }
+        func buildTeamURL(teamID string) string { return "/teams/" + teamID }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func pathFor(kind, id string) string { return "/" + kind + "/" + id }
+        func buildUserURL(id string) string { return pathFor("users", id) }
+        func buildTeamURL(id string) string { return pathFor("teams", id) }

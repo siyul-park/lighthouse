@@ -139,6 +139,8 @@ const NO_NULL: &str = "Rust has no null to pass";
 
 /// Items that do not apply to Go and Rust projects, with the reason.
 const NOT_APPLICABLE: &[(&str, &str)] = &[
+    ("E1 Build Requires More Than One Step", PROCESS),
+    ("E2 Tests Require More Than One Step", PROCESS),
     (
         "G7 Base Classes Depending on Their Derivatives",
         NO_INHERITANCE,

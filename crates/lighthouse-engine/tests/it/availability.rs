@@ -32,10 +32,7 @@ fn what_needs_nothing_runs_and_what_nothing_serves_does_not() {
     let available = Availability::new(false, false, &models);
 
     assert_eq!(available.of(&Needs::Nothing), Ok(()));
-    assert_eq!(
-        available.of(&Needs::Unserved),
-        Err(Unavailable::ProviderUnavailable)
-    );
+    assert_eq!(available.of(&Needs::Unserved), Err(Unavailable::NoProvider));
 }
 
 #[test]

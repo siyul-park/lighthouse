@@ -65,6 +65,8 @@ pub struct OptionSchema {
     pub shape: Shape,
     pub default: Value,
     pub description: String,
+    #[serde(default, rename = "strictDefault")]
+    pub strict_default: bool,
 }
 
 impl OptionSchema {
@@ -74,6 +76,7 @@ impl OptionSchema {
             shape: Shape::of(kind),
             default,
             description: description.into(),
+            strict_default: false,
         }
     }
 }
@@ -88,11 +91,17 @@ impl TryFrom<Map<String, Value>> for OptionSchema {
             .as_str()
             .map(str::to_owned)
             .ok_or("`description` must be a string")?;
+        let strict_default = match keys.remove("strictDefault") {
+            None => false,
+            Some(Value::Bool(value)) => value,
+            Some(_) => return Err("`strictDefault` must be a boolean".to_owned()),
+        };
         let shape = Shape::deserialize(Value::Object(keys)).map_err(|e| e.to_string())?;
         Ok(Self {
             shape,
             default,
             description,
+            strict_default,
         })
     }
 }

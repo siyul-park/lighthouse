@@ -56,7 +56,7 @@ const ROUTE: &str = r#"
 classification = ["a/one", "b/two"]
 routing = "round-robin"
 
-[rules."design/naming"]
+[rules."design/prefer-method"]
 level = "warn"
 classification = ["c/three", "a/one"]
 "#;
@@ -70,7 +70,7 @@ fn a_binding_is_one_model_or_a_route_of_several_in_the_order_written() {
 
     assert_eq!(binding.classification, ["a/one", "b/two"]);
     assert_eq!(
-        binding.route("design/naming").unwrap(),
+        binding.route("design/prefer-method").unwrap(),
         ["c/three", "a/one"]
     );
     assert_eq!(binding.routing, Routing::RoundRobin);

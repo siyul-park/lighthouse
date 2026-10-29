@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/path-parity
+  uid: e86fd435-3839-4ffb-ba5f-0845f7908a5e
+spec:
+  title: Equivalent paths have parity tests
+  context: Cache, fallback, protocol, platform, or implementation paths may drift
+    independently despite passing their local tests.
+  scope:
+    subject: test
+    tests: only
+  requirement: When multiple execution paths implement the same public contract, tests
+    SHOULD prove parity across those paths.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#native-jit-20e6de03'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }

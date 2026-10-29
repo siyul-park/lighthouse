@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../schema/pack.schema.json
+---
 apiVersion: lighthouse/v1alpha1
 kind: Pack
 metadata:
@@ -7,20 +7,28 @@ spec:
   title: Core Decisions
   intro: Language-independent checks that need nothing beyond file contents.
   sections:
-    - name: limits
-      title: Limits
-      intro: Size limits that keep files reviewable.
-      decisions: [file-size]
-    - name: annotations
-      title: Source annotations
-      intro: >-
-        A finding that is right to leave in place can be allowed where it
-        happens, in a comment that a reviewer sees in the diff.
-      decisions: [allow, no-unused-allow]
-    - name: naming
-      title: Naming
-      intro: >-
-        A name is read in findings, configuration and directives for as long as
-        the decision lives; the first decision over documents rather than code
-        keeps decision names consistent.
-      decisions: [decision-naming]
+  - name: limits
+    title: Limits
+    intro: Size limits that keep files reviewable.
+    decisions:
+    - max-lines
+    - max-len
+  - name: annotations
+    title: Source annotations
+    intro: A finding that is right to leave in place can be allowed where it happens,
+      in a comment that a reviewer sees in the diff.
+    decisions:
+    - allow-reason
+    - no-unused-allow
+  - name: naming
+    title: Naming
+    intro: A name is read in findings, configuration and directives for as long as
+      the decision lives; the first decision over documents rather than code keeps
+      decision names consistent.
+    decisions:
+    - decision-naming
+  - name: format
+    title: Formatting
+    intro: Source formatting is decided by the language standard, not by review.
+    decisions:
+    - formatted

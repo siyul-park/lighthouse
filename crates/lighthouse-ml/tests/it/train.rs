@@ -8,7 +8,7 @@ use lighthouse_model::Judgment;
 use lighthouse_plugin::{DATASETS_DIR, Subject, dataset_path};
 use serde_json::json;
 
-const RULE: &str = "core/file-size";
+const RULE: &str = "core/max-lines";
 
 fn label(key: &str, judgment: Judgment, source: Source) -> Label {
     Label {

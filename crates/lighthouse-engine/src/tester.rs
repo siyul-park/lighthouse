@@ -74,7 +74,7 @@ impl<'a> RuleTester<'a> {
             .filter(|example| self.selects(example))
             .collect();
         if selected.is_empty() && self.language.is_some() {
-            if names_files(decision) {
+            if exempt(decision, self.language.as_deref().unwrap_or_default()) {
                 return Vec::new();
             }
             return vec![format!(
@@ -83,9 +83,22 @@ impl<'a> RuleTester<'a> {
                 self.language.as_deref().unwrap_or_default()
             )];
         }
+        let model_only = decision.check.as_ref().is_some_and(|check| {
+            matches!(
+                &check.kind,
+                CheckKind::Cel(cel)
+                    if cel.abstain.is_some() && cel.condition.trim() == "false"
+            )
+        });
         selected
             .into_iter()
             .filter_map(|example| {
+                // A candidate-only decision is not expected to emit a finding
+                // without a bound model; its invalid example is checked by the
+                // catalog's candidate-shape tests instead.
+                if model_only && example.kind == ExampleKind::Invalid {
+                    return None;
+                }
                 let failure = self.run(decision, example).err()?;
                 Some(format!("{} {}: {failure}", decision.id(), example.name))
             })
@@ -108,6 +121,9 @@ impl<'a> RuleTester<'a> {
         let outcome = engine
             .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;
+        if !outcome.incomplete.is_empty() {
+            return Err(format!("analysis incomplete: {:?}", outcome.incomplete));
+        }
         let found = found(&outcome);
         match example.kind {
             ExampleKind::Valid if found.is_empty() => Ok(()),
@@ -288,11 +304,13 @@ fn describe(found: &[(u32, &str)]) -> String {
     out.trim_end().to_owned()
 }
 
-/// Whether the check of `decision` is a command that is run for the files it
-/// names.
-fn names_files(decision: &Decision) -> bool {
-    matches!(
-        decision.check.as_ref().map(|check| &check.kind),
-        Some(CheckKind::Command(command)) if !command.files.is_empty()
-    )
+/// Whether `decision` needs no example in `language`: its check is a command
+/// that names the files it is run for, or has no program for the language.
+fn exempt(decision: &Decision, language: &str) -> bool {
+    match decision.check.as_ref().map(|check| &check.kind) {
+        Some(CheckKind::Command(command)) => {
+            !command.files.is_empty() || command.programs(decision).of(language).is_none()
+        }
+        _ => false,
+    }
 }

@@ -1,0 +1,43 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/contract-coverage
+  uid: 4d83bc11-62c0-458e-a2e7-e2fc5297da81
+spec:
+  title: Tests cover contract dimensions
+  context: An untested boundary is unspecified behavior. Each applicable contract
+    dimension needs evidence; the goal is completeness, not maximizing a percentage.
+  scope:
+    subject: test
+    tests: only
+  requirement: Tests SHOULD cover applicable success, failure, boundaries, ownership,
+    lifecycle, and compatibility dimensions of each public contract.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#tdd-f5c4ca98'
+    - 'Martin, Clean Code (2008), T1 Insufficient Tests'
+    - 'Martin, Clean Code (2008), T5 Test Boundary Conditions'
+    - Martin, Clean Code (2008), T1 Insufficient Tests
+    - Martin, Clean Code (2008), T5 Test Boundary Conditions
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }

@@ -55,7 +55,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         models: &lighthouse_plugin::NoModels,
     };
     registry
-        .rule("core/file-size")
+        .rule("core/max-lines")
         .unwrap()
         .check(&ctx, options)
 }
@@ -65,7 +65,7 @@ fn registry_is_valid_and_exposes_core() {
     let registry = lighthouse_test_support::registry();
     registry.validate().unwrap();
     assert!(registry.has_plugin("core"));
-    let meta = registry.rule("core/file-size").unwrap().manifest();
+    let meta = registry.rule("core/max-lines").unwrap().manifest();
     assert_eq!(meta.scope, RunScope::File);
     assert!(
         meta.analyzers.is_empty(),
@@ -76,11 +76,11 @@ fn registry_is_valid_and_exposes_core() {
 #[test]
 fn a_rule_exists_for_a_decision_a_program_checks() {
     let registry = lighthouse_test_support::registry();
-    let meta = registry.rule("core/file-size").unwrap().manifest();
-    assert_eq!(meta.id, "core/file-size");
+    let meta = registry.rule("core/max-lines").unwrap().manifest();
+    assert_eq!(meta.id, "core/max-lines");
     assert_eq!(meta.severity, Severity::Warn);
     assert_eq!(meta.scope, RunScope::File);
-    for annotation in ["core/allow", "core/no-unused-allow"] {
+    for annotation in ["core/allow-reason", "core/no-unused-allow"] {
         assert!(registry.rule(annotation).is_some(), "{annotation}");
     }
 }
@@ -96,7 +96,7 @@ fn recommended_preset_derives_levels_from_rule_meta() {
         .collect();
     let got: BTreeMap<_, _> = preset.iter().map(|(id, c)| (id.clone(), c.level)).collect();
     assert_eq!(got, want);
-    assert_eq!(want["core/file-size"], Some(Severity::Warn));
+    assert_eq!(want["core/max-lines"], Some(Severity::Warn));
 }
 
 #[test]
@@ -130,7 +130,7 @@ fn rule_reports_lines_beyond_the_limit() {
     assert_eq!(found[0].span.start.line, 3);
     assert_eq!(
         found[0].evidence,
-        json!({ "kind": "lines", "kinds": ["lines"], "lines": 3, "max": 2 })
+        json!({ "kind": "lines", "lines": 3, "max": 2 })
     );
     assert!(run_rule("a\nb\n", &options(2)).unwrap().is_empty());
 }
@@ -138,7 +138,7 @@ fn rule_reports_lines_beyond_the_limit() {
 #[test]
 fn rule_validates_options() {
     let registry = lighthouse_test_support::registry();
-    let rule = registry.rule("core/file-size").unwrap();
+    let rule = registry.rule("core/max-lines").unwrap();
     rule.validate(&Options::new()).unwrap();
     rule.validate(&options(5)).unwrap();
     let bad: Options = serde_json::from_value(json!({ "mx": 5 })).unwrap();
@@ -223,7 +223,11 @@ fn the_bundled_fixes_say_what_each_rule_needs_to_be_fixed() {
     for id in ["design/declaration-groups", "testing/file-layout"] {
         assert_eq!(safety(id).as_deref(), Some("safe"), "{id}");
     }
-    for id in ["design/layout", "design/comments", "core/no-unused-allow"] {
+    for id in [
+        "design/vertical-distance",
+        "design/no-noise-comment",
+        "core/no-unused-allow",
+    ] {
         assert_eq!(safety(id).as_deref(), Some("unsafe"), "{id}");
     }
 }
@@ -261,23 +265,63 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
     assert_eq!(
         design,
         [
+            "design/abbreviations",
             "design/abstraction-level",
-            "design/comments",
             "design/complexity",
-            "design/concurrency",
-            "design/constructors",
+            "design/consistent-terms",
+            "design/constructor-validation",
+            "design/consumer-interfaces",
+            "design/context-first",
+            "design/coupling",
             "design/declaration-groups",
-            "design/errors",
+            "design/encapsulated-platform",
+            "design/encapsulated-state",
+            "design/error-categories",
+            "design/error-identity",
+            "design/error-translation",
             "design/exported-doc",
+            "design/feature-envy",
+            "design/general-extraction",
             "design/layers",
-            "design/layout",
+            "design/max-name-words",
+            "design/meaningful-separation",
             "design/module-layout",
-            "design/naming",
-            "design/ownership",
+            "design/narrow-inputs",
+            "design/no-caller-dependency",
+            "design/no-conjoined-modules",
+            "design/no-detached-comment",
+            "design/no-duplication",
+            "design/no-generated-edits",
+            "design/no-hybrid-type",
+            "design/no-mutable-globals",
+            "design/no-noise-comment",
+            "design/no-panic",
+            "design/no-private-types",
+            "design/no-redundant-qualifier",
+            "design/no-redundant-symbol",
+            "design/no-speculative-generality",
+            "design/no-state-in-errors",
+            "design/no-stored-context",
+            "design/no-todo",
+            "design/no-type-encoding",
+            "design/no-unused-symbol",
+            "design/optional-options",
+            "design/owner-file",
+            "design/plural-collections",
+            "design/predicate-names",
             "design/prefer-method",
-            "design/responsibility",
-            "design/signature",
-            "design/symbols",
+            "design/prefer-reuse",
+            "design/reserved-verbs",
+            "design/resource-owner",
+            "design/scoped-borrows",
+            "design/short-names",
+            "design/signature-size",
+            "design/single-responsibility",
+            "design/state-owner",
+            "design/stateless-layout",
+            "design/task-shutdown",
+            "design/top-down-order",
+            "design/vertical-distance",
         ]
     );
     let design: Vec<_> = design
@@ -291,10 +335,32 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
     let recommended = preset("design/recommended");
     assert_eq!(recommended.len(), design.len());
     assert!(recommended.contains_key("design/layers"));
-    assert!(recommended["design/naming"].options.is_empty());
-    assert_eq!(
-        preset("design/strict")["design/naming"].options["kinds"],
-        json!(["qualifier", "words", "encoding"])
+    assert!(
+        recommended["design/no-redundant-qualifier"]
+            .options
+            .is_empty()
     );
-    assert_eq!(preset("testing/recommended").len(), 4);
+    assert_eq!(
+        preset("design/strict")["design/no-redundant-qualifier"].options["members"],
+        json!(["field", "method", "variant"])
+    );
+    assert!(
+        preset("core/recommended")["core/max-len"]
+            .options
+            .is_empty()
+    );
+    assert_eq!(
+        preset("core/strict")["core/max-len"].options["enabled"],
+        json!(true)
+    );
+    let testing = preset("testing/recommended");
+    assert_eq!(testing.len(), 8);
+    assert_eq!(
+        testing["testing/no-missing-owner"].level,
+        Some(Severity::Warn)
+    );
+    assert_eq!(
+        testing["testing/no-duplicate-owner"].level,
+        Some(Severity::Error)
+    );
 }

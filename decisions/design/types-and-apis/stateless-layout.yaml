@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/stateless-layout
+  uid: e7d3cc32-dc34-4906-b15f-77c15c045962
+spec:
+  title: Layout declarations do not own application state
+  context: Mixing application state into layout makes rendering order and reuse affect
+    behavior.
+  scope:
+    subject: symbol
+  requirement: A layout or presentation declaration SHOULD NOT own mutable application
+    state that belongs to its model or controller.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#ownership-0b016255'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        type Screen struct { width int; height int; lastRoute string }
+        func (s *Screen) Render() {}
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        type Screen struct { width int; height int }
+        func Render(width, height int) {}

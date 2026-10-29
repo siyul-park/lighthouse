@@ -35,7 +35,7 @@ pub enum Unavailable {
     UntrustedProject,
     /// The fix runs a program, and this machine has no sandbox to run it in.
     #[serde(rename = "sandbox unavailable")]
-    SandboxUnavailable,
+    NoSandbox,
     /// A model that costs, and `[models] budget` allows no request.
     #[serde(rename = "no budget")]
     NoBudget,
@@ -44,16 +44,16 @@ pub enum Unavailable {
     BudgetSpent,
     /// Nothing serves the kind of fix the decision names.
     #[serde(rename = "provider unavailable")]
-    ProviderUnavailable,
+    NoProvider,
 }
 
 vocabulary!(Unavailable, "reason" {
     NoAgentBinding => "no agent binding",
     UntrustedProject => "untrusted project",
-    SandboxUnavailable => "sandbox unavailable",
+    NoSandbox => "sandbox unavailable",
     NoBudget => "no budget",
     BudgetSpent => "budget spent",
-    ProviderUnavailable => "provider unavailable",
+    NoProvider => "provider unavailable",
 });
 
 /// The fix proposed for one finding, computed without writing anything: what

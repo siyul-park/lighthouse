@@ -112,7 +112,10 @@ fn justified_helpers_asks_about_a_private_function_with_one_production_caller() 
         .unwrap()
         .clone();
     w.edge(EdgeKind::Calls, &other, &shared);
-    assert_eq!(selected(&w, "design/symbols", "symbol"), ["helper"]);
+    assert_eq!(
+        selected(&w, "design/no-redundant-symbol", "symbol"),
+        ["helper"]
+    );
 }
 
 #[test]
@@ -120,7 +123,7 @@ fn naming_asks_about_a_one_letter_name_and_a_function_returning_a_bool() {
     let mut w = World::default();
     w.symbol("a", "x", SymbolKind::Type, "a/a.ucm");
     w.symbol("a", "Invoice", SymbolKind::Type, "a/a.ucm");
-    assert_eq!(selected(&w, "design/naming", "symbol"), ["x"]);
+    assert_eq!(selected(&w, "design/short-names", "symbol"), ["x"]);
 }
 
 #[test]
@@ -158,7 +161,7 @@ fn meaningful_separation_asks_about_a_small_module_with_one_user() {
         w.import(from, to);
     }
     assert_eq!(
-        selected(&w, "design/responsibility", "module"),
+        selected(&w, "design/meaningful-separation", "module"),
         ["app", "tiny"]
     );
 }
@@ -169,5 +172,5 @@ fn owner_file_asks_about_a_method_declared_away_from_its_type() {
     let store = w.symbol("m", "Store", SymbolKind::Type, "m/store.ucm");
     w.member(&store, "Near", SymbolKind::Method, "m/store.ucm");
     w.member(&store, "Far", SymbolKind::Method, "m/total.ucm");
-    assert_eq!(selected(&w, "design/layout", "symbol"), ["Far"]);
+    assert_eq!(selected(&w, "design/owner-file", "symbol"), ["Far"]);
 }

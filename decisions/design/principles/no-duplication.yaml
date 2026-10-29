@@ -1,0 +1,45 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-duplication
+  uid: 19652758-426a-448b-94f9-1450168c8faa
+spec:
+  title: Behavior has one implementation
+  context: Duplicated behavior diverges as fixes accumulate. Prefer one implementation
+    when meaning and contract are the same; keep distinct behavior separate. Syntax
+    similarity alone is not enough to require abstraction.
+  scope:
+    subject: symbol
+  requirement: Semantically equivalent behavior SHOULD have one implementation and
+    one owner.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#structural-rules-598c8922'
+    - 'Lighthouse, coding-patterns#structural-signals-e07fba6b'
+    - 'Martin, Clean Code (2008), G5 Duplication'
+    - Martin, Clean Code (2008), G5 Duplication
+    - Martin, Clean Code (2008), ch. 3 DRY
+    - Martin, Clean Code (2008), ch. 12 Beck's four rules
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: "package sample\n\nfunc parseName(s string) string {\n\tif s == \"\" {
+        return \"\" }; return strings.TrimSpace(s)\n}\nfunc parseKey(s string) string
+        {\n\tif s == \"\" { return \"\" }; return strings.TrimSpace(s)\n}\n"
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: "package sample\n\nfunc normalizeName(s string) string {\n\tif s == \"\"
+        { return \"\" }\n\treturn strings.TrimSpace(s)\n}\nfunc parseName(s string)
+        string { return normalizeName(s) }\nfunc parseKey(s string) string { return
+        normalizeName(s) }\n"

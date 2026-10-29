@@ -105,7 +105,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   word). Every rule that tells constructors apart shares them; a project replaces
   them once in `[languages.<id>] constructorPrefixes`.
 - `conventions.test_naming` is how a top-level test is named after the public symbol it
-  owns, for `testing/owner`: `prefix` (`Test` in Go, none in Rust; a test without it is
+  owns, for `testing/no-missing-owner` and `testing/no-duplicate-owner`: `prefix` (`Test` in Go, none in Rust; a test without it is
   no owner), `snake_case` (names compared in snake case, as Rust tests are written),
   `variants` (`TestGet_Missing` is a second owner of `Get`, not a case of it) and
   `ancestors` (the tests of a module that tests an ancestor module count for the nested

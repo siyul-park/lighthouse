@@ -1,7 +1,7 @@
 #!/bin/sh
 # Fixes the numbers that search, learned checks and caches are judged against.
 #
-# usage: scripts/baseline.sh [name=]repo-dir...
+# usage: LIGHTHOUSE_TRUST=1 scripts/baseline.sh [name=]repo-dir...
 #
 # Builds the release binary and the plugins, then checks each repository with
 # the strict configuration (baseline/strict-root.toml for a Cargo workspace,
@@ -74,7 +74,13 @@ def run(path, cfg):
          "--timings", "--no-store", "--config", cfg],
         cwd=path, capture_output=True, text=True,
     )
-    report = json.loads(done.stdout)
+    try:
+        report = json.loads(done.stdout)
+    except json.JSONDecodeError as error:
+        detail = done.stderr.strip() or done.stdout.strip() or "no output"
+        raise SystemExit(
+            f"{path}: lighthouse check returned no JSON (exit {done.returncode}): {detail}"
+        ) from error
     counts = {}
     for found in report["findings"]:
         counts[found["decision"]] = counts.get(found["decision"], 0) + 1

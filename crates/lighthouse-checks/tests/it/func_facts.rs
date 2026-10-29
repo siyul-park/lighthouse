@@ -9,9 +9,9 @@ use lighthouse_model::ucm::SymbolKind;
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
-const CLOSE: &str = "design/layout";
+const CLOSE: &str = "design/vertical-distance";
 
-/// the cel check of a function that the `gap` kind of `design/layout`
+/// the cel check of a function that the `gap` kind of `design/vertical-distance`
 /// stands for.
 const CONTIGUITY_AS_CEL: &str =
     "func.gap.between.exists(b, b.kind != 'method' || b.owner_key != func.owner_key)";
@@ -80,9 +80,7 @@ pub(crate) fn flagged_in(
 }
 
 fn contiguity(world: &World, options: &Value) -> BTreeSet<(String, u32)> {
-    let mut gap = options.clone();
-    gap["kinds"] = json!(["gap"]);
-    world.check(CLOSE, gap).into_iter().collect()
+    world.check(CLOSE, options.clone()).into_iter().collect()
 }
 
 /// A file with the shapes the contiguity examples and tests use, one module

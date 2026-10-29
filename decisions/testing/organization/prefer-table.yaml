@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/prefer-table
+  uid: 3b918d83-7fe6-4913-9341-302455a42083
+spec:
+  title: Repeated inputs share one table
+  context: A table keeps the invariant and assertion visible once while making the
+    input/output differences explicit.
+  scope:
+    subject: test
+    tests: only
+  requirement: Tests of the same behavior with different inputs SHOULD use a named
+    table of inputs and expected outputs.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#organization-dac1a854'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestGetOne(t *testing.T) { if Get(1) != "one" { t.Fatal() } }
+        func TestGetTwo(t *testing.T) { if Get(2) != "two" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestGet(t *testing.T) { tests := []struct{ input int; want string }{{1,"one"},{2,"two"}}; for _, tt := range tests { t.Run(tt.want, func(t *testing.T) { if got := Get(tt.input); got != tt.want { t.Fatal() } }) } }

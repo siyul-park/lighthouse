@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
-    Cel, DecisionSpec, Point, Program,
+    Cel, DecisionSpec, Point, Program, Programs,
     expression::compile_problem,
     union::{refuse_strays, stray_field},
 };
@@ -242,15 +242,28 @@ pub struct CommandSpec {
 }
 
 impl CommandSpec {
+    /// The programs of the fix: its own and the ones `decision`'s languages
+    /// give.
+    pub fn programs(&self, decision: &DecisionSpec) -> Programs {
+        let languages = decision
+            .languages
+            .iter()
+            .filter_map(|(id, l)| Some((id.clone(), l.fix.clone()?)))
+            .collect();
+        Programs::new(&self.program, languages)
+    }
+
     /// Why the command cannot run as written.
     fn problem(&self) -> Option<String> {
-        self.program.problem(Point::Fix).or_else(|| {
-            let filter = self.program.output(Point::Fix) == crate::Output::Stdout;
-            let wide = self.scope.is_some_and(|scope| scope != FixScope::File);
-            (filter && wide).then(|| {
-                "`output: stdout` is the new text of one file: its `scope` is `file`".to_owned()
+        let own = self.program.problem(Point::Fix);
+        own.filter(|_| !self.program.command.is_empty())
+            .or_else(|| {
+                let filter = self.program.output(Point::Fix) == crate::Output::Stdout;
+                let wide = self.scope.is_some_and(|scope| scope != FixScope::File);
+                (filter && wide).then(|| {
+                    "`output: stdout` is the new text of one file: its `scope` is `file`".to_owned()
+                })
             })
-        })
     }
 }
 

@@ -1,0 +1,46 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/state-owner
+  uid: 23caf12f-5099-4f89-84cb-f45d1a48d1a7
+spec:
+  title: State has one owner and sync strategy
+  context: Split ownership or multiple synchronization strategies make lifecycle and
+    race behavior difficult to reason about.
+  scope:
+    subject: symbol
+  requirement: Each mutable state value SHOULD have one owner and one explicit synchronization
+    strategy.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#concurrency-ac98e6a0'
+    - 'Lighthouse, coding-patterns#ownership-b242fb18'
+    - 'Martin, Clean Code (2008), ch. 13 Concurrency: SRP, limit shared data'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        var cache map[string]string
+        var cacheMu sync.Mutex
+        func Set(k, v string) { cacheMu.Lock(); cache[k] = v; cacheMu.Unlock() }
+        func Reset() { cache = map[string]string{} }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Cache struct { mu sync.Mutex; entries map[string]string }
+        func (c *Cache) Set(k, v string) { c.mu.Lock(); c.entries[k] = v; c.mu.Unlock() }

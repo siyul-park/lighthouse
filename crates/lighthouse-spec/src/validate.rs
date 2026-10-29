@@ -4,7 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Catalog, Cel, Decision, DecisionStatus, Error, Example, ExampleKind, OptionType,
+    Catalog, Cel, CheckKind, Decision, DecisionStatus, Error, Example, ExampleKind, FixKind,
+    OptionType, Point,
     options::KINDS,
     sources::{SourceLine, has_keyword},
 };
@@ -93,7 +94,8 @@ pub(crate) fn decision(decision: &Decision, cel: &Cel) -> Result<(), Error> {
         .try_for_each(|e| example(decision, e))?;
     canonical(decision)?;
     check(decision, cel)?;
-    fix(decision, cel)
+    fix(decision, cel)?;
+    programs(decision)
 }
 
 pub(crate) fn relative(path: &str) -> bool {
@@ -280,6 +282,29 @@ fn options(decision: &Decision) -> Result<(), Error> {
                 format!("option `{key}` needs a description"),
             ));
         }
+        if property.strict_default
+            && !matches!(
+                property.kind,
+                Some(crate::OptionType::Boolean | crate::OptionType::Array)
+            )
+        {
+            return Err(Error::invalid(
+                id,
+                format!("option `{key}` uses `strictDefault` but is neither a boolean nor a list"),
+            ));
+        }
+        if property.strict_default
+            && property.kind == Some(crate::OptionType::Array)
+            && property
+                .items
+                .as_ref()
+                .is_none_or(|items| items.values.is_empty())
+        {
+            return Err(Error::invalid(
+                id,
+                format!("option `{key}` uses `strictDefault` but has no enumerated items"),
+            ));
+        }
     }
     if let Some(kinds) = schema.properties.get(KINDS) {
         kinds_shape(id, kinds)?;
@@ -386,6 +411,60 @@ fn check(decision: &Decision, cel: &Cel) -> Result<(), Error> {
             id,
             "a checked decision needs a valid and an invalid example",
         ));
+    }
+    Ok(())
+}
+
+/// A `command` check or fix has a program for the languages it covers: its
+/// own `command`, or one in each `languages.<id>` that has none of its own to
+/// replace, and the ones the languages give run at the point they are bound.
+fn programs(decision: &Decision) -> Result<(), Error> {
+    let id = decision.id();
+    let check = match decision.check.as_ref().map(|c| &c.kind) {
+        Some(CheckKind::Command(command)) => Some(&command.program),
+        _ => None,
+    };
+    let fix = match decision.fix.as_ref().map(|f| &f.kind) {
+        Some(FixKind::Command(command)) => Some(&command.program),
+        _ => None,
+    };
+    let owned = [("check", check, Point::Check), ("fix", fix, Point::Fix)];
+    for (what, program, point) in owned {
+        let given = decision.languages.values().any(|l| match point {
+            Point::Check => l.check.is_some(),
+            _ => l.fix.is_some(),
+        });
+        match program {
+            Some(own) if own.command.is_empty() && !given => {
+                return Err(Error::invalid(
+                    id,
+                    format!("{what}: `command` needs a program, or one in `languages.<id>.{what}`"),
+                ));
+            }
+            None if given => {
+                return Err(Error::invalid(
+                    id,
+                    format!(
+                        "`languages.<id>.{what}` needs a decision whose `{what}` is a `command`"
+                    ),
+                ));
+            }
+            _ => {}
+        }
+    }
+    for (language, spec) in &decision.languages {
+        let given = [
+            ("check", &spec.check, Point::Check),
+            ("fix", &spec.fix, Point::Fix),
+        ];
+        for (what, program, point) in given {
+            if let Some(why) = program.as_ref().and_then(|p| p.problem(point)) {
+                return Err(Error::invalid(
+                    id,
+                    format!("`languages.{language}.{what}`: {why}"),
+                ));
+            }
+        }
     }
     Ok(())
 }

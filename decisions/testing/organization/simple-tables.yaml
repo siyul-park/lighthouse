@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/simple-tables
+  uid: 0213d5ae-2c5d-4f5d-a725-c4ced7609f7f
+spec:
+  title: Test tables stay simple
+  context: The table is the test specification. A reader should be able to understand
+    each case without tracing fixture generation.
+  scope:
+    subject: test
+    tests: only
+  requirement: Test table data SHOULD be literal and easy to inspect; complex generation
+    and builders SHOULD NOT hide the input/output specification.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#readability-fa58951a'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestGet(t *testing.T) { cases := buildCasesFromConfig(); for _, tc := range cases { assertGet(t, tc) } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestGet(t *testing.T) { cases := []struct{ input string; want int }{{"a",1},{"b",2}}; for _, tc := range cases { t.Run(tc.input, func(t *testing.T) { if got := Get(tc.input); got != tc.want { t.Fatal() } }) } }

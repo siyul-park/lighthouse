@@ -36,7 +36,7 @@ spec:
 "#;
 
 /// Checks a project with the command check `local/probe` and the bundled
-/// `go/formatted`, whose program is `gofmt`.
+/// `core/formatted`, whose program is `gofmt`.
 fn check(dir: &std::path::Path) -> Run {
     let layer = Catalog::from_local(
         BTreeMap::from([("probe.yaml".to_owned(), PROBE.to_owned())]),
@@ -47,7 +47,7 @@ fn check(dir: &std::path::Path) -> Run {
     let mut registry = lighthouse_test_support::registry();
     registry.register(&plugin).unwrap();
     let config = Config::parse_inline(
-        "plugins = [\"core\", \"go\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n\"go/formatted\" = \"error\"\n",
+        "plugins = [\"core\", \"go\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n\"core/formatted\" = \"error\"\n",
     )
     .unwrap();
     let catalog = Catalog::overlay(lighthouse_test_support::bundled(), &layer).unwrap();

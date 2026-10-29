@@ -44,7 +44,7 @@ pub trait Spec {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Metadata {
-    /// Fully qualified name, such as `design/naming`.
+    /// Fully qualified name, such as `design/no-redundant-qualifier`.
     pub name: String,
     /// Identity that outlives the name: a UUID v4 assigned once, never derived
     /// from the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.

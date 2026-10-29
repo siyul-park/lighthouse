@@ -1,0 +1,47 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/predicate-names
+  uid: 4698e91b-d139-4296-a227-b0867d03fa1e
+spec:
+  title: Predicates state their meaning
+  context: Boolean names state a proposition rather than an action. The form should
+    tell the caller which fact the function asks.
+  scope:
+    subject: symbol
+  requirement: Predicate names SHOULD use HasX for containment, IsX for a state, MatchX
+    for comparison or validation, AtX for position or time, and bare X for a direct
+    boolean value.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#naming-6cd80925'
+    - 'Lighthouse, coding-patterns#naming-88b5f6bb'
+    - 'Lighthouse, coding-patterns#naming-1daea9c6'
+    - 'Lighthouse, coding-patterns#naming-a0778391'
+    - Martin, Clean Code (2008), G20 Function Names Should Say What They Do
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        func Valid() bool { return true }
+        func User() bool { return true }
+        func AtEnd() bool { return true }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        func IsValid() bool { return true }
+        func HasUser() bool { return true }
+        func AtEnd() bool { return true }

@@ -79,7 +79,7 @@ documents):
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
-  name: core/file-size        # the id, `<namespace>/<kebab-name>`
+  name: core/max-lines        # the id, `<namespace>/<kebab-name>`
   uid: 8a4f0a2c-6b57-4a8e-9a42-0d2f3b9f5c11   # identity, a UUID v4 assigned once
   annotations: {}
 spec: { ... }
@@ -105,8 +105,9 @@ paths are relative with `/`. A decision belongs to the pack its id names and to
 the section of that pack's file that lists it, so where the file lies carries no
 meaning. `scope` is `{subject, generated, tests}` (`generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
 Schema object (`type`, `default`, `description` per property, closed with
-`additionalProperties: false`); `languages.<id>` holds the option values and the
-wording of one language. `check` and `fix` choose a provider by `type`: `check` is
+`additionalProperties: false`); `languages.<id>` holds the option values of one language and,
+for a `command` check or fix, the [program](programs.md) that runs for its files (`check`, `fix`), in place of
+the decision's own, whose `command` may then be left out. `check` and `fix` choose a provider by `type`: `check` is
 `cel`, `command` or `model`; `fix` is `cel`, `command`, `model` or `rpc`, with the fields of its type
 next to `safety` and `requires`, and no others.
 
@@ -183,7 +184,7 @@ one provider of the union `cel | command | model`, with the common fields `requi
 - `cel` is an expression over the code model (UCM), written in the decision, with the model as fields of a node (`owner members callers callees references uses implementers prev next tests metrics params results type`, built only for the expressions that read them), the `words` field of a symbol (`parseHTTPServer` is `[parse, http, server]`) and the `cycle` field of a module (the modules in its strongly connected component of the import graph, empty when it is on no cycle); intermediate values are the check's `variables`, which its fix sees too. They run in one CEL environment: the `cel` crate's standard library with its strings, lists, math and encoders extensions and optional syntax, exactly as shipped (`s.trim()`, `l.join(", ")`, `s.split(",")`, `math.greatest(a, b)`), the edit constructors of a fix, and the functions of the CEL libraries that plugins register (a plugin kind, `CelLibrary`: its manifest lists each function with its overloads, doc, example and the step of the precedence rule that admitted it, and the registry's union of the manifests is the one function catalog, listed in [CEL functions](decisions/cel-functions.md)). The composition root builds the environment from the `cel` crate and every registered library and passes it on: the catalog loads and validates against it, and so do the checks, the fixes, the variables and the event mappings of a [model provider](models.md#what-an-agent-did); nothing keeps it in a global; a duplicate function across libraries is a load error, and so is a call of a function no library or the `cel` crate provides, or with arguments no overload takes. The bundled `cel` plugin (`plugins/lang-cel`) provides the libraries our decisions need beyond the crate, one module each.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. The check reads the value for the node's role with `limits.params[?func.role].orValue(limits.params[?'default'].orValue(-1))` (an integer is for every role) and says it in its message (`NewServer needs 9 parameters`, `parse has 9 parameters`).
-  - Intermediate values are the check's `variables`, each evaluated in order and seen by the later ones, the message, the evidence and the fix. A variable with `params` is a function of them (`declaration_group(id)`): it sees its parameters, the `options` and the `file` of its caller and the file-level variables, and nothing else; a body that names anything more is refused when the check is built, as is a call of a function that does not exist and a variable name used twice. A variable that names no selected value (only `file`, `options` and variables like it) is computed once per file, however many nodes the file has, and only when an expression reads it; a variable that nothing reads, directly or through another, is not evaluated at all. A pack lists `variables` in its `Pack` document that its decisions use by name, as they use their own: the pack's variables a decision names, directly or through another, are put before its own, and a decision does not redefine one. This is how decisions share an order: `design` defines `declaration_group(id)` once, `design/declaration-groups` orders by it and `design/layout` reads it, with the options `groups` and `hooks` it takes from `design/declaration-groups` (`options.from`), so there is no registry of order keys and the project sets the order once; the engine takes those options from what the configuration, with the `[[overrides]]` that match the file, sets for `design/declaration-groups` at each file, so an override for a file reaches the layout at that file only. A check that selects a node also sees `file` (its file, with `symbols` and `comments`) when it names it, and the order of siblings is `node.prev`, `node.next`, `file.symbols` and `list.indexOf`. The functions that order siblings, `list.misplaced()` and `list.anchors()`, are in the catalog like any other.
+  - Intermediate values are the check's `variables`, each evaluated in order and seen by the later ones, the message, the evidence and the fix. A variable with `params` is a function of them (`declaration_group(id)`): it sees its parameters, the `options` and the `file` of its caller and the file-level variables, and nothing else; a body that names anything more is refused when the check is built, as is a call of a function that does not exist and a variable name used twice. A variable that names no selected value (only `file`, `options` and variables like it) is computed once per file, however many nodes the file has, and only when an expression reads it; a variable that nothing reads, directly or through another, is not evaluated at all. A pack lists `variables` in its `Pack` document that its decisions use by name, as they use their own: the pack's variables a decision names, directly or through another, are put before its own, and a decision does not redefine one. This is how decisions share an order: `design` defines `declaration_group(id)` once, `design/declaration-groups` orders by it and `design/vertical-distance` reads it, with the options `groups` and `hooks` it takes from `design/declaration-groups` (`options.from`), so there is no registry of order keys and the project sets the order once; the engine takes those options from what the configuration, with the `[[overrides]]` that match the file, sets for `design/declaration-groups` at each file, so an override for a file reaches the layout at that file only. A check that selects a node also sees `file` (its file, with `symbols` and `comments`) when it names it, and the order of siblings is `node.prev`, `node.next`, `file.symbols` and `list.indexOf`. The functions that order siblings, `list.misplaced()` and `list.anchors()`, are in the catalog like any other.
 - `command` runs a [program](programs.md) whose result is findings: `output: lines` (the default; one finding per stdout line, with an optional `path:line[:col]: ` prefix, and a line that is only a project path is a finding at line 1 of that file), `sarif` or `status`. `{file}` runs it once per file, `{files}` over batches of files, neither once; exit `0` and `1` ran (`success`), anything else is an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script; the programs of the bundled catalog need none. A command runs in the project root, [sandboxed](#sandbox), under the one environment of every program (see [programs](programs.md#the-environment)). Trust and the sandbox protect together; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
 - `model` asks the `classification` task of the model the project binds to the decision (`select` and `prompt` optional); a subject nothing decides stays a review task. It is not deterministic and caps the severity at `warn`.
 
@@ -506,7 +507,7 @@ because it is reviewed in the diff, and the report counts what it suppressed (`N
 it is a suppression of kind `inSource`, the same type a reviewer's `external` one has, and
 SARIF lists the suppressed finding with it. The reason is required on every form that disables: a
 directive without one is ignored and reported by the error rule
-`core/allow`. A directive or range whose rule no longer fires there, or is not
+`core/allow-reason`. A directive or range whose rule no longer fires there, or is not
 enabled, an `lighthouse-enable` that closes nothing and a directive that names no id are
 reported by `core/no-unused-allow` so annotations do not rot (when `--decision` leaves the
 annotated rule out of the run, nothing is said). A second `lighthouse-disable` of an id
@@ -528,11 +529,11 @@ without another lookup. The hooks print the same findings as one text block per 
 for the agent to read:
 
 ```text
-design/errors  info (heuristic)  src/lib.rs:2:7
+design/no-panic  warn  src/lib.rs:2:7
   owner:       demo::run#function
   message:     .unwrap() can panic in run: return an error instead
-  requirement: Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
-  context:     Panics bypass the caller's control flow.
+  requirement: Production code SHOULD return errors instead of panicking or unwrapping fallible results, except for explicitly named Must constructors and entry points.
+  context:     Panics and unwraps convert ordinary failures into process or task failure.
   evidence:    function=run kind=unwrap
   expected:    valid rust example `rust-result` (src/lib.rs), canonical
                  pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> { ... }
@@ -662,7 +663,7 @@ at most five:
    read from or written to those files), for the rules and analyzers as well as the language
    providers; a program that reads files is run in a copy of the project that holds the texts.
 5. take the **safe follow-ups**: the safe fixes of the findings the change introduced in its files
-   (the formatter's among them, `go/formatted` and `rust/formatted`), in priority order, at most
+   (the formatter's among them, `core/formatted`), in priority order, at most
    two passes, and check again. They become part of the fix, and so of its preview, when the
    fix is the only one that edits the file; in a file that several fixes of the round edit they
    cannot be told apart, and are reported as applied fixes of their own decision, marked
@@ -693,8 +694,8 @@ The run that ends the fixing resolves the findings the fixes removed.
 Bundled fixes: `design/declaration-groups` (a `move` of a declaration before the first one it
 must precede, or a `reorder` of the file in the order of the declarations' places) and
 `testing/file-layout` (a `move` of a fixture above, or a helper below, the tests) are safe;
-`design/layout` (a `move` next to the related symbol or the caller),
-`design/comments` and `core/no-unused-allow` (a `delete` of the comment or the
+`design/vertical-distance` (a `move` next to the related symbol or the caller),
+`design/no-noise-comment` and `core/no-unused-allow` (a `delete` of the comment or the
 annotation line) are unsafe. An `impl` block is not a symbol, so
 reordering a Rust file cannot move one: such findings are declined and fixed by hand.
 `lighthouse check .` on this repository is clean, and `check --fix` brought it there.
@@ -839,7 +840,7 @@ See [agents.md](agents.md).
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
-bundled `core`, `design` and `testing` plugins with their recommended projects (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/errors`) and
+bundled `core`, `design` and `testing` plugins with their recommended projects (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/max-name-words`) and
 the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
 ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only
@@ -851,5 +852,5 @@ The Rust plugin resolves names syntactically, so its edges are a lower bound
 that count callers therefore have to fail safe: a method called through a
 receiver whose type is not written in the code is recorded as a possible use of
 every non-`pub` method of that name (a `heuristic` edge that counting analyses
-ignore), which keeps `design/symbols` from
+ignore), which keeps `design/no-redundant-symbol` from
 reporting a method that has an unseen caller.

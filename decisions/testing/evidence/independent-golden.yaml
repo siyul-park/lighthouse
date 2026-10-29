@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/independent-golden
+  uid: b2f2b83e-58fa-418b-96af-1c5139b16835
+spec:
+  title: Golden expectations are independent
+  context: Generating expected output with the same code under test can reproduce
+    the same defect in both actual and expected values.
+  scope:
+    subject: test
+    tests: only
+  requirement: Golden tests SHOULD define expected low-level output independently
+    of the implementation that produced it.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#native-jit-7e35f7e0'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }

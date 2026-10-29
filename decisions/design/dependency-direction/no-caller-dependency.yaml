@@ -1,0 +1,65 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-caller-dependency
+  uid: dfc1cc9d-9c52-4716-8556-fdd16e4d5c0a
+spec:
+  title: Reusable code does not depend on caller policy
+  context: General code must remain independent of its callers. A dependency on caller
+    policy or a specific lifecycle pulls unstable semantics into a reusable layer.
+  scope:
+    subject: symbol
+  requirement: Lower-level or reusable symbols SHOULD express their responsibility
+    in the most general form that fits it and SHOULD NOT depend on caller-specific
+    policy, types, lifecycle, or semantics.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#dependency-direction-278c4f1e'
+  examples:
+  - name: go-import-points-up
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
+
+        import "example.com/app/infra"
+
+        func Load() string { return infra.Read() }
+    - path: infra/infra.go
+      body: |
+        package infra
+
+        func Read() string { return "" }
+  - name: go-import-points-down
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
+
+        import "example.com/app/infra"
+
+        func Load() string { return infra.Read() }
+    - path: infra/infra.go
+      body: |
+        package infra
+
+        func Read() string { return "" }
+    canonical: true

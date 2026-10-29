@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/error-translation
+  uid: da0002f3-c886-40b7-a9c1-51b8f58f158b
+spec:
+  title: Errors are translated at the owning boundary
+  context: The owning boundary adds useful context once while preserving the underlying
+    cause for classification and diagnosis.
+  scope:
+    subject: symbol
+  requirement: A layer SHOULD add its own operation context when propagating an error
+    and SHOULD NOT translate errors repeatedly in layers that do not own the boundary.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#errors-2de6c4b7'
+    - Martin, Clean Code (2008), ch. 7 Provide context with exceptions
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        func Load() error { return storage.Get() }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        func Load() error { if err := storage.Get(); err != nil { return fmt.Errorf("load account: %w", err) }; return nil }

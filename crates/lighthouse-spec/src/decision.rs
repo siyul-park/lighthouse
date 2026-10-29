@@ -8,17 +8,26 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     Catalog, Check, CheckKind, DecisionStatus, Error, Example, ExampleKind, Fix, OptionsSchema,
-    Scope,
+    Program, Scope,
 };
 use lighthouse_protocol::{DecisionRef, hash};
 
-/// What one language changes about a decision: the values of its options.
+/// What one language changes about a decision: the values of its options and
+/// the programs that check and fix its files.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LanguageSpec {
     /// Values of the decision's options that replace their defaults here.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub options: Map<String, Value>,
+    /// The program that checks the files of this language, in place of the
+    /// decision's own `command` check, which it needs to be.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<Program>,
+    /// The program that fixes the findings in files of this language, in
+    /// place of the decision's own `command` fix, which it needs to be.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<Program>,
 }
 
 /// Where a decision comes from, in the vocabulary of W3C PROV.

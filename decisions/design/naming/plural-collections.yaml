@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/plural-collections
+  uid: b3a0487d-5626-4213-b0f5-7ba733df15c6
+spec:
+  title: Collection names are plural
+  context: Plural names help callers distinguish one value from a collection without
+    inspecting the type or return expression.
+  scope:
+    subject: symbol
+  requirement: Names for collections and stores SHOULD be plural; names for a single
+    capability or value SHOULD be singular.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#naming-ab64e5fb'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        type Store struct { item []Item; users User }
+        func (s Store) GetItems() []Item { return s.item }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        type Store struct { items []Item; user User }
+        func (s Store) GetItems() []Item { return s.items }

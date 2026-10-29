@@ -1,0 +1,94 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/reserved-verbs
+  uid: 15f5cfe6-e8fb-4ccc-a91a-8b1d247e4647
+spec:
+  title: Action verbs name actions
+  context: The configured verb list follows the project convention. A function that
+    starts with a verb and returns a boolean is a query; one that starts with it and
+    returns something else is for a model to judge, since the decision depends on behavior,
+    not only a name prefix.
+  scope:
+    subject: symbol
+  requirement: Configured action verbs SHOULD name actions or state transitions, not
+    queries that return a boolean or report current state.
+  severity: warn
+  check:
+    type: cel
+    select: function
+    variables:
+    - name: reserved
+      expression: "!func.test && size(func.words) > 0 && func.words[0] in options.verbs"
+    - name: query
+      expression: "size(func.results) == 1 && func.results[0].text == 'bool'"
+    where: reserved && query
+    abstain: reserved && !query && size(func.results) > 0
+    message: "{{ func.name + ' starts with the reserved action verb ' + func.words[0] + ' but answers a question; name it for the question or drop the verb' }}"
+    evidence:
+      name: func.name
+      verb: func.words[0]
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#naming-f81fdf16'
+  options:
+    properties:
+      verbs:
+        type: array
+        items:
+          type: string
+        default:
+        - build
+        - compile
+        - publish
+        - capture
+        - use
+        description: Action verbs reserved for actions and transitions, as lower-case
+          words of a name.
+    additionalProperties: false
+  examples:
+  - name: invalid-go
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        func BuildUser(id string) bool { return id != "" }
+    expect:
+    - line: 3
+  - name: valid-go
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type User struct{ id string }
+
+        func HasUser(id string) bool { return id != "" }
+
+        func BuildUser(id string) User { return User{id: id} }
+  - name: invalid-rust
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |
+        pub fn use_cache() -> bool { true }
+    expect:
+    - line: 1
+  - name: valid-rust
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |
+        pub fn is_cache_enabled() -> bool { true }

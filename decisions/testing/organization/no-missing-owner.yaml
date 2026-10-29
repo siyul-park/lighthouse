@@ -1,0 +1,304 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/no-missing-owner
+  uid: eacf634c-615b-4072-a5a8-1f48e55bd82b
+spec:
+  title: Every public symbol has an owner test
+  context: >-
+    A public symbol without an owner test has no single place to read or extend
+    its specification. A public symbol should have one obvious top-level test
+    whose cases specify its behavior.
+
+    The naming convention is the language's, not a policy: its provider
+    declares it (`conventions.test_naming`) and a project replaces parts of it
+    in `[languages.<id>] testNaming` (`prefix`, `snakeCase`, `variants`,
+    `ancestors`).
+
+    Go: A function or type is owned by `TestName`, a method by
+    `TestType_Method`. Only modules that have tests are judged. Types without
+    methods and interfaces do not require a missing-owner test, nor do methods
+    that implement interface methods. A type counts as tested when one of its
+    members is. Names use the longest matching symbol, so `TestStore_Get`
+    belongs to the method `Get`, not the type `Store`.
+
+    Rust: A function or type is owned by the test with its snake-case name
+    (`get`, `store`), a method by `type_method`. Only crates with tests are
+    judged. Integration tests count for every module in the crate, including
+    public items re-exported from private modules. A method call on a value of
+    unknown type counts for the public methods of that name. Trait-implementation
+    methods and types without methods do not require a missing-owner test.
+  scope:
+    subject: test
+  requirement: >-
+    A public symbol SHOULD have one top-level owner test function.
+  severity: warn
+  options:
+    properties:
+      symbols:
+        type: array
+        items: { type: string, enum: [function, method, type] }
+        default: [function, method, type]
+        description: >-
+          Kinds of public symbols that need an owner test.
+          Interfaces are tested through their implementations and are left out
+          by default.
+      includeInternal:
+        type: boolean
+        default: false
+        description: Also judge symbols public only inside the project.
+      includeDataTypes:
+        type: boolean
+        default: false
+        description: >-
+          Also require owner tests for types that declare no method; such a type
+          is specified by the functions that build and read it.
+      exemptMethods:
+        type: array
+        default: [String, Error, Unwrap, GoString]
+        description: Method names that implement well-known interfaces.
+    additionalProperties: false
+  languages:
+    go:
+      options:
+        includeInternal: true
+    rust:
+      options:
+        exemptMethods:
+          - fmt
+          - source
+          - from
+          - try_from
+          - from_str
+          - default
+          - drop
+          - clone
+          - eq
+          - ne
+          - partial_cmp
+          - cmp
+          - hash
+          - deref
+          - deref_mut
+          - as_ref
+          - as_mut
+          - borrow
+          - next
+          - into_iter
+          - index
+          - index_mut
+          - serialize
+          - deserialize
+  check:
+    type: cel
+    select: symbol
+    variables:
+      - name: visible
+        expression: visible_symbols(options.includeInternal)
+      - name: owner
+        expression: symbol.owner
+      - name: owners
+        expression: symbol.tests
+      - name: missing
+        expression: >-
+          (symbol.kind == 'method'
+              ? (owner != null && owner.kind == 'type' && owner.visibility in visible)
+              : owner == null)
+          && !symbol.implementation
+          && (options.includeDataTypes || !symbol.data_only)
+          && symbol.visibility in visible
+          && options.symbols.exists(k, k == symbol.kind)
+          && !(symbol.kind == 'method' && options.exemptMethods.exists(m, m == symbol.name))
+          && symbol.module_tested
+          && size(owners) == 0 && !symbol.touched_by_tests
+    where: missing
+    message: >-
+      {{ 'public ' + symbol.kind + ' ' + symbol.name + ' has no owner test; add one top-level test for it' }}
+    evidence:
+      symbol: symbol.id
+      owner_tests: owners.map(t, t.id)
+    identity:
+      subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), T1 Insufficient Tests
+  examples:
+  - name: missing-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+
+        func Put() int { return 2 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+    expect:
+    - line: 5
+  - name: missing-valid
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+
+        func Put() int { return 2 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}\n\nfunc
+        TestPutFlow(t *testing.T) {\n\tif store.Put() != 2 {\n\t\tt.Fatal(\"put\")\n\t}\n}"
+  - name: missing-no-tests-at-all
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+  - name: missing-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn get() -> u8 {
+            1
+        }
+
+        pub fn put() -> u8 {
+            2
+        }
+    - path: tests/store.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+        }
+    expect:
+    - line: 5
+  - name: missing-rust-valid
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn get() -> u8 {
+            1
+        }
+    - path: tests/store.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+        }
+  - name: missing-rust-submodule-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod shapes;
+
+        pub use shapes::{area, perimeter};
+    - path: src/shapes.rs
+      body: |-
+        pub fn area() -> u8 {
+            1
+        }
+
+        pub fn perimeter() -> u8 {
+            4
+        }
+    - path: tests/shapes.rs
+      body: |-
+        #[test]
+        fn area() {
+            assert_eq!(workspace::area(), 1);
+        }
+    expect:
+    - line: 5
+  - name: missing-rust-reexport-from-private-module
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod shapes;
+
+        pub use shapes::area;
+    - path: src/shapes.rs
+      body: |-
+        pub fn area() -> u8 {
+            1
+        }
+    - path: tests/shapes.rs
+      body: |-
+        #[test]
+        fn area() {
+            assert_eq!(workspace::area(), 1);
+        }
+  - name: missing-rust-method-on-unknown-receiver
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Registry;
+
+        impl Registry {
+            pub fn register(&self) {}
+        }
+
+        pub fn get() -> u8 {
+            1
+        }
+    - path: tests/registry.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+            let registry = unknown::build();
+            registry.register();
+        }
+  - name: missing-go-interface-implementation
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        type getter interface{ Get() int }
+
+        type Store struct{}
+
+        func (Store) Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestStore(t *testing.T) {\n\tif (store.Store{}) != (store.Store{}) {\n\t\tt.Fatal(\"store\")\n\t}\n}"

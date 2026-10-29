@@ -270,7 +270,7 @@ fn config(plugin: &Path) -> String {
 const CONFIG: &str = r#"extends = ["design/recommended"]
 
 [rules]
-"design/complexity" = { level = "warn", options = { hub = { fanIn = 2, fanOut = 2, statements = 1, coordinatorFanOut = 12, coordinatorMaxFanIn = 1, coordinatorStatements = 15 } } }
+"design/coupling" = { level = "warn", options = { hub = { fanIn = 2, fanOut = 2, statements = 1, coordinatorFanOut = 12, coordinatorMaxFanIn = 1, coordinatorStatements = 15 } } }
 "#;
 
 fn line_of(source: &str, needle: &str) -> u32 {
@@ -312,9 +312,10 @@ fn engine_checks_a_multi_file_go_package() {
     // examples and would also speak about this deliberately small package.
     let only = [
         "design/complexity",
-        "design/complexity",
+        "design/coupling",
         "design/exported-doc",
-        "design/symbols",
+        "design/no-redundant-symbol",
+        "design/no-unused-symbol",
     ]
     .map(str::to_owned);
     let outcome = engine(&plugin, root, "").check(&[], &only).unwrap();
@@ -334,17 +335,17 @@ fn engine_checks_a_multi_file_go_package() {
         (
             "store/load.go",
             line_of(LOAD, "func (s *Store) a()"),
-            "design/symbols",
+            "design/no-unused-symbol",
         ),
         (
             "store/load.go",
             line_of(LOAD, "func (s *Store) b()"),
-            "design/symbols",
+            "design/no-unused-symbol",
         ),
         (
             "store/load.go",
             line_of(LOAD, "func (s *Store) load"),
-            "design/symbols",
+            "design/no-redundant-symbol",
         ),
         (
             "store/load.go",
@@ -354,7 +355,7 @@ fn engine_checks_a_multi_file_go_package() {
         (
             "store/store.go",
             line_of(STORE, "func (s *Store) hub"),
-            "design/complexity",
+            "design/coupling",
         ),
         (
             "store/store.go",
@@ -367,7 +368,7 @@ fn engine_checks_a_multi_file_go_package() {
     assert!(outcome.notices.is_empty(), "{:?}", outcome.notices);
     assert!(outcome.incomplete.is_empty(), "{:?}", outcome.incomplete);
     assert_eq!(outcome.exit_code(true, false), 1);
-    assert_eq!(outcome.exit_code(false, false), 0);
+    assert_eq!(outcome.exit_code(false, false), 1);
 }
 
 /// The findings of a one-file Go package as (symbol, fingerprint).
@@ -474,6 +475,7 @@ fn every_checked_decision_passes_its_catalog_examples() {
         lighthouse_test_support::bundled(),
     )
     .language("go")
+    .trusted(true)
     .check_all();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

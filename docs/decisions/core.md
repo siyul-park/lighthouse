@@ -10,23 +10,22 @@ Size limits that keep files reviewable.
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/file-size`](#files-stay-small-and-cohesive) | Files stay small and cohesive | warn · cel |  |  |
+| [`core/max-lines`](#files-stay-small-and-cohesive) | Files stay small and cohesive | warn · cel |  |  |
+| [`core/max-len`](#lines-fit-the-configured-width) | Lines fit the configured width | warn · cel |  |  |
 
 ### Files stay small and cohesive
 
-`core/file-size` · file · warn · cel
+`core/max-lines` · file · warn · cel
 
-*Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The limits measure the design, not its packaging: the remedy is simpler code or a concept that is reused, never the same code moved elsewhere (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man). A half moved to another file that stays tied to the first through private items is not a boundary (see `design/responsibility`, kind `conjoined`). The count is the file's lines (revive `file-length-limit`), reported once per file with the kind `lines`. Kind `width` (off by default and on in the strict project): a line wider than `maxWidth` columns, counted in characters with a tab as one (ESLint `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single string literal and an import line cannot be wrapped and are not counted. Only files of a language provider are counted: prose and data have no syntax to wrap at. A file reports once, with the kind that matched first.*
+*Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The remedy is simpler code or a concept that is reused, never the same code moved elsewhere. A file over the limit is made simpler, or split along a boundary whose halves are used apart, never by size alone or by moving code to a file that remains tied to the first. A half moved to another file that stays tied to the first through private items is not a boundary (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man).*
 
-A file SHOULD stay at or below the configured line limit (option `max`). A file that is over the limit MUST be made simpler, or split along a boundary whose halves are used apart, never by size alone or by moving code to a file that remains tied to the first. A line that can be wrapped SHOULD NOT be wider than the configured number of columns (option `maxWidth`).
+A file SHOULD stay at or below the configured line limit (option `max`).
 
-Derived from: revive file-length-limit: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#file-length-limit; Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Martin, Clean Code (2008), ch. 5 Horizontal size; ESLint max-len: https://eslint.org/docs/latest/rules/max-len; Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9; Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
+Derived from: revive file-length-limit: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#file-length-limit; Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9; Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
 
 | option | default | meaning |
 | --- | --- | --- |
-| `kinds` | `["lines"]` | What to report. |
 | `max` | `1000` | Largest number of lines a file may have. |
-| `maxWidth` | `120` | Widest a line may be, in characters. |
 
 ```text invalid
 a
@@ -39,7 +38,40 @@ a
 b
 ```
 
-Also: go
+### Lines fit the configured width
+
+`core/max-len` · file · warn · cel
+
+*A line that can be wrapped should be wrapped (ESLint `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single string literal and an import line cannot be wrapped and are not counted. Only source files of a language provider are counted; prose and data have no syntax to wrap at.*
+
+A line that can be wrapped SHOULD NOT be wider than the configured number of columns (option `maxWidth`).
+
+Derived from: Martin, Clean Code (2008), ch. 5 Horizontal size; ESLint max-len: https://eslint.org/docs/latest/rules/max-len; Checkstyle LineLength: https://checkstyle.org/checks/sizes/linelength.html
+
+| option | default | meaning |
+| --- | --- | --- |
+| `enabled` | `false` | Enable line-width findings in the strict project. |
+| `maxWidth` | `120` | Widest a line may be, in characters. |
+
+```go invalid
+package sample
+
+// a line that is far too wide
+var a = 1
+```
+
+```go valid
+package sample
+
+// https://example.com/a/very/long/address
+import _ "net/http/httptest"
+
+var n = []string{
+	"a single string literal that cannot wrap",
+}
+```
+
+Also: text, rust
 
 ## Source annotations
 
@@ -47,16 +79,16 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/allow`](#allow-a-finding-in-source-with-a-reason) | Allow a finding in source, with a reason | error · cel |  |  |
+| [`core/allow-reason`](#allow-a-finding-in-source-with-a-reason) | Allow a finding in source, with a reason | error · cel |  |  |
 | [`core/no-unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · cel | unsafe |  |
 
 ### Allow a finding in source, with a reason
 
-`core/allow` · file · error · cel
+`core/allow-reason` · file · error · cel
 
-*A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change, and an exception without a reason cannot be reviewed or revisited. A silenced check is the smell Martin calls Overridden Safeties, so the way to silence one is narrow and explained. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids (ESLint `eslint-comments/require-description`, golangci `nolintlint` with `require-explanation`, clippy `allow_attributes_without_reason`). `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive. The check reports a directive that gives no reason (kind `reason`); the directive is then ignored. One that suppresses nothing is `core/no-unused-allow`.*
+*A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change, and an exception without a reason cannot be reviewed or revisited. A silenced check is the smell Martin calls Overridden Safeties, so the way to silence one is narrow and explained. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids (ESLint `eslint-comments/require-description`, golangci `nolintlint` with `require-explanation`, clippy `allow_attributes_without_reason`). `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive. The check reports a directive that gives no reason (kind `reason`); the directive is then ignored. One that suppresses nothing is `core/no-unused-allow`. A finding that is right to leave in place MAY be allowed this way: the comment suppresses the named rules there, whatever their severity, and allowed findings are counted in the report.*
 
-An allow annotation MUST give a reason after `--`; an annotation without one is ignored and reported. A finding that is right to leave in place MAY be allowed by a comment on the symbol, the line before it or the same line, written `lighthouse-disable-next-line <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there, whatever their severity, and the reason is required. Allowed findings are counted in the report.
+An allow annotation MUST give a reason after `--`; an annotation without one is ignored and reported.
 
 Derived from: ESLint eslint-comments/require-description: https://eslint-community.github.io/eslint-plugin-eslint-comments/rules/require-description.html; golangci-lint nolintlint require-explanation: https://golangci-lint.run/usage/linters/#nolintlint; clippy allow_attributes_without_reason: https://rust-lang.github.io/rust-clippy/master/index.html#allow_attributes_without_reason; Martin, Clean Code (2008), G4 Overridden Safeties
 
@@ -89,11 +121,8 @@ Derived from: Martin, Clean Code (2008), G4 Overridden Safeties; Martin, Clean C
 ```diff
 --- a/example.go
 +++ b/example.go
-@@ -1,4 +1,3 @@
- package sample
- 
+@@ -3 +2,0 @@
 -// lighthouse-disable-next-line design/exported-doc -- stale
- func open() {}
 ```
 
 Also: rust
@@ -129,3 +158,31 @@ kind: Decision
 metadata:
   name: design/prefer-method
 ```
+
+## Formatting
+
+Source formatting is decided by the language standard, not by review.
+
+| id | title | check | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`core/formatted`](#source-files-use-their-standard-formatter) | Source files use their standard formatter | error · command | safe |  |
+
+### Source files use their standard formatter
+
+`core/formatted` · file · error · command · fix: safe
+
+*Formatting is a repository convention, not a review topic. Each language states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses rustfmt with the edition of the crate that contains the file, supplied by the Rust provider as the `edition` fact, and leaves nested modules to their own files.*
+
+Source files MUST equal the output of their language standard formatter.
+
+Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; gofmt: https://pkg.go.dev/cmd/gofmt; rustfmt: https://rust-lang.github.io/rustfmt/; Martin, Clean Code (2008), ch. 5 Vertical openness and density; Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation; Martin, Clean Code (2008), ch. 5 Team rules
+
+```diff
+--- a/example.go
++++ b/example.go
+@@ -3 +3 @@
+-func  Run( ) int {return 1}
++func Run() int { return 1 }
+```
+
+Also: rust

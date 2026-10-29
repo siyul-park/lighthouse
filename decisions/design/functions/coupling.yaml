@@ -1,0 +1,175 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/coupling
+  uid: 499c0cab-0b4d-4c11-8968-109dbda1d428
+spec:
+  title: Functions are not dependency hubs
+  context: Fan-in, fan-out and statement count identify dependency hubs and high fan-out
+    coordinators (Henry–Kafura). They are advisory signals rather than proof of a
+    defect.
+  scope:
+    subject: symbol
+  requirement: A function SHOULD NOT be a high fan-in/fan-out dependency hub or an
+    oversized coordinator; such functions deserve review for responsibility and change
+    propagation.
+  severity: warn
+  options:
+    properties:
+      hub:
+        type: object
+        properties:
+          fanIn:
+            type: integer
+          fanOut:
+            type: integer
+          statements:
+            type: integer
+          coordinatorFanOut:
+            type: integer
+          coordinatorMaxFanIn:
+            type: integer
+          coordinatorStatements:
+            type: integer
+        default:
+          fanIn: 8
+          fanOut: 6
+          statements: 20
+          coordinatorFanOut: 12
+          coordinatorMaxFanIn: 1
+          coordinatorStatements: 15
+        description: 'What marks a dependency hub or a high fan-out coordinator. `fanIn`:
+          Callers that, with `fanOut` and `statements`, mark a dependency hub. `fanOut`:
+          Callees of a dependency hub. `statements`: Statement count of a dependency
+          hub. `coordinatorFanOut`: Callees that, with the other `coordinator*` options,
+          mark a coordinator. `coordinatorMaxFanIn`: Most callers a coordinator may
+          have. `coordinatorStatements`: Statement count of a coordinator.'
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    variables:
+    - name: m
+      expression: func.metrics
+    - name: subject
+      expression: 'func.role == ''constructor'' ? func.built + '' needs'' : func.name
+        + '' has'''
+    - name: hub_role
+      expression: |-
+        (m.fan_in >= options.hub.fanIn && m.fan_out >= options.hub.fanOut
+         && m.statements >= options.hub.statements)
+        ? 'a dependency hub' : (m.fan_out >= options.hub.coordinatorFanOut
+           && m.fan_in <= options.hub.coordinatorMaxFanIn
+           && m.statements >= options.hub.coordinatorStatements)
+        ? 'a high fan-out coordinator' : ''
+    - name: found
+      expression: 'm.measured && !m.dispatcher && hub_role != '''' ? [{''kind'':''hub'',''what'':hub_role,''own'':m.fan_in,''max'':options.hub.fanIn,''hint'':'''',''value'':m.fan_in}]
+        : []'
+    - name: first
+      expression: 'size(found) > 0 ? found[0] : {''kind'':'''',''what'':'''',''own'':0,''max'':0,''hint'':'''',''value'':0}'
+    where: size(found)>0
+    message: "{{ 'function ' + func.name + ' is ' + first.what + ': fan-in=' + string(m.fan_in)
+      + ' fan-out=' + string(m.fan_out) }}"
+    evidence:
+      kind: "'hub'"
+      fan_in: m.fan_in
+      fan_out: m.fan_out
+      statements: m.statements
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - 'funlen lines 60: https://golangci-lint.run/usage/linters/#funlen'
+    - 'clippy too_many_lines 100: https://doc.rust-lang.org/clippy/lint_configuration.html'
+    - 'ESLint max-lines-per-function: https://eslint.org/docs/latest/rules/max-lines-per-function'
+    - 'funlen statements 40: https://golangci-lint.run/usage/linters/#funlen'
+    - 'ESLint max-statements: https://eslint.org/docs/latest/rules/max-statements'
+    - McCabe 1976, A Complexity Measure
+    - 'gocyclo min-complexity 30: https://golangci-lint.run/usage/linters/#gocyclo'
+    - 'ESLint complexity: https://eslint.org/docs/latest/rules/complexity'
+    - Sonar S1541, cyclop
+    - Campbell 2018, Cognitive Complexity (SonarSource)
+    - 'gocognit min-complexity 30: https://golangci-lint.run/usage/linters/#gocognit'
+    - 'clippy cognitive_complexity 25: https://doc.rust-lang.org/clippy/lint_configuration.html'
+    - Sonar S3776
+    - 'ESLint max-depth 4: https://eslint.org/docs/latest/rules/max-depth'
+    - Sonar S134
+    - Henry and Kafura 1981, information flow
+    - 'funlen: https://golangci-lint.run/usage/linters/#funlen'
+    - SonarSource, Cognitive Complexity (2017)
+    - Martin, Clean Code (2008), G6 Code at Wrong Level of Abstraction
+    - Martin, Clean Code (2008), G16 Obscured Intent
+    - Martin, Clean Code (2008), G30 Functions Should Do One Thing
+    - Martin, Clean Code (2008), G34 Functions Should Descend Only One Level of Abstraction
+    - Martin, Clean Code (2008), ch. 3 Small functions
+    - Martin, Clean Code (2008), ch. 3 Do one thing
+    - Martin, Clean Code (2008), ch. 3 One level of abstraction
+    - Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9
+    - Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
+  examples:
+  - name: hub-hub
+    language: go
+    kind: invalid
+    options:
+      hub:
+        fanIn: 2
+        fanOut: 2
+        statements: 1
+        coordinatorFanOut: 12
+        coordinatorMaxFanIn: 1
+        coordinatorStatements: 15
+    files:
+    - path: sample.go
+      body: "package sample\n\nfunc hub() {\n\tleft()\n\tright()\n}\n\nfunc left()
+        \ {}\nfunc right() {}\n\nfunc a() { hub() }\nfunc b() { hub() }"
+    expect:
+    - line: 3
+  - name: hub-coordinator
+    language: go
+    kind: invalid
+    options:
+      hub:
+        fanIn: 8
+        fanOut: 6
+        statements: 20
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
+    files:
+    - path: sample.go
+      body: "package sample\n\nfunc run() {\n\tone()\n\ttwo()\n\tthree()\n}\n\nfunc
+        one()   {}\nfunc two()   {}\nfunc three() {}"
+    expect:
+    - line: 3
+  - name: hub-ordinary-fan
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: "package sample\n\nfunc hub() {\n\tleft()\n\tright()\n}\n\nfunc left()
+        \ {}\nfunc right() {}\n\nfunc a() { hub() }\nfunc b() { hub() }"
+    canonical: true
+  - name: hub-rust-service-used-across-modules
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod service {
+            pub fn serve() {
+                super::left();
+                super::right();
+            }
+        }
+
+        fn left() {}
+        fn right() {}
+
+        pub fn a() {
+            service::serve();
+        }
+        pub fn b() {
+            service::serve();
+        }
+    canonical: true

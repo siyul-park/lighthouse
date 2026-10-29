@@ -2,3 +2,4 @@ target/
 .claude/worktrees/
 .lighthouse/*.db*
 .lighthouse/cache/
+.env

@@ -1,0 +1,43 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/encapsulated-state
+  uid: c7498381-dff1-4ae5-9930-3962faa989da
+spec:
+  title: Private state goes through its owner
+  context: An owner centralizes invariant preservation and lets callers use a stable
+    API without knowing storage details.
+  scope:
+    subject: symbol
+  requirement: Private mutable state SHOULD be accessed through the owning type’s
+    contract rather than by unrelated callers.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#ownership-1b398d4a'
+    - 'Lighthouse, coding-patterns#types-and-apis-0e075b7e'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Session struct { Token string; Expiry time.Time }
+        func Refresh(s *Session) { s.Token = renew(); s.Expiry = time.Now().Add(time.Hour) }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Session struct { token string; expiry time.Time }
+        func (s *Session) Refresh() { s.token = renew(); s.expiry = time.Now().Add(time.Hour) }

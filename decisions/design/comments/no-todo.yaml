@@ -1,0 +1,126 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-todo
+  uid: 1ff5d12d-96f2-434e-b97e-bef9290da299
+spec:
+  title: TODO comments name deferred work
+  context: A TODO is a reminder without an owner or completion state in the code itself.
+    It is a review signal, not a build failure, and the strict preset opts into it.
+  scope:
+    subject: file
+    tests: include
+  requirement: TODO, FIXME, BUG, HACK and XXX comments SHOULD be completed, filed
+    as actionable work, or removed rather than left without a disposition.
+  severity: info
+  options:
+    properties:
+      enabled:
+        type: boolean
+        default: false
+        strictDefault: true
+        description: Enable TODO-comment findings in the strict project.
+      todoKeywords:
+        type: array
+        default:
+        - TODO
+        - FIXME
+        - BUG
+        - HACK
+        - XXX
+        description: Words that start a comment that defers work.
+    additionalProperties: false
+  check:
+    type: cel
+    select: comment
+    variables:
+    - name: documentation
+      expression: comment.text.split("\n").exists(l, (l.trim().startsWith('///') &&
+        !l.trim().startsWith('////')) || l.trim().startsWith('//!'))
+    - name: bodies
+      expression: 'comment.text.split("\n").map(l, l.trim()).map(l, regex.replace(l,
+        ''^(//)+'', '''')).map(l, l.startsWith(''/*'') ? l.substring(2) : l).map(l,
+        l.endsWith(''*/'') ? l.substring(0, size(l) - 2) : l).map(l, regex.replace(l,
+        ''^#+'', '''').trim()).filter(b, b != '''')'
+    - name: directive
+      expression: size(bodies) > 0 && (['go:', '+build', 'nolint', 'lint:', 'lighthouse-',
+        '#[', 'SAFETY:', 'noqa'].exists(p, bodies[0].startsWith(p)) || bodies[0].matches('^[a-z]+:[a-z]'))
+    - name: prose
+      expression: "!documentation && !comment.text.contains('```') && !directive"
+    - name: matched
+      expression: 'options.enabled && prose && size(bodies) > 0 && options.todoKeywords.exists(k,
+        bodies[0] == k || bodies[0].startsWith(k + '':'') || bodies[0].startsWith(k
+        + '' '')) ? [''todo''] : []'
+    where: size(matched) > 0
+    message: "{{ options.todoKeywords.filter(k, bodies[0] == k || bodies[0].startsWith(k
+      + ':') || bodies[0].startsWith(k + ' '))[0] + ' comment: do it, file it, or
+      delete it' }}"
+    evidence:
+      kind: "'todo'"
+      comment: comment.text
+    identity:
+      subject: comment.file
+      snippet: comment.text
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), C1 Inappropriate Information
+    - Martin, Clean Code (2008), C2 Obsolete Comment
+    - Martin, Clean Code (2008), C3 Redundant Comment
+    - Martin, Clean Code (2008), C4 Poorly Written Comment
+    - Martin, Clean Code (2008), C5 Commented-Out Code
+    - Martin, Clean Code (2008), ch. 4 Position markers
+    - Martin, Clean Code (2008), ch. 4 Redundant and noise comments
+    - Martin, Clean Code (2008), ch. 4 Misleading comments
+    - Martin, Clean Code (2008), ch. 4 Good comments
+    - Martin, Clean Code (2008), ch. 4 TODO comments
+    - Martin, Clean Code (2008), ch. 4 Journal comments
+    - Martin, Clean Code (2008), ch. 4 Closing brace comments
+    - Martin, Clean Code (2008), ch. 4 Commented-out code
+  examples:
+  - name: todo-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        // TODO: remove temporary fallback
+        func Load() {}
+    expect:
+    - line: 3
+    options:
+      enabled: true
+  - name: todo-valid
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        // Load reads the configured record.
+        func Load() {}
+  - name: todo-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        // TODO: remove temporary fallback
+        pub fn load() {}
+    expect:
+    - line: 1
+  - name: todo-rust-valid
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Reads the configured record.
+        pub fn load() {}
+    canonical: true

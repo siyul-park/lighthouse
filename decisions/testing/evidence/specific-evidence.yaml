@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/specific-evidence
+  uid: fa67da60-6daa-4285-98b2-731c94b706da
+spec:
+  title: Architecture contracts have specific evidence
+  context: A generic test may prove behavior but miss the module, platform, backend,
+    or lifecycle condition that defines the architectural contract.
+  scope:
+    subject: test
+    tests: only
+  requirement: Architecture-specific contracts SHOULD have evidence that exercises
+    the relevant architecture boundary rather than only a generic success path.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#completeness-f61f5237'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }

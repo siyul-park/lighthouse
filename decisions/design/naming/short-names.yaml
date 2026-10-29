@@ -1,0 +1,68 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/short-names
+  uid: cec768b1-d137-440f-81a2-7d9304a9e947
+spec:
+  title: Names are long enough for their scope
+  context: A name that escapes a small local scope needs enough information to be
+    read without reconstructing its meaning from distant code.
+  scope:
+    subject: symbol
+  requirement: One-letter names SHOULD be limited to conventional receivers, indices,
+    and genuinely tiny scopes.
+  severity: warn
+  check:
+    type: cel
+    select: symbol
+    where: 'false'
+    abstain: >-
+      symbol.lang != 'cel' && size(symbol.name) == 1 && symbol.name != '_'
+      && !(symbol.name in ['i', 'j', 'k', 'v', 't', 'e'])
+    message: "{{ 'review whether ' + symbol.name + ' is sufficiently descriptive for its scope' }}"
+    evidence:
+      kind: "'short-name'"
+      name: symbol.name
+    identity:
+      subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#naming-eb4a4ae5'
+    - 'Go Code Review Comments, Names: https://go.dev/wiki/CodeReviewComments#name'
+    - 'Rust API Guidelines, Naming: https://rust-lang.github.io/api-guidelines/naming.html'
+  examples:
+  - name: one-letter-go-name
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func x() string { return "x" }
+  - name: descriptive-go-name
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func Load() string { return "x" }
+  - name: one-letter-rust-name
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        fn x() -> &'static str { "x" }
+  - name: descriptive-rust-name
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        fn load() -> &'static str { "x" }
+    canonical: true

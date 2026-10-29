@@ -1,0 +1,146 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/formatted
+  uid: 7d81a933-ea7f-495b-8d2a-6d49b53fe842
+spec:
+  title: Source files use their standard formatter
+  context: Formatting is a repository convention, not a review topic. Each language
+    states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses
+    rustfmt with the edition of the crate that contains the file, supplied by the
+    Rust provider as the `edition` fact, and leaves nested modules to their own files.
+  scope:
+    subject: file
+    generated: false
+    tests: include
+  requirement: Source files MUST equal the output of their language standard formatter.
+  severity: error
+  check:
+    type: command
+  fix:
+    type: command
+    safety: safe
+    priority: -100
+  languages:
+    go:
+      check:
+        command:
+        - gofmt
+        - "-l"
+        - "{files}"
+      fix:
+        command:
+        - gofmt
+        stdin: file
+        output: stdout
+    rust:
+      check:
+        command:
+        - rustfmt
+        - "--edition"
+        - "{file.edition}"
+        - "--check"
+        - "--config"
+        - skip_children=true
+        - "-l"
+        - "{files}"
+      fix:
+        command:
+        - rustfmt
+        - "--edition"
+        - "{file.edition}"
+        - "--config"
+        - skip_children=true
+        - "--emit"
+        - stdout
+        stdin: file
+        output: stdout
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), G24 Follow Standard Conventions
+    - 'gofmt: https://pkg.go.dev/cmd/gofmt'
+    - 'rustfmt: https://rust-lang.github.io/rustfmt/'
+    - Martin, Clean Code (2008), ch. 5 Vertical openness and density
+    - Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation
+    - Martin, Clean Code (2008), ch. 5 Team rules
+  examples:
+  - name: go-unformatted
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |
+        package sample
+
+        func  Run( ) int {return 1}
+    expect:
+    - line: 1
+    fixed:
+    - path: example.go
+      body: |
+        package sample
+
+        func Run() int { return 1 }
+  - name: go-formatted
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |
+        package sample
+
+        func Run() int { return 1 }
+    canonical: true
+  - name: rust-unformatted
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |
+        pub fn run()->i32{1}
+    expect:
+    - line: 1
+    fixed:
+    - path: src/lib.rs
+      body: |
+        pub fn run() -> i32 {
+            1
+        }
+  - name: rust-edition-of-the-crate
+    language: rust
+    kind: valid
+    files:
+    - path: Cargo.toml
+      body: |
+        [package]
+        name = "demo"
+        version = "0.1.0"
+        edition = "2021"
+    - path: src/lib.rs
+      body: |
+        use std::{b, A};
+    canonical: true
+  - name: rust-no-edition-is-2015
+    language: rust
+    kind: valid
+    files:
+    - path: Cargo.toml
+      body: |
+        [package]
+        name = "demo"
+        version = "0.1.0"
+    - path: src/lib.rs
+      body: |
+        use std::{b, A};
+    canonical: false
+  - name: rust-formatted
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |
+        pub fn run() -> i32 {
+            1
+        }
+    canonical: false

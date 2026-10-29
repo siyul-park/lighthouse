@@ -19,12 +19,12 @@ fn span(line: u32) -> Span {
 
 fn coupling() -> Diagnostic {
     let mut d = Diagnostic::new(
-        "design/complexity",
+        "design/coupling",
         Severity::Warn,
         "function coordinates 14 collaborators in its package",
         "internal/jit/compile.go",
         span(350),
-        Fingerprint::new("design/complexity", "jit::compile#function", ""),
+        Fingerprint::new("design/coupling", "jit::compile#function", ""),
     );
     d.symbol = Some("jit::compile#function".to_owned());
     d.evidence = json!({ "fan_in": 2, "fan_out": 14, "callees": ["a", "b c"] });
@@ -33,12 +33,12 @@ fn coupling() -> Diagnostic {
 
 fn helper() -> Diagnostic {
     let mut d = Diagnostic::new(
-        "design/errors",
+        "design/no-redundant-symbol",
         Severity::Info,
         "private helper has one caller",
         "src/lib.rs",
         span(7),
-        Fingerprint::new("design/errors", "m::helper#function", ""),
+        Fingerprint::new("design/no-redundant-symbol", "m::helper#function", ""),
     );
     d.symbol = Some("m::helper#function".to_owned());
     d
@@ -97,12 +97,12 @@ fn mixed(count: usize) -> Vec<Diagnostic> {
             3 => {
                 let symbol = format!("store::helper{i}#function");
                 let mut d = Diagnostic::new(
-                    "design/errors",
+                    "design/no-redundant-symbol",
                     Severity::Info,
                     "private helper has one caller",
                     format!("internal/store/file{}.go", i % 7),
                     span(i as u32 * 5 + 2),
-                    Fingerprint::new("design/errors", &symbol, ""),
+                    Fingerprint::new("design/no-redundant-symbol", &symbol, ""),
                 );
                 d.evidence =
                     json!({ "caller": "store::run#function", "callers": 1, "statements": 3 });
@@ -112,12 +112,12 @@ fn mixed(count: usize) -> Vec<Diagnostic> {
             _ => {
                 let symbol = format!("store::hub{i}#function");
                 let mut d = Diagnostic::new(
-                    "design/complexity",
+                    "design/coupling",
                     Severity::Warn,
                     "function coordinates 14 collaborators in its package",
                     format!("internal/store/hub{}.go", i % 3),
                     span(i as u32 * 7 + 3),
-                    Fingerprint::new("design/complexity", &symbol, ""),
+                    Fingerprint::new("design/coupling", &symbol, ""),
                 );
                 d.evidence = json!({ "fan_in": 2, "fan_out": 14 + i % 3 });
                 d.symbol = Some(symbol);
@@ -187,7 +187,7 @@ fn full_agent_json_is_one_object_of_tagged_records() {
     assert!(report["judgments"]["notApplicable"].is_string());
 
     let coupling = &records[0];
-    assert_eq!(coupling["decision"], "design/complexity");
+    assert_eq!(coupling["decision"], "design/coupling");
     assert_eq!(coupling["authored"], "warn");
     assert_eq!(coupling["symbol"], "jit::compile#function");
     assert_eq!(coupling["location"]["line"], 350);
@@ -287,7 +287,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     });
     let text = render(Format::Agent, &findings, &[], &briefing);
     assert!(text.contains("acme/custom  error"), "{text}");
-    assert!(text.contains("design/complexity  warn"), "{text}");
+    assert!(text.contains("design/coupling  warn"), "{text}");
     assert!(!text.contains("no-panic  info"), "{text}");
     assert!(
         text.contains("... 1 more finding(s) not shown (raise --limit)"),
@@ -308,7 +308,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     assert_eq!(findings.len(), 2);
     assert_eq!(json[0]["omitted"], 1);
     assert_eq!(
-        findings[0]["decision"], "design/complexity",
+        findings[0]["decision"], "design/coupling",
         "original order is kept"
     );
     assert!(json[0]["judgments"].is_object());
@@ -324,7 +324,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
     });
     let text = render(Format::Agent, &findings, &[], &briefing);
     assert!(text.starts_with("acme/custom error\n"), "{text}");
-    assert!(text.contains("design/complexity warn [review]"), "{text}");
+    assert!(text.contains("design/coupling warn [review]"), "{text}");
     assert!(!text.contains("no-panic"), "{text}");
     assert!(
         text.contains("... 1 more finding(s) not shown (raise --limit)"),
@@ -344,7 +344,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
         .iter()
         .map(|g| g["decision"].as_str().unwrap())
         .collect();
-    assert_eq!(rules, ["acme/custom", "design/complexity"]);
+    assert_eq!(rules, ["acme/custom", "design/coupling"]);
     assert_eq!(json[0]["omitted"], json!({ "groups": 1, "findings": 1 }));
     assert_eq!(json[0]["counts"]["info"], 1, "counts cover the whole run");
     assert!(json[0]["judgments"].is_object());
@@ -617,12 +617,12 @@ fn needs_review_follows_the_authored_severity_of_the_decision_and_the_judgments_
         "a warn decision at error"
     );
     let mechanical = Diagnostic::new(
-        "core/allow",
+        "core/allow-reason",
         Severity::Warn,
         "needs a reason",
         "src/lib.rs",
         span(1),
-        Fingerprint::new("core/allow", "m", ""),
+        Fingerprint::new("core/allow-reason", "m", ""),
     );
     assert!(
         !briefing.needs_review(&mechanical),

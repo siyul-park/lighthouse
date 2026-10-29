@@ -158,6 +158,17 @@ fn strict_enables_every_kind_of_a_decision_that_enables_some_by_default() {
 }
 
 #[test]
+fn an_empty_default_leaves_kinds_off_until_the_strict_project() {
+    let off = "        type: array\n        items: { enum: [a] }\n        default: []\n";
+    let catalog = catalog(&[("a", &with_kinds(off)), ("b", &plain())]);
+
+    let recommended = resolve(&catalog, "recommended");
+    assert!(recommended["p/a"].options.is_empty());
+    let strict = resolve(&catalog, "strict");
+    assert_eq!(strict["p/a"].options["kinds"], json!(["a"]));
+}
+
+#[test]
 fn a_decision_that_enables_all_its_kinds_by_default_is_left_alone() {
     let all = with_kinds(
         "        type: array\n        items: { enum: [a, b] }\n        default: [a, b]\n",
@@ -174,4 +185,31 @@ fn a_pack_without_narrow_kinds_has_no_strict_project() {
     let projects = catalog.projects();
     let names: Vec<&str> = projects.names().collect();
     assert_eq!(names, ["p/recommended"]);
+}
+
+#[test]
+fn strict_default_enables_a_boolean_option_only_in_the_strict_project() {
+    let options = "  options:\n    properties:\n      enabled:\n        type: boolean\n        default: false\n        strictDefault: true\n        description: Enable the check.\n    additionalProperties: false\n";
+    let catalog = catalog(&[("a", &format!("{options}{CHECK}")), ("b", &plain())]);
+    assert!(resolve(&catalog, "recommended")["p/a"].options.is_empty());
+    assert_eq!(
+        resolve(&catalog, "strict")["p/a"].options["enabled"],
+        json!(true)
+    );
+}
+
+#[test]
+fn strict_default_enables_all_enum_values_for_an_array_option() {
+    let options = "  options:\n    properties:\n      symbols:\n        type: array\n        items: { enum: [field, method, variant] }\n        default: [variant]\n        strictDefault: true\n        description: Member kinds to check.\n    additionalProperties: false\n";
+    let catalog = catalog(&[("a", &format!("{options}{CHECK}")), ("b", &plain())]);
+    assert_eq!(
+        resolve(&catalog, "recommended")["p/a"]
+            .options
+            .get("symbols"),
+        None
+    );
+    assert_eq!(
+        resolve(&catalog, "strict")["p/a"].options["symbols"],
+        json!(["field", "method", "variant"])
+    );
 }

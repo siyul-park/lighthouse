@@ -1,0 +1,48 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/narrow-inputs
+  uid: 0f58c216-5383-4e2b-886f-04d3589cfe90
+spec:
+  title: Public inputs use narrow abstractions
+  context: A broad project object passed only so a callee can use one capability exposes
+    unrelated dependencies and makes the caller contract harder to substitute. Inputs
+    and outputs are one property of one signature, the abstraction level it asks of
+    callers and promises them (the Go proverb "accept interfaces, return structs"),
+    so they are one decision.
+  scope:
+    subject: symbol
+  requirement: Public inputs SHOULD use the narrowest reusable abstraction that fully
+    expresses the contract; outputs SHOULD use the most concrete public type unless
+    polymorphism is part of the contract.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#types-and-apis-f4a27ffd'
+    - 'Go proverb: accept interfaces, return structs'
+    - 'Postel, RFC 761: be conservative in what you send, liberal in what you accept'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package api
+
+        type Application struct { DB *sql.DB; Logger *log.Logger; Clock Clock }
+        func FindUser(app *Application, id string) User { return app.DB.Find(id) }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package api
+
+        type UserReader interface { Find(string) User }
+        func FindUser(users UserReader, id string) User { return users.Find(id) }

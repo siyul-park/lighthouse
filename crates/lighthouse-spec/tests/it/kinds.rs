@@ -77,11 +77,11 @@ fn a_cel_check_reads_its_select_where_message_and_evidence() {
 #[test]
 fn the_short_name_of_a_decision_is_its_name_inside_the_pack() {
     let decision = lighthouse_test_support::bundled()
-        .decision("design/naming")
+        .decision("design/no-redundant-qualifier")
         .unwrap();
 
-    assert_eq!(decision.short_name(), "naming");
-    assert_eq!(decision.id(), "design/naming");
+    assert_eq!(decision.short_name(), "no-redundant-qualifier");
+    assert_eq!(decision.id(), "design/no-redundant-qualifier");
     let id: &str = Decision::id(decision);
     assert!(id.starts_with(decision.pack()));
 }

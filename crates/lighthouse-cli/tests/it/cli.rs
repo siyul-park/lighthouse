@@ -16,7 +16,7 @@ fn project(max: usize) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/file-size\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
+        lighthouse_test_support::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n").unwrap();
@@ -31,7 +31,7 @@ fn check_reports_warning_and_passes_without_strict() {
         .arg("check")
         .assert()
         .success()
-        .stdout("big.txt:7:1: warn core/file-size: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n");
+        .stdout("big.txt:7:1: warn core/max-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n");
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn timings_go_to_stderr_and_leave_the_report_alone() {
         "index text",
         "merge",
         "rules",
-        "rule core/file-size",
+        "rule core/max-lines",
         "fingerprints",
         "store",
         "report",
@@ -126,7 +126,7 @@ fn json_and_sarif_formats() {
         .unwrap();
     let line: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(line["status"], "findings");
-    assert_eq!(line["groups"][0]["decision"], "core/file-size");
+    assert_eq!(line["groups"][0]["decision"], "core/max-lines");
     assert_eq!(line["groups"][0]["evidence"]["lines"], 8);
 
     let out = lighthouse(dir.path())
@@ -159,8 +159,8 @@ fn gitignored_files_are_skipped_and_rules_filter_applies() {
 #[test]
 fn decision_takes_globs_over_the_enabled_decisions() {
     let dir = project(6);
-    let expected = "big.txt:7:1: warn core/file-size: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n";
-    for selector in ["core/*", "core/file-size", "core/file-size,core/file-*"] {
+    let expected = "big.txt:7:1: warn core/max-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n";
+    for selector in ["core/*", "core/max-lines", "core/max-lines,core/max-*"] {
         lighthouse(dir.path())
             .args(["check", "--decision", selector])
             .assert()
@@ -181,7 +181,7 @@ fn override_can_turn_a_rule_off_for_a_file() {
     fs::write(
         &config,
         lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/file-size\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/file-size\" = \"off\" }\n",
+            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-lines\" = \"off\" }\n",
         ),
     )
     .unwrap();
@@ -253,12 +253,13 @@ fn decision_list_and_explain() {
         .unwrap();
     let list = String::from_utf8(list.stdout).unwrap();
     for line in [
-        "core/file-size\twarn\tFiles stay small and cohesive",
-        "design/complexity\twarn\tA function is small enough to read at one level",
+        "core/max-lines\twarn\tFiles stay small and cohesive",
+        "design/complexity\twarn\tFunctions stay within their complexity limits",
         "design/declaration-groups\terror\t",
-        "design/ownership\twarn\t",
-        "design/errors\twarn\t",
-        "testing/owner\twarn\t",
+        "design/no-mutable-globals\twarn\t",
+        "design/error-identity\twarn\t",
+        "testing/no-missing-owner\twarn\t",
+        "testing/no-duplicate-owner\terror\t",
         "testing/public-boundary\terror\t",
     ] {
         assert!(
@@ -290,9 +291,8 @@ fn decision_list_all_shows_status_of_every_decision() {
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
     for line in [
-        "core/file-size\timplemented\twarn\tFiles stay small and cohesive",
-        "design/duplication\tjudged\tinfo\tOne implementation, one owner",
-        "testing/validation\tdoc\t-\tSmallest failing contract first, validated up to the contract",
+        "core/max-lines\timplemented\twarn\tFiles stay small and cohesive",
+        "design/no-duplication\tjudged\tinfo\tBehavior has one implementation",
     ] {
         assert!(text.lines().any(|l| l == line), "{line}");
     }
@@ -302,11 +302,11 @@ fn decision_list_all_shows_status_of_every_decision() {
 fn explain_describes_judged_decisions() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())
-        .args(["decision", "show", "design/duplication"])
+        .args(["decision", "show", "design/no-duplication"])
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.contains("\n\nMultiple implementations of the same behavior"));
+    assert!(text.contains("Duplicated behavior diverges as fixes accumulate"));
     assert!(text.contains("Status: judged"));
 }
 
@@ -542,7 +542,7 @@ fn changed_reports_only_modified_and_untracked_files_but_analyzes_everything() {
         .args(["check", "--changed"])
         .assert()
         .success()
-        .stdout(predicates_contains("new.txt:7:1: warn core/file-size"))
+        .stdout(predicates_contains("new.txt:7:1: warn core/max-lines"))
         .stdout(predicates_lacks("big.txt"));
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\ni\n").unwrap();
     let out = lighthouse(dir.path())

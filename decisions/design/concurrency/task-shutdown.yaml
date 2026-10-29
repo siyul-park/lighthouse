@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/task-shutdown
+  uid: 93a73f1a-00e4-4cf8-8972-486a715c8c88
+spec:
+  title: Background tasks have a shutdown path
+  context: Starting a goroutine or task without an owner-controlled shutdown path
+    creates leaks and races during teardown.
+  scope:
+    subject: symbol
+  requirement: A background task SHOULD have a defined cancellation signal and a way
+    to wait for termination before its owner is released.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#concurrency-c49e7b37'
+    - Martin, Clean Code (2008), ch. 13 Shared objects and shutdown
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        func Start() { go func() { for { doWork() } }() }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        func Start(ctx context.Context) { go func() { for ctx.Err() == nil { doWork() } }() }

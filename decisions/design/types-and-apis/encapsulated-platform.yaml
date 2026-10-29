@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/encapsulated-platform
+  uid: 271c1e2f-da50-4cd0-8393-d8ecbda71db0
+spec:
+  title: Platform-specific code stays behind a boundary
+  context: Scattered platform branches make common behavior harder to test and platform
+    constraints harder to audit.
+  scope:
+    subject: symbol
+  requirement: Platform-specific behavior SHOULD be isolated behind a narrow interface
+    or implementation boundary.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#generated-and-platform-code-0669c79d'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        func Load() { if runtime.GOOS == "windows" { /* windows code */ } else { /* unix code */ } }
+        func Save() { if runtime.GOOS == "windows" { /* windows code */ } else { /* unix code */ } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+        type Platform interface { Load(); Save() }
+        func NewPlatform() Platform { if runtime.GOOS == "windows" { return windowsPlatform{} }; return unixPlatform{} }

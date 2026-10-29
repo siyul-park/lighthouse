@@ -4,37 +4,45 @@ expression: "render(Format::Agent, &findings, &gap(), &briefing)"
 ---
 acme/custom error
   a.txt:1:1 custom finding c8dfae3
-design/exported-doc warn [review] — Exported symbols SHOULD have doc comments in the language's standard form. Public API changes SHOULD document user-visible behavior, constraints, ownership, or other facts the code cannot express.
+design/exported-doc warn [review] — Exported symbols SHOULD have doc comments in the language's standard form.
   expected:
     package sample
 
     func Helper() {}
   bar/bar.go:4:1 exported function Func1 must have a doc comment adc7d1d
   bar/bar.go:7:1 exported function Func2 must have a doc comment ab2cb8c {receiver=T} (note: judgment expired: decision changed)
-design/complexity warn [review] — A function SHOULD NOT exceed the limit of its role in lines, statements, cyclomatic complexity, cognitive complexity or nesting depth, and SHOULD NOT be a dependency hub or a high fan-out coordinator. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`). The remedy is simpler code or a concept that is reused, never the same body moved elsewhere. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds.
+design/coupling warn [review] — A function SHOULD NOT be a high fan-in/fan-out dependency hub or an oversized coordinator; such functions deserve review for responsibility and change propagation.
   expected:
     package sample
 
-    func total(a, b int) int {
-        sum := a
-
-        sum += b
-
-        return sum
+    func hub() {
+    	left()
+    	right()
     }
+
+    func left()  {}
+    func right() {}
+
+    func a() { hub() }
+    func b() { hub() }
   evidence: callees=["a","b c"] fan_in=2 fan_out=14 symbol=jit::compile#function
-  internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package 95c1bd4
-design/errors info (authored warn) [review] — Dependency identity MUST be preserved when callers depend on it; context added to an error MUST keep the cause reachable: an error MUST be compared with `errors.Is`, asserted with `errors.As` and wrapped with `%w`. Semantic errors MUST use stable, named error values or types, and semantic categories MUST NOT be created from ad hoc formatted messages alone. Error categories MUST be translated only at their owning boundary. Errors MUST NOT expose private or sensitive process state. Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
+  internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package 5da1c26
+design/no-redundant-symbol info (authored warn) [review] — A symbol SHOULD earn its existence by naming reusable behavior, a contract, an invariant, or a real abstraction; a forwarding wrapper or one-implementation private interface SHOULD be consolidated when it adds no distinct responsibility.
   expected:
-    #[derive(PartialEq)]
-    pub enum Failure {
-        Missing,
+    pub struct Store {
+        closed: bool,
+        data: Vec<u8>,
     }
 
-    pub fn is_missing(err: &Failure) -> bool {
-        *err == Failure::Missing
-    }
-  src/lib.rs:7:1 private helper has one caller 46aa779
+    impl Store {
+        fn load(&self, k: usize) -> u8 {
+            if self.closed {
+                return 0;
+            }
+            self.read(k)
+        }
+    ...
+  src/lib.rs:7:1 private helper has one caller 2e996a5
 broken.go: incomplete: type error
 resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 judgments: fail=the finding is right; add `suppress` with a justification to leave it in place; pass=false positive: the code conforms; notApplicable=the decision does not apply here; a hint to narrow it

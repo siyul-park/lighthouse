@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/self-validating
+  uid: e6a85e6c-c2c2-4c59-9f6e-bdde512f4592
+spec:
+  title: Tests validate outcomes automatically
+  context: Automated assertions make the suite reliable evidence in CI and remove
+    the ambiguity of a manual review step.
+  scope:
+    subject: test
+    tests: only
+  requirement: A test SHOULD fail or pass from assertions over observable outcomes
+    and SHOULD NOT require a person to inspect output manually.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#f-i-r-s-t-05a59702'
+    - 'Martin, Clean Code (2008), ch. 9 F.I.R.S.T.'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestOutput(t *testing.T) { fmt.Println(run()) /* inspect output manually */ }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestOutput(t *testing.T) { if got := run(); got != want { t.Fatalf("got %v want %v", got, want) } }

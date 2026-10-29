@@ -1,0 +1,109 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/max-name-words
+  uid: 5aaa4903-d259-4b31-8365-5933925d72c8
+spec:
+  title: Names stay within the word limit
+  context: Long names cost more to read. Name words split at underscores, lower-to-upper
+    transitions, and acronym boundaries (for example, `parseHTTPRequest` has three
+    words).
+  scope:
+    subject: symbol
+  requirement: A name SHOULD contain no more than the configured number of words and
+    SHOULD use only the qualifiers needed to distinguish its meaning.
+  severity: warn
+  options:
+    properties:
+      enabled:
+        type: boolean
+        default: false
+        strictDefault: true
+        description: Enable name-length findings in the strict project.
+      maxWords:
+        type: integer
+        default: 3
+        description: Most words a name may have.
+    additionalProperties: false
+  check:
+    type: cel
+    select: symbol
+    variables:
+    - name: word_count
+      expression: size(symbol.words)
+    where: options.enabled && word_count > options.maxWords
+    message: "{{ symbol.kind + ' ' + symbol.name + ' has ' + string(word_count) +
+      ' words, limit is ' + string(options.maxWords) }}"
+    evidence:
+      name: symbol.name
+      words: word_count
+      max: options.maxWords
+    identity:
+      subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), G20 Function Names Should Say What They Do
+    - Martin, Clean Code (2008), N1 Choose Descriptive Names
+    - Martin, Clean Code (2008), N2 Choose Names at the Appropriate Level of Abstraction
+    - Martin, Clean Code (2008), N3 Use Standard Nomenclature Where Possible
+    - Martin, Clean Code (2008), N4 Unambiguous Names
+    - Martin, Clean Code (2008), N6 Avoid Encodings
+  examples:
+  - name: words-go-long-name
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func parseHTTPRequestBodyBytes() {}
+    expect:
+    - line: 3
+    options:
+      enabled: true
+  - name: words-go-short-name
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func parseHTTPRequest() {}
+    options:
+      enabled: true
+    canonical: true
+  - name: words-go-higher-limit
+    language: go
+    kind: valid
+    options:
+      maxWords: 5
+      enabled: true
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func parseHTTPRequestBodyBytes() {}
+    canonical: false
+  - name: words-rust-long-name
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: fn parse_http_request_body_bytes() {}
+    expect:
+    - line: 1
+    options:
+      enabled: true
+  - name: words-rust-short-name
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: fn parse_http_request() {}
+    options:
+      enabled: true
+    canonical: true

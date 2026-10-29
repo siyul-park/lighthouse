@@ -256,7 +256,8 @@
       "description": "An external program that checks files, by the process contract. Its\n`output` says what it prints (`lines`, `sarif` or `status`); with `lines`,\nexit `0` ran and found nothing and `1` ran and printed findings, one per\nline, anything else (a signal, a timeout, a code outside `success`) is an\nerror that leaves the analysis incomplete, never clean. stderr is for\npeople. It runs without a shell in the project root, read-only by\ncontract. `{file}` runs it once per file, `{files}` over as many files as\nthe argument list allows, neither once over the project.",
       "properties": {
         "command": {
-          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given.",
+          "default": [],
+          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given. A decision's `check` and `fix` may leave it out\nwhen each language it covers gives its own program under\n`languages.<id>`.",
           "items": {
             "type": "string"
           },
@@ -332,16 +333,14 @@
           ]
         }
       },
-      "required": [
-        "command"
-      ],
       "type": "object"
     },
     "CommandSpec": {
       "description": "An external program that fixes a finding, by the process contract. Its\n`output` says what the result is: `files`, the files it changed in a\nscratch copy of the project (a repository of one commit, so tools that need\none find their root), or `stdout`, the new text of `{file}`, which needs no\ncopy. A result with no change declines the finding, with stderr as the\nreason; a code outside `success`, a signal or a timeout is an error that\napplies nothing. stdout carries only the result; stderr is for people.",
       "properties": {
         "command": {
-          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given.",
+          "default": [],
+          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given. A decision's `check` and `fix` may leave it out\nwhen each language it covers gives its own program under\n`languages.<id>`.",
           "items": {
             "type": "string"
           },
@@ -421,9 +420,6 @@
           ]
         }
       },
-      "required": [
-        "command"
-      ],
       "type": "object"
     },
     "DecisionSpec": {
@@ -902,8 +898,30 @@
     },
     "LanguageSpec": {
       "additionalProperties": false,
-      "description": "What one language changes about a decision: the values of its options.",
+      "description": "What one language changes about a decision: the values of its options and\nthe programs that check and fix its files.",
       "properties": {
+        "check": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/program"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The program that checks the files of this language, in place of the\ndecision's own `command` check, which it needs to be."
+        },
+        "fix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/program"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The program that fixes the findings in files of this language, in\nplace of the decision's own `command` fix, which it needs to be."
+        },
         "options": {
           "additionalProperties": true,
           "description": "Values of the decision's options that replace their defaults here.",
@@ -931,7 +949,7 @@
           "type": "object"
         },
         "name": {
-          "description": "Fully qualified name, such as `design/naming`.",
+          "description": "Fully qualified name, such as `design/no-redundant-qualifier`.",
           "type": "string"
         },
         "uid": {
@@ -1313,6 +1331,82 @@
           "type": "object"
         }
       ]
+    },
+    "program": {
+      "description": "A program as the files write it. Where a program is a table of its own\n(a `check` or a `fix`), its fields stand beside the others.",
+      "properties": {
+        "command": {
+          "default": [],
+          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given. A decision's `check` and `fix` may leave it out\nwhen each language it covers gives its own program under\n`languages.<id>`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables the program is given besides the one allowlist. A value may\nhold `${NAME}`, the user's variable `NAME`, which is never written\ninto a command line, a note, a log or a cache key; a variable that is\nnot set fails the run, naming it.",
+          "type": "object"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Output"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What it prints, which decides the result. Default: `lines` for a\ncheck, `files` for a fix, `status` for a `[fix] verify` program."
+        },
+        "sandbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sandbox"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What it may reach besides the project's `[sandbox]`."
+        },
+        "sarif": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sarif"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How a SARIF log is read; only with `output: sarif`."
+        },
+        "stdin": {
+          "$ref": "#/$defs/Stdin",
+          "description": "What it reads on stdin: nothing, or the text of `{file}`."
+        },
+        "success": {
+          "description": "The exit codes that mean the program ran; any other code, a signal or\na timeout is an error. Default: `[0, 1]` for `lines` and `sarif`\n(linters exit 1 with findings), `[0]` otherwise.",
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "timeout": {
+          "description": "How long it may run, such as `30s` or `2m`. Default: `2m`; `10m` for\nan agent and for a `[fix] verify` program.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision.schema.json",

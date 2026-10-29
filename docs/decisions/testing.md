@@ -10,27 +10,35 @@ Test structure should provide one obvious owner for each public contract and kee
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`testing/owner`](#every-public-symbol-has-exactly-one-owner-test) | Every public symbol has exactly one owner test | warn · cel |  |  |
-| [`testing/cases`](#cases-are-behaviors-written-simply-and-asserted-through-the-standard-library) | Cases are behaviors, written simply and asserted through the standard library | warn · cel | unsafe |  |
+| [`testing/no-missing-owner`](#every-public-symbol-has-an-owner-test) | Every public symbol has an owner test | warn · cel |  |  |
+| [`testing/no-duplicate-owner`](#a-public-symbol-has-at-most-one-owner-test) | A public symbol has at most one owner test | error · cel |  |  |
+| [`testing/standard-assertions`](#tests-use-standard-assertions) | Tests use standard assertions | warn · cel | unsafe |  |
+| [`testing/behavior-cases`](#each-test-case-specifies-one-behavior) | Each test case specifies one behavior | warn · model |  |  |
+| [`testing/case-assertions`](#assertions-stay-inside-their-cases) | Assertions stay inside their cases | warn · model |  |  |
+| [`testing/consistent-case-style`](#a-test-level-uses-one-case-style) | A test level uses one case style | warn · cel |  |  |
+| [`testing/max-case-depth`](#test-cases-have-at-most-two-levels) | Test cases have at most two levels | warn · cel |  |  |
+| [`testing/prefer-table`](#repeated-inputs-share-one-table) | Repeated inputs share one table | warn · model |  |  |
+| [`testing/scenario-cases`](#distinct-scenarios-have-distinct-cases) | Distinct scenarios have distinct cases | warn · model |  |  |
+| [`testing/simple-tables`](#test-tables-stay-simple) | Test tables stay simple | warn · model |  |  |
+| [`testing/no-hidden-target`](#tests-expose-the-behavior-they-exercise) | Tests expose the behavior they exercise | warn · cel |  |  |
 | [`testing/file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | error · cel | safe |  |
 
-### Every public symbol has exactly one owner test
+### Every public symbol has an owner test
 
-`testing/owner` · test · warn · cel
+`testing/no-missing-owner` · test · warn · cel
 
-*A contract without an owner test has no place to read or extend its specification, and several semantic owners split one contract across places and let them contradict. Kinds. `missing`: a public symbol that has no owner test. `duplicate`: a public symbol that has two or more owner tests; keep one top-level test and make the rest cases of it. Evidence `owner_tests` lists the owners. The naming convention is the language's, not a policy: its provider declares it (`conventions.test_naming`) and a project replaces parts of it in `[languages.<id>] testNaming` (`prefix`, `snakeCase`, `variants`, `ancestors`). Go: The owner of a function or type is `TestName`, of a method `TestType_Method`. A symbol that no test names and no test code calls or references is reported; a type counts as tested when one of its members is. Only modules that have tests are judged. Types without methods and interfaces are not required to have one, nor are methods that implement an interface method. `TestGet` and `TestGet_Missing` both own `Get`: the second is a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to the method `Get`, not to the type `Store`. Rust: The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. The integration tests of a crate count for every module of it, including public items that the crate root re-exports from private modules, and a method call on a value of unknown type counts for the public methods of that name. Methods of trait impls and types without methods are not required to have one. Rust tests are many small functions, so names that merely extend a symbol's name are not owners; two tests with exactly the name of one item (in different test crates, or inline and in `tests/`) are.*
+*A public symbol without an owner test has no single place to read or extend its specification. A public symbol should have one obvious top-level test whose cases specify its behavior. The naming convention is the language's, not a policy: its provider declares it (`conventions.test_naming`) and a project replaces parts of it in `[languages.<id>] testNaming` (`prefix`, `snakeCase`, `variants`, `ancestors`). Go: A function or type is owned by `TestName`, a method by `TestType_Method`. Only modules that have tests are judged. Types without methods and interfaces do not require a missing-owner test, nor do methods that implement interface methods. A type counts as tested when one of its members is. Names use the longest matching symbol, so `TestStore_Get` belongs to the method `Get`, not the type `Store`. Rust: A function or type is owned by the test with its snake-case name (`get`, `store`), a method by `type_method`. Only crates with tests are judged. Integration tests count for every module in the crate, including public items re-exported from private modules. A method call on a value of unknown type counts for the public methods of that name. Trait-implementation methods and types without methods do not require a missing-owner test.*
 
-Each public symbol SHOULD have one top-level test function, and exported contracts MUST have an owning test. A public symbol MUST NOT have multiple semantic owner test functions.
+A public symbol SHOULD have one top-level owner test function.
 
-Derived from: Martin, Clean Code (2008), T1 Insufficient Tests; Martin, Clean Code (2008), T3 Don't Skip Trivial Tests
+Derived from: Martin, Clean Code (2008), T1 Insufficient Tests
 
 | option | default | meaning |
 | --- | --- | --- |
 | `exemptMethods` | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
 | `includeDataTypes` | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
 | `includeInternal` | `false`; go: `true` | Also judge symbols public only inside the project. |
-| `kinds` | `["missing","duplicate"]` | What to report. |
-| `symbols` | `["function","method","type"]` | Kinds of public symbols that need an owner test (kind `missing`). Interfaces are tested through their implementations and are left out by default. |
+| `symbols` | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
 
 ```go invalid go.mod
 module example.com/store
@@ -70,22 +78,119 @@ func Get() int { return 1 }
 
 Also: rust
 
-### Cases are behaviors, written simply and asserted through the standard library
+### A public symbol has at most one owner test
 
-`testing/cases` · test · warn · cel · fix: unsafe
+`testing/no-duplicate-owner` · test · error · cel
 
-*A case is one behavior with its target, input, operation and expected result visible (Martin, Clean Code ch. 9: clean tests, one concept per test), and the same behavior over many inputs is one table, different scenarios one case each, in one case style at one level, at most two levels deep. Kind `manual` is the one a fact tells apart; the rest is judged: the requirement and the examples are the question put to a model for each test function. A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output. The decision applies to a module whose files import one of the `libraries` somewhere: where no assertion library is in use, a plain compare-and-fail is the standard form and there is nothing to prefer. A benchmark (`Benchmark*`) is not judged: its loop checks a result without an assertion library's overhead. Go: The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion. Rust: Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.*
+*Several semantic owner tests split one public contract across places and let those specifications contradict. Keep one top-level owner test; make the rest cases of it. The naming convention is the language's, not a policy: its provider declares it (`conventions.test_naming`) and a project replaces parts of it in `[languages.<id>] testNaming` (`prefix`, `snakeCase`, `variants`, `ancestors`). Go: A function or type is owned by `TestName`, a method by `TestType_Method`. `TestGet` and `TestGet_Missing` both own `Get`: with variants enabled, the latter is a second owner and should instead be a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to `Get`, not `Store`. Rust: A function or type is owned by the test with its snake-case name (`get`, `store`), a method by `type_method`. Names that merely extend a symbol name are not owners; two tests with exactly the same owner name in different test crates, or inline and in `tests/`, are duplicate owners.*
 
-Tests SHOULD assert through the project's standard assertion library, and a test helper SHOULD NOT reimplement a comparison and failure that the library already provides. A case MUST represent behavior, not a branch or implementation path, and MUST contain the behavior it claims to specify. Assertions outside cases SHOULD describe setup, preconditions, or test-wide invariants, not case behavior. A test function MUST use either table cases or scenario cases, never both, and SHOULD use one case style per level. Tests MUST NOT mix different writing styles or abstraction levels at one level. Test structure MUST serve the contract rather than implementation shape or coverage, and MUST have at most two levels: the test function and its direct cases. Same behavior over many inputs MUST use one inline table of named inputs and expected outputs, each entry one case; cases that specify the same behavior MUST be merged into one case or one table. Different scenarios MUST use one case per scenario, named for the behavior it states. Table data and generation code MUST remain simple enough to read as specification. A test MUST expose the target, input, operation, and expected result in the case; the target and its behavior MUST remain visible. Wrappers, builders, or helpers MUST NOT hide the target call or result being specified, and MUST NOT be added merely for reuse; setup helpers MAY exist only when the specified behavior remains visible.
+A public symbol MUST NOT have multiple semantic owner test functions.
+
+Derived from: Martin, Clean Code (2008), T3 Don't Skip Trivial Tests
+
+| option | default | meaning |
+| --- | --- | --- |
+| `includeInternal` | `false`; go: `true` | Also judge symbols public only inside the project. |
+
+```go invalid store.go
+package store
+
+func Get() int { return 1 }
+```
+
+```go invalid store_test.go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	if store.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+
+func TestGet_Missing(t *testing.T) {
+	if store.Get() != 1 {
+		t.Fatal("missing")
+	}
+}
+```
+
+```go valid store.go
+package store
+
+type Store struct{}
+
+func (s *Store) Get() int { return 1 }
+```
+
+```go valid store_test.go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestStore(t *testing.T) {
+	s := &store.Store{}
+	_ = s
+}
+
+func TestStore_Get(t *testing.T) {
+	s := &store.Store{}
+	if s.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+Also: rust
+
+### Tests use standard assertions
+
+`testing/standard-assertions` · test · warn · cel · fix: unsafe
+
+*Assertions centralize failure messages and keep tests concise. The configured third-party assertion imports are the boundary for the Go check; tests that do not use one are not judged by the deterministic arm.*
+
+Tests SHOULD assert outcomes with the standard testing-library or language-native assertions rather than manually comparing values and failing without a useful diagnostic.
 
 Derived from: Meszaros, xUnit Test Patterns, Obscure Test; Martin, Clean Code (2008), ch. 9 Clean tests; Martin, Clean Code (2008), ch. 9 Single concept per test; Martin, Clean Code (2008), ch. 9 One assert per test
 
 | option | default | meaning |
 | --- | --- | --- |
-| `kinds` | `["manual"]` | What to report. |
-| `libraries` | `["github.com/stretchr/testify"]` | Import paths (or their prefixes) of the assertion libraries; a module that imports none of them is not judged. |
+| `libraries` | `["github.com/stretchr/testify"]` | Import paths (or their prefixes) of the assertion libraries; project-local packages are named by their resolved module paths. A module that imports none of them is not judged. |
+
+```go invalid assertions/assertions.go
+package assertions
+
+func Equal(got, want int) bool { return got == want }
+```
 
 ```go invalid store_test.go
+package store_test
+
+import (
+    "testing"
+
+    "example.com/store"
+    "example.com/store/assertions"
+)
+
+func TestGet(t *testing.T) {
+    _ = assertions.Equal(store.Get(), 1)
+    if got := store.Get(); got != 1 {
+        t.Fatalf("got %d", got)
+    }
+}
+```
+
+```go valid store_test.go
 package store_test
 
 import (
@@ -101,20 +206,228 @@ func TestGet(t *testing.T) {
 }
 ```
 
-```go valid store_test.go
-package store_test
+Also: rust
 
-import (
-	"testing"
+### Each test case specifies one behavior
 
-	"example.com/store"
-)
+`testing/behavior-cases` · test · warn · model
+
+*A test that mixes unrelated behaviors is hard to interpret when it fails. Fixtures and setup may be shared, but a case should state one outcome.*
+
+A test case SHOULD specify one behavior and contain the actions and assertions that establish that behavior.
+
+Derived from: Lighthouse, testing#readability-71cbc25a; Martin, Clean Code (2008), ch. 9 Single concept per test; Martin, Clean Code (2008), ch. 9 Clean tests; Martin, Clean Code (2008), ch. 9 Single concept per test
+
+```go invalid
+package sample
+func TestStore(t *testing.T) { store.Open(); store.Close(); if store.Status() != "closed" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestStoreOpen(t *testing.T) { store.Open(); if !store.IsOpen() { t.Fatal() } }
+func TestStoreClose(t *testing.T) { store.Close(); if store.IsOpen() { t.Fatal() } }
+```
+
+### Assertions stay inside their cases
+
+`testing/case-assertions` · test · warn · model
+
+*Assertions outside a subtest may fail without naming which scenario failed, and their result can depend on case order.*
+
+Assertions that belong to a scenario SHOULD be inside that scenario’s test case; setup outside cases SHOULD only establish shared preconditions.
+
+Derived from: Lighthouse, testing#organization-2aa48e36; Martin, Clean Code (2008), ch. 9 One assert per test; Martin, Clean Code (2008), ch. 9 One assert per test
+
+```go invalid
+package sample
+func TestStore(t *testing.T) { got := store.Get(); if got != want { t.Fatal() }; t.Run("missing", func(t *testing.T) { store.GetMissing() }) }
+```
+
+```go valid
+package sample
+func TestStore(t *testing.T) { t.Run("present", func(t *testing.T) { got := store.Get(); if got != want { t.Fatal() } }) }
+```
+
+### A test level uses one case style
+
+`testing/consistent-case-style` · test · warn · cel
+
+*Mixing table and scenario styles at the same level obscures which inputs are data and which are distinct behaviors.*
+
+A test level SHOULD use either data-driven table cases or individually named scenario cases, not a mixture for the same behavior.
+
+Derived from: Lighthouse, testing#organization-17ab163b
+
+```go invalid sample_test.go
+package sample
+
+import "testing"
+
+func TestGetEmpty(t *testing.T) {
+	if Get("") != 0 {
+		t.Fatal("empty")
+	}
+}
+
+func TestGetCases(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  int
+	}{{"one", "a", 1}, {"two", "ab", 2}}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Get(tc.input); got != tc.want {
+				t.Fatalf("got %d want %d", got, tc.want)
+			}
+		})
+	}
+}
+```
+
+```go valid sample_test.go
+package sample
+
+import "testing"
 
 func TestGet(t *testing.T) {
-	got := store.Get()
-	if got != 1 {
-		t.Errorf("got %d", got)
-		return
+	cases := []struct {
+		name  string
+		input string
+		want  int
+	}{{"empty", "", 0}, {"one", "a", 1}}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Get(tc.input); got != tc.want {
+				t.Fatalf("got %d want %d", got, tc.want)
+			}
+		})
+	}
+}
+```
+
+Also: rust
+
+### Test cases have at most two levels
+
+`testing/max-case-depth` · test · warn · cel
+
+*Deeply nested subtests make the execution tree difficult to read and failures harder to locate.*
+
+Nested test cases SHOULD be limited to two levels: a test function and its direct cases.
+
+Derived from: Lighthouse, testing#organization-c3e1ee9a
+
+```go invalid sample_test.go
+package sample
+import "testing"
+func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { t.Run("b", func(t *testing.T) { t.Run("c", func(t *testing.T) {}) }) }) }
+```
+
+```go valid sample_test.go
+package sample
+import "testing"
+func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { if got := Get(); got != 1 { t.Fatal() } }) }
+```
+
+Also: rust
+
+### Repeated inputs share one table
+
+`testing/prefer-table` · test · warn · model
+
+*A table keeps the invariant and assertion visible once while making the input/output differences explicit.*
+
+Tests of the same behavior with different inputs SHOULD use a named table of inputs and expected outputs.
+
+Derived from: Lighthouse, testing#organization-dac1a854
+
+```go invalid
+package sample
+func TestGetOne(t *testing.T) { if Get(1) != "one" { t.Fatal() } }
+func TestGetTwo(t *testing.T) { if Get(2) != "two" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestGet(t *testing.T) { tests := []struct{ input int; want string }{{1,"one"},{2,"two"}}; for _, tt := range tests { t.Run(tt.want, func(t *testing.T) { if got := Get(tt.input); got != tt.want { t.Fatal() } }) } }
+```
+
+### Distinct scenarios have distinct cases
+
+`testing/scenario-cases` · test · warn · model
+
+*Named scenarios make failure output state which contract path failed and keep the top-level test readable.*
+
+Each behaviorally distinct scenario SHOULD have its own named case rather than being hidden inside a long test body.
+
+Derived from: Lighthouse, testing#organization-bd4d8f2c
+
+```go invalid
+package sample
+func TestAccount(t *testing.T) { a := NewAccount(); a.Deposit(2); a.Withdraw(1); a.Close(); if a.Balance() != 1 { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestDeposit(t *testing.T) { a := NewAccount(); a.Deposit(2); if a.Balance() != 2 { t.Fatal() } }
+func TestWithdraw(t *testing.T) { a := NewAccount(); a.Deposit(2); a.Withdraw(1); if a.Balance() != 1 { t.Fatal() } }
+```
+
+### Test tables stay simple
+
+`testing/simple-tables` · test · warn · model
+
+*The table is the test specification. A reader should be able to understand each case without tracing fixture generation.*
+
+Test table data SHOULD be literal and easy to inspect; complex generation and builders SHOULD NOT hide the input/output specification.
+
+Derived from: Lighthouse, testing#readability-fa58951a
+
+```go invalid
+package sample
+func TestGet(t *testing.T) { cases := buildCasesFromConfig(); for _, tc := range cases { assertGet(t, tc) } }
+```
+
+```go valid
+package sample
+func TestGet(t *testing.T) { cases := []struct{ input string; want int }{{"a",1},{"b",2}}; for _, tc := range cases { t.Run(tc.input, func(t *testing.T) { if got := Get(tc.input); got != tc.want { t.Fatal() } }) } }
+```
+
+### Tests expose the behavior they exercise
+
+`testing/no-hidden-target` · test · warn · cel
+
+*The test body should read like a specification. Helpers may remove repetition, but a reviewer must still see what production behavior is being tested.*
+
+A test SHOULD make the production call and its asserted result visible; helpers SHOULD NOT hide the target call, result, or expected value.
+
+Derived from: Lighthouse, testing#readability-668c9a46; Lighthouse, testing#contract-31731df3; Meszaros, xUnit Test Patterns, Obscure Test
+
+```go invalid sample_test.go
+package sample
+
+import "testing"
+
+func assertGetIsOne(t *testing.T) {
+	t.Helper()
+	if Get() != 1 {
+		t.Fatal("Get is not 1")
+	}
+}
+
+func TestGet(t *testing.T) { assertGetIsOne(t) }
+```
+
+```go valid sample_test.go
+package sample
+
+import "testing"
+
+func TestGet(t *testing.T) {
+	if got := Get(); got != 1 {
+		t.Fatalf("got %d want 1", got)
 	}
 }
 ```
@@ -134,16 +447,10 @@ Derived from: Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Marti
 ```diff
 --- a/store_test.go
 +++ b/store_test.go
-@@ -7,4 +7,6 @@
- )
- 
+@@ -8,0 +9,2 @@
 +const want = 1
 +
- func TestGet(t *testing.T) {
- 	if store.Get() != want {
-@@ -12,4 +14,2 @@
- 	}
- }
+@@ -14,2 +15,0 @@
 -
 -const want = 1
 ```
@@ -162,9 +469,9 @@ Contract tests should prove behavior through the same public boundary available 
 
 `testing/public-boundary` · test · error · cel
 
-*Living outside the target makes private access impossible rather than discouraged. Go: Tests live in `package <target>_test`. A test file inside the target package is reported when it uses an unexported symbol of that package; one that only uses exported symbols is left alone. Python: Contract tests import only the package's public API. Rust: Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]` unit tests are never reported: the provider cannot tell a `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot say that such a test could have lived in `tests/`. TypeScript: Contract tests import only the package's public exports.*
+*Living outside the target makes private access impossible rather than discouraged. A test shows public usage and promised behavior; a private symbol is tested through the public boundary, never by exposing internals solely for tests. Go: Tests live in `package <target>_test`. A test file inside the target package is reported when it uses an unexported symbol of that package; one that only uses exported symbols is left alone. Python: Contract tests import only the package's public API. Rust: Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]` unit tests are never reported: the provider cannot tell a `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot say that such a test could have lived in `tests/`. TypeScript: Contract tests import only the package's public exports.*
 
-Feature contract tests MUST use only the target's public symbols and MUST live outside the target's private scope. Tests MUST NOT reference private symbols of the target; private-symbol testing MUST be resolved at the public boundary rather than by exposing internals solely for tests. A test MUST show public usage and promised behavior.
+Contract tests MUST live outside the target's private scope and MUST NOT reference its private symbols.
 
 Derived from: Martin, Clean Code (2008), ch. 9 Clean tests
 
@@ -200,36 +507,216 @@ Tests are reliable evidence, different test layers prove different facts, and va
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`testing/reliability`](#tests-are-reliable-evidence) | Tests are reliable evidence | warn · model |  |  |
-| [`testing/coverage`](#every-contract-dimension-has-evidence-from-the-right-layer) | Every contract dimension has evidence from the right layer | info · model |  |  |
-| [`testing/validation`](#smallest-failing-contract-first-validated-up-to-the-contract) | Smallest failing contract first, validated up to the contract | doc |  |  |
+| [`testing/independent-tests`](#tests-are-independent-and-repeatable) | Tests are independent and repeatable | warn · model |  |  |
+| [`testing/self-validating`](#tests-validate-outcomes-automatically) | Tests validate outcomes automatically | warn · model |  |  |
+| [`testing/no-polling-after-teardown`](#polling-ends-before-teardown) | Polling ends before teardown | warn · model |  |  |
+| [`testing/pure-polling`](#polling-predicates-are-pure-observations) | Polling predicates are pure observations | warn · model |  |  |
+| [`testing/contract-coverage`](#tests-cover-contract-dimensions) | Tests cover contract dimensions | info · model |  |  |
+| [`testing/lowest-layer`](#tests-use-the-lowest-proving-layer) | Tests use the lowest proving layer | info · model |  |  |
+| [`testing/specific-evidence`](#architecture-contracts-have-specific-evidence) | Architecture contracts have specific evidence | info · model |  |  |
+| [`testing/path-parity`](#equivalent-paths-have-parity-tests) | Equivalent paths have parity tests | info · model |  |  |
+| [`testing/independent-golden`](#golden-expectations-are-independent) | Golden expectations are independent | info · model |  |  |
+| [`testing/no-structure-tests`](#tests-prove-contracts-not-structure) | Tests prove contracts, not structure | info · model |  |  |
 
-### Tests are reliable evidence
+### Tests are independent and repeatable
 
-`testing/reliability` · test · warn · model
+`testing/independent-tests` · test · warn · model
 
-*Order-dependent, manual, slow or timing-dependent tests fail intermittently and stop being evidence (Martin, Clean Code ch. 9: F.I.R.S.T.; van Deursen et al. 2001; Peruma et al., tsDetect 2020). Judged: the requirement and the examples are the question put to a model for every test.*
+*Shared mutable state and order dependence make tests flaky and conceal missing setup.*
 
-Tests MUST be Fast, Independent, Repeatable, Self-validating, and Timely. Tests MUST NOT depend on other tests, uncontrolled mutable state, manual inspection, or unnecessary setup. Readiness polling MUST NOT outlive teardown or retain resources after the case closes them. Polling conditions MUST return readiness and observed results or errors only; assertions belong after readiness is established.
+Each test SHOULD produce the same result regardless of execution order and SHOULD NOT depend on mutable state left by another test.
 
-Derived from: van Deursen et al. 2001; Peruma et al., tsDetect 2020; Martin, Clean Code (2008), ch. 9 F.I.R.S.T.; Martin, Clean Code (2008), T9 Tests Should Be Fast
+Derived from: Lighthouse, testing#f-i-r-s-t-5e44df14; Martin, Clean Code (2008), ch. 9 F.I.R.S.T.; Martin, Clean Code (2008), ch. 9 F.I.R.S.T.
 
-### Every contract dimension has evidence from the right layer
+```go invalid
+package sample
+var shared int
+func TestFirst(t *testing.T) { shared++; if shared != 1 { t.Fatal() } }
+func TestSecond(t *testing.T) { if shared != 1 { t.Fatal() } }
+```
 
-`testing/coverage` · test · info · model
+```go valid
+package sample
+func TestFirst(t *testing.T) { got := compute(); if got != 1 { t.Fatal() } }
+func TestSecond(t *testing.T) { got := compute(); if got != 2 { t.Fatal() } }
+```
 
-*Untested failure and boundary behavior is unspecified behavior. Different test layers prove different facts; evidence is complete only when each required fact has an appropriate proof. Coverage proves reachability, not quality or completeness. Judged: the requirement and the examples are the question put to a model for every test.*
+### Tests validate outcomes automatically
 
-Tests MUST cover applicable success, failure, boundaries, ownership and lifecycle, compatibility, parity, and architecture contracts. Each required fact MUST be proven by the layer that owns it, and the lowest test layer that proves the contract MUST be used. Architecture-specific contracts MUST have architecture-specific evidence. Parity MUST be tested wherever multiple execution paths are required to implement the same public contract. Golden tests MUST define expected low-level output independently of the implementation that produced it. Coverage proves reachability, not quality or completeness; when no red phase is available, coverage SHOULD prove execution without changing production behavior to manufacture failure. Structure-only tests MUST NOT be added merely to exercise implementation details.
+`testing/self-validating` · test · warn · model
 
-Derived from: Martin, Clean Code (2008), T1 Insufficient Tests; Martin, Clean Code (2008), T5 Test Boundary Conditions
+*Automated assertions make the suite reliable evidence in CI and remove the ambiguity of a manual review step.*
 
-### Smallest failing contract first, validated up to the contract
+A test SHOULD fail or pass from assertions over observable outcomes and SHOULD NOT require a person to inspect output manually.
 
-`testing/validation` · test · doc
+Derived from: Lighthouse, testing#f-i-r-s-t-05a59702; Martin, Clean Code (2008), ch. 9 F.I.R.S.T.
 
-*Seeing the contract fail first proves the test can fail. Validation starts with the smallest useful falsification and expands only as far as the affected contract requires. Generated output and documentation freshness are repository gates, not test-completeness rules.*
+```go invalid
+package sample
+func TestOutput(t *testing.T) { fmt.Println(run()) /* inspect output manually */ }
+```
 
-For each behavior change, the agent MUST state the contract and invariants, write the narrowest falsifying test, observe the expected failure when practical, implement the smallest owning change, and run focused checks followed by applicable structural and repository gates. The smallest falsifying check MUST be run first. Package, race, coverage, architecture, and repository checks MUST be applied when relevant; only genuinely inapplicable checks MAY be skipped, and the reason MUST be stated. Generated output and documentation freshness MUST be enforced as repository gates, not as test-completeness rules. The repository MUST build with one command and run its tests with one command, so every gate above is a single step.
+```go valid
+package sample
+func TestOutput(t *testing.T) { if got := run(); got != want { t.Fatalf("got %v want %v", got, want) } }
+```
 
-Derived from: Martin, Clean Code (2008), E1 Build Requires More Than One Step; Martin, Clean Code (2008), E2 Tests Require More Than One Step
+### Polling ends before teardown
+
+`testing/no-polling-after-teardown` · test · warn · model
+
+*Polling past teardown can observe closed resources, leak goroutines, or make test results timing-dependent.*
+
+A polling assertion SHOULD finish before the resource it observes is torn down, and teardown SHOULD NOT race with a still-running poll.
+
+Derived from: Lighthouse, testing#organization-05384f94
+
+```go invalid
+package sample
+func TestWorker(t *testing.T) { worker.Start(); t.Cleanup(worker.Stop); require.Eventually(t, worker.Ready, time.Second, time.Millisecond) }
+```
+
+```go valid
+package sample
+func TestWorker(t *testing.T) { t.Cleanup(worker.Stop); worker.Start(); require.Eventually(t, worker.Ready, time.Second, time.Millisecond) }
+```
+
+### Polling predicates are pure observations
+
+`testing/pure-polling` · test · warn · model
+
+*A polling predicate may execute many times. Side effects make success depend on the scheduler and the number of polls.*
+
+A polling predicate SHOULD observe state without mutating it or consuming a one-shot result.
+
+Derived from: Lighthouse, testing#organization-5dabb856; Martin, Clean Code (2008), T9 Tests Should Be Fast
+
+```go invalid
+package sample
+require.Eventually(t, func() bool { counter++; return counter > 1 }, time.Second, time.Millisecond)
+```
+
+```go valid
+package sample
+require.Eventually(t, func() bool { return store.Ready() }, time.Second, time.Millisecond)
+```
+
+### Tests cover contract dimensions
+
+`testing/contract-coverage` · test · info · model
+
+*An untested boundary is unspecified behavior. Each applicable contract dimension needs evidence; the goal is completeness, not maximizing a percentage.*
+
+Tests SHOULD cover applicable success, failure, boundaries, ownership, lifecycle, and compatibility dimensions of each public contract.
+
+Derived from: Lighthouse, testing#tdd-f5c4ca98; Martin, Clean Code (2008), T1 Insufficient Tests; Martin, Clean Code (2008), T5 Test Boundary Conditions; Martin, Clean Code (2008), T1 Insufficient Tests; Martin, Clean Code (2008), T5 Test Boundary Conditions
+
+```go invalid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+```
+
+### Tests use the lowest proving layer
+
+`testing/lowest-layer` · test · info · model
+
+*Lower-level tests localize failures and run faster; choosing a higher layer is justified only when the contract itself crosses that boundary.*
+
+The lowest test layer that can prove a contract SHOULD be used, while integration tests remain for contracts that cross component boundaries.
+
+Derived from: Lighthouse, testing#tdd-9cd4d927
+
+```go invalid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+```
+
+### Architecture contracts have specific evidence
+
+`testing/specific-evidence` · test · info · model
+
+*A generic test may prove behavior but miss the module, platform, backend, or lifecycle condition that defines the architectural contract.*
+
+Architecture-specific contracts SHOULD have evidence that exercises the relevant architecture boundary rather than only a generic success path.
+
+Derived from: Lighthouse, testing#completeness-f61f5237
+
+```go invalid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+```
+
+### Equivalent paths have parity tests
+
+`testing/path-parity` · test · info · model
+
+*Cache, fallback, protocol, platform, or implementation paths may drift independently despite passing their local tests.*
+
+When multiple execution paths implement the same public contract, tests SHOULD prove parity across those paths.
+
+Derived from: Lighthouse, testing#native-jit-20e6de03
+
+```go invalid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+```
+
+### Golden expectations are independent
+
+`testing/independent-golden` · test · info · model
+
+*Generating expected output with the same code under test can reproduce the same defect in both actual and expected values.*
+
+Golden tests SHOULD define expected low-level output independently of the implementation that produced it.
+
+Derived from: Lighthouse, testing#native-jit-7e35f7e0
+
+```go invalid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+```
+
+### Tests prove contracts, not structure
+
+`testing/no-structure-tests` · test · info · model
+
+*Coverage proves reachability, not quality. Tests should fail for a contract violation rather than an arbitrary refactor.*
+
+Tests SHOULD NOT be added solely to exercise implementation structure when they cannot establish an externally meaningful contract.
+
+Derived from: Lighthouse, testing#tdd-64ebcce6
+
+```go invalid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+```
+
+```go valid
+package sample
+func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+```

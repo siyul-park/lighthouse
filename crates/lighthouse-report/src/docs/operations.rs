@@ -155,7 +155,7 @@ const ORDERS: &str = "## Orders\n\n\
      type: cel\n  \
      edits: \"[reorder(placed.sortBy(s, declaration_group(s)))]\"\n\
      ```\n\n\
-     `design/layout` reads the same `declaration_group(func)`. A function sees the \
+     `design/vertical-distance` reads the same `declaration_group(func)`. A function sees the \
      `options` and the `file` of its caller. `list.misplaced()` gives the \
      indexes of the fewest elements of a list of ints that, moved, put it in order.\n\n";
 

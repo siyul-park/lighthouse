@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/no-polling-after-teardown
+  uid: 62457755-65f8-40f1-b3db-f1068fb8e6b7
+spec:
+  title: Polling ends before teardown
+  context: Polling past teardown can observe closed resources, leak goroutines, or
+    make test results timing-dependent.
+  scope:
+    subject: test
+    tests: only
+  requirement: A polling assertion SHOULD finish before the resource it observes is
+    torn down, and teardown SHOULD NOT race with a still-running poll.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#organization-05384f94'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestWorker(t *testing.T) { worker.Start(); t.Cleanup(worker.Stop); require.Eventually(t, worker.Ready, time.Second, time.Millisecond) }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestWorker(t *testing.T) { t.Cleanup(worker.Stop); worker.Start(); require.Eventually(t, worker.Ready, time.Second, time.Millisecond) }

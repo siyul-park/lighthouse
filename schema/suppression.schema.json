@@ -62,7 +62,7 @@
           "type": "object"
         },
         "name": {
-          "description": "Fully qualified name, such as `design/naming`.",
+          "description": "Fully qualified name, such as `design/no-redundant-qualifier`.",
           "type": "string"
         },
         "uid": {

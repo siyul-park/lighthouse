@@ -13,16 +13,17 @@ spec:
     navigate the same concept. A module root may remain a small public facade
     or composition root; the concern is a sustained mixture of peer roles, not
     the mere presence of a child directory (Martin, Clean Code (2008), G34;
-    Ousterhout, A Philosophy of Software Design, chs. 4 and 9).
+    Ousterhout, A Philosophy of Software Design, chs. 4 and 9). A parent module
+    that keeps direct code beside a nested `language` directory is a concrete
+    warning candidate, because the language implementation is usually a separate
+    responsibility; other mixed layouts need review rather than an automatic
+    warning, since a small facade or composition root may legitimately assemble
+    its children.
   scope:
     subject: module
   requirement: >-
     A module's direct implementation files and its child modules SHOULD form
-    one coherent abstraction level. A parent module that keeps direct code
-    beside a nested `language` directory is a concrete warning candidate because
-    the language implementation is usually a separate responsibility. Other
-    mixed layouts need review rather than an automatic warning: a small facade
-    or composition root may legitimately assemble its children.
+    one coherent abstraction level.
   severity: warn
   options:
     properties:
@@ -57,6 +58,8 @@ spec:
     - path: engine.go
       body: |-
         package sample
+
+        import "example.com/sample/language"
 
         type Engine struct{}
         type Config struct{}

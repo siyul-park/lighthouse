@@ -217,7 +217,7 @@
           "type": "object"
         },
         "name": {
-          "description": "Fully qualified name, such as `design/naming`.",
+          "description": "Fully qualified name, such as `design/no-redundant-qualifier`.",
           "type": "string"
         },
         "uid": {
@@ -959,7 +959,8 @@
       "description": "A program as the files write it. Where a program is a table of its own\n(a `check` or a `fix`), its fields stand beside the others.",
       "properties": {
         "command": {
-          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given.",
+          "default": [],
+          "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given. A decision's `check` and `fix` may leave it out\nwhen each language it covers gives its own program under\n`languages.<id>`.",
           "items": {
             "type": "string"
           },
@@ -1028,9 +1029,6 @@
           ]
         }
       },
-      "required": [
-        "command"
-      ],
       "type": "object"
     }
   },

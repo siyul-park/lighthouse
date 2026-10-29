@@ -2,7 +2,7 @@
 # The gate of the result and provider caches: a warm run prints what a cold run
 # prints, byte for byte, and how long each takes.
 #
-# usage: scripts/fastgate.sh [name=]repo-dir...
+# usage: LIGHTHOUSE_TRUST=1 scripts/fastgate.sh [name=]repo-dir...
 #
 # Builds the release binary and the plugins, copies each repository to a
 # temporary directory (the repository itself is never touched), and on the copy
@@ -25,7 +25,7 @@ make -s plugins
 cargo build -q --release -p lighthouse-cli
 
 python3 - "$root" "$@" <<'PY'
-import os, re, shutil, statistics, subprocess, sys, tempfile
+import json, os, re, shutil, statistics, subprocess, sys, tempfile
 
 root, repos = sys.argv[1], sys.argv[2:]
 binary = f"{root}/target/release/lighthouse"
@@ -66,6 +66,13 @@ def run(path, cfg, cache):
     if not cache:
         args.append("--no-cache")
     done = subprocess.run(args, cwd=path, capture_output=True)
+    try:
+        json.loads(done.stdout)
+    except json.JSONDecodeError as error:
+        detail = done.stderr.decode().strip() or done.stdout.decode().strip() or "no output"
+        raise SystemExit(
+            f"{path}: lighthouse check returned no JSON (exit {done.returncode}): {detail}"
+        ) from error
     times = {"index": 0.0}
     for line in done.stderr.decode().splitlines():
         m = re.match(r"timings: (.+?) ([0-9.]+)ms(?: \(.*\))?$", line)
@@ -163,7 +170,7 @@ def script(path, cfg, kind, probe, body_file):
 
     def option():
         with open(cfg, "a") as f:
-            f.write('[spec.rules."design/naming"]\nlevel = "warn"\noptions.kinds = ["words"]\noptions.maxWords = 2\n')
+            f.write('[spec.rules."design/max-name-words"]\nlevel = "warn"\noptions.enabled = true\noptions.maxWords = 2\n')
 
     def new_caller():
         pkg = re.search(r"^package (\w+)", read(path, caller), re.M)

@@ -78,46 +78,61 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (25)
+## Active decisions (46)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|unsafe` marks a decision with a fixer and the safety of its fix.
 
 ### core
 
-- `core/file-size` (warn) Files stay small and cohesive
-- `core/allow` (error) Allow a finding in source, with a reason
+- `core/max-lines` (warn) Files stay small and cohesive
+- `core/allow-reason` (error) Allow a finding in source, with a reason
 - `core/no-unused-allow` (warn, fixable: unsafe) Allow annotations suppress something
 - `core/decision-naming` (warn) Decision names follow the ESLint convention
+- `core/formatted` (error, fixable: safe) Source files use their standard formatter
 
 ### design
 
-- `design/responsibility` (info) One responsibility per symbol, and a boundary for every split
+- `design/single-responsibility` (info) Symbols have one responsibility
+- `design/meaningful-separation` (info) Modules represent meaningful boundaries
+- `design/no-conjoined-modules` (info) Modules do not share private implementation
 - `design/module-layout` (warn) A module groups code at one abstraction level
-- `design/layers` (warn) Dependencies point down the layers
-- `design/complexity` (warn) A function is small enough to read at one level
-- `design/signature` (warn, fixable: unsafe) A signature is short, public and narrow
+- `design/layers` (error) Dependencies point down the layers
+- `design/complexity` (warn) Functions stay within their complexity limits
+- `design/coupling` (warn) Functions are not dependency hubs
+- `design/signature-size` (warn, fixable: unsafe) Signatures stay within their size limits
+- `design/no-private-types` (warn) Public signatures expose public types
 - `design/prefer-method` (warn, fixable: unsafe) Behavior lives with its owner
-- `design/symbols` (warn, fixable: unsafe) Every symbol earns its existence
-- `design/naming` (warn, fixable: unsafe) Names are short, standard and say what they mean
-- `design/ownership` (warn) State, generated code and platform code have one owner
-- `design/concurrency` (warn) Cancellation is explicit and tasks can be stopped
-- `design/errors` (warn, fixable: unsafe) Errors keep their identity and are returned, not thrown
-- `design/layout` (warn, fixable: unsafe) Declarations are laid out for reading
+- `design/feature-envy` (info, fixable: unsafe) Functions belong with the behavior they use
+- `design/no-unused-symbol` (error) Unused private symbols are removed
+- `design/no-redundant-symbol` (warn, fixable: unsafe) Redundant symbols are removed or consolidated
+- `design/no-redundant-qualifier` (warn, fixable: unsafe) Names do not repeat their owner or module
+- `design/max-name-words` (warn) Names stay within the word limit
+- `design/no-type-encoding` (warn) Names do not encode representation
+- `design/reserved-verbs` (warn) Action verbs name actions
+- `design/short-names` (warn) Names are long enough for their scope
+- `design/abbreviations` (warn) Standard abbreviations keep their spelling
+- `design/consistent-terms` (warn) One concept has one term
+- `design/no-mutable-globals` (warn) Mutable state has an explicit owner
+- `design/context-first` (warn) Context is the first parameter
+- `design/no-stored-context` (warn) Types do not store request contexts
+- `design/error-identity` (warn) Error identity survives wrapping
+- `design/no-panic` (warn, fixable: unsafe) Production errors do not panic
+- `design/top-down-order` (warn, fixable: unsafe) Callers precede private callees
+- `design/vertical-distance` (warn, fixable: unsafe) Related declarations stay close
+- `design/owner-file` (warn) One owner has one cohesive file
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
 - `design/exported-doc` (warn, fixable: unsafe) Exported symbols are documented
-- `design/comments` (warn, fixable: unsafe) A comment states a fact the code cannot
-
-### go
-
-- `go/formatted` (error, fixable: safe) A Go file is as gofmt writes it
-
-### rust
-
-- `rust/formatted` (error, fixable: safe) A Rust file is as rustfmt writes it
+- `design/no-noise-comment` (warn, fixable: unsafe) Comments add no noise
+- `design/no-detached-comment` (warn, fixable: unsafe) Comments stay attached to declarations
+- `design/no-todo` (info) TODO comments name deferred work
 
 ### testing
 
-- `testing/owner` (warn) Every public symbol has exactly one owner test
-- `testing/cases` (warn, fixable: unsafe) Cases are behaviors, written simply and asserted through the standard library
+- `testing/no-missing-owner` (warn) Every public symbol has an owner test
+- `testing/no-duplicate-owner` (error) A public symbol has at most one owner test
+- `testing/standard-assertions` (warn, fixable: unsafe) Tests use standard assertions
+- `testing/consistent-case-style` (warn) A test level uses one case style
+- `testing/max-case-depth` (warn) Test cases have at most two levels
+- `testing/no-hidden-target` (warn) Tests expose the behavior they exercise
 - `testing/file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers
 - `testing/public-boundary` (error) Contract tests live outside the target

@@ -1,4 +1,4 @@
-//! `rust/formatted` formats a file with the edition of its crate: rustfmt does
+//! `core/formatted` formats a file with the edition of its crate: rustfmt does
 //! not read `Cargo.toml`, and `use std::{b, A};` is as rustfmt writes it in the
 //! 2021 edition and not in the 2024 one, which orders the names differently.
 
@@ -22,7 +22,7 @@ fn workspace() -> TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"rust\"]\n[rules]\n\"rust/formatted\" = \"error\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"rust\"]\n[rules]\n\"core/formatted\" = \"error\"\n",
             plugin.to_str().unwrap()
         )),
     );
@@ -47,12 +47,12 @@ fn workspace() -> TempDir {
     dir
 }
 
-/// The files the check of `rust/formatted` flags.
+/// The files the check of `core/formatted` flags.
 fn flagged(dir: &TempDir) -> Vec<String> {
     let found = Client::trusting(dir.path())
         .tool(
             "check",
-            json!({"decision": ["rust/formatted"], "detail": "full"}),
+            json!({"decision": ["core/formatted"], "detail": "full"}),
         )
         .unwrap();
     let mut files: Vec<String> = found["findings"]
@@ -88,7 +88,7 @@ fn a_file_is_fixed_under_the_edition_of_its_crate() {
     let dir = workspace();
 
     let fixed: Value = Client::trusting(dir.path())
-        .tool("fix", json!({"decision": ["rust/formatted"]}))
+        .tool("fix", json!({"decision": ["core/formatted"]}))
         .unwrap();
 
     assert_eq!(

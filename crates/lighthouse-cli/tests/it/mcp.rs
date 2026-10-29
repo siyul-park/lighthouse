@@ -243,16 +243,16 @@ fn the_server_lists_its_tools_and_resources() {
     assert_eq!(uris, ["lighthouse://catalog", "lighthouse://config"]);
     let pattern = client.request(
         "resources/read",
-        json!({ "uri": "lighthouse://decisions/core/file-size" }),
+        json!({ "uri": "lighthouse://decisions/core/max-lines" }),
     );
     let text = pattern["result"]["contents"][0]["text"].as_str().unwrap();
-    assert!(text.contains("core/file-size"), "{text}");
+    assert!(text.contains("core/max-lines"), "{text}");
     let config = client.request("resources/read", json!({ "uri": "lighthouse://config" }));
     assert!(
         config["result"]["contents"][0]["text"]
             .as_str()
             .unwrap()
-            .contains("core/file-size")
+            .contains("core/max-lines")
     );
     let missing = client.request(
         "resources/read",
@@ -328,7 +328,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["decision"] == "design/errors")
+        .find(|g| g["decision"] == "design/no-panic")
         .unwrap_or_else(|| panic!("{tasks}"));
     let (path, rows) = group["files"].as_object().unwrap().iter().next().unwrap();
     let instance = &rows[0];
@@ -347,7 +347,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .as_array()
         .unwrap()
         .iter()
-        .find(|t| t["decision"] == "design/errors")
+        .find(|t| t["decision"] == "design/no-panic")
         .unwrap();
     let fingerprint = task["fingerprint"].as_str().unwrap();
     assert!(fingerprint.starts_with(prefix));
@@ -407,7 +407,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
 
     let after = client.tool("check", json!({})).unwrap();
     let still = rules_of(&after);
-    assert!(!still.contains(&"design/errors"), "{still:?}");
+    assert!(!still.contains(&"design/no-panic"), "{still:?}");
     assert_eq!(after["counts"]["suppressed"], 1);
 }
 
@@ -496,7 +496,7 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     // the project's `rules`.
     let bundled = client.tool(
         "decision_update",
-        json!({ "document": notes("core/file-size", "a\nb\nc\nd\n") }),
+        json!({ "document": notes("core/max-lines", "a\nb\nc\nd\n") }),
     );
     assert!(bundled.unwrap_err().to_string().contains("rules"));
     assert!(!rules_dir.join("override-core-max-file-lines.yaml").exists());
@@ -511,11 +511,11 @@ fn decision_list_and_show_describe_decisions() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|r| r["id"] == "core/file-size")
+        .find(|r| r["id"] == "core/max-lines")
         .unwrap();
     assert_eq!(row["enabled"], true);
     let explained = client
-        .tool("decision_show", json!({ "id": "core/file-size" }))
+        .tool("decision_show", json!({ "id": "core/max-lines" }))
         .unwrap();
     assert!(explained["markdown"].as_str().unwrap().contains("Status:"));
     assert!(
@@ -627,7 +627,7 @@ fn fix_selects_by_fingerprint_and_previews_unsafe_fixes_until_asked() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["decision"] == "design/comments")
+        .find(|g| g["decision"] == "design/no-noise-comment")
         .unwrap_or_else(|| panic!("{found}"));
     let fingerprint = banners["files"]["src/lib.rs"][0][2].as_str().unwrap();
 

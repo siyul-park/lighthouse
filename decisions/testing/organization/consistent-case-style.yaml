@@ -1,0 +1,118 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/consistent-case-style
+  uid: 8eaefa28-47f4-494f-a867-0cc24bae1eec
+spec:
+  title: A test level uses one case style
+  context: Mixing table and scenario styles at the same level obscures which inputs
+    are data and which are distinct behaviors.
+  scope:
+    subject: test
+    tests: only
+  requirement: A test level SHOULD use either data-driven table cases or individually
+    named scenario cases, not a mixture for the same behavior.
+  severity: warn
+  check:
+    type: cel
+    select: test
+    where: 'false'
+    abstain: test.style_mix
+    message: "{{ test.name + ' uses a different case style than a test beside it; review whether they cover the same behavior' }}"
+    evidence:
+      style: test.style
+    identity:
+      subject: test.id
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#organization-17ab163b'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |
+        module sample
+
+        go 1.23
+    - path: sample.go
+      body: |
+        package sample
+
+        func Get(s string) int { return len(s) }
+    - path: sample_test.go
+      body: |
+        package sample
+
+        import "testing"
+
+        func TestGetEmpty(t *testing.T) {
+        	if Get("") != 0 {
+        		t.Fatal("empty")
+        	}
+        }
+
+        func TestGetCases(t *testing.T) {
+        	cases := []struct {
+        		name  string
+        		input string
+        		want  int
+        	}{{"one", "a", 1}, {"two", "ab", 2}}
+        	for _, tc := range cases {
+        		t.Run(tc.name, func(t *testing.T) {
+        			if got := Get(tc.input); got != tc.want {
+        				t.Fatalf("got %d want %d", got, tc.want)
+        			}
+        		})
+        	}
+        }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: go.mod
+      body: |
+        module sample
+
+        go 1.23
+    - path: sample.go
+      body: |
+        package sample
+
+        func Get(s string) int { return len(s) }
+    - path: sample_test.go
+      body: |
+        package sample
+
+        import "testing"
+
+        func TestGet(t *testing.T) {
+        	cases := []struct {
+        		name  string
+        		input string
+        		want  int
+        	}{{"empty", "", 0}, {"one", "a", 1}}
+        	for _, tc := range cases {
+        		t.Run(tc.name, func(t *testing.T) {
+        			if got := Get(tc.input); got != tc.want {
+        				t.Fatalf("got %d want %d", got, tc.want)
+        			}
+        		})
+        	}
+        }
+  - name: one-style-rust
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |
+        #[test]
+        fn lengths() {
+            for (input, want) in [("", 0), ("a", 1)] {
+                assert_eq!(input.len(), want);
+            }
+        }

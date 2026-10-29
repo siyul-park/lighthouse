@@ -6,7 +6,7 @@ use lighthouse_engine::Run;
 
 use crate::annotations::{DOC_RULE, check, rules_of};
 
-const BANNERS: &str = "\"design/comments\" = \"warn\"\n";
+const BANNERS: &str = "\"design/no-noise-comment\" = \"warn\"\n";
 
 fn lines_of(outcome: &Run, rule: &str) -> Vec<u32> {
     outcome
@@ -95,11 +95,11 @@ fn ranges_of_different_rules_nest() {
     let source = "pub fn a() {}\n\
         // lighthouse-disable design/exported-doc -- outer\n\
         pub fn b() {\n    \
-            // lighthouse-disable design/comments -- inner\n    \
+            // lighthouse-disable design/no-noise-comment -- inner\n    \
             let _ = 1;\n    \
             // ======== helpers ========\n    \
             let _ = 2;\n    \
-            // lighthouse-enable design/comments\n    \
+            // lighthouse-enable design/no-noise-comment\n    \
             let _ = 3;\n    \
             // ======== after ========\n    \
             let _ = 4;\n\
@@ -109,7 +109,7 @@ fn ranges_of_different_rules_nest() {
     let outcome = check(source, &format!("{DOC_RULE}{BANNERS}"));
 
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [1, 14]);
-    assert_eq!(lines_of(&outcome, "design/comments"), [10]);
+    assert_eq!(lines_of(&outcome, "design/no-noise-comment"), [10]);
     assert_eq!(outcome.diagnostics.len(), 3, "{:?}", outcome.diagnostics);
     assert_eq!(outcome.suppressed.len(), 2);
 }
@@ -174,11 +174,14 @@ fn every_disable_form_needs_a_reason() {
 
         assert_eq!(
             rules_of(&outcome),
-            ["core/allow", "design/exported-doc"],
+            ["core/allow-reason", "design/exported-doc"],
             "{form}"
         );
         assert!(outcome.suppressed.is_empty(), "{form}");
-        assert!(message_of(&outcome, "core/allow").contains(form), "{form}");
+        assert!(
+            message_of(&outcome, "core/allow-reason").contains(form),
+            "{form}"
+        );
     }
 }
 
@@ -199,7 +202,7 @@ fn there_is_no_form_without_ids() {
 #[test]
 fn two_directives_in_one_comment_each_count_and_only_the_last_reaches_the_symbol_below() {
     let outcome = check(
-        "// lighthouse-disable-next-line design/exported-doc -- one\n// lighthouse-disable-next-line design/comments -- two\npub fn open() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc -- one\n// lighthouse-disable-next-line design/no-noise-comment -- two\npub fn open() {}\n",
         &format!("{DOC_RULE}{BANNERS}"),
     );
 
@@ -255,7 +258,7 @@ fn a_documentation_comment_holds_no_directive() {
     );
 
     assert!(
-        !rules_of(&outcome).contains(&"core/allow"),
+        !rules_of(&outcome).contains(&"core/allow-reason"),
         "{:?}",
         outcome.diagnostics
     );

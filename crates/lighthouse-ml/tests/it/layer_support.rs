@@ -22,7 +22,7 @@ use lighthouse_protocol::hash::sha256;
 use lighthouse_spec::Evaluation;
 use serde_json::{Value, json};
 
-pub const RULE: &str = "core/file-size";
+pub const RULE: &str = "core/max-lines";
 
 pub fn decision() -> DecisionRef {
     DecisionRef {

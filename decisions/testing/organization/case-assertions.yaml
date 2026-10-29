@@ -1,0 +1,41 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/case-assertions
+  uid: 0df7d395-14c1-4bbf-8665-d4600166beab
+spec:
+  title: Assertions stay inside their cases
+  context: Assertions outside a subtest may fail without naming which scenario failed,
+    and their result can depend on case order.
+  scope:
+    subject: test
+    tests: only
+  requirement: Assertions that belong to a scenario SHOULD be inside that scenario’s
+    test case; setup outside cases SHOULD only establish shared preconditions.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#organization-2aa48e36'
+    - 'Martin, Clean Code (2008), ch. 9 One assert per test'
+    - Martin, Clean Code (2008), ch. 9 One assert per test
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestStore(t *testing.T) { got := store.Get(); if got != want { t.Fatal() }; t.Run("missing", func(t *testing.T) { store.GetMissing() }) }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestStore(t *testing.T) { t.Run("present", func(t *testing.T) { got := store.Get(); if got != want { t.Fatal() } }) }

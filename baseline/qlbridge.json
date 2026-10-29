@@ -7,22 +7,26 @@
   ],
   "exitCode": 1,
   "findings": {
-    "core/file-size": 12,
-    "design/complexity": 214,
-    "design/declaration-groups": 709,
+    "core/max-lines": 12,
+    "design/comments": 701,
+    "design/complexity": 91,
+    "design/declaration-groups": 822,
     "design/errors": 42,
     "design/exported-doc": 415,
-    "design/layout": 61,
-    "design/naming": 311,
+    "design/layout": 53,
+    "design/naming": 277,
     "design/ownership": 86,
     "design/prefer-method": 3,
+    "design/responsibility": 11,
     "design/signature": 6,
+    "design/symbols": 21,
+    "go/formatted": 55,
     "testing/cases": 13,
     "testing/file-layout": 93,
-    "testing/owner": 516,
+    "testing/no-missing-owner": 516,
     "testing/public-boundary": 3
   },
-  "findingsTotal": 2484,
+  "findingsTotal": 3220,
   "incomplete": 0,
   "repo": "qlbridge",
   "sources": {
@@ -31,24 +35,94 @@
       "lines": 60506
     }
   },
+  "system": {
+    "coreShare": 0.0,
+    "cycles": 0,
+    "hotspots": [
+      {
+        "cognitive": 319,
+        "id": "vm::evalBinary#function",
+        "score": 5.4721,
+        "vfi": 44
+      },
+      {
+        "cognitive": 97,
+        "id": "lex::LexStatement#function",
+        "score": 1.7774,
+        "vfi": 47
+      },
+      {
+        "cognitive": 52,
+        "id": "expr::tree::Func#method",
+        "score": 1.5813,
+        "vfi": 78
+      },
+      {
+        "cognitive": 62,
+        "id": "rel::parseColumns#function",
+        "score": 1.0394,
+        "vfi": 43
+      },
+      {
+        "cognitive": 20,
+        "id": "expr::IdentityMaybeQuoteStrictBuf#function",
+        "score": 0.7797,
+        "vfi": 100
+      },
+      {
+        "cognitive": 76,
+        "id": "lex::LexExpression#function",
+        "score": 0.7704,
+        "vfi": 26
+      },
+      {
+        "cognitive": 19,
+        "id": "lex::Lexer::PeekWord#method",
+        "score": 0.763,
+        "vfi": 103
+      },
+      {
+        "cognitive": 35,
+        "id": "vm::resolveIncludesDepth#function",
+        "score": 0.7505,
+        "vfi": 55
+      },
+      {
+        "cognitive": 11,
+        "id": "expr::LeftRight#function",
+        "score": 0.6647,
+        "vfi": 155
+      },
+      {
+        "cognitive": 38,
+        "id": "vm::walkTernary#function",
+        "score": 0.6519,
+        "vfi": 44
+      }
+    ],
+    "largestScc": {
+      "members": [],
+      "size": 0
+    },
+    "modules": 24,
+    "propagationCost": 0.3247,
+    "symbolPropagationCost": 0.0056,
+    "symbols": 2565
+  },
   "timingsMs": {
     "median": {
-      "analyzer metrics/cognitive": 0.9,
-      "analyzer metrics/cyclomatic": 0.9,
-      "analyzer metrics/fan": 2.5,
-      "analyzer metrics/nesting": 0.8,
-      "analyzer metrics/size": 1.0,
-      "hashing": 28.4,
-      "identity": 15.1,
-      "index go": 169.2,
+      "analyzer metrics/function": 0.9,
+      "fingerprints": 15.6,
+      "hashing": 29.0,
+      "index go": 197.8,
       "index text": 0.0,
-      "merge": 30.8,
-      "read": 18.3,
-      "report": 1.7,
-      "rules": 27.7,
-      "setup": 8.8,
+      "merge": 25.6,
+      "read": 15.5,
+      "report": 31.1,
+      "rules": 22.0,
+      "setup": 23.9,
       "store": 0.0,
-      "total": 321.7
+      "total": 396.5
     },
     "runs": 3
   }

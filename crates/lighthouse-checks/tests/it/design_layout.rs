@@ -7,10 +7,10 @@ use lighthouse_model::ucm::{EdgeKind, SymbolKind};
 use serde_json::json;
 
 const GROUPS: &str = "design/declaration-groups";
-const CLOSE: &str = "design/layout";
-const CALLERS: &str = "design/layout";
-const BANNERS: &str = "design/comments";
-const QUALIFIERS: &str = "design/naming";
+const CLOSE: &str = "design/vertical-distance";
+const CALLERS: &str = "design/top-down-order";
+const BANNERS: &str = "design/no-noise-comment";
+const QUALIFIERS: &str = "design/no-redundant-qualifier";
 
 #[test]
 fn groups_flag_the_fewest_declarations_that_break_the_order() {

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../schema/decision.schema.json
+---
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
@@ -6,77 +6,68 @@ metadata:
   uid: 0f0d0c43-b356-4aaf-902b-d47bdca2e5e2
 spec:
   title: Exported symbols are documented
-  context: >-
-    Public API changes need facts callers cannot read from the code.
-
-    Go: Normal Go doc comments beginning with the symbol name. A method that
-    implements an interface of the project or of a package the code can
-    import is exempt (revive's `exported` rule, and golint before it, leave
-    the well-known interface methods undocumented too): the interface fixes
-    its name and contract.
-
-    Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside
-    the library crate: `pub` items whose modules are all `pub` or that a
-    `pub use` re-exports. Items in binary crates, in tests and in
-    `pub(crate)` positions are not exported. A trait impl method without
-    docs of its own shows the documentation of the trait's method, as
-    rustdoc does, and a method of any trait impl is exempt. The public items
-    of a library that cannot be published (`publish
-    = false`) are importable only inside the project and count as
-    internal, unless another package of the project depends on the
-    library: then its public items are a contract between packages and
-    stay public (`[languages.rust] unpublished = "auto" | "public" |
-    "internal"`). Code in an inline `#[cfg(test)]` module is test code.
+  context: |-
+    Public API changes need facts callers cannot read from the code: user-visible behavior, constraints, ownership.
+    Go: Normal Go doc comments beginning with the symbol name. A method that implements an interface of the project or of a package the code can import is exempt (revive's `exported` rule, and golint before it, leave the well-known interface methods undocumented too): the interface fixes its name and contract.
+    Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does, and a method of any trait impl is exempt. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.
   scope:
     subject: symbol
-  requirement: >-
-    Exported symbols SHOULD have doc comments in the language's standard form.
-    Public API changes SHOULD document user-visible behavior, constraints,
-    ownership, or other facts the code cannot express.
+  requirement: Exported symbols SHOULD have doc comments in the language's standard
+    form.
   severity: warn
   options:
     properties:
-      kinds:
-        type: array
-        items: { type: string, enum: [function, method, type, interface, const, var] }
-        default: [function, method, type, interface, const, var]
-        description: Symbol kinds that must be documented when exported.
       includeInternal:
         type: boolean
         default: false
-        description: >-
-          Also require docs for symbols exported only inside the project, such
-          as under an internal path.
+        description: Also require docs for symbols exported only inside the project,
+          such as under an internal path.
       exemptInterfaceMethods:
         type: boolean
         default: true
-        description: >-
-          Do not require docs on a method that implements an interface (or
-          trait) method, since the interface fixes its name and contract.
+        description: Do not require docs on a method that implements an interface
+          (or trait) method, since the interface fixes its name and contract.
       exemptMethods:
         type: array
-        default: [String, Error, Unwrap]
-        description: >-
-          Method names that implement well-known interfaces and need no doc
-          comment of their own, when the provider cannot tell they do.
+        default:
+        - String
+        - Error
+        - Unwrap
+        description: Method names that implement well-known interfaces and need no
+          doc comment of their own, when the provider cannot tell they do.
+      symbols:
+        type: array
+        items:
+          type: string
+          enum:
+          - function
+          - method
+          - type
+          - interface
+          - const
+          - var
+        default:
+        - function
+        - method
+        - type
+        - interface
+        - const
+        - var
+        description: Symbol kinds that must be documented when exported.
     additionalProperties: false
   check:
     type: cel
     variables:
-      - name: owner
-        expression: symbol.owner
-      - name: visible
-        expression: "options.includeInternal ? ['public', 'internal'] : ['public']"
-    where: >-
-      symbol.lang != 'cel'
-      && options.kinds.exists(k, k == symbol.kind)
-      && symbol.visibility in visible
-      && (owner == null || (owner.visibility in visible && owner.kind != 'interface'))
-      && !(symbol.kind == 'method'
+    - name: owner
+      expression: symbol.owner
+    - name: visible
+      expression: 'options.includeInternal ? [''public'', ''internal''] : [''public'']'
+    where: |-
+      symbol.lang != 'cel' && options.symbols.exists(k, k == symbol.kind) && symbol.visibility in visible && (owner == null || (owner.visibility in visible && owner.kind != 'interface')) && !(symbol.kind == 'method'
            && (options.exemptMethods.exists(m, m == symbol.name)
                || (options.exemptInterfaceMethods && symbol.role == 'implementation')))
       && !symbol.documented
-    message: "exported {{ symbol.kind }} {{ symbol.name }} must have a doc comment"
+    message: exported {{ symbol.kind }} {{ symbol.name }} must have a doc comment
     evidence:
       symbol: symbol.id
     identity:
@@ -87,268 +78,281 @@ spec:
     scope: symbol
   provenance:
     wasDerivedFrom:
-      - "Martin, Clean Code (2008), ch. 4 Good comments"
+    - Martin, Clean Code (2008), ch. 4 Good comments
   examples:
-    - name: undocumented
-      language: go
-      kind: invalid
-      files:
-        - path: sample.go
-          body: |-
-            package sample
+  - name: undocumented
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
 
-            type Store struct{}
+        type Store struct{}
 
-            func (s *Store) Get() int { return 0 }
+        func (s *Store) Get() int { return 0 }
 
-            func New() *Store { return &Store{} }
+        func New() *Store { return &Store{} }
 
-            const Limit = 3
+        const Limit = 3
 
-            var Default = New()
-      expect:
-        - line: 3
-        - line: 5
-        - line: 7
-        - line: 9
-        - line: 11
-    - name: well-known-methods
-      language: go
-      kind: valid
-      files:
-        - path: sample.go
-          body: |-
-            package sample
+        var Default = New()
+    expect:
+    - line: 3
+    - line: 5
+    - line: 7
+    - line: 9
+    - line: 11
+  - name: well-known-methods
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
 
-            // Code is a failure code.
-            type Code int
+        // Code is a failure code.
+        type Code int
 
-            func (c Code) String() string { return "code" }
+        func (c Code) String() string { return "code" }
 
-            func (c Code) Error() string { return "code" }
-    - name: generated-file
-      language: go
-      kind: valid
-      files:
-        - path: sample.go
-          body: |-
-            // Code generated by tool. DO NOT EDIT.
+        func (c Code) Error() string { return "code" }
+  - name: generated-file
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        // Code generated by tool. DO NOT EDIT.
 
-            package sample
+        package sample
 
-            func Generated() {}
-    - name: test-file
-      language: go
-      kind: valid
-      canonical: true
-      files:
-        - path: sample_test.go
-          body: |-
-            package sample
+        func Generated() {}
+  - name: test-file
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |-
+        package sample
 
-            func Helper() {}
-    - name: documented
-      language: go
-      kind: valid
-      files:
-        - path: sample.go
-          body: "package sample\n\n// Store keeps values.\ntype Store struct{}\n\n// Get returns the stored value.\nfunc (s *Store) Get() int { return 0 }\n\ntype hidden struct{}\n\nfunc (h hidden) Run() {}\n\n// Limits bound the store.\nconst (\n\tMin = 1\n\tMax = 3\n)\n\nfunc helper() {}"
-    - name: rust-undocumented
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Store;
+        func Helper() {}
+  - name: documented
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: "package sample\n\n// Store keeps values.\ntype Store struct{}\n\n// Get
+        returns the stored value.\nfunc (s *Store) Get() int { return 0 }\n\ntype
+        hidden struct{}\n\nfunc (h hidden) Run() {}\n\n// Limits bound the store.\nconst
+        (\n\tMin = 1\n\tMax = 3\n)\n\nfunc helper() {}"
+  - name: rust-undocumented
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store;
 
-            impl Store {
-                pub fn get(&self) -> i32 {
-                    0
-                }
+        impl Store {
+            pub fn get(&self) -> i32 {
+                0
+            }
+        }
+
+        pub fn make() -> Store {
+            Store
+        }
+
+        pub trait Source {
+            fn read(&self) -> i32;
+        }
+
+        pub const LIMIT: u32 = 3;
+
+        pub static DEFAULT: u32 = 4;
+    expect:
+    - line: 1
+    - line: 4
+    - line: 9
+    - line: 13
+    - line: 17
+    - line: 19
+  - name: rust-well-known-trait-methods
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        use std::fmt;
+
+        /// A failure code.
+        pub struct Code(pub u32);
+
+        impl fmt::Display for Code {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
+        impl std::error::Error for Code {}
+
+        impl Default for Code {
+            fn default() -> Self {
+                Code(0)
+            }
+        }
+  - name: rust-trait-impl-shows-trait-docs
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Something that can be read.
+        pub trait Source {
+            /// Reads the next value.
+            fn read(&self) -> i32;
+        }
+
+        /// A constant source.
+        pub struct Fixed;
+
+        impl Source for Fixed {
+            fn read(&self) -> i32 {
+                1
+            }
+        }
+  - name: rust-generated-file
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        // @generated by a tool. DO NOT EDIT.
+
+        pub fn generated() {}
+  - name: rust-test-file
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: tests/helper.rs
+      body: pub fn helper() {}
+  - name: rust-documented
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Store keeps values.
+        pub struct Store;
+
+        impl Store {
+            /// Get returns the stored value.
+            pub fn get(&self) -> i32 {
+                0
             }
 
-            pub fn make() -> Store {
-                Store
+            fn hidden(&self) {}
+        }
+
+        struct Private;
+
+        impl Private {
+            pub fn run(&self) {}
+        }
+
+        pub(crate) fn crate_wide() {}
+
+        mod inner {
+            pub fn unreachable_from_outside() {}
+        }
+
+        /// Limits bound the store.
+        pub const MIN: u32 = 1;
+
+        fn helper() {}
+  - name: rust-binary-crate
+    language: rust
+    kind: valid
+    files:
+    - path: src/main.rs
+      body: |-
+        pub fn exposed_in_name_only() {}
+
+        fn main() {
+            exposed_in_name_only();
+        }
+  - name: rust-project-trait-impl
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Something that can be read.
+        pub trait Source {
+            /// Reads the next value.
+            fn read(&self) -> i32;
+        }
+
+        /// A constant source.
+        pub struct Fixed;
+
+        impl Source for Fixed {
+            fn read(&self) -> i32 {
+                1
             }
+        }
+  - name: rust-inline-test-module
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Adds.
+        pub fn add(a: i32, b: i32) -> i32 {
+            a + b
+        }
 
-            pub trait Source {
-                fn read(&self) -> i32;
-            }
+        #[cfg(test)]
+        mod tests {
+            pub fn helper() {}
 
-            pub const LIMIT: u32 = 3;
+            pub struct Fixture;
+        }
+  - name: rust-publish-false
+    language: rust
+    kind: valid
+    files:
+    - path: Cargo.toml
+      body: |-
+        [package]
+        name = "sample"
+        version = "0.1.0"
+        publish = false
+    - path: src/lib.rs
+      body: |-
+        pub struct Internal;
 
-            pub static DEFAULT: u32 = 4;
-      expect:
-        - line: 1
-        - line: 4
-        - line: 9
-        - line: 13
-        - line: 17
-        - line: 19
-    - name: rust-well-known-trait-methods
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            use std::fmt;
+        pub fn only_inside_the_project() {}
+  - name: go-implements-an-interface-it-never-names
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
 
-            /// A failure code.
-            pub struct Code(pub u32);
+        go 1.26
+    - path: api/api.go
+      body: "package api\n\n// Sink takes what is written to it.\ntype Sink interface
+        {\n\t// Flush writes what is buffered.\n\tFlush()\n}\n"
+    - path: impl/impl.go
+      body: |
+        package impl
 
-            impl fmt::Display for Code {
-                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                    write!(f, "{}", self.0)
-                }
-            }
+        // File is a file.
+        type File struct{}
 
-            impl std::error::Error for Code {}
-
-            impl Default for Code {
-                fn default() -> Self {
-                    Code(0)
-                }
-            }
-    - name: rust-trait-impl-shows-trait-docs
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            /// Something that can be read.
-            pub trait Source {
-                /// Reads the next value.
-                fn read(&self) -> i32;
-            }
-
-            /// A constant source.
-            pub struct Fixed;
-
-            impl Source for Fixed {
-                fn read(&self) -> i32 {
-                    1
-                }
-            }
-    - name: rust-generated-file
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            // @generated by a tool. DO NOT EDIT.
-
-            pub fn generated() {}
-    - name: rust-test-file
-      language: rust
-      kind: valid
-      canonical: true
-      files:
-        - path: tests/helper.rs
-          body: "pub fn helper() {}"
-    - name: rust-documented
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            /// Store keeps values.
-            pub struct Store;
-
-            impl Store {
-                /// Get returns the stored value.
-                pub fn get(&self) -> i32 {
-                    0
-                }
-
-                fn hidden(&self) {}
-            }
-
-            struct Private;
-
-            impl Private {
-                pub fn run(&self) {}
-            }
-
-            pub(crate) fn crate_wide() {}
-
-            mod inner {
-                pub fn unreachable_from_outside() {}
-            }
-
-            /// Limits bound the store.
-            pub const MIN: u32 = 1;
-
-            fn helper() {}
-    - name: rust-binary-crate
-      language: rust
-      kind: valid
-      files:
-        - path: src/main.rs
-          body: |-
-            pub fn exposed_in_name_only() {}
-
-            fn main() {
-                exposed_in_name_only();
-            }
-    - name: rust-project-trait-impl
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            /// Something that can be read.
-            pub trait Source {
-                /// Reads the next value.
-                fn read(&self) -> i32;
-            }
-
-            /// A constant source.
-            pub struct Fixed;
-
-            impl Source for Fixed {
-                fn read(&self) -> i32 {
-                    1
-                }
-            }
-    - name: rust-inline-test-module
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            /// Adds.
-            pub fn add(a: i32, b: i32) -> i32 {
-                a + b
-            }
-
-            #[cfg(test)]
-            mod tests {
-                pub fn helper() {}
-
-                pub struct Fixture;
-            }
-    - name: rust-publish-false
-      language: rust
-      kind: valid
-      files:
-        - path: Cargo.toml
-          body: |-
-            [package]
-            name = "sample"
-            version = "0.1.0"
-            publish = false
-        - path: src/lib.rs
-          body: |-
-            pub struct Internal;
-
-            pub fn only_inside_the_project() {}
-    - name: go-implements-an-interface-it-never-names
-      language: go
-      kind: valid
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: api/api.go
-          body: "package api\n\n// Sink takes what is written to it.\ntype Sink interface {\n\t// Flush writes what is buffered.\n\tFlush()\n}\n"
-        - path: impl/impl.go
-          body: "package impl\n\n// File is a file.\ntype File struct{}\n\nfunc (f *File) Flush() {}\n"
+        func (f *File) Flush() {}

@@ -312,23 +312,21 @@ fn commands(
         }
     }
     for decision in catalog.decisions().filter(|d| !d.bundled(shipped)) {
-        if let Some(check) = &decision.check
-            && let CheckKind::Command(command) = &check.kind
-        {
-            let argv = &command.program.command;
-            found.push(Program {
-                what: format!("check of {}: {}", decision.id(), argv.join(" ")),
-                argv: argv.clone(),
-            });
-        }
-        if let Some(fix) = &decision.fix
-            && let FixKind::Command(command) = &fix.kind
-        {
-            let argv = &command.program.command;
-            found.push(Program {
-                what: format!("fixer of {}: {}", decision.id(), argv.join(" ")),
-                argv: argv.clone(),
-            });
+        let checks = decision.check.as_ref().and_then(|check| match &check.kind {
+            CheckKind::Command(command) => Some(command.programs(decision)),
+            _ => None,
+        });
+        let fixes = decision.fix.as_ref().and_then(|fix| match &fix.kind {
+            FixKind::Command(command) => Some(command.programs(decision)),
+            _ => None,
+        });
+        for (what, programs) in [("check", checks), ("fixer", fixes)] {
+            for program in programs.iter().flat_map(|p| p.all()) {
+                found.push(Program {
+                    what: format!("{what} of {}: {}", decision.id(), program.shown()),
+                    argv: program.command.clone(),
+                });
+            }
         }
     }
     Ok(found)

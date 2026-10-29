@@ -1,0 +1,40 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/pure-polling
+  uid: a08f1f60-64be-4301-b2fe-6a1a5249bebf
+spec:
+  title: Polling predicates are pure observations
+  context: A polling predicate may execute many times. Side effects make success depend
+    on the scheduler and the number of polls.
+  scope:
+    subject: test
+    tests: only
+  requirement: A polling predicate SHOULD observe state without mutating it or consuming
+    a one-shot result.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#organization-5dabb856'
+    - Martin, Clean Code (2008), T9 Tests Should Be Fast
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        require.Eventually(t, func() bool { counter++; return counter > 1 }, time.Second, time.Millisecond)
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        require.Eventually(t, func() bool { return store.Ready() }, time.Second, time.Millisecond)

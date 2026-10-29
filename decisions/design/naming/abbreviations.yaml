@@ -1,0 +1,120 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/abbreviations
+  uid: 18203a14-0d67-4227-b659-57dbe5594f03
+spec:
+  title: Standard abbreviations keep their spelling
+  context: Nonstandard abbreviations increase the number of terms readers must learn
+    and make the same concept appear under multiple spellings. Go writes common initialisms
+    in capitals (golint `commonInitialisms`, revive `var-naming`); Rust writes an acronym
+    as one word (Rust API Guidelines, C-CASE), so its list is empty.
+  scope:
+    subject: symbol
+  requirement: Names SHOULD use standard abbreviations and initialisms in their conventional
+    form, such as `HTTP`, `URL`, `ID`, and `JSON`.
+  severity: warn
+  check:
+    type: cel
+    select: symbol
+    variables:
+    - name: spelled
+      expression: "!symbol.generated ? options.initialisms.filter(w, symbol.name.matches('(^|[a-z0-9])'
+        + w.substring(0, 1) + w.substring(1).lowerAscii() + '([A-Z0-9_]|$)')) : []"
+    where: size(spelled) > 0
+    message: "{{ symbol.name + ' spells the initialism ' + spelled[0] + ' in lower case; write it ' + spelled[0] }}"
+    evidence:
+      name: symbol.name
+      initialism: spelled[0]
+    identity:
+      subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#naming-49da70c5'
+  options:
+    properties:
+      initialisms:
+        type: array
+        items:
+          type: string
+        default:
+        - ACL
+        - API
+        - ASCII
+        - CPU
+        - CSS
+        - DNS
+        - EOF
+        - GUID
+        - HTML
+        - HTTP
+        - HTTPS
+        - ID
+        - IP
+        - JSON
+        - LHS
+        - QPS
+        - RAM
+        - RHS
+        - RPC
+        - SLA
+        - SMTP
+        - SQL
+        - SSH
+        - TCP
+        - TLS
+        - TTL
+        - UDP
+        - UI
+        - UID
+        - UUID
+        - URI
+        - URL
+        - UTF8
+        - VM
+        - XML
+        - XMPP
+        - XSRF
+        - XSS
+        description: Initialisms that must be written in capitals, as upper-case words.
+    additionalProperties: false
+  languages:
+    rust:
+      options:
+        initialisms: []
+  examples:
+  - name: lower-case-initialism
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Config struct{ httpUrl string }
+    expect:
+    - line: 3
+  - name: capital-initialism
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        type Config struct{ httpURL string }
+
+        func Identity() string { return "" }
+  - name: acronym-as-word-rust
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |
+        pub struct Config {
+            pub http_url: String,
+            pub uuid: String,
+        }

@@ -1,0 +1,125 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-detached-comment
+  uid: 0def0213-f4c8-4a64-8a6c-3be8e1f4ac54
+spec:
+  title: Comments stay attached to declarations
+  context: Detached comments can be dropped from Go documentation or left behind when
+    a declaration moves. A blank line between a comment and the declaration it describes
+    is misleading. Rust `///` followed by a blank line still attaches to the item,
+    but the blank line is misleading there too (clippy `empty_line_after_doc_comments`).
+    Reported only when blank lines alone separate the comment from the next declaration;
+    a comment on the file's first line (a license header, package documentation or
+    build constraint), an inner `//!` documentation comment, a directive, a banner,
+    a comment followed by code or by another comment, and one without a following
+    declaration are not candidates. The fix deletes the blank lines. It is unsafe
+    because the comment may have been meant for the section rather than the declaration.
+  scope:
+    subject: file
+  requirement: A comment that describes a declaration SHOULD be adjacent to it, without
+    intervening blank lines.
+  severity: warn
+  check:
+    type: cel
+    select: comment
+    where: comment.standalone && comment.gap > 0 && !comment.top && !comment.generated
+      && !comment.banner && !comment.directive && !comment.text.startsWith('//!')
+      && !comment.text.startsWith('/*!')
+    message: comment above {{ comment.next_name }} is separated from it by {{ string(comment.gap)
+      }} blank line(s)
+    evidence:
+      comment: comment.text
+      next: comment.next
+      gap: comment.gap
+      blank: comment.blank
+    identity:
+      subject: comment.file
+      snippet: comment.text
+  fix:
+    safety: unsafe
+    type: cel
+    edits: "[remove(finding.evidence.blank)]"
+  provenance:
+    wasDerivedFrom:
+    - clippy empty_line_after_doc_comments
+    - clippy empty_line_after_outer_attr
+    - 'Go documentation comments: https://go.dev/doc/comment'
+  examples:
+  - name: detached-go-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        package sample
+
+        // Load reads a record.
+
+        func Load() {}
+    expect:
+    - line: 3
+    fixed:
+    - path: sample.go
+      body: |
+        package sample
+
+        // Load reads a record.
+        func Load() {}
+  - name: detached-go-valid
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        // Package sample loads records.
+        package sample
+
+        // Load reads a record.
+        func Load() {}
+  - name: header-and-directive-go-valid
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |
+        // Copyright 2026 The Sample Authors.
+
+        package sample
+
+        //go:noinline
+
+        func Load() {}
+  - name: detached-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |
+        pub fn before() {}
+
+        /// Opens the store.
+
+        pub fn open() {}
+    expect:
+    - line: 3
+    fixed:
+    - path: src/lib.rs
+      body: |
+        pub fn before() {}
+
+        /// Opens the store.
+        pub fn open() {}
+  - name: detached-rust-valid
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |
+        //! Stores records.
+
+        /// Opens the store.
+        pub fn open() {}
+    canonical: true

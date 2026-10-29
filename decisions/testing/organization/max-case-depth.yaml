@@ -1,0 +1,81 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/max-case-depth
+  uid: 1f4ce235-757f-4369-af6a-f9a8f812816f
+spec:
+  title: Test cases have at most two levels
+  context: Deeply nested subtests make the execution tree difficult to read and failures
+    harder to locate.
+  scope:
+    subject: test
+    tests: only
+  requirement: 'Nested test cases SHOULD be limited to two levels: a test function
+    and its direct cases.'
+  severity: warn
+  check:
+    type: cel
+    select: test
+    where: test.nesting > 2
+    message: "{{ test.name + ' has ' + string(test.nesting) + ' nested case levels (max 2)' }}"
+    evidence:
+      nesting: test.nesting
+    identity:
+      subject: test.id
+  provenance:
+    wasDerivedFrom:
+    - "Lighthouse, testing#organization-c3e1ee9a"
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |
+        module sample
+
+        go 1.23
+    - path: sample.go
+      body: |-
+        package sample
+
+        func Get() int { return 1 }
+    - path: sample_test.go
+      body: |
+        package sample
+        import "testing"
+        func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { t.Run("b", func(t *testing.T) { t.Run("c", func(t *testing.T) {}) }) }) }
+    expect:
+    - line: 3
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: go.mod
+      body: |
+        module sample
+
+        go 1.23
+    - path: sample.go
+      body: |-
+        package sample
+
+        func Get() int { return 1 }
+    - path: sample_test.go
+      body: |
+        package sample
+        import "testing"
+        func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { if got := Get(); got != 1 { t.Fatal() } }) }
+  - name: rust-flat-test
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        #[test]
+        fn loads() {
+            assert_eq!(2 + 2, 4);
+        }
+    canonical: true

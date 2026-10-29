@@ -67,7 +67,7 @@ verify):
 - **`type`** names where evaluation happens: `cel` (an expression), `command` (a process), `rpc` (a plugin process) or `model` (the bound classification model).
 - **Capabilities** in the manifest say how it behaves: `deterministic`, `abstains`, `cost`.
 
-**Fix.** A decision's `fix` is `cel`, `command`, `rpc` or `model`. A command is a [program](programs.md), the same shape as a command check. A model fix is made by an agent that edits a scratch copy of the project (`[models] agent`) for the decisions `[fix] decisions` lists, within the scope `symbol` or `files`; with no agent bound the finding stays a review task carrying the brief. An agent's work is a guess, so it is kept only when the scope holds, the finding is gone, nothing of `warn` or `error` is new in the changed and referencing files and they are fully analyzed; `[fix] verify` programs must also pass over the fixed texts. A kept fix is written when `[fix] unsafe = true` or the run has `--unsafe-fixes`, and otherwise reported as a preview. Details: [models.md](models.md#fixes-by-a-model), [fixer-spec.md](fixer-spec.md).
+**Fix.** A decision's `fix` is `cel`, `command`, `rpc` or `model`. A command is a [program](programs.md), the same shape as a command check. A `command` check or fix that differs by language leaves its `command` out and gives one program per language under `languages.<id>.check` and `languages.<id>.fix` (`core/formatted`: gofmt and rustfmt); a file of a language with no program is not checked or fixed by it. A model fix is made by an agent that edits a scratch copy of the project (`[models] agent`) for the decisions `[fix] decisions` lists, within the scope `symbol` or `files`; with no agent bound the finding stays a review task carrying the brief. An agent's work is a guess, so it is kept only when the scope holds, the finding is gone, nothing of `warn` or `error` is new in the changed and referencing files and they are fully analyzed; `[fix] verify` programs must also pass over the fixed texts. A kept fix is written when `[fix] unsafe = true` or the run has `--unsafe-fixes`, and otherwise reported as a preview. Details: [models.md](models.md#fixes-by-a-model), [fixer-spec.md](fixer-spec.md).
 
 The engine keys every behaviour off capabilities, never off type, op or model names. There
 are no profiles or tiers beyond that.
@@ -188,7 +188,7 @@ timeout = "120s"
 plugin = "model-local"
 # `local` is built in and needs no declaration: model = "local/learned@sha256:<hex>"
 
-[rules."design/naming-result"]
+[rules."design/no-redundant-qualifier-result"]
 level = "info"
 model = "ollama/qwen3-coder:30b"  # a cheaper model for this decision only
 evaluation = { precision = 0.9 }          # recall = 0.8 optional

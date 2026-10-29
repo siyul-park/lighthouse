@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/no-structure-tests
+  uid: 44a497d8-5df1-4a4e-90c4-30ccf6f50856
+spec:
+  title: Tests prove contracts, not structure
+  context: Coverage proves reachability, not quality. Tests should fail for a contract
+    violation rather than an arbitrary refactor.
+  scope:
+    subject: test
+    tests: only
+  requirement: Tests SHOULD NOT be added solely to exercise implementation structure
+    when they cannot establish an externally meaningful contract.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, testing#tdd-64ebcce6'
+  examples:
+  - name: invalid-contract
+    language: go
+    kind: invalid
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "unexpected" { t.Fatal() } }
+  - name: valid-contract
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: sample_test.go
+      body: |
+        package sample
+        func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }

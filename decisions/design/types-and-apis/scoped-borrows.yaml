@@ -1,0 +1,39 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/scoped-borrows
+  uid: b0ba744d-4ac1-40b1-b56e-debec1ce7e58
+spec:
+  title: Borrowed values stay within their boundary
+  context: Ownership and lifetimes should be visible in API contracts rather than
+    enforced by undocumented caller discipline.
+  scope:
+    subject: symbol
+  requirement: A borrowed value SHOULD NOT escape the lifetime or ownership boundary
+    that makes its referent valid.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - 'Lighthouse, coding-patterns#ownership-c85ed7a6'
+  examples:
+  - name: invalid-contract
+    language: rust
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |
+        pub struct Parser { input: String }
+        pub fn view<'a>(p: &'a Parser) -> &'a str { p.input.as_str() }
+        pub fn leaked<'a>(p: &'a Parser) -> &'a mut String { &mut p.input }
+  - name: valid-contract
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.go
+      body: |
+        pub struct Parser { input: String }
+        pub fn view(p: &Parser) -> &str { p.input.as_str() }

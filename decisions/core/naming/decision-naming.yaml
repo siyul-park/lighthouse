@@ -45,7 +45,8 @@ spec:
         expression: >-
           parts.filter(w, regex.replace(w, 's+$', '') == decision.pack
             || (size(regex.replace(w, 's+$', '')) >= 4
-                && decision.pack.startsWith(regex.replace(w, 's+$', ''))))
+                && decision.pack.startsWith(regex.replace(w, 's+$', ''))
+                && !(decision.pack == 'testing' && regex.replace(w, 's+$', '') == 'test')))
       - name: problems
         expression: >-
           (shape ? '' : ' is not kebab-case;')
@@ -84,12 +85,12 @@ spec:
             kind: Decision
             metadata:
               name: core/max-lines
-        - path: decisions/design/layout.yaml
+        - path: decisions/design/top-down-order.yaml
           body: |-
             apiVersion: lighthouse/v1alpha1
             kind: Decision
             metadata:
-              name: design/layout
+              name: design/top-down-order
     - name: not-kebab-case
       language: text
       kind: invalid
@@ -139,9 +140,9 @@ spec:
       expect:
         - line: 4
           message: uses `is`
-    - name: repeats-the-pack
+    - name: testing-pack-may-use-test
       language: text
-      kind: invalid
+      kind: valid
       files:
         - path: decisions/testing/unique.yaml
           body: |-
@@ -149,6 +150,3 @@ spec:
             kind: Decision
             metadata:
               name: testing/unique-owner-test
-      expect:
-        - line: 4
-          message: repeats its pack in `test`

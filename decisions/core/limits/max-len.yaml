@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/max-len
+  uid: 74c00f10-5b72-48b4-962d-4d40a78d9472
+spec:
+  title: Lines fit the configured width
+  context: >-
+    A line that can be wrapped should be wrapped (ESLint `max-len`,
+    Checkstyle `LineLength`). A comment that is one URL, a single string
+    literal and an import line cannot be wrapped and are not counted. Only
+    source files of a language provider are counted; prose and data have no
+    syntax to wrap at.
+  scope:
+    subject: file
+    generated: true
+    tests: include
+  requirement: >-
+    A line that can be wrapped SHOULD NOT be wider than the configured number
+    of columns (option `maxWidth`).
+  severity: warn
+  options:
+    properties:
+      enabled:
+        type: boolean
+        default: false
+        strictDefault: true
+        description: Enable line-width findings in the strict project.
+      maxWidth:
+        type: integer
+        default: 120
+        description: Widest a line may be, in characters.
+    additionalProperties: false
+  check:
+    type: cel
+    variables:
+    - name: wide
+      expression: >-
+        options.enabled && file.lang != 'text'
+        ? file.line_widths.filter(l, l.width > options.maxWidth && !l.exempt)
+        : []
+    where: size(wide) > 0
+    message: >-
+      {{ string(size(wide)) + ' lines are wider than '
+         + string(options.maxWidth) + ' columns (first: line '
+         + string(wide[0].line) + ')' }}
+    evidence:
+      kind: "'width'"
+      lines: file.lines
+      maxWidth: options.maxWidth
+    at:
+      line: wide[0].line
+      endLine: wide[0].line
+    identity:
+      subject: file.path
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), ch. 5 Horizontal size
+    - 'ESLint max-len: https://eslint.org/docs/latest/rules/max-len'
+    - 'Checkstyle LineLength: https://checkstyle.org/checks/sizes/linelength.html'
+  examples:
+  - name: wide-line
+    language: go
+    kind: invalid
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: wide.go
+      body: |-
+        package sample
+
+        // a line that is far too wide
+        var a = 1
+    expect: [{ line: 3 }]
+  - name: wide-exempt
+    language: go
+    kind: valid
+    canonical: true
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: exempt.go
+      body: |-
+        package sample
+
+        // https://example.com/a/very/long/address
+        import _ "net/http/httptest"
+
+        var n = []string{
+        	"a single string literal that cannot wrap",
+        }
+  - name: wide-text
+    language: text
+    kind: valid
+    options: { enabled: true, maxWidth: 10 }
+    files:
+    - path: wide.txt
+      body: |-
+        short
+        a prose line that is far too wide but is not source
+  - name: rust-wide-line
+    language: rust
+    kind: invalid
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: src/lib.rs
+      body: |-
+        fn open() {}
+        // this comment is far too wide
+    expect: [{ line: 2 }]
+  - name: rust-wide-exempt
+    language: rust
+    kind: valid
+    canonical: true
+    options: { enabled: true, maxWidth: 20 }
+    files:
+    - path: src/lib.rs
+      body: |-
+        fn open() {}
+        // https://example.com/a/very/long/address

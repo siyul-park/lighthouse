@@ -7,22 +7,24 @@
   ],
   "exitCode": 1,
   "findings": {
-    "core/file-size": 14,
+    "core/max-lines": 14,
     "design/comments": 1,
-    "design/complexity": 164,
+    "design/complexity": 70,
     "design/concurrency": 1,
-    "design/declaration-groups": 45,
+    "design/declaration-groups": 235,
     "design/errors": 64,
     "design/exported-doc": 154,
-    "design/layout": 83,
+    "design/layout": 87,
     "design/naming": 65,
     "design/ownership": 154,
     "design/prefer-method": 2,
+    "design/responsibility": 9,
     "design/signature": 13,
     "testing/file-layout": 59,
-    "testing/owner": 2
+    "testing/no-duplicate-owner": 1,
+    "testing/no-missing-owner": 1
   },
-  "findingsTotal": 821,
+  "findingsTotal": 930,
   "incomplete": 0,
   "repo": "minivm",
   "sources": {
@@ -31,24 +33,94 @@
       "lines": 188892
     }
   },
+  "system": {
+    "coreShare": 0.0,
+    "cycles": 0,
+    "hotspots": [
+      {
+        "cognitive": 90,
+        "id": "transform::walker::instruction#method",
+        "score": 2.239,
+        "vfi": 56
+      },
+      {
+        "cognitive": 58,
+        "id": "analysis::Blocks#function",
+        "score": 1.4687,
+        "vfi": 57
+      },
+      {
+        "cognitive": 61,
+        "id": "internal/ssa::operation#function",
+        "score": 1.355,
+        "vfi": 50
+      },
+      {
+        "cognitive": 44,
+        "id": "internal/asm::allocator::liveness#method",
+        "score": 1.036,
+        "vfi": 53
+      },
+      {
+        "cognitive": 55,
+        "id": "interp::native::settle#method",
+        "score": 1.0262,
+        "vfi": 42
+      },
+      {
+        "cognitive": 44,
+        "id": "internal/jit/compile::lowering::scan#method",
+        "score": 0.9969,
+        "vfi": 51
+      },
+      {
+        "cognitive": 37,
+        "id": "internal/jit/compile::lowering::call#method",
+        "score": 0.8547,
+        "vfi": 52
+      },
+      {
+        "cognitive": 33,
+        "id": "internal/jit/compile::lowering::function#method",
+        "score": 0.733,
+        "vfi": 50
+      },
+      {
+        "cognitive": 30,
+        "id": "internal/asm::allocator::intervals#method",
+        "score": 0.693,
+        "vfi": 52
+      },
+      {
+        "cognitive": 35,
+        "id": "interp::Interpreter::dispatch#method",
+        "score": 0.653,
+        "vfi": 42
+      }
+    ],
+    "largestScc": {
+      "members": [],
+      "size": 0
+    },
+    "modules": 26,
+    "propagationCost": 0.2293,
+    "symbolPropagationCost": 0.0098,
+    "symbols": 2251
+  },
   "timingsMs": {
     "median": {
-      "analyzer metrics/cognitive": 1.2,
-      "analyzer metrics/cyclomatic": 1.1,
-      "analyzer metrics/fan": 3.3,
-      "analyzer metrics/nesting": 1.0,
-      "analyzer metrics/size": 1.2,
-      "hashing": 99.7,
-      "identity": 7.1,
-      "index go": 692.0,
+      "analyzer metrics/function": 0.8,
+      "fingerprints": 6.4,
+      "hashing": 95.9,
+      "index go": 722.3,
       "index text": 0.0,
-      "merge": 115.5,
-      "read": 18.8,
-      "report": 0.5,
-      "rules": 44.7,
-      "setup": 8.9,
+      "merge": 82.1,
+      "read": 17.2,
+      "report": 8.7,
+      "rules": 29.7,
+      "setup": 22.7,
       "store": 0.0,
-      "total": 1011.1
+      "total": 1007.5
     },
     "runs": 3
   }

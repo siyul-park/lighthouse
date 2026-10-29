@@ -19,7 +19,9 @@ use lighthouse_model::{Diagnostic, Position, RunScope, Span, squash, ucm::Projec
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use lighthouse_process::{Environment, Home, Job, Ran, context, copy_project, expand};
 use lighthouse_protocol::hash::Hasher;
-use lighthouse_spec::{Batching, GlobSet, Output, Point, Program, Stdin, file_fact, glob_set};
+use lighthouse_spec::{
+    Batching, GlobSet, Output, Point, Program, Programs, Stdin, file_fact, glob_set,
+};
 use serde_json::{Map, Value, json};
 use tempfile::TempDir;
 
@@ -32,7 +34,7 @@ const STATUS_SHOWN: usize = 400;
 
 /// A `command` check, compiled.
 pub(crate) struct CommandRule {
-    program: Program,
+    programs: Programs,
     files: Option<GlobSet>,
     /// What the decision says when a line only names a file.
     title: String,
@@ -47,6 +49,7 @@ pub(crate) struct CommandRule {
 impl CommandRule {
     pub(crate) fn new(
         spec: &lighthouse_spec::CommandCheck,
+        programs: Programs,
         title: &str,
         bundled: bool,
     ) -> Result<Self, crate::Error> {
@@ -55,7 +58,7 @@ impl CommandRule {
             .transpose()
             .map_err(|e| crate::Error::invalid(title, e.to_string()))?;
         Ok(Self {
-            program: spec.program.clone(),
+            programs,
             files,
             title: title.to_owned(),
             bundled,
@@ -69,15 +72,59 @@ impl CommandRule {
         ctx: &Context,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
+        let held = self.root_for(ctx, ctx.file.map(|(file, _)| file.path.as_path()))?;
+        let root = held
+            .as_ref()
+            .map_or_else(|| ctx.workspace.root.clone(), |dir| dir.path().to_owned());
+        let run = |program| self.invocation(program, (meta, ctx, options), &root);
+        if meta.scope == RunScope::File {
+            let Some((file, text)) = ctx.file else {
+                return Ok(Vec::new());
+            };
+            let Some(program) = self.programs.of(&file.lang) else {
+                return Ok(Vec::new());
+            };
+            if !self.selects(&file.path) {
+                return Ok(Vec::new());
+            }
+            return run(program)?.one(&file.path, Some(text));
+        }
+        let mut found = Vec::new();
+        for (program, files) in self.assigned(ctx) {
+            let run = run(program)?;
+            match program.batching() {
+                Batching::Files => found.extend(run.all(files)?),
+                Batching::File => {
+                    for file in files {
+                        let text = program.stdin == Stdin::File;
+                        let content = text.then(|| ctx.workspace.read(&file)).transpose()?;
+                        found.extend(run.one(&file, content.as_deref())?);
+                    }
+                }
+                Batching::Once => {
+                    found.extend(run.collect(&run.invoke(&run.arguments(&[])?, &[])?, None)?);
+                }
+            }
+        }
+        Ok(found)
+    }
+
+    /// The run of `program` for the rule `meta` over `ctx`, in `root`.
+    fn invocation<'a>(
+        &'a self,
+        program: &'a Program,
+        (meta, ctx, options): (&'a RuleManifest, &'a Context<'a>, &Map<String, Value>),
+        root: &Path,
+    ) -> Result<Invocation<'a>, PluginError> {
         let incomplete = |reason: String| PluginError::Incomplete(format!("{}: {reason}", meta.id));
         if !ctx.trusted && !self.bundled {
             return Err(PluginError::Incomplete(format!(
                 "`{}` is not run: this project is not trusted to run commands (run `lighthouse trust`, or set LIGHTHOUSE_TRUST=1 in CI)",
-                self.program.shown()
+                program.shown()
             )));
         }
         let environment = Environment::new(
-            &self.program.env,
+            &program.env,
             context(
                 &json!({ "id": meta.id }).to_string(),
                 &Value::Object(options.clone()).to_string(),
@@ -85,47 +132,47 @@ impl CommandRule {
             Home::User,
         )
         .map_err(incomplete)?;
-        let held = self.root_for(ctx, ctx.file.map(|(file, _)| file.path.as_path()))?;
-        let run = Invocation {
-            rule: self,
+        Ok(Invocation {
+            program,
+            title: &self.title,
             meta,
             ctx,
             environment,
-            root: held
-                .as_ref()
-                .map_or_else(|| ctx.workspace.root.clone(), |dir| dir.path().to_owned()),
-        };
-        match (meta.scope, self.program.batching()) {
-            (RunScope::File, _) => {
-                let Some((file, text)) = ctx.file else {
-                    return Ok(Vec::new());
-                };
-                if !self.selects(&file.path) {
-                    return Ok(Vec::new());
-                }
-                run.one(&file.path, Some(text))
-            }
-            (RunScope::Project, Batching::Files) => run.all(),
-            (RunScope::Project, Batching::File) => {
-                let mut found = Vec::new();
-                for file in ctx.project.files.iter().filter(|f| self.selects(&f.path)) {
-                    let text = self.program.stdin == Stdin::File;
-                    let content = text.then(|| ctx.workspace.read(&file.path)).transpose()?;
-                    found.extend(run.one(&file.path, content.as_deref())?);
-                }
-                Ok(found)
-            }
-            (RunScope::Project, Batching::Once) => {
-                run.collect(&run.invoke(&run.arguments(&[])?, &[])?, None)
+            root: root.to_owned(),
+        })
+    }
+
+    /// Each program that runs over the project, with the files it is run for:
+    /// the files it selects, whose language it is the program of. A program
+    /// that names no file runs once, for no file.
+    fn assigned(&self, ctx: &Context) -> Vec<(&Program, Vec<PathBuf>)> {
+        let mut by: BTreeMap<Option<&str>, Vec<PathBuf>> = BTreeMap::new();
+        for file in ctx.project.files.iter().filter(|f| self.selects(&f.path)) {
+            let key = self
+                .programs
+                .is_language(&file.lang)
+                .then_some(file.lang.as_str());
+            if self.programs.of(&file.lang).is_some() {
+                by.entry(key).or_default().push(file.path.clone());
             }
         }
+        let own = self.programs.own();
+        if !own.command.is_empty() && own.batching() == Batching::Once {
+            by.entry(None).or_default();
+        }
+        by.into_iter()
+            .filter_map(|(key, files)| {
+                let program = key.map_or(Some(own), |language| self.programs.of(language))?;
+                Some((program, files))
+            })
+            .collect()
     }
 
     /// Whether the findings for a file are a function of its text: the
     /// program is bundled, so it is known to read nothing else, and it keeps
     /// no secret in its environment.
     pub(crate) fn local(&self, scope: RunScope) -> bool {
-        self.bundled && scope == RunScope::File && self.program.env.is_empty()
+        self.bundled && scope == RunScope::File && self.programs.all().all(|p| p.env.is_empty())
     }
 
     /// The copy of the project the program is run in, when the run stands
@@ -191,7 +238,9 @@ impl Printed {
 }
 
 struct Invocation<'a> {
-    rule: &'a CommandRule,
+    program: &'a Program,
+    /// What the decision says when a line only names a file.
+    title: &'a str,
     meta: &'a RuleManifest,
     ctx: &'a Context<'a>,
     environment: Environment,
@@ -203,7 +252,7 @@ impl Invocation<'_> {
     /// One invocation for one file.
     fn one(&self, file: &Path, text: Option<&str>) -> Result<Vec<Diagnostic>, PluginError> {
         let command = self.arguments(std::slice::from_ref(&file.to_path_buf()))?;
-        let stdin = match self.rule.program.stdin {
+        let stdin = match self.program.stdin {
             Stdin::None => Vec::new(),
             Stdin::File => text.unwrap_or_default().as_bytes().to_vec(),
         };
@@ -213,18 +262,10 @@ impl Invocation<'_> {
 
     /// Invocations over every file the program is run for, as many files per
     /// run as the argument list allows.
-    fn all(&self) -> Result<Vec<Diagnostic>, PluginError> {
-        let files: Vec<PathBuf> = self
-            .ctx
-            .project
-            .files
-            .iter()
-            .filter(|f| self.rule.selects(&f.path))
-            .map(|f| f.path.clone())
-            .collect();
+    fn all(&self, files: Vec<PathBuf>) -> Result<Vec<Diagnostic>, PluginError> {
         let mut found = Vec::new();
         for group in self.grouped(files)? {
-            for chunk in chunks(&self.rule.program.command, &group) {
+            for chunk in chunks(&self.program.command, &group) {
                 let command = self.arguments(chunk)?;
                 let printed = self.invoke(&command, &[])?;
                 found.extend(self.collect(&printed, None)?);
@@ -255,7 +296,6 @@ impl Invocation<'_> {
     /// The facts of a file the command names, as `{file.<fact>}`.
     fn facts(&self) -> Vec<&str> {
         let mut facts: Vec<&str> = self
-            .rule
             .program
             .command
             .iter()
@@ -294,7 +334,7 @@ impl Invocation<'_> {
                 .collect::<Result<_, PluginError>>()?,
             None => BTreeMap::new(),
         };
-        expand(&self.rule.program.command, &self.root, |arg| match arg {
+        expand(&self.program.command, &self.root, |arg| match arg {
             "{file}" | "{files}" => Some(files.iter().map(|f| slashed(f)).collect()),
             "{decision}" => Some(vec![self.meta.id.clone()]),
             _ => file_fact(arg)
@@ -308,7 +348,7 @@ impl Invocation<'_> {
     fn invoke(&self, command: &[String], stdin: &[u8]) -> Result<Printed, PluginError> {
         let shown = command.join(" ");
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
-        let program = &self.rule.program;
+        let program = &self.program;
         let root = &self.root;
         let policy = program.policy(&self.ctx.workspace.sandbox);
         let profile = policy.profile(root, root).caching();
@@ -349,7 +389,7 @@ impl Invocation<'_> {
         printed: &Printed,
         file: Option<&Path>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
-        let program = &self.rule.program;
+        let program = &self.program;
         match program.output(Point::Check) {
             Output::Lines => {
                 let lines = printed.lines();
@@ -386,12 +426,7 @@ impl Invocation<'_> {
     /// The one finding of a `status` program whose code is not a success: the
     /// tail of what it printed is its message.
     fn failure(&self, printed: &Printed, file: Option<&Path>) -> Vec<Diagnostic> {
-        if self
-            .rule
-            .program
-            .success(Point::Check)
-            .contains(&printed.code)
-        {
+        if self.program.success(Point::Check).contains(&printed.code) {
             return Vec::new();
         }
         let said = if printed.stderr.trim().is_empty() {
@@ -403,7 +438,7 @@ impl Invocation<'_> {
         let tail: String = said.chars().skip(skipped).collect();
         let message = format!(
             "`{}` exited {}{}{tail}",
-            self.rule.program.shown(),
+            self.program.shown(),
             printed.code,
             if tail.is_empty() { "" } else { ": " },
         );
@@ -481,7 +516,7 @@ impl Invocation<'_> {
     /// `rustfmt -l` and `prettier --list-different` print.
     fn named(&self, line: &str) -> Option<(PathBuf, (u32, u32), &str)> {
         let path = self.project_path(line.trim())?;
-        Some((path, (1, 1), self.rule.title.as_str()))
+        Some((path, (1, 1), self.title))
     }
 
     /// `path` as a file of the project: relative to the root, or absolute

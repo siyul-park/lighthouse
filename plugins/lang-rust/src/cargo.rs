@@ -208,7 +208,7 @@ fn publishable(dir: &Path, package: &Table) -> bool {
             .skip(1)
             .find_map(workspace_publish)
             .unwrap_or(true),
-        Some(other) => publish_flag(other),
+        Some(other) => is_publishable(other),
     }
 }
 
@@ -216,10 +216,10 @@ fn workspace_publish(dir: &Path) -> Option<bool> {
     let text = fs::read_to_string(dir.join("Cargo.toml")).ok()?;
     let manifest: Table = text.parse().ok()?;
     let package = manifest.get("workspace")?.get("package")?;
-    Some(package.get("publish").is_none_or(publish_flag))
+    Some(package.get("publish").is_none_or(is_publishable))
 }
 
-fn publish_flag(value: &Value) -> bool {
+fn is_publishable(value: &Value) -> bool {
     match value {
         Value::Boolean(flag) => *flag,
         Value::Array(registries) => !registries.is_empty(),
