@@ -48,8 +48,29 @@ pub(crate) fn index_with_sources(
     let mut paths = Vec::new();
     collect(&root, &root, &mut paths);
     paths.sort();
+    let inputs = paths
+        .iter()
+        .map(|path| IndexInput::File {
+            source_ast,
+            file: FileRef {
+                path: path.clone(),
+                hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
+            },
+        })
+        .collect();
+    exchange(&root, inputs, options, cache)
+}
+
+/// One `index` request of `inputs` over the project at `root`, served by a
+/// provider of its own.
+pub(crate) fn exchange(
+    root: &Path,
+    inputs: Vec<IndexInput>,
+    options: serde_json::Value,
+    cache: Option<&Path>,
+) -> IndexResult {
     let mut child = Command::new(env!("CARGO_BIN_EXE_lang-rust"))
-        .current_dir(&root)
+        .current_dir(root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -61,16 +82,7 @@ pub(crate) fn index_with_sources(
             root: root.to_string_lossy().into_owned(),
         },
         language: "rust".to_owned(),
-        inputs: paths
-            .iter()
-            .map(|path| IndexInput::File {
-                source_ast,
-                file: FileRef {
-                    path: path.clone(),
-                    hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
-                },
-            })
-            .collect(),
+        inputs,
         context: wire::Context {
             options: serde_json::from_value(options).unwrap(),
             overlays: None,
@@ -85,7 +97,7 @@ pub(crate) fn index_with_sources(
             name: "test".to_owned(),
             version: "0".to_owned(),
         },
-        workspace_folders: vec![wire::WorkspaceFolder::at(&root).unwrap()],
+        workspace_folders: vec![wire::WorkspaceFolder::at(root).unwrap()],
     };
     let request = Message::request(1, wire::INITIALIZE, handshake).unwrap();
     write_message(&mut stdin, &request).unwrap();

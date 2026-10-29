@@ -18,6 +18,7 @@ use crate::{
     cargo::{self, Manifests, Package, Target, TargetKind},
     extract,
     names::Index,
+    region,
     tree::{Root, Tree},
 };
 
@@ -72,19 +73,6 @@ impl Handler for Provider {
                 IndexInput::File { .. } => None,
             })
             .collect();
-        if !regions.is_empty() {
-            return Ok(IndexResult {
-                incomplete: regions
-                    .iter()
-                    .map(|regions| Incomplete {
-                        path: Some(regions.path.clone()),
-                        reason: "Rust provider does not analyze selected source regions yet"
-                            .to_owned(),
-                    })
-                    .collect(),
-                ..IndexResult::default()
-            });
-        }
         let options = match params.context.options.get(LANGUAGE) {
             Some(raw) => match Options::deserialize(raw) {
                 Ok(options) => options,
@@ -102,6 +90,9 @@ impl Handler for Provider {
             },
             None => Options::default(),
         };
+        if !regions.is_empty() {
+            return Ok(region::index(&params, &regions, &options));
+        }
         let provider = format!("{}@{}", self.id, self.version);
         Ok(index_files(&params, &options, &provider))
     }
@@ -119,16 +110,16 @@ impl Provider {
 /// `[languages.rust]`; unknown keys are rejected.
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-struct Options {
+pub(crate) struct Options {
     /// What the `pub` items of a library with `publish = false` are.
     #[serde(default)]
-    unpublished: Unpublished,
+    pub(crate) unpublished: Unpublished,
 }
 
 /// Whether the public items of an unpublished library are a contract.
 #[derive(Deserialize, Default, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-enum Unpublished {
+pub(crate) enum Unpublished {
     /// `public` when another package of the project depends on the library,
     /// `internal` when none does.
     #[default]
@@ -144,7 +135,7 @@ struct Packages {
 }
 
 /// Who governs a file.
-enum Governor {
+pub(crate) enum Governor {
     Manifest(PathBuf),
     Failed(String),
     Nobody,
@@ -394,7 +385,7 @@ fn packages(root: &Path, files: &[String]) -> Packages {
 }
 
 /// The manifest nearest above `rel` within `root`, loading each directory once.
-fn governor(
+pub(crate) fn governor(
     root: &Path,
     rel: &str,
     by_dir: &mut BTreeMap<PathBuf, Result<Option<Package>, String>>,
@@ -414,7 +405,7 @@ fn governor(
 }
 
 /// The texts that stand in for files, by absolute path.
-fn overlays(params: &IndexParams, root: &Path) -> HashMap<PathBuf, String> {
+pub(crate) fn overlays(params: &IndexParams, root: &Path) -> HashMap<PathBuf, String> {
     params
         .context
         .overlays
@@ -438,7 +429,7 @@ fn module_tree(
     tree
 }
 
-fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
+pub(crate) fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
     let used = depended_on(packages);
     let shipped = shipped(packages);
     let mut roots = Vec::new();

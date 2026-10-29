@@ -2,4 +2,5 @@
 
 mod cache;
 mod index;
+mod regions;
 mod source;

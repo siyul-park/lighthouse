@@ -11,6 +11,7 @@ mod extract;
 mod macros;
 mod names;
 mod provider;
+mod region;
 mod signature;
 mod source;
 mod spans;

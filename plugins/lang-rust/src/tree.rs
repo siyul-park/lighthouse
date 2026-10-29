@@ -210,6 +210,40 @@ impl Tree {
         self.children(at);
     }
 
+    /// Adds the file at `abs`, which an overlay stands in for, as the private
+    /// module `name` of `parent`: code that is inside that module.
+    pub fn add_snippet(&mut self, parent: usize, name: &str, abs: &Path) {
+        let Load::New(file) = self.load(abs) else {
+            return;
+        };
+        let (path, krate, cfg_test) = {
+            let module = &self.mods[parent];
+            (
+                format!("{}/{name}", module.path),
+                module.krate,
+                module.cfg_test,
+            )
+        };
+        let dir = crate::provider::normalize(abs)
+            .parent()
+            .map(Path::to_owned)
+            .unwrap_or_default();
+        let at = self.mods.len();
+        self.mods.push(Mod {
+            path,
+            name: name.to_owned(),
+            parent: Some(parent),
+            krate,
+            file,
+            inline: Vec::new(),
+            vis: Visibility::Private,
+            cfg_test,
+            dir,
+            nested: false,
+        });
+        self.children(at);
+    }
+
     /// Parses a file once.
     fn load(&mut self, abs: &Path) -> Load {
         let abs = crate::provider::normalize(abs);
