@@ -250,50 +250,7 @@ impl Config {
                 })
             })
             .collect::<Result<_, Error>>()?;
-        let mut source_ids = BTreeSet::new();
-        for (at, source) in spec.sources.iter().enumerate() {
-            if source.id.is_empty() || source.select.is_empty() {
-                return Err(Error::Config(format!(
-                    "sources[{at}] requires non-empty id and select"
-                )));
-            }
-            let language = &source.language;
-            let fixed = language.provider.is_some();
-            let dynamic = language.select.is_some();
-            if language.provider.as_deref().is_some_and(str::is_empty)
-                || language.select.as_deref().is_some_and(str::is_empty)
-                || fixed == dynamic
-            {
-                return Err(Error::Config(format!(
-                    "sources[{at}].language requires exactly one non-empty provider or select"
-                )));
-            }
-            if language.syntax.as_deref().is_some_and(str::is_empty) {
-                return Err(Error::Config(format!(
-                    "sources[{at}].language.syntax must not be empty"
-                )));
-            }
-            validate_selector(&source.select, &format!("sources[{at}].select"))?;
-            if let Some(selector) = &language.select {
-                validate_selector(selector, &format!("sources[{at}].language.select"))?;
-            }
-            if let Some(context) = &language.context {
-                validate_source_context(context, &format!("sources[{at}].language.context"))?;
-            }
-            if source.files.is_empty() {
-                return Err(Error::Config(format!(
-                    "source `{}` requires at least one file glob",
-                    source.id
-                )));
-            }
-            if !source_ids.insert(&source.id) {
-                return Err(Error::Config(format!(
-                    "duplicate source id `{}`",
-                    source.id
-                )));
-            }
-            globs(&source.files)?;
-        }
+        validate_sources(&spec.sources)?;
         let mut languages = BTreeMap::new();
         for (id, language) in spec.languages {
             languages.insert(
@@ -574,6 +531,55 @@ fn parse_project(format: Format, path: &str, text: &str) -> Result<Resource<Proj
         });
     }
     Ok(resource::<ProjectSpec>(path, &docs.remove(0))?)
+}
+
+/// Why the source rules are not usable, when they are not.
+fn validate_sources(sources: &[SourceRuleSpec]) -> Result<(), Error> {
+    let mut source_ids = BTreeSet::new();
+    for (at, source) in sources.iter().enumerate() {
+        if source.id.is_empty() || source.select.is_empty() {
+            return Err(Error::Config(format!(
+                "sources[{at}] requires non-empty id and select"
+            )));
+        }
+        let language = &source.language;
+        let fixed = language.provider.is_some();
+        let dynamic = language.from.is_some();
+        if language.provider.as_deref().is_some_and(str::is_empty)
+            || language.from.as_deref().is_some_and(str::is_empty)
+            || fixed == dynamic
+        {
+            return Err(Error::Config(format!(
+                "sources[{at}].language requires exactly one non-empty provider or from"
+            )));
+        }
+        if language.syntax.as_deref().is_some_and(str::is_empty) {
+            return Err(Error::Config(format!(
+                "sources[{at}].language.syntax must not be empty"
+            )));
+        }
+        validate_selector(&source.select, &format!("sources[{at}].select"))?;
+        if let Some(selector) = &language.from {
+            validate_selector(selector, &format!("sources[{at}].language.from"))?;
+        }
+        if let Some(context) = &language.context {
+            validate_source_context(context, &format!("sources[{at}].language.context"))?;
+        }
+        if source.files.is_empty() {
+            return Err(Error::Config(format!(
+                "source `{}` requires at least one file glob",
+                source.id
+            )));
+        }
+        if !source_ids.insert(&source.id) {
+            return Err(Error::Config(format!(
+                "duplicate source id `{}`",
+                source.id
+            )));
+        }
+        globs(&source.files)?;
+    }
+    Ok(())
 }
 
 fn validate_selector(selector: &str, field: &str) -> Result<(), Error> {

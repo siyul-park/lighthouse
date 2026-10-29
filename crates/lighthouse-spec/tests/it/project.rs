@@ -332,14 +332,16 @@ select = "$.spec.check.where"
 id = "condition"
 files = ["decisions/**/*.yaml"]
 select = "$.spec.check.where"
-language = { provider = "cel", select = "$.language" }
+language = { provider = "cel", from = "$.language" }
 "#
         )
         .is_err()
     );
     for language in [
-        r#"{ provider = "", select = "$.language" }"#,
-        r#"{ provider = "cel", select = "" }"#,
+        r#"{ provider = "", from = "$.language" }"#,
+        r#"{ provider = "cel", from = "" }"#,
+        r#"{ from = "" }"#,
+        r#"{}"#,
     ] {
         let source = format!(
             r#"[[sources]]
@@ -351,9 +353,20 @@ language = {language}
         );
         assert!(
             Config::parse_inline(&source).is_err(),
-            "empty source provider/select must be rejected: {language}"
+            "an empty or missing provider/from must be rejected: {language}"
         );
     }
+    let named = Config::parse_inline(
+        r#"[[sources]]
+id = "fences"
+files = ["**/*.md"]
+select = "$..?(@.kind == 'code_block')"
+language = { from = "$.lang", context = { example = true } }
+"#,
+    )
+    .unwrap();
+    assert_eq!(named.sources()[0].language.from.as_deref(), Some("$.lang"));
+    assert_eq!(named.sources()[0].language.provider, None);
     assert!(
         Config::parse_inline(
             r#"[[sources]]

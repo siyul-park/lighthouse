@@ -843,20 +843,20 @@
     },
     "SourceLanguageSpec": {
       "additionalProperties": false,
-      "description": "Analysis destination for a source rule. Exactly one of provider and\nselect is required; select resolves a provider key from each candidate.",
+      "description": "Analysis destination for a source rule. Exactly one of provider and from\nis required; from reads the language of each candidate.",
       "properties": {
         "context": {
           "description": "Optional provider-specific values and selector projections."
         },
-        "provider": {
-          "description": "Fixed opaque key in the provider registry.",
+        "from": {
+          "description": "Candidate-relative selector returning the name of the language of each\ncandidate, as a document writes it: one of the aliases a provider\ndeclares, in any case. A candidate whose name is absent or unknown is\nnot analyzed; it is text.",
           "type": [
             "string",
             "null"
           ]
         },
-        "select": {
-          "description": "Candidate-relative selector returning one provider key.",
+        "provider": {
+          "description": "Fixed opaque key in the provider registry.",
           "type": [
             "string",
             "null"

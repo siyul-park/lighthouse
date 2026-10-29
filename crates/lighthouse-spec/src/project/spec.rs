@@ -69,17 +69,20 @@ pub struct SourceRuleSpec {
     pub language: SourceLanguageSpec,
 }
 
-/// Analysis destination for a source rule. Exactly one of provider and
-/// select is required; select resolves a provider key from each candidate.
+/// Analysis destination for a source rule. Exactly one of provider and from
+/// is required; from reads the language of each candidate.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SourceLanguageSpec {
     /// Fixed opaque key in the provider registry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
-    /// Candidate-relative selector returning one provider key.
+    /// Candidate-relative selector returning the name of the language of each
+    /// candidate, as a document writes it: one of the aliases a provider
+    /// declares, in any case. A candidate whose name is absent or unknown is
+    /// not analyzed; it is text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub select: Option<String>,
+    pub from: Option<String>,
     /// Optional interpretation owned by the selected provider.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
