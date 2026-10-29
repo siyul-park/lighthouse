@@ -239,7 +239,7 @@ var Defaults = map[string]string{}
 func Run() int { return language.Analyze() }
 ```
 
-```go valid go.mod
+```gomod valid go.mod
 module example.com/sample
 go 1.26
 ```
@@ -280,7 +280,7 @@ Derived from: import-linter, layers, independence and forbidden contracts; ArchU
 | `independent` | `true` | Modules of one layer that match different globs do not import each other. |
 | `layers` | `[]` | The layers from the top down, each a list of module globs, such as `[["app/cli"], ["app/**"], ["app/model"]]`. A module imports only modules of its own layer or below. |
 
-```go invalid go.mod
+```gomod invalid go.mod
 module example.com/app
 
 go 1.26
@@ -300,7 +300,7 @@ package infra
 func Read() string { return "" }
 ```
 
-```go valid go.mod
+```gomod valid go.mod
 module example.com/app
 
 go 1.26
@@ -332,7 +332,7 @@ An interface SHOULD be defined at the point that consumes behavior, and SHOULD e
 
 Derived from: Lighthouse, coding-patterns#types-and-apis-99a0c39c
 
-```go invalid go.mod
+```gomod invalid go.mod
 module example.com/app
 
 go 1.26
@@ -352,7 +352,7 @@ package infra
 func Read() string { return "" }
 ```
 
-```go valid go.mod
+```gomod valid go.mod
 module example.com/app
 
 go 1.26
@@ -382,7 +382,7 @@ Lower-level or reusable symbols SHOULD express their responsibility in the most 
 
 Derived from: Lighthouse, coding-patterns#dependency-direction-278c4f1e
 
-```go invalid go.mod
+```gomod invalid go.mod
 module example.com/app
 
 go 1.26
@@ -402,7 +402,7 @@ package infra
 func Read() string { return "" }
 ```
 
-```go valid go.mod
+```gomod valid go.mod
 module example.com/app
 
 go 1.26
@@ -808,7 +808,7 @@ Derived from: Martin, Clean Code (2008), G9 Dead Code; Martin, Clean Code (2008)
 | --- | --- | --- |
 | `kinds` | `["wrapper","interface"]` | What to report. |
 
-```cel invalid
+```yaml invalid
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata: { name: example/decision }
@@ -830,7 +830,7 @@ spec:
     message: Example
 ```
 
-```cel valid
+```yaml valid
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata: { name: example/decision }

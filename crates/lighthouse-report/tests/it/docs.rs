@@ -49,6 +49,32 @@ const BETA: &str = "  title: Beta is advice
   requirement: Beta SHOULD be considered.
 ";
 
+const MODULE: &str = "  title: Module holds
+  context: Keeps the module.
+  scope: { subject: file }
+  requirement: The module MUST hold.
+  severity: error
+  check:
+    type: cel
+    select: file
+    where: 'true'
+    message: m
+  examples:
+    - name: broken
+      language: go
+      kind: invalid
+      files:
+        - { path: go.mod, body: 'module example.com/m' }
+        - { path: Cargo.toml, body: '[package]' }
+        - { path: decision.yaml, body: 'kind: Decision' }
+        - { path: a.go, body: 'broken()' }
+      expect: [{ line: 1 }]
+    - name: fine
+      language: go
+      kind: valid
+      files: [{ path: a.go, body: 'fine()' }]
+";
+
 fn fixture() -> Catalog {
     let mut demo = pack("demo", &[("one", &["alpha", "beta"])]);
     demo = demo
@@ -71,6 +97,25 @@ fn fixture() -> Catalog {
         &lighthouse_test_support::cel(),
     )
     .unwrap()
+}
+
+#[test]
+fn a_file_that_is_not_the_language_of_its_example_is_fenced_as_what_it_is() {
+    let catalog = Catalog::from_files(
+        files(&[
+            ("demo/pack.yaml", pack("demo", &[("one", &["module"])])),
+            ("demo/one/module.yaml", decision("demo/module", MODULE)),
+        ]),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
+
+    let text = pages(&catalog)["decisions/demo.md"].clone();
+
+    assert!(text.contains("```gomod invalid go.mod\n"), "{text}");
+    assert!(text.contains("```toml invalid Cargo.toml\n"), "{text}");
+    assert!(text.contains("```yaml invalid decision.yaml\n"), "{text}");
+    assert!(text.contains("```go invalid a.go\n"), "{text}");
 }
 
 #[test]

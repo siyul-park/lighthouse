@@ -38,13 +38,13 @@ a
 b
 ```
 
-Also: go, rust, yaml, toml, cel
+Also: go, rust, yaml, toml, cel, markdown
 
 ### Lines fit the configured width
 
 `core/max-len` · file · warn · cel
 
-*A line that can be wrapped should be wrapped (ESLint `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single string literal and an import line cannot be wrapped and are not counted. Only source files of a language provider are counted; prose and data have no syntax to wrap at.*
+*A line that can be wrapped should be wrapped (ESLint `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single string literal and an import line cannot be wrapped and are not counted. Only source files of a language provider are counted; prose (text and Markdown) and data have no syntax to wrap at.*
 
 A line that can be wrapped SHOULD NOT be wider than the configured number of columns (option `maxWidth`).
 
@@ -73,7 +73,7 @@ var n = []string{
 }
 ```
 
-Also: text, rust, yaml, toml, cel
+Also: text, rust, yaml, toml, cel, markdown
 
 ## Source annotations
 
@@ -147,14 +147,14 @@ A decision name SHOULD be kebab-case with at most three words, not counting a `n
 
 Derived from: Martin, Clean Code (2008), N1 Choose Descriptive Names
 
-```text invalid
+```yaml invalid
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/Private_Types
 ```
 
-```text valid
+```yaml valid
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:

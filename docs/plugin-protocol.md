@@ -604,18 +604,19 @@ type-checks with `go/types`.
 - Load, parse and type errors become `incomplete` entries per file, with
   `line:col: message`.
 
-## `lang-yaml` and `lang-toml`
+## `lang-yaml`, `lang-toml` and `lang-markdown`
 
 Host-file providers: they advertise `source-ast` and `overlays` (globs
-`**/*.yaml`, `**/*.yml` and `**/*.toml`, priority 20) and return no code model,
+`**/*.yaml`, `**/*.yml` and `**/*.toml`, and `**/*.md` and `**/*.markdown` for Markdown, priority 20) and return no code model,
 only a fragment for every requested file (so file decisions such as
 `core/max-lines` see it) with the comments the parser retains (TOML: `toml_edit`
 keeps them; YAML: the parser drops them, so none) and, for each file whose
 `source_ast` is true, its `Source`. The core selects the regions other providers analyze (the CEL
 expressions of a decision, for `lang-cel`) from the tree, so the provider only
-parses and maps; the answers to `initialize` and `index` are the same for both
-(`lighthouse_protocol::serve_host`). A selected-regions input is an
-`incomplete` entry.
+parses and maps; the answers to `initialize` and `index` are the same for all
+(`lighthouse_protocol::serve_host`). A selected-regions input has the provider read each
+region as a document of its language: a region that is not one is a notice, and one it
+cannot map is an `incomplete` entry; the answer is a fragment of the host file alone.
 
 - The tree is JSON: a YAML stream is `{"kind": "Stream", "documents": [...]}` and
   a TOML document is its root table. Each mapping entry has the `range` of the
@@ -626,6 +627,26 @@ parses and maps; the answers to `initialize` and `index` are the same for both
 - A document that does not parse, or a string that cannot be mapped to exact
   host bytes, is an `incomplete` entry for the file, never a tree with a wrong
   map.
+- A Markdown document is `{"kind": "document", "children": [...]}` of comrak's
+  CommonMark and GFM nodes, each with a `kind`. A `code_block` carries the fence
+  `info` as written, the `lang` (its first word), the `attributes` (the rest, split on
+  spaces and commas as rustdoc and mdBook read them) and the canonical `key` of the
+  language (`yml` is `yaml`, `rs` is `rust`, `golang` is `go`; the table is in the
+  plugin's README). Its `text_pointer` names the body, whose `text_map` runs through the
+  indentation of a list item or a block quote and the line endings of the file. The
+  descendant segment `..` of the selector grammar reaches a block at any depth. Markdown
+  has no subjects of its own yet: it is a language of files only.
+
+### Regions, examples and what the file knows of them
+
+The engine tells each host file which languages its regions are in and whether a source
+rule marks them as example code (the reserved `language.context.example: true`): the
+files it returns carry the fact `regions` (`go:example,yaml:code`), the modules a
+region provider returns say their `language` and whether they are examples, and the
+file's `analysisLanguage` is the one language of its code that is not example code. An
+edge from example code to project code is a reference with a site and no caller, so an
+example never keeps a symbol alive, owns a test or breaks a layer. A decision's
+`languages` and `scope.examples` decide which regions it sees.
 
 ## `lang-rust`
 

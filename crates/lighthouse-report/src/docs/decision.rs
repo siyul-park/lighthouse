@@ -250,9 +250,24 @@ fn example_block(out: &mut String, example: &Example, other: Option<&Example>) {
         let _ = writeln!(
             out,
             "```{} {label}\n{}\n```\n",
-            example.language,
+            fence_language(&example.language, &file.path),
             file.text().trim_end()
         );
+    }
+}
+
+/// The language a fence names for a file of an example: the example's own,
+/// except for the files that are not written in it (a Go module file, a Cargo
+/// manifest, a YAML decision), which a reader and a tool that reads the fence take as what
+/// they are.
+fn fence_language<'a>(language: &'a str, path: &str) -> &'a str {
+    match path.rsplit('/').next().unwrap_or(path) {
+        "go.mod" | "go.work" => "gomod",
+        "go.sum" => "text",
+        "Cargo.lock" => "toml",
+        name if name.ends_with(".toml") => "toml",
+        name if name.ends_with(".yaml") || name.ends_with(".yml") => "yaml",
+        _ => language,
     }
 }
 

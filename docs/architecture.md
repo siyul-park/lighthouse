@@ -10,8 +10,8 @@
    RPC host (lighthouse-rpc) ── language plugins as processes
           │                      plugins/lang-go (go/packages + go/types)
           │                      plugins/lang-rust (syn + own module resolution)
-          │                      plugins/lang-yaml, lang-toml (syntax trees of
-          │                      host files, for embedded sources)
+          │                      plugins/lang-yaml, lang-toml, lang-markdown (syntax
+          │                      trees of host files, for embedded sources)
    code model (UCM, lighthouse_model::ucm)
 ```
 
@@ -106,7 +106,7 @@ refuses two decisions with the same.
 Conventions: keys are lowerCamelCase, option names included (`maxWords`), durations are strings (`30s`), enums are lowercase kebab,
 paths are relative with `/`. A decision belongs to the pack its id names and to
 the section of that pack's file that lists it, so where the file lies carries no
-meaning. `scope` is `{subject, generated, tests}` (`generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
+meaning. `scope` is `{subject, generated, tests, examples}` (`generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them; `examples: exclude|include|only`, default `include`, is the same for the code that documentation shows: a decision that needs a whole unit or the project graph sets `exclude`). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
 Schema object (`type`, `default`, `description` per property, closed with
 `additionalProperties: false`); `languages.<id>` holds the option values of one language and,
 for a `command` check or fix, the [program](programs.md) that runs for its files (`check`, `fix`), in place of
@@ -790,7 +790,7 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 - [spec](../crates/lighthouse-spec/README.md): decision kinds, Catalog, local layer.
 - [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), [protocol](../crates/lighthouse-protocol/README.md): L0 vocabulary, resources and the wire; protocol also owns the hashes and folds that host and plugin must compute alike.
 - `process`: child-process helper and the [sandbox](#sandbox) (no README). `test-support`: dev-only helper of the test suites (no README).
-- Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [lang-yaml](../plugins/lang-yaml/README.md), [lang-toml](../plugins/lang-toml/README.md), [lang-cel](../plugins/lang-cel/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
+- Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [lang-yaml](../plugins/lang-yaml/README.md), [lang-toml](../plugins/lang-toml/README.md), [lang-markdown](../plugins/lang-markdown/README.md), [lang-cel](../plugins/lang-cel/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
 
 Each crate has one integration-test binary, `tests/it/main.rs` with a module per area.
 

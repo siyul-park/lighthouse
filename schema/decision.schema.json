@@ -642,6 +642,26 @@
       ],
       "type": "string"
     },
+    "ExampleScope": {
+      "description": "Which example code a decision applies to: the code that documentation\nshows, which is analyzed like any other and is not part of the project.",
+      "oneOf": [
+        {
+          "const": "exclude",
+          "description": "Project code only.",
+          "type": "string"
+        },
+        {
+          "const": "include",
+          "description": "Project code and examples.",
+          "type": "string"
+        },
+        {
+          "const": "only",
+          "description": "Examples only.",
+          "type": "string"
+        }
+      ]
+    },
     "Expect": {
       "additionalProperties": false,
       "description": "An expected diagnostic of an invalid example.",
@@ -1129,8 +1149,12 @@
     },
     "Scope": {
       "additionalProperties": false,
-      "description": "Where a decision applies: what it is about, and which code its subjects\nmay be in. Generated and test code are told apart by the host (the\nprovider's marker, `.gitattributes`, the project's `generated` globs), and\nthe engine leaves the subjects out that the scope excludes before any\ncheck runs.",
+      "description": "Where a decision applies: what it is about, and which code its subjects\nmay be in. Generated, test and example code are told apart by the host (the\nprovider's marker, `.gitattributes`, the project's `generated` globs), and\nthe engine leaves the subjects out that the scope excludes before any\ncheck runs.",
       "properties": {
+        "examples": {
+          "$ref": "#/$defs/ExampleScope",
+          "description": "Which example code is a subject, the code documentation shows:\n`include` (the default), `exclude` or `only`."
+        },
         "generated": {
           "description": "Generated code is a subject too. Default: it is not.",
           "type": "boolean"

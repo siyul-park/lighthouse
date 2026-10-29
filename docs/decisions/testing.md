@@ -40,7 +40,7 @@ Derived from: Martin, Clean Code (2008), T1 Insufficient Tests
 | `includeInternal` | `false`; go: `true` | Also judge symbols public only inside the project. |
 | `symbols` | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
 
-```go invalid go.mod
+```gomod invalid go.mod
 module example.com/store
 
 go 1.26
