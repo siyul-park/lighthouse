@@ -39,6 +39,7 @@ spec:
     subject: file
     generated: true
     tests: include
+    examples: exclude
   languages:
     go: {}
     rust: {}

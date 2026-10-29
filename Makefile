@@ -36,6 +36,7 @@ lint: plugins
 	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./...
 	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check decisions/
 	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check . --allow-incomplete
+	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- decision test 'markdown/*'
 
 # What CI runs.
 ci: test lint

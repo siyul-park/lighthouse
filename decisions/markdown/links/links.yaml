@@ -51,7 +51,7 @@ spec:
         success: [0]
   provenance:
     wasDerivedFrom:
-      - 'lychee: https://github.com/lycheeverse/lychee'
+      - 'lychee: https://github.com/lycheeverse/lychee (examples verified with 0.24.2)'
       - 'GitHub Flavored Markdown spec, links: https://github.github.com/gfm/#links'
       - 'markdownlint MD051 link-fragments: https://github.com/DavidAnson/markdownlint/blob/main/doc/md051.md'
   examples:
