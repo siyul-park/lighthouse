@@ -492,6 +492,7 @@ fn evaluate_selector<'a>(
                 (SelectorPart::Filter(filter), _) => {
                     next.extend(filter_matches(source_ast, &parent, filter)?.then_some(parent));
                 }
+                (SelectorPart::Descend, _) => descend(source_ast, &parent, &mut next),
                 (SelectorPart::Key(key), Value::Object(object)) => {
                     next.extend(object.get(key).map(|value| Selected {
                         value,
@@ -505,22 +506,7 @@ fn evaluate_selector<'a>(
                     }));
                 }
                 (SelectorPart::Keys, Value::Object(object)) => {
-                    let mut children: Vec<_> = object
-                        .iter()
-                        .map(|(key, value)| Selected {
-                            value,
-                            pointer: pointer_child(&parent.pointer, key),
-                        })
-                        .collect();
-                    children.sort_by_key(|item| {
-                        source_ast
-                            .mapping
-                            .get(&item.pointer)
-                            .and_then(|entry| entry.range)
-                            .map(|range| range[0])
-                            .unwrap_or(u32::MAX)
-                    });
-                    next.extend(children);
+                    next.extend(object_children(source_ast, &parent.pointer, object));
                 }
                 (SelectorPart::Indices, Value::Array(array)) => {
                     next.extend(array.iter().enumerate().map(|(index, value)| Selected {
@@ -534,6 +520,49 @@ fn evaluate_selector<'a>(
         current = next;
     }
     Ok(current)
+}
+
+/// The values of `object` below `pointer`, in the order of their source.
+fn object_children<'a>(
+    source_ast: &Source,
+    pointer: &str,
+    object: &'a Map<String, Value>,
+) -> Vec<Selected<'a>> {
+    let mut children: Vec<_> = object
+        .iter()
+        .map(|(key, value)| Selected {
+            value,
+            pointer: pointer_child(pointer, key),
+        })
+        .collect();
+    children.sort_by_key(|item| {
+        source_ast
+            .mapping
+            .get(&item.pointer)
+            .and_then(|entry| entry.range)
+            .map_or(u32::MAX, |range| range[0])
+    });
+    children
+}
+
+/// Adds `parent` and every value below it, parents first.
+fn descend<'a>(source_ast: &Source, parent: &Selected<'a>, found: &mut Vec<Selected<'a>>) {
+    found.push(parent.clone());
+    let children: Vec<Selected<'a>> = match parent.value {
+        Value::Object(object) => object_children(source_ast, &parent.pointer, object),
+        Value::Array(array) => array
+            .iter()
+            .enumerate()
+            .map(|(index, value)| Selected {
+                value,
+                pointer: pointer_child(&parent.pointer, &index.to_string()),
+            })
+            .collect(),
+        _ => return,
+    };
+    for child in &children {
+        descend(source_ast, child, found);
+    }
 }
 
 fn filter_matches(
@@ -566,9 +595,6 @@ fn compare(
         .iter()
         .map(|item| scalar(item.value))
         .collect::<Result<Vec<_>, _>>()?;
-    if matched.is_empty() {
-        return Ok(false);
-    }
     Ok(if comparison.equal {
         matched.iter().any(|value| value == &comparison.value)
     } else {
@@ -621,6 +647,39 @@ mod tests {
             ["/items/0", "/items/1"]
         );
         assert_eq!(selected[0].value, selected[1].value);
+    }
+
+    #[test]
+    fn descendants_come_parents_first_with_their_pointers() {
+        let ast = Source {
+            path: "doc.md".to_owned(),
+            ast: serde_json::json!({
+                "kind": "document",
+                "children": [
+                    {"kind": "code_block", "attributes": []},
+                    {"kind": "list", "children": [
+                        {"kind": "item", "children": [
+                            {"kind": "code_block", "attributes": ["ignore"]}
+                        ]}
+                    ]}
+                ]
+            }),
+            mapping: BTreeMap::new(),
+        };
+        let blocks = evaluate(&ast, "", "$..?(@.kind == 'code_block')").unwrap();
+        let pointers: Vec<_> = blocks.iter().map(|item| item.pointer.as_str()).collect();
+        assert_eq!(
+            pointers,
+            ["/children/0", "/children/1/children/0/children/0"]
+        );
+        let kept = evaluate(
+            &ast,
+            "",
+            "$..?(@.kind == 'code_block' && @.attributes[*] != 'ignore')",
+        )
+        .unwrap();
+        let pointers: Vec<_> = kept.iter().map(|item| item.pointer.as_str()).collect();
+        assert_eq!(pointers, ["/children/0"]);
     }
 
     #[test]

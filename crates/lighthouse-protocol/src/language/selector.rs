@@ -10,6 +10,9 @@ pub struct Selector {
 /// One step in a selector path or a predicate applied to the current candidates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelectorPart {
+    /// `..`: the current value and every value below it, parents first, in
+    /// the order the tree states them.
+    Descend,
     Key(String),
     Index(usize),
     Keys,
@@ -42,6 +45,15 @@ impl Selector {
         let mut at = 1;
         while at < bytes.len() {
             match bytes[at] {
+                b'.' if bytes.get(at + 1) == Some(&b'.') => {
+                    parts.push(SelectorPart::Descend);
+                    at += 1;
+                    match bytes.get(at + 1) {
+                        Some(b'[' | b'?') => at += 1,
+                        Some(_) => parts.push(parse_key(source, &mut at)?),
+                        None => return Err("descendant segment needs a selector".to_owned()),
+                    }
+                }
                 b'.' => parts.push(parse_key(source, &mut at)?),
                 b'[' if bytes.get(at + 1) == Some(&b'?') => {
                     at += 1;
@@ -424,11 +436,37 @@ mod tests {
     }
 
     #[test]
+    fn selector_parses_the_descendant_segment() {
+        assert_eq!(
+            Selector::parse("$..name").unwrap().parts(),
+            &[SelectorPart::Descend, SelectorPart::Key("name".to_owned())]
+        );
+        assert_eq!(
+            Selector::parse("$..*").unwrap().parts(),
+            &[SelectorPart::Descend, SelectorPart::Keys]
+        );
+        assert_eq!(
+            Selector::parse("$..[0]").unwrap().parts(),
+            &[SelectorPart::Descend, SelectorPart::Index(0)]
+        );
+        assert!(matches!(
+            Selector::parse("$..?(@.kind == 'code_block').text")
+                .unwrap()
+                .parts(),
+            [
+                SelectorPart::Descend,
+                SelectorPart::Filter(_),
+                SelectorPart::Key(_)
+            ]
+        ));
+    }
+
+    #[test]
     fn selector_rejects_ambiguous_syntax() {
         for selector in [
             "",
             "spec.rules",
-            "$..name",
+            "$..",
             "$.[0]",
             "$[x]",
             "$['broken]",

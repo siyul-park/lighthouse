@@ -158,7 +158,10 @@ regions from it.
 
 The core owns selector parsing and evaluation. select and language.select use the same
 bounded path/filter grammar: $, named and quoted keys, numeric indices, dot-wildcard and array-wildcard,
-equality/inequality predicates, conjunction and disjunction. The host provider does not get the source
+the descendant segment `..` (the value and every value below it, parents first, as RFC 9535 defines
+it), equality/inequality predicates, conjunction and disjunction. `!=` holds when no selected
+value equals the operand, so a path that selects nothing satisfies it. A tree whose blocks nest,
+such as Markdown, needs the descendant segment to reach a block at any depth. The host provider does not get the source
 rules and must not implement a private selection mode. The core resolves language.context
 projections and declaration context before it creates source-region inputs.
 
