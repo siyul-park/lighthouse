@@ -39,6 +39,13 @@ type run struct {
 	failed map[string]int
 	// encoded holds fragments that are already JSON, from the cache.
 	encoded map[string]json.RawMessage
+	// imported memoizes the imports goimports settles, by module and names.
+	imported map[string]string
+	// loads counts the batches the run had the go command load.
+	loads int
+	// regionModules gives the module path of the unit of a fence by its file,
+	// where the unit's directory is not its own.
+	regionModules map[string]string
 }
 
 // batch is the set of files that one go.mod governs. Files with no go.mod form
@@ -86,6 +93,7 @@ func (r *run) index() {
 	}
 	sort.Strings(candidates)
 	batches := r.batches(candidates)
+	r.loads = len(batches)
 	loads := r.loadAll(batches)
 	for _, b := range batches {
 		r.analyze(b, loads.next())
@@ -286,6 +294,10 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 			}
 			r.claimed[rel] = true
 			u := newUnit(rel, file, pkg, src, res)
+			if module, ok := r.regionModules[rel]; ok {
+				u.module = module
+				u.frag.Modules[0].Path = module
+			}
 			r.fragments[rel] = u.fragment()
 			units = append(units, u)
 		}
@@ -497,6 +509,8 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		excludedFiles: map[string]bool{},
 		failed:        map[string]int{},
 		encoded:       map[string]json.RawMessage{},
+		regionModules: map[string]string{},
+		imported:      map[string]string{},
 		result:        emptyResult(),
 	}
 	for _, f := range params.FileInputs() {
@@ -600,6 +614,9 @@ func positionFile(pos string) string {
 // vendor directories, and names starting with "." or "_".
 func ignoredPath(rel string) bool {
 	for _, part := range strings.Split(rel, "/") {
+		if part == snippetsDir {
+			continue
+		}
 		if part == "testdata" || part == "vendor" || strings.HasPrefix(part, ".") || strings.HasPrefix(part, "_") {
 			return true
 		}

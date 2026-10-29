@@ -14,6 +14,9 @@ import (
 type RunStats struct {
 	Hits   []string
 	Misses []string
+	// Loads is how many times the request had the go command load packages:
+	// one for each module it holds files or fences of.
+	Loads int
 }
 
 // factsRecord is the cached facts of source files by content hash.

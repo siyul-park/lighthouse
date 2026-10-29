@@ -37,12 +37,7 @@ func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error
 func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 	for _, input := range params.Inputs {
 		if input.Kind == "regions" && input.Regions != nil {
-			result := emptyResult()
-			result.Incomplete = append(result.Incomplete, sdk.Incomplete{
-				Path:   input.Regions.Path,
-				Reason: "Go provider does not analyze selected source regions yet",
-			})
-			return result, nil
+			return p.indexRegions(params), nil
 		}
 	}
 	opts, err := newOptions(params.Context.Options)
