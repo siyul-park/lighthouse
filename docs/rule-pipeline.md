@@ -26,6 +26,7 @@ says what exists today (see [Status](#status)).
 | Revision | a change to a decision, with its evaluation and approval | promotion, demotion, narrowing, widening, model attachment |
 
 **Meaning version and check revision are the central axis.**
+
 - A judgment belongs to the meaning version it was made under. It holds while that version and its evidence are unchanged.
 - A new check revision (a better predicate, a retrained model, a narrower selector) never expires judgments, so a check improves without losing its history.
 - A new meaning version never silently inherits judgments.
@@ -64,6 +65,7 @@ parts, and each answers a different question:
 
 A check is one provider, configured like every other provider in Lighthouse (fix,
 verify):
+
 - **`type`** names where evaluation happens: `cel` (an expression), `command` (a process), `rpc` (a plugin process) or `model` (the bound classification model).
 - **Capabilities** in the manifest say how it behaves: `deterministic`, `abstains`, `cost`.
 
@@ -75,6 +77,7 @@ are no profiles or tiers beyond that.
 **Results and execution errors are different things.** A provider that runs and finds a
 violation produces a `fail` result, which is a normal finding. An **execution error** (a
 crash, a timeout, unparsable output) is not a result:
+
 - From a deterministic provider, it leaves the analysis incomplete (exit 3). Nothing it would have covered can be called clean.
 - From a non-deterministic provider, it skips the affected subjects with a notice; they stay `review`.
 
@@ -88,6 +91,7 @@ check:
 ```
 
 That is the whole check for a decision the model should evaluate:
+
 - **Question:** the decision's `requirement`. An optional `prompt` replaces it when the requirement reads badly as a question.
 - **Shots:** the decision's examples.
 - **Candidates:** the subjects in the decision's `scope`. An optional `select` (CEL) narrows them. Only subjects of a file (a symbol, function, file, test, comment or event) can be judged: a model needs their source.
@@ -226,6 +230,7 @@ evaluation = { precision = 0.9 }          # recall = 0.8 optional
 
 Evidence is what was observed. It carries no result. Every record (evidence, judgment,
 suppression, revision, decision) has the same provenance, in W3C PROV-O terms:
+
 - `wasAttributedTo`: the person or software agent (an agent, a model, a mining rule, Lighthouse);
 - `wasDerivedFrom`: what it came from;
 - `generatedAtTime`: when it was made.
@@ -253,6 +258,7 @@ intent → decision is a complete loop.
 ## Judgment and suppression
 
 A **judgment** is a result on one subject, and it labels one of the check's two parts:
+
 - `pass` and `fail` are **conformance** labels; they evaluate the evaluator;
 - `notApplicable` is an **applicability** label; it evaluates the selector.
 
@@ -290,6 +296,7 @@ the log applies it. The two kinds are the only records of the decision log; they
 `Suppression` naming the id of the `Judgment` it goes with.
 
 What a run **reports** uses SARIF results with their standard meaning:
+
 - `fail` is a finding. A suppressed `fail` stays in SARIF with its suppression.
 - `review` is a case nobody has decided yet.
 - `notApplicable` is a subject outside the selector, or judged so.
@@ -309,6 +316,7 @@ history stays in git.
 
 A revision is a change to a decision: `{decision, parent, meaningVersion, checkRevision,
 change, evaluation, approval}`.
+
 - Authored edits to the YAML are revisions whose history is git.
 - Decision-level model bindings, thresholds and approvals are `Revision` records in `decisions.jsonl`.
 - Lighthouse proposes revisions; it never applies one without approval.
@@ -335,6 +343,7 @@ Versioning but is not SemVer: it says which version of the decision moved.
 Each decision has an evaluation policy: its precision target and, optionally, a recall target.
 
 Beyond change classes:
+
 - **Status** follows the ADR lifecycle: `proposed → accepted | rejected`, `accepted → deprecated | superseded`. Split and merge are supersession, and the old judgments are reused only as evidence.
 - Moving a decision between a project and a pack is packaging, not a change to the decision. Judgments never travel with it, and models are retrained locally.
 - **Promotion** (a prompted model, then a trained one, then a deterministic check) is not a state. It is a sequence of `minor` revisions, each passing evaluation against the current one.

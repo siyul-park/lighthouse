@@ -78,7 +78,7 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (46)
+## Active decisions (48)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|unsafe` marks a decision with a fixer and the safety of its fix.
 
@@ -125,6 +125,11 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/no-noise-comment` (warn, fixable: unsafe) Comments add no noise
 - `design/no-detached-comment` (warn, fixable: unsafe) Comments stay attached to declarations
 - `design/no-todo` (info) TODO comments name deferred work
+
+### markdown
+
+- `markdown/gfm` (warn, fixable: unsafe) Markdown follows GitHub Flavored Markdown
+- `markdown/links` (warn) Relative links and anchors resolve
 
 ### testing
 

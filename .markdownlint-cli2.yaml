@@ -1,0 +1,9 @@
+config:
+  # Prose is not wrapped at a column; the renderer wraps it.
+  MD013: false
+  # A heading may end in a full stop (an acronym: F.I.R.S.T.).
+  MD026:
+    punctuation: ",;:!"
+ignores:
+  # A prompt the agent reads, not a document: it begins with a list.
+  - crates/lighthouse-session/src/agent-loop.md

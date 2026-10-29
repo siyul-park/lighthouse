@@ -62,7 +62,9 @@ What is checked by hand is automated first where the result can be verified, the
 where rules fall short, then reach. Each step below comes before the ones that build on it.
 
 ### Fixes by models, verified
+
 The biggest direct cut in agent work, and it needs no labels: the verifier already exists.
+
 - **A `type: model` fix** for the decisions `[fix] decisions` lists, once `[models] agent`
   is bound: an agent edit of a scratch workspace (`agent`: a headless agent CLI, later an ACP
   agent), within the scope `symbol` or `files`. Without an agent the finding stays a review task
@@ -73,7 +75,9 @@ The biggest direct cut in agent work, and it needs no labels: the verifier alrea
   - `[fix] unsafe` (false by default) says whether a verified change is applied without a person; `[rules."<id>"] safety` says it per decision.
 
 ### Local models
+
 Free, local and calibrated, run in process; evaluation is the promotion gate.
+
 - A Core ML embedding model on the Apple Neural Engine through the standard Apple path;
   adopted only if it is at least twice as fast with no drop in evaluation.
 - A 1B-4B local model as a classifier, measured first on the hand-labelled subjects
@@ -85,12 +89,15 @@ Free, local and calibrated, run in process; evaluation is the promotion gate.
   candidates on request.
 
 ### Checks that author themselves
+
 A check author turns `model` checks and noisy selectors into deterministic revisions that
 pass the evaluation gate, which removes review tasks at the source. A revision still needs
 approval, and a major change always needs a person.
 
 ### Learning from history
+
 Labels are the measured bottleneck of every classifier, so they come next.
+
 - **Repository mining:** change direction, prevalence and kept fixes become weak labels
   (strength `derived`) and `proposed` decisions. Changes are grouped by structural change
   first, then by embeddings; generation drafts the wording. A design comes first.
@@ -98,15 +105,18 @@ Labels are the measured bottleneck of every classifier, so they come next.
   samples findings; it never removes one.
 
 ### More Clean Code coverage
+
 General provider facts for the 40 pending items: flow attributes, event kinds, external
 calls, parameter attributes, type origin; effects, locals and clone fingerprints follow.
 This adds findings, so it waits until automation exists to absorb them.
+
 - A new deterministic kind ships only if its sampled precision passes; otherwise it is
   judged.
 - A project can replace a bundled decision's check (`rules."<id>".check`) to wrap a
   linter it already runs.
 
 ### Fast on large repositories
+
 - **Done:** per-unit provider caches with early cutoff and a host result cache keyed by
   each rule's declared reach. Warm runs are byte-identical to cold runs
   (`scripts/fastgate.sh`); a warm run on this repository takes 0.7 s.
@@ -120,12 +130,14 @@ This adds findings, so it waits until automation exists to absorb them.
   `lighthouse/check` for `rpc` checks.
 
 ### The decision loop, completed
+
 - **Graph queries:** decision, finding, judgment (reason, actor), evidence and revision.
 - **Proposals:** narrow, widen, demote or promote a decision, with generated examples
   and drafted wording. Nothing is enabled automatically.
 - `lighthouse log compact`.
 
 ### Decision search
+
 - One `search` tool over decisions, judgments, findings, examples, symbols and
   revisions, for decisions that rules cannot capture precisely.
 - **Ranking:** a structured filter, then BM25 (FTS5), the project's embedding model and
@@ -140,7 +152,9 @@ This adds findings, so it waits until automation exists to absorb them.
   - FTS5 BM25 alone is the baseline; embeddings are adopted only if they improve it.
 
 ### Packaging and adoption
+
 Public adoption waits until the loop has been shown working.
+
 - Prebuilt binaries that bundle the Go and Rust providers and the local model plugin
   (model weights download on first use), plus a one-command install. Verified on clean
   machines. Not yet a public release.
@@ -149,6 +163,7 @@ Public adoption waits until the loop has been shown working.
 - Public release, and a docs pass: each document holds only what its reader needs.
 
 ### Later
+
 | Step | Scope |
 | --- | --- |
 | Artifact graph | domain-neutral nodes and edges; a markdown provider as the first non-code domain, then the shared artifact and relation graph extracted from what the second domain shows is common |
@@ -159,6 +174,7 @@ Public adoption waits until the loop has been shown working.
 | Remote models | training and classification on a server declared by base URL, through the published model APIs only: TypeSafe System One for classification, OpenAI Embeddings, Models, Files and Fine-tuning for the rest; a reference server serving both; one conformance suite for in-process, stdio and HTTP; local stays the default |
 
 ## Known gaps
+
 - A per-language check, `spec.languages.<id>.check`, does not exist. A decision whose
   deterministic part rests on facts only some providers give (`design/context-first`,
   `design/no-stored-context`, `design/error-identity`, `design/no-private-types`: Go only) guards its `where` on

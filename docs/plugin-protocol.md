@@ -46,14 +46,14 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Protocol 0.4 uses one `lighthouse/index` interface for physical files and selected source regions. Each input is a tagged `IndexInput`: `{ kind: "file", file, source_ast }` asks a provider to analyze a physical file and, when `source_ast` is true, return its selectable AST; `{ kind: "regions", regions }` asks it to analyze source regions selected by the core. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
+Protocol 0.4 uses one `lighthouse/index` interface for physical files and selected source regions. Each input is a tagged `IndexInput`: `{ kind: "file", file, source_ast }` asks a provider to analyze a physical file and, when `source_ast` is true, return its selectable AST; `{ kind: "regions", regions }` asks it to analyze source regions selected by the core. A request may mix both kinds: a provider indexes the physical files and the regions together, in one pass (Go: one `packages.Load` per module), and answers one fragment per file, the regions' facts merged into the fragment of their host file. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
 
 The `source_ast` flag is per file, so a batch requests ASTs only where a source rule's file globs match. Providers that advertise the `source-ast` capability MUST return one `Source` per requested file, with `path`, provider-defined serialized `ast`, and a separate `mapping` keyed by canonical JSON Pointer. Each mapping entry can carry a half-open UTF-8 byte `range`, a descendant `text_pointer` for a node's source-text scalar, and optional `text_map` segments from extracted-text bytes to original-host bytes. ASTs retain the parser/provider's structural shape; locations live in the sidecar rather than injected into every node. Providers parse and map only: they do not receive or interpret `spec.sources`, selector filters, destination keys, or `language.context`. The shared core evaluates selectors, filters and context projections, validates mappings, resolves the destination provider key, and forwards each selected region through the same `lighthouse/index` method. Source rules are core configuration and are not transported through provider context.
 
 ## Methods
 
 | Method | Kind | HTTP twin |
-|---|---|---|
+| --- | --- | --- |
 | `initialize` | request | none |
 | `lighthouse/index` | request | none |
 | `lighthouse/classify` | request | `POST /v1/systemone` |
@@ -113,7 +113,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   has Go's convention. A project replaces any part in
   `[languages.<id>] testNaming = { prefix, snakeCase, variants, ancestors }`.
 - Each entry of `capabilities.languages` is the language's **provider manifest**
-  (`ProviderManifest`): `id`, `globs`, `priority`, `fallback`, `conventions` and
+  (`ProviderManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `priority`, `fallback`, `conventions` and
   `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field
   for field; the plugin's own identity (`serverInfo`) is the plugin manifest.
 - The `capabilities` of a language list what its provider guarantees. `semantic-edges`: `calls`,
@@ -156,13 +156,20 @@ identity values are scoped to the selected logical root when the root AST contai
 documents. Each physical file is represented once even when multiple source rules select
 regions from it.
 
-The core owns selector parsing and evaluation. select and language.select use the same
-bounded path/filter grammar: $, named and quoted keys, numeric indices, dot-wildcard and array-wildcard,
-the descendant segment `..` (the value and every value below it, parents first, as RFC 9535 defines
-it), equality/inequality predicates, conjunction and disjunction. `!=` holds when no selected
-value equals the operand, so a path that selects nothing satisfies it. A tree whose blocks nest,
+The core owns selector parsing and evaluation. `select` and `language.from` use the same
+bounded path/filter grammar: `$`, named and quoted keys, numeric indices, dot-wildcard and array-wildcard,
+the descendant segment `..` (as in RFC 9535 section 2.5.2: the next selector applies to the value and to every
+value below it, parents first), the filter `?( )` with equality/inequality predicates, conjunction and
+disjunction. The filter is this grammar's own, not the RFC's filter expression: it has no existence tests, no
+function extensions and no comparison but `==` and `!=`. `!=` holds when no selected
+value equals the operand, so a path that selects nothing satisfies it
+(`@.attributes[*] != "ignore"` is true of a block with no attributes). A tree whose blocks nest,
 such as Markdown, needs the descendant segment to reach a block at any depth. The host provider does not get the source
-rules and must not implement a private selection mode. The core resolves language.context
+rules and must not implement a private selection mode. `language` names the destination in one of two ways: `provider`, a fixed provider id, or `from`,
+a candidate-relative selector for the name the document gives the language (a fence's `lang`). The name is one
+of the `aliases` of a provider's manifest, in any case (`Go`, `golang` and `go` are the language `go`; a
+manifest's aliases are the names GitHub Linguist lists); a candidate whose name is absent, not unique or
+unknown to the enabled providers is text, and nothing is said of it. The core resolves language.context
 projections and declaration context before it creates source-region inputs.
 
 A selected region carries a stable id, its `rule_id`, `node_pointer`, and `source_pointer`,
@@ -243,9 +250,10 @@ whenever answers for the same input may), `cost` (0 for a model that runs locall
 keys behaviour off these capabilities, never off names.
 
 `lighthouse/classify` takes the body of TypeSafe's System One API (`POST /v1/systemone`),
-https://docs.typesafe.ai/api, for one subject: `{state, model, questions, options?}`. `options`
+<https://docs.typesafe.ai/api>, for one subject: `{state, model, questions, options?}`. `options`
 holds provider configuration and is omitted when empty. HTTP clients remove it before sending the
 System One body to the API.
+
 - `state` is `{language, file, text, facts, neighbors}`: the subject's source by extent, the facts
   the check computed, and a few callers and callees.
 - `questions` is keyed by decision id; each is `{type: "noul", instructions: {requirement, prompt},
@@ -301,7 +309,7 @@ backoff on 429, 503 and 529. A model that fails leaves its subjects to review.
 A response MAY carry a JSON-RPC `error`, with the codes of JSON-RPC and LSP:
 
 | Code | Name | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `-32700` | ParseError | malformed input (the plugin then stops) |
 | `-32601` | MethodNotFound | unknown method |
 | `-32602` | InvalidParams | the params do not fit the method |
@@ -314,7 +322,7 @@ The host treats failures as follows, always turning them into
 `incomplete` entries and never into a crash:
 
 | Failure | Host behavior |
-|---|---|
+| --- | --- |
 | `error` response to `lighthouse/index` | batch incomplete; plugin stays usable |
 | crash, closed output, malformed or invalid message | batch incomplete; plugin is killed and every later call fails the same way |
 | no answer within the request timeout (default 600 s, `timeout` of the plugin entry in seconds; the first index may build a cold cache) | as above; the whole process group is killed |
@@ -334,7 +342,7 @@ The host treats failures as follows, always turning them into
   package, whose module has `test_of` set to the module it tests.
 - A **symbol id** is the single stable identity of a declaration:
 
-  ```
+  ```text
   id   = module "::" { owner "::" } name "#" kind
   kind = function | method | type | field | variant | const | var | interface | test
   ```
@@ -373,7 +381,7 @@ are left out. `imports` edges are kept for external packages, naming them by
 import path, because the dependency itself is the fact.
 
 | kind | meaning |
-|---|---|
+| --- | --- |
 | `contains` | module or type contains a symbol |
 | `imports` | module depends on another module |
 | `calls` | function or method calls a function or method |
@@ -417,6 +425,7 @@ or in a `Result` or `Option`.
 (receiver excluded) and results, one `TypeRef` per occurrence in order (a Rust
 tuple result is one entry). A
 `TypeRef` is `{ text, symbol?, exported? }`:
+
 - `text` is the type as written, normalized. Go prints it with `types.TypeString`
   and the full import path as qualifier (`context.Context`, `*example.com/m/x.T`,
   `[]string`); Rust prints the type's tokens without the spaces between them
@@ -441,7 +450,7 @@ count for the function that contains them; functions declared inside a body have
 summaries of their own.
 
 | kind | maps |
-|---|---|
+| --- | --- |
 | `panic` | Go: a call of the builtin `panic`. Rust: the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros; `detail` is the macro name |
 | `unwrap` | Rust: a `.unwrap()`, `.expect(..)`, `.unwrap_err()` or `.expect_err(..)` call on any receiver, as clippy's `unwrap_used` and `expect_used` see it; `detail` is the method name |
 | `error-compare` | Go: `==` or `!=` where one operand has type `error` and the other is not `nil` (or a `switch` on an error with a case other than `nil`), after go-errorlint's `comparison`; `detail` is the error operand. `io.EOF`, `sql.ErrNoRows` and the body of an `Is(error) bool` method are exempt |
@@ -458,13 +467,13 @@ enclosing nesting constructs (nested functions included) around it. Providers
 map syntax onto these kinds:
 
 | kind | maps |
-|---|---|
+| --- | --- |
 | `if`, `else-if`, `else` | conditional, chained conditional, final branch; an `else if` is `else-if` at the nesting of its `if` |
 | `switch` | `switch`, type switch, `match`, `select`: one event; `arms` counts arms other than the default; `returning` when every arm, default included, is a single return |
 | `loop` | every loop form |
 | `catch` | one per exception handler |
 | `jump` | `goto`, labeled `break` and `continue` |
-| `logic` | one event per run of like `&&`/`||` operators; `operators` counts them |
+| `logic` | one event per run of like `&&`/`\|\|` operators; `operators` counts them |
 | `recursion` | a call of the enclosing function, resolved semantically |
 
 Nested functions and closures emit nothing but raise the nesting of what they
@@ -630,9 +639,8 @@ cannot map is an `incomplete` entry; the answer is a fragment of the host file a
 - A Markdown document is `{"kind": "document", "children": [...]}` of comrak's
   CommonMark and GFM nodes, each with a `kind`. A `code_block` carries the fence
   `info` as written, the `lang` (its first word), the `attributes` (the rest, split on
-  spaces and commas as rustdoc and mdBook read them) and the canonical `key` of the
-  language (`yml` is `yaml`, `rs` is `rust`, `golang` is `go`; the table is in the
-  plugin's README). Its `text_pointer` names the body, whose `text_map` runs through the
+  spaces and commas as rustdoc and mdBook read them). Which language the `lang` names is the
+  core's to say (`language.from`, the aliases of the manifests). Its `text_pointer` names the body, whose `text_map` runs through the
   indentation of a list item or a block quote and the line endings of the file. The
   descendant segment `..` of the selector grammar reaches a block at any depth. Markdown
   has no subjects of its own yet: it is a language of files only.
@@ -769,7 +777,7 @@ Models behind the standard HTTP protocols, as a provider in `lighthouse.toml`
 classification uses `typesafe` when listed, else `openai`. There is no chat method: Chat Completions
 are only the logprobs adapter behind classification.
 
-For `typesafe`, the System One body is forwarded as it is to `POST {url}/v1/systemone` with the provider's `headers` (`Authorization: Bearer <key>` at the service of the protocol) (https://docs.typesafe.ai/api), and its answer is read as it comes.
+For `typesafe`, the System One body is forwarded as it is to `POST {url}/v1/systemone` with the provider's `headers` (`Authorization: Bearer <key>` at the service of the protocol) (<https://docs.typesafe.ai/api>), and its answer is read as it comes.
 
 For `openai`, each question is rendered as a prompt that asks for one word, `true` or `false`, and
 sent to `{url}/chat/completions` with the provider's `headers`, `temperature` 0,
@@ -777,4 +785,4 @@ sent to `{url}/chat/completions` with the provider's `headers`, `temperature` 0,
 two words at the answer token. A response without logprobs is an error ("the model returned no
 logprobs; it cannot serve classification"), never read as a verbalized number. The API shapes are
 those of OpenAI's Chat Completions as documented by OpenRouter
-(https://openrouter.ai/docs/quickstart).
+(<https://openrouter.ai/docs/quickstart>).

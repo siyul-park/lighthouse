@@ -7,7 +7,7 @@ principles, generated from the catalog and config).
 
 ## Setup
 
-```
+```sh
 lighthouse init --agent claude-code
 ```
 
@@ -51,7 +51,7 @@ output as `structuredContent` (validated by the tool's `outputSchema`, the schem
 `idempotentHint`, `openWorldHint`). An unknown tool is a JSON-RPC error. The tools:
 
 | Tool | CLI twin | Result |
-|------|----------|--------|
+| ------ | ---------- | -------- |
 | `check` | `check` | `CheckReport`: compact groups findings by decision, `detail: "full"` gives one record each |
 | `fix` | `check --fix` | `FixReport`: `diff`, `applied`, `declined`, `rounds` |
 | `decision_list` | `decision list` | `DecisionList` |
@@ -255,7 +255,7 @@ baseline is written. A `session_id` that is not `[A-Za-z0-9_-]{1,128}` is no
 session.
 
 | Event | Scope | Behavior |
-|-------|-------|----------|
+| ------- | ------- | ---------- |
 | `pre-tool-use` | the file to be touched (`Edit`, `Write`, `MultiEdit` only) | records the baseline if the session has none for the file; silent |
 | `post-tool-use` | the edited file (`Edit`, `Write`, `MultiEdit` only) | new or updated error or warn findings: `decision: block` with up to 5 findings in the text form of the findings; new or updated info findings that ask for review only: `additionalContext` with the count and how to resolve them through MCP; incomplete analysis is stated and, without `--allow-incomplete`, blocks; nothing new and complete: silent. Without a session or a baseline for the file, every finding of the file is reported with a note that the PreToolUse hook is missing |
 | `stop` | the files with a baseline in the session that still exist | new or updated errors, or an incomplete analysis (with or without `--allow-incomplete`; the flag only changes the wording), block once with up to 10 findings and the gaps; otherwise allowed, with a `systemMessage` when new warnings, infos, findings asking for review or gaps remain. No baseline in the session, or no session: silent, and no check runs |

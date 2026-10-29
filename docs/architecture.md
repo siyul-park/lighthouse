@@ -1,6 +1,6 @@
 # Architecture
 
-```
+```text
  CLI ─ engine ─ config ─ reporters ─ store (.lighthouse/lighthouse.db)
           │      └─ fix orchestrator (the only writer)
    plugin registry ── in-process plugins: core, metrics, design, testing,
@@ -188,7 +188,7 @@ one provider of the union `cel | command | model`, with the common fields `requi
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. The check reads the value for the node's role with `limits.params[?func.role].orValue(limits.params[?'default'].orValue(-1))` (an integer is for every role) and says it in its message (`NewServer needs 9 parameters`, `parse has 9 parameters`).
   - Intermediate values are the check's `variables`, each evaluated in order and seen by the later ones, the message, the evidence and the fix. A variable with `params` is a function of them (`declaration_group(id)`): it sees its parameters, the `options` and the `file` of its caller and the file-level variables, and nothing else; a body that names anything more is refused when the check is built, as is a call of a function that does not exist and a variable name used twice. A variable that names no selected value (only `file`, `options` and variables like it) is computed once per file, however many nodes the file has, and only when an expression reads it; a variable that nothing reads, directly or through another, is not evaluated at all. A pack lists `variables` in its `Pack` document that its decisions use by name, as they use their own: the pack's variables a decision names, directly or through another, are put before its own, and a decision does not redefine one. This is how decisions share an order: `design` defines `declaration_group(id)` once, `design/declaration-groups` orders by it and `design/vertical-distance` reads it, with the options `groups` and `hooks` it takes from `design/declaration-groups` (`options.from`), so there is no registry of order keys and the project sets the order once; the engine takes those options from what the configuration, with the `[[overrides]]` that match the file, sets for `design/declaration-groups` at each file, so an override for a file reaches the layout at that file only. A check that selects a node also sees `file` (its file, with `symbols` and `comments`) when it names it, and the order of siblings is `node.prev`, `node.next`, `file.symbols` and `list.indexOf`. The functions that order siblings, `list.misplaced()` and `list.anchors()`, are in the catalog like any other.
-- `command` runs a [program](programs.md) whose result is findings: `output: lines` (the default; one finding per stdout line, with an optional `path:line[:col]: ` prefix, and a line that is only a project path is a finding at line 1 of that file), `sarif` or `status`. `{file}` runs it once per file, `{files}` over batches of files, neither once; exit `0` and `1` ran (`success`), anything else is an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script; the programs of the bundled catalog need none. A command runs in the project root, [sandboxed](#sandbox), under the one environment of every program (see [programs](programs.md#the-environment)). Trust and the sandbox protect together; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
+- `command` runs a [program](programs.md) whose result is findings: `output: lines` (the default; one finding per stdout line, with an optional `path:line[:col]:` prefix, and a line that is only a project path is a finding at line 1 of that file), `sarif` or `status`. `{file}` runs it once per file, `{files}` over batches of files, neither once; exit `0` and `1` ran (`success`), anything else is an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script; the programs of the bundled catalog need none. A command runs in the project root, [sandboxed](#sandbox), under the one environment of every program (see [programs](programs.md#the-environment)). Trust and the sandbox protect together; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
 - `model` asks the `classification` task of the model the project binds to the decision (`select` and `prompt` optional); a subject nothing decides stays a review task. It is not deterministic and caps the severity at `warn`.
 
 A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and judgments without ever expiring one.
@@ -743,7 +743,7 @@ sandbox-runtime:
   and relays to a Unix socket the host serves.
 - **Fail closed.** When the backend is missing or does not work (no `bwrap`, user namespaces
   forbidden), the program is not run: a check leaves the analysis incomplete, a fix or an agent
-  fails with "sandbox unavailable: <reason>; install bubblewrap, or set `[sandbox] enabled = false` in
+  fails with "sandbox unavailable: `<reason>`; install bubblewrap, or set `[sandbox] enabled = false` in
   a trusted project". It never falls back to an unsandboxed run.
 
 `[sandbox] enabled = false` is the one way out. It is an environment key, so it can come from any
@@ -770,7 +770,7 @@ single `Fixer` interface. The kinds, their operations and their testing are in
 Dependencies point down only, by the layer table in `lighthouse.toml`; the project configuration (`Project`, rule levels, overrides) is `spec::project`. Each crate's role, entry points and invariants are in its README.
 
 | Layer | Crates |
-|-------|--------|
+| ------- | -------- |
 | L5 | [cli](../crates/lighthouse-cli/README.md) |
 | L4 | [session](../crates/lighthouse-session/README.md) |
 | L3 | [report](../crates/lighthouse-report/README.md), [store](../crates/lighthouse-store/README.md), [ml](../crates/lighthouse-ml/README.md) |
@@ -822,7 +822,7 @@ hook is the same record in the same log. Fixing is the same: `check --fix [--dry
 [--unsafe-fixes] [--fixer <id>]` and the MCP `fix` tool call one session operation.
 Hooks never fix.
 
-```
+```text
  lighthouse-cli ── surface: the operations both frontends share (check [--fix], review, decision, ...)
                 ├ cli: the terminal (docs, init --agent, hook claude-code, ...)
                 └ mcp: `lighthouse mcp`, tools and resources over stdio (rmcp)

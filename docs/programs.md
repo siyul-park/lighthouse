@@ -36,7 +36,7 @@ A check adds `files`, globs of the project-relative paths the program is run for
 
 | Result | `output` | Read as |
 | --- | --- | --- |
-| findings | `lines` | one finding per non-blank stdout line. A leading `path:line[:col]: ` places it. A line that is only the path of a project file, as `gofmt -l`, `rustfmt -l` and `prettier --list-different` print, places it at line 1 of that file with the decision's title as the message, once however often the tool names the file. Any other line attaches to the file the program was run for, or to the project. |
+| findings | `lines` | one finding per non-blank stdout line. A leading `path:line[:col]:` places it. A line that is only the path of a project file, as `gofmt -l`, `rustfmt -l` and `prettier --list-different` print, places it at line 1 of that file with the decision's title as the message, once however often the tool names the file. Any other line attaches to the file the program was run for, or to the project. |
 | | `sarif` | one finding per SARIF result, filtered by `sarif`. See [wrapping linters](wrapping-linters.md). |
 | | `status` | one finding when the exit code is not in `success`, the tail of stderr or stdout as its message. A program that only passes or fails is a check whose one finding is the failure. |
 | changes | `files` | the files the program changed in its scratch copy of the project |

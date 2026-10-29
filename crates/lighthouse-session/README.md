@@ -5,6 +5,7 @@ The operations every frontend shares, and the composition root that wires store,
 **Layer.** L4; depends on every layer below except protocol and process.
 
 ## Entry points
+
 - `Session::load`, `load_in`, `find_in`, `catalog`, `registry`: the configuration, the catalog layers and the plugins of a project, found from a directory without changing the process's.
 - `check`, `Checked::render`, `Checked::report`, `fix::run`: run, narrow the report, remember the run.
 - `review::{list, show, history, prune, resolve}`: judgments through the store.
@@ -14,6 +15,7 @@ The operations every frontend shares, and the composition root that wires store,
 - `trust`, `revoke`, `skill`, `bundled_docs`.
 
 ## Invariants
+
 - Frontends call these functions and print; they hold no logic. The same judgment recorded through the CLI, MCP or a hook is the same record.
 - Trust is the user's decision, never the repository's: it is a digest of the configuration, rules and in-project programs as loaded, and any change withdraws it. Commands (formatters, command fixers) run only in a trusted project.
 - Report scope (git changes, since) narrows the report, never the analysis.
@@ -21,4 +23,5 @@ The operations every frontend shares, and the composition root that wires store,
 - The lib re-exports the types frontends need (including the ml request and result types), so a frontend imports no other workspace crate.
 
 ## Tests
+
 No crate tests of its own: exercised end to end by `crates/lighthouse-cli/tests/it`; `cargo test -p lighthouse-cli`.

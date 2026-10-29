@@ -112,7 +112,7 @@ safety = "safe"                                    # trust the agent on this dec
 - **What keeps it.** The orchestrator applies the files in memory, formats, re-checks, and keeps the
   edit only if at least one targeted finding is gone, no decision has more findings of `warn` or `error` in
   the changed and reached files than before (counted by decision and file, so a renamed symbol's
-  old findings are not new; "introduced <decision> at <line>"), and they are fully analyzed.
+  old findings are not new; "introduced `<decision>` at `<line>`"), and they are fully analyzed.
   Targeted findings still there are declined `unresolved`; the rest count as `verified`. Otherwise the
   files are rolled back and the findings declined with the reason.
 - **Runs in sequence.** One run for each file and scope of the findings (every model-fixable finding
@@ -280,7 +280,7 @@ two generic ways to get it. It knows no harness.
   skipped.
 
 | Key | Meaning |
-|---|---|
+| --- | --- |
 | `select` | bool: the line holds tool calls |
 | `each` | optional list: one event for each element, seen as `item` by the keys below (a shell command with a pipe, a change of several files) |
 | `tool` | `read`, `search`, `list`, `edit` or `run`, usually `tools[line.…]`; a call with no tool (a harness tool the table lacks, or a failure) is not an event |
@@ -314,7 +314,7 @@ catalog layer holds decisions, packs and Projects, so it cannot carry providers 
 records the sources its flags and event shapes were checked against.
 
 | Recipe | Harness | Stream |
-|---|---|---|
+| --- | --- | --- |
 | `opencode` | opencode | `--format json` |
 | `claude-code` | Claude Code | `--output-format stream-json --verbose` |
 | `codex` | Codex CLI | `exec --json` |
@@ -348,7 +348,6 @@ cost = 0
 ```
 
 An `openai` HTTP provider serves classification only (Chat Completions with logprobs, never fixes).
-
 
 ## `model-http`
 

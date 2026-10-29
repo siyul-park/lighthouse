@@ -20,14 +20,14 @@ A Markdown file is valid GitHub Flavored Markdown.
 
 A Markdown file MUST pass markdownlint-cli2.
 
-Derived from: GitHub Flavored Markdown spec: https://github.github.com/gfm/; markdownlint-cli2: https://github.com/DavidAnson/markdownlint-cli2; markdownlint rules: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+Derived from: GitHub Flavored Markdown spec: https://github.github.com/gfm/; markdownlint-cli2: https://github.com/DavidAnson/markdownlint-cli2 (examples verified with v0.24.0, markdownlint v0.42.0); markdownlint rules: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
 
 ```diff
 --- a/example.md
 +++ b/example.md
-@@ -3 +3 @@
--#Broken heading
-+# Broken heading
+@@ -1 +1 @@
+-#Title
++# Title
 ```
 
 ## Links
@@ -46,7 +46,7 @@ A link in a document leads somewhere that exists.
 
 A relative link, and the heading it points to, MUST exist.
 
-Derived from: lychee: https://github.com/lycheeverse/lychee; GitHub Flavored Markdown spec, links: https://github.github.com/gfm/#links; markdownlint MD051 link-fragments: https://github.com/DavidAnson/markdownlint/blob/main/doc/md051.md
+Derived from: lychee: https://github.com/lycheeverse/lychee (examples verified with 0.24.2); GitHub Flavored Markdown spec, links: https://github.github.com/gfm/#links; markdownlint MD051 link-fragments: https://github.com/DavidAnson/markdownlint/blob/main/doc/md051.md
 
 ```markdown invalid
 # Title
