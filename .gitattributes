@@ -1,1 +1,2 @@
 .lighthouse/decisions.jsonl merge=union
+docs/decisions/*.md linguist-generated=true

@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../schema/pack.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Pack
+metadata:
+  name: markdown
+spec:
+  title: Markdown Decisions
+  intro: >-
+    Documentation is read where it is rendered, so it is checked against the
+    format its renderer reads and against the files it points to. The checks
+    wrap the tools that own those rules and need them installed; a project
+    without them has an incomplete analysis, never a clean one.
+  sections:
+    - name: format
+      title: Format
+      intro: A Markdown file is valid GitHub Flavored Markdown.
+      decisions: [gfm]
+    - name: links
+      title: Links
+      intro: A link in a document leads somewhere that exists.
+      decisions: [links]

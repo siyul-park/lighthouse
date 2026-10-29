@@ -250,7 +250,7 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
     assert_eq!(
         plugins,
         [
-            "lang-cel", "core", "metrics", "design", "go", "rust", "testing"
+            "lang-cel", "core", "metrics", "design", "go", "markdown", "rust", "testing"
         ]
     );
     let languages: Vec<_> = registry

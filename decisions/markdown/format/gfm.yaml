@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: markdown/gfm
+  uid: 11f300e6-07ee-4538-a8d3-42aa80475c4e
+spec:
+  title: Markdown follows GitHub Flavored Markdown
+  context: >-
+    A document is read rendered, and a construct the renderer reads differently
+    from the author (a heading without its space, a list that restarts, a fence
+    that never closes) is a defect the author does not see. markdownlint-cli2
+    owns these rules (MD001 to MD059) and fixes the ones it marks fixable, so
+    the decision runs it and does not restate them. It reads the repository's
+    own `.markdownlint-cli2.*` configuration, which is where a project turns a
+    rule off.
+
+    The program is not bundled. A project without markdownlint-cli2 on its
+    `PATH` has an incomplete analysis for its Markdown files, and a finding is
+    never invented in its place. The finding of a file that fails is the end
+    of what the tool printed, which names each rule and line.
+  scope:
+    subject: file
+    generated: false
+    tests: include
+    examples: exclude
+  requirement: >-
+    A Markdown file MUST pass markdownlint-cli2.
+  severity: warn
+  check:
+    type: command
+    files:
+      - "**/*.md"
+      - "**/*.markdown"
+  fix:
+    type: command
+    safety: unsafe
+    priority: -100
+  languages:
+    markdown:
+      check:
+        command:
+          - markdownlint-cli2
+          - "{file}"
+        output: status
+        success: [0]
+      fix:
+        command:
+          - markdownlint-cli2
+          - "--fix"
+          - "{file}"
+        output: files
+        success: [0, 1]
+  provenance:
+    wasDerivedFrom:
+      - 'GitHub Flavored Markdown spec: https://github.github.com/gfm/'
+      - 'markdownlint-cli2: https://github.com/DavidAnson/markdownlint-cli2'
+      - 'markdownlint rules: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md'
+  examples:
+    - name: heading-without-space
+      language: markdown
+      kind: invalid
+      files:
+        - path: example.md
+          body: |
+            # Title
+
+            #Broken heading
+      expect:
+        - line: 1
+      fixed:
+        - path: example.md
+          body: |
+            # Title
+
+            # Broken heading
+    - name: well-formed
+      language: markdown
+      kind: valid
+      canonical: true
+      files:
+        - path: example.md
+          body: |
+            # Title
+
+            A paragraph, and a list:
+
+            - one
+            - two

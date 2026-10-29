@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "plugins/fake-model", "plugins/lang-cel", "plugins/lang-rust", "plugins/lang-toml", "plugins/lang-yaml", "plugins/model-http", "plugins/model-local"]
+members = ["crates/*", "plugins/fake-model", "plugins/lang-cel", "plugins/lang-markdown", "plugins/lang-rust", "plugins/lang-toml", "plugins/lang-yaml", "plugins/model-http", "plugins/model-local"]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,6 +11,7 @@ publish = false
 assert_cmd = "2"
 async-openai = { version = "=0.42.0", default-features = false, features = ["chat-completion-types"] }
 cel = "0.15"
+comrak = { version = "=0.59.0", default-features = false }
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 globset = "0.4"

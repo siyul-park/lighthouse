@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: markdown/links
+  uid: b41642c0-eee3-4d79-a402-9b8ad26485cd
+spec:
+  title: Relative links and anchors resolve
+  context: >-
+    A link to a file or a heading that has moved is dead on arrival, and nothing
+    but a check finds it. The check is lychee, offline: it reads the links of a
+    document and opens only the files they name, with their fragments, and
+    makes no request. A link to another site is outside the decision.
+
+    Lychee is chosen over a check of our own on the document tree. The tree
+    names every link, but a link is a subject only once the Markdown provider
+    states sections and links as subjects (MD2); until then a CEL check sees a
+    file's text and facts, not its nodes, and would have to parse Markdown a
+    second time. Lychee already resolves relative paths against the file,
+    reads fragments the way GitHub slugs headings, and is the tool the
+    documentation world uses. When MD2 gives links, a CEL check over them
+    replaces the program and this reasoning with it.
+
+    The program is not bundled. A project without lychee on its `PATH` has an
+    incomplete analysis for its Markdown files, never a clean one. The finding
+    of a file that fails is the end of what lychee printed, which names each
+    broken link.
+  scope:
+    subject: file
+    generated: false
+    tests: include
+    examples: exclude
+  requirement: >-
+    A relative link, and the heading it points to, MUST exist.
+  severity: warn
+  check:
+    type: command
+    files:
+      - "**/*.md"
+      - "**/*.markdown"
+  languages:
+    markdown:
+      check:
+        command:
+          - lychee
+          - "--offline"
+          - "--include-fragments"
+          - "--no-progress"
+          - "{file}"
+        output: status
+        success: [0]
+  provenance:
+    wasDerivedFrom:
+      - 'lychee: https://github.com/lycheeverse/lychee'
+      - 'GitHub Flavored Markdown spec, links: https://github.github.com/gfm/#links'
+      - 'markdownlint MD051 link-fragments: https://github.com/DavidAnson/markdownlint/blob/main/doc/md051.md'
+  examples:
+    - name: missing-file
+      language: markdown
+      kind: invalid
+      files:
+        - path: example.md
+          body: |
+            # Title
+
+            See [the guide](guide.md).
+      expect:
+        - line: 1
+    - name: existing-file
+      language: markdown
+      kind: valid
+      canonical: true
+      files:
+        - path: example.md
+          body: |
+            # Title
+
+            See [the guide](guide.md).
+        - path: guide.md
+          body: |
+            # Guide

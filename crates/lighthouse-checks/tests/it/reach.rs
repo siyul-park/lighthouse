@@ -130,6 +130,8 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("design/task-shutdown", Some((Reach::Local, false))),
     ("design/top-down-order", Some((Reach::Global, false))),
     ("design/vertical-distance", Some((Reach::Local, false))),
+    ("markdown/gfm", Some((Reach::Local, false))),
+    ("markdown/links", Some((Reach::Local, false))),
     ("testing/behavior-cases", Some((Reach::Local, false))),
     ("testing/case-assertions", Some((Reach::Local, false))),
     ("testing/consistent-case-style", Some((Reach::Local, false))),

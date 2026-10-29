@@ -16,7 +16,7 @@ fn bundled_catalog_has_the_core_design_language_and_testing_packs() {
         .iter()
         .map(|p| &*p.id)
         .collect();
-    assert_eq!(ids, ["core", "design", "go", "rust", "testing"]);
+    assert_eq!(ids, ["core", "design", "go", "markdown", "rust", "testing"]);
 }
 
 #[test]

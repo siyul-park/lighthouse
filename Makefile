@@ -16,7 +16,7 @@ plugins:
 	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
 	mv -f $(PLUGINS)/lang-go/lang-go.new $(PLUGINS)/lang-go/lang-go
 	cp plugins/lang-go/lighthouse-plugin.toml $(PLUGINS)/lang-go/
-	for plugin in lang-rust lang-yaml lang-toml model-http model-local; do \
+	for plugin in lang-rust lang-yaml lang-toml lang-markdown model-http model-local; do \
 		mkdir -p $(PLUGINS)/$$plugin; \
 		cargo build --release -p $$plugin; \
 		cp target/release/$$plugin $(PLUGINS)/$$plugin/$$plugin.new; \

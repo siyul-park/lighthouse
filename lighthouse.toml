@@ -12,10 +12,12 @@ plugins = [
   "lang-cel",
   "go",
   "rust",
+  "markdown",
   { id = "lang-go", path = "target/plugins/lang-go" },
   { id = "lang-rust", path = "target/plugins/lang-rust" },
   { id = "lang-yaml", path = "target/plugins/lang-yaml" },
   { id = "lang-toml", path = "target/plugins/lang-toml" },
+  { id = "lang-markdown", path = "target/plugins/lang-markdown" },
 ]
 extends = ["core/recommended", "design/recommended", "testing/recommended", "go/recommended", "rust/recommended"]
 sources = [
@@ -41,6 +43,11 @@ sources = [
   { id = "project-event-path", files = ["lighthouse.toml"], select = "$.spec.models.providers.*.events.path", language = { provider = "cel" } },
   { id = "project-event-pattern", files = ["lighthouse.toml"], select = "$.spec.models.providers.*.events.pattern", language = { provider = "cel" } },
   { id = "project-event-command", files = ["lighthouse.toml"], select = "$.spec.models.providers.*.events.command", language = { provider = "cel" } },
+  { id = "markdown-yaml", files = ["**/*.md"], select = "$..?(@.kind == \"code_block\" && @.key == \"yaml\" && @.attributes[*] != \"ignore\" && @.attributes[*] != \"compile_fail\")", language = { provider = "yaml", context = { example = true } } },
+  { id = "markdown-toml", files = ["**/*.md"], select = "$..?(@.kind == \"code_block\" && @.key == \"toml\" && @.attributes[*] != \"ignore\" && @.attributes[*] != \"compile_fail\")", language = { provider = "toml", context = { example = true } } },
+  { id = "markdown-cel", files = ["**/*.md"], select = "$..?(@.kind == \"code_block\" && @.key == \"cel\" && @.attributes[*] != \"invalid\" && @.attributes[*] != \"ignore\" && @.attributes[*] != \"compile_fail\")", language = { provider = "cel", context = { example = true } } },
+  { id = "markdown-go", files = ["**/*.md"], select = "$..?(@.kind == \"code_block\" && @.key == \"go\" && @.attributes[*] != \"ignore\" && @.attributes[*] != \"compile_fail\")", language = { provider = "go", context = { example = true } } },
+  { id = "markdown-rust", files = ["**/*.md"], select = "$..?(@.kind == \"code_block\" && @.key == \"rust\" && @.attributes[*] != \"ignore\" && @.attributes[*] != \"compile_fail\")", language = { provider = "rust", context = { example = true } } },
   { id = "project-event-said", files = ["lighthouse.toml"], select = "$.spec.models.providers.*.events.said", language = { provider = "cel" } }
 ]
 
