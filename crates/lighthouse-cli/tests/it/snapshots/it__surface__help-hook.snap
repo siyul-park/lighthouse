@@ -14,9 +14,11 @@ Arguments:
 
   <EVENT>
           Possible values:
-          - pre-tool-use:  Before Edit, Write or MultiEdit: record the file's findings as the session's baseline, once per file; prints nothing
-          - post-tool-use: After Edit, Write or MultiEdit: report the findings the edit introduced
-          - stop:          When the agent wants to stop: report the findings the session introduced
+          - pre-tool-use:       Before Edit, Write or MultiEdit: record the file's findings as the session's baseline, once per file; prints nothing
+          - post-tool-use:      After Edit, Write or MultiEdit: report the findings the edit introduced
+          - stop:               When the agent wants to stop: report the findings the session introduced
+          - user-prompt-submit: When the person submits a prompt: record what it says about a design decision; tell the agent only when the project surfaces signals
+          - session-start:      When a session starts: with surfacing on, a digest of the decisions of the project and the proposals that wait for a person
 
 Options:
       --allow-incomplete

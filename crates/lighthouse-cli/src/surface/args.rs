@@ -245,6 +245,35 @@ pub struct DecisionShowArgs {
     pub id: String,
 }
 
+/// `decision signals`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DecisionSignalsArgs {
+    /// Include every signal: the settled ones, the prompts no rule decided
+    /// and the findings of edits. By default, the open signals that state a
+    /// decision.
+    #[arg(long)]
+    pub all: bool,
+    /// List at most this many signals and say how many were left out.
+    #[arg(long, value_name = "N")]
+    pub limit: Option<usize>,
+}
+
+/// `decision signal dismiss`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SignalDismissArgs {
+    /// The signal, by id or by a unique prefix of at least 7 characters.
+    #[arg(value_name = "ID")]
+    pub id: String,
+    /// Why the signal is not a decision. It labels the classifier's answer.
+    #[arg(long, value_name = "TEXT")]
+    pub reason: String,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub attributed: Attributed,
+}
+
 /// `decision create` and `decision update`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

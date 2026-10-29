@@ -217,6 +217,8 @@ fn the_server_lists_its_tools_and_resources() {
             "decision_eval",
             "decision_list",
             "decision_show",
+            "decision_signal_dismiss",
+            "decision_signals",
             "decision_test",
             "decision_update",
             "fix",

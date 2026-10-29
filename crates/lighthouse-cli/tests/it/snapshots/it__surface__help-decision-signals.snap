@@ -1,0 +1,45 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+List the session signals: what the hooks heard of design decisions.
+
+The hooks classify each prompt of a person (directive, correction, preference, none, or an abstention when no rule decides) and record the findings an agent's edits introduced or resolved, locally and never in git. By default the open signals that state a decision are listed; --all lists every one. The counts are by class, by rule that fired, by abstention and by status, and the measures of the loop are the share of signals recorded or linked, of proposals named a possible duplicate and of proposals a person accepted, each with a Wilson 95% interval. Retention and whether the agent is told are `[signals]` in lighthouse.toml.
+
+Usage: lighthouse decision signals [OPTIONS]
+
+Options:
+      --all
+          Include every signal: the settled ones, the prompts no rule decided and the findings of edits. By default, the open signals that state a decision
+
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --limit <N>
+          List at most this many signals and say how many were left out
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse decision signals
+  lighthouse decision signals --all --limit 50 --format json
+  lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'

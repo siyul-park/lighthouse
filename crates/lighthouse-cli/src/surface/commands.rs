@@ -10,9 +10,9 @@ use crate::surface::{
     Result,
     args::{
         CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
-        DecisionTestArgs, DocumentArgs, FingerprintArgs, FixOptions, ModelAttachArgs,
-        ModelDetachArgs, ModelListArgs, ModelRebuildArgs, ModelTrainArgs, ReviewListArgs,
-        ReviewResolveArgs,
+        DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs, FixOptions,
+        ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelRebuildArgs, ModelTrainArgs,
+        ReviewListArgs, ReviewResolveArgs, SignalDismissArgs,
     },
     check, config, decision, model,
     reply::{CheckFormat, Context, FormatArg, Reply},
@@ -55,6 +55,12 @@ Examples:
   lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e
   lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --repo cel=../cel
   lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --attributed-to agent:claude --format json";
+
+const SIGNALS_EXAMPLES: &str = "\
+Examples:
+  lighthouse decision signals
+  lighthouse decision signals --all --limit 50 --format json
+  lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'";
 
 const SHOW_EXAMPLES: &str = "\
 Examples:
@@ -164,7 +170,11 @@ pub enum DecisionCommand {
     ///
     /// The document is YAML or JSON, from a file or stdin (`-`). Nothing is
     /// written unless the candidate validates, compiles and every example
-    /// passes the whole engine; a rejection leaves the project untouched. The
+    /// passes the whole engine; a rejection leaves the project untouched. A
+    /// document without `spec.status` is written as `proposed`: it produces no
+    /// findings until a person accepts it. Decisions that may repeat it are named
+    /// in the reply ("possible duplicate"), and the signals named in
+    /// `provenance.wasDerivedFrom` as `signal:<id>` become recorded. The
     /// decision also needs the `local` plugin in lighthouse.toml to run in
     /// `check`.
     Create {
@@ -176,7 +186,8 @@ pub enum DecisionCommand {
     /// Replace a project-local decision with a Decision document.
     ///
     /// The same gate as `decision create` applies, and nothing is written when
-    /// it fails. A bundled decision is not changed in place: its level and
+    /// it fails. The signals the document names in `provenance.wasDerivedFrom`
+    /// become linked. A bundled decision is not changed in place: its level and
     /// options are the `rules` of lighthouse.toml, and different wording or
     /// examples are a local decision.
     Update {
@@ -184,6 +195,29 @@ pub enum DecisionCommand {
         args: DocumentArgs,
         #[command(flatten)]
         output: FormatArg,
+    },
+    /// List the session signals: what the hooks heard of design decisions.
+    ///
+    /// The hooks classify each prompt of a person (directive, correction,
+    /// preference, none, or an abstention when no rule decides) and record the
+    /// findings an agent's edits introduced or resolved, locally and never in
+    /// git. By default the open signals that state a decision are listed; --all
+    /// lists every one. The counts are by class, by rule that fired, by
+    /// abstention and by status, and the measures of the loop are the share of
+    /// signals recorded or linked, of proposals named a possible duplicate and of
+    /// proposals a person accepted, each with a Wilson 95% interval. Retention
+    /// and whether the agent is told are `[signals]` in lighthouse.toml.
+    #[command(after_long_help = SIGNALS_EXAMPLES)]
+    Signals {
+        #[command(flatten)]
+        args: DecisionSignalsArgs,
+        #[command(flatten)]
+        output: FormatArg,
+    },
+    /// Settle the session signals.
+    Signal {
+        #[command(subcommand)]
+        command: SignalCommand,
     },
     /// Run the examples of checked decisions through the whole engine.
     ///
@@ -211,6 +245,25 @@ pub enum DecisionCommand {
     Eval {
         #[command(flatten)]
         args: DecisionEvalArgs,
+        #[command(flatten)]
+        output: FormatArg,
+    },
+}
+
+/// `decision signal <verb>`.
+#[derive(Debug, Subcommand)]
+pub enum SignalCommand {
+    /// Dismiss a signal: it is not a design decision.
+    ///
+    /// A dismissed signal stays in `decision signals --all` with its reason
+    /// and who gave it, and is not asked about again. The reason is the label
+    /// that a later evaluation of the classifier learns from. The signal id is
+    /// the one `decision signals` shows, or a unique prefix of at least 7
+    /// characters.
+    #[command(after_long_help = SIGNALS_EXAMPLES)]
+    Dismiss {
+        #[command(flatten)]
+        args: SignalDismissArgs,
         #[command(flatten)]
         output: FormatArg,
     },
@@ -394,6 +447,14 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
                 &decision::read_document(&args.document)?,
                 output.format,
             ),
+            DecisionCommand::Signals { args, output } => {
+                decision::signals(ctx, args, output.format)
+            }
+            DecisionCommand::Signal { command } => match command {
+                SignalCommand::Dismiss { args, output } => {
+                    decision::dismiss(ctx, args, output.format)
+                }
+            },
             DecisionCommand::Test { args, output } => decision::test(ctx, args, output.format),
             DecisionCommand::Eval { args, output } => decision::eval(ctx, args, output.format),
         },

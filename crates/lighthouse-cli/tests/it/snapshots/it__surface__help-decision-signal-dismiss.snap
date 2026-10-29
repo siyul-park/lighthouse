@@ -1,0 +1,51 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Dismiss a signal: it is not a design decision.
+
+A dismissed signal stays in `decision signals --all` with its reason and who gave it, and is not asked about again. The reason is the label that a later evaluation of the classifier learns from. The signal id is the one `decision signals` shows, or a unique prefix of at least 7 characters.
+
+Usage: lighthouse decision signal dismiss [OPTIONS] --reason <TEXT> <ID>
+
+Arguments:
+  <ID>
+          The signal, by id or by a unique prefix of at least 7 characters
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --reason <TEXT>
+          Why the signal is not a decision. It labels the classifier's answer
+
+      --attributed-to <WHO>
+          Who this is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          
+          [env: LIGHTHOUSE_ATTRIBUTED_TO=]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse decision signals
+  lighthouse decision signals --all --limit 50 --format json
+  lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'

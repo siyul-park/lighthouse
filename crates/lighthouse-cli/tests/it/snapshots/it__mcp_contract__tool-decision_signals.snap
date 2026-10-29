@@ -1,0 +1,432 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "List the session signals: what the hooks heard of design decisions.\n\nThe hooks classify each prompt of a person (directive, correction, preference, none, or an abstention when no rule decides) and record the findings an agent's edits introduced or resolved, locally and never in git. By default the open signals that state a decision are listed; --all lists every one. The counts are by class, by rule that fired, by abstention and by status, and the measures of the loop are the share of signals recorded or linked, of proposals named a possible duplicate and of proposals a person accepted, each with a Wilson 95% interval. Retention and whether the agent is told are `[signals]` in lighthouse.toml.\n\nExamples:\n  lighthouse decision signals\n  lighthouse decision signals --all --limit 50 --format json\n  lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision signals`.",
+    "properties": {
+      "all": {
+        "default": false,
+        "description": "Include every signal: the settled ones, the prompts no rule decided\nand the findings of edits. By default, the open signals that state a\ndecision.",
+        "type": "boolean"
+      },
+      "limit": {
+        "default": null,
+        "description": "List at most this many signals and say how many were left out.",
+        "format": "uint",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    "type": "object"
+  },
+  "name": "decision_signals",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-signals.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The `DecisionSignals` kind.",
+    "properties": {
+      "counts": {
+        "description": "How many signals fall in each bucket.",
+        "properties": {
+          "abstained": {
+            "description": "Prompts no rule decided, which a bound model could.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "byClass": {
+            "additionalProperties": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "By class: `directive`, `correction`, `preference`, `none`, `abstain`\nand `finding`.",
+            "type": "object"
+          },
+          "byRule": {
+            "additionalProperties": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "By the classifier rule that fired, or the decision of a finding.",
+            "type": "object"
+          },
+          "byStatus": {
+            "additionalProperties": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "By status: `open`, `recorded`, `linked` and `dismissed`.",
+            "type": "object"
+          },
+          "total": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "byClass",
+          "byRule",
+          "byStatus",
+          "abstained"
+        ],
+        "type": "object"
+      },
+      "measures": {
+        "description": "The measures of the loop, counted from signal statuses and proposals, never\nfrom what the agent says of itself.",
+        "properties": {
+          "capture": {
+            "description": "The share of signals that state a decision that were recorded or\nlinked.",
+            "properties": {
+              "high": {
+                "format": "double",
+                "type": "number"
+              },
+              "hits": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "low": {
+                "format": "double",
+                "type": "number"
+              },
+              "of": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "value": {
+                "format": "double",
+                "type": "number"
+              }
+            },
+            "required": [
+              "hits",
+              "of",
+              "value",
+              "low",
+              "high"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "duplicate": {
+            "description": "The share of proposals the dedupe check named a possible duplicate for.",
+            "properties": {
+              "high": {
+                "format": "double",
+                "type": "number"
+              },
+              "hits": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "low": {
+                "format": "double",
+                "type": "number"
+              },
+              "of": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "value": {
+                "format": "double",
+                "type": "number"
+              }
+            },
+            "required": [
+              "hits",
+              "of",
+              "value",
+              "low",
+              "high"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "ratification": {
+            "description": "The share of proposals a person has accepted.",
+            "properties": {
+              "high": {
+                "format": "double",
+                "type": "number"
+              },
+              "hits": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "low": {
+                "format": "double",
+                "type": "number"
+              },
+              "of": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "value": {
+                "format": "double",
+                "type": "number"
+              }
+            },
+            "required": [
+              "hits",
+              "of",
+              "value",
+              "low",
+              "high"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "omitted": {
+        "description": "How many `limit` left out.",
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "signals": {
+        "description": "The open signals that state a decision, or every signal with `all`.",
+        "items": {
+          "description": "A recorded signal.",
+          "oneOf": [
+            {
+              "properties": {
+                "status": {
+                  "const": "open",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "A decision was recorded from it: the uid of that decision.",
+              "properties": {
+                "decision": {
+                  "type": "string"
+                },
+                "status": {
+                  "const": "recorded",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "decision"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "An existing decision already says it: its uid.",
+              "properties": {
+                "decision": {
+                  "type": "string"
+                },
+                "status": {
+                  "const": "linked",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "decision"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "reason": {
+                  "type": "string"
+                },
+                "status": {
+                  "const": "dismissed",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "reason"
+              ],
+              "type": "object"
+            }
+          ],
+          "properties": {
+            "asked": {
+              "description": "Whether a stop has asked the agent about it.",
+              "type": "boolean"
+            },
+            "by": {
+              "description": "Who it is attributed to: the person for what they said, the agent for\nwhat its edits caused, a model for what one classified.",
+              "properties": {
+                "hadRole": {
+                  "anyOf": [
+                    {
+                      "description": "The role a software agent had in a record, PROV's `hadRole`.",
+                      "oneOf": [
+                        {
+                          "const": "agent",
+                          "description": "A coding agent that reviewed the finding.",
+                          "type": "string"
+                        },
+                        {
+                          "const": "model",
+                          "description": "A model that classified the subject.",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "description": "What kind of agent a record is attributed to, a W3C PROV class.",
+                  "oneOf": [
+                    {
+                      "const": "Person",
+                      "description": "A human.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "SoftwareAgent",
+                      "description": "A program, such as a coding agent or a model.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            "class": {
+              "description": "What a signal says.",
+              "oneOf": [
+                {
+                  "const": "directive",
+                  "description": "A rule to follow: \"always\", \"never\", \"must\", \"don't\".",
+                  "type": "string"
+                },
+                {
+                  "const": "correction",
+                  "description": "A turn away from what the agent did or chose: \"no, …\", \"instead\".",
+                  "type": "string"
+                },
+                {
+                  "const": "preference",
+                  "description": "A stated taste: \"X is better\", \"I prefer\".",
+                  "type": "string"
+                },
+                {
+                  "const": "finding",
+                  "description": "A finding the session introduced or resolved.",
+                  "type": "string"
+                },
+                {
+                  "const": "none",
+                  "description": "A message a rule proved says no decision (an acknowledgement).",
+                  "type": "string"
+                },
+                {
+                  "const": "abstain",
+                  "description": "A message no rule decides; a bound model could.",
+                  "type": "string"
+                }
+              ]
+            },
+            "event": {
+              "type": "string"
+            },
+            "excerpt": {
+              "type": "string"
+            },
+            "features": true,
+            "id": {
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            },
+            "session": {
+              "type": "string"
+            },
+            "settledBy": {
+              "description": "Who settled it, as `--attributed-to` spells it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "time": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "session",
+            "time",
+            "event",
+            "class",
+            "excerpt",
+            "features",
+            "rule",
+            "by",
+            "asked"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "signals",
+      "omitted",
+      "counts",
+      "measures"
+    ],
+    "title": "DecisionSignals",
+    "type": "object"
+  },
+  "title": "List the session signals: what the hooks heard of design decisions"
+}

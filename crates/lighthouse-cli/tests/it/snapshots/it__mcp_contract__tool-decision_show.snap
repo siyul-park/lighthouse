@@ -175,6 +175,42 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "markdown": {
         "description": "Context, requirement, examples and status.",
         "type": "string"
+      },
+      "support": {
+        "description": "The signals a proposal derives from; absent for a decision that names\nnone.",
+        "properties": {
+          "byClass": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "description": "Signals by class, then by `person`, `agent` or `model`.",
+            "type": "object"
+          },
+          "personShare": {
+            "description": "`(person + 1) / (signals + 2)`.",
+            "format": "double",
+            "type": "number"
+          },
+          "signals": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "signals",
+          "byClass",
+          "personShare"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
       }
     },
     "required": [

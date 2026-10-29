@@ -1,0 +1,244 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Dismiss a signal: it is not a design decision.\n\nA dismissed signal stays in `decision signals --all` with its reason and who gave it, and is not asked about again. The reason is the label that a later evaluation of the classifier learns from. The signal id is the one `decision signals` shows, or a unique prefix of at least 7 characters.\n\nExamples:\n  lighthouse decision signals\n  lighthouse decision signals --all --limit 50 --format json\n  lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision signal dismiss`.",
+    "properties": {
+      "attributedTo": {
+        "default": null,
+        "description": "Who this is attributed to: `person` or `agent`, with an id after a\ncolon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "id": {
+        "description": "The signal, by id or by a unique prefix of at least 7 characters.",
+        "type": "string"
+      },
+      "reason": {
+        "description": "Why the signal is not a decision. It labels the classifier's answer.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "reason"
+    ],
+    "type": "object"
+  },
+  "name": "decision_signal_dismiss",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/signal-dismiss.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A recorded signal.",
+    "oneOf": [
+      {
+        "properties": {
+          "status": {
+            "const": "open",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "A decision was recorded from it: the uid of that decision.",
+        "properties": {
+          "decision": {
+            "type": "string"
+          },
+          "status": {
+            "const": "recorded",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "decision"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "An existing decision already says it: its uid.",
+        "properties": {
+          "decision": {
+            "type": "string"
+          },
+          "status": {
+            "const": "linked",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "decision"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "const": "dismissed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "type": "object"
+      }
+    ],
+    "properties": {
+      "asked": {
+        "description": "Whether a stop has asked the agent about it.",
+        "type": "boolean"
+      },
+      "by": {
+        "description": "Who it is attributed to: the person for what they said, the agent for\nwhat its edits caused, a model for what one classified.",
+        "properties": {
+          "hadRole": {
+            "anyOf": [
+              {
+                "description": "The role a software agent had in a record, PROV's `hadRole`.",
+                "oneOf": [
+                  {
+                    "const": "agent",
+                    "description": "A coding agent that reviewed the finding.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "model",
+                    "description": "A model that classified the subject.",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "What kind of agent a record is attributed to, a W3C PROV class.",
+            "oneOf": [
+              {
+                "const": "Person",
+                "description": "A human.",
+                "type": "string"
+              },
+              {
+                "const": "SoftwareAgent",
+                "description": "A program, such as a coding agent or a model.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "class": {
+        "description": "What a signal says.",
+        "oneOf": [
+          {
+            "const": "directive",
+            "description": "A rule to follow: \"always\", \"never\", \"must\", \"don't\".",
+            "type": "string"
+          },
+          {
+            "const": "correction",
+            "description": "A turn away from what the agent did or chose: \"no, …\", \"instead\".",
+            "type": "string"
+          },
+          {
+            "const": "preference",
+            "description": "A stated taste: \"X is better\", \"I prefer\".",
+            "type": "string"
+          },
+          {
+            "const": "finding",
+            "description": "A finding the session introduced or resolved.",
+            "type": "string"
+          },
+          {
+            "const": "none",
+            "description": "A message a rule proved says no decision (an acknowledgement).",
+            "type": "string"
+          },
+          {
+            "const": "abstain",
+            "description": "A message no rule decides; a bound model could.",
+            "type": "string"
+          }
+        ]
+      },
+      "event": {
+        "type": "string"
+      },
+      "excerpt": {
+        "type": "string"
+      },
+      "features": true,
+      "id": {
+        "type": "string"
+      },
+      "rule": {
+        "type": "string"
+      },
+      "session": {
+        "type": "string"
+      },
+      "settledBy": {
+        "description": "Who settled it, as `--attributed-to` spells it.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "time": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "session",
+      "time",
+      "event",
+      "class",
+      "excerpt",
+      "features",
+      "rule",
+      "by",
+      "asked"
+    ],
+    "title": "SignalDismiss",
+    "type": "object"
+  },
+  "title": "Dismiss a signal: it is not a design decision"
+}

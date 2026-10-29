@@ -20,6 +20,7 @@ mod color;
 mod command;
 mod docs;
 mod hook;
+mod paste;
 mod project;
 mod reference;
 mod setup;

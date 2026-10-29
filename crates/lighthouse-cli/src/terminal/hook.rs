@@ -7,7 +7,8 @@
 //! PostToolUse and Stop keep the findings that are new or updated against it.
 //!
 //! Contract used (Claude Code hooks reference): the payload carries `session_id`,
-//! `cwd`, `hook_event_name`, and for PreToolUse and PostToolUse `tool_name` and
+//! `cwd`, `hook_event_name`, and for UserPromptSubmit `prompt`, for SessionStart
+//! `source`, and for PreToolUse and PostToolUse `tool_name` and
 //! `tool_input` (`file_path` for Edit, Write and MultiEdit); for Stop
 //! `stop_hook_active` says a stop hook already forced the agent to continue. Exit 0 with a JSON
 //! object on stdout: `decision: "block"` with `reason` feeds the reason back to
@@ -26,14 +27,17 @@ use std::{
 };
 
 use clap::ValueEnum;
+use lighthouse_model::{AgentKind, Attribution};
 use lighthouse_report::Format;
 use lighthouse_session::{
-    AGENT_LOOP, CheckRequest, Checked, ModelOptions, RunStatus, Session, baseline,
+    AGENT_LOOP, CheckRequest, Checked, ModelOptions, RunStatus, Session, baseline, signal,
 };
 use serde_json::{Value, json};
 
-use crate::terminal::Result;
+use crate::terminal::{Result, paste};
 
+/// The session of a payload without a usable `session_id`.
+const NO_SESSION: &str = "-";
 /// Findings printed back to the agent by an edit and by the end of a turn.
 const EDIT_LIMIT: usize = 5;
 const STOP_LIMIT: usize = 10;
@@ -53,6 +57,12 @@ pub enum Event {
     PostToolUse,
     /// When the agent wants to stop: report the findings the session introduced.
     Stop,
+    /// When the person submits a prompt: record what it says about a design
+    /// decision; tell the agent only when the project surfaces signals.
+    UserPromptSubmit,
+    /// When a session starts: with surfacing on, a digest of the decisions of
+    /// the project and the proposals that wait for a person.
+    SessionStart,
 }
 
 impl Event {
@@ -62,17 +72,19 @@ impl Event {
             Self::PreToolUse => "PreToolUse",
             Self::PostToolUse => "PostToolUse",
             Self::Stop => "Stop",
+            Self::UserPromptSubmit => "UserPromptSubmit",
+            Self::SessionStart => "SessionStart",
         }
     }
 
-    /// The command that runs the hook of the event: only the first, which
-    /// records a baseline and prints nothing, has no incompleteness to allow.
+    /// The command that runs the hook of the event: only the events that
+    /// check have an incompleteness to allow.
     pub fn command(self) -> String {
         let event = self.to_possible_value().expect("every event has a name");
-        let flag = if self == Self::PreToolUse {
-            ""
-        } else {
+        let flag = if matches!(self, Self::PostToolUse | Self::Stop) {
             " --allow-incomplete"
+        } else {
+            ""
         };
         format!("{COMMAND} {}{flag}", event.get_name())
     }
@@ -130,6 +142,24 @@ fn answer_event(
     let root = session.root.canonicalize()?;
     let id = baseline::session_id(payload["session_id"].as_str());
     match event {
+        Event::UserPromptSubmit => {
+            let Some(prompt) = payload["prompt"].as_str() else {
+                return Ok(None);
+            };
+            let signal =
+                signal::capture_prompt(&session, id.unwrap_or(NO_SESSION), &paste::quoted(prompt))?;
+            Ok(session
+                .surfaces()
+                .then(|| signal::prompt_context(&session, &signal))
+                .flatten()
+                .map(|text| context(event, text)))
+        }
+        Event::SessionStart => {
+            if !session.surfaces() {
+                return Ok(None);
+            }
+            Ok(signal::digest(&session)?.map(|text| context(event, text)))
+        }
         Event::PreToolUse => {
             let (Some(id), Some(file)) = (id, edited_file(payload, &root)) else {
                 return Ok(None);
@@ -154,9 +184,15 @@ fn answer_event(
             let mut checked =
                 lighthouse_session::check(&session, &request(vec![root.join(&file)], true))?;
             let before = id.and_then(|id| baseline::load(&root, id, &file));
+            let now = checked.run.diagnostics.clone();
             if let Some(before) = &before {
                 baseline::introduced(&mut checked.run.diagnostics, std::slice::from_ref(before));
             }
+            let gone = before
+                .as_ref()
+                .map(|b| baseline::gone(std::slice::from_ref(b), &now))
+                .unwrap_or_default();
+            record_findings(&session, id, event, &checked, &gone);
             Ok(after_edit(&checked, allow_incomplete, before.is_none()))
         }
         Event::Stop => {
@@ -168,14 +204,87 @@ fn answer_event(
                 .map(|b| root.join(b.path()))
                 .filter(|f| f.exists())
                 .collect();
-            if files.is_empty() {
-                return Ok(None);
+            let mut stopped = None;
+            if !files.is_empty() {
+                let mut checked = lighthouse_session::check(&session, &request(files, true))?;
+                let now = checked.run.diagnostics.clone();
+                baseline::introduced(&mut checked.run.diagnostics, &before);
+                let gone = baseline::gone(&before, &now);
+                record_findings(&session, id, event, &checked, &gone);
+                stopped = at_stop(&checked, allow_incomplete, stop_hook_active);
             }
-            let mut checked = lighthouse_session::check(&session, &request(files, true))?;
-            baseline::introduced(&mut checked.run.diagnostics, &before);
-            Ok(at_stop(&checked, allow_incomplete, stop_hook_active))
+            Ok(with_open_signals(&session, id, stop_hook_active, stopped))
         }
     }
+}
+
+/// Records the findings the session introduced and resolved as signals. A
+/// signal that cannot be recorded is said on stderr and never costs the agent
+/// the answer of the hook. What an incomplete analysis did not check is not
+/// said to be resolved.
+fn record_findings(
+    session: &Session,
+    id: Option<&str>,
+    event: Event,
+    checked: &Checked,
+    gone: &[String],
+) {
+    let resolved = if checked.summary().status == RunStatus::Incomplete {
+        &[]
+    } else {
+        gone
+    };
+    if let Err(e) = signal::capture_findings(
+        session,
+        id.unwrap_or(NO_SESSION),
+        event.name(),
+        &checked.run.diagnostics,
+        resolved,
+        &Attribution::new(AgentKind::SoftwareAgent, Some("claude-code".to_owned())),
+    ) {
+        eprintln!("lighthouse hook: signals: {e}");
+    }
+}
+
+/// `stopped` with the review task of the session's open signals, when the
+/// project surfaces signals: they are asked about once, and never again by a
+/// stop this hook already forced.
+///
+/// The task is guidance, not an error, so it goes where the Claude Code hooks
+/// reference ("Stop decision control") puts it: `hookSpecificOutput.additionalContext`
+/// with `hookEventName: "Stop"`, which keeps the conversation going under the
+/// same loop protections (`stop_hook_active`, the cap on consecutive
+/// continuations). When the stop is already blocked for findings, the task
+/// joins the `reason` of that block instead.
+fn with_open_signals(
+    session: &Session,
+    id: Option<&str>,
+    stop_hook_active: bool,
+    stopped: Option<Value>,
+) -> Option<Value> {
+    if !session.surfaces() || stop_hook_active {
+        return stopped;
+    }
+    let open = match signal::unasked(&session.root, id.unwrap_or(NO_SESSION)) {
+        Ok(open) if !open.is_empty() => open,
+        Ok(_) => return stopped,
+        Err(e) => {
+            eprintln!("lighthouse hook: signals: {e}");
+            return stopped;
+        }
+    };
+    if let Err(e) = signal::mark_asked(&session.root, &open) {
+        eprintln!("lighthouse hook: signals: {e}");
+    }
+    let text = signal::stop_context(&open);
+    let mut reply = stopped.unwrap_or_else(|| json!({}));
+    if let Some(reason) = reply["reason"].as_str() {
+        reply["reason"] = json!(format!("{reason}\n\n{text}"));
+    } else {
+        reply["hookSpecificOutput"] =
+            json!({ "hookEventName": Event::Stop.name(), "additionalContext": text });
+    }
+    Some(reply)
 }
 
 /// What the agent hears when Lighthouse could not run at all: a broken config
@@ -189,6 +298,7 @@ fn unchecked(event: Event, stop_hook_active: bool, error: &str) -> Option<Value>
     match event {
         Event::PreToolUse => None,
         Event::PostToolUse => Some(context(event, text)),
+        Event::UserPromptSubmit | Event::SessionStart => None,
         Event::Stop if stop_hook_active => Some(notice(text)),
         Event::Stop => Some(block(text)),
     }

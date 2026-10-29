@@ -9,7 +9,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": false
   },
-  "description": "Replace a project-local decision with a Decision document.\n\nThe same gate as `decision create` applies, and nothing is written when it fails. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.",
+  "description": "Replace a project-local decision with a Decision document.\n\nThe same gate as `decision create` applies, and nothing is written when it fails. The signals the document names in `provenance.wasDerivedFrom` become linked. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`decision create` and `decision update`.",
@@ -36,6 +36,37 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "created": {
         "type": "boolean"
       },
+      "duplicates": {
+        "description": "Existing decisions the new one may repeat; the decision is written\nanyway, because a person decides.",
+        "items": {
+          "description": "An existing decision a new one may repeat.",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "requirement": {
+              "description": "The first line of its requirement.",
+              "type": "string"
+            },
+            "similarity": {
+              "description": "BM25 of the decision for the new text, from 0 to 1.",
+              "format": "double",
+              "type": "number"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "status",
+            "requirement",
+            "similarity"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
       "id": {
         "type": "string"
       },
@@ -49,6 +80,13 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       },
       "path": {
         "type": "string"
+      },
+      "signals": {
+        "description": "The signals now recorded or linked, by id.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       },
       "tested": {
         "description": "What the gate ran before the decision was written.",
@@ -91,6 +129,13 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           "skipped"
         ],
         "type": "object"
+      },
+      "unknownSignals": {
+        "description": "Signals the document names that the store does not hold.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       }
     },
     "required": [

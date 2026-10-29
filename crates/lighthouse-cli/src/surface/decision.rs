@@ -6,12 +6,15 @@ use std::{
     io::{Read, stdin},
 };
 
+use lighthouse_model::Attribution;
 use lighthouse_report::{Aim, CheckInfo, Descriptor, FixInfo};
 use lighthouse_session::{
     Authored, DecisionRow, DecisionTest, Fixing, Session, active_decisions, create_decision,
     decision_rows, explain,
     model::{self, EvalReport, EvalRequest, Side},
-    replace_decision, test_decisions,
+    replace_decision,
+    signal::{self, Support},
+    test_decisions,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -19,7 +22,10 @@ use serde_json::Value;
 
 use crate::surface::{
     Result,
-    args::{DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs},
+    args::{
+        DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionSignalsArgs,
+        DecisionTestArgs, SignalDismissArgs,
+    },
     list::{Page, omitted_line, page},
     reply::{Context, FOUND, Format, Reply},
 };
@@ -56,6 +62,10 @@ pub(super) struct DecisionShow {
     /// How its check and fix run here; absent for a decision without a check.
     #[serde(flatten)]
     descriptor: Option<Descriptor>,
+    /// The signals a proposal derives from; absent for a decision that names
+    /// none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    support: Option<Support>,
 }
 
 /// The `DecisionTest` kind: the examples of the checked decisions, run.
@@ -131,10 +141,18 @@ pub fn show(ctx: &Context, args: &DecisionShowArgs, format: Format) -> Result<Re
             descriptor.line("<fingerprint>", false)
         );
     }
+    let support = match session.catalog.decision(&args.id) {
+        Some(decision) => signal::support(&session, decision)?,
+        None => None,
+    };
+    if let Some(support) = &support {
+        let _ = writeln!(markdown, "support: {}", support.line());
+    }
     let shown = DecisionShow {
         id: args.id.clone(),
         markdown: markdown.clone(),
         descriptor,
+        support,
     };
     Reply::data(format, &shown, || markdown)
 }
@@ -142,6 +160,57 @@ pub fn show(ctx: &Context, args: &DecisionShowArgs, format: Format) -> Result<Re
 /// `decision create`: `document` is YAML or JSON text.
 pub fn create(ctx: &Context, document: &str, format: Format) -> Result<Reply> {
     write(ctx, document, format, create_decision)
+}
+
+/// `decision signals`.
+pub fn signals(ctx: &Context, args: &DecisionSignalsArgs, format: Format) -> Result<Reply> {
+    let report = signal::report(&ctx.session()?, args.all, args.limit)?;
+    Reply::data(format, &report, || {
+        let mut out = String::new();
+        for s in &report.signals {
+            let _ = writeln!(
+                out,
+                "{}\t{}\t{}\t{}\t{}",
+                s.id,
+                s.class,
+                s.status.name(),
+                if s.rule.is_empty() { "-" } else { &s.rule },
+                s.excerpt
+            );
+        }
+        out.push_str(&omitted_line(report.omitted));
+        let counts = &report.counts;
+        let _ = writeln!(
+            out,
+            "{} signal(s): {}; {} abstained; by status: {}",
+            counts.total,
+            tally(&counts.by_class),
+            counts.abstained,
+            tally(&counts.by_status)
+        );
+        if !counts.by_rule.is_empty() {
+            let _ = writeln!(out, "by rule: {}", tally(&counts.by_rule));
+        }
+        for (name, rate) in [
+            ("capture", report.measures.capture),
+            ("duplicate", report.measures.duplicate),
+            ("ratification", report.measures.ratification),
+        ] {
+            if let Some(rate) = rate {
+                let _ = writeln!(out, "{name}: {rate}");
+            }
+        }
+        out
+    })
+}
+
+/// `decision signal dismiss`.
+pub fn dismiss(ctx: &Context, args: &SignalDismissArgs, format: Format) -> Result<Reply> {
+    let by = ctx.attribution(args.attributed.attributed_to.as_deref())?;
+    let dismissed = signal::dismiss(&ctx.session()?, &args.id, &args.reason, &by)?;
+    Reply::data(format, &dismissed, || {
+        format!("dismissed signal {}\n", dismissed.id)
+    })
 }
 
 /// `decision update`: `document` is YAML or JSON text.
@@ -202,16 +271,31 @@ pub fn eval(ctx: &Context, args: &DecisionEvalArgs, format: Format) -> Result<Re
     Reply::data(format, &report, || eval_text(&report))
 }
 
+fn tally(counts: &std::collections::BTreeMap<String, usize>) -> String {
+    if counts.is_empty() {
+        return "-".to_owned();
+    }
+    counts
+        .iter()
+        .map(|(name, n)| format!("{name} {n}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Writes a decision with `make` once its document parses.
 fn write(
     ctx: &Context,
     text: &str,
     format: Format,
-    make: fn(&Session, Value) -> Result<Authored>,
+    make: fn(&Session, Value, &Attribution) -> Result<Authored>,
 ) -> Result<Reply> {
     let document: Value = serde_norway::from_str(text)
         .map_err(|e| format!("the document is not valid YAML or JSON: {e}"))?;
-    let done = make(&Session::load(ctx.config.as_deref())?, document)?;
+    let done = make(
+        &Session::load(ctx.config.as_deref())?,
+        document,
+        &ctx.attribution(None)?,
+    )?;
     let verb = if done.created { "created" } else { "updated" };
     Reply::data(format, &done, || {
         format!(

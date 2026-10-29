@@ -20,6 +20,7 @@ mod fix_trust;
 mod fx;
 mod help;
 mod hook_session;
+mod hook_signals;
 mod internal;
 mod judgments;
 mod layers;

@@ -501,6 +501,10 @@
           "$ref": "#/$defs/SandboxSpec",
           "description": "The sandbox the programs of the project run in."
         },
+        "signals": {
+          "$ref": "#/$defs/SignalsSpec",
+          "description": "How long session signals are kept, and whether the agent hears about\nthem."
+        },
         "sources": {
           "description": "Embedded source rules. The host language is inferred by normal file routing.",
           "items": {
@@ -841,6 +845,31 @@
         }
       ]
     },
+    "SignalsSpec": {
+      "additionalProperties": false,
+      "description": "The `signals` table of a project.",
+      "properties": {
+        "retention": {
+          "description": "How long a signal is kept, such as `30d`; older ones are purged when a\nnew one is written. Default: `30d`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "surface": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Surface"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`shadow` records signals and prints nothing to the agent; `on` tells\nit. Default: `shadow`."
+        }
+      },
+      "type": "object"
+    },
     "SourceLanguageSpec": {
       "additionalProperties": false,
       "description": "Analysis destination for a source rule. Exactly one of provider and from\nis required; from reads the language of each candidate.",
@@ -916,6 +945,21 @@
         {
           "const": "file",
           "description": "The text of `{file}`.",
+          "type": "string"
+        }
+      ]
+    },
+    "Surface": {
+      "description": "Whether the agent hears about the signals.",
+      "oneOf": [
+        {
+          "const": "shadow",
+          "description": "Signals are recorded and counted; the agent is told nothing.",
+          "type": "string"
+        },
+        {
+          "const": "on",
+          "description": "The hooks tell the agent about design decisions, open signals and the\ndecisions of the project.",
           "type": "string"
         }
       ]

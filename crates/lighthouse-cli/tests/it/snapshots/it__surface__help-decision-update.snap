@@ -4,7 +4,7 @@ expression: "printed(dir.path(), &args)"
 ---
 Replace a project-local decision with a Decision document.
 
-The same gate as `decision create` applies, and nothing is written when it fails. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.
+The same gate as `decision create` applies, and nothing is written when it fails. The signals the document names in `provenance.wasDerivedFrom` become linked. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.
 
 Usage: lighthouse decision update [OPTIONS] <FILE|->
 

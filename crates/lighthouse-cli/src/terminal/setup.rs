@@ -24,6 +24,9 @@ const DENY_TRUST: &str = "Bash(lighthouse trust:*)";
 const PRE_TIMEOUT: u64 = 120;
 const POST_TIMEOUT: u64 = 120;
 const STOP_TIMEOUT: u64 = 300;
+/// The prompt and session hooks run no check: they read the catalog and the
+/// local store.
+const SIGNAL_TIMEOUT: u64 = 10;
 
 /// Sets up Claude Code in the project at `root`, printing what changed.
 pub fn claude_code(config: Option<&Path>, root: &Path) -> Result<()> {
@@ -63,6 +66,8 @@ fn hooks(path: &Path) -> Result<()> {
         (Event::PreToolUse, Some(&edits), PRE_TIMEOUT),
         (Event::PostToolUse, Some(&edits), POST_TIMEOUT),
         (Event::Stop, None, STOP_TIMEOUT),
+        (Event::UserPromptSubmit, None, SIGNAL_TIMEOUT),
+        (Event::SessionStart, None, SIGNAL_TIMEOUT),
     ] {
         let name = event.name();
         let groups = hooks

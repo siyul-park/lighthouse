@@ -4,7 +4,7 @@ expression: "printed(dir.path(), &args)"
 ---
 Add a project-local decision from a Decision document.
 
-The document is YAML or JSON, from a file or stdin (`-`). Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.
+The document is YAML or JSON, from a file or stdin (`-`). Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. A document without `spec.status` is written as `proposed`: it produces no findings until a person accepts it. Decisions that may repeat it are named in the reply ("possible duplicate"), and the signals named in `provenance.wasDerivedFrom` as `signal:<id>` become recorded. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.
 
 Usage: lighthouse decision create [OPTIONS] <FILE|->
 

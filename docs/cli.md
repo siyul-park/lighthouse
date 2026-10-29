@@ -160,13 +160,15 @@ Inspect, author, test and evaluate decisions
 Usage: lighthouse decision <COMMAND>
 
 Commands:
-  list    List the decisions that have a rule
-  show    Show a decision or rule: context, requirement, examples and status
-  create  Add a project-local decision from a Decision document
-  update  Replace a project-local decision with a Decision document
-  test    Run the examples of checked decisions through the whole engine
-  eval    Measure a decision's check against its labels
-  help    Print this message or the help of the given subcommand(s)
+  list     List the decisions that have a rule
+  show     Show a decision or rule: context, requirement, examples and status
+  create   Add a project-local decision from a Decision document
+  update   Replace a project-local decision with a Decision document
+  signals  List the session signals: what the hooks heard of design decisions
+  signal   Settle the session signals
+  test     Run the examples of checked decisions through the whole engine
+  eval     Measure a decision's check against its labels
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help
@@ -230,7 +232,7 @@ Options:
 ```text
 Add a project-local decision from a Decision document.
 
-The document is YAML or JSON, from a file or stdin (`-`). Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.
+The document is YAML or JSON, from a file or stdin (`-`). Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. A document without `spec.status` is written as `proposed`: it produces no findings until a person accepts it. Decisions that may repeat it are named in the reply ("possible duplicate"), and the signals named in `provenance.wasDerivedFrom` as `signal:<id>` become recorded. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.
 
 Usage: lighthouse decision create [OPTIONS] <FILE|->
 
@@ -257,7 +259,7 @@ Options:
 ```text
 Replace a project-local decision with a Decision document.
 
-The same gate as `decision create` applies, and nothing is written when it fails. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.
+The same gate as `decision create` applies, and nothing is written when it fails. The signals the document names in `provenance.wasDerivedFrom` become linked. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.
 
 Usage: lighthouse decision update [OPTIONS] <FILE|->
 
@@ -277,6 +279,96 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+```
+
+## `lighthouse decision signals`
+
+```text
+List the session signals: what the hooks heard of design decisions.
+
+The hooks classify each prompt of a person (directive, correction, preference, none, or an abstention when no rule decides) and record the findings an agent's edits introduced or resolved, locally and never in git. By default the open signals that state a decision are listed; --all lists every one. The counts are by class, by rule that fired, by abstention and by status, and the measures of the loop are the share of signals recorded or linked, of proposals named a possible duplicate and of proposals a person accepted, each with a Wilson 95% interval. Retention and whether the agent is told are `[signals]` in lighthouse.toml.
+
+Usage: lighthouse decision signals [OPTIONS]
+
+Options:
+      --all
+          Include every signal: the settled ones, the prompts no rule decided and the findings of edits. By default, the open signals that state a decision
+
+      --limit <N>
+          List at most this many signals and say how many were left out
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse decision signals
+  lighthouse decision signals --all --limit 50 --format json
+  lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'
+```
+
+## `lighthouse decision signal`
+
+```text
+Settle the session signals
+
+Usage: lighthouse decision signal <COMMAND>
+
+Commands:
+  dismiss  Dismiss a signal: it is not a design decision
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help
+```
+
+## `lighthouse decision signal dismiss`
+
+```text
+Dismiss a signal: it is not a design decision.
+
+A dismissed signal stays in `decision signals --all` with its reason and who gave it, and is not asked about again. The reason is the label that a later evaluation of the classifier learns from. The signal id is the one `decision signals` shows, or a unique prefix of at least 7 characters.
+
+Usage: lighthouse decision signal dismiss [OPTIONS] --reason <TEXT> <ID>
+
+Arguments:
+  <ID>
+          The signal, by id or by a unique prefix of at least 7 characters
+
+Options:
+      --reason <TEXT>
+          Why the signal is not a decision. It labels the classifier's answer
+
+      --attributed-to <WHO>
+          Who this is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          
+          [env: LIGHTHOUSE_ATTRIBUTED_TO=]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse decision signals
+  lighthouse decision signals --all --limit 50 --format json
+  lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'
 ```
 
 ## `lighthouse decision test`
@@ -1042,9 +1134,11 @@ Arguments:
 
   <EVENT>
           Possible values:
-          - pre-tool-use:  Before Edit, Write or MultiEdit: record the file's findings as the session's baseline, once per file; prints nothing
-          - post-tool-use: After Edit, Write or MultiEdit: report the findings the edit introduced
-          - stop:          When the agent wants to stop: report the findings the session introduced
+          - pre-tool-use:       Before Edit, Write or MultiEdit: record the file's findings as the session's baseline, once per file; prints nothing
+          - post-tool-use:      After Edit, Write or MultiEdit: report the findings the edit introduced
+          - stop:               When the agent wants to stop: report the findings the session introduced
+          - user-prompt-submit: When the person submits a prompt: record what it says about a design decision; tell the agent only when the project surfaces signals
+          - session-start:      When a session starts: with surfacing on, a digest of the decisions of the project and the proposals that wait for a person
 
 Options:
       --allow-incomplete

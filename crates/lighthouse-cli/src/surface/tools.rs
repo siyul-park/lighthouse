@@ -12,6 +12,7 @@ use lighthouse_session::{
     fix::Fixed,
     model::{Attachment, Detachment, EvalReport, Rebuilt, Trained, remote_bound},
     review::{Recorded, Shown},
+    signal::{Signal, SignalReport},
 };
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde::de::DeserializeOwned;
@@ -21,8 +22,9 @@ use crate::surface::{
     Result,
     args::{
         CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
-        DecisionTestArgs, DocumentArgs, FingerprintArgs, FixArgs, ModelAttachArgs, ModelDetachArgs,
-        ModelListArgs, ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
+        DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs, FixArgs,
+        ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelTrainArgs, ReviewListArgs,
+        ReviewResolveArgs, SignalDismissArgs,
     },
     check,
     commands::{self, CheckCommand},
@@ -42,7 +44,7 @@ const FIX_DESCRIPTION: &str = "Fix findings with the fixers the decisions name (
 const REBUILD_KIND: &str = "ModelRebuild";
 
 /// The tools, in the order they are listed.
-pub const TOOLS: [Tool; 17] = [
+pub const TOOLS: [Tool; 19] = [
     Tool::new::<CheckArgs, CheckReport>(
         "check",
         &["check"],
@@ -91,6 +93,20 @@ pub const TOOLS: [Tool; 17] = [
         "DecisionReport",
         Hints::WRITE,
         |ctx, args| decision::update(ctx, &parse::<DocumentArgs>(args)?.document, Format::Json),
+    ),
+    Tool::new::<DecisionSignalsArgs, SignalReport>(
+        "decision_signals",
+        &["decision", "signals"],
+        "DecisionSignals",
+        Hints::READ,
+        |ctx, args| decision::signals(ctx, &parse(args)?, Format::Json),
+    ),
+    Tool::new::<SignalDismissArgs, Signal>(
+        "decision_signal_dismiss",
+        &["decision", "signal", "dismiss"],
+        "SignalDismiss",
+        Hints::WRITE,
+        |ctx, args| decision::dismiss(ctx, &parse(args)?, Format::Json),
     ),
     Tool::new::<DecisionTestArgs, DecisionTested>(
         "decision_test",

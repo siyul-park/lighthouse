@@ -7,13 +7,15 @@ Inspect, author, test and evaluate decisions
 Usage: lighthouse decision [OPTIONS] <COMMAND>
 
 Commands:
-  list    List the decisions that have a rule
-  show    Show a decision or rule: context, requirement, examples and status
-  create  Add a project-local decision from a Decision document
-  update  Replace a project-local decision with a Decision document
-  test    Run the examples of checked decisions through the whole engine
-  eval    Measure a decision's check against its labels
-  help    Print this message or the help of the given subcommand(s)
+  list     List the decisions that have a rule
+  show     Show a decision or rule: context, requirement, examples and status
+  create   Add a project-local decision from a Decision document
+  update   Replace a project-local decision with a Decision document
+  signals  List the session signals: what the hooks heard of design decisions
+  signal   Settle the session signals
+  test     Run the examples of checked decisions through the whole engine
+  eval     Measure a decision's check against its labels
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --config <FILE>  The project file; the project root is then the current directory [env: LIGHTHOUSE_CONFIG=]
