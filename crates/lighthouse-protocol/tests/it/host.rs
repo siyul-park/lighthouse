@@ -33,6 +33,7 @@ const LANGUAGE: HostLanguage = HostLanguage {
     version: "1",
     id: "lines",
     name: "Lines",
+    aliases: &["lines"],
     globs: &["**/*.lines"],
 };
 

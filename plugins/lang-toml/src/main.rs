@@ -21,6 +21,7 @@ fn main() {
             version: env!("CARGO_PKG_VERSION"),
             id: "toml",
             name: "TOML",
+            aliases: &["toml"],
             globs: &["**/*.toml"],
         },
         Toml,

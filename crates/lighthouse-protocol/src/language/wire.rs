@@ -147,6 +147,12 @@ impl InitializeResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ProviderManifest {
     pub id: String,
+    /// The names the language goes by in a document, as GitHub Linguist's
+    /// `aliases` are: what a fenced code block may call it (`golang`, `rs`).
+    /// Matched without regard to case; no two languages of a project have one
+    /// alike.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
     /// Project-relative path globs; `*` and `?` never cross `/`, a `**`
     /// component matches any number of directories.
     pub globs: Vec<String>,

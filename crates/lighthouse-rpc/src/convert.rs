@@ -37,6 +37,7 @@ variants! {
 pub(crate) fn provider_manifest(language: &wire::ProviderManifest) -> ProviderManifest {
     ProviderManifest {
         id: language.id.clone(),
+        aliases: language.aliases.clone(),
         globs: language.globs.clone(),
         conventions: language.conventions.clone(),
         // A name this host does not know is a capability it cannot use.

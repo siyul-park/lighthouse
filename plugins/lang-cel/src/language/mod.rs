@@ -26,6 +26,7 @@ pub struct Language {
 impl Language {
     pub fn new() -> Self {
         let mut manifest = ProviderManifest::new("cel", Vec::new());
+        manifest.aliases = vec!["cel".to_owned()];
         manifest.capabilities = [
             lighthouse_model::ucm::Capability::SemanticEdges,
             lighthouse_model::ucm::Capability::Extent,

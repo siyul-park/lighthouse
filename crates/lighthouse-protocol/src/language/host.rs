@@ -60,6 +60,9 @@ pub struct HostLanguage {
     pub id: &'static str,
     /// The name of the language in messages.
     pub name: &'static str,
+    /// The names the language goes by in a document, see
+    /// `ProviderManifest::aliases`.
+    pub aliases: &'static [&'static str],
     pub globs: &'static [&'static str],
 }
 
@@ -138,6 +141,11 @@ impl<P: HostParser> Handler for HostProvider<P> {
             language.version,
             vec![ProviderManifest {
                 id: language.id.to_owned(),
+                aliases: language
+                    .aliases
+                    .iter()
+                    .map(|alias| (*alias).to_owned())
+                    .collect(),
                 globs: language
                     .globs
                     .iter()

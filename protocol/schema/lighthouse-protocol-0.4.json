@@ -1455,6 +1455,13 @@
     "ProviderManifest": {
       "description": "What a language provider declares: the language it indexes, how the host\nroutes files to it and what it guarantees. A plugin's `initialize` result\nlists one per language.",
       "properties": {
+        "aliases": {
+          "description": "The names the language goes by in a document, as GitHub Linguist's\n`aliases` are: what a fenced code block may call it (`golang`, `rs`).\nMatched without regard to case; no two languages of a project have one\nalike.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "capabilities": {
           "default": [],
           "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, and `source-ast`. Hosts ignore\nunknown values.",

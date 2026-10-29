@@ -261,3 +261,66 @@ fn rule_manifest_fingerprints_are_seeded_by_the_uid_so_a_rename_moves_none() {
         "a rename moves no fingerprint"
     );
 }
+
+struct Aliased(
+    PluginManifest,
+    &'static [(&'static str, &'static [&'static str])],
+);
+
+impl Plugin for Aliased {
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
+    }
+    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+        self.1
+            .iter()
+            .map(|&(id, aliases)| {
+                Box::new(Lang(ProviderManifest {
+                    aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
+                    ..ProviderManifest::new(id, Vec::new())
+                })) as Box<dyn LanguageProvider>
+            })
+            .collect()
+    }
+}
+
+fn aliased(plugin: &str, languages: &'static [(&'static str, &'static [&'static str])]) -> Aliased {
+    let manifest = PluginManifest {
+        id: plugin.to_owned(),
+        version: "0".to_owned(),
+    };
+    Aliased(manifest, languages)
+}
+
+#[test]
+fn a_language_is_found_by_any_alias_in_any_case_and_an_unknown_name_by_none() {
+    let mut registry = Registry::default();
+    registry
+        .register(&aliased(
+            "a",
+            &[("go", &["go", "golang"]), ("rust", &["rs"])],
+        ))
+        .unwrap();
+
+    assert_eq!(registry.language_named("golang"), Some("go"));
+    assert_eq!(registry.language_named("GoLang"), Some("go"));
+    assert_eq!(registry.language_named("RS"), Some("rust"));
+    assert_eq!(registry.language_named("cobol"), None);
+}
+
+#[test]
+fn an_alias_two_languages_share_is_a_load_error() {
+    let mut registry = Registry::default();
+    registry
+        .register(&aliased("a", &[("go", &["golang"])]))
+        .unwrap();
+
+    let err = registry
+        .register(&aliased("b", &[("other", &["GOLANG"])]))
+        .unwrap_err();
+
+    assert!(
+        matches!(&err, Error::Alias { alias, .. } if alias == "golang"),
+        "{err}"
+    );
+}

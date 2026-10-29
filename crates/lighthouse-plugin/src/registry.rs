@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     Analyzer, CelCatalog, CelLibrary, Error, Fixer, LanguageProvider, ModelClient, Plugin,
-    PluginManifest, Rule,
+    PluginManifest, ProviderManifest, Rule,
 };
 
 /// A language provider with the id of the plugin that registered it.
@@ -201,16 +201,45 @@ impl Registry {
     }
 
     fn check_languages(&self, languages: &[Box<dyn LanguageProvider>]) -> Result<(), Error> {
+        let mut claimed: BTreeMap<String, String> = self
+            .languages
+            .iter()
+            .flat_map(|x| aliases_of(x.provider.manifest()))
+            .collect();
+        let mut ids: BTreeSet<&str> = self
+            .languages
+            .iter()
+            .map(|x| x.provider.manifest().id.as_str())
+            .collect();
         for l in languages {
-            if self
-                .languages
-                .iter()
-                .any(|x| x.provider.manifest().id == l.manifest().id)
-            {
-                return Err(Error::Duplicate(l.manifest().id.clone()));
+            let manifest = l.manifest();
+            if !ids.insert(&manifest.id) {
+                return Err(Error::Duplicate(manifest.id.clone()));
+            }
+            for (alias, id) in aliases_of(manifest) {
+                if let Some(first) = claimed.insert(alias.clone(), id.clone())
+                    && first != id
+                {
+                    return Err(Error::Alias {
+                        alias,
+                        first,
+                        second: id,
+                    });
+                }
             }
         }
         Ok(())
+    }
+
+    /// The id of the language a name stands for, without regard to case: one
+    /// of the aliases a provider declared.
+    pub fn language_named(&self, name: &str) -> Option<&str> {
+        let name = name.to_lowercase();
+        self.languages
+            .iter()
+            .map(|l| l.provider.manifest())
+            .find(|manifest| manifest.aliases.iter().any(|a| a.to_lowercase() == name))
+            .map(|manifest| manifest.id.as_str())
     }
 
     /// The manifests of the registered plugins, in registration order.
@@ -323,4 +352,12 @@ fn claim<'a>(
         }
     }
     Ok(())
+}
+
+/// The aliases of a provider in lower case, each with the id it names.
+fn aliases_of(manifest: &ProviderManifest) -> impl Iterator<Item = (String, String)> + '_ {
+    manifest
+        .aliases
+        .iter()
+        .map(|alias| (alias.to_lowercase(), manifest.id.clone()))
 }

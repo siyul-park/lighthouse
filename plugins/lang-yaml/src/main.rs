@@ -21,6 +21,7 @@ fn main() {
             version: env!("CARGO_PKG_VERSION"),
             id: "yaml",
             name: "YAML",
+            aliases: &["yaml", "yml"],
             globs: &["**/*.yaml", "**/*.yml"],
         },
         Yaml,

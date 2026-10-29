@@ -47,6 +47,12 @@ pub use registry::{Language, Registry, plugin_of};
 pub enum Error {
     #[error("`{0}` is registered twice")]
     Duplicate(String),
+    #[error("the alias `{alias}` names the languages `{first}` and `{second}`")]
+    Alias {
+        alias: String,
+        first: String,
+        second: String,
+    },
     #[error("`{id}` must be prefixed with `{plugin}/`")]
     Prefix { plugin: String, id: String },
     #[error("`{required_by}` requires unknown analyzer `{id}`")]
@@ -229,6 +235,11 @@ impl Context<'_> {
 pub struct ProviderManifest {
     /// The language id, such as `go`.
     pub id: String,
+    /// The names the language goes by in a document, as GitHub Linguist's
+    /// `aliases` are: what a fenced code block may call it (`golang`, `rs`).
+    /// Matched without regard to case; no two providers of a registry have one
+    /// alike.
+    pub aliases: Vec<String>,
     pub globs: Vec<String>,
     pub conventions: Conventions,
     pub capabilities: Vec<Capability>,
@@ -254,6 +265,7 @@ impl ProviderManifest {
     pub fn new(id: impl Into<String>, globs: Vec<String>) -> Self {
         Self {
             id: id.into(),
+            aliases: Vec::new(),
             globs,
             conventions: Conventions::default(),
             capabilities: Vec::new(),
