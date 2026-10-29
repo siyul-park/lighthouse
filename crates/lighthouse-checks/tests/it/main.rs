@@ -24,6 +24,7 @@ mod model_selects;
 mod module_types;
 mod neighbors;
 mod reach;
+mod region_options;
 mod rules;
 mod rust;
 mod stability;

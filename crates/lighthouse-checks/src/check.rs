@@ -3,7 +3,10 @@
 //! The decision supplies id, severity, scope, options and the examples that
 //! `lighthouse decision test` runs.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 use lighthouse_model::{Diagnostic, Options, Reach, RunScope};
 
@@ -136,6 +139,30 @@ impl Check {
         self.libraries.clone()
     }
 
+    /// The findings of a CEL rule over a file: one run, or one for each
+    /// language of the code in it, under that language's options.
+    fn cel(
+        &self,
+        rule: &CelRule,
+        ctx: &Context,
+        configured: &Options,
+    ) -> Result<Vec<Diagnostic>, PluginError> {
+        let languages = if self.meta.scope == RunScope::File {
+            self.languages(ctx)
+        } else {
+            Vec::new()
+        };
+        if languages.is_empty() {
+            return rule.check(&self.meta, ctx, &self.resolved(configured, ctx)?, None);
+        }
+        let mut found = Vec::new();
+        for language in &languages {
+            let options = rule_options(&self.decision, configured, Some(language))?;
+            found.extend(rule.check(&self.meta, ctx, &options, Some(language))?);
+        }
+        Ok(found)
+    }
+
     /// The options of the focused file's language over the decision's defaults.
     fn resolved(
         &self,
@@ -144,6 +171,25 @@ impl Check {
     ) -> Result<Map<String, Value>, PluginError> {
         let language = ctx.file.map(|(file, _)| file.analysis_language());
         rule_options(&self.decision, configured, language)
+    }
+
+    /// The languages of the code in the focused file when it is in several, as
+    /// a Markdown file with Go and Rust fences is: each is judged under the
+    /// options of its own language. Empty when it is in one.
+    fn languages(&self, ctx: &Context) -> Vec<String> {
+        let Some((file, _)) = ctx.file else {
+            return Vec::new();
+        };
+        let mut languages: BTreeSet<&str> = BTreeSet::from([file.analysis_language()]);
+        languages.extend(
+            ctx.project
+                .symbols_in(&file.path)
+                .filter_map(|symbol| ctx.project.language_of(symbol)),
+        );
+        if languages.len() < 2 {
+            return Vec::new();
+        }
+        languages.into_iter().map(str::to_owned).collect()
     }
 }
 
@@ -169,11 +215,9 @@ impl Rule for Check {
 
     /// Runs once per file or once over the project, following the decision's scope.
     fn check(&self, ctx: &Context, options: &Options) -> Result<Vec<Diagnostic>, PluginError> {
-        let resolved = self.resolved(options, ctx)?;
-        let meta = &self.meta;
         match self.kind.as_ref() {
-            Kind::Cel(rule) => rule.check(meta, ctx, &resolved),
-            Kind::Command(rule) => rule.check(meta, ctx, &resolved),
+            Kind::Cel(rule) => self.cel(rule, ctx, options),
+            Kind::Command(rule) => rule.check(&self.meta, ctx, &self.resolved(options, ctx)?),
         }
     }
 }

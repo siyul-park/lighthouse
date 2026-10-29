@@ -169,10 +169,16 @@ impl CommandRule {
     }
 
     /// Whether the findings for a file are a function of its text: the
-    /// program is bundled, so it is known to read nothing else, and it keeps
-    /// no secret in its environment.
+    /// program is bundled and is given the text on stdin, so it has no path
+    /// to read the project's configuration or its other files by, and it
+    /// keeps no secret in its environment.
     pub(crate) fn local(&self, scope: RunScope) -> bool {
-        self.bundled && scope == RunScope::File && self.programs.all().all(|p| p.env.is_empty())
+        self.bundled
+            && scope == RunScope::File
+            && self
+                .programs
+                .all()
+                .all(|p| p.env.is_empty() && p.stdin == Stdin::File)
     }
 
     /// The copy of the project the program is run in, when the run stands

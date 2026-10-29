@@ -253,6 +253,22 @@ impl World {
         });
     }
 
+    /// Declares module `path` as code of `language` that a host file holds.
+    pub fn module_in(&mut self, path: &str, language: &str) {
+        self.modules.push(Module {
+            path: path.to_owned(),
+            name: None,
+            test_of: None,
+            language: Some(language.to_owned()),
+            example: false,
+        });
+    }
+
+    /// A function of `module` in `file`.
+    pub fn symbol_in(&mut self, module: &str, name: &str, file: &str) -> Symbol {
+        self.func(module, name, file)
+    }
+
     pub fn check(&self, rule: &str, options: Value) -> Vec<(String, u32)> {
         let design = Checks::new(
             &lighthouse_test_support::composition(),

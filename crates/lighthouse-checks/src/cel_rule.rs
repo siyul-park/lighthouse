@@ -230,6 +230,7 @@ impl CelRule {
         meta: &RuleManifest,
         ctx: &Context,
         options: &Map<String, Value>,
+        focus: Option<&str>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let builder = Builder::new(ctx, &self.needs)?;
         let reviewing = self.reviews() && ctx.models.asks(&meta.id);
@@ -238,6 +239,7 @@ impl CelRule {
             reviewing,
             meta,
             builder,
+            focus,
             candidates: RefCell::default(),
             shared: Shared::new(self, meta.scope, cel_fact(&Value::Object(options.clone()))),
         };
@@ -258,6 +260,10 @@ struct Evaluation<'a> {
     reviewing: bool,
     meta: &'a RuleManifest,
     builder: Builder<'a>,
+    /// The language a run of a file with code in several is about: its
+    /// symbols are the subjects, and the options are the language's. The
+    /// subjects that are no symbol belong to the language of the file.
+    focus: Option<&'a str>,
     /// The subjects `abstain` picked, to be put to the models.
     candidates: RefCell<Vec<Candidate>>,
     /// What the judgments of the file read in place.
@@ -350,6 +356,13 @@ impl Evaluation<'_> {
                 .file
                 .set(cel_fact(&self.builder.file(file, text)));
         }
+        let symbols = matches!(
+            self.rule.select,
+            Select::Symbol | Select::Function | Select::Test | Select::Event
+        );
+        if !symbols && self.focus.is_some_and(|l| l != file.analysis_language()) {
+            return Ok(Vec::new());
+        }
         match self.rule.select {
             Select::File if ctx.applies.admits_file(file) => {
                 let value = cel_fact(&self.builder.file(file, text));
@@ -380,6 +393,10 @@ impl Evaluation<'_> {
         for symbol in project
             .symbols_in(&file.path)
             .filter(|s| ctx.applies.admits_symbol(project, s))
+            .filter(|s| {
+                self.focus
+                    .is_none_or(|language| project.language_of(s) == Some(language))
+            })
         {
             if self.rule.select == Select::Event {
                 found.extend(self.judge_events(symbol)?);
