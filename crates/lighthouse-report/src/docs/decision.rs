@@ -128,6 +128,10 @@ fn entry(decision: &Decision, level_of_title: usize, sources: Option<&str>) -> S
     if decision.fix.is_some() {
         let _ = write!(meta, " · fix: {}", decision.fix_safety(None));
     }
+    if !decision.languages.is_empty() {
+        let listed: Vec<&str> = decision.languages.keys().map(String::as_str).collect();
+        let _ = write!(meta, " · {}", listed.join(", "));
+    }
     if !decision.status.is_default() {
         let _ = write!(meta, " · {}", decision.status);
     }

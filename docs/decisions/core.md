@@ -38,6 +38,8 @@ a
 b
 ```
 
+Also: go, rust, yaml, toml, cel
+
 ### Lines fit the configured width
 
 `core/max-len` · file · warn · cel
@@ -71,7 +73,7 @@ var n = []string{
 }
 ```
 
-Also: text, rust
+Also: text, rust, yaml, toml, cel
 
 ## Source annotations
 
@@ -84,7 +86,7 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 
 ### Allow a finding in source, with a reason
 
-`core/allow-reason` · file · error · cel
+`core/allow-reason` · file · error · cel · go, rust, toml
 
 *A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change, and an exception without a reason cannot be reviewed or revisited. A silenced check is the smell Martin calls Overridden Safeties, so the way to silence one is narrow and explained. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids (ESLint `eslint-comments/require-description`, golangci `nolintlint` with `require-explanation`, clippy `allow_attributes_without_reason`). `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive. The check reports a directive that gives no reason (kind `reason`); the directive is then ignored. One that suppresses nothing is `core/no-unused-allow`. A finding that is right to leave in place MAY be allowed this way: the comment suppresses the named rules there, whatever their severity, and allowed findings are counted in the report.*
 
@@ -106,11 +108,11 @@ package sample
 func Open() {}
 ```
 
-Also: rust
+Also: rust, toml
 
 ### Allow annotations suppress something
 
-`core/no-unused-allow` · file · warn · cel · fix: unsafe
+`core/no-unused-allow` · file · warn · cel · fix: unsafe · go, rust, toml
 
 *An exception that no longer applies is noise that hides the next real one. A `lighthouse-disable` range that covers no finding is as stale as a single directive, and so is a `lighthouse-enable` that closes no range, or a directive that names no decision (there is no form without ids).*
 
@@ -119,13 +121,13 @@ An allow annotation SHOULD suppress a finding; one whose rule no longer fires th
 Derived from: Martin, Clean Code (2008), G4 Overridden Safeties; Martin, Clean Code (2008), G12 Clutter
 
 ```diff
---- a/example.go
-+++ b/example.go
-@@ -3 +2,0 @@
--// lighthouse-disable-next-line design/exported-doc -- stale
+--- a/example.toml
++++ b/example.toml
+@@ -1 +0,0 @@
+-# lighthouse-disable-next-line design/exported-doc -- stale
 ```
 
-Also: rust
+Also: go, rust
 
 ## Naming
 
@@ -169,7 +171,7 @@ Source formatting is decided by the language standard, not by review.
 
 ### Source files use their standard formatter
 
-`core/formatted` · file · error · command · fix: safe
+`core/formatted` · file · error · command · fix: safe · go, rust
 
 *Formatting is a repository convention, not a review topic. Each language states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses rustfmt with the edition of the crate that contains the file, supplied by the Rust provider as the `edition` fact, and leaves nested modules to their own files.*
 
