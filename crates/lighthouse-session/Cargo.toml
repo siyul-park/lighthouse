@@ -25,6 +25,7 @@ schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_norway.workspace = true
+regex.workspace = true
 toml.workspace = true
 
 [dev-dependencies]

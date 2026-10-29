@@ -23,6 +23,7 @@ pub mod environment;
 pub mod fix;
 pub mod model;
 pub mod review;
+pub mod signal;
 
 pub use authoring::{Authored, create_decision, replace_decision};
 pub use check::{CheckReport, CheckRequest, Checked, RunStatus, Summary, check};

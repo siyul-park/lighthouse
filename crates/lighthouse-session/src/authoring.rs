@@ -10,13 +10,21 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_model::Attribution;
 use lighthouse_resource::{API_VERSION, STATE_DIR, new_uid};
 use lighthouse_spec::{Catalog, local_dir, local_files};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{DecisionTest, Result, Session, test_decisions};
+use crate::{
+    DecisionTest, Result, Session,
+    signal::{DUPLICATE_THRESHOLD, Duplicate, candidates, record_proposal, settle_derived},
+    test_decisions,
+};
+
+/// Most possible duplicates a reply names.
+const DUPLICATES: usize = 3;
 
 const LOCAL_PACK: &str = "local";
 /// Held while a decision is authored. Its name matches the `.lighthouse/*.db*`
@@ -38,27 +46,64 @@ pub struct Authored {
     /// project's own decisions do not run in `check`.
     pub local_plugin_listed: bool,
     /// What to do next.
-    pub note: &'static str,
+    pub note: String,
+    /// Existing decisions the new one may repeat; the decision is written
+    /// anyway, because a person decides.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub duplicates: Vec<Duplicate>,
+    /// The signals now recorded or linked, by id.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub signals: Vec<String>,
+    /// Signals the document names that the store does not hold.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unknown_signals: Vec<String>,
 }
 
 /// Adds the local decision the `Decision` document describes. The document is
 /// complete: `metadata.name` is its id (`local/<name>`), `spec` carries the
-/// examples. A missing `apiVersion` or `metadata.uid` is filled in.
-pub fn create_decision(session: &Session, mut document: Value) -> Result<Authored> {
+/// examples. A missing `apiVersion` or `metadata.uid` is filled in, and a
+/// missing `spec.status` is `proposed`: only a person accepts a decision.
+/// Decisions that may repeat it are named in the result, and the signals it
+/// derives from become recorded.
+pub fn create_decision(
+    session: &Session,
+    mut document: Value,
+    by: &Attribution,
+) -> Result<Authored> {
     let (id, name) = local_name(&document)?;
     let _lock = lock(&session.root)?;
     if local_files(&session.root)?.is_some_and(|f| f.contains_key(&file_name(&name))) {
         return Err(format!("`{id}` already exists; change it with `decision update`").into());
     }
     complete(&mut document);
-    commit(session, &id, &name, document, true)
+    if let Some(spec) = document.get_mut("spec").and_then(Value::as_object_mut) {
+        spec.entry("status")
+            .or_insert_with(|| Value::String("proposed".to_owned()));
+    }
+    let query = format!(
+        "{} {}",
+        document
+            .pointer("/spec/title")
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+        document
+            .pointer("/spec/requirement")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+    );
+    let duplicates = candidates(session, &query, Some(&id), DUPLICATE_THRESHOLD, DUPLICATES)?;
+    commit(session, &id, &name, document, Some(duplicates), by)
 }
 
 /// Replaces the local decision the `Decision` document names with it, keeping
 /// the uid the decision has. A bundled decision is not changed in place: its
 /// level and options are the project's `rules`, and different wording or
 /// examples are a local decision.
-pub fn replace_decision(session: &Session, mut document: Value) -> Result<Authored> {
+pub fn replace_decision(
+    session: &Session,
+    mut document: Value,
+    by: &Attribution,
+) -> Result<Authored> {
     let id = document_id(&document)?;
     let _lock = lock(&session.root)?;
     let files = local_files(&session.root)?.unwrap_or_default();
@@ -84,7 +129,7 @@ pub fn replace_decision(session: &Session, mut document: Value) -> Result<Author
         metadata["uid"] = uid;
     }
     let name = name.to_owned();
-    commit(session, &id, &name, document, false)
+    commit(session, &id, &name, document, None, by)
 }
 
 /// The id of a document and the name of the file it is kept in.
@@ -147,8 +192,11 @@ fn commit(
     id: &str,
     name: &str,
     mut doc: Value,
-    created: bool,
+    duplicates: Option<Vec<Duplicate>>,
+    by: &Attribution,
 ) -> Result<Authored> {
+    let created = duplicates.is_some();
+    let duplicates = duplicates.unwrap_or_default();
     ensure_uid(&mut doc);
     let root = session.root.clone();
     let plugin_listed = session.config.lists(LOCAL_PACK);
@@ -181,11 +229,27 @@ fn commit(
     }
     let dir = local_dir(&root);
     Catalog::write_local(&dir, name, &text)?;
-    let note = if plugin_listed {
-        "the `local` plugin is listed; enable the decision with `extends = [\"local/recommended\"]` or a [rules] entry if it is not on yet"
+    let mut note = if plugin_listed {
+        "the `local` plugin is listed; enable the decision with `extends = [\"local/recommended\"]` or a [rules] entry if it is not on yet".to_owned()
     } else {
-        "add \"local\" to `plugins` in lighthouse.toml, and enable the decision, for `check` to run it"
+        "add \"local\" to `plugins` in lighthouse.toml, and enable the decision, for `check` to run it".to_owned()
     };
+    let uid = doc
+        .pointer("/metadata/uid")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let settled = settle_derived(session, &doc, &uid, created, by)?;
+    if created {
+        record_proposal(session, &uid, id, &duplicates)?;
+    }
+    if !duplicates.is_empty() {
+        let names: Vec<&str> = duplicates.iter().map(|d| d.id.as_str()).collect();
+        note = format!(
+            "possible duplicate of {}: a person decides whether to keep both; {note}",
+            names.join(", ")
+        );
+    }
     Ok(Authored {
         id: id.to_owned(),
         path: dir.join(file_name(name)),
@@ -193,6 +257,9 @@ fn commit(
         test,
         local_plugin_listed: plugin_listed,
         note,
+        duplicates,
+        signals: settled.signals,
+        unknown_signals: settled.unknown,
     })
 }
 

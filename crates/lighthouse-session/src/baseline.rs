@@ -135,6 +135,21 @@ pub fn introduced(findings: &mut Vec<Diagnostic>, baselines: &[Baseline]) {
     });
 }
 
+/// The fingerprints the `baselines` hold that `findings`, from a complete
+/// check of the baselines' files, no longer do: what the session resolved.
+pub fn gone(baselines: &[Baseline], findings: &[Diagnostic]) -> Vec<String> {
+    baselines
+        .iter()
+        .flat_map(|b| b.findings.keys())
+        .filter(|fp| {
+            findings
+                .iter()
+                .all(|d| d.fingerprint.as_str() != fp.as_str())
+        })
+        .cloned()
+        .collect()
+}
+
 /// The project-relative path of `path`, an absolute path an editing tool
 /// touches, when it is worth checking: it lies inside the project (`root`,
 /// canonical), is not in a directory Lighthouse never reads, and is text when

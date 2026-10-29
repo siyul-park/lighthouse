@@ -1,0 +1,214 @@
+# The rules of the `decision-signal` classifier: patterns are data. A rule
+# matches one sentence of what the person wrote (code, pasted content and
+# quoted logs are cut first; a question is never matched). The first rule that
+# matches decides, so the order is the priority: corrections, then directives,
+# then preferences. Matching ignores case.
+
+# ---- none: a message that only acknowledges
+
+[[rule]]
+id = "en-never-mind"
+class = "none"
+pattern = '^\s*(?:never mind|nevermind|nvm|forget it|thanks|thank you|thx|lgtm|ok(?:ay)?|sounds good|looks good|go ahead|continue|yes|yep|sure)\s*[,.!]?\s*(?:go ahead|continue|thanks|thank you)?\s*[.!]?\s*$'
+
+[[rule]]
+id = "ko-ack"
+class = "none"
+pattern = '^\s*(?:네|응|좋아|좋아요|좋습니다|고마워|고마워요|감사합니다|감사해요|알겠어|알겠습니다|계속해|계속 진행해|진행해|그래|오케이|ㅇㅋ)\s*[,.!]?\s*(?:계속해|진행해|고마워|감사합니다)?\s*[.!]?\s*$'
+
+# ---- correction, English
+
+[[rule]]
+id = "en-no-open"
+class = "correction"
+pattern = '^\s*(?:no|nope|nah|wrong|incorrect)\s*[,.!:;-]'
+
+[[rule]]
+id = "en-not-what"
+class = "correction"
+pattern = '\b(?:that\x27?s|this is|it\x27?s|you\x27?re|you are|that is)\s+(?:not (?:what|right|correct|how|the way)|wrong|incorrect|backwards)\b'
+
+[[rule]]
+id = "en-i-said"
+class = "correction"
+pattern = '\bi\s+(?:said|meant|asked for|wanted|told you)\b[^.!?\n]{0,60}\b(?:not|instead|rather)\b'
+
+[[rule]]
+id = "en-instead"
+class = "correction"
+pattern = '\binstead\b'
+
+[[rule]]
+id = "en-actually"
+class = "correction"
+pattern = '^\s*(?:actually|wait|hold on)\s*[,:-]'
+
+[[rule]]
+id = "en-dont-do-that"
+class = "correction"
+pattern = '\b(?:don\x27?t|do not|stop)\s+(?:doing\s+(?:that|this)|do\s+that|it\s+that\s+way)\b'
+
+[[rule]]
+id = "en-not-x-but-y"
+class = "correction"
+pattern = '\bnot\s+\w[\w.:/-]{1,40},\s+(?:but|use|rather)\b'
+
+# ---- correction, Korean
+
+[[rule]]
+id = "ko-no-open"
+class = "correction"
+pattern = '^\s*(?:아니(?:[야요오,.!\s]|$)|아냐|아뇨|틀렸|잘못)'
+
+[[rule]]
+id = "ko-not-that"
+class = "correction"
+pattern = '(?:그게|그건|이게|이건|그거|이거|그렇게)\s*(?:아니|말고|하지\s*말)|그게\s*아니라|(?:내가|제가)\s*(?:말한|원한|시킨|요청한|말씀드린)'
+
+[[rule]]
+id = "ko-instead"
+class = "correction"
+pattern = '\S\s*말고|대신[^.!?\n]{0,20}(?:써|쓰|사용|넣|만들|이용|해)'
+
+[[rule]]
+id = "ko-wrong"
+class = "correction"
+pattern = '틀렸|잘못\s*(?:했|됐|된|짚|이해|알)'
+
+# ---- directive, English
+
+[[rule]]
+id = "en-always-never"
+class = "directive"
+pattern = '\b(?:always|never)\s+(?:use|add|call|write|put|name|return|wrap|keep|run|check|import|create|make|log|handle|mock|commit|expose|declare|prefix|suffix|start|end|pass|test|document|leave|let|have|be|do|go|take|rely|depend|end|include|ship|merge|push|inline|duplicate|share|mix|nest|touch|change|edit|modify|catch|swallow|hardcode|hard-code)\b'
+
+[[rule]]
+id = "en-dont-verb"
+class = "directive"
+pattern = '\b(?:don\x27?t|do not|stop|avoid)\s+(?:ever\s+)?(?:use|using|add|adding|write|writing|call|calling|put|putting|create|creating|make|making|introduce|introducing|name|naming|import|importing|commit|committing|mock|mocking|hardcode|hard-code|touch|touching|modify|modifying|change|changing|edit|editing|include|including|rely|relying|return|returning|expose|exposing|log|logging|catch|catching|swallow|swallowing|duplicate|duplicating|inline|inlining|leave|leaving|pass|passing|share|sharing|mix|mixing|nest|nesting|depend|depending)\b'
+
+[[rule]]
+id = "en-must"
+class = "directive"
+pattern = '\b(?:must|shall)\s+(?:not\s+|never\s+|always\s+|only\s+)?(?:be|have|use|return|include|call|live|go|stay|contain|implement|follow|handle|import|take|accept|expose|start|end|keep|own|wrap|check|validate)\b|\bmust(?:n\x27?t|\s+not)\b'
+
+[[rule]]
+id = "en-should-always"
+class = "directive"
+pattern = '\b(?:should|need to|needs to|has to|have to|ought to)\s+(?:always|never|only)\b'
+
+[[rule]]
+id = "en-all-must"
+class = "directive"
+pattern = '\b(?:all|every|each|any)\b[^.!?\n]{0,50}\b(?:must|shall|needs? to|has to|have to)\b'
+
+[[rule]]
+id = "en-from-now-on"
+class = "directive"
+pattern = '\b(?:from now on|going forward|henceforth)\b'
+
+[[rule]]
+id = "en-we-convention"
+class = "directive"
+pattern = '\bwe\s+(?:always|never|only|don\x27?t|do not)\b'
+
+[[rule]]
+id = "en-convention"
+class = "directive"
+pattern = '\b(?:the|our|a)\s+(?:rule|convention|policy|standard|guideline)\s+(?:is|here is)\b|\bby convention\b|\bhouse style\b'
+
+[[rule]]
+id = "en-only-use"
+class = "directive"
+pattern = '\bonly\s+(?:use|allow|accept|import|call|expose)\b'
+
+[[rule]]
+id = "en-follow"
+class = "directive"
+pattern = '\b(?:follow|stick to|adhere to|respect)\s+(?:our|the|this)\s+(?:(?:repo|project|codebase)\x27?s?\s+)?(?:convention|conventions|style|guidelines|pattern|patterns|standard|standards)\b'
+
+# ---- directive, Korean
+
+[[rule]]
+id = "ko-always-never"
+class = "directive"
+pattern = '항상|절대(?:로)?(?:\s|[,.!]|$)|반드시|무조건'
+
+[[rule]]
+id = "ko-dont"
+class = "directive"
+pattern = '(?:하지|쓰지|넣지|만들지|추가하지|사용하지|호출하지|바꾸지|건드리지|남기지|커밋하지|수정하지|반환하지|노출하지|중복하지|섞지|두지|붙이지)\s*(?:마|말|않도록|않게|않는다|않는)|말아야|금지'
+
+[[rule]]
+id = "ko-must"
+class = "directive"
+pattern = '(?:해야|하여야|해야만|되어야|돼야|이어야|여야)\s*(?:한다|합니다|함|해|돼|됨|됩니다|하며|하고|하는|해요|겠다)|(?:할|쓸|둘|넣을|사용할|추가할|유지할|지킬|따를|붙일)\s*것\s*[.!]?\s*$'
+
+[[rule]]
+id = "ko-from-now-on"
+class = "directive"
+pattern = '앞으로(?:는|도)?|이제부터|지금부터|이후로는'
+
+[[rule]]
+id = "ko-we"
+class = "directive"
+pattern = '(?:우리(?:\s*(?:프로젝트|팀|레포|저장소|코드베이스))?|이\s*(?:프로젝트|레포|저장소|코드베이스|코드))(?:는|에서는|의|도)?\s*[^.!?\n]{0,30}(?:항상|절대|반드시|해야|말아야|하지\s*않|만\s*(?:쓴|사용|허용|둔)|한다|합니다|지킨다|따른다)'
+
+[[rule]]
+id = "ko-only"
+class = "directive"
+pattern = '(?:만|으로만)\s*(?:쓴다|써|써야|사용|허용|쓰도록|사용하도록|쓸\s*것|해라|해야)'
+
+[[rule]]
+id = "ko-convention"
+class = "directive"
+pattern = '(?:규칙|컨벤션|규약|원칙)(?:은|는)\s'
+
+# ---- preference, English
+
+[[rule]]
+id = "en-prefer"
+class = "preference"
+pattern = '\b(?:i|we)\s+(?:would\s+|do\s+)?(?:strongly\s+)?(?:prefer|favou?r)\b|\bi\x27?d\s+prefer\b|\bprefer\s+\w+(?:\s+\w+){0,3}\s+(?:over|to|than)\b|\bpreferably\b'
+
+[[rule]]
+id = "en-is-better"
+class = "preference"
+pattern = '\b(?:is|are|feels|looks|reads|seems|would be|will be)\s+(?:much |way |a lot |far |a bit |slightly |just |generally |usually )?(?:better|cleaner|nicer|simpler|clearer|preferable|more (?:idiomatic|readable|natural|elegant|explicit|consistent|maintainable|ergonomic))\b'
+
+[[rule]]
+id = "en-better-than"
+class = "preference"
+pattern = '\b(?:better|cleaner|nicer|simpler|clearer)\s+(?:than|to)\b'
+
+[[rule]]
+id = "en-rather"
+class = "preference"
+pattern = '\b(?:i\x27?d|we\x27?d|i would|i)\s+rather\b'
+
+[[rule]]
+id = "en-like-style"
+class = "preference"
+pattern = '\bi\s+(?:like|love|hate|dislike|don\x27?t like|do not like)\b[^.!?\n]{0,60}\b(?:style|naming|names?|pattern|approach|way|syntax|layout|structure|convention)\b'
+
+[[rule]]
+id = "en-i-think-better"
+class = "preference"
+pattern = '\bi\s+(?:think|feel|believe)\b[^.!?\n]{0,60}\b(?:better|cleaner|simpler|nicer|clearer|more (?:readable|idiomatic|natural|elegant))\b'
+
+# ---- preference, Korean
+
+[[rule]]
+id = "ko-more-good"
+class = "preference"
+pattern = '(?:더|훨씬|좀|조금|오히려|확실히|보통|대체로)\s*(?:낫|나은|나아|좋|깔끔|명확|읽기\s*쉽|간단|자연스럽|예쁘|직관적|편하|안전)'
+
+[[rule]]
+id = "ko-is-better"
+class = "preference"
+pattern = '(?:[가이]|은|는|쪽이|편이|보다)\s*(?:더\s*)?(?:낫|나은|나아|나을|좋겠|깔끔하|깔끔해)'
+
+[[rule]]
+id = "ko-prefer"
+class = "preference"
+pattern = '선호|(?:더\s*)?좋아(?:해|하는|합니다)|취향|마음에\s*(?:들|안\s*들|든다)|별로(?:야|다|예요|네|인\s*것|인데)|차라리'
