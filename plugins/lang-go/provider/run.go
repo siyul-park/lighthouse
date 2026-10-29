@@ -39,8 +39,6 @@ type run struct {
 	failed map[string]int
 	// encoded holds fragments that are already JSON, from the cache.
 	encoded map[string]json.RawMessage
-	// imported memoizes the imports goimports settles, by module and names.
-	imported map[string]string
 	// loads counts the batches the run had the go command load.
 	loads int
 	// regionModules gives the module path of the unit of a fence by its file,
@@ -510,7 +508,6 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		failed:        map[string]int{},
 		encoded:       map[string]json.RawMessage{},
 		regionModules: map[string]string{},
-		imported:      map[string]string{},
 		result:        emptyResult(),
 	}
 	for _, f := range params.FileInputs() {

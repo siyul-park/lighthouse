@@ -47,6 +47,19 @@ func TestProviderIndexRegions(t *testing.T) {
 		require.Equal(t, sdk.Position{Line: 2, Col: 15}, call.Site.Start)
 	})
 
+	t.Run("fences that use different packages get the imports each lacks", func(t *testing.T) {
+		root := regionProject(t)
+
+		result, _ := indexFences(t, root, []fence{
+			{body: "fmt.Println(m.Hello(), rand.IntN(3))\n"},
+			{body: "fmt.Println(strings.ToUpper(m.Hello()))\n"},
+		})
+
+		require.Empty(t, result.Incomplete)
+		require.False(t, hasNotice(result, "do not type-check"), "%v", result.Notices)
+		require.Len(t, onlyFragment(t, result).Edges, 2*4, "per fence: three imports (fmt, the module, the package it lacked) and a call")
+	})
+
 	t.Run("the wrapper of statements is no symbol and no place", func(t *testing.T) {
 		root := regionProject(t)
 

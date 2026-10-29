@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
@@ -28,6 +29,18 @@ type snippet struct {
 	text regionText
 	// note says why the fence is not analysed, when it is not.
 	note string
+	// form is the text of the fence under the imports it lacks, uses are
+	// what it selects from packages it does not import (`name.Selected`),
+	// and dir is the module they are looked up in.
+	form func(imports string) regionText
+	uses []string
+	dir  string
+}
+
+// importSpec is one import of a declaration.
+type importSpec struct {
+	name string
+	path string
 }
 
 // snippetsDir holds the units of the fences beside their Markdown file. No
@@ -57,6 +70,7 @@ func (p *Provider) indexRegions(params sdk.IndexParams) sdk.IndexResult {
 			snippets = append(snippets, r.snippets(input.Regions)...)
 		}
 	}
+	r.complete(snippets)
 	for _, s := range snippets {
 		if s.note != "" {
 			continue
@@ -118,21 +132,21 @@ func (r *run) compile(s *snippet, pkg, wrapper, moduleDir string) {
 		return
 	}
 	head := "package " + pkg + "\n\n"
-	var form func(imports string) regionText
 	switch {
 	case parses("package p\n"+src, 0):
-		form = func(imports string) regionText { return body.around(head+imports, "") }
+		s.form = func(imports string) regionText { return body.around(head+imports, "") }
 	case parses("package p\n\nfunc _() {\n"+src+"\n}\n", 0):
-		form = func(imports string) regionText {
+		s.form = func(imports string) regionText {
 			return body.around(head+imports+"func "+wrapper+"() {\n", "\n}\n")
 		}
 	default:
 		s.note = "is not valid Go"
 		return
 	}
-	s.text = form("")
-	if missing := r.missingImports(moduleDir, s.text.text); missing != "" {
-		s.text = form(missing)
+	s.text = s.form("")
+	s.dir = moduleDir
+	if file, err := parser.ParseFile(token.NewFileSet(), "", s.text.text, 0); err == nil {
+		s.uses = qualifiers(file)
 	}
 }
 
@@ -156,26 +170,29 @@ func (r *run) packageName(dir string) string {
 	return ""
 }
 
-// missingImports is the import declaration goimports adds to the text, for the
-// packages it names without importing; empty when it uses none. What goimports
-// settles depends on the names and the module only, so each set of names is
-// asked once.
-func (r *run) missingImports(dir string, text []byte) string {
-	file, err := parser.ParseFile(token.NewFileSet(), "", text, 0)
-	if err != nil {
-		return ""
+// complete gives each fence the imports it lacks. What goimports settles
+// depends on the names and the module only, and each call scans the module, so
+// the names of all the fences of a module are asked at once.
+func (r *run) complete(snippets []*snippet) {
+	groups := map[string][]*snippet{}
+	for _, s := range snippets {
+		if s.form != nil && len(s.uses) > 0 {
+			groups[s.dir] = append(groups[s.dir], s)
+		}
 	}
-	names := qualifiers(file)
-	if len(names) == 0 {
-		return ""
+	dirs := make([]string, 0, len(groups))
+	for dir := range groups {
+		dirs = append(dirs, dir)
 	}
-	key := dir + "\x00" + strings.Join(names, ",")
-	if known, ok := r.imported[key]; ok {
-		return known
+	sort.Strings(dirs)
+	for _, dir := range dirs {
+		declarations := importDeclarations(dir, groups[dir])
+		for _, s := range groups[dir] {
+			if declaration := declarations[strings.Join(s.uses, ",")]; declaration != "" {
+				s.text = s.form(declaration)
+			}
+		}
 	}
-	declaration := goimports(dir, text)
-	r.imported[key] = declaration
-	return declaration
 }
 
 // regionResult reports the fragments of the units in the host's coordinates,
@@ -225,6 +242,122 @@ func (r *run) regionResult(snippets []*snippet) sdk.IndexResult {
 	return result
 }
 
+// importDeclarations is the import declaration of each set of uses of the
+// fences, by the uses joined with commas. When the names of all the uses
+// settle to one import each, the sets are read from it; otherwise each set is
+// asked for on its own.
+func importDeclarations(dir string, fences []*snippet) map[string]string {
+	sets := map[string]*snippet{}
+	union := map[string]bool{}
+	for _, s := range fences {
+		sets[strings.Join(s.uses, ",")] = s
+		for _, use := range s.uses {
+			union[use] = true
+		}
+	}
+	names := map[string]bool{}
+	for use := range union {
+		names[packageOf(use)] = true
+	}
+	out := map[string]string{}
+	byName, ok := importsByName(goimports(dir, probe(union)), names)
+	for key, s := range sets {
+		if !ok {
+			out[key] = declaration(goimports(dir, s.text.text))
+			continue
+		}
+		var specs []importSpec
+		seen := map[string]bool{}
+		for _, use := range s.uses {
+			name := packageOf(use)
+			if spec, found := byName[name]; found && !seen[name] {
+				seen[name] = true
+				specs = append(specs, spec)
+			}
+		}
+		out[key] = declaration(specs)
+	}
+	return out
+}
+
+// packageOf is the package name of a use, `name.Selected`.
+func packageOf(use string) string {
+	name, _, _ := strings.Cut(use, ".")
+	return name
+}
+
+// probe is a file that makes each of the uses.
+func probe(uses map[string]bool) []byte {
+	sorted := make([]string, 0, len(uses))
+	for use := range uses {
+		sorted = append(sorted, use)
+	}
+	sort.Strings(sorted)
+	var b strings.Builder
+	b.WriteString("package p\n\nvar (\n")
+	for _, use := range sorted {
+		b.WriteString("\t_ = " + use + "\n")
+	}
+	b.WriteString(")\n")
+	return []byte(b.String())
+}
+
+// importsByName reads the imports by the name the file uses them under. It is
+// false when that name is not the one the spec shows (the package clause of
+// the imported package says it, and goimports does not), or when two imports
+// have one name; the imports are then asked for set by set.
+func importsByName(specs []importSpec, names map[string]bool) (map[string]importSpec, bool) {
+	byName := map[string]importSpec{}
+	for _, spec := range specs {
+		name := spec.name
+		if name == "" {
+			name = path.Base(spec.path)
+			if i := strings.LastIndex(name, "."); i > 0 && isMajor(name[i+1:]) {
+				name = name[:i]
+			}
+			if isMajor(name) {
+				name = path.Base(path.Dir(spec.path))
+			}
+		}
+		if _, dup := byName[name]; dup || !names[name] {
+			return nil, false
+		}
+		byName[name] = spec
+	}
+	return byName, true
+}
+
+// isMajor reports whether the element is a major version suffix, v2 and up.
+func isMajor(element string) bool {
+	if len(element) < 2 || element[0] != 'v' {
+		return false
+	}
+	for _, c := range element[1:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// declaration is the import declaration of the specs, empty for none.
+func declaration(specs []importSpec) string {
+	if len(specs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("import (\n")
+	for _, spec := range specs {
+		b.WriteString("\t")
+		if spec.name != "" {
+			b.WriteString(spec.name + " ")
+		}
+		b.WriteString(strconv.Quote(spec.path) + "\n")
+	}
+	b.WriteString(")\n\n")
+	return b.String()
+}
+
 // mergeFragment adds the fragment of a fence to the one of its host file.
 func mergeFragment(merged map[string]*sdk.Fragment, f *sdk.Fragment, host string) {
 	into := merged[host]
@@ -241,35 +374,37 @@ func mergeFragment(merged map[string]*sdk.Fragment, f *sdk.Fragment, host string
 
 // goimports asks the vendor tool which imports the text lacks, as its module
 // has them.
-func goimports(dir string, text []byte) string {
+func goimports(dir string, text []byte) []importSpec {
 	cwd, err := os.Getwd()
 	if err != nil || os.Chdir(dir) != nil {
-		return ""
+		return nil
 	}
 	defer func() { _ = os.Chdir(cwd) }()
 	out, err := imports.Process(filepath.Join(dir, "lighthouse_snippet.go"), text, &imports.Options{Comments: true, TabIndent: true, TabWidth: 8})
 	if err != nil {
-		return ""
+		return nil
 	}
 	added, err := parser.ParseFile(token.NewFileSet(), "", out, parser.ImportsOnly)
-	if err != nil || len(added.Imports) == 0 {
-		return ""
+	if err != nil {
+		return nil
 	}
-	var b strings.Builder
-	b.WriteString("import (\n")
+	specs := make([]importSpec, 0, len(added.Imports))
 	for _, spec := range added.Imports {
-		b.WriteString("\t")
-		if spec.Name != nil {
-			b.WriteString(spec.Name.Name + " ")
+		path, err := strconv.Unquote(spec.Path.Value)
+		if err != nil {
+			continue
 		}
-		b.WriteString(spec.Path.Value + "\n")
+		next := importSpec{path: path}
+		if spec.Name != nil {
+			next.name = spec.Name.Name
+		}
+		specs = append(specs, next)
 	}
-	b.WriteString(")\n\n")
-	return b.String()
+	return specs
 }
 
-// qualifiers are the names of the packages the file uses without importing:
-// the identifiers no declaration binds that something is selected from.
+// qualifiers are the uses of packages the file makes without importing, as
+// `name.Selected`: what is selected from an identifier no declaration binds.
 func qualifiers(file *ast.File) []string {
 	unresolved := map[*ast.Ident]bool{}
 	for _, id := range file.Unresolved {
@@ -279,17 +414,17 @@ func qualifiers(file *ast.File) []string {
 	ast.Inspect(file, func(n ast.Node) bool {
 		if sel, ok := n.(*ast.SelectorExpr); ok {
 			if id, ok := sel.X.(*ast.Ident); ok && unresolved[id] {
-				found[id.Name] = true
+				found[id.Name+"."+sel.Sel.Name] = true
 			}
 		}
 		return true
 	})
-	names := make([]string, 0, len(found))
-	for name := range found {
-		names = append(names, name)
+	uses := make([]string, 0, len(found))
+	for use := range found {
+		uses = append(uses, use)
 	}
-	sort.Strings(names)
-	return names
+	sort.Strings(uses)
+	return uses
 }
 
 func parses(src string, mode parser.Mode) bool {
