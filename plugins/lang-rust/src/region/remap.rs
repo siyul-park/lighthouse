@@ -116,7 +116,22 @@ impl Remap<'_> {
             edge.site = edge.site.and_then(|site| self.span(site));
         }
         fragment.edges.retain(|edge| !dropped.contains(&edge.to));
-        fragment.comments.clear();
+        // The comments the host shows, at their place; the text is the
+        // fence's, without the indentation of a list item.
+        fragment.comments.retain_mut(|comment| {
+            let Some(span) = self.span(comment.span) else {
+                return false;
+            };
+            comment.span = span;
+            if comment
+                .attached_to
+                .as_ref()
+                .is_some_and(|id| dropped.contains(id))
+            {
+                comment.attached_to = None;
+            }
+            true
+        });
         fragment.file = FileInfo {
             path: path.to_owned(),
             generated: false,

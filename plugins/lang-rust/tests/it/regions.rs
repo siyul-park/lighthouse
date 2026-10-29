@@ -243,3 +243,54 @@ fn edge<'a>(fragment: &'a Fragment, kind: EdgeKind, to: &str) -> &'a lighthouse_
         .find(|edge| edge.kind == kind && edge.to == to)
         .unwrap_or_else(|| panic!("no {kind:?} edge to {to}: {:?}", fragment.edges))
 }
+
+#[test]
+fn the_comments_of_a_fence_are_the_hosts_and_the_hidden_ones_are_not_shown() {
+    let dir = crate_with(LIB);
+
+    let result = fences(
+        dir.path(),
+        &[(
+            "# // hidden note\npub fn a() {}\n// shown note\npub fn run() { demo::greet(); }\n",
+            json!({}),
+        )],
+    );
+
+    let comments = &fragment(&result).comments;
+    assert_eq!(comments.len(), 1, "{comments:?}");
+    assert_eq!(comments[0].text, "// shown note");
+    assert_eq!(comments[0].span.start.line, 4);
+    assert_eq!(comments[0].span.start.col, 1);
+}
+
+#[test]
+fn the_edition_a_fence_asks_for_is_the_fact_of_its_file() {
+    let dir = crate_with(LIB);
+
+    let asked = fences(
+        dir.path(),
+        &[("pub struct A;\n", json!({"info": "rust,edition2018"}))],
+    );
+    let plain = fences(dir.path(), &[("pub struct A;\n", json!({"info": "rust"}))]);
+    let split = fences(
+        dir.path(),
+        &[
+            ("pub struct A;\n", json!({"info": "rust edition2018"})),
+            ("pub struct B;\n", json!({"info": "rust,edition2021"})),
+        ],
+    );
+
+    assert_eq!(fragment(&asked).file.facts["edition"], "2018");
+    assert_eq!(
+        fragment(&plain).file.facts["edition"],
+        "2015",
+        "the crate sets none, and Cargo's default is the file's"
+    );
+    assert!(!fragment(&split).file.facts.contains_key("edition"));
+    assert!(
+        split
+            .notices
+            .iter()
+            .any(|n| n.contains("different editions"))
+    );
+}

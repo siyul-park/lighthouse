@@ -33,6 +33,7 @@ impl Handler for Provider {
     fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
         let language = ProviderManifest {
             id: LANGUAGE.to_owned(),
+            aliases: vec!["rust".to_owned(), "rs".to_owned()],
             globs: vec!["**/*.rs".to_owned()],
             priority: 0,
             fallback: false,
@@ -90,11 +91,26 @@ impl Handler for Provider {
             },
             None => Options::default(),
         };
-        if !regions.is_empty() {
-            return Ok(region::index(&params, &regions, &options));
-        }
         let provider = format!("{}@{}", self.id, self.version);
-        Ok(index_files(&params, &options, &provider))
+        let has_files = params
+            .inputs
+            .iter()
+            .any(|input| matches!(input, IndexInput::File { .. }));
+        if regions.is_empty() {
+            return Ok(index_files(&params, &options, &provider));
+        }
+        let mut result = region::index(&params, &regions, &options);
+        if has_files {
+            let files = index_files(&params, &options, &provider);
+            result.fragments.extend(files.fragments);
+            result.sources.extend(files.sources);
+            result.notices.extend(files.notices);
+            result.incomplete.extend(files.incomplete);
+            result
+                .fragments
+                .sort_by(|a, b| a.file.path.cmp(&b.file.path));
+        }
+        Ok(result)
     }
 }
 

@@ -22,7 +22,7 @@ use lighthouse_protocol::{
 };
 
 use crate::{
-    cargo::{Package, TargetKind},
+    cargo::{Manifests, Package, TargetKind},
     extract,
     names::Index,
     provider::{Governor, Options, governor, normalize, overlays, roots},
@@ -36,6 +36,9 @@ const DIR: &str = ".lighthouse-snippets";
 
 /// The context key that puts a fence inside the module a file declares.
 const CRATE: &str = "crate";
+
+/// The context key that hands on the info string of a fence.
+const INFO: &str = "info";
 
 struct Snippet<'a> {
     host: &'a EmbeddedFile,
@@ -51,6 +54,8 @@ struct Snippet<'a> {
     into: Option<PathBuf>,
     /// The package that governs the unit, as an index of the packages read.
     package: Option<usize>,
+    /// The edition the fence asks for, as an attribute of its info string.
+    edition: Option<String>,
 }
 
 pub(crate) fn index(
@@ -127,7 +132,9 @@ pub(crate) fn index(
         entry.edges.extend(fragment.edges);
         entry.functions.extend(fragment.functions);
         entry.tests.extend(fragment.tests);
+        entry.comments.extend(fragment.comments);
     }
+    state_editions(&root, &snippets, &mut by_host, &mut result);
     if let Some(first) = unresolved.first() {
         result.notices.push(format!(
             "{} Rust fence(s) use names the project does not hold (another crate, or what the prose defines); their edges stay syntactic, e.g. in {first}",
@@ -136,6 +143,38 @@ pub(crate) fn index(
     }
     result.fragments = by_host.into_values().collect();
     result
+}
+
+/// The fact `edition` of each host file: the edition its fences ask for, or the
+/// one of the crate around the file when none does. Fences that ask for
+/// different editions leave the file without one: one fact cannot say both.
+fn state_editions(
+    root: &Path,
+    snippets: &[Snippet],
+    by_host: &mut BTreeMap<String, Fragment>,
+    result: &mut IndexResult,
+) {
+    let mut crates = Manifests::default();
+    for (path, fragment) in by_host.iter_mut() {
+        let asked: BTreeSet<&str> = snippets
+            .iter()
+            .filter(|snippet| snippet.host.path == *path)
+            .filter_map(|snippet| snippet.edition.as_deref())
+            .collect();
+        let edition = match asked.len() {
+            0 => crates.edition(root, &root.join(path)).ok(),
+            1 => asked.first().map(|edition| (*edition).to_owned()),
+            _ => {
+                result.notices.push(format!(
+                    "{path}: the Rust fences ask for different editions; the file has none of its own"
+                ));
+                None
+            }
+        };
+        if let Some(edition) = edition {
+            fragment.file.facts.insert("edition".to_owned(), edition);
+        }
+    }
 }
 
 /// The units of the fences, in the order of the files and of the fences.
@@ -171,10 +210,23 @@ fn snippets<'a>(root: &Path, files: &[&'a EmbeddedFile]) -> Vec<Snippet<'a>> {
                     .and_then(serde_json::Value::as_str)
                     .map(|path| normalize(&root.join(path))),
                 package: None,
+                edition: edition_of(source),
             });
         }
     }
     found
+}
+
+/// The edition a fence asks for: `edition2021` among the words of the info
+/// string its source rule hands on, split as rustdoc splits it.
+fn edition_of(source: &EmbeddedSource) -> Option<String> {
+    let info = source.context.get(INFO)?.as_str()?;
+    info.split(|c: char| c.is_whitespace() || c == ',')
+        .find_map(|word| {
+            word.strip_prefix("edition")
+                .filter(|year| year.len() == 4 && year.chars().all(|c| c.is_ascii_digit()))
+        })
+        .map(str::to_owned)
 }
 
 /// The packages that govern the units, read once each, and a last one for the
