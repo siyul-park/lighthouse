@@ -784,34 +784,47 @@ single `Fixer` interface. The kinds, their operations and their testing are in
 
 ## Crates
 
-Dependencies point down only, by the layer table in `lighthouse.toml`; the project configuration (`Project`, rule levels, overrides) is `spec::project`. Each crate's role, entry points and invariants are in its README.
+Dependencies point down only, by the layer table in `lighthouse.toml`; the project configuration (`Project`, rule levels, overrides) is `spec::project`. Each crate has one role; its README carries its row and the entry points and invariants.
 
-| Layer | Crates |
-| ------- | -------- |
-| L5 | [cli](../crates/lighthouse-cli/README.md) |
-| L4 | [session](../crates/lighthouse-session/README.md) |
-| L3 | [report](../crates/lighthouse-report/README.md), [store](../crates/lighthouse-store/README.md), [ml](../crates/lighthouse-ml/README.md) |
-| L2 | [engine](../crates/lighthouse-engine/README.md), [checks](../crates/lighthouse-checks/README.md), [rpc](../crates/lighthouse-rpc/README.md) |
-| L1 | [plugin](../crates/lighthouse-plugin/README.md), [spec](../crates/lighthouse-spec/README.md) |
-| L0 | [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), `process`, all on [protocol](../crates/lighthouse-protocol/README.md), which depends on no workspace crate |
+| Crate | L | Owns | Never |
+| --- | --- | --- | --- |
+| [protocol](../crates/lighthouse-protocol/README.md) | 0 | wire types, framing and schemas for plugins and models; also the hashes and folds that host and plugin must compute alike | any lighthouse crate |
+| [resource](../crates/lighthouse-resource/README.md) | 0 | the KRM envelope, documents and kind schemas | spec semantics |
+| [process](../crates/lighthouse-process/README.md) | 0 | running a process: group, timeout, caps and the [sandbox](#sandbox) policy | what it runs |
+| [model](../crates/lighthouse-model/README.md) | 0 | the vocabulary: UCM, findings, records and signals | I/O |
+| [plugin](../crates/lighthouse-plugin/README.md) | 1 | the plugin SPI (traits, manifests) and the Registry | spec and config |
+| [spec](../crates/lighthouse-spec/README.md) | 1 | the kinds, the Catalog, the Project config and the CEL environment | plugins and libraries |
+| [engine](../crates/lighthouse-engine/README.md) | 2 | the orchestration of one run: index, analyze, check, suppress inSource, fix rounds | store and frontends |
+| [checks](../crates/lighthouse-checks/README.md) | 2 | the builtin, cel and command checks, the bundled pack plugins and the composition logic | a concrete plugin |
+| [rpc](../crates/lighthouse-rpc/README.md) | 2 | the process-plugin adapter, wire to core | engine |
+| [ml](../crates/lighthouse-ml/README.md) | 3 | the mlops host pipeline: labels, dataset, train, grade, attach | project and catalog |
+| [report](../crates/lighthouse-report/README.md) | 3 | reporters, docs rendering and descriptors | store |
+| [store](../crates/lighthouse-store/README.md) | 3 | the SQLite store: findings, judgments, signals and records | engine |
+| [session](../crates/lighthouse-session/README.md) | 4 | the composition root and the per-command wiring (check, fix, model, signal, hooks logic) | terminal I/O |
+| [cli](../crates/lighthouse-cli/README.md) | 5 | the argv and MCP surfaces, the terminal and hook adapters | logic beyond parsing and printing |
+| [test-support](../crates/lighthouse-test-support/README.md) | dev | the shared test fixtures and the bundled composition for tests | production use |
 
-- [cli](../crates/lighthouse-cli/README.md): `surface`, `cli` and `mcp` frontends.
-- [session](../crates/lighthouse-session/README.md): the shared operations; composition root.
-- [report](../crates/lighthouse-report/README.md): output formats.
-- [store](../crates/lighthouse-store/README.md): findings, judgments, the decision log.
-- [ml](../crates/lighthouse-ml/README.md): model evaluation and training.
-- [engine](../crates/lighthouse-engine/README.md): analysis and fix orchestration.
-- [checks](../crates/lighthouse-checks/README.md): declarative checks, metrics, the bundled registry.
-- [rpc](../crates/lighthouse-rpc/README.md): language plugins as processes.
-- [plugin](../crates/lighthouse-plugin/README.md): SPI and Registry.
-- [spec](../crates/lighthouse-spec/README.md): decision kinds, Catalog, local layer.
-- [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), [protocol](../crates/lighthouse-protocol/README.md): L0 vocabulary, resources and the wire; protocol also owns the hashes and folds that host and plugin must compute alike.
-- `process`: child-process helper and the [sandbox](#sandbox) (no README). `test-support`: dev-only helper of the test suites (no README).
 - Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [lang-typescript](../plugins/lang-typescript/README.md), [lang-yaml](../plugins/lang-yaml/README.md), [lang-toml](../plugins/lang-toml/README.md), [lang-markdown](../plugins/lang-markdown/README.md), [lang-cel](../plugins/lang-cel/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
 
 Each crate has one integration-test binary, `tests/it/main.rs` with a module per area.
 
 The core never knows the code model (UCM): the modules of `model` other than `ucm`, and the `store`, `ml`, `report` and `session` crates, import nothing of `lighthouse_model::ucm`. A `forbidden` contract of `design/layers` in `lighthouse.toml` enforces it.
+
+## Flows
+
+Each flow is the path of one operation, as `crate::symbol`; a hop that only forwards is left out. Every edge points down.
+
+- **check.** `cli::terminal` argv and `cli::surface::check::check` → `session::Session::load` (config, catalog, local decisions) → `session::check` → `Session::engine` (starts the plugin processes through `rpc`) → `engine::Engine::check` (index, analyze, rules, inSource suppression) → `session::findings::remember` (store, external suppression) → `report::report` → the reply. `check --fix` loads the session once and runs the fix before the check.
+- **fix.** `cli::surface::check::fix` → `session::fix::run` → `Session::engine` → `engine::Engine::fix` (propose, settle, write; every round verifies with `Engine::check` on in-memory overlays, and `Engine::fix` is the only writer) → `session::findings::remember` → the reply.
+- **MCP.** `cli::mcp::server::call_tool` → `cli::surface::tools` (the tool of the name, its serde arguments) → the same `cli::surface` function the command calls. A tool is its command's twin: one function behind two argument parsers, kept equal by tests.
+- **hooks.** `cli::terminal::hook::run` → `answer_event` → `session::check` of the edited file (`PreToolUse` records the baseline, `PostToolUse` diffs against it) and `session::signal` (`capture_prompt`, `capture_findings`, `stop_context`, `digest`) → the reply as agent context.
+- **decision test.** `cli::surface::decision` → `session::decisions::test_decisions` → `Session::in_process_registry` → `engine::RuleTester::check` → `engine::ExampleRun::run_in`, one engine per example, because an engine owns its registry and each example is its own project.
+- **model.** `cli::surface::model` → `session::model::{eval, train, attach, rebuild}` (project, records and the model client from the engine) → `ml::{eval, train, attach, rebuild}` (labels, dataset, grading; no project) → `session` writes the revision to the log through `store`.
+- **signals.** `cli::terminal::hook` → `session::signal::capture_prompt` (strip, classify) → `store::Store::add_signal` → `Store::signals` (`SignalClass::SAID` is the one list of the classes worth surfacing) → `session::signal::{prompt_context, stop_context, digest}`.
+
+Two suppressions, by design. The engine applies the suppressions written in the source (`lighthouse-disable` annotations), which are part of the code being analyzed; the store applies the external ones (judgments in the decision log), which belong to the project's memory. The first needs no store, so a run without one still honors annotations.
+
+The wire model is not the core model. A plugin's `index` result is converted in `rpc::convert` to the UCM, so a plugin in another language can change its wire types and the core can change the UCM without either breaking the other.
 
 ## Models
 
