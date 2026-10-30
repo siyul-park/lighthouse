@@ -16,6 +16,18 @@ fn line(parts: &[&str]) -> Vec<String> {
     parts.iter().map(|p| (*p).to_owned()).collect()
 }
 
+/// The variables of a user, looked up by name: what `Environment::new_in`
+/// reads instead of the variables of the test process. `PATH` is the
+/// process's, which the shell of the program needs.
+fn users<const N: usize>(vars: [(&str, &str); N]) -> impl Fn(&str) -> Option<String> {
+    let mut vars: BTreeMap<String, String> = vars
+        .into_iter()
+        .map(|(name, value)| (name.to_owned(), value.to_owned()))
+        .collect();
+    vars.insert("PATH".to_owned(), std::env::var("PATH").unwrap());
+    move |name| vars.get(name).cloned()
+}
+
 fn unsandboxed() -> Policy {
     Policy {
         enabled: false,
@@ -91,13 +103,13 @@ fn a_program_that_outlives_its_timeout_is_an_error() {
 
 #[test]
 fn the_environment_is_the_allowlist_the_declared_variables_and_lighthouses_own() {
-    // SAFETY: this test is the only one that touches this variable.
-    unsafe { std::env::set_var("LIGHTHOUSE_PROGRAM_TEST_LEAK", "leaked") };
+    let users = users([("LIGHTHOUSE_PROGRAM_TEST_LEAK", "leaked")]);
     let declared = BTreeMap::from([("KEPT".to_owned(), "yes".to_owned())]);
-    let environment = Environment::new(
+    let environment = Environment::new_in(
         &declared,
         context("local/probe", "{}"),
         Home::Own(Path::new("/tmp/home-of-the-run")),
+        users,
     )
     .unwrap();
 
@@ -141,14 +153,13 @@ fn the_environment_is_the_allowlist_the_declared_variables_and_lighthouses_own()
 
 #[test]
 fn a_variable_in_a_value_is_the_users_and_an_unset_one_names_itself() {
-    // SAFETY: these variables belong to this test.
-    unsafe { std::env::set_var("LIGHTHOUSE_PROGRAM_TEST_KEY", "sk-test-value") };
+    let users = users([("LIGHTHOUSE_PROGRAM_TEST_KEY", "sk-test-value")]);
     let declared = BTreeMap::from([(
         "TOKEN".to_owned(),
         "Bearer ${LIGHTHOUSE_PROGRAM_TEST_KEY}".to_owned(),
     )]);
 
-    let environment = Environment::new(&declared, Vec::new(), Home::User).unwrap();
+    let environment = Environment::new_in(&declared, Vec::new(), Home::User, &users).unwrap();
 
     // The program holds the value; what it prints of it is scrubbed.
     let printed = ran(
@@ -170,20 +181,19 @@ fn a_variable_in_a_value_is_the_users_and_an_unset_one_names_itself() {
         "TOKEN".to_owned(),
         "${LIGHTHOUSE_PROGRAM_TEST_UNSET}".to_owned(),
     )]);
-    let error = Environment::new(&unset, Vec::new(), Home::User).unwrap_err();
+    let error = Environment::new_in(&unset, Vec::new(), Home::User, &users).unwrap_err();
     assert!(error.contains("LIGHTHOUSE_PROGRAM_TEST_UNSET"), "{error}");
     assert!(!error.contains("sk-test-value"), "{error}");
 }
 
 #[test]
 fn a_value_a_program_echoes_on_stderr_is_scrubbed_from_what_the_error_shows() {
-    // SAFETY: this variable belongs to this test.
-    unsafe { std::env::set_var("LIGHTHOUSE_PROGRAM_TEST_SECRET", "sk-echoed") };
+    let users = users([("LIGHTHOUSE_PROGRAM_TEST_SECRET", "sk-echoed")]);
     let declared = BTreeMap::from([(
         "TOKEN".to_owned(),
         "${LIGHTHOUSE_PROGRAM_TEST_SECRET}".to_owned(),
     )]);
-    let environment = Environment::new(&declared, Vec::new(), Home::User).unwrap();
+    let environment = Environment::new_in(&declared, Vec::new(), Home::User, &users).unwrap();
 
     let failed = ran(
         "echo \"bad key $TOKEN\" >&2; exit 4",
@@ -202,13 +212,12 @@ fn a_value_a_program_echoes_on_stderr_is_scrubbed_from_what_the_error_shows() {
 
 #[test]
 fn a_value_a_program_echoes_on_stdout_is_scrubbed_too_unless_stdout_is_data() {
-    // SAFETY: this variable belongs to this test.
-    unsafe { std::env::set_var("LIGHTHOUSE_PROGRAM_TEST_STDOUT", "sk-on-stdout") };
+    let users = users([("LIGHTHOUSE_PROGRAM_TEST_STDOUT", "sk-on-stdout")]);
     let declared = BTreeMap::from([(
         "TOKEN".to_owned(),
         "${LIGHTHOUSE_PROGRAM_TEST_STDOUT}".to_owned(),
     )]);
-    let environment = Environment::new(&declared, Vec::new(), Home::User).unwrap();
+    let environment = Environment::new_in(&declared, Vec::new(), Home::User, &users).unwrap();
     let command = line(&["sh", "-c", "echo \"a/b.go:1: key $TOKEN\""]);
     let policy = unsandboxed();
     let profile = Profile::new(Path::new("."));

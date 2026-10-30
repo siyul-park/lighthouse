@@ -51,10 +51,20 @@ impl Environment {
         context: Vec<(String, String)>,
         home: Home<'_>,
     ) -> Result<Self, String> {
+        Self::new_in(declared, context, home, |name| env::var(name).ok())
+    }
+
+    /// [`Environment::new`] reading the user's variables through `lookup`.
+    pub fn new_in(
+        declared: &BTreeMap<String, String>,
+        context: Vec<(String, String)>,
+        home: Home<'_>,
+        lookup: impl Fn(&str) -> Option<String>,
+    ) -> Result<Self, String> {
         let user = |names: &[&str]| -> Vec<(String, String)> {
             names
                 .iter()
-                .filter_map(|k| env::var(k).ok().map(|v| ((*k).to_owned(), v)))
+                .filter_map(|k| lookup(k).map(|v| ((*k).to_owned(), v)))
                 .collect()
         };
         let mut vars = user(&INHERITED);
@@ -64,7 +74,7 @@ impl Environment {
         }
         let mut secrets = Vec::new();
         for (key, value) in declared {
-            let (expanded, used) = substitute(value)?;
+            let (expanded, used) = substitute(value, &lookup)?;
             secrets.extend(used);
             vars.push((key.clone(), expanded));
         }
@@ -215,7 +225,7 @@ pub fn variables(value: &str) -> Result<Vec<&str>, String> {
 /// `value` with each `${NAME}` replaced by the user's variable. A variable
 /// that is not set is an error that names it.
 pub fn expand_value(value: &str) -> Result<String, String> {
-    substitute(value).map(|(expanded, _)| expanded)
+    substitute(value, &|name| env::var(name).ok()).map(|(expanded, _)| expanded)
 }
 
 /// What a decision a program serves tells it, as `LIGHTHOUSE_*` variables.
@@ -255,14 +265,17 @@ pub fn expand(
 
 /// `value` with each `${NAME}` replaced by the user's variable, and the
 /// variables used with their values.
-fn substitute(value: &str) -> Result<(String, Vec<(String, String)>), String> {
+fn substitute(
+    value: &str,
+    lookup: &impl Fn(&str) -> Option<String>,
+) -> Result<(String, Vec<(String, String)>), String> {
     let mut out = String::new();
     let mut used = Vec::new();
     let mut rest = value;
     for name in variables(value)? {
         let at = rest.find("${").unwrap_or_default();
         out.push_str(&rest[..at]);
-        let found = env::var(name).map_err(|_| format!("the variable `{name}` is not set"))?;
+        let found = lookup(name).ok_or_else(|| format!("the variable `{name}` is not set"))?;
         out.push_str(&found);
         used.push((name.to_owned(), found));
         rest = &rest[at + name.len() + 3..];
