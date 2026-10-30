@@ -74,10 +74,6 @@ spec:
         # The constructor and the protocol methods that Python defines on every class have no test of their own.
         exemptMethods:
         - __init__
-        - __repr__
-        - __str__
-        - __eq__
-        - __hash__
     rust:
       options:
         exemptMethods:

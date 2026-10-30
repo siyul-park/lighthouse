@@ -44,38 +44,51 @@ fn entry(project: &Project, ty: &Symbol) -> Value {
         .filter_map(|id| project.symbol(id))
         .filter(|s| s.kind == SymbolKind::Method)
         .collect();
-    let own: Vec<&&Symbol> = methods
+    let own: Vec<&Symbol> = methods
         .iter()
+        .copied()
         .filter(|m| !project.function(&m.id).is_some_and(|f| f.implementation))
         .collect();
-    let groups = groups(project, ty, &methods);
+    let all = groups(project, ty, &methods, false);
+    // The cohesion of what the type itself decides: no implementation of a
+    // contract someone else fixes, nothing that relates to no sibling.
+    let core = groups(project, ty, &own, true);
     json!({
         "id": ty.id.as_str(),
         "name": ty.name,
         "file": ty.file.to_string_lossy(),
+        "lang": project.file(&ty.file).map_or("", |f| f.lang.as_str()),
         "line": ty.span.start.line,
         "methods": own.len(),
         "public_methods": own.iter().filter(|m| m.visibility == Visibility::Public).count(),
-        "lcom4": groups.len(),
-        "groups": groups,
+        "lcom4": all.len(),
+        "groups": all,
+        "lcom4_core": core.len(),
+        "groups_core": core,
     })
 }
 
 /// The names of the methods of each connected component, the largest
 /// component first. The methods of an interface declare no bodies and share
-/// nothing: they are one group.
-fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol]) -> Vec<Vec<String>> {
+/// nothing: they are one group. With `core`, a method that uses no field and
+/// neither calls nor is called by a sibling is left out: it has no instance
+/// state to be cohesive with, as a static method has none.
+fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol], core: bool) -> Vec<Vec<String>> {
     if methods.is_empty() {
         return Vec::new();
     }
     let mut parent: Vec<usize> = (0..methods.len()).collect();
-    if ty.kind == SymbolKind::Type {
-        join_methods(project, ty, methods, &mut parent);
+    let related = if ty.kind == SymbolKind::Type {
+        join_methods(project, ty, methods, &mut parent)
     } else {
         parent.fill(0);
-    }
+        vec![true; methods.len()]
+    };
     let mut components: BTreeMap<usize, Vec<String>> = BTreeMap::new();
     for (at, method) in methods.iter().enumerate() {
+        if core && !related[at] {
+            continue;
+        }
         let root = root(&mut parent, at);
         components
             .entry(root)
@@ -90,8 +103,15 @@ fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol]) -> Vec<Vec<String
     groups
 }
 
-/// Joins the methods that call each other or use the same field of `ty`.
-fn join_methods(project: &Project, ty: &Symbol, methods: &[&Symbol], parent: &mut [usize]) {
+/// Joins the methods that call each other or use the same field of `ty`, and
+/// tells which methods are related to anything at all.
+fn join_methods(
+    project: &Project,
+    ty: &Symbol,
+    methods: &[&Symbol],
+    parent: &mut [usize],
+) -> Vec<bool> {
+    let mut related = vec![false; methods.len()];
     let at: BTreeMap<&SymbolId, usize> = methods
         .iter()
         .enumerate()
@@ -120,11 +140,14 @@ fn join_methods(project: &Project, ty: &Symbol, methods: &[&Symbol], parent: &mu
                 None
             };
             if let Some(j) = other {
+                related[i] = true;
+                related[j] = true;
                 let (a, b) = (root(parent, i), root(parent, j));
                 parent[a.max(b)] = a.min(b);
             }
         }
     }
+    related
 }
 
 fn root(parent: &mut [usize], mut at: usize) -> usize {

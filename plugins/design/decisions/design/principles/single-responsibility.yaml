@@ -11,7 +11,10 @@ spec:
     is members). Members counts the public methods of a type (Sonar S1448). Cohesion
     finds a type with at least `minMethods` methods that fall in more than one connected
     group, where two methods are joined by a field they both use or by a call between
-    them (LCOM4, Hitz and Montazeri 1995). Both are only signals; review the semantic
+    them (LCOM4, Hitz and Montazeri 1995). For Python, whose classes are full of
+    special methods, overrides and static helpers, the methods that implement a
+    contract someone else fixes and those that use no field and call no sibling are
+    left out of the groups, having no instance state to be cohesive with. Both are only signals; review the semantic
     responsibilities rather than splitting by size alone.
   scope:
     subject: module
@@ -42,7 +45,7 @@ spec:
     - name: crowded
       expression: module.types.filter(t, t.public_methods > options.maxMembers)
     - name: split
-      expression: module.types.filter(t, t.methods >= options.minMethods && t.lcom4 > 1)
+      expression: "module.types.filter(t, t.methods >= options.minMethods && (t.lang == 'python' ? t.lcom4_core : t.lcom4) > 1)"
     - name: more
       expression: size(crowded) + size(split.filter(t, !crowded.exists(c, c.id == t.id)))
         - 1
@@ -50,7 +53,8 @@ spec:
     message: "{{ (size(crowded) > 0 ? crowded[0].name + ' has ' + string(crowded[0].public_methods)
       + ' public methods (max ' + string(options.maxMembers) + '): review whether it
       has several responsibilities; split by responsibility' : split[0].name + \"'s
-      methods form \" + string(split[0].lcom4) + ' unrelated groups (' + split[0].groups.map(g,
+      methods form \" + string(split[0].lang == 'python' ? split[0].lcom4_core : split[0].lcom4)
+      + ' unrelated groups (' + (split[0].lang == 'python' ? split[0].groups_core : split[0].groups).map(g,
       g.join(', ')).join(' | ') + '); split ' + split[0].name + ' along them') + (more
       > 0 ? ' (+' + string(more) + ' more types)' : '') }}"
     evidence:
@@ -397,3 +401,25 @@ spec:
 
             def last(self) -> int:
                 return self._items[-1]
+  - name: cohesion-python-contract-valid
+    language: python
+    kind: valid
+    files:
+    - path: store.py
+      body: |-
+        class Store:
+            def __init__(self) -> None:
+                self._items: list[int] = []
+
+            def add(self, item: int) -> None:
+                self._items.append(item)
+
+            def count(self) -> int:
+                return len(self._items)
+
+            def __repr__(self) -> str:
+                return "Store"
+
+            @staticmethod
+            def version() -> int:
+                return 1

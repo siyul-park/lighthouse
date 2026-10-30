@@ -15,7 +15,9 @@ spec:
     Prettier 3.9.10, and the project's Prettier configuration still applies. Without
     Prettier on `PATH` the analysis of those files is incomplete, never clean. A
     project that formats with Biome swaps the program through
-    `rules."core/formatted"`.
+    `rules."core/formatted"`. Python uses `ruff format` found on `PATH`, Black-compatible
+    but not identical to Black; a project that formats with Black swaps the program
+    the same way.
   scope:
     subject: file
     generated: false

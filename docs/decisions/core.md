@@ -173,7 +173,7 @@ Source formatting is decided by the language standard, not by review.
 
 `core/formatted` · file · error · command · fix: safe · go, python, rust, typescript
 
-*Formatting is a repository convention, not a review topic. Each language states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses rustfmt with the edition of the crate that contains the file, supplied by the Rust provider as the `edition` fact. TypeScript and JavaScript use Prettier, found on `PATH` like markdownlint-cli2 and never the project's own `node_modules`; the examples are verified with Prettier 3.9.10, and the project's Prettier configuration still applies. Without Prettier on `PATH` the analysis of those files is incomplete, never clean. A project that formats with Biome swaps the program through `rules."core/formatted"`.*
+*Formatting is a repository convention, not a review topic. Each language states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses rustfmt with the edition of the crate that contains the file, supplied by the Rust provider as the `edition` fact. TypeScript and JavaScript use Prettier, found on `PATH` like markdownlint-cli2 and never the project's own `node_modules`; the examples are verified with Prettier 3.9.10, and the project's Prettier configuration still applies. Without Prettier on `PATH` the analysis of those files is incomplete, never clean. A project that formats with Biome swaps the program through `rules."core/formatted"`. Python uses `ruff format` found on `PATH`, Black-compatible but not identical to Black; a project that formats with Black swaps the program the same way.*
 
 Source files MUST equal the output of their language standard formatter.
 

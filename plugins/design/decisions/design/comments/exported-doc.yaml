@@ -24,10 +24,6 @@ spec:
         - interface
         exemptMethods:
         - __init__
-        - __repr__
-        - __str__
-        - __eq__
-        - __hash__
     rust: {}
     typescript:
       options:

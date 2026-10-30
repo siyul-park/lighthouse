@@ -35,7 +35,7 @@ Derived from: Martin, Clean Code (2008), T1 Insufficient Tests
 
 | option | default | meaning |
 | --- | --- | --- |
-| `exemptMethods` | `["String","Error","Unwrap","GoString"]`; python: `["__init__","__repr__","__str__","__eq__","__hash__"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]`; typescript: `["constructor","toString","toJSON","valueOf"]` | Method names that implement well-known interfaces. |
+| `exemptMethods` | `["String","Error","Unwrap","GoString"]`; python: `["__init__"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]`; typescript: `["constructor","toString","toJSON","valueOf"]` | Method names that implement well-known interfaces. |
 | `includeDataTypes` | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
 | `includeInternal` | `false`; go: `true`; python: `true`; typescript: `true` | Also judge symbols public only inside the project. |
 | `symbols` | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |

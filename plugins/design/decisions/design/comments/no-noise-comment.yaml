@@ -18,12 +18,13 @@ spec:
     python:
       options:
         # Python statements: a keyword opens a line of code only with the shape code gives it;
-        # prose ending in a colon is not a block opener. Assignments and calls with literals are code.
+        # prose ending in a colon is not a block opener. Assignments and calls with literals are code;
+        # `a == b`, a sentence that ends in a period and a line with several `=` (`a = 1, b = 2`) are prose.
         codePatterns:
         - '^(def|class|async def)\s+\w+.*:$'
         - '^(if|elif|else|for|while|with|try|except|finally)\b.*:$'
         - '^(import|from)\s+[\w.]+(\s+import\s+\S.*)?$'
-        - '^[A-Za-z_][\w.]*(\[[^\]]*\])?\s*(=|\+=|-=|\*=)\s*\S.*$'
+        - '^[A-Za-z_][\w.]*(\[[^\]]*\])?\s*(=|\+=|-=|\*=)\s*[^=\s]([^=]*[^.\s=])?$'
         - '^[A-Za-z_][\w.]*\(.*["0-9].*\)$'
     rust: {}
     typescript:
@@ -652,5 +653,16 @@ spec:
     - path: example.py
       body: |-
         # Retry once: the first call warms the cache.
+        def load() -> str:
+            return "x"
+  - name: python-prose-with-operators-valid
+    language: python
+    kind: valid
+    files:
+    - path: example.py
+      body: |-
+        # name==version requirement
+        # PYTHON_GIL=0 crashes the interpreter on free-threaded builds.
+        # show_traceback = True, using_user_site = False
         def load() -> str:
             return "x"
