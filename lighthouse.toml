@@ -76,7 +76,7 @@ options.layers = [
   ["lighthouse_session/**"],
   ["lighthouse_report/**", "lighthouse_store/**", "lighthouse_ml/**"],
   ["lighthouse_engine/**", "lighthouse_checks/**", "lighthouse_rpc/**"],
-  ["lighthouse_cel/**"],
+  ["lang_cel/**"],
   ["lighthouse_plugin/**", "lighthouse_spec/**"],
   ["lighthouse_model/**", "lighthouse_resource/**", "lighthouse_process/**"],
   ["lighthouse_protocol/**"],
