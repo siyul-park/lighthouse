@@ -22,7 +22,7 @@ include_dir = "0.7"
 insta = "1"
 jsonschema = "0.58"
 libc = "0.2"
-ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "api-24", "download-binaries", "tls-native"] }
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "api-24", "download-binaries", "tls-native"] }
 predicates = "3"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
