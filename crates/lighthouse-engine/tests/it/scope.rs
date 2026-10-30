@@ -35,9 +35,10 @@ fn generated_code_is_told_apart_by_the_host_and_left_out_of_the_subjects() {
         ("a/x.txt", b"1"),
         ("gen/g.txt", b"2"),
         ("vendor/v.txt", b"3"),
+        ("third/t.txt", b"4"),
         (
             ".gitattributes",
-            b"gen/** linguist-generated=true\n*.md -linguist-generated\n",
+            b"gen/** linguist-generated=true\nthird/** linguist-vendored\n*.md -linguist-generated\n",
         ),
     ]);
 

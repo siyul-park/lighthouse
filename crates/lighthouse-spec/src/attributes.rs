@@ -1,6 +1,8 @@
 //! Telling generated code apart in the host, language-neutrally: the
-//! `.gitattributes` `linguist-generated` attribute (the GitHub standard) and
-//! the project's `generated.files`. A provider's own marker (Go's `// Code
+//! `.gitattributes` `linguist-generated` and `linguist-vendored` attributes
+//! (the GitHub standard; both leave a file out of Linguist's statistics and
+//! diffs, and vendored code is no more the project's to restyle than
+//! generated code is) and the project's `generated.files`. A provider's own marker (Go's `// Code
 //! generated ... DO NOT EDIT.`, `@generated`) arrives with its fragment.
 
 use std::{fs, path::Path};
@@ -8,12 +10,12 @@ use std::{fs, path::Path};
 use globset::{Glob, GlobBuilder, GlobMatcher};
 
 const ATTRIBUTES_FILE: &str = ".gitattributes";
-const ATTRIBUTE: &str = "linguist-generated";
+const ATTRIBUTES: [&str; 2] = ["linguist-generated", "linguist-vendored"];
 
-/// The `linguist-generated` lines of a `.gitattributes` at the project root,
+/// The `linguist-generated` and `linguist-vendored` lines of a `.gitattributes` at the project root,
 /// later lines winning. A pattern without a `/` matches at any depth, one
 /// with a leading `/` from the root; `linguist-generated=false` and
-/// `-linguist-generated` switch it off again. Nested attribute files are not
+/// `-linguist-generated` (likewise for `linguist-vendored`) switch it off again. Nested attribute files are not
 /// read.
 #[derive(Debug, Default)]
 pub struct Attributes {
@@ -67,16 +69,15 @@ impl Attributes {
     }
 }
 
-/// What an attribute token says about `linguist-generated`, if it names it.
+/// What an attribute token says about `linguist-generated` or
+/// `linguist-vendored`, if it names one.
 fn setting(token: &str) -> Option<bool> {
-    match token {
-        ATTRIBUTE => Some(true),
-        "-linguist-generated" | "!linguist-generated" => Some(false),
-        other => match other.split_once('=')? {
-            (ATTRIBUTE, value) => Some(value != "false"),
-            _ => None,
-        },
+    let name = token.trim_start_matches(['-', '!']);
+    if ATTRIBUTES.contains(&name) {
+        return Some(name == token);
     }
+    let (name, value) = token.split_once('=')?;
+    ATTRIBUTES.contains(&name).then_some(value != "false")
 }
 
 fn matcher(pattern: &str) -> Result<GlobMatcher, globset::Error> {

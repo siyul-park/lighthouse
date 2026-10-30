@@ -255,7 +255,7 @@ pub struct Engine {
     /// Rules whose decision is about the project's own documents (the `spec`
     /// domain): a run that selects one finds those documents first.
     documented: BTreeSet<String>,
-    /// The `linguist-generated` attributes of the project.
+    /// The `linguist-generated` and `linguist-vendored` attributes of the project.
     attributes: Attributes,
     /// What assembling the engine found worth telling; every run reports it.
     notices: Vec<String>,
