@@ -205,7 +205,8 @@ class Collector {
   private parameterProperty(parameter: ts.ParameterDeclaration, owner: Decl): void {
     const flags = ts.getCombinedModifierFlags(parameter);
     const marked =
-      flags & (ts.ModifierFlags.Public | ts.ModifierFlags.Private | ts.ModifierFlags.Protected | ts.ModifierFlags.Readonly);
+      flags &
+      (ts.ModifierFlags.Public | ts.ModifierFlags.Private | ts.ModifierFlags.Protected | ts.ModifierFlags.Readonly);
     if (marked === 0 || !ts.isIdentifier(parameter.name)) return;
     this.decls.add({ kind: "field", name: parameter.name.text, owner, node: parameter, extent: parameter });
   }
@@ -235,7 +236,11 @@ class Collector {
       if (name === undefined) continue;
       if (ts.isPropertySignature(member)) {
         this.decls.add({ kind: "field", name, owner, node: member, extent: member });
-      } else if (ts.isMethodSignature(member) || ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) {
+      } else if (
+        ts.isMethodSignature(member) ||
+        ts.isGetAccessorDeclaration(member) ||
+        ts.isSetAccessorDeclaration(member)
+      ) {
         this.decls.add({ kind: "method", name, owner, node: member, extent: member });
       }
     }
@@ -327,7 +332,16 @@ class Collector {
     const base = target.base === "exports" ? undefined : this.byName(target.base);
     if (target.base !== "exports" && base === undefined) return;
     const fn = functionInitializer(value);
-    const kind: SymbolKind = base === undefined ? (fn !== undefined ? "function" : ts.isClassExpression(value) ? "type" : "const") : fn !== undefined ? "method" : "field";
+    const kind: SymbolKind =
+      base === undefined
+        ? fn !== undefined
+          ? "function"
+          : ts.isClassExpression(value)
+            ? "type"
+            : "const"
+        : fn !== undefined
+          ? "method"
+          : "field";
     if (base === undefined && ts.isIdentifier(value)) return;
     const decl = this.decls.add({
       kind,
@@ -348,7 +362,13 @@ class Collector {
       const name = ts.isFunctionExpression(fn) ? (fn.name?.text ?? "default") : "default";
       this.decls.add({ kind: "function", name, node: statement, extent: statement, body: fn, assignment: true });
     } else if (ts.isClassExpression(value)) {
-      const decl = this.decls.add({ kind: "type", name: value.name?.text ?? "default", node: statement, extent: statement, assignment: true });
+      const decl = this.decls.add({
+        kind: "type",
+        name: value.name?.text ?? "default",
+        node: statement,
+        extent: statement,
+        assignment: true,
+      });
       this.classMembers(value, decl);
     } else if (ts.isObjectLiteralExpression(value)) {
       this.exportedObject(value);

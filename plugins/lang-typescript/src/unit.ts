@@ -11,7 +11,17 @@ import { isTable, nestingOf, testCallOf } from "./tests.ts";
 import { Types } from "./types.ts";
 import { type EdgeSink, Uses } from "./uses.ts";
 import type { Reach } from "./visibility.ts";
-import type { Edge, EdgeKind, Fragment, FunctionSummary, Node, Resolution, Span, Symbol as Sym, TestCase } from "./wire.ts";
+import type {
+  Edge,
+  EdgeKind,
+  Fragment,
+  FunctionSummary,
+  Node,
+  Resolution,
+  Span,
+  Symbol as Sym,
+  TestCase,
+} from "./wire.ts";
 
 /** What indexing a file gave: its fragment and how many of its imports resolve nowhere. */
 export interface Indexed {

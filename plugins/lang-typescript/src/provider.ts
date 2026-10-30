@@ -5,14 +5,7 @@ import { PROTOCOL_VERSION } from "./server.ts";
 import { analyze } from "./analyze.ts";
 import { isDeclarationFile, isIgnored, slashed } from "./paths.ts";
 import { type Snippet, planSnippets } from "./regions.ts";
-import type {
-  EmbeddedFile,
-  Fragment,
-  IndexParams,
-  IndexResult,
-  InitializeResult,
-  ProviderManifest,
-} from "./wire.ts";
+import type { EmbeddedFile, Fragment, IndexParams, IndexResult, InitializeResult, ProviderManifest } from "./wire.ts";
 
 const LANGUAGE = "typescript";
 const SOURCE_GLOB = "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}";
@@ -59,7 +52,8 @@ export class Provider implements Handler {
     }
     const root = fs.realpathSync(params.project.root);
     const overlays = new Map<string, string>();
-    for (const overlay of params.context?.overlays ?? []) overlays.set(slashed(path.join(root, overlay.path)), overlay.text);
+    for (const overlay of params.context?.overlays ?? [])
+      overlays.set(slashed(path.join(root, overlay.path)), overlay.text);
 
     const files: string[] = [];
     const hosts: EmbeddedFile[] = [];
@@ -76,7 +70,12 @@ export class Provider implements Handler {
   }
 
   /** The requested files that are analysed; the others get an empty fragment or are incomplete. */
-  private admit(root: string, files: readonly string[], overlays: ReadonlyMap<string, string>, result: Required<IndexResult>): string[] {
+  private admit(
+    root: string,
+    files: readonly string[],
+    overlays: ReadonlyMap<string, string>,
+    result: Required<IndexResult>,
+  ): string[] {
     const admitted: string[] = [];
     for (const rel of new Set(files)) {
       const abs = slashed(path.join(root, rel));

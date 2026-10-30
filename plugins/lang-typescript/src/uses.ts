@@ -231,7 +231,8 @@ export class Uses {
     const pattern = node.parent;
     if (ts.isObjectBindingPattern(pattern)) {
       const key = node.propertyName ?? (ts.isIdentifier(node.name) ? node.name : undefined);
-      const text = key === undefined ? undefined : ts.isIdentifier(key) || ts.isStringLiteralLike(key) ? key.text : undefined;
+      const text =
+        key === undefined ? undefined : ts.isIdentifier(key) || ts.isStringLiteralLike(key) ? key.text : undefined;
       if (key !== undefined && text !== undefined) {
         const type = this.model.checker.getTypeAtLocation(pattern);
         this.add("references", this.model.declsOfSymbol(type.getProperty(text)), key, from);
@@ -288,7 +289,8 @@ export class Uses {
 function isBareUse(id: ts.Identifier): boolean {
   const parent = id.parent;
   if (parent === undefined) return false;
-  if (ts.isShorthandPropertyAssignment(parent) || ts.isExportSpecifier(parent) || ts.isImportSpecifier(parent)) return false;
+  if (ts.isShorthandPropertyAssignment(parent) || ts.isExportSpecifier(parent) || ts.isImportSpecifier(parent))
+    return false;
   if (ts.isBindingElement(parent) && parent.propertyName === id) return false;
   if (ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) return false;
   if (ts.isJsxAttribute(parent) || ts.isJsxNamespacedName(parent)) return false;

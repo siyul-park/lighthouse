@@ -122,7 +122,7 @@ export class FlowWalker {
     const operators: ts.SyntaxKind[] = [];
     const leaves: ts.Expression[] = [];
     chain(node, operators, leaves);
-    for (let i = 0; i < operators.length; ) {
+    for (let i = 0; i < operators.length;) {
       let j = i;
       while (j < operators.length && operators[j] === operators[i]) j++;
       this.events.push({ kind: "logic", nesting: this.nesting, operators: j - i });

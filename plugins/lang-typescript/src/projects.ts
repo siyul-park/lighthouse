@@ -81,7 +81,9 @@ export class Workspace {
       roots = [...new Set([...parsed.fileNames, ...files])];
       references = parsed.projectReferences;
       for (const diagnostic of parsed.errors) {
-        notices.push(`${this.display(governing.path)}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")}`);
+        notices.push(
+          `${this.display(governing.path)}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")}`,
+        );
       }
     }
     options = {
@@ -114,7 +116,9 @@ export class Workspace {
         ? getSourceFile.call(host, file, languageVersionOrOptions, onError, shouldCreate)
         : ts.createSourceFile(file, text, languageVersionOrOptions, true);
     };
-    (host as ts.CompilerHost & { useSourceOfProjectReferenceRedirect?(): boolean }).useSourceOfProjectReferenceRedirect = () => true;
+    (
+      host as ts.CompilerHost & { useSourceOfProjectReferenceRedirect?(): boolean }
+    ).useSourceOfProjectReferenceRedirect = () => true;
     const cache = ts.createModuleResolutionCache(this.root, (file) => file, options);
     host.resolveModuleNameLiterals = (literals, containing, redirect, resolutionOptions, containingFile) =>
       literals.map((literal) => {

@@ -79,11 +79,7 @@ export function serve(input: Readable, output: Writable, handler: Handler): Prom
 
 type Outcome = { result: unknown } | Failure;
 
-async function reply(
-  writer: StreamMessageWriter,
-  id: number | string | null,
-  outcome: Outcome,
-): Promise<void> {
+async function reply(writer: StreamMessageWriter, id: number | string | null, outcome: Outcome): Promise<void> {
   const body =
     "result" in outcome
       ? { jsonrpc: "2.0", id, result: outcome.result }

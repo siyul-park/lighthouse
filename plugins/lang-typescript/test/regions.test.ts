@@ -9,7 +9,8 @@ import type { EmbeddedFile, Fragment, IndexResult } from "../src/wire.ts";
 const GREET = "src/index::greet#function";
 const MANIFEST = '{ "name": "demo", "private": false }\n';
 const LIBRARY = "export function greet(name: string): string {\n  return name;\n}\n";
-const TSCONFIG = '{ "compilerOptions": { "strict": true, "module": "ESNext", "moduleResolution": "Bundler" }, "include": ["src"] }\n';
+const TSCONFIG =
+  '{ "compilerOptions": { "strict": true, "module": "ESNext", "moduleResolution": "Bundler" }, "include": ["src"] }\n';
 
 const roots: string[] = [];
 
@@ -135,7 +136,10 @@ describe("fences of a host file", () => {
   it("take their language from the info string", () => {
     const root = project();
 
-    const result = index(root, markdown([{ info: "js", body: 'import { greet } from "demo";\nexport const shown = greet(1);\n' }]));
+    const result = index(
+      root,
+      markdown([{ info: "js", body: 'import { greet } from "demo";\nexport const shown = greet(1);\n' }]),
+    );
 
     const fragment = fragmentOf(result);
     assert.equal(fragment.modules![0]!.path, ".lighthouse-snippets/README.md.1/snippet");

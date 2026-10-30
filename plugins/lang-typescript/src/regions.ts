@@ -61,7 +61,13 @@ export function planSnippets(hosts: readonly EmbeddedFile[]): Snippet[] {
 
 function extensionOf(source: EmbeddedSource): string {
   const info = source.context?.["info"];
-  const word = typeof info === "string" ? info.trim().split(/[\s,{]/)[0]?.toLowerCase() : undefined;
+  const word =
+    typeof info === "string"
+      ? info
+          .trim()
+          .split(/[\s,{]/)[0]
+          ?.toLowerCase()
+      : undefined;
   return (word === undefined ? undefined : EXTENSIONS[word]) ?? ".ts";
 }
 
@@ -157,7 +163,8 @@ export class Remap {
     for (const comment of all) {
       const span = this.span(comment.span);
       if (span === undefined) continue;
-      const attached = comment.attached_to != null && dropped.has(comment.attached_to) ? undefined : comment.attached_to;
+      const attached =
+        comment.attached_to != null && dropped.has(comment.attached_to) ? undefined : comment.attached_to;
       shown.push({ ...comment, span, attached_to: attached });
     }
     return shown;

@@ -32,7 +32,10 @@ export function testCallOf(call: ts.CallExpression): TestCall | undefined {
   }
   const [first] = call.arguments;
   if (first === undefined || !ts.isStringLiteralLike(first)) return undefined;
-  const callback = [...call.arguments].reverse().map((a) => functionInitializer(a)).find((f) => f !== undefined);
+  const callback = [...call.arguments]
+    .reverse()
+    .map((a) => functionInitializer(a))
+    .find((f) => f !== undefined);
   return { title: first.text, callback, each };
 }
 
@@ -93,7 +96,11 @@ export function isTable(call: TestCall, file: ts.SourceFile): boolean {
   bind(file);
   const rows = (expression: ts.Expression): boolean => {
     const value = unwrap(expression);
-    const array = ts.isArrayLiteralExpression(value) ? value : ts.isIdentifier(value) ? arrays.get(value.text) : undefined;
+    const array = ts.isArrayLiteralExpression(value)
+      ? value
+      : ts.isIdentifier(value)
+        ? arrays.get(value.text)
+        : undefined;
     return array !== undefined && array.elements.length > 0 && array.elements.every(isRow);
   };
   let table = false;

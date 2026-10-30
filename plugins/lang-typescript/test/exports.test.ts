@@ -30,7 +30,10 @@ function visibilities(files: Record<string, string>, target: string): Record<str
 
 describe("what a file exports", () => {
   it("is what the checker reports for an ES module", () => {
-    const seen = visibilities({ "lib.ts": "export const shown = 1;\nconst hidden = 2;\nexport { hidden as renamed };\n" }, "lib.ts");
+    const seen = visibilities(
+      { "lib.ts": "export const shown = 1;\nconst hidden = 2;\nexport { hidden as renamed };\n" },
+      "lib.ts",
+    );
 
     assert.deepEqual(seen, { shown: "public", hidden: "public" });
   });

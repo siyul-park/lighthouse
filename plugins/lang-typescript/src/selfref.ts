@@ -53,7 +53,11 @@ function packageAbove(start: string): Package | undefined {
   for (;;) {
     try {
       const manifest: unknown = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
-      if (typeof manifest === "object" && manifest !== null && typeof (manifest as { name?: unknown }).name === "string") {
+      if (
+        typeof manifest === "object" &&
+        manifest !== null &&
+        typeof (manifest as { name?: unknown }).name === "string"
+      ) {
         return { dir, name: (manifest as { name: string }).name, manifest: manifest as Record<string, unknown> };
       }
     } catch {
@@ -75,7 +79,10 @@ function entryBases(dir: string, manifest: Record<string, unknown>): string[] {
   return [...named, ...mapped, "src/index", "index", "lib/index"].map((value) => path.join(dir, value));
 }
 
-function probe(base: string, exists: (file: string) => boolean): Pick<ts.ResolvedModuleFull, "resolvedFileName" | "extension"> | undefined {
+function probe(
+  base: string,
+  exists: (file: string) => boolean,
+): Pick<ts.ResolvedModuleFull, "resolvedFileName" | "extension"> | undefined {
   for (const stem of [base, path.join(base, "index")]) {
     for (const [suffix, extension] of EXTENSIONS) {
       if (exists(stem + suffix)) return { resolvedFileName: stem + suffix, extension };

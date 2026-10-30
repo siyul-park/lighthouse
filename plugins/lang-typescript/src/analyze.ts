@@ -88,7 +88,9 @@ export function analyze(request: Request): Map<Snippet, Fragment> {
       const where = `${snippet.host.path}:${hostLine(snippet)}`;
       if (source === undefined || model.declsOf(source) === undefined) continue;
       if (syntaxProblem(built.program, source) !== undefined) {
-        result.notices.push(`${where}: the ${language(snippet)} fence is not valid ${language(snippet)} and is not analysed`);
+        result.notices.push(
+          `${where}: the ${language(snippet)} fence is not valid ${language(snippet)} and is not analysed`,
+        );
         continue;
       }
       if (built.program.getSemanticDiagnostics(source).length > 0) untyped++;
