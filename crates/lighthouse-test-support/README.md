@@ -11,7 +11,7 @@ Builds the bundled CEL libraries, composition, catalog and plugin registries the
 - `libraries`, `composition`, `cel`, `bundled`, `registry`, `full`, `full_registry`: the bundled composition, shared by the tests of a process.
 - `catalog`: decision, pack and catalog-file builders.
 - `project`, `listing`, `installed`: project documents and installed plugin directories.
-- `lang_go`, `lang_typescript`, `lang_rust`, `fake_model`, `model_local`, `model_http`: the built plugins.
+- `lang_go`, `lang_typescript`, `lang_python`, `lang_rust`, `fake_model`, `model_local`, `model_http`: the built plugins.
 
 ## Tests
 

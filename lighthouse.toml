@@ -9,6 +9,7 @@ plugins = [
   { id = "lang-go", path = "target/plugins/lang-go" },
   { id = "lang-rust", path = "target/plugins/lang-rust" },
   { id = "lang-typescript", path = "target/plugins/lang-typescript" },
+  { id = "lang-python", path = "target/plugins/lang-python" },
   { id = "lang-yaml", path = "target/plugins/lang-yaml" },
   { id = "lang-toml", path = "target/plugins/lang-toml" },
   { id = "lang-markdown", path = "target/plugins/lang-markdown" },

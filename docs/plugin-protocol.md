@@ -834,6 +834,57 @@ and executes nothing of the project. It has no cache and does not return `source
   tail. A fence with invalid syntax is a notice; fences that do not type-check are
   counted in one notice and keep the edges that resolve. Neither is a gap.
 
+## `lang-python`
+
+Reports `semantic-edges`, `extent` (from the first decorator or the comment lines that lead a declaration, to its last
+token), `reference-sites` and `overlays`. Language `python`, aliases `python`, `py`, `py3`, `python3` and `rusthon`
+(GitHub Linguist's names). It is a Python process (3.11 or newer, standard library only, always `python3 -I`) that reads
+sources with the `ast` and `symtable` of the interpreter that runs it and never imports or executes the project. It has
+no cache and does not return `source-ast`. `semantic-edges` is partial: only names that scopes, imports and annotations
+settle are `semantic`.
+
+- Context: no keys; any key is an `incomplete` entry. The interpreter is the `python3` on `PATH`; an older one refuses to
+  start with a message on stderr.
+- Import roots: the project root, `src` when the layout says so and the package directories `pyproject.toml` declares
+  statically (`[tool.setuptools]`, `[tool.hatch]`), and the directory above the topmost package of the importing file.
+  Regular packages and modules win over PEP 420 namespace packages. A relative import resolves against the package.
+- Modules: one per file, its path without extension; a package's `__init__.py` is its directory. A test file
+  (`test_*.py`, `*_test.py`, `conftest.py`, under `tests/` or `test/`) has `test_of` set to the module it names by
+  stripping the marker, else its directory.
+- Symbols: functions (`def`, and a module-level name bound to a `lambda`), classes (`type`, or `interface` for a
+  `Protocol`), methods, class attributes, dataclass and `NamedTuple` fields and the fields `__init__` sets (`field`),
+  `Enum` members (`variant`), module-level assignments (`const` for an upper-case name or `Final`, else `var`), and
+  tests. Overloads, property accessors and conditional definitions are one symbol. Functions nested in functions are not
+  symbols; their uses belong to the function that contains them. Statements that run when a module loads are one bodyless
+  `<module>` function.
+- Visibility: no leading `_` is `public` (dunder names too), a leading `_` is `private`; a module with a static
+  `__all__` makes exactly the names it lists public; a name imported in a package `__init__.py` and listed in its
+  `__all__` is public. A public member of a `private` class is `internal`, as is a public name of a module whose path
+  has an underscore component; everything in a test file is `private`.
+- Edges: `calls`, `references`, `imports` and `implements`. A name resolves through `symtable`'s scopes (locals, closures
+  and `nonlocal`, `global`, comprehensions), imports (absolute, relative, aliased, `*` with `__all__`), modules,
+  classes and their project bases, `self`/`cls`, annotated parameters and locals assigned once from a class call or an
+  annotation; `Foo()` calls `__init__` when a project class has one, else references `Foo`; `super().m()` resolves to
+  the base. `implements` runs from a class to a project `Protocol` or abstract class among its bases. A use on a receiver of
+  unknown type, and `getattr(x, "name")`, is a `syntactic` edge to each project member that bears the name when at most
+  eight do. Imports of the standard library are `semantic`; those of anything else outside the project are
+  `syntactic`, named by their dotted path.
+- Flow follows the model's mapping: `if`/`elif`/`else`, conditional expressions (an `if`), `for`/`while` (`loop`),
+  `match` (`switch`, `arms` excluding the wildcard or capture arm), `except` (`catch`), runs of `and`/`or`, a call of the
+  enclosing function (`recursion`); nested functions and lambdas raise nesting; comprehensions emit nothing. No `jump`
+  and no `events`. `tokens` counts a string with replacement fields as one token, whatever the interpreter version.
+- Tests: pytest `test_*` functions of test files and `test_*` methods of `Test*` classes without `__init__`;
+  `unittest.TestCase` methods starting with `test`. The symbol is kind `test`; a test is a `table` for
+  `parametrize` or a loop over a literal list of rows. `conventions.test_naming` is `test_` in snake case.
+- Types: `signature` and `type_ref` come from annotations (`Any` where there is none); `returns` counts a returned or
+  yielded value of an unannotated function. `implementation` marks a method that overrides one of a project base class,
+  protocol or abstract class, or carries `@override`; `constructs` marks `__init__` and defs that return their own class.
+- Syntax errors are an `incomplete` entry per file (`line:col: message`) and the file keeps an empty fragment.
+  `.pyi` files, `testdata` and hidden directories are answered with empty fragments.
+- Fences: a Python region is a module of its own under `<dir>/.lighthouse-snippets/<file>.<n>/snippet.py` that uses the
+  project from outside. A fence with invalid syntax is a notice; names the prose defines are `syntactic` edges to the
+  project declarations that bear them, counted in one notice. Neither is a gap.
+
 ## `model-http`
 
 Models behind the standard HTTP protocols, as a provider in `lighthouse.toml`

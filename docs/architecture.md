@@ -11,6 +11,7 @@
           │                      plugins/lang-go (go/packages + go/types)
           │                      plugins/lang-rust (syn + own module resolution)
           │                      plugins/lang-typescript (TypeScript compiler API)
+          │                      plugins/lang-python (ast + symtable, standard library)
           │                      plugins/lang-yaml, lang-toml, lang-markdown (syntax
           │                      trees of host files, for embedded sources)
    code model (UCM, lighthouse_model::ucm)
@@ -804,7 +805,7 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 | [cli](../crates/lighthouse-cli/README.md) | 5 | the argv and MCP surfaces, the terminal and hook adapters | logic beyond parsing and printing |
 | [test-support](../crates/lighthouse-test-support/README.md) | dev | the shared test fixtures and the bundled composition for tests | production use |
 
-- Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [lang-typescript](../plugins/lang-typescript/README.md), [lang-yaml](../plugins/lang-yaml/README.md), [lang-toml](../plugins/lang-toml/README.md), [lang-markdown](../plugins/lang-markdown/README.md), [lang-cel](../plugins/lang-cel/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
+- Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [lang-typescript](../plugins/lang-typescript/README.md), [lang-python](../plugins/lang-python/README.md), [lang-yaml](../plugins/lang-yaml/README.md), [lang-toml](../plugins/lang-toml/README.md), [lang-markdown](../plugins/lang-markdown/README.md), [lang-cel](../plugins/lang-cel/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
 
 Each crate has one integration-test binary, `tests/it/main.rs` with a module per area.
 
