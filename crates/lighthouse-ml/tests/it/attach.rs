@@ -3,7 +3,7 @@
 
 use lighthouse_ml::{
     attach::{attachable, evidence},
-    evaluate::{EvalReport, Layer, Side, Usage},
+    eval::{EvalReport, Layer, Side, Usage},
     metrics::{Metrics, Outcome},
 };
 use lighthouse_model::Judgment;

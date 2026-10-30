@@ -4,7 +4,7 @@
 use std::fs;
 
 use lighthouse_ml::{
-    evaluate::Found,
+    eval::Found,
     labels::Label,
     train::{Fit, Rows, train},
 };

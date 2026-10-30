@@ -16,7 +16,7 @@ pub use bound::{Binding, BoundModel, bound_models, remote_bound};
 pub use eval::{EvalRequest, eval};
 pub use labelling::{Labelling, Repo};
 pub use lighthouse_ml::{
-    evaluate::{EvalReport, Side},
+    eval::{EvalReport, Side},
     metrics::Rate,
     train::Trained,
 };

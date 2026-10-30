@@ -1,6 +1,6 @@
 //! `lighthouse eval`: runs the checks of a decision, and of a candidate beside
 //! it, on the repositories its labels come from, and hands what they found to
-//! the host's evaluation (`lighthouse_ml::evaluate`). The model a revision
+//! the host's evaluation (`lighthouse_ml::eval`). The model a revision
 //! attached, and the one `--model` names, are layers laid over the run of the
 //! check without models attached.
 
@@ -12,7 +12,7 @@ use std::{
 
 use lighthouse_engine::ModelOptions;
 use lighthouse_ml::{
-    evaluate::{Candidate, EvalReport, Found, Overlaid, Overlay, RepoResult, grade},
+    eval::{Candidate, EvalReport, Found, Overlaid, Overlay, RepoResult, grade},
     labels::{Label, Source},
 };
 use lighthouse_model::Severity;

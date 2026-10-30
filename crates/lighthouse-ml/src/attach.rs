@@ -5,7 +5,7 @@
 use lighthouse_model::Result;
 use serde_json::{Value, json};
 
-use crate::evaluate::EvalReport;
+use crate::eval::EvalReport;
 
 /// Why the model an evaluation graded may not be attached: none when it may.
 /// The candidate side of `report` is the check with the model as its first

@@ -1,6 +1,6 @@
 use lighthouse_engine::Run;
 use lighthouse_ml::{
-    evaluate::{Candidate, EvalReport, Found, RepoResult, Usage, grade},
+    eval::{Candidate, EvalReport, Found, RepoResult, Usage, grade},
     labels::{Label, Source},
     metrics::Outcome,
 };

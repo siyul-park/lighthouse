@@ -4,7 +4,7 @@
 //! which hands over what the checks found.
 
 pub mod attach;
-pub mod evaluate;
+pub mod eval;
 pub mod labels;
 pub mod metrics;
 pub mod rebuild;

@@ -8,7 +8,7 @@ use std::{
 
 use lighthouse_engine::Run;
 use lighthouse_ml::{
-    evaluate::{EvalReport, Found, Overlaid, Overlay, grade},
+    eval::{EvalReport, Found, Overlaid, Overlay, grade},
     labels::{Label, Source},
     metrics::Outcome,
 };

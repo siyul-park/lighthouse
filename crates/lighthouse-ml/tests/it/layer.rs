@@ -1,7 +1,7 @@
 //! Grading the model a revision attaches, laid over the run without it.
 
 use lighthouse_ml::{
-    evaluate::{EvalReport, grade},
+    eval::{EvalReport, grade},
     metrics::Outcome,
 };
 use lighthouse_model::{Judgment, Result};

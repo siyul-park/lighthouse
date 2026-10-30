@@ -9,7 +9,7 @@ The host side of mlops: the labels of a decision, the dataset they make, the tra
 - `labels::Labels`, `Judged`, `Table`, `Label`: subjects and their one label each.
 - `train::Rows`, `Fit`, `train`, `Trained`: the rows of the labelled subjects, their dataset (the one writer of training files) and the fine-tuning job on it.
 - `rebuild::Learned`: a model that is a file, checked and made again from its dataset.
-- `evaluate::grade`, `RepoResult`, `EvalReport::pool`, `Overlay`: a check (and a candidate or an attached model beside it) against the labels, pooled over repositories.
+- `eval::grade`, `RepoResult`, `EvalReport::pool`, `Overlay`: a check (and a candidate or an attached model beside it) against the labels, pooled over repositories.
 - `metrics::Metrics::of`, `Rate`: the metrics, with Wilson 95% intervals.
 
 ## Invariants

@@ -2,7 +2,7 @@
 
 mod attach;
 mod cross_fit;
-mod evaluate;
+mod eval;
 mod labels;
 mod layer;
 mod layer_support;
