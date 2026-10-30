@@ -377,5 +377,5 @@ fn a_binding_that_names_no_model_of_the_route_is_not_a_spent_budget() {
         .unwrap_err();
 
     assert_eq!(refused, Refusal::Failed("no model is bound".to_owned()));
-    assert_eq!(route.usage().calls, 0);
+    assert_eq!(route.usage().usage.calls, 0);
 }

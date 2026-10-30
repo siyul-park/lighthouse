@@ -109,8 +109,7 @@ pub struct Run {
     pub probabilities: BTreeMap<String, (f64, String)>,
     /// Requests put to models this run (answers from the cache are not
     /// counted), and what they cost.
-    pub model_calls: usize,
-    pub model_cost: f64,
+    pub usage: lighthouse_model::Usage,
     /// Findings that source directives suppress, within the report scope.
     /// They are not in `diagnostics` and never fail the run.
     pub suppressed: Vec<Suppressed>,

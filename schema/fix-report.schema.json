@@ -390,7 +390,7 @@
           ]
         },
         "calls": {
-          "description": "Requests that went to a model (a run of an agent is one); answers kept\nfrom earlier runs are not counted.",
+          "description": "Requests that went to a model; answers kept from earlier runs are not\ncounted.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"

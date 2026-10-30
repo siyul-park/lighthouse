@@ -71,8 +71,7 @@ impl Found {
             .collect();
         found.notices = run.notices.iter().cloned().collect();
         found.subjects = Arc::new(run.questions.clone());
-        found.usage.calls = run.model_calls;
-        found.usage.cost = run.model_cost;
+        found.usage.usage = run.usage;
         found
     }
 

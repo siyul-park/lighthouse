@@ -61,7 +61,7 @@ impl Engine {
         let (found, unsettled) = self.collect(&scene, &mut run)?;
         run.questions = models.subjects();
         run.probabilities = models.probabilities();
-        (run.model_calls, run.model_cost) = models.usage();
+        run.usage = models.usage();
         run.notices.extend(models.finish());
         if let Some(cache) = &cache {
             if let Some(run_cache) = &run_cache {

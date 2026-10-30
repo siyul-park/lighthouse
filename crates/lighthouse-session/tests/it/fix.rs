@@ -225,7 +225,7 @@ fn models() {
 fn batch() {
     let (_dir, _scripts, done) = agent_run(CUT, true);
     let usage = done.usage.as_ref().unwrap();
-    assert_eq!(usage.calls, 1);
+    assert_eq!(usage.usage.calls, 1);
     let runs = usage.agent.as_ref().unwrap();
     assert_eq!(runs.runs, 1);
     let batch = &runs.batches[0];

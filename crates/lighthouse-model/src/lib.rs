@@ -14,6 +14,7 @@ mod review;
 mod scope;
 mod signal;
 mod text;
+mod usage;
 
 pub mod annotation;
 pub mod glob;
@@ -33,6 +34,7 @@ pub use signal::{SignalClass, SignalStatus};
 pub use text::{
     ColumnUnit, LineIndex, Position, Span, byte_position, eol_of, squash, utf16_position,
 };
+pub use usage::Usage;
 pub use vocabulary::UnknownTerm;
 
 /// Decision options as configured in `lighthouse.toml`.

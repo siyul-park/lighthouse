@@ -210,12 +210,16 @@ fn usage_sums_what_each_repository_asked_of_models() {
         [(1, 2, 3, 0.5), (2, 0, 1, 0.25)].map(|(model_decided, reviews, calls, cost)| Usage {
             model_decided,
             reviews,
-            calls,
-            cost,
+            usage: lighthouse_model::Usage { calls, cost },
         });
     let sum: Usage = usages.into_iter().sum();
     assert_eq!(
-        (sum.model_decided, sum.reviews, sum.calls, sum.cost),
+        (
+            sum.model_decided,
+            sum.reviews,
+            sum.usage.calls,
+            sum.usage.cost
+        ),
         (3, 2, 4, 0.75)
     );
 }

@@ -398,7 +398,7 @@ fn side(out: &mut String, label: &str, side: &Side) {
     let _ = writeln!(
         out,
         "  decided by a model: {}, left to review: {}, questions asked: {} (cost {})",
-        side.usage.model_decided, side.usage.reviews, side.usage.calls, side.usage.cost
+        side.usage.model_decided, side.usage.reviews, side.usage.usage.calls, side.usage.usage.cost
     );
     for notice in &side.notices {
         let _ = writeln!(out, "  note: {notice}");

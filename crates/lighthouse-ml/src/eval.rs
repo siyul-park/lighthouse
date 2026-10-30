@@ -47,8 +47,8 @@ pub struct Usage {
     /// Subjects left to review.
     pub reviews: usize,
     /// Questions put to models, and what they cost.
-    pub calls: usize,
-    pub cost: f64,
+    #[serde(flatten)]
+    pub usage: lighthouse_model::Usage,
 }
 
 impl Sum for Usage {
@@ -56,8 +56,10 @@ impl Sum for Usage {
         usages.fold(Self::default(), |sum, usage| Self {
             model_decided: sum.model_decided + usage.model_decided,
             reviews: sum.reviews + usage.reviews,
-            calls: sum.calls + usage.calls,
-            cost: sum.cost + usage.cost,
+            usage: lighthouse_model::Usage {
+                calls: sum.usage.calls + usage.usage.calls,
+                cost: sum.usage.cost + usage.usage.cost,
+            },
         })
     }
 }

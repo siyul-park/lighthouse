@@ -47,8 +47,7 @@ pub(crate) enum Refusal {
 /// What the route was asked and cost this run.
 #[derive(Default)]
 struct Spent {
-    calls: usize,
-    cost: f64,
+    usage: lighthouse_model::Usage,
     /// Time the models took to answer.
     time: Duration,
 }
@@ -56,9 +55,7 @@ struct Spent {
 /// What a run has spent on the models of a route.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Usage {
-    /// Requests that went to a model; kept answers are not counted.
-    pub(crate) calls: usize,
-    pub(crate) cost: f64,
+    pub(crate) usage: lighthouse_model::Usage,
     pub(crate) time: Duration,
 }
 
@@ -206,8 +203,7 @@ impl Route<'_> {
     pub(crate) fn usage(&self) -> Usage {
         let spent = self.spent.lock().unwrap_or_else(PoisonError::into_inner);
         Usage {
-            calls: spent.calls,
-            cost: spent.cost,
+            usage: spent.usage,
             time: spent.time,
         }
     }
@@ -253,8 +249,8 @@ impl Route<'_> {
 
     fn count_call(&self, cost: f64, took: Duration) {
         let mut spent = self.spent.lock().unwrap_or_else(PoisonError::into_inner);
-        spent.calls += 1;
-        spent.cost += cost;
+        spent.usage.calls += 1;
+        spent.usage.cost += cost;
         spent.time += took;
     }
 

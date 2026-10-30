@@ -118,7 +118,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "description": "One check's numbers.",
         "properties": {
           "calls": {
-            "description": "Questions put to models, and what they cost.",
+            "description": "Requests that went to a model; answers kept from earlier runs are not\ncounted.",
             "format": "uint",
             "minimum": 0,
             "type": "integer"
@@ -528,7 +528,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "description": "One check's numbers.",
         "properties": {
           "calls": {
-            "description": "Questions put to models, and what they cost.",
+            "description": "Requests that went to a model; answers kept from earlier runs are not\ncounted.",
             "format": "uint",
             "minimum": 0,
             "type": "integer"

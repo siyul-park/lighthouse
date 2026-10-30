@@ -79,9 +79,8 @@ impl<'a> Layer<'a> {
 /// What the models of a run were asked and cost.
 #[derive(Default)]
 struct Usage {
-    /// Requests that went through to a model; answers kept are not counted.
-    calls: usize,
-    cost: f64,
+    /// Requests that went through to a model, and what they cost.
+    usage: lighthouse_model::Usage,
     /// Subjects left to review because the budget was spent.
     over_budget: usize,
 }
@@ -221,8 +220,8 @@ impl<'a> RunModels<'a> {
     /// Counts a request that goes to a model.
     pub(super) fn count_call(&self, cost: f64) {
         let mut usage = self.usage.lock().unwrap_or_else(PoisonError::into_inner);
-        usage.calls += 1;
-        usage.cost += cost;
+        usage.usage.calls += 1;
+        usage.usage.cost += cost;
     }
 
     /// Counts subjects left to review for want of budget.
@@ -234,9 +233,11 @@ impl<'a> RunModels<'a> {
     }
 
     /// How many questions were put to models this run, and what they cost.
-    pub(super) fn usage(&self) -> (usize, f64) {
-        let usage = self.usage.lock().unwrap_or_else(PoisonError::into_inner);
-        (usage.calls, usage.cost)
+    pub(super) fn usage(&self) -> lighthouse_model::Usage {
+        self.usage
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .usage
     }
 
     /// What went wrong with the models: a failure never makes the run

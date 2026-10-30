@@ -26,8 +26,7 @@ use crate::{Error, Run};
 /// went to it, their cost, and the runs of an agent that edits.
 type ModelCounts = (
     BTreeMap<String, crate::ModelCounts>,
-    usize,
-    f64,
+    lighthouse_model::Usage,
     Option<EditUsage>,
 );
 
@@ -131,7 +130,7 @@ impl Orchestrator<'_> {
                 },
             );
         }
-        let (models, model_calls, model_cost, model_edits) = self.model_counts(&kept);
+        let (models, usage, model_edits) = self.model_counts(&kept);
         self.notes.extend(self.proposer.finish_kept());
         Ok(FixReport {
             applied: kept,
@@ -141,8 +140,7 @@ impl Orchestrator<'_> {
             notes: self.notes,
             previews: self.previews,
             models,
-            model_calls,
-            model_cost,
+            usage,
             model_edits,
             finished: outcome,
         })
@@ -161,11 +159,11 @@ impl Orchestrator<'_> {
                 let usage = models.usage();
                 self.notes.extend(models.finish());
                 let edits = Some(EditUsage {
-                    runs: usage.calls,
+                    runs: usage.usage.calls,
                     seconds: usage.time.as_secs_f64(),
                     batches: models.traces(),
                 });
-                (models.account.counts(), usage.calls, usage.cost, edits)
+                (models.account.counts(), usage.usage, edits)
             }
             None => Default::default(),
         }

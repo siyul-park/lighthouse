@@ -371,8 +371,7 @@ pub struct FixReport {
     pub models: BTreeMap<String, ModelCounts>,
     /// Requests that went to a model this run (kept answers are not counted),
     /// and what they cost.
-    pub model_calls: usize,
-    pub model_cost: f64,
+    pub usage: lighthouse_model::Usage,
     /// Present when the model is an agent that edits: its runs and the time
     /// they took.
     pub model_edits: Option<EditUsage>,

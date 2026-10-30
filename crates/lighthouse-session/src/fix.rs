@@ -133,10 +133,9 @@ pub struct Models {
 /// Requests to models and what they cost.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct Usage {
-    /// Requests that went to a model (a run of an agent is one); answers kept
-    /// from earlier runs are not counted.
-    pub calls: usize,
-    pub cost: f64,
+    /// Requests that went to a model (a run of an agent is one).
+    #[serde(flatten)]
+    pub usage: lighthouse_model::Usage,
     /// Present when the model is an agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<Runs>,
@@ -311,7 +310,7 @@ impl Fixed {
             };
             lines.push(format!(
                 "models: {} request(s), cost {}{runs}",
-                usage.calls, usage.cost
+                usage.usage.calls, usage.usage.cost
             ));
         }
         let waiting = if self.previews.is_empty() {
@@ -509,8 +508,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
             .map(|(decision, counts)| (decision.clone(), Models::from(counts)))
             .collect(),
         usage: (!report.models.is_empty()).then_some(Usage {
-            calls: report.model_calls,
-            cost: report.model_cost,
+            usage: report.usage,
             agent: report.model_edits.as_ref().map(|agent| Runs {
                 runs: agent.runs,
                 seconds: agent.seconds,

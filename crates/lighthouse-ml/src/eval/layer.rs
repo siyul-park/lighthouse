@@ -79,8 +79,8 @@ impl<'a> Overlay<'a> {
             };
             match asked {
                 Ok((noul, by, cost)) => {
-                    found.usage.calls += 1;
-                    found.usage.cost += cost;
+                    found.usage.usage.calls += 1;
+                    found.usage.usage.cost += cost;
                     let fails = fails(noul).is_some();
                     if label.observed.is_some() {
                         label.observed = Some(if fails {
