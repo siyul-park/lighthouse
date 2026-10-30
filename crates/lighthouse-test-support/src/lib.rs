@@ -79,6 +79,7 @@ use lighthouse_spec::{Catalog, Env};
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
 static LANG_TYPESCRIPT: OnceLock<Option<PathBuf>> = OnceLock::new();
+static LANG_PYTHON: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 
@@ -135,6 +136,14 @@ pub fn lang_go() -> Option<PathBuf> {
 /// build panics.
 pub fn lang_typescript() -> Option<PathBuf> {
     LANG_TYPESCRIPT.get_or_init(build_lang_typescript).clone()
+}
+
+/// Directory of the `lang-python` plugin (manifest, launcher and the
+/// `lang_python` package), installed once per process. `None` after printing a
+/// skip message when no Python 3.11 or newer runs, unless `CI` or
+/// `LIGHTHOUSE_REQUIRE_PYTHON` is set, where a missing Python panics.
+pub fn lang_python() -> Option<PathBuf> {
+    LANG_PYTHON.get_or_init(build_lang_python).clone()
 }
 
 /// Directory of the `lang-rust` plugin (manifest and binary), built once per
@@ -281,6 +290,45 @@ fn build_lang_typescript() -> Option<PathBuf> {
     Some(out)
 }
 
+/// The oldest Python the provider runs on.
+const MIN_PYTHON: (u32, u32) = (3, 11);
+
+fn build_lang_python() -> Option<PathBuf> {
+    let source = workspace().join("plugins/lang-python");
+    if python_version().is_none_or(|version| version < MIN_PYTHON) {
+        assert!(
+            env::var_os("CI").is_none() && env::var_os("LIGHTHOUSE_REQUIRE_PYTHON").is_none(),
+            "Python {}.{} or newer is required here to run plugins/lang-python",
+            MIN_PYTHON.0,
+            MIN_PYTHON.1
+        );
+        eprintln!("skipping: no Python 3.11 or newer for plugins/lang-python");
+        return None;
+    }
+    let out = workspace().join("target/plugins-test/lang-python");
+    fs::create_dir_all(&out).expect("create plugin dir");
+    install_tree(&source.join("lang_python"), &out.join("lang_python"));
+    for name in ["lang-python", "lighthouse-plugin.toml"] {
+        install(&out.join(name), |tmp| {
+            fs::copy(source.join(name), tmp).expect("copy plugin file");
+            #[cfg(unix)]
+            fs::set_permissions(tmp, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+        });
+    }
+    Some(out)
+}
+
+/// The major and minor version of the `python3` on `PATH`, when there is one.
+fn python_version() -> Option<(u32, u32)> {
+    let output = Command::new("python3")
+        .args(["-I", "-c", "import sys; print(*sys.version_info[:2])"])
+        .output()
+        .ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    let mut parts = text.split_whitespace().map(|part| part.parse().ok());
+    Some((parts.next()??, parts.next()??))
+}
+
 /// The major version of the Node on `PATH`, when there is one.
 fn node_major(dir: &Path) -> Option<u32> {
     let output = Command::new("node")
@@ -323,6 +371,9 @@ fn install_tree(from: &Path, to: &Path) {
     for entry in fs::read_dir(from).expect("read build directory") {
         let entry = entry.expect("directory entry");
         let target = to.join(entry.file_name());
+        if entry.file_name() == "__pycache__" {
+            continue;
+        }
         if entry.file_type().expect("file type").is_dir() {
             install_tree(&entry.path(), &target);
         } else {

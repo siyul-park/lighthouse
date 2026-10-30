@@ -48,6 +48,11 @@ fn plugins() -> Vec<(&'static str, Kind, std::path::PathBuf)> {
             lighthouse_test_support::lang_typescript(),
         ),
         (
+            "lang-python",
+            Kind::Language,
+            lighthouse_test_support::lang_python(),
+        ),
+        (
             "fake-model",
             Kind::Model,
             Some(lighthouse_test_support::fake_model()),

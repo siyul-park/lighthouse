@@ -1,0 +1,729 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::Engine#type"
+        },
+        {
+          "from": {
+            "symbol": "refs::Engine#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::Engine::start#method"
+        },
+        {
+          "from": {
+            "symbol": "refs::Engine#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::Engine::stop#method"
+        },
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::Boat#type"
+        },
+        {
+          "from": {
+            "symbol": "refs::Boat#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::Boat::start#method"
+        },
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::dynamic#function"
+        },
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::typed#function"
+        },
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::inferred#function"
+        },
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::cached#function"
+        },
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "refs::value#function"
+        },
+        {
+          "from": {
+            "module": "refs"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "functools"
+        },
+        {
+          "from": {
+            "symbol": "refs::dynamic#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 18
+            },
+            "start": {
+              "col": 11,
+              "line": 18
+            }
+          },
+          "to": "refs::Engine::stop#method"
+        },
+        {
+          "from": {
+            "symbol": "refs::dynamic#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 19
+            },
+            "start": {
+              "col": 20,
+              "line": 19
+            }
+          },
+          "to": "refs::Engine::start#method"
+        },
+        {
+          "from": {
+            "symbol": "refs::dynamic#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 19
+            },
+            "start": {
+              "col": 20,
+              "line": 19
+            }
+          },
+          "to": "refs::Boat::start#method"
+        },
+        {
+          "from": {
+            "symbol": "refs::typed#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 23
+            },
+            "start": {
+              "col": 19,
+              "line": 23
+            }
+          },
+          "to": "refs::Engine#type"
+        },
+        {
+          "from": {
+            "symbol": "refs::typed#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 24
+            },
+            "start": {
+              "col": 12,
+              "line": 24
+            }
+          },
+          "to": "refs::Engine::start#method"
+        },
+        {
+          "from": {
+            "symbol": "refs::inferred#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 29
+            },
+            "start": {
+              "col": 14,
+              "line": 29
+            }
+          },
+          "to": "refs::Engine#type"
+        },
+        {
+          "from": {
+            "symbol": "refs::inferred#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 30
+            },
+            "start": {
+              "col": 12,
+              "line": 30
+            }
+          },
+          "to": "refs::Engine::stop#method"
+        },
+        {
+          "from": {
+            "symbol": "refs::cached#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 36
+            },
+            "start": {
+              "col": 12,
+              "line": 36
+            }
+          },
+          "to": "refs::Engine#type"
+        },
+        {
+          "from": {
+            "symbol": "refs::cached#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 36
+            },
+            "start": {
+              "col": 21,
+              "line": 36
+            }
+          },
+          "to": "refs::Engine::start#method"
+        },
+        {
+          "from": {
+            "symbol": "refs::value#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 40
+            },
+            "start": {
+              "col": 12,
+              "line": 40
+            }
+          },
+          "to": "refs::Engine#type"
+        }
+      ],
+      "file": {
+        "path": "refs.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "refs::Engine::start#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "refs::Engine::stop#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "refs::Boat::start#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": "refs::dynamic#function",
+          "tokens": 18,
+          "top_level": 3
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "refs::Engine",
+                "text": "Engine"
+              }
+            ],
+            "results": []
+          },
+          "statements": 2,
+          "symbol": "refs::typed#function",
+          "tokens": 10,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": "refs::inferred#function",
+          "tokens": 12,
+          "top_level": 3
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "refs::cached#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "refs::value#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "refs"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::Engine#type",
+          "kind": "type",
+          "name": "Engine",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::Engine::start#method",
+          "kind": "method",
+          "name": "start",
+          "owner": "refs::Engine#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 9
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::Engine::stop#method",
+          "kind": "method",
+          "name": "stop",
+          "owner": "refs::Engine#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 9
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::Boat#type",
+          "kind": "type",
+          "name": "Boat",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::Boat::start#method",
+          "kind": "method",
+          "name": "start",
+          "owner": "refs::Boat#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::dynamic#function",
+          "kind": "function",
+          "name": "dynamic",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::typed#function",
+          "kind": "function",
+          "name": "typed",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::inferred#function",
+          "kind": "function",
+          "name": "inferred",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::cached#function",
+          "kind": "function",
+          "name": "cached",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "file": "refs.py",
+          "id": "refs::value#function",
+          "kind": "function",
+          "name": "value",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

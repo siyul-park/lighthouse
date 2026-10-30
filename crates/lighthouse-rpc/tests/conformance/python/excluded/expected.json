@@ -1,0 +1,111 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": ".hidden/skip.py"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "real"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "real::real#function"
+        }
+      ],
+      "file": {
+        "path": "real.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "real::real#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "real"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "real.py",
+          "id": "real::real#function",
+          "kind": "function",
+          "name": "real",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": "real.pyi"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": "testdata/skip.py"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

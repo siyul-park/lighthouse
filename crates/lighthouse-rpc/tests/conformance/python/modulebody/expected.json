@@ -1,0 +1,388 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "body"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "body::VERSION#const"
+        },
+        {
+          "from": {
+            "module": "body"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "body::setup#function"
+        },
+        {
+          "from": {
+            "module": "body"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "body::main#function"
+        },
+        {
+          "from": {
+            "module": "body"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "body::<module>#function"
+        },
+        {
+          "from": {
+            "module": "body"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "sys"
+        },
+        {
+          "from": {
+            "symbol": "body::main#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 12
+            },
+            "start": {
+              "col": 12,
+              "line": 12
+            }
+          },
+          "to": "body::setup#function"
+        },
+        {
+          "from": {
+            "symbol": "body::<module>#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 6,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "to": "body::setup#function"
+        },
+        {
+          "from": {
+            "symbol": "body::<module>#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 18
+            },
+            "start": {
+              "col": 14,
+              "line": 18
+            }
+          },
+          "to": "body::main#function"
+        }
+      ],
+      "file": {
+        "path": "body.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "body::setup#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "body::setup#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "body::main#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "body"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "body.py",
+          "id": "body::VERSION#const",
+          "kind": "const",
+          "name": "VERSION",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "body.py",
+          "id": "body::setup#function",
+          "kind": "function",
+          "name": "setup",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "file": "body.py",
+          "id": "body::main#function",
+          "kind": "function",
+          "name": "main",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "body.py",
+          "id": "body::<module>#function",
+          "kind": "function",
+          "name": "<module>",
+          "span": {
+            "end": {
+              "col": 8,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "quiet"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "quiet::NAME#const"
+        },
+        {
+          "from": {
+            "module": "quiet"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "quiet::f#function"
+        },
+        {
+          "from": {
+            "module": "quiet"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "os"
+        }
+      ],
+      "file": {
+        "path": "quiet.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "quiet::f#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "quiet"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "quiet.py",
+          "id": "quiet::NAME#const",
+          "kind": "const",
+          "name": "NAME",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "quiet.py",
+          "id": "quiet::f#function",
+          "kind": "function",
+          "name": "f",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

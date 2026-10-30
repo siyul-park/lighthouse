@@ -1,0 +1,98 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": "broken.py"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "broken"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "fine"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "fine::fine#function"
+        }
+      ],
+      "file": {
+        "path": "fine.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "fine::fine#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "fine"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "fine.py",
+          "id": "fine::fine#function",
+          "kind": "function",
+          "name": "fine",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [
+    {
+      "path": "broken.py",
+      "reason": "5:9: invalid syntax"
+    }
+  ],
+  "notices": [],
+  "sources": []
+}

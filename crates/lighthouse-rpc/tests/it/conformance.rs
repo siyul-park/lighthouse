@@ -91,7 +91,26 @@ const TYPESCRIPT: Lang = Lang {
     capabilities: &["semantic-edges", "extent", "reference-sites", "overlays"],
 };
 
-const LANGS: [&Lang; 3] = [&GO, &RUST, &TYPESCRIPT];
+const PYTHON: Lang = Lang {
+    id: "python",
+    exts: &[".py", ".pyi"],
+    min_cases: 20,
+    plugin: lighthouse_test_support::lang_python,
+    probe: ("plain.py", || json!({ "python": { "nope": 1 } })),
+    manifest_id: "lang-python",
+    globs: &["**/*.{py,pyi}"],
+    test_globs: &[
+        "**/test_*.py",
+        "**/*_test.py",
+        "**/conftest.py",
+        "**/tests/**",
+        "**/test/**",
+    ],
+    constructor_prefixes: &["new", "create", "from"],
+    capabilities: &["semantic-edges", "extent", "reference-sites", "overlays"],
+};
+
+const LANGS: [&Lang; 4] = [&GO, &RUST, &TYPESCRIPT, &PYTHON];
 
 fn files(dir: &Path, base: &Path, suffixes: &[&str], out: &mut Vec<String>) {
     let mut entries: Vec<_> = fs::read_dir(dir)
@@ -299,6 +318,11 @@ fn typescript_plugin_answers_the_same_with_a_cache() {
 }
 
 #[test]
+fn python_plugin_answers_the_same_with_a_cache() {
+    cached_runs_equal_uncached(&PYTHON);
+}
+
+#[test]
 fn go_plugin_matches_the_golden_wire_output() {
     golden(&GO);
 }
@@ -311,6 +335,11 @@ fn rust_plugin_matches_the_golden_wire_output() {
 #[test]
 fn typescript_plugin_matches_the_golden_wire_output() {
     golden(&TYPESCRIPT);
+}
+
+#[test]
+fn python_plugin_matches_the_golden_wire_output() {
+    golden(&PYTHON);
 }
 
 #[test]
@@ -459,6 +488,12 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
 #[test]
 fn overlays_replace_the_text_a_provider_reads() {
     for (lang, file, added, symbol) in [
+        (
+            &PYTHON,
+            "extents.py",
+            "\n\ndef added() -> int:\n    return 1\n",
+            "::added#function",
+        ),
         (
             &GO,
             "extents.go",

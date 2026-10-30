@@ -1,0 +1,167 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 6
+            },
+            "start": {
+              "col": 18,
+              "line": 6
+            }
+          },
+          "text": "# ünïcode"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "unicode"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "unicode::naïve#function"
+        },
+        {
+          "from": {
+            "module": "unicode"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "unicode::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "unicode::naïve#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 42,
+              "line": 2
+            },
+            "start": {
+              "col": 36,
+              "line": 2
+            }
+          },
+          "to": "unicode::helper#function"
+        }
+      ],
+      "file": {
+        "path": "unicode.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": "unicode::naïve#function",
+          "tokens": 9,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "unicode::helper#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "unicode"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 48,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "unicode.py",
+          "id": "unicode::naïve#function",
+          "kind": "function",
+          "name": "naïve",
+          "span": {
+            "end": {
+              "col": 48,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "unicode.py",
+          "id": "unicode::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

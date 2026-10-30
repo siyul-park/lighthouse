@@ -1,0 +1,1045 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "classes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::traced#function"
+        },
+        {
+          "from": {
+            "module": "classes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::Inner#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::Inner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::Inner::value#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::Inner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::Inner::read#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::scale#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::__init__#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::name#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::_cache#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::title#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::make#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::build#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::show#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::other#method"
+        },
+        {
+          "from": {
+            "module": "classes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Child#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Child#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Child::show#method"
+        },
+        {
+          "from": {
+            "module": "classes"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "functools"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::Inner::read#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 20
+            },
+            "start": {
+              "col": 25,
+              "line": 20
+            }
+          },
+          "to": "classes::Outer::Inner::value#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::title#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 30
+            },
+            "start": {
+              "col": 21,
+              "line": 30
+            }
+          },
+          "to": "classes::Outer::name#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::title#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 34
+            },
+            "start": {
+              "col": 14,
+              "line": 34
+            }
+          },
+          "to": "classes::Outer::name#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::make#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 38
+            },
+            "start": {
+              "col": 16,
+              "line": 38
+            }
+          },
+          "to": "classes::Outer::__init__#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::build#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 42
+            },
+            "start": {
+              "col": 16,
+              "line": 42
+            }
+          },
+          "to": "classes::Outer::__init__#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::show#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 44
+            },
+            "start": {
+              "col": 6,
+              "line": 44
+            }
+          },
+          "to": "classes::traced#function"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::show#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 46
+            },
+            "start": {
+              "col": 17,
+              "line": 46
+            }
+          },
+          "to": "classes::Outer#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::show#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 46
+            },
+            "start": {
+              "col": 23,
+              "line": 46
+            }
+          },
+          "to": "classes::Outer::Inner#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::show#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 47
+            },
+            "start": {
+              "col": 22,
+              "line": 47
+            }
+          },
+          "to": "classes::Outer::Inner::read#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::show#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 47
+            },
+            "start": {
+              "col": 36,
+              "line": 47
+            }
+          },
+          "to": "classes::Outer::scale#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::other#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 49
+            },
+            "start": {
+              "col": 29,
+              "line": 49
+            }
+          },
+          "to": "classes::Outer#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::other#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 50
+            },
+            "start": {
+              "col": 22,
+              "line": 50
+            }
+          },
+          "to": "classes::Outer::show#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Child#type"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 53
+            },
+            "start": {
+              "col": 13,
+              "line": 53
+            }
+          },
+          "to": "classes::Outer#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Child::show#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 55
+            },
+            "start": {
+              "col": 24,
+              "line": 55
+            }
+          },
+          "to": "classes::Outer::show#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Child::show#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 43,
+              "line": 55
+            },
+            "start": {
+              "col": 38,
+              "line": 55
+            }
+          },
+          "to": "classes::Outer::scale#field"
+        }
+      ],
+      "file": {
+        "path": "classes.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": "classes::traced#function",
+          "tokens": 22,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "classes::Outer::Inner::read#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": []
+          },
+          "statements": 2,
+          "symbol": "classes::Outer::__init__#method",
+          "tokens": 11,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "classes::Outer::title#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "classes::Outer::make#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "classes::Outer::build#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": "classes::Outer::show#method",
+          "tokens": 17,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "classes::Outer",
+                "text": "Outer"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "classes::Outer::other#method",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "classes::Child::show#method",
+          "tokens": 12,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "classes"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::traced#function",
+          "kind": "function",
+          "name": "traced",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Outer owns Inner.",
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer#type",
+          "kind": "type",
+          "name": "Outer",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 20
+            },
+            "start": {
+              "col": 5,
+              "line": 16
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::Inner#type",
+          "kind": "type",
+          "name": "Inner",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 20
+            },
+            "start": {
+              "col": 5,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 17
+            },
+            "start": {
+              "col": 9,
+              "line": 17
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::Inner::value#field",
+          "kind": "field",
+          "name": "value",
+          "owner": "classes::Outer::Inner#type",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 17
+            },
+            "start": {
+              "col": 9,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 20
+            },
+            "start": {
+              "col": 9,
+              "line": 19
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::Inner::read#method",
+          "kind": "method",
+          "name": "read",
+          "owner": "classes::Outer::Inner#type",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 20
+            },
+            "start": {
+              "col": 9,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::scale#field",
+          "kind": "field",
+          "name": "scale",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 26
+            },
+            "start": {
+              "col": 5,
+              "line": 24
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::__init__#method",
+          "kind": "method",
+          "name": "__init__",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 26
+            },
+            "start": {
+              "col": 5,
+              "line": 24
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "classes.py",
+          "id": "classes::Outer::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 25
+            },
+            "start": {
+              "col": 9,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "classes.py",
+          "id": "classes::Outer::_cache#field",
+          "kind": "field",
+          "name": "_cache",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 26
+            },
+            "start": {
+              "col": 9,
+              "line": 26
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 34
+            },
+            "start": {
+              "col": 5,
+              "line": 28
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::title#method",
+          "kind": "method",
+          "name": "title",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 30
+            },
+            "start": {
+              "col": 5,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 36
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::make#method",
+          "kind": "method",
+          "name": "make",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 36
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 42
+            },
+            "start": {
+              "col": 5,
+              "line": 40
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::build#method",
+          "kind": "method",
+          "name": "build",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 42
+            },
+            "start": {
+              "col": 5,
+              "line": 40
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 41,
+              "line": 47
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::show#method",
+          "kind": "method",
+          "name": "show",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 41,
+              "line": 47
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 50
+            },
+            "start": {
+              "col": 5,
+              "line": 49
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Outer::other#method",
+          "kind": "method",
+          "name": "other",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 50
+            },
+            "start": {
+              "col": 5,
+              "line": 49
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 53
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Child#type",
+          "kind": "type",
+          "name": "Child",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 53
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 55
+            },
+            "start": {
+              "col": 5,
+              "line": 54
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Child::show#method",
+          "kind": "method",
+          "name": "show",
+          "owner": "classes::Child#type",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 55
+            },
+            "start": {
+              "col": 5,
+              "line": 54
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

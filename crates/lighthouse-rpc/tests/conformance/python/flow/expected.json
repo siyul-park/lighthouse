@@ -1,0 +1,426 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "flow::classify#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "flow::walk#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "flow::dispatch#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "flow::mixed#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "flow::nest#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::walk#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 29
+            },
+            "start": {
+              "col": 16,
+              "line": 29
+            }
+          },
+          "to": "flow::walk#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::walk#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 29
+            },
+            "start": {
+              "col": 34,
+              "line": 29
+            }
+          },
+          "to": "flow::walk#function"
+        }
+      ],
+      "file": {
+        "path": "flow.py"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            },
+            {
+              "kind": "else-if",
+              "nesting": 0
+            },
+            {
+              "kind": "else",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 1
+            },
+            {
+              "kind": "if",
+              "nesting": 2
+            },
+            {
+              "kind": "catch",
+              "nesting": 0
+            },
+            {
+              "kind": "catch",
+              "nesting": 0
+            },
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 3,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 16,
+          "symbol": "flow::classify#function",
+          "tokens": 86,
+          "top_level": 4
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": "flow::walk#function",
+          "tokens": 23,
+          "top_level": 2
+        },
+        {
+          "flow": [
+            {
+              "arms": 2,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 7,
+          "symbol": "flow::dispatch#function",
+          "tokens": 18,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 5,
+          "symbol": "flow::mixed#function",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 2,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 4,
+          "symbol": "flow::nest#function",
+          "tokens": 12,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "path": "flow"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "flow.py",
+          "id": "flow::classify#function",
+          "kind": "function",
+          "name": "classify",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "file": "flow.py",
+          "id": "flow::walk#function",
+          "kind": "function",
+          "name": "walk",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 32
+            }
+          },
+          "file": "flow.py",
+          "id": "flow::dispatch#function",
+          "kind": "function",
+          "name": "dispatch",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 32
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "file": "flow.py",
+          "id": "flow::mixed#function",
+          "kind": "function",
+          "name": "mixed",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "file": "flow.py",
+          "id": "flow::nest#function",
+          "kind": "function",
+          "name": "nest",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

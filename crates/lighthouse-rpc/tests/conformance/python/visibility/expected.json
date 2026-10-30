@@ -1,0 +1,700 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "listed"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "listed::chosen#function"
+        },
+        {
+          "from": {
+            "module": "listed"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "listed::unlisted#function"
+        },
+        {
+          "from": {
+            "module": "listed"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 1
+            },
+            "start": {
+              "col": 12,
+              "line": 1
+            }
+          },
+          "to": "listed::chosen#function"
+        }
+      ],
+      "file": {
+        "path": "listed.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "listed::chosen#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "listed::unlisted#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "listed"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "listed.py",
+          "id": "listed::chosen#function",
+          "kind": "function",
+          "name": "chosen",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "file": "listed.py",
+          "id": "listed::unlisted#function",
+          "kind": "function",
+          "name": "unlisted",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 3
+            },
+            "start": {
+              "col": 12,
+              "line": 3
+            }
+          },
+          "to": "pkg/impl::exposed#function"
+        },
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 32,
+              "line": 3
+            },
+            "start": {
+              "col": 23,
+              "line": 3
+            }
+          },
+          "to": "pkg/impl::_lifted#function"
+        },
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "pkg/impl"
+        },
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "pkg/impl::_lifted#function"
+        },
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "pkg/impl::exposed#function"
+        }
+      ],
+      "file": {
+        "path": "pkg/__init__.py"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "pkg"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "pkg/_internal"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/_internal::shared#function"
+        }
+      ],
+      "file": {
+        "path": "pkg/_internal.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/_internal::shared#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "pkg/_internal"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "pkg/_internal.py",
+          "id": "pkg/_internal::shared#function",
+          "kind": "function",
+          "name": "shared",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "pkg/impl"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/impl::exposed#function"
+        },
+        {
+          "from": {
+            "module": "pkg/impl"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/impl::_lifted#function"
+        },
+        {
+          "from": {
+            "module": "pkg/impl"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/impl::_hidden#function"
+        },
+        {
+          "from": {
+            "module": "pkg/impl"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/impl::_Quiet#type"
+        },
+        {
+          "from": {
+            "symbol": "pkg/impl::_Quiet#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/impl::_Quiet::visible#method"
+        },
+        {
+          "from": {
+            "symbol": "pkg/impl::_Quiet#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/impl::_Quiet::_tucked#method"
+        },
+        {
+          "from": {
+            "symbol": "pkg/impl::_Quiet#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/impl::_Quiet::__repr__#method"
+        }
+      ],
+      "file": {
+        "path": "pkg/impl.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/impl::exposed#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/impl::_lifted#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/impl::_hidden#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/impl::_Quiet::visible#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/impl::_Quiet::_tucked#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/impl::_Quiet::__repr__#method",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "pkg/impl"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "pkg/impl.py",
+          "id": "pkg/impl::exposed#function",
+          "kind": "function",
+          "name": "exposed",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "pkg/impl.py",
+          "id": "pkg/impl::_lifted#function",
+          "kind": "function",
+          "name": "_lifted",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "pkg/impl.py",
+          "id": "pkg/impl::_hidden#function",
+          "kind": "function",
+          "name": "_hidden",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "file": "pkg/impl.py",
+          "id": "pkg/impl::_Quiet#type",
+          "kind": "type",
+          "name": "_Quiet",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "file": "pkg/impl.py",
+          "id": "pkg/impl::_Quiet::visible#method",
+          "kind": "method",
+          "name": "visible",
+          "owner": "pkg/impl::_Quiet#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 17
+            }
+          },
+          "file": "pkg/impl.py",
+          "id": "pkg/impl::_Quiet::_tucked#method",
+          "kind": "method",
+          "name": "_tucked",
+          "owner": "pkg/impl::_Quiet#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 17
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 21
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
+          "file": "pkg/impl.py",
+          "id": "pkg/impl::_Quiet::__repr__#method",
+          "kind": "method",
+          "name": "__repr__",
+          "owner": "pkg/impl::_Quiet#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 21
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

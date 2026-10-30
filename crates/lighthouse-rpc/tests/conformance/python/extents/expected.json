@@ -1,0 +1,455 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": "extents::lead#function",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "text": "# leading comment\n# second line"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 7
+            },
+            "start": {
+              "col": 15,
+              "line": 7
+            }
+          },
+          "text": "# trailing"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "text": "# detached by a blank line"
+        },
+        {
+          "attached_to": "extents::Box::size#field",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 32
+            }
+          },
+          "text": "# attribute comment"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 33
+            },
+            "start": {
+              "col": 15,
+              "line": 33
+            }
+          },
+          "text": "# trailing size"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "extents::lead#function"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "extents::detached#function"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "extents::decorated#function"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "extents::LIMIT#const"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "extents::Box#type"
+        },
+        {
+          "from": {
+            "symbol": "extents::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "extents::Box::size#field"
+        },
+        {
+          "from": {
+            "symbol": "extents::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "extents::Box::method#method"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "functools"
+        },
+        {
+          "from": {
+            "symbol": "extents::Box::method#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 36
+            },
+            "start": {
+              "col": 21,
+              "line": 36
+            }
+          },
+          "to": "extents::Box::size#field"
+        }
+      ],
+      "file": {
+        "path": "extents.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "extents::lead#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "extents::detached#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "extents::decorated#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "extents::Box::method#method",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "extents"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "extents.py",
+          "id": "extents::lead#function",
+          "kind": "function",
+          "name": "lead",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "extents.py",
+          "id": "extents::detached#function",
+          "kind": "function",
+          "name": "detached",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Doc of decorated.\n\nMore text.",
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "extents.py",
+          "id": "extents::decorated#function",
+          "kind": "function",
+          "name": "decorated",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "The limit.",
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "file": "extents.py",
+          "id": "extents::LIMIT#const",
+          "kind": "const",
+          "name": "LIMIT",
+          "span": {
+            "end": {
+              "col": 10,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "A box.",
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "file": "extents.py",
+          "id": "extents::Box#type",
+          "kind": "type",
+          "name": "Box",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 32
+            }
+          },
+          "file": "extents.py",
+          "id": "extents::Box::size#field",
+          "kind": "field",
+          "name": "size",
+          "owner": "extents::Box#type",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 33
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "file": "extents.py",
+          "id": "extents::Box::method#method",
+          "kind": "method",
+          "name": "method",
+          "owner": "extents::Box#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

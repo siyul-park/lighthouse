@@ -1,0 +1,1492 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "calc::add#function"
+        },
+        {
+          "from": {
+            "module": "calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "calc::sub#function"
+        },
+        {
+          "from": {
+            "module": "calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "calc::Account#type"
+        },
+        {
+          "from": {
+            "symbol": "calc::Account#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "calc::Account::deposit#method"
+        }
+      ],
+      "file": {
+        "path": "calc.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "calc::add#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "calc::sub#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "calc::Account::deposit#method",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "calc"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "calc.py",
+          "id": "calc::add#function",
+          "kind": "function",
+          "name": "add",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "calc.py",
+          "id": "calc::sub#function",
+          "kind": "function",
+          "name": "sub",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "calc.py",
+          "id": "calc::Account#type",
+          "kind": "type",
+          "name": "Account",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "file": "calc.py",
+          "id": "calc::Account::deposit#method",
+          "kind": "method",
+          "name": "deposit",
+          "owner": "calc::Account#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "conftest"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "conftest::account#function"
+        },
+        {
+          "from": {
+            "module": "conftest"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "pytest"
+        }
+      ],
+      "file": {
+        "path": "conftest.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "conftest::account#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "conftest",
+          "test_of": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "conftest.py",
+          "id": "conftest::account#function",
+          "kind": "function",
+          "name": "account",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::ROWS#const"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::check_sum#function"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::build_rows#function"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::test_add#test"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::test_add_table#test"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::test_loop#test"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::test_manual#test"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::TestAccount#type"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestAccount#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::TestAccount::test_deposit#test"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestAccount#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::TestAccount::helper#method"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::Holder#type"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::Holder#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::Holder::test_ignored#method"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "pytest"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "calc"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::check_sum#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 9
+            },
+            "start": {
+              "col": 12,
+              "line": 9
+            }
+          },
+          "to": "calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::build_rows#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 13
+            },
+            "start": {
+              "col": 12,
+              "line": 13
+            }
+          },
+          "to": "test_calc::ROWS#const"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::test_add#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 17
+            },
+            "start": {
+              "col": 12,
+              "line": 17
+            }
+          },
+          "to": "calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::test_add_table#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "to": "test_calc::check_sum#function"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::test_loop#test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 26
+            },
+            "start": {
+              "col": 27,
+              "line": 26
+            }
+          },
+          "to": "test_calc::ROWS#const"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::test_loop#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 27
+            },
+            "start": {
+              "col": 16,
+              "line": 27
+            }
+          },
+          "to": "calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::test_manual#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 31
+            },
+            "start": {
+              "col": 8,
+              "line": 31
+            }
+          },
+          "to": "calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestAccount::test_deposit#test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 37
+            },
+            "start": {
+              "col": 16,
+              "line": 37
+            }
+          },
+          "to": "calc::Account#type"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestAccount::test_deposit#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 37
+            },
+            "start": {
+              "col": 26,
+              "line": 37
+            }
+          },
+          "to": "calc::Account::deposit#method"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestAccount::helper#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 40
+            },
+            "start": {
+              "col": 16,
+              "line": 40
+            }
+          },
+          "to": "calc::sub#function"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::Holder::test_ignored#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 45
+            },
+            "start": {
+              "col": 16,
+              "line": 45
+            }
+          },
+          "to": "calc::add#function"
+        }
+      ],
+      "file": {
+        "path": "test_calc.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 3,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "test_calc::check_sum#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "test_calc::build_rows#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "test_calc::test_add#test",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "test_calc::check_sum#function",
+          "max_nesting": 0,
+          "params": 3,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "test_calc::test_add_table#test",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "test_calc::test_loop#test",
+          "tokens": 18,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "manual_assertions": 1,
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "test_calc::test_manual#test",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "test_calc::TestAccount::test_deposit#test",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "test_calc::TestAccount::helper#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "test_calc::Holder::test_ignored#method",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "test_calc",
+          "test_of": "calc"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::ROWS#const",
+          "kind": "const",
+          "name": "ROWS",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::check_sum#function",
+          "kind": "function",
+          "name": "check_sum",
+          "role": "test-helper",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::build_rows#function",
+          "kind": "function",
+          "name": "build_rows",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::test_add#test",
+          "kind": "test",
+          "name": "test_add",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::test_add_table#test",
+          "kind": "test",
+          "name": "test_add_table",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 37,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::test_loop#test",
+          "kind": "test",
+          "name": "test_loop",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 36,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::test_manual#test",
+          "kind": "test",
+          "name": "test_manual",
+          "span": {
+            "end": {
+              "col": 36,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::TestAccount#type",
+          "kind": "type",
+          "name": "TestAccount",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 41,
+              "line": 37
+            },
+            "start": {
+              "col": 5,
+              "line": 36
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::TestAccount::test_deposit#test",
+          "kind": "test",
+          "name": "test_deposit",
+          "owner": "test_calc::TestAccount#type",
+          "span": {
+            "end": {
+              "col": 41,
+              "line": 37
+            },
+            "start": {
+              "col": 5,
+              "line": 36
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 40
+            },
+            "start": {
+              "col": 5,
+              "line": 39
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::TestAccount::helper#method",
+          "kind": "method",
+          "name": "helper",
+          "owner": "test_calc::TestAccount#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 40
+            },
+            "start": {
+              "col": 5,
+              "line": 39
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 45
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::Holder#type",
+          "kind": "type",
+          "name": "Holder",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 45
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 45
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::Holder::test_ignored#method",
+          "kind": "method",
+          "name": "test_ignored",
+          "owner": "test_calc::Holder#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 45
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "test_calc::test_add#test",
+          "targets": [
+            "calc::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "test_calc::test_add_table#test",
+          "targets": [
+            "test_calc::check_sum#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "test_calc::test_loop#test",
+          "targets": [
+            "test_calc::ROWS#const",
+            "calc::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "test_calc::test_manual#test",
+          "targets": [
+            "calc::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "test_calc::TestAccount::test_deposit#test",
+          "targets": [
+            "calc::Account#type",
+            "calc::Account::deposit#method"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "test_unit"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_unit::SubTests#type"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_unit::SubTests::setUp#method"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_unit::SubTests::test_sub#test"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_unit::SubTests::test_rows#test"
+        },
+        {
+          "from": {
+            "module": "test_unit"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "unittest"
+        },
+        {
+          "from": {
+            "module": "test_unit"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "calc"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests::test_sub#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 11
+            },
+            "start": {
+              "col": 26,
+              "line": 11
+            }
+          },
+          "to": "calc::sub#function"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests::test_rows#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 16
+            },
+            "start": {
+              "col": 34,
+              "line": 16
+            }
+          },
+          "to": "calc::sub#function"
+        }
+      ],
+      "file": {
+        "path": "test_unit.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "test_unit::SubTests::setUp#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "test_unit::SubTests::test_sub#test",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 3,
+          "symbol": "test_unit::SubTests::test_rows#test",
+          "tokens": 42,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "test_unit",
+          "test_of": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 47,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "test_unit.py",
+          "id": "test_unit::SubTests#type",
+          "kind": "type",
+          "name": "SubTests",
+          "span": {
+            "end": {
+              "col": 47,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "file": "test_unit.py",
+          "id": "test_unit::SubTests::setUp#method",
+          "kind": "method",
+          "name": "setUp",
+          "owner": "test_unit::SubTests#type",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 48,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "file": "test_unit.py",
+          "id": "test_unit::SubTests::test_sub#test",
+          "kind": "test",
+          "name": "test_sub",
+          "owner": "test_unit::SubTests#type",
+          "span": {
+            "end": {
+              "col": 48,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 47,
+              "line": 16
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "file": "test_unit.py",
+          "id": "test_unit::SubTests::test_rows#test",
+          "kind": "test",
+          "name": "test_rows",
+          "owner": "test_unit::SubTests#type",
+          "span": {
+            "end": {
+              "col": 47,
+              "line": 16
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "test_unit::SubTests::test_sub#test",
+          "targets": [
+            "calc::sub#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "test_unit::SubTests::test_rows#test",
+          "targets": [
+            "calc::sub#function"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

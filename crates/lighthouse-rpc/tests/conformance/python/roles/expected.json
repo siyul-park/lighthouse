@@ -1,0 +1,487 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::FIXTURE_ROWS#const"
+        },
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::DEFAULT#const"
+        },
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::Sample#type"
+        },
+        {
+          "from": {
+            "symbol": "test_roles::Sample#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::Sample::value#field"
+        },
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::assert_positive#function"
+        },
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::make_sample#function"
+        },
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::sample#function"
+        },
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_roles::test_it#test"
+        },
+        {
+          "from": {
+            "module": "test_roles"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "pytest"
+        },
+        {
+          "from": {
+            "symbol": "test_roles::make_sample#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 16
+            },
+            "start": {
+              "col": 12,
+              "line": 16
+            }
+          },
+          "to": "test_roles::Sample#type"
+        },
+        {
+          "from": {
+            "symbol": "test_roles::sample#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 21
+            },
+            "start": {
+              "col": 12,
+              "line": 21
+            }
+          },
+          "to": "test_roles::make_sample#function"
+        },
+        {
+          "from": {
+            "symbol": "test_roles::test_it#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 25
+            },
+            "start": {
+              "col": 5,
+              "line": 25
+            }
+          },
+          "to": "test_roles::assert_positive#function"
+        },
+        {
+          "from": {
+            "symbol": "test_roles::test_it#test"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 25
+            },
+            "start": {
+              "col": 28,
+              "line": 25
+            }
+          },
+          "to": "test_roles::Sample::value#field"
+        }
+      ],
+      "file": {
+        "path": "test_roles.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "test_roles::assert_positive#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "test_roles::Sample#type",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "test_roles::make_sample#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "test_roles::make_sample#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "test_roles::sample#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "test_roles::test_it#test",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "test_roles",
+          "test_of": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::FIXTURE_ROWS#const",
+          "kind": "const",
+          "name": "FIXTURE_ROWS",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::DEFAULT#const",
+          "kind": "const",
+          "name": "DEFAULT",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::Sample#type",
+          "kind": "type",
+          "name": "Sample",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::Sample::value#field",
+          "kind": "field",
+          "name": "value",
+          "owner": "test_roles::Sample#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::assert_positive#function",
+          "kind": "function",
+          "name": "assert_positive",
+          "role": "test-helper",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::make_sample#function",
+          "kind": "function",
+          "name": "make_sample",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::sample#function",
+          "kind": "function",
+          "name": "sample",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 34,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "file": "test_roles.py",
+          "id": "test_roles::test_it#test",
+          "kind": "test",
+          "name": "test_it",
+          "span": {
+            "end": {
+              "col": 34,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "test_roles::test_it#test",
+          "targets": [
+            "test_roles::assert_positive#function",
+            "test_roles::Sample::value#field"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

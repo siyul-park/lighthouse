@@ -1,0 +1,310 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "ns/a/mod"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "ns/a/mod::alpha#function"
+        }
+      ],
+      "file": {
+        "path": "ns/a/mod.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "ns/a/mod::alpha#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "ns/a/mod"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "ns/a/mod.py",
+          "id": "ns/a/mod::alpha#function",
+          "kind": "function",
+          "name": "alpha",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "ns/b/other"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "ns/b/other::beta#function"
+        }
+      ],
+      "file": {
+        "path": "ns/b/other.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "ns/b/other::beta#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "ns/b/other"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "ns/b/other.py",
+          "id": "ns/b/other::beta#function",
+          "kind": "function",
+          "name": "beta",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "use"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "use::use#function"
+        },
+        {
+          "from": {
+            "module": "use"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "ns/a/mod"
+        },
+        {
+          "from": {
+            "module": "use"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "ns/b"
+        },
+        {
+          "from": {
+            "module": "use"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "ns/b/other"
+        },
+        {
+          "from": {
+            "symbol": "use::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 6
+            },
+            "start": {
+              "col": 21,
+              "line": 6
+            }
+          },
+          "to": "ns/a/mod::alpha#function"
+        },
+        {
+          "from": {
+            "symbol": "use::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 6
+            },
+            "start": {
+              "col": 37,
+              "line": 6
+            }
+          },
+          "to": "ns/b/other::beta#function"
+        }
+      ],
+      "file": {
+        "path": "use.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "use::use#function",
+          "tokens": 16,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "use"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "use.py",
+          "id": "use::use#function",
+          "kind": "function",
+          "name": "use",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

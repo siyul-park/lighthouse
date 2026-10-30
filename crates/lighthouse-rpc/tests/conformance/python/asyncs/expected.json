@@ -1,0 +1,314 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "asyncs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "asyncs::fetch#function"
+        },
+        {
+          "from": {
+            "module": "asyncs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "asyncs::gather#function"
+        },
+        {
+          "from": {
+            "module": "asyncs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "asyncs::stream#function"
+        },
+        {
+          "from": {
+            "module": "asyncs"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "asyncs::lock#function"
+        },
+        {
+          "from": {
+            "module": "asyncs"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "asyncio"
+        },
+        {
+          "from": {
+            "symbol": "asyncs::gather#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 10
+            },
+            "start": {
+              "col": 22,
+              "line": 10
+            }
+          },
+          "to": "asyncs::fetch#function"
+        },
+        {
+          "from": {
+            "symbol": "asyncs::gather#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 11
+            },
+            "start": {
+              "col": 23,
+              "line": 11
+            }
+          },
+          "to": "asyncs::stream#function"
+        },
+        {
+          "from": {
+            "symbol": "asyncs::gather#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 13
+            },
+            "start": {
+              "col": 16,
+              "line": 13
+            }
+          },
+          "to": "asyncs::lock#function"
+        }
+      ],
+      "file": {
+        "path": "asyncs.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": "asyncs::fetch#function",
+          "tokens": 9,
+          "top_level": 2
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 6,
+          "symbol": "asyncs::gather#function",
+          "tokens": 39,
+          "top_level": 4
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "asyncs::stream#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "asyncs::lock#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "asyncs"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "asyncs.py",
+          "id": "asyncs::fetch#function",
+          "kind": "function",
+          "name": "fetch",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "asyncs.py",
+          "id": "asyncs::gather#function",
+          "kind": "function",
+          "name": "gather",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 12,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "asyncs.py",
+          "id": "asyncs::stream#function",
+          "kind": "function",
+          "name": "stream",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "file": "asyncs.py",
+          "id": "asyncs::lock#function",
+          "kind": "function",
+          "name": "lock",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

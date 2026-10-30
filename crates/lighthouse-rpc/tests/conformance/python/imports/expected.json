@@ -1,0 +1,964 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": "app/__init__.py"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "app"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "app/star"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app/star::use#function"
+        },
+        {
+          "from": {
+            "module": "app/star"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "app/util"
+        },
+        {
+          "from": {
+            "symbol": "app/star::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 5
+            },
+            "start": {
+              "col": 12,
+              "line": 5
+            }
+          },
+          "to": "app/util::double#function"
+        },
+        {
+          "from": {
+            "symbol": "app/star::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 5
+            },
+            "start": {
+              "col": 24,
+              "line": 5
+            }
+          },
+          "to": "app/util::triple#function"
+        }
+      ],
+      "file": {
+        "path": "app/star.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "app/star::use#function",
+          "tokens": 10,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "app/star"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "app/star.py",
+          "id": "app/star::use#function",
+          "kind": "function",
+          "name": "use",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "app/sub"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 3
+            },
+            "start": {
+              "col": 12,
+              "line": 3
+            }
+          },
+          "to": "app/sub/leaf::Leaf#type"
+        },
+        {
+          "from": {
+            "module": "app/sub"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "app/sub/leaf"
+        },
+        {
+          "from": {
+            "module": "app/sub"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "app/sub/leaf::Leaf#type"
+        }
+      ],
+      "file": {
+        "path": "app/sub/__init__.py"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "app/sub"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "app/sub/leaf"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app/sub/leaf::Leaf#type"
+        },
+        {
+          "from": {
+            "symbol": "app/sub/leaf::Leaf#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app/sub/leaf::Leaf::go#method"
+        },
+        {
+          "from": {
+            "module": "app/sub/leaf"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "app"
+        },
+        {
+          "from": {
+            "module": "app/sub/leaf"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "app/util"
+        },
+        {
+          "from": {
+            "module": "app/sub/leaf"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "app/util"
+        },
+        {
+          "from": {
+            "symbol": "app/sub/leaf::Leaf::go#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 7
+            },
+            "start": {
+              "col": 21,
+              "line": 7
+            }
+          },
+          "to": "app/util::double#function"
+        },
+        {
+          "from": {
+            "symbol": "app/sub/leaf::Leaf::go#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 7
+            },
+            "start": {
+              "col": 33,
+              "line": 7
+            }
+          },
+          "to": "app/util::quad#function"
+        }
+      ],
+      "file": {
+        "path": "app/sub/leaf.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "app/sub/leaf::Leaf::go#method",
+          "tokens": 12,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "app/sub/leaf"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "app/sub/leaf.py",
+          "id": "app/sub/leaf::Leaf#type",
+          "kind": "type",
+          "name": "Leaf",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "file": "app/sub/leaf.py",
+          "id": "app/sub/leaf::Leaf::go#method",
+          "kind": "method",
+          "name": "go",
+          "owner": "app/sub/leaf::Leaf#type",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "app/util"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app/util::double#function"
+        },
+        {
+          "from": {
+            "module": "app/util"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app/util::triple#function"
+        },
+        {
+          "from": {
+            "module": "app/util"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app/util::quad#function"
+        },
+        {
+          "from": {
+            "module": "app/util"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 3
+            },
+            "start": {
+              "col": 12,
+              "line": 3
+            }
+          },
+          "to": "app/util::double#function"
+        },
+        {
+          "from": {
+            "module": "app/util"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 3
+            },
+            "start": {
+              "col": 22,
+              "line": 3
+            }
+          },
+          "to": "app/util::triple#function"
+        }
+      ],
+      "file": {
+        "path": "app/util.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "app/util::double#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "app/util::triple#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "app/util::quad#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "app/util"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "app/util.py",
+          "id": "app/util::double#function",
+          "kind": "function",
+          "name": "double",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "app/util.py",
+          "id": "app/util::triple#function",
+          "kind": "function",
+          "name": "triple",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "file": "app/util.py",
+          "id": "app/util::quad#function",
+          "kind": "function",
+          "name": "quad",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "main::main#function"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "os"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "numpy"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "app/sub/leaf"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "to": "app"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "to": "app/util"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "to": "app/sub"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "to": "app/util"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "to": "missing"
+        },
+        {
+          "from": {
+            "symbol": "main::main#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 13
+            },
+            "start": {
+              "col": 10,
+              "line": 13
+            }
+          },
+          "to": "app/sub/leaf::Leaf#type"
+        },
+        {
+          "from": {
+            "symbol": "main::main#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 13
+            },
+            "start": {
+              "col": 17,
+              "line": 13
+            }
+          },
+          "to": "app/sub/leaf::Leaf::go#method"
+        },
+        {
+          "from": {
+            "symbol": "main::main#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 14
+            },
+            "start": {
+              "col": 10,
+              "line": 14
+            }
+          },
+          "to": "app/util::triple#function"
+        },
+        {
+          "from": {
+            "symbol": "main::main#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 9,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 15
+            }
+          },
+          "to": "app/sub/leaf::Leaf#type"
+        },
+        {
+          "from": {
+            "symbol": "main::main#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 15
+            },
+            "start": {
+              "col": 12,
+              "line": 15
+            }
+          },
+          "to": "app/sub/leaf::Leaf::go#method"
+        },
+        {
+          "from": {
+            "symbol": "main::main#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 16
+            },
+            "start": {
+              "col": 12,
+              "line": 16
+            }
+          },
+          "to": "app/util::double#function"
+        }
+      ],
+      "file": {
+        "path": "main.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 6,
+          "symbol": "main::main#function",
+          "tokens": 40,
+          "top_level": 6
+        }
+      ],
+      "modules": [
+        {
+          "path": "main"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "main.py",
+          "id": "main::main#function",
+          "kind": "function",
+          "name": "main",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 relative import(s) resolve to no file; their edges are syntactic"
+  ],
+  "sources": []
+}

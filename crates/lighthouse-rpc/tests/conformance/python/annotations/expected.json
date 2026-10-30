@@ -1,0 +1,336 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "annotations"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "annotations::Node#type"
+        },
+        {
+          "from": {
+            "symbol": "annotations::Node#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "annotations::Node::next#field"
+        },
+        {
+          "from": {
+            "symbol": "annotations::Node#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "annotations::Node::link#method"
+        },
+        {
+          "from": {
+            "module": "annotations"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "annotations::build#function"
+        },
+        {
+          "from": {
+            "symbol": "annotations::Node::next#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 12,
+              "line": 2
+            }
+          },
+          "to": "annotations::Node#type"
+        },
+        {
+          "from": {
+            "symbol": "annotations::Node::link#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 32,
+              "line": 4
+            },
+            "start": {
+              "col": 28,
+              "line": 4
+            }
+          },
+          "to": "annotations::Node#type"
+        },
+        {
+          "from": {
+            "symbol": "annotations::Node::link#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 43,
+              "line": 4
+            },
+            "start": {
+              "col": 39,
+              "line": 4
+            }
+          },
+          "to": "annotations::Node#type"
+        },
+        {
+          "from": {
+            "symbol": "annotations::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 8
+            },
+            "start": {
+              "col": 19,
+              "line": 8
+            }
+          },
+          "to": "annotations::Node#type"
+        },
+        {
+          "from": {
+            "symbol": "annotations::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 8
+            },
+            "start": {
+              "col": 34,
+              "line": 8
+            }
+          },
+          "to": "annotations::Node#type"
+        },
+        {
+          "from": {
+            "symbol": "annotations::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 53,
+              "line": 8
+            },
+            "start": {
+              "col": 49,
+              "line": 8
+            }
+          },
+          "to": "annotations::Node#type"
+        }
+      ],
+      "file": {
+        "path": "annotations.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "annotations::Node",
+                "text": "Node"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "annotations::Node",
+                "text": "Node"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "annotations::Node::link#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "annotations::Node",
+                "text": "Node"
+              },
+              {
+                "exported": true,
+                "symbol": "annotations::Node",
+                "text": "Node"
+              }
+            ],
+            "results": [
+              {
+                "text": "list[Node]"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "annotations::build#function",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "annotations"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "annotations.py",
+          "id": "annotations::Node#type",
+          "kind": "type",
+          "name": "Node",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 31,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "file": "annotations.py",
+          "id": "annotations::Node::next#field",
+          "kind": "field",
+          "name": "next",
+          "optional": true,
+          "owner": "annotations::Node#type",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": "annotations::Node",
+            "text": "Node | None"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "file": "annotations.py",
+          "id": "annotations::Node::link#method",
+          "kind": "method",
+          "name": "link",
+          "owner": "annotations::Node#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "file": "annotations.py",
+          "id": "annotations::build#function",
+          "kind": "function",
+          "name": "build",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

@@ -1,0 +1,261 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/pkg"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 3
+            },
+            "start": {
+              "col": 12,
+              "line": 3
+            }
+          },
+          "to": "src/pkg/mod::compute#function"
+        },
+        {
+          "from": {
+            "module": "src/pkg"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/pkg/mod"
+        },
+        {
+          "from": {
+            "module": "src/pkg"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/pkg/mod::compute#function"
+        }
+      ],
+      "file": {
+        "path": "src/pkg/__init__.py"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "src/pkg"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/pkg/mod"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/pkg/mod::compute#function"
+        }
+      ],
+      "file": {
+        "path": "src/pkg/mod.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/pkg/mod::compute#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/pkg/mod"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/pkg/mod.py",
+          "id": "src/pkg/mod::compute#function",
+          "kind": "function",
+          "name": "compute",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "tests/test_mod"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "tests/test_mod::test_compute#test"
+        },
+        {
+          "from": {
+            "module": "tests/test_mod"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/pkg/mod"
+        },
+        {
+          "from": {
+            "symbol": "tests/test_mod::test_compute#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 5
+            },
+            "start": {
+              "col": 12,
+              "line": 5
+            }
+          },
+          "to": "src/pkg/mod::compute#function"
+        }
+      ],
+      "file": {
+        "path": "tests/test_mod.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "tests/test_mod::test_compute#test",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "tests/test_mod",
+          "test_of": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "tests/test_mod.py",
+          "id": "tests/test_mod::test_compute#test",
+          "kind": "test",
+          "name": "test_compute",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "tests/test_mod::test_compute#test",
+          "targets": [
+            "src/pkg/mod::compute#function"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

@@ -1,0 +1,1278 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Config#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Config::name#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Config#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Config::parent#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Config#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Config::retries#field"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::__init__#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::config#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::fetch#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::load#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::create#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::pure#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::wrapped#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::untyped#method"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::make#function"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::forward#function"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::passthrough#function"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::thing#function"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "__future__"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "dataclasses"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 43,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "to": "typing"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "to": "other"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Config::parent#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 13
+            },
+            "start": {
+              "col": 22,
+              "line": 13
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::__init__#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 18
+            },
+            "start": {
+              "col": 32,
+              "line": 18
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::fetch#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 80,
+              "line": 21
+            },
+            "start": {
+              "col": 74,
+              "line": 21
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::fetch#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 22
+            },
+            "start": {
+              "col": 21,
+              "line": 22
+            }
+          },
+          "to": "signatures::Service::load#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::load#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 79,
+              "line": 24
+            },
+            "start": {
+              "col": 73,
+              "line": 24
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::create#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 28
+            },
+            "start": {
+              "col": 29,
+              "line": 28
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::create#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 47,
+              "line": 28
+            },
+            "start": {
+              "col": 40,
+              "line": 28
+            }
+          },
+          "to": "signatures::Service#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::create#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 29
+            },
+            "start": {
+              "col": 16,
+              "line": 29
+            }
+          },
+          "to": "signatures::Service::__init__#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::pure#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 32
+            },
+            "start": {
+              "col": 24,
+              "line": 32
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::pure#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 33
+            },
+            "start": {
+              "col": 16,
+              "line": 33
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service::wrapped#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 36
+            },
+            "start": {
+              "col": 21,
+              "line": 36
+            }
+          },
+          "to": "signatures::Service::load#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::make#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 42
+            },
+            "start": {
+              "col": 24,
+              "line": 42
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::make#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 43
+            },
+            "start": {
+              "col": 12,
+              "line": 43
+            }
+          },
+          "to": "signatures::Config#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::forward#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 47
+            },
+            "start": {
+              "col": 12,
+              "line": 47
+            }
+          },
+          "to": "signatures::make#function"
+        },
+        {
+          "from": {
+            "symbol": "signatures::passthrough#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 51
+            },
+            "start": {
+              "col": 12,
+              "line": 51
+            }
+          },
+          "to": "signatures::make#function"
+        },
+        {
+          "from": {
+            "symbol": "signatures::thing#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 54
+            },
+            "start": {
+              "col": 35,
+              "line": 54
+            }
+          },
+          "to": "signatures::Config#type"
+        }
+      ],
+      "file": {
+        "path": "signatures.py"
+      },
+      "functions": [
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "signatures::Config",
+                "text": "Config"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "signatures::Service::__init__#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "signatures::Service::load#method",
+          "max_nesting": 0,
+          "params": 4,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "str"
+              },
+              {
+                "text": "Any"
+              },
+              {
+                "text": "int"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "signatures::Config",
+                "text": "Optional[Config]"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::Service::fetch#method",
+          "tokens": 17,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 4,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "str"
+              },
+              {
+                "text": "Any"
+              },
+              {
+                "text": "int"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "signatures::Config",
+                "text": "Optional[Config]"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::Service::load#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "signatures::Config",
+                "text": "Config"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "signatures::Service",
+                "text": "Service"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::Service::create#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "signatures::Config",
+                "text": "Config"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::Service::pure#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "signatures::Service::load#method",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::Service::wrapped#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::Service::untyped#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "forwards_to": "signatures::Config#type",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "str"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "signatures::Config",
+                "text": "Config"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::make#function",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "signatures::make#function",
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              },
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::forward#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "signatures::make#function",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "str"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "signatures::passthrough#function",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "Thing"
+              },
+              {
+                "text": "list[Config]"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "signatures::thing#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "signatures"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Config#type",
+          "kind": "type",
+          "name": "Config",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Config::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "signatures::Config#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
+          "type_ref": {
+            "text": "str"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 36,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Config::parent#field",
+          "kind": "field",
+          "name": "parent",
+          "optional": true,
+          "owner": "signatures::Config#type",
+          "span": {
+            "end": {
+              "col": 36,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": "signatures::Config",
+            "text": "Optional[Config]"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Config::retries#field",
+          "kind": "field",
+          "name": "retries",
+          "optional": true,
+          "owner": "signatures::Config#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service#type",
+          "kind": "type",
+          "name": "Service",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 19
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service::__init__#method",
+          "kind": "method",
+          "name": "__init__",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 19
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "signatures.py",
+          "id": "signatures::Service::config#field",
+          "kind": "field",
+          "name": "config",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 19
+            },
+            "start": {
+              "col": 9,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 58,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 21
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service::fetch#method",
+          "kind": "method",
+          "name": "fetch",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 58,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 21
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 25
+            },
+            "start": {
+              "col": 5,
+              "line": 24
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service::load#method",
+          "kind": "method",
+          "name": "load",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 25
+            },
+            "start": {
+              "col": 5,
+              "line": 24
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 27
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service::create#method",
+          "kind": "method",
+          "name": "create",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service::pure#method",
+          "kind": "method",
+          "name": "pure",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service::wrapped#method",
+          "kind": "method",
+          "name": "wrapped",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 39
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::Service::untyped#method",
+          "kind": "method",
+          "name": "untyped",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 39
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 43
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::make#function",
+          "kind": "function",
+          "name": "make",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 43
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::forward#function",
+          "kind": "function",
+          "name": "forward",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::passthrough#function",
+          "kind": "function",
+          "name": "passthrough",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 54
+            }
+          },
+          "file": "signatures.py",
+          "id": "signatures::thing#function",
+          "kind": "function",
+          "name": "thing",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 54
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

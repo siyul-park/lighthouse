@@ -1,0 +1,1310 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Point#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Point#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Point::x#field"
+        },
+        {
+          "from": {
+            "symbol": "models::Point#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Point::y#field"
+        },
+        {
+          "from": {
+            "symbol": "models::Point#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Point::tags#field"
+        },
+        {
+          "from": {
+            "symbol": "models::Point#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Point::label#field"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Color#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Color#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Color::RED#variant"
+        },
+        {
+          "from": {
+            "symbol": "models::Color#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Color::GREEN#variant"
+        },
+        {
+          "from": {
+            "symbol": "models::Color#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Color::describe#method"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Pair::left#field"
+        },
+        {
+          "from": {
+            "symbol": "models::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Pair::right#field"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Row#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Row#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Row::key#field"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Shape#interface"
+        },
+        {
+          "from": {
+            "symbol": "models::Shape#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Shape::area#method"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Base#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Base::run#method"
+        },
+        {
+          "from": {
+            "symbol": "models::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Base::helper#method"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Square#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Square#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Square::run#method"
+        },
+        {
+          "from": {
+            "symbol": "models::Square#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Square::helper#method"
+        },
+        {
+          "from": {
+            "symbol": "models::Square#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Square::area#method"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Circle#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Circle#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Circle::area#method"
+        },
+        {
+          "from": {
+            "symbol": "models::Circle#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::Circle::other#method"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "models::parse#function"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "abc"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "enum"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "to": "typing"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "to": "dataclasses"
+        },
+        {
+          "from": {
+            "module": "models"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 71,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "to": "typing"
+        },
+        {
+          "from": {
+            "symbol": "models::Square#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 47
+            },
+            "start": {
+              "col": 14,
+              "line": 47
+            }
+          },
+          "to": "models::Base#type"
+        },
+        {
+          "from": {
+            "symbol": "models::Circle#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 58
+            },
+            "start": {
+              "col": 14,
+              "line": 58
+            }
+          },
+          "to": "models::Shape#interface"
+        }
+      ],
+      "file": {
+        "path": "models.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::Color::describe#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "float"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::Shape::area#method",
+          "tokens": 1,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "models::Base::run#method",
+          "tokens": 1,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::Base::helper#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "models::Square::run#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::Square::helper#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "float"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::Square::area#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "float"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::Circle::area#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::Circle::other#method",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "models::parse#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "models"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 32,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "models.py",
+          "id": "models::Point#type",
+          "kind": "type",
+          "name": "Point",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 11
+            }
+          },
+          "file": "models.py",
+          "id": "models::Point::x#field",
+          "kind": "field",
+          "name": "x",
+          "owner": "models::Point#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 11
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
+          "file": "models.py",
+          "id": "models::Point::y#field",
+          "kind": "field",
+          "name": "y",
+          "optional": true,
+          "owner": "models::Point#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "file": "models.py",
+          "id": "models::Point::tags#field",
+          "kind": "field",
+          "name": "tags",
+          "optional": true,
+          "owner": "models::Point#type",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "type_ref": {
+            "text": "list"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 32,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "file": "models.py",
+          "id": "models::Point::label#field",
+          "kind": "field",
+          "name": "label",
+          "optional": true,
+          "owner": "models::Point#type",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "type_ref": {
+            "text": "Optional[str]"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "file": "models.py",
+          "id": "models::Color#type",
+          "kind": "type",
+          "name": "Color",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 12,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
+          "file": "models.py",
+          "id": "models::Color::RED#variant",
+          "kind": "variant",
+          "name": "RED",
+          "owner": "models::Color#type",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 19
+            },
+            "start": {
+              "col": 5,
+              "line": 19
+            }
+          },
+          "file": "models.py",
+          "id": "models::Color::GREEN#variant",
+          "kind": "variant",
+          "name": "GREEN",
+          "owner": "models::Color#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 19
+            },
+            "start": {
+              "col": 5,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 23
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "file": "models.py",
+          "id": "models::Color::describe#method",
+          "kind": "method",
+          "name": "describe",
+          "owner": "models::Color#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 23
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "file": "models.py",
+          "id": "models::Pair#type",
+          "kind": "type",
+          "name": "Pair",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 27
+            },
+            "start": {
+              "col": 5,
+              "line": 27
+            }
+          },
+          "file": "models.py",
+          "id": "models::Pair::left#field",
+          "kind": "field",
+          "name": "left",
+          "owner": "models::Pair#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 27
+            },
+            "start": {
+              "col": 5,
+              "line": 27
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 28
+            },
+            "start": {
+              "col": 5,
+              "line": 28
+            }
+          },
+          "file": "models.py",
+          "id": "models::Pair::right#field",
+          "kind": "field",
+          "name": "right",
+          "owner": "models::Pair#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 28
+            },
+            "start": {
+              "col": 5,
+              "line": 28
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "file": "models.py",
+          "id": "models::Row#type",
+          "kind": "type",
+          "name": "Row",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 32
+            }
+          },
+          "file": "models.py",
+          "id": "models::Row::key#field",
+          "kind": "field",
+          "name": "key",
+          "owner": "models::Row#type",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 32
+            }
+          },
+          "type_ref": {
+            "text": "str"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "file": "models.py",
+          "id": "models::Shape#interface",
+          "kind": "interface",
+          "name": "Shape",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 36
+            }
+          },
+          "file": "models.py",
+          "id": "models::Shape::area#method",
+          "kind": "method",
+          "name": "area",
+          "owner": "models::Shape#interface",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 36
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "file": "models.py",
+          "id": "models::Base#type",
+          "kind": "type",
+          "name": "Base",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 31,
+              "line": 41
+            },
+            "start": {
+              "col": 5,
+              "line": 40
+            }
+          },
+          "file": "models.py",
+          "id": "models::Base::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "models::Base#type",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 41
+            },
+            "start": {
+              "col": 5,
+              "line": 40
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 44
+            },
+            "start": {
+              "col": 5,
+              "line": 43
+            }
+          },
+          "file": "models.py",
+          "id": "models::Base::helper#method",
+          "kind": "method",
+          "name": "helper",
+          "owner": "models::Base#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 44
+            },
+            "start": {
+              "col": 5,
+              "line": 43
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 47
+            }
+          },
+          "file": "models.py",
+          "id": "models::Square#type",
+          "kind": "type",
+          "name": "Square",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 47
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 49
+            },
+            "start": {
+              "col": 5,
+              "line": 48
+            }
+          },
+          "file": "models.py",
+          "id": "models::Square::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "models::Square#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 49
+            },
+            "start": {
+              "col": 5,
+              "line": 48
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 52
+            },
+            "start": {
+              "col": 5,
+              "line": 51
+            }
+          },
+          "file": "models.py",
+          "id": "models::Square::helper#method",
+          "kind": "method",
+          "name": "helper",
+          "owner": "models::Square#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 52
+            },
+            "start": {
+              "col": 5,
+              "line": 51
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 55
+            },
+            "start": {
+              "col": 5,
+              "line": 54
+            }
+          },
+          "file": "models.py",
+          "id": "models::Square::area#method",
+          "kind": "method",
+          "name": "area",
+          "owner": "models::Square#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 55
+            },
+            "start": {
+              "col": 5,
+              "line": 54
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 58
+            }
+          },
+          "file": "models.py",
+          "id": "models::Circle#type",
+          "kind": "type",
+          "name": "Circle",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 58
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 60
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
+          "file": "models.py",
+          "id": "models::Circle::area#method",
+          "kind": "method",
+          "name": "area",
+          "owner": "models::Circle#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 60
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 64
+            },
+            "start": {
+              "col": 5,
+              "line": 62
+            }
+          },
+          "file": "models.py",
+          "id": "models::Circle::other#method",
+          "kind": "method",
+          "name": "other",
+          "owner": "models::Circle#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 64
+            },
+            "start": {
+              "col": 5,
+              "line": 62
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 72
+            },
+            "start": {
+              "col": 1,
+              "line": 67
+            }
+          },
+          "file": "models.py",
+          "id": "models::parse#function",
+          "kind": "function",
+          "name": "parse",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 72
+            },
+            "start": {
+              "col": 1,
+              "line": 71
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

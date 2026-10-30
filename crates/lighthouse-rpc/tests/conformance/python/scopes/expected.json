@@ -1,0 +1,524 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 54,
+              "line": 23
+            },
+            "start": {
+              "col": 42,
+              "line": 23
+            }
+          },
+          "text": "# noqa: E731"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "scopes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "scopes::counter#var"
+        },
+        {
+          "from": {
+            "module": "scopes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "scopes::helper#function"
+        },
+        {
+          "from": {
+            "module": "scopes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "scopes::outer#function"
+        },
+        {
+          "from": {
+            "module": "scopes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "scopes::bump#function"
+        },
+        {
+          "from": {
+            "module": "scopes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "scopes::Holder#type"
+        },
+        {
+          "from": {
+            "symbol": "scopes::Holder#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "scopes::Holder::size#field"
+        },
+        {
+          "from": {
+            "symbol": "scopes::Holder#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "scopes::Holder::method#method"
+        },
+        {
+          "from": {
+            "symbol": "scopes::outer#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 11
+            },
+            "start": {
+              "col": 13,
+              "line": 11
+            }
+          },
+          "to": "scopes::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "scopes::outer#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 16
+            },
+            "start": {
+              "col": 16,
+              "line": 16
+            }
+          },
+          "to": "scopes::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "scopes::outer#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 22
+            },
+            "start": {
+              "col": 16,
+              "line": 22
+            }
+          },
+          "to": "scopes::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "scopes::outer#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 23
+            },
+            "start": {
+              "col": 25,
+              "line": 23
+            }
+          },
+          "to": "scopes::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "scopes::bump#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 30
+            },
+            "start": {
+              "col": 16,
+              "line": 30
+            }
+          },
+          "to": "scopes::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "scopes::bump#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 31
+            },
+            "start": {
+              "col": 12,
+              "line": 31
+            }
+          },
+          "to": "scopes::counter#var"
+        },
+        {
+          "from": {
+            "symbol": "scopes::Holder::size#field"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 35
+            },
+            "start": {
+              "col": 12,
+              "line": 35
+            }
+          },
+          "to": "scopes::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "scopes::Holder::method#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 50,
+              "line": 38
+            },
+            "start": {
+              "col": 46,
+              "line": 38
+            }
+          },
+          "to": "scopes::Holder::size#field"
+        },
+        {
+          "from": {
+            "symbol": "scopes::Holder::method#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 38
+            },
+            "start": {
+              "col": 17,
+              "line": 38
+            }
+          },
+          "to": "scopes::helper#function"
+        }
+      ],
+      "file": {
+        "path": "scopes.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "scopes::helper#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 13,
+          "symbol": "scopes::outer#function",
+          "tokens": 67,
+          "top_level": 7
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": "scopes::bump#function",
+          "tokens": 9,
+          "top_level": 3
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "scopes::Holder::method#method",
+          "tokens": 15,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "scopes"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 12,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "scopes.py",
+          "id": "scopes::counter#var",
+          "kind": "var",
+          "name": "counter",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "scopes.py",
+          "id": "scopes::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "scopes.py",
+          "id": "scopes::outer#function",
+          "kind": "function",
+          "name": "outer",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "file": "scopes.py",
+          "id": "scopes::bump#function",
+          "kind": "function",
+          "name": "bump",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 52,
+              "line": 38
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "file": "scopes.py",
+          "id": "scopes::Holder#type",
+          "kind": "type",
+          "name": "Holder",
+          "span": {
+            "end": {
+              "col": 52,
+              "line": 38
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 35
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "file": "scopes.py",
+          "id": "scopes::Holder::size#field",
+          "kind": "field",
+          "name": "size",
+          "owner": "scopes::Holder#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 35
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 52,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 37
+            }
+          },
+          "file": "scopes.py",
+          "id": "scopes::Holder::method#method",
+          "kind": "method",
+          "name": "method",
+          "owner": "scopes::Holder#type",
+          "span": {
+            "end": {
+              "col": 52,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 37
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

@@ -1,0 +1,221 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "# banner"
+        },
+        {
+          "attached_to": "comments::a#function",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "# first\n# second"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 9
+            },
+            "start": {
+              "col": 8,
+              "line": 9
+            }
+          },
+          "text": "# inline"
+        },
+        {
+          "attached_to": "comments::b#function",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "text": "# attached to b"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "comments"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "comments::a#function"
+        },
+        {
+          "from": {
+            "module": "comments"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "comments::x#var"
+        },
+        {
+          "from": {
+            "module": "comments"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "comments::b#function"
+        }
+      ],
+      "file": {
+        "path": "comments.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "comments::a#function",
+          "tokens": 2,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "comments::b#function",
+          "tokens": 2,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "comments"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "comments.py",
+          "id": "comments::a#function",
+          "kind": "function",
+          "name": "a",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "comments.py",
+          "id": "comments::x#var",
+          "kind": "var",
+          "name": "x",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "comments.py",
+          "id": "comments::b#function",
+          "kind": "function",
+          "name": "b",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}
