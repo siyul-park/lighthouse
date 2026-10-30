@@ -22,11 +22,11 @@ use lighthouse_protocol::{
 };
 
 use crate::{
-    cargo::{Manifests, Package, TargetKind},
     index,
     names::Index,
+    project::cargo::{Manifests, Package, TargetKind},
+    project::{Root, Tree},
     provider::{Governor, Options, governor, normalize, overlays, roots},
-    tree::{Root, Tree},
 };
 use remap::{Lines, Remap};
 use text::Text;

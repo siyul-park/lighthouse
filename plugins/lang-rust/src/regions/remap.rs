@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use lighthouse_protocol::{FileInfo, Fragment, Node, Position, Span};
 
 use super::text::Text;
-use crate::tree::SourceFile;
+use crate::project::SourceFile;
 
 /// The lines of a host file, to turn the byte offsets of a mapping into
 /// positions.

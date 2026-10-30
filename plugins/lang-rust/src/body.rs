@@ -19,8 +19,8 @@ use flow::is_logic;
 use crate::{
     macros,
     names::{Index, Ns, Res, Sym, TyCx, UseEntry, flatten, symbol_id},
+    project::SourceFile,
     spans::{ident_span, span_of},
-    tree::SourceFile,
 };
 
 /// A method name shared by more private methods than this is too common for a

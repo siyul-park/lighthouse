@@ -4,12 +4,13 @@
 
 mod body;
 mod cache;
-mod cargo;
+
 mod comments;
 mod events;
 mod index;
 mod macros;
 mod names;
+mod project;
 mod provider;
 mod regions;
 mod signature;
@@ -17,7 +18,6 @@ mod source;
 mod spans;
 mod syntax;
 mod tests;
-mod tree;
 
 use std::{
     io::{self, BufReader},

@@ -19,7 +19,7 @@ impl Index<'_> {
     }
 
     pub fn is_library(&self, m: ModId) -> bool {
-        self.tree.crates[self.tree.mods[m].krate].kind == crate::cargo::TargetKind::Lib
+        self.tree.crates[self.tree.mods[m].krate].kind == crate::project::cargo::TargetKind::Lib
     }
 
     /// Every module from the crate root down to `m` is `pub` or re-exported.

@@ -21,7 +21,7 @@ use syn::{ImplItem, Item, TraitItem};
 
 use crate::{
     index::MacroStats,
-    tree::{SourceFile, Tree},
+    project::{SourceFile, Tree},
 };
 
 /// Versions the layout and meaning of the cache file.

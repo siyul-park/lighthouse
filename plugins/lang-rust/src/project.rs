@@ -15,7 +15,9 @@ use syn::{
     Attribute, Expr, ExprLit, Item, Lit, Meta, Token, parse::Parser, punctuated::Punctuated,
 };
 
-use crate::cargo::TargetKind;
+use self::cargo::TargetKind;
+
+pub(crate) mod cargo;
 
 pub struct SourceFile {
     pub rel: String,

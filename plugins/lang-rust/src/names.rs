@@ -17,9 +17,9 @@ use quote::ToTokens;
 use syn::{Item, UseTree};
 
 use crate::{
+    project::{Tree, vis},
     spans::span_of,
     syntax::doc_of,
-    tree::{Tree, vis},
 };
 
 /// Attributes that make a function a test, matched on the whole path:
@@ -151,7 +151,7 @@ pub struct Index<'t> {
 impl<'t> Index<'t> {
     /// Declares every module's items, then its impl blocks, then settles
     /// which items are exported.
-    pub fn build(tree: &'t Tree, packages: &[crate::cargo::Package]) -> Self {
+    pub fn build(tree: &'t Tree, packages: &[crate::project::cargo::Package]) -> Self {
         let mut children: HashMap<(ModId, String), ModId> = tree.aliases.clone();
         for (at, m) in tree.mods.iter().enumerate() {
             if let Some(parent) = m.parent {
@@ -308,11 +308,14 @@ fn signature(sig: &syn::Signature, cx: TyCx) -> Sig {
     Sig { ret, cx }
 }
 
-fn externs(tree: &Tree, packages: &[crate::cargo::Package]) -> Vec<BTreeMap<String, ModId>> {
+fn externs(
+    tree: &Tree,
+    packages: &[crate::project::cargo::Package],
+) -> Vec<BTreeMap<String, ModId>> {
     let libs: BTreeMap<&str, ModId> = tree
         .crates
         .iter()
-        .filter(|c| c.kind == crate::cargo::TargetKind::Lib)
+        .filter(|c| c.kind == crate::project::cargo::TargetKind::Lib)
         .map(|c| (packages[c.package].name.as_str(), c.root))
         .collect();
     tree.crates
@@ -325,7 +328,7 @@ fn externs(tree: &Tree, packages: &[crate::cargo::Package]) -> Vec<BTreeMap<Stri
                     found.insert(extern_name.clone(), root);
                 }
             }
-            if c.kind != crate::cargo::TargetKind::Lib
+            if c.kind != crate::project::cargo::TargetKind::Lib
                 && let Some(&root) = libs.get(package.name.as_str())
             {
                 found.insert(package.lib_name.clone(), root);

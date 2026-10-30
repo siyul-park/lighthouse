@@ -5,7 +5,7 @@ use quote::ToTokens;
 use serde_json::{Map, Value};
 use syn::{Expr, Fields, FnArg, ImplItem, Item, Pat, Stmt, Type, Variant, spanned::Spanned};
 
-use crate::tree::SourceFile;
+use crate::project::SourceFile;
 
 mod common;
 mod expr;

@@ -10,8 +10,8 @@ use syn::{
 
 use crate::{
     macros,
+    project::SourceFile,
     spans::{ident_span, span_of},
-    tree::SourceFile,
 };
 
 /// The macros that panic or mark code that must not run.

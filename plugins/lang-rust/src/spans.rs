@@ -4,7 +4,7 @@ use lighthouse_protocol::{Position, Span};
 use proc_macro2::TokenTree;
 use quote::ToTokens;
 
-use crate::tree::SourceFile;
+use crate::project::SourceFile;
 
 /// Span of an item from its first token after the attributes to its last
 /// token. proc-macro2 counts columns in characters; the protocol wants bytes.

@@ -8,10 +8,10 @@ use syn::Attribute;
 use super::{Extractor, Owner, Shape, cap};
 use crate::{
     names::{ModId, symbol_id},
+    project::vis,
     signature::{field_type, optional_field, serde_default},
     spans::{extent_of, span_of},
     syntax::doc_of,
-    tree::vis,
 };
 
 impl Extractor<'_> {

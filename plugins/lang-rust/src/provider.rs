@@ -15,11 +15,11 @@ use serde::Deserialize;
 
 use crate::{
     cache::Cache,
-    cargo::{self, Manifests, Package, Target, TargetKind},
     index,
     names::Index,
+    project::cargo::{self, Manifests, Package, Target, TargetKind},
+    project::{Root, Tree},
     regions,
-    tree::{Root, Tree},
 };
 
 const LANGUAGE: &str = "rust";

@@ -7,7 +7,7 @@ fn file(text: &str) -> SourceFile {
         text: text.to_owned(),
         ast: parse_file(text).unwrap(),
         generated: false,
-        line_starts: crate::tree::line_starts(text),
+        line_starts: crate::project::line_starts(text),
     }
 }
 

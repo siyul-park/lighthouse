@@ -16,11 +16,11 @@ use crate::{
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
     },
+    project::{SourceFile, vis},
     signature::signature_of,
     spans::{extent_of, span_of},
     syntax::{built_type, constructs, count_tokens, doc_of, signature_counts},
     tests,
-    tree::{SourceFile, vis},
 };
 
 /// What macros kept from the analysis in one file.
