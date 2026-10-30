@@ -33,7 +33,7 @@ fn the_digest_is_that_of_the_canonical_form_and_the_file_reads_back() {
     let hex = write(dir.path(), &document).unwrap();
 
     assert_eq!(hex, digest(&document));
-    let loaded = load(dir.path(), &hex).unwrap();
+    let loaded = load(dir.path(), &Digest::new(&hex)).unwrap();
     assert_eq!(loaded.decision, "d/x");
     assert_eq!(loaded.embedder, "Fake@2");
     assert_eq!(loaded.model, rate(0.3));
@@ -58,7 +58,7 @@ fn neighbours_keep_their_vectors_among_the_references() {
     )
     .unwrap();
 
-    assert_eq!(load(dir.path(), &hex).unwrap().model, knn);
+    assert_eq!(load(dir.path(), &Digest::new(&hex)).unwrap().model, knn);
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn a_file_that_is_not_what_its_name_says_is_refused_with_both_digests() {
     let tampered = fs::read_to_string(&path).unwrap().replace("0.3", "0.9");
     fs::write(&path, tampered).unwrap();
 
-    let error = load(dir.path(), &hex).unwrap_err();
+    let error = load(dir.path(), &Digest::new(&hex)).unwrap_err();
     assert!(
         error.contains(&format!("not the expected sha256:{hex}")),
         "{error}"
@@ -82,11 +82,11 @@ fn a_file_that_is_not_what_its_name_says_is_refused_with_both_digests() {
 fn a_missing_file_names_the_path_and_the_digest() {
     let dir = tempfile::tempdir().unwrap();
     let hex = "ab".repeat(32);
-    let error = load(dir.path(), &hex).unwrap_err();
+    let error = load(dir.path(), &Digest::new(&hex)).unwrap_err();
 
     assert!(error.contains(&format!("expected sha256:{hex}")), "{error}");
     assert!(
-        load(dir.path(), "../x")
+        load(dir.path(), &Digest::new("../x"))
             .unwrap_err()
             .contains("not a SHA-256")
     );

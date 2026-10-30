@@ -1,4 +1,4 @@
-use lighthouse_protocol::hash::{Hasher, digest, sha256, short, short_digest};
+use lighthouse_protocol::hash::{Digest, Hasher, digest, sha256, short, short_digest};
 
 const ABC: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 
@@ -37,4 +37,17 @@ fn a_json_value_is_digested_by_its_canonical_form() {
 
     assert_eq!(digest(&value), sha256(r#"{"a":[true,null],"b":1}"#));
     assert_eq!(short_digest(&value, 4), digest(&value)[..8]);
+}
+
+#[test]
+fn a_digest_reads_as_much_as_its_reader_wants() {
+    let reference = format!("sha256:{ABC}");
+    assert_eq!(Digest::parse(&reference).unwrap().hex(), ABC);
+    assert_eq!(Digest::parse(&reference).unwrap().to_string(), reference);
+    assert!(Digest::parse(ABC).is_none());
+    assert_eq!(Digest::parse("sha256:abc").unwrap().hex(), "abc");
+    assert_eq!(Digest::lenient(&reference), Digest::lenient(ABC));
+    assert!(Digest::new(ABC).is_sha256());
+    assert!(!Digest::new("abc").is_sha256());
+    assert!(!Digest::new(ABC.to_uppercase()).is_sha256());
 }

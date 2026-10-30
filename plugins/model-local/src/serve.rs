@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 use lighthouse_protocol::{
     Answer, Capabilities, CreateFineTuningJobRequest, ErrorObject, FineTuneJobError, FineTuningJob,
     FineTuningJobStatus, Handler, InitializeParams, InitializeResult, MODELS_DIR, Model,
-    SystemOneRequest, SystemOneResponse,
+    SystemOneRequest, SystemOneResponse, hash::Digest,
 };
 use serde_json::{Value, json};
 
@@ -62,10 +62,11 @@ impl Handler for Plugin {
     }
 
     fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, ErrorObject> {
-        let hex = digest_of(&params.model)?;
+        let digest = digest_of(&params.model)?;
+        let hex = digest.hex();
         if !self.loaded.contains_key(hex) {
             self.loaded
-                .insert(hex.to_owned(), artifact::load(&self.dir, hex)?);
+                .insert(hex.to_owned(), artifact::load(&self.dir, &digest)?);
         }
         Ok(answer(&self.loaded[hex], &mut self.embedders, params)?)
     }
@@ -78,15 +79,16 @@ impl Handler for Plugin {
     }
 }
 
-/// The digest (hex) in a reference `learned@sha256:<hex>`.
-fn digest_of(model: &str) -> Result<&str, String> {
+/// The digest in a reference `learned@sha256:<hex>`.
+fn digest_of(model: &str) -> Result<Digest, String> {
     match model.strip_prefix(MODEL) {
         Some("") => Err(format!(
             "`{MODEL}` is not trained: train first with `lighthouse model train <decision> --model local/{MODEL}`, \
              then use the reference it prints (`{MODEL}@sha256:<hex>`)"
         )),
         Some(rest) => rest
-            .strip_prefix("@sha256:")
+            .strip_prefix('@')
+            .and_then(Digest::parse)
             .ok_or_else(|| format!("`{model}` is not `{MODEL}@sha256:<hex>`")),
         None => Err(format!("model-local offers `{MODEL}`, not `{model}`")),
     }
@@ -156,8 +158,9 @@ fn row_of(loaded: &Loaded, embedders: &mut Embedders, text: &str) -> Result<Line
 
 fn succeeded(request: CreateFineTuningJobRequest, trained: &Trained) -> FineTuningJob {
     let hyperparameters = json!({"chosen": trained.fitted.chosen, "embedder": trained.embedder});
-    let reference = format!("{MODEL}@sha256:{}", trained.hex);
-    let result = format!("sha256:{}", trained.hex);
+    let digest = Digest::new(&trained.hex);
+    let reference = format!("{MODEL}@{digest}");
+    let result = digest.to_string();
     job(request, FineTuningJobStatus::Succeeded, |job| {
         job.hyperparameters = hyperparameters;
         job.fine_tuned_model = Some(reference);
@@ -181,10 +184,7 @@ fn job(
     fill: impl FnOnce(&mut FineTuningJob),
 ) -> FineTuningJob {
     let mut job = FineTuningJob {
-        id: format!(
-            "ftjob-{}",
-            request.training_file.trim_start_matches("sha256:")
-        ),
+        id: format!("ftjob-{}", Digest::lenient(&request.training_file).hex()),
         created_at: 0,
         finished_at: None,
         object: "fine_tuning.job".to_owned(),

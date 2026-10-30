@@ -14,7 +14,10 @@ use lighthouse_model::{Attribution, Result};
 use lighthouse_plugin::{
     DATASETS_DIR, DecisionRef, LineKeys, Question, Subject, TrainingLine, dataset_path,
 };
-use lighthouse_protocol::{canonical, hash::sha256};
+use lighthouse_protocol::{
+    canonical,
+    hash::{Digest, sha256},
+};
 use serde_json::Value;
 
 use crate::labels::Source;
@@ -76,13 +79,12 @@ pub(crate) fn write_lines(root: &Path, lines: &[String]) -> Result<String> {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
     fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(format!("sha256:{hex}"))
+    Ok(Digest::new(hex).to_string())
 }
 
 /// The path of the dataset `digest` (`sha256:<hex>`) names.
 pub(crate) fn path_of(root: &Path, digest: &str) -> PathBuf {
-    let hex = digest.strip_prefix("sha256:").unwrap_or(digest);
-    dataset_path(&root.join(DATASETS_DIR), hex)
+    dataset_path(&root.join(DATASETS_DIR), Digest::lenient(digest).hex())
 }
 
 /// The lines of the dataset `digest` names, or `None` when the store does not

@@ -7,7 +7,7 @@ use std::{fs, path::Path};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use lighthouse_protocol::{
     artifact_path, canonical,
-    hash::{digest, sha256},
+    hash::{Digest, digest, sha256},
     stats::FOLDS,
 };
 use serde_json::{Map, Value, json};
@@ -104,20 +104,17 @@ pub fn write(dir: &Path, document: &Value) -> Result<String, String> {
     Ok(hex)
 }
 
-/// Reads the model with digest `hex` from the store under `dir`, and checks
+/// Reads the model `wanted` from the store under `dir`, and checks
 /// that it is the one asked for.
-pub fn load(dir: &Path, hex: &str) -> Result<Loaded, String> {
-    if hex.len() != 64
-        || !hex
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return Err(format!("`sha256:{hex}` is not a SHA-256 digest"));
+pub fn load(dir: &Path, wanted: &Digest) -> Result<Loaded, String> {
+    if !wanted.is_sha256() {
+        return Err(format!("`{wanted}` is not a SHA-256 digest"));
     }
+    let hex = wanted.hex();
     let path = artifact_path(dir, hex);
     let text = fs::read_to_string(&path).map_err(|e| {
         format!(
-            "{}: {e} (expected sha256:{hex}); run `lighthouse model rebuild`",
+            "{}: {e} (expected {wanted}); run `lighthouse model rebuild`",
             path.display()
         )
     })?;
@@ -126,7 +123,7 @@ pub fn load(dir: &Path, hex: &str) -> Result<Loaded, String> {
     let actual = digest(&document);
     if actual != hex {
         return Err(format!(
-            "{}: its digest is sha256:{actual}, not the expected sha256:{hex}",
+            "{}: its digest is sha256:{actual}, not the expected {wanted}",
             path.display()
         ));
     }

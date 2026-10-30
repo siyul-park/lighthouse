@@ -8,7 +8,7 @@ use std::path::Path;
 
 use lighthouse_model::Result;
 use lighthouse_plugin::{FineTuningJobStatus, ModelClient};
-use lighthouse_protocol::hash::digest;
+use lighthouse_protocol::hash::{Digest, digest};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
@@ -41,32 +41,31 @@ impl Status {
 }
 
 /// A model that is a file: `<provider>/<model>@sha256:<hex>`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Learned<'a> {
     /// The whole reference.
     pub model: &'a str,
     /// `<provider>/<model>`, which trains it.
     pub trainer: &'a str,
-    /// The digest of the artifact, without the `sha256:`.
-    pub hex: &'a str,
+    /// The digest of the artifact.
+    pub digest: Digest,
 }
 
 impl<'a> Learned<'a> {
     /// The parts of a model reference that name a file, when it is one.
     pub fn parse(model: &'a str) -> Option<Self> {
         let (trainer, digest) = model.split_once('@')?;
-        let hex = digest.strip_prefix("sha256:")?;
         Some(Self {
             model,
             trainer,
-            hex,
+            digest: Digest::parse(digest)?,
         })
     }
 
     /// The dataset (`sha256:<hex>`) the card of the artifact names as the file
     /// it was trained on; none for a model without an artifact here.
     pub(crate) fn dataset(&self, root: &Path) -> Result<Option<String>> {
-        let document = artifact::read(root, self.hex)?;
+        let document = artifact::read(root, self.digest.hex())?;
         Ok(document
             .as_ref()
             .and_then(|document| document.pointer("/card/trainingFile"))
@@ -78,14 +77,14 @@ impl<'a> Learned<'a> {
     /// file's canonical form has the digest in its name, `Differs` when it has
     /// another, and `None` when the file is not there.
     pub fn check(&self, root: &Path) -> Result<Option<(Status, Option<String>)>> {
-        let Some(document) = artifact::read(root, self.hex)? else {
+        let Some(document) = artifact::read(root, self.digest.hex())? else {
             return Ok(None);
         };
-        let actual = digest(&document);
-        Ok(Some(if actual == self.hex {
+        let actual = Digest::new(digest(&document));
+        Ok(Some(if actual == self.digest {
             (Status::Present, None)
         } else {
-            let note = format!("the file holds sha256:{actual}, not sha256:{}", self.hex);
+            let note = format!("the file holds {actual}, not {}", self.digest);
             (Status::Differs, Some(note))
         }))
     }
@@ -124,13 +123,13 @@ impl<'a> Learned<'a> {
             ));
         }
         let made = artifact::made(&done).unwrap_or_default();
-        if made == self.hex {
+        if made == self.digest {
             return Ok((Status::Rebuilt, None));
         }
         Ok((
             Status::Differs,
             Some(format!(
-                "training made sha256:{made}; the trainer or its weights changed since attach"
+                "training made {made}; the trainer or its weights changed since attach"
             )),
         ))
     }

@@ -49,7 +49,7 @@ fn learned_names_the_trainer_and_the_digest_of_a_model_that_is_a_file() {
     let model = Learned::parse("local/learned@sha256:abc").unwrap();
 
     assert_eq!(model.trainer, "local/learned");
-    assert_eq!(model.hex, "abc");
+    assert_eq!(model.digest.hex(), "abc");
     assert!(Learned::parse("openai/gpt-5").is_none());
     assert!(Learned::parse("local/learned@v2").is_none());
 }

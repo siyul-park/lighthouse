@@ -13,6 +13,7 @@ use lighthouse_plugin::{
     CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
     FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, ModelClient, Subject, fails, request_of,
 };
+use lighthouse_protocol::hash::Digest;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
@@ -143,10 +144,9 @@ pub(crate) fn fine_tune(
     decision: &str,
 ) -> Result<FineTuningJob> {
     let model = ModelRef::parse(reference).map_or(reference, |parsed| parsed.model);
-    let hex = training_file
-        .strip_prefix("sha256:")
-        .unwrap_or(training_file);
-    let seed = hex
+    let digest = Digest::lenient(training_file);
+    let seed = digest
+        .hex()
         .get(..8)
         .and_then(|prefix| u32::from_str_radix(prefix, 16).ok())
         .unwrap_or(0);
@@ -246,6 +246,6 @@ fn taught(
 
 /// The card of the artifact the job made, when it is in the store.
 fn card_of(root: &Path, job: &FineTuningJob) -> Option<Value> {
-    let document = artifact::read(root, artifact::made(job)?).ok()??;
+    let document = artifact::read(root, artifact::made(job)?.hex()).ok()??;
     document.get("card").cloned()
 }
