@@ -47,14 +47,21 @@ spec:
 
         type ClientOptions struct { Timeout time.Duration; Retries int; Insecure bool }
         func NewClient(url string, opts ClientOptions) *Client { return nil }
-  - name: python-positional-flags
+  - name: python-optional-flags-as-parameters
     language: python
     kind: invalid
     files:
     - path: client/http.py
       body: |-
-        def connect(host: str, port: int, tls: bool, retries: int, timeout: float, proxy: str | None) -> None:
-            ...
+        def connect(
+            host: str,
+            port: int,
+            tls: bool = True,
+            retries: int = 3,
+            timeout: float = 10.0,
+            proxy: str | None = None,
+        ) -> None:
+            return None
   - name: python-options-object
     language: python
     kind: valid
@@ -70,7 +77,8 @@ spec:
             tls: bool = True
             retries: int = 3
             timeout: float = 10.0
+            proxy: str | None = None
 
 
-        def connect(host: str, port: int, options: Options = Options()) -> None:
-            ...
+        def connect(host: str, port: int, options: Options) -> None:
+            return None

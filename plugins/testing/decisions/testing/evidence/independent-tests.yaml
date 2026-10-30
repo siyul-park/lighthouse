@@ -48,38 +48,62 @@ spec:
         package sample
         func TestFirst(t *testing.T) { got := compute(); if got != 1 { t.Fatal() } }
         func TestSecond(t *testing.T) { got := compute(); if got != 2 { t.Fatal() } }
-  - name: python-test-reimplements-the-code
+  - name: python-tests-share-a-module-level-object
     language: python
     kind: invalid
     files:
-    - path: sums.py
+    - path: tally.py
       body: |-
-        def total(values: list[int]) -> int:
-            return sum(values)
-    - path: test_sums.py
+        class Tally:
+            def __init__(self) -> None:
+                self.count = 0
+
+            def add(self) -> int:
+                self.count += 1
+                return self.count
+    - path: test_tally.py
       body: |-
-        from sums import total
+        from tally import Tally
+
+        shared = Tally()
 
 
-        def test_total() -> None:
-            values = [1, 2, 3]
-            expected = 0
-            for v in values:
-                expected += v
-            assert total(values) == expected
-  - name: python-test-literal-expectation
+        def test_first_add_returns_one() -> None:
+            assert shared.add() == 1
+
+
+        def test_second_add_returns_two() -> None:
+            assert shared.add() == 2
+  - name: python-each-test-builds-its-own-fixture
     language: python
     kind: valid
     canonical: true
     files:
-    - path: sums.py
+    - path: tally.py
       body: |-
-        def total(values: list[int]) -> int:
-            return sum(values)
-    - path: test_sums.py
+        class Tally:
+            def __init__(self) -> None:
+                self.count = 0
+
+            def add(self) -> int:
+                self.count += 1
+                return self.count
+    - path: test_tally.py
       body: |-
-        from sums import total
+        import pytest
+
+        from tally import Tally
 
 
-        def test_total() -> None:
-            assert total([1, 2, 3]) == 6
+        @pytest.fixture
+        def tally() -> Tally:
+            return Tally()
+
+
+        def test_first_add_returns_one(tally: Tally) -> None:
+            assert tally.add() == 1
+
+
+        def test_second_add_returns_two(tally: Tally) -> None:
+            tally.add()
+            assert tally.add() == 2

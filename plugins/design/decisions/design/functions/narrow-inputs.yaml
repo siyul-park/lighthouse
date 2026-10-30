@@ -57,7 +57,18 @@ spec:
     files:
     - path: billing/tax.py
       body: |-
-        def tax_due(order: "Order") -> int:
+        from dataclasses import dataclass
+
+
+        @dataclass
+        class Order:
+            id: str
+            customer: str
+            total: int
+            rate: int
+
+
+        def tax_due(order: Order) -> int:
             return order.total * order.rate // 100
   - name: python-narrow-input
     language: python

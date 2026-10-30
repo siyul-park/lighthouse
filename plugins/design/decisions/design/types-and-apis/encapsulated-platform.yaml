@@ -43,32 +43,59 @@ spec:
         package sample
         type Platform interface { Load(); Save() }
         func NewPlatform() Platform { if runtime.GOOS == "windows" { return windowsPlatform{} }; return unixPlatform{} }
-  - name: python-platform-leaks-through-public-field
+  - name: python-platform-checks-in-every-function
     language: python
     kind: invalid
     files:
-    - path: storage/disk.py
+    - path: config/paths.py
       body: |-
-        import sqlite3
+        import os
+        import sys
 
 
-        class Store:
-            def __init__(self, path: str):
-                self.connection = sqlite3.connect(path)
-  - name: python-platform-hidden
+        def config_file() -> str:
+            if sys.platform == "win32":
+                return os.path.join(os.environ["APPDATA"], "tool", "config.toml")
+            return os.path.expanduser("~/.config/tool/config.toml")
+
+
+        def cache_dir() -> str:
+            if sys.platform == "win32":
+                return os.path.join(os.environ["LOCALAPPDATA"], "tool")
+            return os.path.expanduser("~/.cache/tool")
+  - name: python-platform-behind-an-interface
     language: python
     kind: valid
     canonical: true
     files:
-    - path: storage/disk.py
+    - path: config/paths.py
       body: |-
-        import sqlite3
+        import os
+        import sys
+        from typing import Protocol
 
 
-        class Store:
-            def __init__(self, path: str):
-                self._connection = sqlite3.connect(path)
+        class Platform(Protocol):
+            def config_file(self) -> str: ...
 
-            def get(self, key: str) -> str | None:
-                row = self._connection.execute("SELECT v FROM kv WHERE k = ?", (key,)).fetchone()
-                return row[0] if row else None
+            def cache_dir(self) -> str: ...
+
+
+        class WindowsPlatform:
+            def config_file(self) -> str:
+                return os.path.join(os.environ["APPDATA"], "tool", "config.toml")
+
+            def cache_dir(self) -> str:
+                return os.path.join(os.environ["LOCALAPPDATA"], "tool")
+
+
+        class PosixPlatform:
+            def config_file(self) -> str:
+                return os.path.expanduser("~/.config/tool/config.toml")
+
+            def cache_dir(self) -> str:
+                return os.path.expanduser("~/.cache/tool")
+
+
+        def current() -> Platform:
+            return WindowsPlatform() if sys.platform == "win32" else PosixPlatform()

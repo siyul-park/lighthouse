@@ -206,6 +206,11 @@ spec:
         def test_get_counts() -> None:
             if get("ab") != 2:
                 raise AssertionError("wrong count")
+
+
+        def test_get_rejects_none() -> None:
+            with pytest.raises(TypeError):
+                get(None)
     expect:
     - line: 6
   - name: python-assert-valid
@@ -226,7 +231,8 @@ spec:
 
         def test_get_counts() -> None:
             assert get("ab") == 2
-  fix:
-    safety: unsafe
-    type: model
-    scope: symbol
+
+
+        def test_get_rejects_none() -> None:
+            with pytest.raises(TypeError):
+                get(None)

@@ -43,45 +43,110 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
-  - name: python-only-the-success-path-tested
+  - name: python-one-of-two-stores-tested
     language: python
     kind: invalid
     files:
-    - path: parse.py
+    - path: store.py
       body: |-
-        def parse_port(text: str) -> int:
-            if not text.isdigit():
-                raise ValueError("not a number")
-            return int(text)
-    - path: test_parse.py
-      body: |-
-        from parse import parse_port
+        from pathlib import Path
+        from typing import Protocol
 
 
-        def test_parse_port() -> None:
-            assert parse_port("80") == 80
-  - name: python-both-paths-tested
+        class Store(Protocol):
+            def get(self, key: str) -> str | None: ...
+
+            def put(self, key: str, value: str) -> None: ...
+
+
+        class MemoryStore:
+            def __init__(self) -> None:
+                self._items: dict[str, str] = {}
+
+            def get(self, key: str) -> str | None:
+                return self._items.get(key)
+
+            def put(self, key: str, value: str) -> None:
+                self._items[key] = value
+
+
+        class FileStore:
+            def __init__(self, directory: Path) -> None:
+                self._directory = directory
+
+            def get(self, key: str) -> str | None:
+                path = self._directory / key
+                return path.read_text() if path.exists() else None
+
+            def put(self, key: str, value: str) -> None:
+                (self._directory / key).write_text(value)
+    - path: test_store.py
+      body: |-
+        from store import MemoryStore
+
+
+        def test_get_returns_what_was_put() -> None:
+            store = MemoryStore()
+            store.put("a", "1")
+            assert store.get("a") == "1"
+  - name: python-both-stores-share-the-tests
     language: python
     kind: valid
     canonical: true
     files:
-    - path: parse.py
+    - path: store.py
       body: |-
-        def parse_port(text: str) -> int:
-            if not text.isdigit():
-                raise ValueError("not a number")
-            return int(text)
-    - path: test_parse.py
+        from pathlib import Path
+        from typing import Protocol
+
+
+        class Store(Protocol):
+            def get(self, key: str) -> str | None: ...
+
+            def put(self, key: str, value: str) -> None: ...
+
+
+        class MemoryStore:
+            def __init__(self) -> None:
+                self._items: dict[str, str] = {}
+
+            def get(self, key: str) -> str | None:
+                return self._items.get(key)
+
+            def put(self, key: str, value: str) -> None:
+                self._items[key] = value
+
+
+        class FileStore:
+            def __init__(self, directory: Path) -> None:
+                self._directory = directory
+
+            def get(self, key: str) -> str | None:
+                path = self._directory / key
+                return path.read_text() if path.exists() else None
+
+            def put(self, key: str, value: str) -> None:
+                (self._directory / key).write_text(value)
+    - path: test_store.py
       body: |-
+        from pathlib import Path
+
         import pytest
 
-        from parse import parse_port
+        from store import FileStore, MemoryStore, Store
 
 
-        def test_parse_port() -> None:
-            assert parse_port("80") == 80
+        @pytest.fixture(params=["memory", "file"])
+        def store(request: pytest.FixtureRequest, tmp_path: Path) -> Store:
+            if request.param == "memory":
+                return MemoryStore()
+            return FileStore(tmp_path)
 
 
-        def test_parse_port_rejects_text() -> None:
-            with pytest.raises(ValueError):
-                parse_port("http")
+        def test_get_returns_what_was_put(store: Store) -> None:
+            store.put("a", "1")
+            assert store.get("a") == "1"
+
+
+        def test_get_of_a_missing_key_is_none(store: Store) -> None:
+            assert store.get("b") is None

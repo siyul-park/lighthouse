@@ -45,34 +45,65 @@ spec:
       body: |
         package sample
         func TestStore(t *testing.T) { t.Run("present", func(t *testing.T) { got := store.Get(); if got != want { t.Fatal() } }) }
-  - name: python-table-rows-without-case-identity
+  - name: python-assertion-outside-a-case
     language: python
     kind: invalid
     files:
-    - path: test_sample.py
+    - path: store.py
       body: |-
-        import pytest
+        class Store:
+            def __init__(self) -> None:
+                self._items: dict[str, int] = {}
 
-        from sample import get
+            def put(self, key: str, value: int) -> None:
+                self._items[key] = value
+
+            def get(self, key: str) -> int | None:
+                return self._items.get(key)
+    - path: test_store.py
+      body: |-
+        from store import Store
+
+        store = Store()
+        store.put("a", 1)
+        assert store.get("a") == 1
 
 
-        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
-        def test_get(text: str, want: int) -> None:
-            got = get(text)
-            if got != want:
-                raise AssertionError("mismatch")
-  - name: python-table-rows-assert-each-case
+        def test_get_of_a_missing_key_is_none() -> None:
+            assert store.get("b") is None
+  - name: python-setup-in-a-fixture-assertions-in-cases
     language: python
     kind: valid
     canonical: true
     files:
-    - path: test_sample.py
+    - path: store.py
+      body: |-
+        class Store:
+            def __init__(self) -> None:
+                self._items: dict[str, int] = {}
+
+            def put(self, key: str, value: int) -> None:
+                self._items[key] = value
+
+            def get(self, key: str) -> int | None:
+                return self._items.get(key)
+    - path: test_store.py
       body: |-
         import pytest
 
-        from sample import get
+        from store import Store
 
 
-        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
-        def test_get(text: str, want: int) -> None:
-            assert get(text) == want
+        @pytest.fixture
+        def store() -> Store:
+            result = Store()
+            result.put("a", 1)
+            return result
+
+
+        def test_get_of_a_present_key(store: Store) -> None:
+            assert store.get("a") == 1
+
+
+        def test_get_of_a_missing_key_is_none(store: Store) -> None:
+            assert store.get("b") is None

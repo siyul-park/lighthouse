@@ -43,26 +43,84 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
-  - name: python-truthy-assertion
+  - name: python-only-the-generic-success-path
     language: python
     kind: invalid
     files:
-    - path: test_sample.py
+    - path: fetch.py
       body: |-
-        from sample import get
+        from typing import Protocol
 
 
-        def test_get() -> None:
-            assert get("ab")
-  - name: python-specific-assertion
+        class FetchError(Exception):
+            """The fetch failed."""
+
+
+        class Client(Protocol):
+            def get(self, url: str, timeout: float) -> str: ...
+
+
+        def fetch(client: Client, url: str) -> str:
+            try:
+                return client.get(url, timeout=3.0)
+            except TimeoutError as e:
+                raise FetchError(url) from e
+    - path: test_fetch.py
+      body: |-
+        from fetch import fetch
+
+
+        class OkClient:
+            def get(self, url: str, timeout: float) -> str:
+                return "ok"
+
+
+        def test_fetch_returns_the_body() -> None:
+            assert fetch(OkClient(), "http://x") == "ok"
+  - name: python-exercises-the-timeout-boundary
     language: python
     kind: valid
     canonical: true
     files:
-    - path: test_sample.py
+    - path: fetch.py
       body: |-
-        from sample import get
+        from typing import Protocol
 
 
-        def test_get() -> None:
-            assert get("ab") == 2
+        class FetchError(Exception):
+            """The fetch failed."""
+
+
+        class Client(Protocol):
+            def get(self, url: str, timeout: float) -> str: ...
+
+
+        def fetch(client: Client, url: str) -> str:
+            try:
+                return client.get(url, timeout=3.0)
+            except TimeoutError as e:
+                raise FetchError(url) from e
+    - path: test_fetch.py
+      body: |-
+        import pytest
+
+        from fetch import FetchError, fetch
+
+
+        class OkClient:
+            def get(self, url: str, timeout: float) -> str:
+                return "ok"
+
+
+        class SlowClient:
+            def get(self, url: str, timeout: float) -> str:
+                raise TimeoutError
+
+
+        def test_fetch_returns_the_body() -> None:
+            assert fetch(OkClient(), "http://x") == "ok"
+
+
+        def test_fetch_turns_a_client_timeout_into_a_fetch_error() -> None:
+            with pytest.raises(FetchError):
+                fetch(SlowClient(), "http://x")

@@ -133,8 +133,15 @@ spec:
     files:
     - path: src/sample/__init__.py
       body: |-
+        from src.sample.part import work
+
+
         def api() -> int:
             return 1
+
+
+        def run() -> int:
+            return work()
     - path: src/sample/part.py
       body: |-
         from src.sample import api
@@ -142,3 +149,27 @@ spec:
 
         def work() -> int:
             return api() + 1
+  - name: python-modules-share-a-private-helper
+    language: python
+    kind: invalid
+    files:
+    - path: src/sample/__init__.py
+      body: |-
+        from src.sample.part import work
+
+
+        def _secret() -> int:
+            return 1
+
+
+        def run() -> int:
+            return work()
+    - path: src/sample/part.py
+      body: |-
+        from src.sample import _secret
+
+
+        def work() -> int:
+            return _secret() + 1
+    expect:
+    - line: 1

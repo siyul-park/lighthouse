@@ -47,42 +47,45 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
-  - name: python-one-of-two-public-functions-tested
+  - name: python-failure-path-untested
     language: python
     kind: invalid
     files:
-    - path: codec.py
+    - path: parse.py
       body: |-
-        def encode(text: str) -> bytes:
-            return text.encode()
-
-
-        def decode(data: bytes) -> str:
-            return data.decode()
-    - path: test_codec.py
+        def parse_port(text: str) -> int:
+            if not text.isdigit():
+                raise ValueError("not a number")
+            return int(text)
+    - path: test_parse.py
       body: |-
-        from codec import encode
+        from parse import parse_port
 
 
-        def test_encode_round_trip() -> None:
-            assert encode("a") == b"a"
-  - name: python-both-public-functions-tested
+        def test_parse_port() -> None:
+            assert parse_port("80") == 80
+  - name: python-success-and-failure-tested
     language: python
     kind: valid
     canonical: true
     files:
-    - path: codec.py
+    - path: parse.py
       body: |-
-        def encode(text: str) -> bytes:
-            return text.encode()
-
-
-        def decode(data: bytes) -> str:
-            return data.decode()
-    - path: test_codec.py
+        def parse_port(text: str) -> int:
+            if not text.isdigit():
+                raise ValueError("not a number")
+            return int(text)
+    - path: test_parse.py
       body: |-
-        from codec import decode, encode
+        import pytest
+
+        from parse import parse_port
 
 
-        def test_encode_then_decode() -> None:
-            assert decode(encode("a")) == "a"
+        def test_parse_port() -> None:
+            assert parse_port("80") == 80
+
+
+        def test_parse_port_rejects_text() -> None:
+            with pytest.raises(ValueError):
+                parse_port("http")

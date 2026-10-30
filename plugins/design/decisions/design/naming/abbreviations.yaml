@@ -219,30 +219,30 @@ spec:
         export function userId(): string {
           return "";
         }
-  - name: python-function-camel-initialism
+  - name: python-class-acronym-mixed-case
     language: python
     kind: invalid
     files:
-    - path: web/fetch.py
+    - path: web/client.py
       body: |-
-        def fetchUrl(address: str) -> str:
-            return address
+        class HttpClient:
+            pass
     expect:
     - line: 1
-  - name: python-function-snake-case
-    language: python
-    kind: valid
-    canonical: true
-    files:
-    - path: web/fetch.py
-      body: |-
-        def fetch_url(address: str) -> str:
-            return address
   - name: python-class-acronym-capitalized
     language: python
     kind: valid
+    canonical: true
     files:
     - path: web/client.py
       body: |-
         class HTTPClient:
             pass
+  - name: python-function-snake-case
+    language: python
+    kind: valid
+    files:
+    - path: web/fetch.py
+      body: |-
+        def fetch_url(address: str) -> str:
+            return address

@@ -43,25 +43,28 @@ spec:
         package sample
         type Screen struct { width int; height int }
         func Render(width, height int) {}
-  - name: python-stateful-helper-module
+  - name: python-view-owns-application-state
     language: python
     kind: invalid
     files:
-    - path: pricing/rules.py
+    - path: shop/cart_view.py
       body: |-
-        _last_quote: int = 0
+        class CartView:
+            def __init__(self) -> None:
+                self.items: list[str] = []
+                self.last_route = "/cart"
 
-
-        def quote(base: int) -> int:
-            global _last_quote
-            _last_quote = base * 2
-            return _last_quote
-  - name: python-stateless-functions
+            def render(self) -> str:
+                return "\n".join(self.items)
+  - name: python-view-renders-its-model
     language: python
     kind: valid
     canonical: true
     files:
-    - path: pricing/rules.py
+    - path: shop/cart_view.py
       body: |-
-        def quote(base: int) -> int:
-            return base * 2
+        from collections.abc import Sequence
+
+
+        def render_cart(items: Sequence[str]) -> str:
+            return "\n".join(items)

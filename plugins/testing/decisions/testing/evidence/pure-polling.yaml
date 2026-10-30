@@ -44,33 +44,53 @@ spec:
       body: |
         package sample
         require.Eventually(t, func() bool { return store.Ready() }, time.Second, time.Millisecond)
-  - name: python-unbounded-sleep-loop
+  - name: python-poll-consumes-the-result
     language: python
     kind: invalid
     files:
-    - path: test_queue.py
+    - path: test_worker.py
       body: |-
         import time
 
-        from queue_impl import Queue
+        from worker import Worker
 
 
-        def test_queue_drains() -> None:
-            q = Queue()
-            q.start()
-            while not q.empty():
-                time.sleep(0.1)
-  - name: python-bounded-wait
+        def wait_for(predicate, timeout: float = 5.0) -> bool:
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                if predicate():
+                    return True
+                time.sleep(0.05)
+            return False
+
+
+        def test_worker_reports_done() -> None:
+            worker = Worker()
+            worker.start()
+            assert wait_for(lambda: worker.take_result() == "done")
+  - name: python-poll-observes-the-status
     language: python
     kind: valid
     canonical: true
     files:
-    - path: test_queue.py
+    - path: test_worker.py
       body: |-
-        from queue_impl import Queue
+        import time
+
+        from worker import Worker
 
 
-        def test_queue_drains() -> None:
-            q = Queue()
-            q.start()
-            assert q.wait_empty(timeout=5)
+        def wait_for(predicate, timeout: float = 5.0) -> bool:
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                if predicate():
+                    return True
+                time.sleep(0.05)
+            return False
+
+
+        def test_worker_reports_done() -> None:
+            worker = Worker()
+            worker.start()
+            assert wait_for(lambda: worker.status() == "done")
+            assert worker.take_result() == "done"

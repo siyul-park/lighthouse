@@ -43,7 +43,7 @@ spec:
       body: |
         package sample
         func TestGet(t *testing.T) { cases := []struct{ input string; want int }{{"a",1},{"b",2}}; for _, tc := range cases { t.Run(tc.input, func(t *testing.T) { if got := Get(tc.input); got != tc.want { t.Fatal() } }) } }
-  - name: python-logic-in-table-rows
+  - name: python-rows-generated-from-the-code-under-test
     language: python
     kind: invalid
     files:
@@ -53,11 +53,13 @@ spec:
 
         from sample import get
 
+        CASES = [(text, len(text)) for text in ["", "a", "ab", "abc"]]
 
-        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1 if True else 0)])
-        def test_get(text: str, want: int) -> None:
+
+        @pytest.mark.parametrize(("text", "want"), CASES)
+        def test_get_counts_characters(text: str, want: int) -> None:
             assert get(text) == want
-  - name: python-plain-table-rows
+  - name: python-literal-rows
     language: python
     kind: valid
     canonical: true
@@ -69,6 +71,9 @@ spec:
         from sample import get
 
 
-        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
-        def test_get(text: str, want: int) -> None:
+        @pytest.mark.parametrize(
+            ("text", "want"),
+            [("", 0), ("a", 1), ("ab", 2), ("abc", 3)],
+        )
+        def test_get_counts_characters(text: str, want: int) -> None:
             assert get(text) == want

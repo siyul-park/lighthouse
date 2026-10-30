@@ -47,34 +47,67 @@ spec:
         package sample
         func TestStoreOpen(t *testing.T) { store.Open(); if !store.IsOpen() { t.Fatal() } }
         func TestStoreClose(t *testing.T) { store.Close(); if store.IsOpen() { t.Fatal() } }
-  - name: python-cases-named-by-number
+  - name: python-one-test-two-behaviors
     language: python
     kind: invalid
     files:
-    - path: test_sample.py
+    - path: store.py
       body: |-
-        from sample import get
+        class Store:
+            def __init__(self) -> None:
+                self._open = False
+
+            def open(self) -> None:
+                self._open = True
+
+            def close(self) -> None:
+                self._open = False
+
+            def is_open(self) -> bool:
+                return self._open
+    - path: test_store.py
+      body: |-
+        from store import Store
 
 
-        def test_1() -> None:
-            assert get("") == 0
-
-
-        def test_2() -> None:
-            assert get("a") == 1
-  - name: python-cases-named-by-behavior
+        def test_store() -> None:
+            store = Store()
+            store.open()
+            assert store.is_open()
+            store.close()
+            assert not store.is_open()
+  - name: python-one-test-per-behavior
     language: python
     kind: valid
     canonical: true
     files:
-    - path: test_sample.py
+    - path: store.py
       body: |-
-        from sample import get
+        class Store:
+            def __init__(self) -> None:
+                self._open = False
+
+            def open(self) -> None:
+                self._open = True
+
+            def close(self) -> None:
+                self._open = False
+
+            def is_open(self) -> bool:
+                return self._open
+    - path: test_store.py
+      body: |-
+        from store import Store
 
 
-        def test_get_empty_is_zero() -> None:
-            assert get("") == 0
+        def test_open_makes_the_store_open() -> None:
+            store = Store()
+            store.open()
+            assert store.is_open()
 
 
-        def test_get_counts_one_character() -> None:
-            assert get("a") == 1
+        def test_close_makes_the_store_closed() -> None:
+            store = Store()
+            store.open()
+            store.close()
+            assert not store.is_open()

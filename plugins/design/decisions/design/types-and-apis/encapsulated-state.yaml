@@ -46,28 +46,39 @@ spec:
 
         type Session struct { token string; expiry time.Time }
         func (s *Session) Refresh() { s.token = renew(); s.expiry = time.Now().Add(time.Hour) }
-  - name: python-public-mutable-state
+  - name: python-state-mutated-by-an-outside-function
     language: python
     kind: invalid
     files:
-    - path: cart/cart.py
+    - path: auth/session.py
       body: |-
-        class Cart:
-            def __init__(self) -> None:
-                self.items: list[str] = []
-  - name: python-encapsulated-state
+        import time
+
+
+        class Session:
+            def __init__(self, token: str) -> None:
+                self.token = token
+                self.expiry = time.time() + 3600
+
+
+        def refresh(session: Session, token: str) -> None:
+            session.token = token
+            session.expiry = time.time() + 3600
+  - name: python-state-changed-through-its-owner
     language: python
     kind: valid
     canonical: true
     files:
-    - path: cart/cart.py
+    - path: auth/session.py
       body: |-
-        class Cart:
-            def __init__(self) -> None:
-                self._items: list[str] = []
+        import time
 
-            def add(self, item: str) -> None:
-                self._items.append(item)
 
-            def items(self) -> tuple[str, ...]:
-                return tuple(self._items)
+        class Session:
+            def __init__(self, token: str) -> None:
+                self._token = token
+                self._expiry = time.time() + 3600
+
+            def refresh(self, token: str) -> None:
+                self._token = token
+                self._expiry = time.time() + 3600
