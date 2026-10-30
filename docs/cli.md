@@ -416,7 +416,7 @@ Arguments:
 
 Options:
       --labels <FILE>
-          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists
 
       --repo <NAME=DIR>
           A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
@@ -717,7 +717,7 @@ Options:
           Also label the subjects nobody labelled with this model's answers (weight 0.5): a fail where it is sure of one, a pass where it is sure of the other. `<provider>/<model>`
 
       --labels <FILE>
-          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists
 
       --repo <NAME=DIR>
           A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
@@ -758,7 +758,7 @@ Options:
           The model to attach, `<provider>/<model>@sha256:<hex>` for a learned one: graded as the first layer of the decision before anything is written
 
       --labels <FILE>
-          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists
 
       --repo <NAME=DIR>
           A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project
@@ -833,7 +833,7 @@ Arguments:
 
 Options:
       --labels <FILE>
-          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists
 
       --repo <NAME=DIR>
           A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project

@@ -192,7 +192,7 @@ Result: [DecisionEval](../schema/decision-eval.schema.json).
 | `audit` | integer \| null |  | Write this many selected subjects the check did not flag to a table for a person to label (`TP` or `FP`), to measure recall. |
 | `check` | string \| null |  | A decision file whose check is evaluated beside the current one. |
 | `id` (required) | string |  | The decision, such as `design/prefer-method`. |
-| `labels` | string \| null | `null` | A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists. |
+| `labels` | string \| null | `null` | A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists. |
 | `model` | string \| null |  | A model to grade as the first layer of the decision, beside the current check: `<provider>/<model>@sha256:<hex>`. One fitted on labels is graded on those by refits that leave each fold out. |
 | `repo` | string[] | `[]` | A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project. |
 
@@ -286,7 +286,7 @@ Result: [ModelTrain](../schema/model-train.schema.json).
 | --- | --- | --- | --- |
 | `fromModel` | string \| null |  | Also label the subjects nobody labelled with this model's answers (weight 0.5): a fail where it is sure of one, a pass where it is sure of the other. `<provider>/<model>`. |
 | `id` (required) | string |  | The decision whose labels the model learns, such as `design/prefer-method`. |
-| `labels` | string \| null | `null` | A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists. |
+| `labels` | string \| null | `null` | A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists. |
 | `model` | string \| null |  | The model to train, `<provider>/<model>`. Default: the one bound to the decision. |
 | `repo` | string[] | `[]` | A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project. |
 
@@ -307,7 +307,7 @@ Result: [ModelAttach](../schema/model-attach.schema.json).
 | --- | --- | --- | --- |
 | `attributedTo` | string \| null | `null` | Who this is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP. |
 | `id` (required) | string |  | The decision the model judges, such as `design/prefer-method`. |
-| `labels` | string \| null | `null` | A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists. |
+| `labels` | string \| null | `null` | A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists. |
 | `model` (required) | string |  | The model to attach, `<provider>/<model>@sha256:<hex>` for a learned one: graded as the first layer of the decision before anything is written. |
 | `repo` | string[] | `[]` | A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project. |
 
