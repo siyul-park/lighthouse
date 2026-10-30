@@ -236,3 +236,7 @@ spec:
         def test_get_rejects_none() -> None:
             with pytest.raises(TypeError):
                 get(None)
+  fix:
+    safety: unsafe
+    type: model
+    scope: symbol
