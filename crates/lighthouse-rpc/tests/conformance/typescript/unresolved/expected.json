@@ -186,6 +186,24 @@
             "symbol": "src/u::run#function"
           },
           "kind": "references",
+          "resolution": "heuristic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "to": "src/shared::dynamic#function"
+        },
+        {
+          "from": {
+            "symbol": "src/u::run#function"
+          },
+          "kind": "references",
           "resolution": "semantic",
           "site": {
             "end": {

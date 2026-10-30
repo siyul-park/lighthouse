@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { assignmentTarget, exportedNames, isRequireInit, unwrap } from "./commonjs.ts";
 import { SNIPPETS_DIR, idPart } from "./paths.ts";
 import { Lines } from "./positions.ts";
 import type { SymbolKind } from "./wire.ts";
@@ -33,6 +34,8 @@ export class FileDecls {
   readonly lines: Lines;
   /** Whether the file is a fence of a host file: analysed as a unit of its own beside the host. */
   readonly fence: boolean;
+  /** The names a CommonJS file hands out: a value it exports, not a binding anyone can assign. */
+  readonly exported: ReadonlySet<string>;
 
   constructor(
     readonly file: ts.SourceFile,
@@ -40,14 +43,34 @@ export class FileDecls {
   ) {
     this.lines = new Lines(file.text);
     this.fence = file.fileName.includes(`/${SNIPPETS_DIR}/`);
+    this.exported = new Set(isScript(file) ? file.statements.flatMap(exportedNames).map((id) => id.text) : []);
     new Collector(this).statements(file.statements, undefined);
   }
 
   /** The declaration a node declares, or that its range lies in. */
   of(node: ts.Node): Decl | undefined {
     const direct = this.nodes.get(node);
-    if (direct !== undefined || !ts.isBinaryExpression(node)) return direct;
+    if (direct !== undefined) return direct;
+    if (ts.isVariableDeclaration(node) && !ts.isIdentifier(node.name)) return this.firstBound(node.name);
+    if (!ts.isBinaryExpression(node)) return undefined;
     return this.nodes.get(node.left) ?? this.nodes.get(node.parent);
+  }
+
+  /** The declaration of the first name a destructuring pattern binds: the one that owns what its initializer uses. */
+  private firstBound(pattern: ts.BindingName): Decl | undefined {
+    if (ts.isIdentifier(pattern)) return undefined;
+    for (const element of pattern.elements) {
+      if (!ts.isBindingElement(element)) continue;
+      const found = this.nodes.get(element) ?? this.firstBound(element.name);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+
+  /** Whether a statement is, or states, a declaration already. */
+  covers(statement: ts.Statement): boolean {
+    if (this.nodes.has(statement)) return true;
+    return ts.isExpressionStatement(statement) && this.of(statement.expression) !== undefined;
   }
 
   /** The member of a declaration with a name, as the class's constructor. */
@@ -245,26 +268,30 @@ class Collector {
 
   /** Declares the names a variable declaration binds: one, or those of a destructuring pattern. */
   private binding(name: ts.BindingName, declaration: ts.VariableDeclaration, owner: Decl | undefined): void {
+    if (isRequireInit(declaration.initializer)) return;
+    const element = ts.isBindingElement(name.parent) ? name.parent : undefined;
     const list = declaration.parent as ts.VariableDeclarationList;
     const isConst = (list.flags & ts.NodeFlags.Const) !== 0 || (list.flags & ts.NodeFlags.Using) !== 0;
     const single = name === declaration.name && list.declarations.length === 1;
     const extent = single && ts.isVariableStatement(list.parent) ? list.parent : undefined;
     if (ts.isIdentifier(name)) {
-      const fn = isConst ? functionInitializer(declaration.initializer) : undefined;
-      const cls = isConst ? classInitializer(declaration.initializer) : undefined;
+      const whole = element === undefined;
+      const fn = isConst && whole ? functionInitializer(declaration.initializer) : undefined;
+      const cls = isConst && whole ? classInitializer(declaration.initializer) : undefined;
+      const value = isConst || this.decls.exported.has(name.text);
       const decl = this.decls.add({
-        kind: fn !== undefined ? "function" : cls !== undefined ? "type" : isConst ? "const" : "var",
+        kind: fn !== undefined ? "function" : cls !== undefined ? "type" : value ? "const" : "var",
         name: name.text,
         owner,
-        node: declaration,
+        node: element ?? declaration,
         extent,
         body: fn,
       });
       if (cls !== undefined) this.classMembers(cls, decl);
       return;
     }
-    for (const element of name.elements) {
-      if (ts.isBindingElement(element)) this.binding(element.name, declaration, owner);
+    for (const part of name.elements) {
+      if (ts.isBindingElement(part)) this.binding(part.name, declaration, owner);
     }
   }
 
@@ -383,37 +410,6 @@ export function functionInitializer(
 export function classInitializer(init: ts.Expression | undefined): ts.ClassExpression | undefined {
   const inner = init === undefined ? undefined : unwrap(init);
   return inner !== undefined && ts.isClassExpression(inner) ? inner : undefined;
-}
-
-export function unwrap(expression: ts.Expression): ts.Expression {
-  let current = expression;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
-
-/** The base and name of `exports.f`, `module.exports.f`, `A.f` and `A.prototype.f`; `module.exports` alone has the name "". */
-export function assignmentTarget(left: ts.Expression): { base: string; name: string } | undefined {
-  if (ts.isPropertyAccessExpression(left)) {
-    const object = left.expression;
-    if (ts.isIdentifier(object) && object.text === "module" && left.name.text === "exports") {
-      return { base: "module.exports", name: "" };
-    }
-    if (ts.isIdentifier(object)) return { base: object.text, name: left.name.text };
-    if (ts.isPropertyAccessExpression(object) && ts.isIdentifier(object.expression)) {
-      const root = object.expression.text;
-      if (root === "module" && object.name.text === "exports") return { base: "exports", name: left.name.text };
-      if (object.name.text === "prototype") return { base: root, name: left.name.text };
-    }
-  }
-  return undefined;
 }
 
 /** Whether the file is JavaScript, where assignments declare members and exports. */

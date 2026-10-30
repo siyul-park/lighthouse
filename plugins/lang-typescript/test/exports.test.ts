@@ -59,6 +59,39 @@ describe("what a file exports", () => {
     assert.deepEqual(seen, { Whole: "public" });
   });
 
+  it("includes a variable that a chain of assignments ends in the exports", () => {
+    const seen = visibilities(
+      { "app.js": "var app = exports = module.exports = {};\nvar local = {};\napp.run = function run() {};\n" },
+      "app.js",
+    );
+
+    assert.deepEqual(seen, { app: "public", local: "private", run: "public" });
+  });
+
+  it("declares no name for a module a CommonJS file requires, as an import declares none", () => {
+    const seen = visibilities(
+      {
+        "app.js":
+          "var parser = require('body-parser')\nvar mixin = require('merge-descriptors');\nexports = module.exports = create;\nfunction create() { mixin({}, {}, false); }\nexports.json = parser.json\n",
+      },
+      "app.js",
+    );
+
+    assert.deepEqual(seen, { create: "public", json: "public" });
+  });
+
+  it("reaches the public members of a class the module keeps to itself", () => {
+    const seen = visibilities(
+      {
+        "box.ts":
+          "class Box {\n  get(): number { return 1; }\n  private hidden(): number { return 2; }\n}\nexport function make(): { get(): number } { return new Box(); }\n",
+      },
+      "box.ts",
+    );
+
+    assert.deepEqual(seen, { Box: "private", get: "internal", hidden: "private", make: "public" });
+  });
+
   it("includes the default export named by an identifier", () => {
     const seen = visibilities({ "main.ts": "function main(): void {}\nexport default main;\n" }, "main.ts");
 

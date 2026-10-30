@@ -1,6 +1,7 @@
 import { builtinModules } from "node:module";
 import ts from "typescript";
-import { type Decl, type FileDecls, assignmentTarget, isScript } from "./decls.ts";
+import { type Decl, type FileDecls, isScript } from "./decls.ts";
+import { assignmentTarget } from "./commonjs.ts";
 import type { Lines } from "./positions.ts";
 import type { Model } from "./model.ts";
 import { isIgnored, modulePath, relative, slashed } from "./paths.ts";
@@ -9,6 +10,9 @@ import type { EdgeKind, Node, Resolution, Span } from "./wire.ts";
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 
 const BUILTINS = new Set(builtinModules);
+
+/** The most declarations of one name a use of unknown type is guessed to mean; a name more bear says nothing of which one is meant. */
+const MAX_CANDIDATES = 8;
 
 /** A name used at a place: by whom, whether it is called, and the value it is accessed on. */
 interface Reference {
@@ -291,15 +295,25 @@ export class Uses {
     const found = this.model.declsOfSymbol(symbol);
     if (found.length > 0) {
       this.add(call ? "calls" : "references", found, at);
-    } else if (this.model.declaresName(textOf(name)) && this.unknownTarget(symbol, at)) {
+    } else if (this.model.declsNamed(textOf(name)).length > 0 && this.unknownTarget(symbol, at)) {
       this.sink.edge(call ? "calls" : "references", from, textOf(name), this.spanOf(name), "syntactic");
+      this.mayName(name, from);
     }
+  }
+
+  /** A name used on a value of no known type may be any function or method that bears it, when few do: each is referenced, as a guess. */
+  private mayName(name: ts.Node, from: Node): void {
+    const candidates = this.model.declsNamed(textOf(name)).filter((d) => d.kind === "function" || d.kind === "method");
+    if (candidates.length === 0 || candidates.length > MAX_CANDIDATES) return;
+    for (const decl of candidates) this.sink.edge("references", from, decl.id, this.spanOf(name), "heuristic");
   }
 
   /** Whether a name resolves nowhere because of an unresolved import or a receiver of type `any`. */
   private unknownTarget(symbol: ts.Symbol | undefined, { receiver, call = false }: Reference): boolean {
     if (symbol === undefined) {
       if (receiver === undefined) return this.fence;
+      // A JavaScript file is not checked: a property its checker cannot find is not known to be absent.
+      if (receiver.kind === ts.SyntaxKind.ThisKeyword || isScript(this.decls.file)) return true;
       const type = this.model.checker.getTypeAtLocation(receiver);
       return call && (type.flags & ts.TypeFlags.Any) !== 0;
     }

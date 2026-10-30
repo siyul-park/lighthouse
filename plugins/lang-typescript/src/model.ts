@@ -1,5 +1,7 @@
 import ts from "typescript";
-import { type Decl, FileDecls, assignmentTarget } from "./decls.ts";
+import { exportedNames } from "./commonjs.ts";
+import { type Decl, FileDecls } from "./decls.ts";
+import { declareModuleBody } from "./modulebody.ts";
 import { isDeclarationFile, isIgnored, isTestFile, modulePath, relative, slashed } from "./paths.ts";
 import { selfReference } from "./selfref.ts";
 import { declareTests, importsRunner } from "./tests.ts";
@@ -10,7 +12,7 @@ export class Model {
   private readonly files = new Map<ts.SourceFile, FileDecls | null>();
   private readonly exports = new Map<ts.SourceFile, Set<ts.Symbol>>();
   private modules: Set<string> | undefined;
-  private names: Set<string> | undefined;
+  private names: Map<string, Decl[]> | undefined;
 
   constructor(
     readonly program: ts.Program,
@@ -42,6 +44,7 @@ export class Model {
   private collect(file: ts.SourceFile, rel: string): FileDecls {
     const decls = new FileDecls(file, modulePath(rel));
     if (isTestFile(rel) || importsRunner(file)) declareTests(decls);
+    declareModuleBody(decls);
     return decls;
   }
 
@@ -60,15 +63,17 @@ export class Model {
     return selfReference(from.fileName, specifier, (file) => this.host.fileExists(file))?.resolvedFileName;
   }
 
-  /** Whether a file of the project declares a name; a use of a name no declaration of the project bears can name nothing of it. */
-  declaresName(name: string): boolean {
+  /** The declarations of the project that bear a name; a use of a name none bears can name nothing of the project. */
+  declsNamed(name: string): readonly Decl[] {
     if (this.names === undefined) {
-      this.names = new Set();
+      this.names = new Map();
       for (const file of this.program.getSourceFiles()) {
-        for (const decl of this.declsOf(file)?.list ?? []) this.names.add(decl.name);
+        for (const decl of this.declsOf(file)?.list ?? []) {
+          this.names.set(decl.name, [...(this.names.get(decl.name) ?? []), decl]);
+        }
       }
     }
-    return this.names.has(name);
+    return this.names.get(name) ?? [];
   }
 
   /** Whether a source file of the project declares the module. */
@@ -90,10 +95,12 @@ export class Model {
 
   /** The declarations of the project a symbol resolves to, through aliases. */
   declsOfSymbol(symbol: ts.Symbol | undefined): Decl[] {
-    if (symbol === undefined) return [];
-    const target = this.resolve(symbol);
+    return symbol === undefined ? [] : this.declarationsOf(this.resolve(symbol));
+  }
+
+  private declarationsOf(symbol: ts.Symbol): Decl[] {
     const found: Decl[] = [];
-    for (const node of target.declarations ?? []) {
+    for (const node of symbol.declarations ?? []) {
       const decl = this.declOf(node);
       if (decl !== undefined && !found.includes(decl)) found.push(decl);
     }
@@ -104,7 +111,8 @@ export class Model {
   resolve(symbol: ts.Symbol): ts.Symbol {
     if ((symbol.flags & ts.SymbolFlags.Alias) === 0) return symbol;
     const target = this.checker.getAliasedSymbol(symbol);
-    return target.declarations === undefined && target.flags === ts.SymbolFlags.None ? symbol : target;
+    // An import that resolves nowhere aliases the checker's one `unknown` symbol, which is no name of its own.
+    return target.declarations === undefined ? symbol : target;
   }
 
   /** The symbols a file exports, aliases resolved. */
@@ -118,7 +126,7 @@ export class Model {
         for (const exported of this.checker.getExportsOfModule(module)) found.add(this.resolve(exported));
       }
       for (const statement of file.statements) {
-        for (const target of this.exportedNames(statement)) {
+        for (const target of exportedNames(statement)) {
           const symbol = ts.isShorthandPropertyAssignment(target.parent)
             ? this.checker.getShorthandAssignmentValueSymbol(target.parent)
             : this.checker.getSymbolAtLocation(target);
@@ -128,24 +136,6 @@ export class Model {
       this.exports.set(file, found);
     }
     return found;
-  }
-
-  /** The identifiers a statement hands out by name: `export default x`, `module.exports = x`, `module.exports = { x }`. */
-  private exportedNames(statement: ts.Statement): ts.Identifier[] {
-    if (ts.isExportAssignment(statement)) {
-      return ts.isIdentifier(statement.expression) ? [statement.expression] : [];
-    }
-    if (!ts.isExpressionStatement(statement) || !ts.isBinaryExpression(statement.expression)) return [];
-    const { left, operatorToken, right } = statement.expression;
-    if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return [];
-    const target = assignmentTarget(left);
-    if (target === undefined || (target.base !== "module.exports" && target.base !== "exports")) return [];
-    if (ts.isIdentifier(right)) return [right];
-    if (!ts.isObjectLiteralExpression(right) || target.base !== "module.exports") return [];
-    return right.properties.flatMap((property) => {
-      if (ts.isShorthandPropertyAssignment(property)) return [property.name];
-      return ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer) ? [property.initializer] : [];
-    });
   }
 
   /** The symbol a declaration's name introduces. */

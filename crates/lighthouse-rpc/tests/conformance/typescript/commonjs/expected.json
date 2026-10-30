@@ -414,22 +414,6 @@
           },
           "kind": "contains",
           "resolution": "semantic",
-          "to": "main::lib#const"
-        },
-        {
-          "from": {
-            "module": "main"
-          },
-          "kind": "contains",
-          "resolution": "semantic",
-          "to": "main::twice#const"
-        },
-        {
-          "from": {
-            "module": "main"
-          },
-          "kind": "contains",
-          "resolution": "semantic",
           "to": "main::run#function"
         },
         {
@@ -460,7 +444,7 @@
         },
         {
           "from": {
-            "symbol": "main::twice#const"
+            "module": "main"
           },
           "kind": "references",
           "resolution": "semantic",
@@ -560,50 +544,6 @@
         }
       ],
       "symbols": [
-        {
-          "extent": {
-            "end": {
-              "col": 30,
-              "line": 1
-            },
-            "start": {
-              "col": 1,
-              "line": 1
-            }
-          },
-          "file": "main.js",
-          "id": "main::lib#const",
-          "kind": "const",
-          "name": "lib",
-          "span": {
-            "end": {
-              "col": 29,
-              "line": 1
-            },
-            "start": {
-              "col": 7,
-              "line": 1
-            }
-          },
-          "visibility": "private"
-        },
-        {
-          "file": "main.js",
-          "id": "main::twice#const",
-          "kind": "const",
-          "name": "twice",
-          "span": {
-            "end": {
-              "col": 35,
-              "line": 2
-            },
-            "start": {
-              "col": 7,
-              "line": 2
-            }
-          },
-          "visibility": "private"
-        },
         {
           "extent": {
             "end": {

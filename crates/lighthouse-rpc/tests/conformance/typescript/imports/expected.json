@@ -416,7 +416,16 @@
     },
     {
       "comments": [],
-      "edges": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/side"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/side::<module>#function"
+        }
+      ],
       "file": {
         "path": "src/side.ts"
       },
@@ -426,7 +435,25 @@
           "path": "src/side"
         }
       ],
-      "symbols": [],
+      "symbols": [
+        {
+          "file": "src/side.ts",
+          "id": "src/side::<module>#function",
+          "kind": "function",
+          "name": "<module>",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "private"
+        }
+      ],
       "tests": []
     },
     {

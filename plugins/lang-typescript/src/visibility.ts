@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import type { Decl } from "./decls.ts";
+import { MODULE_BODY } from "./modulebody.ts";
 import type { Model } from "./model.ts";
 import { isTestFile, relative, slashed } from "./paths.ts";
 import type { Visibility } from "./wire.ts";
@@ -21,12 +22,16 @@ export class Reach {
     const owner = decl.owner;
     const file = decl.nodes[0]!.getSourceFile();
     if (owner === undefined) {
+      if (decl.name === MODULE_BODY) return "private";
       if (this.isTest(file) || !this.exported(decl)) return "private";
       return this.published(file) ? "public" : "internal";
     }
     const outer = this.visibility(owner);
     if (inNamespace(decl) && !this.exported(decl)) return "private";
-    return least(outer, own(decl));
+    const mine = own(decl);
+    // A public member of a class its module keeps to itself is still reached through the instances the module hands out.
+    if (mine === "public" && outer === "private" && !this.isTest(file)) return "internal";
+    return least(outer, mine);
   }
 
   /** Whether the declaration is importable from outside its file. */

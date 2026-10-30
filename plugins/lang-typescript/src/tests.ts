@@ -1,5 +1,6 @@
 import ts from "typescript";
-import { type FileDecls, type FunctionBody, functionInitializer, unwrap } from "./decls.ts";
+import { type FileDecls, type FunctionBody, functionInitializer } from "./decls.ts";
+import { unwrap } from "./commonjs.ts";
 
 const TEST_NAMES = new Set(["describe", "it", "test", "suite", "context", "specify"]);
 const RUNNERS = new Set(["vitest", "@jest/globals", "mocha", "node:test", "bun:test", "@playwright/test", "ava"]);

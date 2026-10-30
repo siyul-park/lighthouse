@@ -1,0 +1,728 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "app"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app::app#const"
+        },
+        {
+          "from": {
+            "symbol": "app::app#const"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app::app::init#method"
+        },
+        {
+          "from": {
+            "symbol": "app::app#const"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app::app::defaults#method"
+        },
+        {
+          "from": {
+            "symbol": "app::app#const"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "app::app::path#method"
+        },
+        {
+          "from": {
+            "symbol": "app::app::init#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 8,
+              "line": 7
+            }
+          },
+          "to": "defaults"
+        },
+        {
+          "from": {
+            "symbol": "app::app::init#method"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 8,
+              "line": 7
+            }
+          },
+          "to": "app::app::defaults#method"
+        },
+        {
+          "from": {
+            "symbol": "app::app::path#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 15
+            },
+            "start": {
+              "col": 36,
+              "line": 15
+            }
+          },
+          "to": "path"
+        },
+        {
+          "from": {
+            "symbol": "app::app::path#method"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 15
+            },
+            "start": {
+              "col": 36,
+              "line": 15
+            }
+          },
+          "to": "app::app::path#method"
+        }
+      ],
+      "file": {
+        "path": "app.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "app::app::init#method",
+          "tokens": 14,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "app::app::defaults#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "app::app::path#method",
+          "tokens": 21,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "app"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "app.js",
+          "id": "app::app#const",
+          "kind": "const",
+          "name": "app",
+          "span": {
+            "end": {
+              "col": 42,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "app.js",
+          "id": "app::app::init#method",
+          "kind": "method",
+          "name": "init",
+          "owner": "app::app#const",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "app.js",
+          "id": "app::app::defaults#method",
+          "kind": "method",
+          "name": "defaults",
+          "owner": "app::app#const",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "file": "app.js",
+          "id": "app::app::path#method",
+          "kind": "method",
+          "name": "path",
+          "owner": "app::app#const",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "lib"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "lib::lib#function"
+        }
+      ],
+      "file": {
+        "path": "lib.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "lib::lib#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "lib"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "lib.js",
+          "id": "lib::lib#function",
+          "kind": "function",
+          "name": "lib",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "main::<module>#function"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 3
+            },
+            "start": {
+              "col": 11,
+              "line": 3
+            }
+          },
+          "to": "lib"
+        },
+        {
+          "from": {
+            "symbol": "main::<module>#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 4,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "to": "lib::lib#function"
+        }
+      ],
+      "file": {
+        "path": "main.js"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "main"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "main.js",
+          "id": "main::<module>#function",
+          "kind": "function",
+          "name": "<module>",
+          "span": {
+            "end": {
+              "col": 7,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "run"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "run::usedAtLoad#function"
+        },
+        {
+          "from": {
+            "module": "run"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "run::neverUsed#function"
+        },
+        {
+          "from": {
+            "module": "run"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "run::<module>#function"
+        },
+        {
+          "from": {
+            "module": "run"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 32,
+              "line": 3
+            },
+            "start": {
+              "col": 12,
+              "line": 3
+            }
+          },
+          "to": "node:path"
+        },
+        {
+          "from": {
+            "module": "run"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 4
+            },
+            "start": {
+              "col": 11,
+              "line": 4
+            }
+          },
+          "to": "node:path"
+        },
+        {
+          "from": {
+            "symbol": "run::<module>#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 15
+            },
+            "start": {
+              "col": 16,
+              "line": 15
+            }
+          },
+          "to": "run::usedAtLoad#function"
+        }
+      ],
+      "file": {
+        "path": "run.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              }
+            ],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "run::usedAtLoad#function",
+          "tokens": 12,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "run::neverUsed#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "run"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "run.js",
+          "id": "run::usedAtLoad#function",
+          "kind": "function",
+          "name": "usedAtLoad",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "run.js",
+          "id": "run::neverUsed#function",
+          "kind": "function",
+          "name": "neverUsed",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "run.js",
+          "id": "run::<module>#function",
+          "kind": "function",
+          "name": "<module>",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "run.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "run.test::run#test"
+        },
+        {
+          "from": {
+            "module": "run.test"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 32,
+              "line": 3
+            },
+            "start": {
+              "col": 12,
+              "line": 3
+            }
+          },
+          "to": "node:path"
+        }
+      ],
+      "file": {
+        "path": "run.test.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "run.test::run#test",
+          "tokens": 20,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "run.test",
+          "test_of": "run"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "run.test.js",
+          "id": "run.test::run#test",
+          "kind": "test",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 1,
+          "style": "scenario",
+          "symbol": "run.test::run#test",
+          "targets": []
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

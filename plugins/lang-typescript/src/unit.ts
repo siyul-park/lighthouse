@@ -2,6 +2,7 @@ import ts from "typescript";
 import { manualAssertions } from "./assertions.ts";
 import { commentsOf, isGenerated } from "./comments.ts";
 import type { Decl } from "./decls.ts";
+import { MODULE_BODY } from "./modulebody.ts";
 import { docOf, extentOf } from "./extent.ts";
 import { FlowWalker, countTokens, statementCount } from "./flow.ts";
 import { forwardTarget } from "./forward.ts";
@@ -140,7 +141,7 @@ export class Unit implements EdgeSink {
 
   /** The role of a declaration of a test file: fixtures are data, helpers check on behalf of tests. */
   private role(decl: Decl): "test-helper" | "fixture" | undefined {
-    if (!this.test || decl.owner !== undefined) return undefined;
+    if (!this.test || decl.owner !== undefined || decl.name === MODULE_BODY) return undefined;
     if (decl.kind === "function") return callsAssertion(decl.body) ? "test-helper" : "fixture";
     return decl.kind === "type" || decl.kind === "interface" || decl.kind === "const" || decl.kind === "var"
       ? "fixture"

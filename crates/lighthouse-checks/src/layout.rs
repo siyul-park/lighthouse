@@ -5,6 +5,11 @@
 use lighthouse_model::ucm::{File, Project, Symbol, SymbolKind, SymbolRole, Visibility};
 use lighthouse_plugin::Context;
 
+/// The name of the function that stands for the statements a module runs when
+/// it loads. A provider declares it so that the uses those statements make have
+/// an owner; it is no declaration to place.
+pub const MODULE_BODY: &str = "<module>";
+
 /// Declarations of the focused file in source order, one list per module the
 /// file declares (an inline module is a module of its own). A declaration is a
 /// type, interface, constant, variable, function or method that is not a member
@@ -84,13 +89,15 @@ pub fn has_word_prefix(name: &str, prefix: &str) -> bool {
 }
 
 /// A type, interface, constant, variable, function or method that is not a
-/// member of an interface and not nested in a function body.
+/// member of an interface, not nested in a function body and not the body of a
+/// module.
 pub fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
     use SymbolKind::{Const, Function, Interface, Method, Type, Var};
     if !matches!(
         symbol.kind,
         Type | Interface | Const | Var | Function | Method
-    ) {
+    ) || symbol.name == MODULE_BODY
+    {
         return false;
     }
     match symbol.owner.as_ref().and_then(|o| project.symbol(o)) {

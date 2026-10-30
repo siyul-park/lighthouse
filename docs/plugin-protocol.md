@@ -360,6 +360,10 @@ The host treats failures as follows, always turning them into
   `testing.TB`) or `fixture` (test data and the code that builds it: types,
   constants, variables and functions that need no handle). Test entry points
   are `test` symbols and carry no role; methods and fields carry none either.
+- A provider whose language runs statements when a module loads (JavaScript,
+  Python) declares them as one bodyless `function` named `<module>` (CPython's
+  name for the code of a module), so that the calls and references they make have
+  an owner. Checks do not place it as a declaration.
 - `span`: 1-based `line`, 1-based `col` counted in bytes, `end` exclusive.
 - `extent` (optional, capability `extent`): the whole declaration, from its first
   leading doc comment, attribute or annotation to its last token. Comments that lead it

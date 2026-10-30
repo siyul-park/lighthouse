@@ -1,7 +1,7 @@
 //! The vocabulary the ordering checks share.
 
 use lighthouse_checks::layout::{
-    declarations, declarations_in, exposed, has_word_prefix, is_declaration, owner_key,
+    MODULE_BODY, declarations, declarations_in, exposed, has_word_prefix, is_declaration, owner_key,
 };
 use lighthouse_model::{
     Position, Span,
@@ -156,4 +156,15 @@ fn is_declaration_leaves_out_fields_and_members_of_interfaces() {
     assert!(is_declaration(&project, &method));
     assert!(!is_declaration(&project, &field));
     assert!(!is_declaration(&project, &declared));
+}
+
+#[test]
+fn the_body_of_a_module_is_no_declaration() {
+    let body = symbol(MODULE_BODY, SymbolKind::Function, None, 1);
+    let project = Project::merge([Fragment {
+        files: vec![file()],
+        symbols: vec![body.clone()],
+        ..Fragment::default()
+    }]);
+    assert!(!is_declaration(&project, &body));
 }

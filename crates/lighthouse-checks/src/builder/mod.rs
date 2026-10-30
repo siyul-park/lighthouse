@@ -23,7 +23,7 @@ use serde_json::{Map, Value, json};
 use crate::{
     eval::{Fact, cel_fact, with_entries, with_fact},
     facts,
-    layout::{self, contains},
+    layout::{self, MODULE_BODY, contains},
     library::Needs,
     naming::Tests,
     table::Table,
@@ -155,10 +155,11 @@ impl<'a> Builder<'a> {
             .attached_to
             .as_ref()
             .and_then(|id| self.project.symbol(id))
+            .filter(|symbol| symbol.name != MODULE_BODY)
             .or_else(|| {
                 self.project
                     .symbols_in(&comment.file)
-                    .filter(|symbol| symbol.span.start.line > end)
+                    .filter(|symbol| symbol.span.start.line > end && symbol.name != MODULE_BODY)
                     .min_by_key(|symbol| (symbol.span.start, &symbol.id))
             });
         let bodies: Vec<&str> = comment
@@ -673,9 +674,13 @@ impl<'a> Builder<'a> {
             .filter_map(|id| project.symbol(id))
             .collect();
         // A package variable that calls it is a table of handlers: the order
-        // of its entries says nothing about who the helper belongs to.
+        // of its entries says nothing about who the helper belongs to. The
+        // statements a module runs when it loads call it where it has to be
+        // defined already.
         if callers.is_empty()
-            || callers.iter().any(|s| s.kind == SymbolKind::Var)
+            || callers
+                .iter()
+                .any(|s| s.kind == SymbolKind::Var || s.name == MODULE_BODY)
             || !callers.iter().all(|s| s.file == callee.file)
             || reaches(
                 project,

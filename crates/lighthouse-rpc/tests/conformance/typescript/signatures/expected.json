@@ -754,7 +754,7 @@
           "type_ref": {
             "text": "number"
           },
-          "visibility": "private"
+          "visibility": "internal"
         },
         {
           "extent": {
