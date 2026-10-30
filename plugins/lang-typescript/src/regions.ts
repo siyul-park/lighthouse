@@ -1,6 +1,6 @@
 import path from "node:path";
 import ts from "typescript";
-import { SNIPPETS_DIR } from "./paths.ts";
+import { SNIPPETS_DIR } from "./project/paths.ts";
 import { byteLineStarts, positionAtByte } from "./positions.ts";
 import type {
   Comment,

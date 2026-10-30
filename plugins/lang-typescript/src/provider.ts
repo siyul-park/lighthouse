@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Handler } from "./server.ts";
 import { PROTOCOL_VERSION } from "./server.ts";
 import { index } from "./index.ts";
-import { isDeclarationFile, isIgnored, slashed } from "./paths.ts";
+import { isDeclarationFile, isIgnored, slashed } from "./project/paths.ts";
 import { type Snippet, planSnippets } from "./regions.ts";
 import type { EmbeddedFile, Fragment, IndexParams, IndexResult, InitializeResult, LanguageManifest } from "./wire.ts";
 

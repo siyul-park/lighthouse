@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import ts from "typescript";
-import { manualAssertions } from "../src/assertions.ts";
+import { manualAssertions } from "../src/tests/assertions.ts";
 
 function body(text: string): ts.Node {
   return ts.createSourceFile("check.ts", text, ts.ScriptTarget.ESNext, true);

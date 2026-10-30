@@ -1,12 +1,12 @@
 import path from "node:path";
 import type ts from "typescript";
 import { Model } from "./model.ts";
-import { slashed } from "./paths.ts";
-import { Workspace } from "./projects.ts";
+import { slashed } from "./project/paths.ts";
+import { Workspace } from "./project.ts";
 import { syntaxProblem } from "./diagnostics.ts";
 import { Remap, type Snippet } from "./regions.ts";
 import { Types } from "./types.ts";
-import { type Services, Unit } from "./unit.ts";
+import { type Services, Unit } from "./index/unit.ts";
 import { Reach } from "./visibility.ts";
 import type { Fragment, IndexResult } from "./wire.ts";
 

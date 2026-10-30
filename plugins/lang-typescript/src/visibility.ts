@@ -4,7 +4,7 @@ import ts from "typescript";
 import type { Decl } from "./symbols.ts";
 import { MODULE_BODY } from "./modulebody.ts";
 import type { Model } from "./model.ts";
-import { isTestFile, relative, slashed } from "./paths.ts";
+import { isTestFile, relative, slashed } from "./project/paths.ts";
 import type { Visibility } from "./wire.ts";
 
 const RANK: Record<Visibility, number> = { private: 0, internal: 1, public: 2 };

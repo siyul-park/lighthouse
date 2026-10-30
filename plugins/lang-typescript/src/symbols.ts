@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { assignmentTarget, exportedNames, isRequireInit, unwrap } from "./commonjs.ts";
-import { SNIPPETS_DIR, idPart } from "./paths.ts";
+import { SNIPPETS_DIR, idPart } from "./project/paths.ts";
 import { Lines } from "./positions.ts";
 import type { SymbolKind } from "./wire.ts";
 

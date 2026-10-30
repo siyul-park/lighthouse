@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
-import { SNIPPETS_DIR } from "./paths.ts";
+import { SNIPPETS_DIR } from "./project/paths.ts";
 
 const EXTENSIONS: [string, ts.Extension][] = [
   [".ts", ts.Extension.Ts],

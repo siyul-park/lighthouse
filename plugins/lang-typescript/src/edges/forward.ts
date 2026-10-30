@@ -1,6 +1,6 @@
 import ts from "typescript";
-import type { Decl } from "./symbols.ts";
-import type { Model } from "./model.ts";
+import type { Decl } from "../symbols.ts";
+import type { Model } from "../model.ts";
 
 /**
  * The call a function body consists of when it passes the receiver and every
