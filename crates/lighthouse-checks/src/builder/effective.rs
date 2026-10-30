@@ -53,8 +53,12 @@ impl Builder<'_> {
     /// The struct `ty` names when it exists only for `function`.
     fn hidden(&self, index: &Index, function: &Symbol, ty: &str) -> Option<Hidden> {
         let project = self.project;
-        let id = SymbolId::parse(&format!("{ty}#type"))?;
-        let symbol = project.symbol(&id)?;
+        // A struct is a `type`; where an interface lists only fields (a
+        // TypeScript options interface) it is the same parameter list.
+        let (id, symbol) = ["type", "interface"].into_iter().find_map(|kind| {
+            let id = SymbolId::parse(&format!("{ty}#{kind}"))?;
+            project.symbol(&id).map(|symbol| (id.clone(), symbol))
+        })?;
         let members = project.members(&id);
         let fields: Vec<&Symbol> = members
             .iter()

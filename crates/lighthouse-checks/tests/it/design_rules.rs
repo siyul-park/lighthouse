@@ -511,6 +511,29 @@ fn a_struct_used_only_by_one_function_counts_its_fields() {
 }
 
 #[test]
+fn an_interface_used_only_by_one_function_counts_its_fields() {
+    let mut w = World::default();
+    let request = w.symbol("m", "Request", SymbolKind::Interface, "m/a.ucm");
+    for field in ["a", "b", "c"] {
+        w.member(&request, field, SymbolKind::Field, "m/a.ucm");
+    }
+    let build = w.func("m", "build", "m/a.ucm");
+    takes(&mut w, &build, "m::Request", 7);
+    assert_eq!(
+        w.names(&w.check(PARAMS, json!({}))),
+        ["build"],
+        "6 + 3 fields"
+    );
+
+    let other = w.func("m", "other", "m/a.ucm");
+    takes(&mut w, &other, "m::Request", 1);
+    assert!(
+        w.check(PARAMS, json!({})).is_empty(),
+        "shared by two functions"
+    );
+}
+
+#[test]
 fn an_options_struct_counts_only_its_required_fields() {
     let mut w = World::default();
     let options = w.symbol("m", "BuildOptions", SymbolKind::Type, "m/a.ucm");
