@@ -769,6 +769,67 @@ Rust with a notice.
   written. A file whose header comment says `@generated` or `DO NOT EDIT` has
   `generated` set.
 
+## `lang-typescript`
+
+Reports `semantic-edges`, `extent` (from the first decorator, JSDoc or comment line
+above a declaration to its last token), `reference-sites` and `overlays`. Language
+`typescript`, aliases `typescript`, `ts`, `tsx`, `typescriptreact`, `javascript`, `js`
+and `node` (Linguist's names). It is a Node (24 or newer) process that loads
+TypeScript 6.0.3 from its own `node_modules`, never the one of the project it reads,
+and executes nothing of the project. It has no cache and does not return `source-ast`.
+
+- Context: no keys; any key is an `incomplete` entry.
+- Programs: one per owning `tsconfig.json` or `jsconfig.json` (the nearest above a
+  file, or the one a project reference points to); `paths`, `baseUrl` and project
+  references resolve as `tsc` does. A file in no project goes in a default program
+  (JavaScript allowed and not checked, `ESNext`, bundler resolution, strict).
+  `allowJs` is always on, so requested JavaScript files are analyzed whatever the
+  project says. The manifest cannot exclude files, so `.d.ts` files, `node_modules`,
+  `testdata` and hidden directories are sent by the host and answered with empty
+  fragments.
+- Modules: one per file, its path without extension (`src/util`). A test file
+  (`.test.`, `.spec.`, `__tests__/`) has `test_of` set to the module it tests by
+  name, else its directory.
+- Symbols: functions (a `const` bound to a function or arrow is a `function`;
+  an arrow in a class property is a `method`), classes and type aliases (`type`),
+  interfaces and `enum`/namespace declarations (`interface`, `type`), methods,
+  properties (`field`), enum members (`variant`), constants and variables (`const`,
+  `var`), and tests. Overloads and merged declarations (interface + interface,
+  class + namespace, function + namespace) are one symbol whose primary node is the
+  implementation. CommonJS `module.exports`, `exports.x` and `X.prototype.m`
+  assignments declare symbols, and JavaScript `this.x =` in a constructor declares fields.
+- Visibility: an exported declaration is `public`, or `internal` when the nearest
+  `package.json` has `"private": true`; a declaration that is not exported is
+  `private`, as is everything in a test file; `protected` is `internal`, `private` and
+  `#x` are `private`; the members of a namespace need `export`.
+- Edges: `calls`, `references`, `imports` and `implements` come from the checker
+  and are `semantic`, including `new` to the constructor, tagged templates,
+  decorators and JSX elements. `implements` is the explicit `extends`/`implements`
+  clauses only. `imports` runs from the module to the module (a project `.d.ts`
+  target by path without extension) or to the package specifier of an external
+  module. A `syntactic` edge to a bare name is emitted only for an unresolved
+  relative import, a call on an `any` receiver, or a name a fence defines in the
+  prose, and only when a file of the project declares that name.
+- Flow follows the model's mapping: `if`/`else if`/`else`, `?:` (an `if`),
+  `for`/`for-in`/`for-of`/`while`/`do`, `switch` (`arms` excluding `default`;
+  `returning` when every arm returns), `try` (one `catch` per handler), labeled
+  `break`/`continue` as `jump`, runs of `&&`/`||`/`??` as `logic`, a call of the
+  enclosing function as `recursion`; closures raise nesting. No `events`.
+- Tests: top-level `describe`/`it`/`test`/`suite`/`context`/`specify` calls
+  (with `.each`, `.skip`, `.only`) in test files or in files that import a known
+  runner; the symbol name is the title; `nesting` is the depth of nested calls;
+  a test is a `table` for `.each` or a loop over a literal array of rows, else
+  `scenario`. `conventions.test_naming` is declared with no prefix.
+- Syntax errors are an `incomplete` entry per file (`line:col: message (and N more)`)
+  and the file still has a fragment; type errors are not gaps.
+- Fences: a TypeScript or JavaScript region is a module of its own under
+  `<dir>/.lighthouse-snippets/<file>.<n>/snippet.<ext>` (extension from the first
+  word of `context.info`, default `.ts`) that uses the package around the file from
+  outside: a bare import of the nearest `package.json` name resolves to the package
+  entry. A fence that is not a module is analyzed with an unmapped `export {};`
+  tail. A fence with invalid syntax is a notice; fences that do not type-check are
+  counted in one notice and keep the edges that resolve. Neither is a gap.
+
 ## `model-http`
 
 Models behind the standard HTTP protocols, as a provider in `lighthouse.toml`

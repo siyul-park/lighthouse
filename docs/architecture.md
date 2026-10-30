@@ -10,6 +10,7 @@
    RPC host (lighthouse-rpc) ── language plugins as processes
           │                      plugins/lang-go (go/packages + go/types)
           │                      plugins/lang-rust (syn + own module resolution)
+          │                      plugins/lang-typescript (TypeScript compiler API)
           │                      plugins/lang-yaml, lang-toml, lang-markdown (syntax
           │                      trees of host files, for embedded sources)
    code model (UCM, lighthouse_model::ucm)
@@ -790,7 +791,7 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 - [spec](../crates/lighthouse-spec/README.md): decision kinds, Catalog, local layer.
 - [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), [protocol](../crates/lighthouse-protocol/README.md): L0 vocabulary, resources and the wire; protocol also owns the hashes and folds that host and plugin must compute alike.
 - `process`: child-process helper and the [sandbox](#sandbox) (no README). `test-support`: dev-only helper of the test suites (no README).
-- Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [lang-yaml](../plugins/lang-yaml/README.md), [lang-toml](../plugins/lang-toml/README.md), [lang-markdown](../plugins/lang-markdown/README.md), [lang-cel](../plugins/lang-cel/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
+- Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [lang-typescript](../plugins/lang-typescript/README.md), [lang-yaml](../plugins/lang-yaml/README.md), [lang-toml](../plugins/lang-toml/README.md), [lang-markdown](../plugins/lang-markdown/README.md), [lang-cel](../plugins/lang-cel/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
 
 Each crate has one integration-test binary, `tests/it/main.rs` with a module per area.
 
