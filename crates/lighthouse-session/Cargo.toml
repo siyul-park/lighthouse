@@ -10,6 +10,7 @@ doctest = false
 
 [dependencies]
 globset.workspace = true
+lang-cel.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-ml.workspace = true

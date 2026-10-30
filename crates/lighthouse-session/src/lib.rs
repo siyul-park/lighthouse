@@ -52,10 +52,22 @@ pub use lighthouse_engine::SKIPPED_DIRS;
 pub use lighthouse_model::Result;
 
 use lighthouse_checks::Composition;
+use lighthouse_plugin::{Plugin, Registry};
+
+/// The registry of the CEL libraries the tool bundles: the one plugin the
+/// composition root registers, which the checks take as given.
+pub(crate) fn libraries() -> Result<Registry> {
+    let plugin = lang_cel::Cel::new();
+    let mut registry = Registry::default();
+    registry
+        .register(&plugin)
+        .map_err(|e| format!("the `{}` plugin: {e}", plugin.manifest().id))?;
+    Ok(registry)
+}
 
 /// The CEL environment of the bundled libraries: built at the composition
 /// root every way into the session goes through before a decision is read,
 /// and passed on from there.
 pub(crate) fn compose() -> Result<Composition> {
-    lighthouse_checks::compose().map_err(Into::into)
+    lighthouse_checks::compose(&libraries()?).map_err(Into::into)
 }

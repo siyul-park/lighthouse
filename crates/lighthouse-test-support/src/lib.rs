@@ -3,10 +3,20 @@
 
 pub mod catalog;
 
+/// The registry of the bundled CEL libraries, built the way the composition
+/// root of the tool builds it.
+pub fn libraries() -> Registry {
+    let mut registry = Registry::default();
+    registry
+        .register(&lang_cel::Cel::new())
+        .expect("the bundled CEL library registers");
+    registry
+}
+
 /// The composition of the bundled CEL libraries, built the way every entry
 /// point of the tool builds it before it reads a decision.
 pub fn composition() -> Composition {
-    lighthouse_checks::compose().expect("the bundled CEL libraries compose")
+    lighthouse_checks::compose(&libraries()).expect("the bundled CEL libraries compose")
 }
 
 /// The CEL environment of [`composition`].
@@ -22,7 +32,7 @@ pub fn bundled() -> &'static Catalog {
 
 /// The bundled plugins, compiled in the composition [`bundled`] belongs to.
 pub fn registry() -> Registry {
-    lighthouse_checks::registry(shared()).expect("the bundled plugins build")
+    lighthouse_checks::registry(shared(), libraries()).expect("the bundled plugins build")
 }
 
 /// The language plugins of this repository that provide a pack.
@@ -46,7 +56,8 @@ pub fn full() -> &'static Catalog {
 /// The plugins of the packs of [`full`], compiled in the composition
 /// [`bundled`] belongs to.
 pub fn full_registry() -> Registry {
-    lighthouse_checks::registry_of(shared(), full()).expect("the plugins of the packs build")
+    lighthouse_checks::registry_of(shared(), full(), libraries())
+        .expect("the plugins of the packs build")
 }
 
 fn shared() -> &'static Composition {

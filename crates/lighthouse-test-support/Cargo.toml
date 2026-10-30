@@ -9,6 +9,7 @@ test = false
 doctest = false
 
 [dependencies]
+lang-cel.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-resource.workspace = true

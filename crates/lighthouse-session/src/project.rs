@@ -140,7 +140,7 @@ impl Session {
             .collect();
         let layers = personal.iter().map(|p| p.layer.clone()).collect();
         let (config, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;
-        let bundled = lighthouse_checks::ids(&comp)?;
+        let bundled = lighthouse_checks::ids(&comp, &crate::libraries()?)?;
         if let Some(listed) = config.plugins().iter().find(|p| bundled.contains(&p.id)) {
             return Err(format!(
                 "plugin `{}` is bundled: remove it from `plugins`",
@@ -357,7 +357,8 @@ impl Session {
     /// language plugin.
     pub fn in_process_registry(&self) -> Result<Registry> {
         let mut registry =
-            lighthouse_checks::registry_of(&self.comp, &self.base).map_err(|e| e.to_string())?;
+            lighthouse_checks::registry_of(&self.comp, &self.base, crate::libraries()?)
+                .map_err(|e| e.to_string())?;
         if let Some(local) = &self.local {
             let plugin = Checks::new(&self.comp, "local", local)?;
             if !plugin.is_empty() {
@@ -431,7 +432,7 @@ pub(crate) fn repository_catalog(
     comp: &Composition,
     root: &Path,
 ) -> Result<(Catalog, BTreeMap<String, String>)> {
-    let bundled = lighthouse_checks::ids(comp)?;
+    let bundled = lighthouse_checks::ids(comp, &crate::libraries()?)?;
     let found = lighthouse_rpc::discover(&[root.join("plugins")])?.found;
     let mut plugins = Vec::new();
     let mut homes = BTreeMap::new();

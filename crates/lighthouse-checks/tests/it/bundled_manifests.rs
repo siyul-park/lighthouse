@@ -44,7 +44,11 @@ fn a_bundled_plugin_names_a_catalog_exactly_when_it_provides_packs() {
 
 #[test]
 fn the_bundled_ids_are_the_library_the_packs_and_metrics() {
-    let ids = lighthouse_checks::ids(&lighthouse_test_support::composition()).unwrap();
+    let ids = lighthouse_checks::ids(
+        &lighthouse_test_support::composition(),
+        &lighthouse_test_support::libraries(),
+    )
+    .unwrap();
 
     assert_eq!(ids, ["lang-cel", "core", "design", "testing", "metrics"]);
 }

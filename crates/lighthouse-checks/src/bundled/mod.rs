@@ -6,21 +6,21 @@ pub(crate) mod core_pack;
 use lighthouse_plugin::{Plugin, Registry};
 use lighthouse_spec::Catalog;
 
-use crate::{Checks, Composition, Error, compose::libraries, metrics::Metrics};
+use crate::{Checks, Composition, Error, metrics::Metrics};
 
 /// Pack whose plugin provides the fallback text language and that the
 /// `metrics` plugin is listed after.
 pub(crate) const CORE: &str = "core";
 
-/// Registry holding every bundled plugin, its decisions compiled in `comp`.
-pub fn registry(comp: &Composition) -> Result<Registry, Error> {
-    registry_of(comp, bundled(comp)?)
+/// Registry holding `libraries` and every bundled plugin, its decisions
+/// compiled in `comp`.
+pub fn registry(comp: &Composition, libraries: Registry) -> Result<Registry, Error> {
+    registry_of(comp, bundled(comp)?, libraries)
 }
 
 /// The ids of the bundled plugins, which a project never lists: the CEL
-/// library, the packs of the bundled catalog and the `metrics` analyzer.
-pub fn ids(comp: &Composition) -> Result<Vec<String>, Error> {
-    let libraries = libraries().map_err(|why| Error::invalid("bundled", why))?;
+/// libraries, the packs of the bundled catalog and the `metrics` analyzer.
+pub fn ids(comp: &Composition, libraries: &Registry) -> Result<Vec<String>, Error> {
     let mut ids: Vec<String> = libraries.manifests().iter().map(|m| m.id.clone()).collect();
     ids.extend(bundled(comp)?.packs().iter().map(|p| p.id.clone()));
     ids.push(Metrics.manifest().id.clone());
@@ -29,14 +29,17 @@ pub fn ids(comp: &Composition) -> Result<Vec<String>, Error> {
 
 /// Like [`registry`], with the plugins of the packs of `catalog`: the bundled
 /// catalog, or the bundled one with the catalogs of language plugins added.
-pub fn registry_of(comp: &Composition, catalog: &Catalog) -> Result<Registry, Error> {
+pub fn registry_of(
+    comp: &Composition,
+    catalog: &Catalog,
+    mut registry: Registry,
+) -> Result<Registry, Error> {
     if !comp.is_built_in() {
         return Err(Error::invalid(
             "bundled",
             "the bundled registry needs the composition from `compose()`",
         ));
     }
-    let mut registry = libraries().map_err(|why| Error::invalid("bundled", why))?;
     for pack in catalog.packs() {
         let checks = Checks::new(comp, &pack.id, catalog)?;
         register(&mut registry, &checks)?;

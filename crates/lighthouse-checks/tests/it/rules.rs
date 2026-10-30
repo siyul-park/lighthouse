@@ -671,7 +671,7 @@ fn compose_from_names_the_library_that_cannot_register() {
 
 #[test]
 fn bundled() {
-    let comp = lighthouse_checks::compose().unwrap();
+    let comp = lighthouse_checks::compose(&lighthouse_test_support::libraries()).unwrap();
 
     let first = comp.bundled().unwrap();
     let second = comp.bundled().unwrap();

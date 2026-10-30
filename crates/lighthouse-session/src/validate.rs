@@ -182,7 +182,9 @@ impl Sets {
                 return;
             }
         };
-        let bundled = match lighthouse_checks::ids(&session.comp) {
+        let bundled = match crate::libraries()
+            .and_then(|libs| lighthouse_checks::ids(&session.comp, &libs).map_err(Into::into))
+        {
             Ok(ids) => ids,
             Err(e) => {
                 problems.push(problem(path, e));
@@ -298,9 +300,10 @@ fn provided_by(
 /// is reported with the documents that hold it, not as a failure of
 /// validating them, so it is left out.
 fn registry_of(session: &Session) -> Result<Registry> {
-    session
-        .in_process_registry()
-        .or_else(|_| lighthouse_checks::registry(&session.comp).map_err(|e| e.to_string().into()))
+    session.in_process_registry().or_else(|_| {
+        lighthouse_checks::registry(&session.comp, crate::libraries()?)
+            .map_err(|e| e.to_string().into())
+    })
 }
 
 /// What building the checks and fixes of the decisions `own` says is wrong

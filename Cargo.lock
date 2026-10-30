@@ -1833,7 +1833,6 @@ name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
  "cel",
- "lang-cel",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -2024,6 +2023,7 @@ name = "lighthouse-session"
 version = "0.1.0"
 dependencies = [
  "globset",
+ "lang-cel",
  "lighthouse-checks",
  "lighthouse-engine",
  "lighthouse-ml",
@@ -2086,6 +2086,7 @@ dependencies = [
 name = "lighthouse-test-support"
 version = "0.1.0"
 dependencies = [
+ "lang-cel",
  "lighthouse-checks",
  "lighthouse-plugin",
  "lighthouse-resource",
