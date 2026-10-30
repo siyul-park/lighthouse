@@ -40,34 +40,6 @@ pub struct Detachment {
     pub model: String,
 }
 
-/// Appends a minor revision of `decision` on top of its latest to the log of
-/// `session`, approved by `approval`, binding `model` (none unbinds), and
-/// gives its id.
-fn append(
-    session: &Session,
-    records: &Records,
-    decision: &Decision,
-    approval: Attribution,
-    model: Option<&str>,
-    evaluation: Value,
-) -> Result<String> {
-    let key = decision.key();
-    Ok(append_revision(
-        &session.root,
-        RevisionSpec {
-            decision: key.to_owned(),
-            parent: records.latest(key).map(|latest| latest.id.clone()),
-            meaning_version: Some(decision.meaning_version()),
-            check_revision: Some(decision.check_revision()),
-            change: Change::Minor,
-            evaluation,
-            approval,
-            model: model.map(str::to_owned),
-            generated_at_time: now(),
-        },
-    )?)
-}
-
 /// Evaluates `request.model` as the first layer of the decision and, when the
 /// evaluation allows it, appends the revision that attaches it.
 pub fn attach(request: &EvalRequest, approval: Attribution) -> Result<Attachment> {
@@ -134,4 +106,32 @@ pub fn detach(config: Option<&Path>, decision: &str, approval: Attribution) -> R
         decision: found.id().to_owned(),
         model,
     })
+}
+
+/// Appends a minor revision of `decision` on top of its latest to the log of
+/// `session`, approved by `approval`, binding `model` (none unbinds), and
+/// gives its id.
+fn append(
+    session: &Session,
+    records: &Records,
+    decision: &Decision,
+    approval: Attribution,
+    model: Option<&str>,
+    evaluation: Value,
+) -> Result<String> {
+    let key = decision.key();
+    Ok(append_revision(
+        &session.root,
+        RevisionSpec {
+            decision: key.to_owned(),
+            parent: records.latest(key).map(|latest| latest.id.clone()),
+            meaning_version: Some(decision.meaning_version()),
+            check_revision: Some(decision.check_revision()),
+            change: Change::Minor,
+            evaluation,
+            approval,
+            model: model.map(str::to_owned),
+            generated_at_time: now(),
+        },
+    )?)
 }

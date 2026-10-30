@@ -293,30 +293,6 @@ impl Fixed {
     }
 }
 
-/// A person's line for the counts of `decision`.
-fn model_line(counts: &ModelCounts, decision: &str) -> String {
-    {
-        let declined: Vec<String> = counts
-            .declined
-            .iter()
-            .map(|(class, n)| format!("{class} {n}"))
-            .collect();
-        let declined = if declined.is_empty() {
-            "0".to_owned()
-        } else {
-            format!(
-                "{} ({})",
-                counts.declined.values().sum::<usize>(),
-                declined.join(", ")
-            )
-        };
-        format!(
-            "model fixes {decision}: asked {}, answered {}, verified {}, applied {}, previewed {}, declined {declined}",
-            counts.asked, counts.answered, counts.verified, counts.applied, counts.previewed
-        )
-    }
-}
-
 impl Previewed {
     /// The fix `fix` as reported, its application naming the findings it was
     /// made for by the first characters of their fingerprints that tell them
@@ -508,4 +484,28 @@ fn suppressed(
         .map(|d| d.fingerprint.clone())
         .collect();
     Ok(all.difference(&kept).cloned().collect())
+}
+
+/// A person's line for the counts of `decision`.
+fn model_line(counts: &ModelCounts, decision: &str) -> String {
+    {
+        let declined: Vec<String> = counts
+            .declined
+            .iter()
+            .map(|(class, n)| format!("{class} {n}"))
+            .collect();
+        let declined = if declined.is_empty() {
+            "0".to_owned()
+        } else {
+            format!(
+                "{} ({})",
+                counts.declined.values().sum::<usize>(),
+                declined.join(", ")
+            )
+        };
+        format!(
+            "model fixes {decision}: asked {}, answered {}, verified {}, applied {}, previewed {}, declined {declined}",
+            counts.asked, counts.answered, counts.verified, counts.applied, counts.previewed
+        )
+    }
 }

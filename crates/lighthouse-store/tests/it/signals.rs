@@ -186,3 +186,19 @@ fn store_has_signal() {
     assert!(!store.has_signal("aaaaaaa").unwrap());
     assert!(!store.has_signal("bbbbbbbbbbbb").unwrap());
 }
+
+#[test]
+fn a_signal_shows_the_fields_of_the_new_signal_beside_its_own() {
+    let mut store = Store::open_in_memory().unwrap();
+    store
+        .add_signal(&new("aaaaaaaaaaaa", SignalClass::Directive), WEEK)
+        .unwrap();
+    let found: Vec<lighthouse_store::Signal> = store.signals(&SignalFilter::default()).unwrap();
+    let shown = serde_json::to_value(&found[0]).unwrap();
+    for key in ["id", "session", "event", "class", "excerpt", "rule", "by"] {
+        assert!(shown.get(key).is_some(), "{key}");
+    }
+    assert!(shown["time"].is_string());
+    assert_eq!(shown["asked"], false);
+    assert!(shown.get("signal").is_none());
+}

@@ -320,11 +320,6 @@ pub struct DeclinedFix {
     pub reason: String,
 }
 
-/// A path as the reports write it, with `/` on every platform.
-fn slashed_path<S: serde::Serializer>(path: &Path, out: S) -> Result<S::Ok, S::Error> {
-    out.serialize_str(&lighthouse_resource::slashed(path))
-}
-
 /// A file's text before and after the run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileChange {
@@ -407,4 +402,9 @@ fn decision_of(decision: &Decision) -> FixDecision {
         requirement: decision.requirement.clone(),
         context: decision.context.clone(),
     }
+}
+
+/// A path as the reports write it, with `/` on every platform.
+fn slashed_path<S: serde::Serializer>(path: &Path, out: S) -> Result<S::Ok, S::Error> {
+    out.serialize_str(&lighthouse_resource::slashed(path))
 }

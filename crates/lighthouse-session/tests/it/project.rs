@@ -72,6 +72,22 @@ fn session_registry() {
 }
 
 #[test]
+fn session_engine_with() {
+    let dir = project("error");
+    let session = session(dir.path());
+    let (registry, _) = session.registry().unwrap();
+    let config = lighthouse_spec::Config::parse_inline(
+        "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = \"warn\"\n",
+    )
+    .unwrap();
+    let engine = session
+        .engine_with(registry, config, &session.catalog, dir.path())
+        .unwrap();
+    assert!(engine.active("core/max-lines"));
+    assert!(!engine.active("local/short"));
+}
+
+#[test]
 fn session_engine() {
     let dir = project("error");
     let (engine, notices) = session(dir.path()).engine().unwrap();
