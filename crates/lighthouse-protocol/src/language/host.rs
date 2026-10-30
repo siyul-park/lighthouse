@@ -74,6 +74,7 @@ pub struct HostProvider<P> {
 }
 
 impl<P: HostParser> HostProvider<P> {
+    /// The provider of the language `parser` reads.
     pub fn new(parser: P) -> Self {
         Self {
             language: parser.language(),
