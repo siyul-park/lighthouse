@@ -11,6 +11,47 @@ use crate::{
 };
 use lighthouse_protocol::{DecisionRef, hash};
 
+/// Where a decision stands in its life, as an architecture decision record
+/// does. Only an accepted decision is enforced.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecisionStatus {
+    /// Under discussion: written down, not yet enforced.
+    Proposed,
+    #[default]
+    Accepted,
+    /// Considered and turned down; kept so the question is not asked again.
+    Rejected,
+    /// Replaced by another decision (named in that decision's `supersedes`).
+    Superseded,
+    /// No longer wanted, and nothing replaces it.
+    Deprecated,
+}
+
+impl DecisionStatus {
+    /// Whether decisions in this state are enforced.
+    pub fn enforced(self) -> bool {
+        self == Self::Accepted
+    }
+
+    /// Whether this is the default, left out of written files.
+    pub fn is_default(&self) -> bool {
+        *self == Self::Accepted
+    }
+}
+
+impl std::fmt::Display for DecisionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Proposed => "proposed",
+            Self::Accepted => "accepted",
+            Self::Rejected => "rejected",
+            Self::Superseded => "superseded",
+            Self::Deprecated => "deprecated",
+        })
+    }
+}
+
 /// What one language changes about a decision: the values of its options and
 /// the programs that check and fix its files.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -412,45 +453,4 @@ fn option_content(property: &crate::OptionSchema) -> Value {
         content["shape"] = json!(property.shape);
     }
     content
-}
-
-/// Where a decision stands in its life, as an architecture decision record
-/// does. Only an accepted decision is enforced.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum DecisionStatus {
-    /// Under discussion: written down, not yet enforced.
-    Proposed,
-    #[default]
-    Accepted,
-    /// Considered and turned down; kept so the question is not asked again.
-    Rejected,
-    /// Replaced by another decision (named in that decision's `supersedes`).
-    Superseded,
-    /// No longer wanted, and nothing replaces it.
-    Deprecated,
-}
-
-impl DecisionStatus {
-    /// Whether decisions in this state are enforced.
-    pub fn enforced(self) -> bool {
-        self == Self::Accepted
-    }
-
-    /// Whether this is the default, left out of written files.
-    pub fn is_default(&self) -> bool {
-        *self == Self::Accepted
-    }
-}
-
-impl std::fmt::Display for DecisionStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Proposed => "proposed",
-            Self::Accepted => "accepted",
-            Self::Rejected => "rejected",
-            Self::Superseded => "superseded",
-            Self::Deprecated => "deprecated",
-        })
-    }
 }
