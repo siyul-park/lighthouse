@@ -44,6 +44,31 @@ fn provider_of(text: &str, name: &str, stream: &Path) -> ModelProvider {
 /// What the layer `text` makes of `stream` (with `@ROOT@` the directory the
 /// agent ran in), run in a directory that holds `files`.
 fn run_with(text: &str, name: &str, stream: &str, files: &[&str]) -> Edited {
+    run_as(text, name, stream, files, |name| std::env::var(name).ok())
+}
+
+/// [`run_with`] for a user whose variables are `vars`, read by name instead of
+/// from the environment of the test process.
+fn run_for(text: &str, name: &str, stream: &str, vars: &[(&str, &str)]) -> Edited {
+    let vars: Vec<(String, String)> = vars
+        .iter()
+        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+        .collect();
+    let lookup = move |name: &str| {
+        vars.iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, value)| value.clone())
+    };
+    run_as(text, name, stream, &[], lookup)
+}
+
+fn run_as(
+    text: &str,
+    name: &str,
+    stream: &str,
+    files: &[&str],
+    lookup: impl Fn(&str) -> Option<String> + Send + Sync + 'static,
+) -> Edited {
     let root = tempfile::tempdir().unwrap();
     for file in files {
         let path = root.path().join(file);
@@ -58,13 +83,14 @@ fn run_with(text: &str, name: &str, stream: &str, files: &[&str]) -> Edited {
     )
     .unwrap();
     let provider = provider_of(text, name, &path);
-    let agent = CommandModel::new(
+    let agent = CommandModel::new_in(
         &lighthouse_test_support::cel(),
         kept.path(),
         name,
         "m",
         &provider,
         &Policy::default(),
+        lookup,
     )
     .unwrap();
     agent
@@ -246,15 +272,18 @@ fn each_makes_an_event_of_every_element_and_a_list_of_paths_one_for_each_path() 
 
 #[test]
 fn a_secret_the_stream_echoes_does_not_reach_the_events_or_what_was_said() {
-    // SAFETY: this variable belongs to this test.
-    unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_EVENTS", "s3cret") };
     let stream = "{\"name\":\"cat\",\"file\":\"token-s3cret\"}\n";
     let text = layer("pattern = 'line.file'\nsaid = 'line.file'").replace(
         "command = [\"harness\"]",
         "command = [\"harness\"]\nenv = { KEY = \"${LIGHTHOUSE_RPC_TEST_EVENTS}\" }",
     );
 
-    let found = run(&text, "p", stream);
+    let found = run_for(
+        &text,
+        "p",
+        stream,
+        &[("LIGHTHOUSE_RPC_TEST_EVENTS", "s3cret")],
+    );
 
     assert_eq!(
         found.events[0].pattern.as_deref(),
@@ -290,15 +319,18 @@ fn a_call_whose_operands_name_no_file_is_one_event_without_a_path() {
 
 #[test]
 fn a_secret_the_json_escapes_is_hidden_in_what_the_events_carry() {
-    // SAFETY: this variable belongs to this test.
-    unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_ESCAPED", "s3cret/x") };
     let stream = "{\"name\":\"cat\",\"file\":\"token-s3cret\\/x\"}\n";
     let text = layer("pattern = 'line.file'\nsaid = 'line.file'").replace(
         "command = [\"harness\"]",
         "command = [\"harness\"]\nenv = { KEY = \"${LIGHTHOUSE_RPC_TEST_ESCAPED}\" }",
     );
 
-    let found = run(&text, "p", stream);
+    let found = run_for(
+        &text,
+        "p",
+        stream,
+        &[("LIGHTHOUSE_RPC_TEST_ESCAPED", "s3cret/x")],
+    );
 
     let pattern = found.events[0].pattern.as_deref().unwrap();
     assert!(!pattern.contains("s3cret"), "{pattern}");

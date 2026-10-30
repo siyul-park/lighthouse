@@ -8,7 +8,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs, io,
+    env, fs, io,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -120,6 +120,17 @@ pub(in crate::fix) fn run_verify(
     programs: &[Program],
     policy: &Policy,
 ) -> Result<(), String> {
+    run_verify_in(root, texts, programs, policy, |name| env::var(name).ok())
+}
+
+/// [`run_verify`] reading the user's variables through `lookup`.
+pub(in crate::fix) fn run_verify_in(
+    root: &Path,
+    texts: &Overlays,
+    programs: &[Program],
+    policy: &Policy,
+    lookup: impl Fn(&str) -> Option<String>,
+) -> Result<(), String> {
     let scratch = Scratch::new(root, texts)
         .map_err(|e| format!("the scratch copy of the project failed: {e}"))?;
     for program in programs {
@@ -127,7 +138,7 @@ pub(in crate::fix) fn run_verify(
         let own = program.policy(policy);
         let mut profile = own.profile(root, scratch.path()).caching();
         profile.writes.push(scratch.path().to_owned());
-        let environment = Environment::new(&program.env, Vec::new(), Home::User)
+        let environment = Environment::new_in(&program.env, Vec::new(), Home::User, &lookup)
             .map_err(|reason| format!("`{shown}`: {reason}"))?;
         let ran = Job {
             command: &program.command,

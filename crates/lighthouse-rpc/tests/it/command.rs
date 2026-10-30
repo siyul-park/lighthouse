@@ -352,6 +352,13 @@ fn an_agent_runs_with_a_home_of_its_own_and_writes_only_in_its_directory() {
 
 /// An agent that writes its key variable and its arguments into its directory
 /// and says the key on stdout, configured with `env = { KEY = "${NAME}" }`.
+/// A user with the one variable `name`, read by name instead of from the
+/// environment of the test process.
+fn user(name: &str, value: &str) -> impl Fn(&str) -> Option<String> + Send + Sync + 'static {
+    let (name, value) = (name.to_owned(), value.to_owned());
+    move |asked| (asked == name).then(|| value.clone())
+}
+
 fn keyed(name: &str) -> lighthouse_spec::ModelProvider {
     let script =
         "printf %s \"$KEY\" > key.txt; printf '%s' \"$*\" > argv.txt; echo \"the key is $KEY\"";
@@ -363,17 +370,16 @@ fn keyed(name: &str) -> lighthouse_spec::ModelProvider {
 
 #[test]
 fn a_key_reaches_the_program_by_its_environment_and_nowhere_else() {
-    // SAFETY: this variable belongs to this test.
-    unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_KEY", "sk-agent-secret") };
     let work = tempfile::tempdir().unwrap();
     let provider = keyed("LIGHTHOUSE_RPC_TEST_KEY");
-    let command = CommandModel::new(
+    let command = CommandModel::new_in(
         &lighthouse_test_support::cel(),
         work.path(),
         "p/m",
         "m",
         &provider,
         &Policy::default(),
+        user("LIGHTHOUSE_RPC_TEST_KEY", "sk-agent-secret"),
     )
     .unwrap();
 
@@ -403,16 +409,15 @@ fn a_key_reaches_the_program_by_its_environment_and_nowhere_else() {
 fn the_version_of_a_model_holds_the_name_of_a_key_and_a_hash_of_its_value() {
     let work = tempfile::tempdir().unwrap();
     let version = |value: &str| {
-        // SAFETY: this variable belongs to this test.
-        unsafe { std::env::set_var("LIGHTHOUSE_RPC_TEST_ROTATED", value) };
         let provider = keyed("LIGHTHOUSE_RPC_TEST_ROTATED");
-        CommandModel::new(
+        CommandModel::new_in(
             &lighthouse_test_support::cel(),
             work.path(),
             "p/m",
             "m",
             &provider,
             &Policy::default(),
+            user("LIGHTHOUSE_RPC_TEST_ROTATED", value),
         )
         .unwrap()
         .manifest()

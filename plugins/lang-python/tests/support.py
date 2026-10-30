@@ -4,6 +4,7 @@ import os
 import tempfile
 from typing import Any
 
+from lang_python.project import Model, Project
 from lang_python.provider import Provider
 
 
@@ -46,3 +47,9 @@ def edges(result: dict[str, Any], path: str, kind: str | None = None) -> list[tu
         source = e["from"].get("symbol") or e["from"]["module"]
         found.append((e["kind"], source, e["to"], e["resolution"]))
     return found
+
+
+def model_of(files: dict[str, str]) -> Model:
+    """The model of a project of in-memory files: nothing is read from the disk."""
+    with tempfile.TemporaryDirectory() as root:
+        return Model(Project(root, files))

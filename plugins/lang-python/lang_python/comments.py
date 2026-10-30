@@ -22,7 +22,9 @@ STRING_ENDS = {getattr(tokenize, name) for name in ("FSTRING_END", "TSTRING_END"
 
 
 @dataclass(frozen=True)
-class CommentToken:
+class _CommentToken:
+    """A `#` comment: where it starts and ends on its line, its text, and whether it stands alone."""
+
     line: int
     col: int
     """The 0-based byte column of the `#`."""
@@ -37,7 +39,7 @@ class Tokens:
 
     def __init__(self, text: str, lines: Lines):
         self.lines = lines
-        self.comments: list[CommentToken] = []
+        self.comments: list[_CommentToken] = []
         self.starts: list[tuple[int, int]] = []
         depth = 0
         try:
@@ -59,10 +61,10 @@ class Tokens:
     def _start(self, token: tokenize.TokenInfo) -> tuple[int, int]:
         return token.start[0], self.lines.byte_col(*token.start)
 
-    def _comment(self, token: tokenize.TokenInfo) -> CommentToken:
+    def _comment(self, token: tokenize.TokenInfo) -> _CommentToken:
         line, col = token.start
         alone = token.line[:col].strip() == ""
-        return CommentToken(
+        return _CommentToken(
             line, self.lines.byte_col(line, col), self.lines.byte_col(line, token.end[1]), token.string, alone
         )
 
@@ -71,7 +73,7 @@ class Tokens:
         replacement fields one token."""
         return bisect.bisect_left(self.starts, end) - bisect.bisect_left(self.starts, start)
 
-    def leading(self, line: int) -> CommentToken | None:
+    def leading(self, line: int) -> _CommentToken | None:
         """The first of the comment lines that stand alone right above a line, with no blank line between."""
         first = None
         current = line - 1
@@ -82,14 +84,14 @@ class Tokens:
             first = comment
             current -= 1
 
-    def trailing(self, line: int, after_col: int) -> CommentToken | None:
+    def trailing(self, line: int, after_col: int) -> _CommentToken | None:
         """The comment that follows code on a line, after a column."""
         comment = self.by_line.get(line)
         return comment if comment is not None and not comment.alone and comment.col >= after_col else None
 
     def grouped(self, symbols_at: dict[int, str]) -> list[Comment]:
         """Every comment, adjacent line comments that stand alone joined, with the symbol each documents."""
-        groups: list[list[CommentToken]] = []
+        groups: list[list[_CommentToken]] = []
         for comment in self.comments:
             previous = groups[-1][-1] if groups else None
             if previous is not None and previous.alone and comment.alone and comment.line == previous.line + 1:

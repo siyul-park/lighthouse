@@ -58,9 +58,10 @@ class Unit:
         self.seen: set[str] = set()
         self.targets: dict[str, dict[str, None]] = {}
         self.uses: Uses | None = None
-        self.functions = Functions(model, parsed, self.resolver, types, self.module_scope, self.test)
+        self.functions = Functions(model, parsed, types)
 
     def edge(self, kind: EdgeKind, source: Node, to: str, site: Span | None, resolution: Resolution) -> None:
+        """Records an edge once, however often it is stated; a call or reference also says what its source touches."""
         owner = source.get("symbol") or source.get("module") or ""
         key = json.dumps([kind, owner, to, site])
         if key in self.seen:
@@ -74,8 +75,9 @@ class Unit:
             self.targets.setdefault(source["symbol"], {})[to] = None
 
     def index(self) -> Indexed:
+        """The fragment of the file, with the count of imports that resolved nowhere and whether names were guessed."""
         decls = self.decls
-        symbols = [self.symbol(decl) for decl in decls.list]
+        symbols = [self._symbol(decl) for decl in decls.list]
         for decl in decls.list:
             container: Node = {"symbol": decl.owner.id} if decl.owner is not None else {"module": decls.module}
             self.edge("contains", container, decl.id, None, "semantic")
@@ -86,7 +88,7 @@ class Unit:
         for decl in decls.list:
             if decl.body is None:
                 continue
-            functions.append(self.functions.summary(decl, self.function_scope(decl)))
+            functions.append(self.functions.summary(decl, self._function_scope(decl)))
             if decl.kind == "test":
                 tests.append(test_case(decl, self.parsed.tree, self.targets.get(decl.id, {})))
         starts = {}
@@ -97,7 +99,7 @@ class Unit:
                 "path": self.rel,
                 **({"generated": True} if is_generated(self.parsed.tree, self.parsed.tokens) else {}),
             },
-            "modules": [self.module_record(decls.module)],
+            "modules": [self._module_record(decls.module)],
             "symbols": symbols,
             "edges": self.edges,
             "functions": functions,
@@ -106,16 +108,15 @@ class Unit:
         }
         return Indexed(fragment, self.uses.unresolved_imports, self.uses.guessed)
 
-    def module_record(self, module: str) -> Module:
+    def _module_record(self, module: str) -> Module:
         if not self.test:
             return {"path": module}
-        named = tested_module(module)
-        known = self.model.project.modules()
-        return {"path": module, "test_of": named if named is not None and named in known else directory_of(module)}
+        named = tested_module(module, self.model.project.modules())
+        return {"path": module, "test_of": named if named is not None else directory_of(module)}
 
     # symbols
 
-    def symbol(self, decl: Decl) -> Symbol:
+    def _symbol(self, decl: Decl) -> Symbol:
         lines = self.parsed.lines
         symbol: Symbol = {
             "id": decl.id,
@@ -147,6 +148,6 @@ class Unit:
 
     # summaries
 
-    def function_scope(self, decl: Decl) -> Scope:
+    def _function_scope(self, decl: Decl) -> Scope:
         scope = self.uses.scopes.get(id(decl.body)) if self.uses is not None else None
         return scope if scope is not None else self.module_scope

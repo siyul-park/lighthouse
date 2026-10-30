@@ -3,46 +3,47 @@
 import ast
 
 from lang_python.symbols import FUNCTION_NODES, Decl, dotted, has_decorator
-from lang_python.project import DeclVal, Model, ParsedFile, Resolver, Scope, has_name, unwrap_annotation
+from lang_python.project import DeclVal, Model, ParsedFile, Resolver, Scope, has_name, resolver_of, unwrap_annotation
 from lang_python.extent import start_of
 from lang_python.visibility import Reach
 from lang_python.flow import FlowWalker
 from lang_python.sdk.wire import FunctionSummary, Signature, TypeRef
-from lang_python.tests import body_statements, manual_assertions
+from lang_python.tests import body_statements, is_test_file, manual_assertions
 
 NO_OVERRIDE = frozenset({"__init__", "__new__", "__init_subclass__", "__class_getitem__"})
 NOTHING = frozenset({"None", "NoReturn", "Never"})
 UNTYPED = "Any"
 
 
-def text_of(annotation: ast.expr) -> str:
+def _text_of(annotation: ast.expr) -> str:
     """The annotation as written, normalized: a quoted annotation is shown without its quotes."""
     if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
         return annotation.value.strip()
     return ast.unparse(annotation)
 
 
-def is_nothing(annotation: ast.expr) -> bool:
-    name = text_of(annotation).rsplit(".", 1)[-1]
+def _is_nothing(annotation: ast.expr) -> bool:
+    name = _text_of(annotation).rsplit(".", 1)[-1]
     return name in NOTHING
 
 
-def receiver_free(node: ast.FunctionDef | ast.AsyncFunctionDef, decl: Decl) -> bool:
+def _receiver_free(node: ast.FunctionDef | ast.AsyncFunctionDef, decl: Decl) -> bool:
     """Whether a def has no receiver to leave out: a function, or a static method."""
     return decl.owner is None or has_decorator(node, "staticmethod")
 
 
 def parameters(node: ast.AST) -> list[ast.arg]:
+    """Every parameter of a def or lambda in declaration order: positional, `*args`, keyword-only, `**kwargs`."""
     args = node.args  # type: ignore[attr-defined]
     return [*args.posonlyargs, *args.args, *([args.vararg] if args.vararg else []), *args.kwonlyargs] + (
         [args.kwarg] if args.kwarg else []
     )
 
 
-def own_parameters(node: ast.AST, decl: Decl | None) -> list[ast.arg]:
+def _own_parameters(node: ast.AST, decl: Decl | None) -> list[ast.arg]:
     """The declared parameters, the receiver excluded."""
     found = parameters(node)
-    if decl is not None and isinstance(node, FUNCTION_NODES) and not receiver_free(node, decl) and found:
+    if decl is not None and isinstance(node, FUNCTION_NODES) and not _receiver_free(node, decl) and found:
         return found[1:]
     return found
 
@@ -53,10 +54,10 @@ class Types:
     def __init__(self, reach: Reach):
         self.reach = reach
 
-    def ref(self, annotation: ast.expr | None, resolver: Resolver, scope: Scope) -> TypeRef:
+    def _ref(self, annotation: ast.expr | None, resolver: Resolver, scope: Scope) -> TypeRef:
         if annotation is None:
             return {"text": UNTYPED}
-        ref: TypeRef = {"text": text_of(annotation)}
+        ref: TypeRef = {"text": _text_of(annotation)}
         cls = resolver.annotation_class(annotation, scope)
         if cls is not None:
             ref["symbol"] = cls.id[: cls.id.rindex("#")]
@@ -64,22 +65,24 @@ class Types:
         return ref
 
     def field(self, decl: Decl, resolver: Resolver, scope: Scope) -> tuple[TypeRef, bool] | None:
+        """The type of an annotated field and whether it is optional; None when it has no annotation."""
         if decl.annotation is None:
             return None
-        optional = nullable(decl.annotation) or (
+        optional = _nullable(decl.annotation) or (
             decl.default and "dataclass" in (decl.owner.traits if decl.owner else ())
         )
-        return self.ref(decl.annotation, resolver, scope), bool(optional)
+        return self._ref(decl.annotation, resolver, scope), bool(optional)
 
     def signature(self, decl: Decl, resolver: Resolver, scope: Scope) -> Signature | None:
+        """The types a def's annotations give its parameters and result; None when it has neither."""
         node = decl.body
         if node is None:
             return None
-        params = [self.ref(arg.annotation, resolver, scope) for arg in own_parameters(node, decl)]
+        params = [self._ref(arg.annotation, resolver, scope) for arg in _own_parameters(node, decl)]
         results: list[TypeRef] = []
         if returns(node) == 1:
             annotation = node.returns if isinstance(node, FUNCTION_NODES) else None
-            results.append(self.ref(annotation, resolver, scope))
+            results.append(self._ref(annotation, resolver, scope))
         if not params and not results:
             return None
         return {"params": params, "results": results}
@@ -96,30 +99,43 @@ class Types:
         annotation = unwrap_annotation(node.returns)
         if annotation is None:
             return False
-        if decl.owner is not None and text_of(annotation) in ("Self", "typing.Self", decl.owner.name):
+        if decl.owner is not None and _text_of(annotation) in ("Self", "typing.Self", decl.owner.name):
             return True
         cls = resolver.annotation_class(node.returns, scope)
         return cls is not None and cls.module == decl.module
 
 
-def nullable(annotation: ast.expr) -> bool:
+def _nullable(annotation: ast.expr) -> bool:
     """Whether an annotation admits None: `Optional[X]`, `X | None`, `Union[X, None]`."""
     if isinstance(annotation, ast.Constant):
-        if isinstance(annotation.value, str):
-            try:
-                return nullable(ast.parse(annotation.value.strip(), mode="eval").body)
-            except SyntaxError:
-                return False
-        return annotation.value is None
+        return _nullable_constant(annotation)
     if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
-        return nullable(annotation.left) or nullable(annotation.right)
+        return _nullable(annotation.left) or _nullable(annotation.right)
     if isinstance(annotation, ast.Subscript):
-        wrapper = (dotted(annotation.value) or "").rsplit(".", 1)[-1]
-        if wrapper == "Optional":
-            return True
-        if wrapper == "Union" and isinstance(annotation.slice, ast.Tuple):
-            return any(nullable(e) for e in annotation.slice.elts)
+        return _nullable_subscript(annotation)
     return False
+
+
+def _nullable_constant(annotation: ast.Constant) -> bool:
+    """Whether `None`, or a quoted annotation, admits None."""
+    if not isinstance(annotation.value, str):
+        return annotation.value is None
+    try:
+        return _nullable(ast.parse(annotation.value.strip(), mode="eval").body)
+    except SyntaxError:
+        return False
+
+
+def _nullable_subscript(annotation: ast.Subscript) -> bool:
+    """Whether `Optional[X]` or a `Union` with None admits None."""
+    wrapper = (dotted(annotation.value) or "").rsplit(".", 1)[-1]
+    if wrapper == "Optional":
+        return True
+    return (
+        wrapper == "Union"
+        and isinstance(annotation.slice, ast.Tuple)
+        and any(_nullable(e) for e in annotation.slice.elts)
+    )
 
 
 def returns(node: ast.AST) -> int:
@@ -128,11 +144,11 @@ def returns(node: ast.AST) -> int:
         return 1
     annotation = node.returns  # type: ignore[attr-defined]
     if annotation is not None:
-        return 0 if is_nothing(annotation) else 1
-    return 1 if yields_value(node.body) else 0  # type: ignore[attr-defined]
+        return 0 if _is_nothing(annotation) else 1
+    return 1 if _yields_value(node.body) else 0  # type: ignore[attr-defined]
 
 
-def yields_value(body: list[ast.stmt]) -> bool:
+def _yields_value(body: list[ast.stmt]) -> bool:
     """Whether a body returns a value or yields, not counting what nested functions do."""
     stack: list[ast.AST] = list(body)
     while stack:
@@ -151,22 +167,21 @@ def yields_value(body: list[ast.stmt]) -> bool:
 class Functions:
     """Builds the summaries of the functions of one parsed file."""
 
-    def __init__(
-        self, model: Model, parsed: ParsedFile, resolver: Resolver, types: Types, module_scope: Scope, test: bool
-    ):
+    def __init__(self, model: Model, parsed: ParsedFile, types: Types):
         self.model = model
         self.parsed = parsed
-        self.resolver = resolver
+        self.resolver = resolver_of(model, parsed)
         self.types = types
-        self.module_scope = module_scope
-        self.test = test
+        self.module_scope = parsed.scopes().module(parsed.tree)
+        self.test = is_test_file(parsed.rel)
 
     def summary(self, decl: Decl, scope: Scope) -> FunctionSummary:
+        """The summary of one declaration with a body: its flow, size, signature and the roles it plays."""
         node = decl.body
-        walker = FlowWalker(lambda call: self.calls_self(call, decl, scope))
+        walker = FlowWalker(lambda call: self._calls_self(call, decl, scope))
         walker.run(node.body)  # type: ignore[union-attr]
         statements = [] if isinstance(node, ast.Lambda) else body_statements(node)
-        params = own_parameters(node, decl)
+        params = _own_parameters(node, decl)
         summary: FunctionSummary = {
             "symbol": decl.id,
             "max_nesting": walker.deepest,
@@ -174,16 +189,16 @@ class Functions:
             "top_level": 1 if isinstance(node, ast.Lambda) else len(statements),
             "params": len(params),
             "returns": returns(node),
-            "tokens": self.token_count(node, statements),
+            "tokens": self._token_count(node, statements),
             "flow": walker.events,
         }
-        forwards = self.forward_target(decl, node, scope)
+        forwards = self._forward_target(decl, node, scope)
         if forwards is not None:
             summary["forwards_to"] = forwards
         signature = self.types.signature(decl, self.resolver, self.module_scope)
         if signature is not None:
             summary["signature"] = signature
-        if self.implementation(decl):
+        if self._implementation(decl):
             summary["implementation"] = True
         if self.types.constructs(decl, self.resolver, self.module_scope):
             summary["constructs"] = True
@@ -193,7 +208,7 @@ class Functions:
                 summary["manual_assertions"] = manual
         return summary
 
-    def token_count(self, node: ast.AST, statements: list[ast.stmt]) -> int:
+    def _token_count(self, node: ast.AST, statements: list[ast.stmt]) -> int:
         tokens = self.parsed.tokens
         if isinstance(node, ast.Lambda):
             return tokens.count(
@@ -205,11 +220,11 @@ class Functions:
         last = statements[-1]
         return tokens.count((line, col), (last.end_lineno, last.end_col_offset))
 
-    def calls_self(self, call: ast.Call, decl: Decl, scope: Scope) -> bool:
+    def _calls_self(self, call: ast.Call, decl: Decl, scope: Scope) -> bool:
         value = self.resolver.expr_value(call.func, scope)
         return isinstance(value, DeclVal) and value.decl is decl
 
-    def implementation(self, decl: Decl) -> bool:
+    def _implementation(self, decl: Decl) -> bool:
         """Whether a method overrides one of a project base class, an interface or an abstract class, or says so."""
         node = decl.body
         if decl.kind != "method" or decl.owner is None or decl.name in NO_OVERRIDE or node is None:
@@ -222,44 +237,52 @@ class Functions:
                 return True
         return False
 
-    def forward_target(self, decl: Decl, node: ast.AST, scope: Scope) -> str | None:
+    def _forward_target(self, decl: Decl, node: ast.AST, scope: Scope) -> str | None:
         """The call a body consists of when it passes every parameter on, in order: `return self.read(key)`."""
-        if isinstance(node, ast.Lambda):
+        call = _forwarded_call(node)
+        if call is None or not _passes_on(node, _own_parameters(node, decl), call):
             return None
-        statements = body_statements(node)
-        if len(statements) != 1:
+        if not _reaches_through(node, decl, call.func):
             return None
-        only = statements[0]
-        expr = only.value if isinstance(only, (ast.Return, ast.Expr)) else None
-        while isinstance(expr, ast.Await):
-            expr = expr.value
-        if not isinstance(expr, ast.Call):
-            return None
-        params = own_parameters(node, decl)
-        if not passes_on(node, params, expr):
-            return None
-        callee = expr.func
-        method = decl.owner is not None
-        everything = [*node.args.posonlyargs, *node.args.args]  # type: ignore[attr-defined]
-        if isinstance(callee, ast.Name) and not method:
-            pass
-        elif (
-            isinstance(callee, ast.Attribute)
-            and method
-            and everything
-            and isinstance(callee.value, ast.Name)
-            and callee.value.id == everything[0].arg
-        ):
-            pass
-        else:
-            return None
-        value = self.resolver.expr_value(callee, scope)
+        value = self.resolver.expr_value(call.func, scope)
         return value.decl.id if isinstance(value, DeclVal) else None
 
 
-def passes_on(node: ast.AST, params: list[ast.arg], call: ast.Call) -> bool:
+def _forwarded_call(node: ast.AST) -> ast.Call | None:
+    """The call a def of one statement consists of, whether returned, awaited or only made."""
+    if isinstance(node, ast.Lambda):
+        return None
+    statements = body_statements(node)
+    if len(statements) != 1:
+        return None
+    only = statements[0]
+    expr = only.value if isinstance(only, (ast.Return, ast.Expr)) else None
+    while isinstance(expr, ast.Await):
+        expr = expr.value
+    return expr if isinstance(expr, ast.Call) else None
+
+
+def _reaches_through(node: ast.AST, decl: Decl, callee: ast.expr) -> bool:
+    """Whether a callee is how the def reaches its target: a bare name in a function, `receiver.name` in a method."""
+    if decl.owner is None:
+        return isinstance(callee, ast.Name)
+    receiver = [*node.args.posonlyargs, *node.args.args][:1]  # type: ignore[attr-defined]
+    return (
+        bool(receiver)
+        and isinstance(callee, ast.Attribute)
+        and isinstance(callee.value, ast.Name)
+        and callee.value.id == receiver[0].arg
+    )
+
+
+def _passes_on(node: ast.AST, params: list[ast.arg], call: ast.Call) -> bool:
     """Whether a call's arguments are exactly the parameters, named and in order."""
     args = node.args  # type: ignore[attr-defined]
+    return _passes_positionals(args, params, call) and _passes_keywords(args, call)
+
+
+def _passes_positionals(args: ast.arguments, params: list[ast.arg], call: ast.Call) -> bool:
+    """Whether the positional arguments of a call are the positional parameters, `*args` included."""
     positional = [*args.posonlyargs, *args.args]
     wanted = [p.arg for p in params if any(p is q for q in positional)]
     if args.vararg is not None:
@@ -272,8 +295,11 @@ def passes_on(node: ast.AST, params: list[ast.arg], call: ast.Call) -> bool:
             given.append(argument.id)
         else:
             return False
-    if given != wanted:
-        return False
+    return given == wanted
+
+
+def _passes_keywords(args: ast.arguments, call: ast.Call) -> bool:
+    """Whether the keyword arguments of a call are the keyword-only parameters, `**kwargs` included."""
     keywords: dict[str, str] = {}
     for keyword in call.keywords:
         if not isinstance(keyword.value, ast.Name):

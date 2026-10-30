@@ -10,11 +10,24 @@ spec:
     Public API changes need facts callers cannot read from the code: user-visible behavior, constraints, ownership.
     Go: Normal Go doc comments beginning with the symbol name. A method that implements an interface of the project or of a package the code can import is exempt (revive's `exported` rule, and golint before it, leave the well-known interface methods undocumented too): the interface fixes its name and contract.
     Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does, and a method of any trait impl is exempt. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.
+    Python: PEP 257 docstrings (pydocstyle D1xx, ruff D1) of public modules' functions, classes and methods. A module-level name has no docstring form, so constants and variables are not judged; `__init__` and the protocol methods Python defines on every class are exempt, as Go exempts `String`. A name with a leading underscore, or one outside `__all__`, is not public.
   scope:
     subject: symbol
   languages:
     go: {}
-    python: {}
+    python:
+      options:
+        symbols:
+        - function
+        - method
+        - type
+        - interface
+        exemptMethods:
+        - __init__
+        - __repr__
+        - __str__
+        - __eq__
+        - __hash__
     rust: {}
     typescript:
       options:
@@ -522,3 +535,17 @@ spec:
       body: |-
         def _load() -> str:
             return "x"
+  - name: python-constant-and-constructor
+    language: python
+    kind: valid
+    files:
+    - path: example.py
+      body: |-
+        LIMIT = 3
+
+
+        class Store:
+            """Holds a value."""
+
+            def __init__(self, value: str) -> None:
+                self.value = value

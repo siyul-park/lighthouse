@@ -20,6 +20,7 @@ class Scope:
     cache: dict = field(default_factory=dict)
 
     def symbol(self, name: str) -> symtable.Symbol | None:
+        """The `symtable` symbol of a name in this scope; None when the scope has no table or the name is unknown."""
         if self.table is None:
             return None
         try:
@@ -48,18 +49,19 @@ class ScopeTree:
             self._collect(child)
 
     def module(self, node: ast.Module) -> Scope:
+        """The module scope of the tree."""
         return Scope("module", self.root, None, node)
 
     def enter(self, node: ast.AST, parent: Scope) -> Scope:
         """The scope a def, class, lambda or comprehension opens inside a scope."""
         kind = "class" if isinstance(node, ast.ClassDef) else "function"
-        key = (scope_name(node), getattr(node, "lineno", 0))
+        key = (_scope_name(node), getattr(node, "lineno", 0))
         queue = self.queues.get(key)
         table = queue.popleft() if queue else None
         return Scope(kind, table, parent, node)
 
 
-def scope_name(node: ast.AST) -> str:
+def _scope_name(node: ast.AST) -> str:
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         return node.name
     if isinstance(node, ast.Lambda):
@@ -77,17 +79,15 @@ def binding_scope(scope: Scope, name: str) -> Scope | None:
 
     Class scopes are skipped by the scopes nested in them, as Python does."""
     symbol = scope.symbol(name)
-    if symbol is None:
+    if symbol is None or symbol.is_declared_global() or scope.kind == "module" or symbol.is_global():
         return None
-    if symbol.is_declared_global():
-        return None
-    if scope.kind == "module":
-        return None
-    if symbol.is_local() and not symbol.is_global():
+    if symbol.is_local():
         return scope
-    if symbol.is_global():
-        return None
-    # free: the nearest enclosing function scope that binds it
+    return _enclosing_binder(scope, name)
+
+
+def _enclosing_binder(scope: Scope, name: str) -> Scope | None:
+    """The nearest enclosing function scope that binds a free name."""
     outer = scope.parent
     while outer is not None:
         if outer.kind == "function":

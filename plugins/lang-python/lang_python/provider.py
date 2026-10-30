@@ -30,6 +30,7 @@ CAPABILITIES = ["semantic-edges", "extent", "reference-sites", "overlays"]
 
 
 def language() -> LanguageManifest:
+    """The manifest of Python: its globs, aliases, test conventions and capabilities."""
     return {
         "id": LANGUAGE,
         "aliases": ALIASES,
@@ -44,7 +45,7 @@ def language() -> LanguageManifest:
     }
 
 
-def empty_fragment(rel: str) -> Fragment:
+def _empty_fragment(rel: str) -> Fragment:
     return {
         "file": {"path": rel},
         "modules": [],
@@ -64,19 +65,20 @@ class Provider:
         self.version = version
 
     def manifest(self) -> list[LanguageManifest]:
+        """The language manifests the provider answers with."""
         return [language()]
 
     def index(self, params: IndexParams) -> IndexResult:
         """Analyzes every requested file and the fences of host files. A failure on one file is an incomplete
         entry; a bad request never ends the process."""
-        unknown = unknown_option((params.get("context") or {}).get("options", {}).get(LANGUAGE))
+        unknown = _unknown_option((params.get("context") or {}).get("options", {}).get(LANGUAGE))
         if unknown is not None:
             return {"fragments": [], "sources": [], "notices": [], "incomplete": [{"reason": unknown}]}
-        run = Indexing(params)
+        run = _Indexing(params)
         return run.run()
 
 
-class Indexing:
+class _Indexing:
     """One index request in progress."""
 
     def __init__(self, params: IndexParams):
@@ -103,8 +105,8 @@ class Indexing:
 
     def run(self) -> IndexResult:
         for rel in dict.fromkeys(self.files):
-            self.file(rel)
-        for host, fragment in self.fences():
+            self._file(rel)
+        for host, fragment in self._fences():
             self.fragments.append(fragment)
         self.fragments.sort(key=lambda f: f["file"]["path"])
         if self.unresolved:
@@ -116,9 +118,9 @@ class Indexing:
             )
         return {"fragments": self.fragments, "sources": [], "notices": self.notices, "incomplete": self.incomplete}
 
-    def file(self, rel: str) -> None:
+    def _file(self, rel: str) -> None:
         if is_ignored(rel) or is_stub(rel):
-            self.fragments.append(empty_fragment(rel))
+            self.fragments.append(_empty_fragment(rel))
             return
         parsed = self.model.file(rel)
         if parsed is None:
@@ -126,18 +128,18 @@ class Indexing:
             return
         if parsed.tree is None:
             self.incomplete.append({"path": rel, "reason": parsed.error or "cannot parse the file"})
-            fragment = empty_fragment(rel)
+            fragment = _empty_fragment(rel)
             fragment["modules"] = [{"path": module_path(rel)}]
             self.fragments.append(fragment)
             return
-        indexed = self.unit(rel)
+        indexed = self._unit(rel)
         if indexed is None:
-            self.fragments.append(empty_fragment(rel))
+            self.fragments.append(_empty_fragment(rel))
             return
         self.unresolved += indexed.unresolved
         self.fragments.append(indexed.fragment)
 
-    def unit(self, rel: str) -> Indexed | None:
+    def _unit(self, rel: str) -> Indexed | None:
         parsed = self.model.file(rel)
         try:
             return Unit(self.model, self.reach, self.types, parsed).index()
@@ -147,13 +149,13 @@ class Indexing:
             self.incomplete.append({"path": rel, "reason": "internal error: %s: %s" % (type(error).__name__, error)})
         return None
 
-    def fences(self) -> list[tuple[EmbeddedFile, Fragment]]:
+    def _fences(self) -> list[tuple[EmbeddedFile, Fragment]]:
         """The fragments of the host files: the facts of their fences, in the host's coordinates."""
         merged: dict[str, Fragment] = {}
         for host in self.hosts:
-            merged[host["path"]] = empty_fragment(host["path"])
+            merged[host["path"]] = _empty_fragment(host["path"])
         for snippet in self.snippets:
-            fragment = self.fence(snippet)
+            fragment = self._fence(snippet)
             if fragment is None:
                 continue
             target = merged[snippet.host["path"]]
@@ -161,7 +163,7 @@ class Indexing:
                 target[key].extend(fragment.get(key, []))  # type: ignore[literal-required]
         return [(host, merged[host["path"]]) for host in self.hosts]
 
-    def fence(self, snippet: Snippet) -> Fragment | None:
+    def _fence(self, snippet: Snippet) -> Fragment | None:
         parsed = self.model.file(snippet.rel)
         if parsed is None or parsed.tree is None:
             self.notices.append(
@@ -169,7 +171,7 @@ class Indexing:
                 % (snippet.host["path"], host_line(snippet))
             )
             return None
-        indexed = self.unit(snippet.rel)
+        indexed = self._unit(snippet.rel)
         if indexed is None:
             return None
         if indexed.guessed:
@@ -178,7 +180,7 @@ class Indexing:
         return Remap(snippet, module).fragment(indexed.fragment)
 
 
-def unknown_option(options: Any) -> str | None:
+def _unknown_option(options: Any) -> str | None:
     """The reason the provider's options are refused, if they are: it has none yet, so any key is unknown."""
     if options is None:
         return None

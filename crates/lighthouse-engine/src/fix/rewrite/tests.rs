@@ -17,7 +17,10 @@ use lighthouse_model::{
 use lighthouse_process::Policy;
 use lighthouse_spec::{FixScope, Program};
 
-use super::{Bounds, Change, Changes, Scratch, World, accept, run_verify, scope::first_outside};
+use super::{
+    Bounds, Change, Changes, Scratch, World, accept, run_verify, run_verify_in,
+    scope::first_outside,
+};
 use crate::{Overlays, Run};
 
 fn span(from: (u32, u32), to: (u32, u32)) -> Span {
@@ -236,8 +239,6 @@ fn a_git_directory_in_the_environment_never_receives_the_base_commit() {
 
 #[test]
 fn a_secret_a_verify_program_prints_is_not_in_the_note_of_its_failure() {
-    // SAFETY: this variable belongs to this test.
-    unsafe { std::env::set_var("LIGHTHOUSE_VERIFY_TEST_SECRET", "sk-in-a-note") };
     let root = tempfile::tempdir().unwrap();
     let mut program = Program::of(vec![
         "sh".to_owned(),
@@ -251,11 +252,12 @@ fn a_secret_a_verify_program_prints_is_not_in_the_note_of_its_failure() {
     .into();
     program.output = Some(lighthouse_spec::Output::Lines);
 
-    let failed = run_verify(
+    let failed = run_verify_in(
         root.path(),
         &Overlays::new(),
         &[program],
         &Policy::default(),
+        |name| (name == "LIGHTHOUSE_VERIFY_TEST_SECRET").then(|| "sk-in-a-note".to_owned()),
     )
     .unwrap_err();
 

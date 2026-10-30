@@ -1,6 +1,6 @@
 import unittest
 
-from lang_python.provider import ALIASES, language
+from lang_python.provider import ALIASES, Provider, language
 
 from tests.support import edges, fragment, index, symbols
 
@@ -13,6 +13,14 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(declared["aliases"], ["python", "py", "py3", "python3", "rusthon"])
         self.assertEqual(ALIASES, declared["aliases"])
         self.assertEqual(declared["capabilities"], ["semantic-edges", "extent", "reference-sites", "overlays"])
+
+    def test_language(self):
+        naming = language()["conventions"]["test_naming"]
+        self.assertEqual(naming, {"prefix": "test_", "snake_case": True, "variants": False, "ancestors": False})
+        self.assertIn("**/test_*.py", language()["conventions"]["test_globs"])
+
+    def test_provider_manifest(self):
+        self.assertEqual(Provider("lang-python", "0").manifest(), [language()])
 
 
 class FactTests(unittest.TestCase):
@@ -212,6 +220,28 @@ class TestCaseTests(unittest.TestCase):
         )
         self.assertEqual(found["test_x::U::helper#method"]["kind"], "method")
         self.assertEqual(fragment(result, "test_x.py")["modules"][0]["test_of"], ".")
+
+    def test_a_test_below_tests_names_the_module_it_mirrors(self):
+        files = {
+            "pkg/__init__.py": "",
+            "pkg/shape.py": "def area():\n    pass\n",
+            "other/shape.py": "def area():\n    pass\n",
+            "tests/test_shape.py": "def test_area():\n    assert 1\n",
+            "pkg/tests/test_shape.py": "def test_area():\n    assert 1\n",
+            "tests/pkg/test_shape.py": "def test_area():\n    assert 1\n",
+            "tests/test_unknown.py": "def test_x():\n    assert 1\n",
+        }
+        result = index(files)
+        of = {rel: fragment(result, rel)["modules"][0]["test_of"] for rel in files if "test_" in rel}
+        self.assertEqual(
+            of,
+            {
+                "tests/test_shape.py": ".",
+                "pkg/tests/test_shape.py": "pkg/shape",
+                "tests/pkg/test_shape.py": "pkg/shape",
+                "tests/test_unknown.py": ".",
+            },
+        )
 
     def test_nested_test_classes_are_case_levels(self):
         source = (

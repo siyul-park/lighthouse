@@ -1,6 +1,7 @@
 import unittest
 from typing import Any
 
+from lang_python.regions import Remap, host_line, plan_snippets
 from tests.support import edges, fragment, index
 
 LIB = {"pkg/__init__.py": "", "pkg/core.py": "def compute(x):\n    return x\n"}
@@ -21,7 +22,57 @@ def host(path: str, text: str, code: str, start: int | None = None) -> dict[str,
     return {"path": path, "hash": "0", "text": text, "sources": [source]}
 
 
+def two_fences() -> dict[str, Any]:
+    """A Markdown host with two fences, the second written first in the list of sources."""
+    first, second = "a = 1\n", "def demo():\n    pass\n"
+    text = "# T\n\n```python\n" + first + "```\n\n```python\n" + second + "```\n"
+    one = host("docs/guide.md", text, first)
+    two = host("docs/guide.md", text, second)
+    one["sources"] = [two["sources"][0] | {"id": "2"}, one["sources"][0]]
+    return one
+
+
 class RegionTests(unittest.TestCase):
+    def test_plan_snippets(self):
+        snippets = plan_snippets([two_fences()])
+        self.assertEqual(
+            [(s.rel, s.text.text) for s in snippets],
+            [
+                ("docs/.lighthouse-snippets/guide.md.1/snippet.py", "a = 1\n"),
+                ("docs/.lighthouse-snippets/guide.md.2/snippet.py", "def demo():\n    pass\n"),
+            ],
+        )
+        self.assertEqual(snippets[0].text.host[0], (15, 16))
+        self.assertEqual(plan_snippets([]), [])
+
+    def test_host_line(self):
+        first, second = plan_snippets([two_fences()])
+        self.assertEqual((host_line(first), host_line(second)), (4, 8))
+
+    def test_remap_fragment(self):
+        snippet = plan_snippets([two_fences()])[1]
+        where = {"start": {"line": 1, "col": 1}, "end": {"line": 2, "col": 9}}
+        elsewhere = {"start": {"line": 40, "col": 1}, "end": {"line": 41, "col": 1}}
+        base = {"kind": "function", "visibility": "public", "file": snippet.rel}
+        source = {
+            "file": {"path": snippet.rel},
+            "modules": [{"path": "m"}],
+            "symbols": [
+                {**base, "id": "m::demo#function", "span": where},
+                {**base, "id": "m::gone#function", "span": elsewhere, "owner": "m::demo#function"},
+            ],
+            "edges": [],
+            "functions": [],
+            "tests": [],
+            "comments": [],
+        }  # fmt: skip
+        mapped = Remap(snippet, "m").fragment(source)
+        self.assertEqual(mapped["file"], {"path": "docs/guide.md"})
+        self.assertEqual([s["id"] for s in mapped["symbols"]], ["m::demo#function"])
+        self.assertEqual(mapped["symbols"][0]["file"], "docs/guide.md")
+        self.assertEqual(mapped["symbols"][0]["span"]["start"], {"line": 8, "col": 1})
+        self.assertEqual(mapped["symbols"][0]["span"]["end"], {"line": 9, "col": 9})
+
     def test_a_fence_is_a_module_whose_edges_land_in_the_host(self):
         code = "from pkg.core import compute\n\n\ndef demo():\n    return compute(1)\n"
         text = "# Title\n\n```python\n" + code + "```\n"
@@ -50,6 +101,17 @@ class RegionTests(unittest.TestCase):
         found = edges(result, "README.md", "calls")
         self.assertEqual([e[2:] for e in found], [("pkg/core::compute#function", "syntactic")])
         self.assertTrue(any("matched by name" in n for n in result["notices"]))
+
+    def test_a_fence_exports_only_what_its_own_all_lists(self):
+        code = "__all__ = ['shown']\n\n\ndef shown():\n    pass\n\n\ndef hidden():\n    pass\n"
+        text = "```python\n" + code + "```\n"
+        merged = fragment(index(LIB, paths=[], regions=[host("README.md", text, code)]), "README.md")
+        visibility = {s["name"]: s["visibility"] for s in merged["symbols"] if s["kind"] == "function"}
+        self.assertEqual(visibility, {"shown": "public", "hidden": "private"})
+        plain = "def demo():\n    pass\n"
+        text = "```python\n" + plain + "```\n"
+        merged = fragment(index(LIB, paths=[], regions=[host("README.md", text, plain)]), "README.md")
+        self.assertEqual([s["visibility"] for s in merged["symbols"] if s["name"] == "demo"], ["private"])
 
     def test_comments_are_mapped_through_the_text_map(self):
         code = "# note\ndef f():\n    pass\n"

@@ -29,17 +29,19 @@ class ParsedFile:
 
     @property
     def tokens(self) -> Tokens:
+        """The comments and significant tokens of the file, read on first use."""
         if self._tokens is None:
             self._tokens = Tokens(self.text, self.lines)
         return self._tokens
 
     def scopes(self) -> ScopeTree:
+        """The `symtable` scopes of the file, read on first use."""
         if self._scopes is None:
             self._scopes = ScopeTree(self.text, self.rel)
         return self._scopes
 
 
-def syntax_problem(error: BaseException) -> str:
+def _syntax_problem(error: BaseException) -> str:
     """The first problem of a file that does not parse, as `line:col: message`."""
     if isinstance(error, SyntaxError):
         return "%d:%d: %s" % (error.lineno or 1, error.offset or 1, error.msg)
@@ -69,12 +71,13 @@ class Model:
         try:
             tree = ast.parse(text, filename=rel)
         except (SyntaxError, ValueError, RecursionError, MemoryError) as error:
-            return ParsedFile(rel, text, lines, None, syntax_problem(error), module)
+            return ParsedFile(rel, text, lines, None, _syntax_problem(error), module)
         parsed = ParsedFile(rel, text, lines, tree, None, module)
         parsed.decls = FileDecls(rel, module, tree, text, is_test_file(rel) and not is_stub(rel))
         return parsed
 
     def decls(self, rel: str) -> FileDecls | None:
+        """The declarations of the file at a path; None when it cannot be read or does not parse."""
         parsed = self.file(rel)
         return None if parsed is None else parsed.decls
 

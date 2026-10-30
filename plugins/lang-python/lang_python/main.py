@@ -11,6 +11,7 @@ MIN_VERSION = (3, 11)
 
 
 def main() -> int:
+    """Serves the protocol until the host ends the session and returns the exit code: 1 on an old interpreter."""
     if sys.version_info < MIN_VERSION:
         found = sys.version_info[:2]
         sys.stderr.write("%s: Python %d.%d or newer is required, found %d.%d\n" % (ID, *MIN_VERSION, *found))

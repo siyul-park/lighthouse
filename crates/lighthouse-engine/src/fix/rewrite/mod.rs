@@ -24,7 +24,7 @@ use lighthouse_protocol::hash;
 use lighthouse_spec::FixScope;
 
 use scope::{first_outside, reached};
-pub(in crate::fix) use scratch::{Change, Changes, Scratch, run_verify};
+pub(in crate::fix) use scratch::{Change, Changes, Scratch, run_verify, run_verify_in};
 
 use super::model::Class;
 use crate::{

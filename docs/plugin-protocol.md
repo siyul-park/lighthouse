@@ -850,7 +850,9 @@ settle are `semantic`.
   Regular packages and modules win over PEP 420 namespace packages. A relative import resolves against the package.
 - Modules: one per file, its path without extension; a package's `__init__.py` is its directory. A test file
   (`test_*.py`, `*_test.py`, `conftest.py`, under `tests/` or `test/`) has `test_of` set to the module it names by
-  stripping the marker, else its directory.
+  stripping the marker. In a `tests/` or `test/` directory the name mirrors the layout beside it: `a/tests/test_b.py`
+  names `a/b`, else the one module `b` anywhere below `a` (`tests/sub/test_b.py` names `sub/b`); a name that points at
+  none or at several is the directory above `tests`.
 - Symbols: functions (`def`, and a module-level name bound to a `lambda`), classes (`type`, or `interface` for a
   `Protocol`), methods, class attributes, dataclass and `NamedTuple` fields and the fields a method sets with `self.name = ...` (`field`; the first write declares it, every write is a `references` edge),
   `Enum` members (`variant`), module-level assignments (`const` for an upper-case name or `Final`, else `var`), and
@@ -860,7 +862,8 @@ settle are `semantic`.
 - Visibility: no leading `_` is `public` (dunder names too), a leading `_` is `private`; a module with a static
   `__all__` makes exactly the names it lists public; a name imported in a package `__init__.py` and listed in its
   `__all__` is public. A public member of a `private` class is `internal`, as is a public name of a module whose path
-  has an underscore component; everything in a test file is `private`.
+  has an underscore component; everything in a test file is `private`, and so is everything in a fence unless the
+  fence has its own `__all__`.
 - Edges: `calls`, `references`, `imports` and `implements`. A name resolves through `symtable`'s scopes (locals, closures
   and `nonlocal`, `global`, comprehensions), imports (absolute, relative, aliased, `*` with `__all__`), modules,
   classes and their project bases, `self`/`cls`, annotated parameters and locals assigned once from a class call or an

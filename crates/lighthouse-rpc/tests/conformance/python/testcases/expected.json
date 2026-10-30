@@ -324,6 +324,100 @@
     },
     {
       "comments": [],
+      "edges": [],
+      "file": {
+        "path": "pkg/__init__.py"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "pkg"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "pkg/shape"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg/shape::area#function"
+        }
+      ],
+      "file": {
+        "path": "pkg/shape.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "pkg/shape::area#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "pkg/shape"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "The area of a rectangle.",
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "pkg/shape.py",
+          "id": "pkg/shape::area#function",
+          "kind": "function",
+          "name": "area",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -1706,6 +1800,115 @@
           "symbol": "test_unit::SubTests::test_rows#test",
           "targets": [
             "calc::sub#function"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "tests/test_shape"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "tests/test_shape::test_area#test"
+        },
+        {
+          "from": {
+            "module": "tests/test_shape"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "pkg/shape"
+        },
+        {
+          "from": {
+            "symbol": "tests/test_shape::test_area#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 5
+            },
+            "start": {
+              "col": 12,
+              "line": 5
+            }
+          },
+          "to": "pkg/shape::area#function"
+        }
+      ],
+      "file": {
+        "path": "tests/test_shape.py"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "tests/test_shape::test_area#test",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "tests/test_shape",
+          "test_of": "pkg/shape"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "tests/test_shape.py",
+          "id": "tests/test_shape::test_area#test",
+          "kind": "test",
+          "name": "test_area",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "tests/test_shape::test_area#test",
+          "targets": [
+            "pkg/shape::area#function"
           ]
         }
       ]

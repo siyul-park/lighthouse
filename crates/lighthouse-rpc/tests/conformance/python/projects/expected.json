@@ -211,7 +211,7 @@
       "modules": [
         {
           "path": "tests/test_mod",
-          "test_of": "."
+          "test_of": "src/pkg/mod"
         }
       ],
       "symbols": [

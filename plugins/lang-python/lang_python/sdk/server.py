@@ -25,7 +25,7 @@ class Provider(Protocol):
     def index(self, params: dict[str, Any]) -> dict[str, Any]: ...
 
 
-class Failure(Exception):
+class _Failure(Exception):
     """A JSON-RPC error answer."""
 
     def __init__(self, code: int, message: str):
@@ -34,62 +34,79 @@ class Failure(Exception):
         self.message = message
 
 
-class FramingError(Exception):
+class _FramingError(Exception):
     """Input that is not a framed JSON message."""
 
 
-def read_message(stream: BinaryIO) -> dict[str, Any] | None:
-    """The next message, or None at the end of the input."""
-    length = None
+def _read_headers(stream: BinaryIO) -> dict[str, str] | None:
+    """The header lines of the next message by lower-cased name, or None at the end of the input."""
+    headers: dict[str, str] = {}
     seen = False
     while True:
         line = stream.readline()
         if line == b"":
             if seen:
-                raise FramingError("input ended inside a header")
+                raise _FramingError("input ended inside a header")
             return None
         seen = True
         text = line.decode("utf-8", errors="replace").strip()
         if text == "":
-            break
+            return headers
         name, _, value = text.partition(":")
-        if name.strip().lower() == "content-length":
-            try:
-                length = int(value.strip())
-            except ValueError as error:
-                raise FramingError("bad Content-Length") from error
-    if length is None or length < 0:
-        raise FramingError("missing Content-Length")
+        headers[name.strip().lower()] = value.strip()
+
+
+def _content_length(headers: dict[str, str]) -> int:
+    """The body length the headers state."""
+    raw = headers.get("content-length")
+    if raw is None:
+        raise _FramingError("missing Content-Length")
+    try:
+        length = int(raw)
+    except ValueError as error:
+        raise _FramingError("bad Content-Length") from error
+    if length < 0:
+        raise _FramingError("missing Content-Length")
+    return length
+
+
+def read_message(stream: BinaryIO) -> dict[str, Any] | None:
+    """The next message, or None at the end of the input."""
+    headers = _read_headers(stream)
+    if headers is None:
+        return None
+    length = _content_length(headers)
     body = stream.read(length)
     if len(body) != length:
-        raise FramingError("input ended inside a body")
+        raise _FramingError("input ended inside a body")
     try:
         message = json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, ValueError) as error:
-        raise FramingError("invalid JSON: %s" % error) from error
+        raise _FramingError("invalid JSON: %s" % error) from error
     if not isinstance(message, dict):
-        raise FramingError("a message must be an object")
+        raise _FramingError("a message must be an object")
     return message
 
 
 def write_message(stream: BinaryIO, message: dict[str, Any]) -> None:
+    """Writes a message after its `Content-Length` header, counted in UTF-8 bytes."""
     body = json.dumps(message, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     stream.write(b"Content-Length: %d\r\n\r\n" % len(body))
     stream.write(body)
     stream.flush()
 
 
-def require(params: Any, names: tuple[str, ...]) -> dict[str, Any]:
+def _require(params: Any, names: tuple[str, ...]) -> dict[str, Any]:
     """Refuses params that lack a required member, as the Rust server does."""
     if not isinstance(params, dict):
-        raise Failure(INVALID_PARAMS, "params must be an object")
+        raise _Failure(INVALID_PARAMS, "params must be an object")
     for name in names:
         if name not in params:
-            raise Failure(INVALID_PARAMS, "missing field `%s`" % name)
+            raise _Failure(INVALID_PARAMS, "missing field `%s`" % name)
     return params
 
 
-class Session:
+class _Session:
     """What the loop knows of the conversation."""
 
     def __init__(self, provider: Provider):
@@ -97,11 +114,11 @@ class Session:
         self.initialized = False
         self.shutdown = False
 
-    def route(self, method: str, params: Any) -> Any:
+    def _route(self, method: str, params: Any) -> Any:
         if method == "initialize":
-            body = require(params, ("protocolVersion", "clientInfo", "workspaceFolders"))
+            body = _require(params, ("protocolVersion", "clientInfo", "workspaceFolders"))
             if body["protocolVersion"] != PROTOCOL_VERSION:
-                raise Failure(
+                raise _Failure(
                     REQUEST_FAILED,
                     "host speaks protocol %s, this plugin speaks %s" % (body["protocolVersion"], PROTOCOL_VERSION),
                 )
@@ -112,13 +129,13 @@ class Session:
                 "capabilities": {"languages": self.provider.manifest()},
             }
         if not self.initialized:
-            raise Failure(NOT_INITIALIZED, "`%s` before `initialize`" % method)
+            raise _Failure(NOT_INITIALIZED, "`%s` before `initialize`" % method)
         if method == "lighthouse/index":
-            return self.provider.index(require(params, ("project", "language", "inputs")))
+            return self.provider.index(_require(params, ("project", "language", "inputs")))
         if method == "shutdown":
             self.shutdown = True
             return None
-        raise Failure(METHOD_NOT_FOUND, "unknown method %s" % method)
+        raise _Failure(METHOD_NOT_FOUND, "unknown method %s" % method)
 
     def answer(self, message: dict[str, Any]) -> dict[str, Any] | None:
         request_id = message.get("id")
@@ -126,8 +143,8 @@ class Session:
         if not isinstance(method, str):
             return None
         try:
-            result = self.route(method, message.get("params"))
-        except Failure as failure:
+            result = self._route(method, message.get("params"))
+        except _Failure as failure:
             outcome: dict[str, Any] = {"error": {"code": failure.code, "message": failure.message}}
         except Exception as error:  # a bad request never ends the process
             outcome = {"error": {"code": INTERNAL_ERROR, "message": "panic: %s: %s" % (type(error).__name__, error)}}
@@ -142,11 +159,11 @@ def serve(provider: Provider, source: BinaryIO | None = None, sink: BinaryIO | N
     """Serves a provider on stdin and stdout until `exit` or the end of the input; 0 after `shutdown`, 1 otherwise."""
     source = source if source is not None else sys.stdin.buffer
     sink = sink if sink is not None else sys.stdout.buffer
-    session = Session(provider)
+    session = _Session(provider)
     while True:
         try:
             message = read_message(source)
-        except FramingError as error:
+        except _FramingError as error:
             write_message(sink, {"jsonrpc": "2.0", "id": None, "error": {"code": PARSE_ERROR, "message": str(error)}})
             return 1
         if message is None or message.get("method") == "exit":

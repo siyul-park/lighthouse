@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 
 def position(line: int, col: int) -> Position:
+    """A position from a 1-based line and a 1-based byte column."""
     return {"line": line, "col": col}
 
 
@@ -21,6 +22,7 @@ def span(start_line: int, start_col: int, end_line: int, end_col: int) -> Span:
 
 
 def span_of(node: ast.AST) -> Span:
+    """The span of a node, from the positions `ast` records for it."""
     return span(node.lineno, node.col_offset, node.end_lineno, node.end_col_offset)  # type: ignore[attr-defined]
 
 
@@ -38,11 +40,8 @@ class Lines:
         return len(self.lines[line - 1][:char_col].encode("utf-8"))
 
     def line_text(self, line: int) -> str:
+        """The text of a 1-based line, or an empty string beyond the last."""
         return self.lines[line - 1] if 0 < line <= len(self.lines) else ""
-
-    def span_chars(self, start: tuple[int, int], end: tuple[int, int]) -> Span:
-        """A span from (line, character column) pairs, as `tokenize` counts them."""
-        return span(start[0], self.byte_col(*start), end[0], self.byte_col(*end))
 
 
 def before(a: Any, b: Any) -> bool:
@@ -70,23 +69,32 @@ def span_for(decl: Decl, lines: Lines) -> Span:
     return span_of(node)
 
 
+def _last_statement(decl: Decl) -> ast.stmt:
+    """The statement a declaration ends with: the last of several definitions of one function, else its first."""
+    first = decl.statements[0]
+    if decl.kind in ("function", "method", "test") and all(isinstance(s, FUNCTION_NODES) for s in decl.statements):
+        return decl.statements[-1]  # type: ignore[return-value]
+    return first  # type: ignore[return-value]
+
+
+def _end_of(decl: Decl, first: ast.stmt, last: ast.stmt) -> tuple[int, int]:
+    """Where a declaration ends: after its last statement, or after the docstring of an attribute."""
+    if decl.doc_statement is not None and last is first:
+        return decl.doc_statement.end_lineno, decl.doc_statement.end_col_offset  # type: ignore[return-value]
+    return last.end_lineno, last.end_col_offset  # type: ignore[return-value]
+
+
 def extent_of(decl: Decl, tokens: "Tokens", lines: Lines) -> Span | None:
     """The whole declaration: leading comments without a blank line, decorators through the last token,
     an attribute docstring and a comment that trails it."""
     if decl.instance or not decl.statements or decl.statements[0] is None:
         return None
     first = decl.statements[0]
-    last = first
-    mergeable = decl.kind in ("function", "method", "test") and all(s is not None for s in decl.statements)
-    if mergeable and all(isinstance(s, FUNCTION_NODES) for s in decl.statements):
-        last = decl.statements[-1]
     line, col = start_of(first, lines)
     lead = tokens.leading(line)
     if lead is not None:
         line, col = lead.line, lead.col
-    end_line, end_col = last.end_lineno, last.end_col_offset  # type: ignore[union-attr]
-    if decl.doc_statement is not None and last is first:
-        end_line, end_col = decl.doc_statement.end_lineno, decl.doc_statement.end_col_offset  # type: ignore[assignment]
+    end_line, end_col = _end_of(decl, first, _last_statement(decl))
     trailing = tokens.trailing(end_line, end_col)
     if trailing is not None:
         end_col = trailing.end_col

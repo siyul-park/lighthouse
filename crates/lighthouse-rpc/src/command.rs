@@ -6,6 +6,7 @@
 //! program, so a trusted project is the only one that builds it.
 
 use std::{
+    env,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -21,6 +22,9 @@ use serde_json::{Value, json};
 
 use crate::events::{Events, NOTES_BYTES, Reading, Scrubber, tail};
 
+/// Where the variables of the user are read: by name.
+type Lookup = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+
 /// A program run as a model.
 pub struct CommandModel {
     manifest: Model,
@@ -35,6 +39,8 @@ pub struct CommandModel {
     /// How the program runs: the project's `[sandbox]` with the lists of the
     /// provider's own added.
     policy: Policy,
+    /// The user's variables that `${NAME}` in the program's `env` expands.
+    lookup: Lookup,
 }
 
 impl CommandModel {
@@ -48,6 +54,22 @@ impl CommandModel {
         model: &str,
         provider: &ModelProvider,
         sandbox: &Policy,
+    ) -> Option<Self> {
+        Self::new_in(cel, dir, name, model, provider, sandbox, |name| {
+            env::var(name).ok()
+        })
+    }
+
+    /// [`CommandModel::new`] reading the user's variables through `lookup`
+    /// instead of the environment of the process.
+    pub fn new_in(
+        cel: &Env,
+        dir: &Path,
+        name: &str,
+        model: &str,
+        provider: &ModelProvider,
+        sandbox: &Policy,
+        lookup: impl Fn(&str) -> Option<String> + Send + Sync + 'static,
     ) -> Option<Self> {
         let ModelProvider::Command {
             protocol,
@@ -76,7 +98,7 @@ impl CommandModel {
                         "program": program,
                         "model": model,
                         "pointer": pointer,
-                        "secrets": secrets(program),
+                        "secrets": secrets(program, &lookup),
                         "binary": program_hash(dir, &program.command),
                     })),
                     6,
@@ -100,6 +122,7 @@ impl CommandModel {
                 .map(|spec| Events::new(cel, spec).map(Arc::new)),
             dir: dir.to_owned(),
             policy: program.policy(sandbox),
+            lookup: Arc::new(lookup),
         })
     }
 }
@@ -126,10 +149,11 @@ impl CommandModel {
             .then(tempfile::tempdir)
             .transpose()
             .map_err(|e| failed(e.to_string()))?;
-        let environment = Environment::new(
+        let environment = Environment::new_in(
             &self.program.env,
             Vec::new(),
             home.as_ref().map_or(Home::User, |h| Home::Own(h.path())),
+            &*self.lookup,
         )
         .map_err(failed)?;
         let mut profile = self.policy.profile(&self.dir, dir);
@@ -300,11 +324,11 @@ fn program_hash(root: &Path, argv: &[String]) -> String {
 
 /// The variables a program's `env` expands, with a hash of the value of each:
 /// what the model's version holds of a secret, never the value.
-fn secrets(program: &Program) -> Value {
+fn secrets(program: &Program, lookup: &impl Fn(&str) -> Option<String>) -> Value {
     referenced(&program.env)
         .into_iter()
         .map(|name| {
-            let hashed = std::env::var(&name).map(hash::sha256).unwrap_or_default();
+            let hashed = lookup(&name).map(hash::sha256).unwrap_or_default();
             (name, Value::from(hashed))
         })
         .collect::<serde_json::Map<_, _>>()

@@ -15,6 +15,7 @@ IGNORED_DIRS = frozenset({"node_modules", "testdata", "__pycache__", "site-packa
 
 
 def is_stub(rel: str) -> bool:
+    """Whether a path is a type stub (`.pyi`), read for its types but never a subject."""
     return rel.endswith(".pyi")
 
 
@@ -86,7 +87,7 @@ class Project:
             return None
         return decode(data)
 
-    def exists(self, rel: str) -> bool:
+    def _exists(self, rel: str) -> bool:
         return rel in self.files
 
     def modules(self) -> frozenset[str]:
@@ -97,7 +98,7 @@ class Project:
         """The import roots: the project root, `src` where the layout says so, and declared package dirs."""
         roots = [""]
         extra = self._declared_roots()
-        if "src" in self.dirs and (self.exists("pyproject.toml") or "src/__init__.py" not in self.files):
+        if "src" in self.dirs and (self._exists("pyproject.toml") or "src/__init__.py" not in self.files):
             if "src" not in extra and self._has_package("src"):
                 extra.append("src")
         for root in extra:
@@ -129,7 +130,7 @@ class Project:
         except OSError:
             return None
 
-    def implicit_root(self, rel: str) -> str:
+    def _implicit_root(self, rel: str) -> str:
         """The directory above the topmost package a file lives in: where a script run beside it would import from."""
         directory = posixpath.dirname(rel)
         while directory and posixpath.join(directory, "__init__.py") in self.files:
@@ -139,7 +140,7 @@ class Project:
     def find(self, dotted: str, from_rel: str | None = None) -> ModuleLoc | None:
         """The module a dotted name names, looked up the way the import system does: regular packages and modules
         first, in root order; a namespace package only when no root has a regular one."""
-        implicit = self.implicit_root(from_rel) if from_rel is not None else ""
+        implicit = self._implicit_root(from_rel) if from_rel is not None else ""
         key = (dotted, implicit)
         if key not in self._located:
             self._located[key] = self._find(dotted, implicit)
@@ -196,29 +197,42 @@ class Project:
 
 def declared_roots(data: dict[str, Any]) -> list[str]:
     """The package directories a `pyproject.toml` declares statically, for setuptools and hatch."""
-    found: list[str] = []
     tool = data.get("tool", {})
-    setuptools = tool.get("setuptools", {})
+    found = [
+        *_setuptools_roots(tool.get("setuptools", {})),
+        *_hatch_roots(tool.get("hatch", {}).get("build", {})),
+    ]
+    return [posixpath.normpath(root) for root in found if root not in ("", ".")]
+
+
+def _setuptools_roots(setuptools: dict[str, Any]) -> list[str]:
+    """The directories `[tool.setuptools]` takes packages from: `package-dir` and `packages.find.where`."""
+    found: list[str] = []
     package_dir = setuptools.get("package-dir")
     if isinstance(package_dir, dict) and isinstance(package_dir.get(""), str):
         found.append(package_dir[""])
-    where = (
-        setuptools.get("packages", {}).get("find", {}).get("where")
-        if isinstance(setuptools.get("packages"), dict)
-        else None
-    )
+    packages = setuptools.get("packages")
+    where = packages.get("find", {}).get("where") if isinstance(packages, dict) else None
     if isinstance(where, list):
         found.extend(w for w in where if isinstance(w, str))
-    hatch = tool.get("hatch", {}).get("build", {})
-    targets = hatch.get("targets", {}) if isinstance(hatch, dict) else {}
-    for section in [hatch] + [t for t in targets.values() if isinstance(t, dict)]:
-        for package in section.get("packages", []) if isinstance(section.get("packages"), list) else []:
+    return found
+
+
+def _hatch_roots(build: Any) -> list[str]:
+    """The directories `[tool.hatch.build]` and its targets take packages and sources from."""
+    if not isinstance(build, dict):
+        return []
+    found: list[str] = []
+    targets = build.get("targets", {})
+    for section in [build] + [t for t in targets.values() if isinstance(t, dict)]:
+        packages = section.get("packages")
+        for package in packages if isinstance(packages, list) else []:
             if isinstance(package, str) and "/" in package:
                 found.append(posixpath.dirname(package))
         sources = section.get("sources")
         if isinstance(sources, list):
             found.extend(s for s in sources if isinstance(s, str))
-    return [posixpath.normpath(root) for root in found if root not in ("", ".")]
+    return found
 
 
 def decode(data: bytes) -> str:
