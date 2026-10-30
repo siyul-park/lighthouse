@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     typescript: {}
   requirement: 'Nested test cases SHOULD be limited to two levels: a test function
     and its direct cases.'
@@ -116,3 +117,40 @@ spec:
             expect(get()).toBe(1);
           });
         });
+  - name: depth-python-invalid
+    language: python
+    kind: invalid
+    files:
+    - path: store.py
+      body: |-
+        def get() -> int:
+            return 1
+    - path: test_store.py
+      body: |-
+        from store import get
+
+
+        class TestGet:
+            class TestWhenCalled:
+                class TestTwice:
+                    def test_returns_one(self) -> None:
+                        assert get() == 1
+    expect:
+    - line: 7
+  - name: depth-python-valid
+    language: python
+    kind: valid
+    files:
+    - path: store.py
+      body: |-
+        def get() -> int:
+            return 1
+    - path: test_store.py
+      body: |-
+        from store import get
+
+
+        class TestGet:
+            class TestWhenCalled:
+                def test_returns_one(self) -> None:
+                    assert get() == 1

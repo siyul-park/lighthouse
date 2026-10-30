@@ -41,7 +41,7 @@ class Decl:
     annotation: ast.expr | None = None
     default: bool = False
     instance: bool = False
-    """A field a constructor sets (`self.name = ...`) rather than one the class body declares."""
+    """A field a method sets (`self.name = ...`) rather than one the class body declares."""
     traits: frozenset[str] = frozenset()
     """What the class is: `enum`, `protocol`, `abstract`, `dataclass`, `testcase`, `test-class`."""
 
@@ -220,8 +220,8 @@ class Collector:
             kind = "test"
         overload = has_decorator(node, "overload")
         body = None if overload else node
-        decl = self.decls.add(kind, node.name, owner, node, node, body)
-        if kind == "method" and node.name == "__init__" and owner is not None and decl.nodes[0] is node:
+        self.decls.add(kind, node.name, owner, node, node, body)
+        if owner is not None and not (has_decorator(node, "staticmethod") or has_decorator(node, "classmethod")):
             self.instance_fields(node, owner)
 
     def is_test_method(self, owner: Decl, node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -315,12 +315,12 @@ class Collector:
         decl.default = value is not None
         decl.doc_statement = self.decls.following.get(id(stmt))
 
-    def instance_fields(self, init: ast.FunctionDef | ast.AsyncFunctionDef, owner: Decl) -> None:
-        """The fields a constructor sets: `self.name = value` among its statements."""
-        first = init.args.args[0].arg if init.args.args else None
+    def instance_fields(self, method: ast.FunctionDef | ast.AsyncFunctionDef, owner: Decl) -> None:
+        """The fields a method sets: `self.name = value` among its statements, the first one declaring."""
+        first = method.args.args[0].arg if method.args.args else None
         if first is None:
             return
-        for stmt in walk_flat(init.body):
+        for stmt in walk_flat(method.body):
             targets: list[ast.expr] = []
             annotation = None
             if isinstance(stmt, ast.Assign):

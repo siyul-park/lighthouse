@@ -43,3 +43,9 @@ class TestAccount:
 class Holder:
     def test_ignored(self):
         return add(1, 1)
+
+
+class TestNested:
+    class TestInner:
+        def test_deposit(self):
+            assert Account().deposit(1) == 1

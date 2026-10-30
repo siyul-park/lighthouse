@@ -117,8 +117,24 @@ def role_of(decl: Decl, test: bool) -> str | None:
     return "fixture" if decl.kind in ("type", "interface", "const", "var") else None
 
 
+def case_depth(decl: Decl) -> int:
+    """How many test classes enclose a test: a method of a class nested in another is at depth two."""
+    depth = 0
+    owner = decl.owner
+    while owner is not None:
+        if owner.traits & {"testcase", "test-class"}:
+            depth += 1
+        owner = owner.owner
+    return depth
+
+
 def test_case(decl: Decl, tree: ast.Module, targets: dict[str, None]) -> TestCase:
     """The test case of a `test` symbol: a table when it runs over rows written in the file."""
     node = decl.body
     table = isinstance(node, FUNCTION_NODES) and is_table(node, tree)
-    return {"symbol": decl.id, "nesting": 0, "style": "table" if table else "scenario", "targets": list(targets)}
+    return {
+        "symbol": decl.id,
+        "nesting": case_depth(decl),
+        "style": "table" if table else "scenario",
+        "targets": list(targets),
+    }

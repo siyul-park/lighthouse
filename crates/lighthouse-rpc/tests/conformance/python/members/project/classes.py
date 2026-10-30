@@ -53,3 +53,12 @@ class Outer:
 class Child(Outer):
     def show(self):
         return super().show() + self.scale
+
+
+class Counter:
+    def __init__(self):
+        self.count = 0
+
+    def reset(self):
+        self.count = 0
+        self.resets = 1

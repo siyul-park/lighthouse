@@ -102,6 +102,23 @@ class EdgeTests(unittest.TestCase):
         self.assertIn(("calls", "pkg/b::B::use#method", "pkg/a::A::go#method", "semantic"), found)
         self.assertIn(("calls", "pkg/b::B::use#method", "pkg/b::B::use#method", "semantic"), found)
 
+    def test_attribute_writes_of_a_method_are_fields_and_references_to_them(self):
+        result = index(
+            {
+                "m.py": "class A:\n    def __init__(self):\n        self.items = []\n\n"
+                "    def add(self, x):\n        self.items.append(x)\n        self.last = x\n\n"
+                "    @classmethod\n    def make(cls):\n        cls.shared = 1\n"
+            }
+        )
+        found = symbols(result, "m.py")
+        self.assertEqual(found["m::A::items#field"]["owner"], "m::A#type")
+        self.assertIn("m::A::last#field", found)
+        self.assertNotIn("m::A::shared#field", found)
+        refs = edges(result, "m.py", "references")
+        self.assertIn(("references", "m::A::__init__#method", "m::A::items#field", "semantic"), refs)
+        self.assertIn(("references", "m::A::add#method", "m::A::items#field", "semantic"), refs)
+        self.assertIn(("references", "m::A::add#method", "m::A::last#field", "semantic"), refs)
+
     def test_an_untyped_receiver_is_syntactic_and_an_unknown_name_is_nothing(self):
         result = index(
             {
@@ -195,6 +212,22 @@ class TestCaseTests(unittest.TestCase):
         )
         self.assertEqual(found["test_x::U::helper#method"]["kind"], "method")
         self.assertEqual(fragment(result, "test_x.py")["modules"][0]["test_of"], ".")
+
+    def test_nested_test_classes_are_case_levels(self):
+        source = (
+            "def test_a():\n    assert 1\n\n\nclass TestOuter:\n    def test_b(self):\n        assert 1\n\n"
+            "    class TestMiddle:\n        class TestInner:\n            def test_c(self):\n                assert 1\n"
+        )
+        result = index({"test_x.py": source})
+        nesting = {t["symbol"]: t["nesting"] for t in fragment(result, "test_x.py")["tests"]}
+        self.assertEqual(
+            nesting,
+            {
+                "test_x::test_a#test": 0,
+                "test_x::TestOuter::test_b#test": 1,
+                "test_x::TestOuter::TestMiddle::TestInner::test_c#test": 3,
+            },
+        )
 
     def test_a_non_test_file_declares_pytest_names_as_functions(self):
         result = index({"lib.py": "def test_a():\n    pass\n"})

@@ -249,6 +249,24 @@
         },
         {
           "from": {
+            "symbol": "signatures::Service::__init__#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 19
+            },
+            "start": {
+              "col": 14,
+              "line": 19
+            }
+          },
+          "to": "signatures::Service::config#field"
+        },
+        {
+          "from": {
             "symbol": "signatures::Service::fetch#method"
           },
           "kind": "references",

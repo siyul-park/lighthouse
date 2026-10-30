@@ -17,10 +17,10 @@ The Python language provider: parses each file with the `ast` of the interpreter
 | Fact | Source |
 | --- | --- |
 | `modules` | one per file; a package's `__init__.py` is its directory; `test_of` for test files |
-| `symbols` | functions, classes (`interface` for `Protocol`), methods, class and dataclass fields, `Enum` members, assignments, tests; `extent`, `doc` (PEP 257), `role` in test files |
+| `symbols` | functions, classes (`interface` for `Protocol`), methods, class and dataclass fields, the fields a method sets (`self.name = ...`, the first write declares it), `Enum` members, assignments, tests; `extent`, `doc` (PEP 257), `role` in test files |
 | `edges` | `calls`, `references`, `imports`, `implements` with sites; `semantic` where scopes, imports and annotations settle the name, else `syntactic` |
 | `functions` | flow, nesting, statements, tokens, parameters, returns, signature, `forwards_to`, `implementation`, `constructs`, `manual_assertions` |
-| `tests` | `test_*` functions, `Test*` classes, `unittest.TestCase` methods; `parametrize` and loops over literal rows are tables |
+| `tests` | `test_*` functions, `Test*` classes, `unittest.TestCase` methods; `parametrize` and loops over literal rows are tables; `nesting` counts the test classes around a test |
 | `comments`, `generated` | every comment; `# @generated` and `DO NOT EDIT` above the first statement |
 
 Capabilities: `semantic-edges` (partial: annotations, imports and local inference only), `extent`, `reference-sites`, `overlays`.

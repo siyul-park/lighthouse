@@ -301,8 +301,6 @@ class Uses:
             return
         found = None if base is None else self.resolver.attribute(base, node.attr)
         if isinstance(found, DeclVal):
-            if found.decl.node is node:
-                return
             self.to_decl(found.decl, site, owner, call, "semantic")
         elif isinstance(found, ModuleVal):
             return

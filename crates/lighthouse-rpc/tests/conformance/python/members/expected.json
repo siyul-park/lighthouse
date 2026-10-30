@@ -135,6 +135,46 @@
           "from": {
             "module": "classes"
           },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Counter#type"
+        },
+        {
+          "from": {
+            "symbol": "classes::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Counter::__init__#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Counter::reset#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Counter::resets#field"
+        },
+        {
+          "from": {
+            "module": "classes"
+          },
           "kind": "imports",
           "resolution": "semantic",
           "site": {
@@ -166,6 +206,42 @@
             }
           },
           "to": "classes::Outer::Inner::value#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::__init__#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 25
+            },
+            "start": {
+              "col": 14,
+              "line": 25
+            }
+          },
+          "to": "classes::Outer::name#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer::__init__#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 26
+            },
+            "start": {
+              "col": 14,
+              "line": 26
+            }
+          },
+          "to": "classes::Outer::_cache#field"
         },
         {
           "from": {
@@ -418,6 +494,60 @@
             }
           },
           "to": "classes::Outer::scale#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Counter::__init__#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 60
+            },
+            "start": {
+              "col": 14,
+              "line": 60
+            }
+          },
+          "to": "classes::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Counter::reset#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 63
+            },
+            "start": {
+              "col": 14,
+              "line": 63
+            }
+          },
+          "to": "classes::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Counter::reset#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 64
+            },
+            "start": {
+              "col": 14,
+              "line": 64
+            }
+          },
+          "to": "classes::Counter::resets#field"
         }
       ],
       "file": {
@@ -601,6 +731,27 @@
           "symbol": "classes::Child::show#method",
           "tokens": 12,
           "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "classes::Counter::__init__#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "classes::Counter::reset#method",
+          "tokens": 10,
+          "top_level": 2
         }
       ],
       "modules": [
@@ -1031,6 +1182,125 @@
             "start": {
               "col": 5,
               "line": 54
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 58
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Counter#type",
+          "kind": "type",
+          "name": "Counter",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 58
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 60
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Counter::__init__#method",
+          "kind": "method",
+          "name": "__init__",
+          "owner": "classes::Counter#type",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 60
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "classes.py",
+          "id": "classes::Counter::count#field",
+          "kind": "field",
+          "name": "count",
+          "owner": "classes::Counter#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 60
+            },
+            "start": {
+              "col": 9,
+              "line": 60
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 64
+            },
+            "start": {
+              "col": 5,
+              "line": 62
+            }
+          },
+          "file": "classes.py",
+          "id": "classes::Counter::reset#method",
+          "kind": "method",
+          "name": "reset",
+          "owner": "classes::Counter#type",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 64
+            },
+            "start": {
+              "col": 5,
+              "line": 62
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "classes.py",
+          "id": "classes::Counter::resets#field",
+          "kind": "field",
+          "name": "resets",
+          "owner": "classes::Counter#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 64
+            },
+            "start": {
+              "col": 9,
+              "line": 64
             }
           },
           "visibility": "public"

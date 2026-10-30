@@ -425,6 +425,30 @@
           "from": {
             "module": "test_calc"
           },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::TestNested#type"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestNested#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::TestNested::TestInner#type"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestNested::TestInner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_calc::TestNested::TestInner::test_deposit#test"
+        },
+        {
+          "from": {
+            "module": "test_calc"
+          },
           "kind": "imports",
           "resolution": "syntactic",
           "site": {
@@ -654,6 +678,42 @@
             }
           },
           "to": "calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestNested::TestInner::test_deposit#test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 51
+            },
+            "start": {
+              "col": 20,
+              "line": 51
+            }
+          },
+          "to": "calc::Account#type"
+        },
+        {
+          "from": {
+            "symbol": "test_calc::TestNested::TestInner::test_deposit#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 51
+            },
+            "start": {
+              "col": 30,
+              "line": 51
+            }
+          },
+          "to": "calc::Account::deposit#method"
         }
       ],
       "file": {
@@ -812,6 +872,16 @@
           "statements": 1,
           "symbol": "test_calc::Holder::test_ignored#method",
           "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "test_calc::TestNested::TestInner::test_deposit#test",
+          "tokens": 11,
           "top_level": 1
         }
       ],
@@ -1152,6 +1222,89 @@
             }
           },
           "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 48
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::TestNested#type",
+          "kind": "type",
+          "name": "TestNested",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 48
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 51
+            },
+            "start": {
+              "col": 5,
+              "line": 49
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::TestNested::TestInner#type",
+          "kind": "type",
+          "name": "TestInner",
+          "owner": "test_calc::TestNested#type",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 51
+            },
+            "start": {
+              "col": 5,
+              "line": 49
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 51
+            },
+            "start": {
+              "col": 9,
+              "line": 50
+            }
+          },
+          "file": "test_calc.py",
+          "id": "test_calc::TestNested::TestInner::test_deposit#test",
+          "kind": "test",
+          "name": "test_deposit",
+          "owner": "test_calc::TestNested::TestInner#type",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 51
+            },
+            "start": {
+              "col": 9,
+              "line": 50
+            }
+          },
+          "visibility": "private"
         }
       ],
       "tests": [
@@ -1189,9 +1342,18 @@
           ]
         },
         {
-          "nesting": 0,
+          "nesting": 1,
           "style": "scenario",
           "symbol": "test_calc::TestAccount::test_deposit#test",
+          "targets": [
+            "calc::Account#type",
+            "calc::Account::deposit#method"
+          ]
+        },
+        {
+          "nesting": 2,
+          "style": "scenario",
+          "symbol": "test_calc::TestNested::TestInner::test_deposit#test",
           "targets": [
             "calc::Account#type",
             "calc::Account::deposit#method"
@@ -1217,6 +1379,14 @@
           "kind": "contains",
           "resolution": "semantic",
           "to": "test_unit::SubTests::setUp#method"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_unit::SubTests::value#field"
         },
         {
           "from": {
@@ -1272,6 +1442,24 @@
         },
         {
           "from": {
+            "symbol": "test_unit::SubTests::setUp#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 8
+            },
+            "start": {
+              "col": 14,
+              "line": 8
+            }
+          },
+          "to": "test_unit::SubTests::value#field"
+        },
+        {
+          "from": {
             "symbol": "test_unit::SubTests::test_sub#test"
           },
           "kind": "calls",
@@ -1287,6 +1475,24 @@
             }
           },
           "to": "calc::sub#function"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests::test_sub#test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 47,
+              "line": 11
+            },
+            "start": {
+              "col": 42,
+              "line": 11
+            }
+          },
+          "to": "test_unit::SubTests::value#field"
         },
         {
           "from": {
@@ -1410,6 +1616,24 @@
           "visibility": "private"
         },
         {
+          "file": "test_unit.py",
+          "id": "test_unit::SubTests::value#field",
+          "kind": "field",
+          "name": "value",
+          "owner": "test_unit::SubTests#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 8
+            },
+            "start": {
+              "col": 9,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        },
+        {
           "extent": {
             "end": {
               "col": 48,
@@ -1468,15 +1692,16 @@
       ],
       "tests": [
         {
-          "nesting": 0,
+          "nesting": 1,
           "style": "scenario",
           "symbol": "test_unit::SubTests::test_sub#test",
           "targets": [
-            "calc::sub#function"
+            "calc::sub#function",
+            "test_unit::SubTests::value#field"
           ]
         },
         {
-          "nesting": 0,
+          "nesting": 1,
           "style": "table",
           "symbol": "test_unit::SubTests::test_rows#test",
           "targets": [

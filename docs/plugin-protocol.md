@@ -852,7 +852,7 @@ settle are `semantic`.
   (`test_*.py`, `*_test.py`, `conftest.py`, under `tests/` or `test/`) has `test_of` set to the module it names by
   stripping the marker, else its directory.
 - Symbols: functions (`def`, and a module-level name bound to a `lambda`), classes (`type`, or `interface` for a
-  `Protocol`), methods, class attributes, dataclass and `NamedTuple` fields and the fields `__init__` sets (`field`),
+  `Protocol`), methods, class attributes, dataclass and `NamedTuple` fields and the fields a method sets with `self.name = ...` (`field`; the first write declares it, every write is a `references` edge),
   `Enum` members (`variant`), module-level assignments (`const` for an upper-case name or `Final`, else `var`), and
   tests. Overloads, property accessors and conditional definitions are one symbol. Functions nested in functions are not
   symbols; their uses belong to the function that contains them. Statements that run when a module loads are one bodyless
@@ -875,7 +875,8 @@ settle are `semantic`.
   and no `events`. `tokens` counts a string with replacement fields as one token, whatever the interpreter version.
 - Tests: pytest `test_*` functions of test files and `test_*` methods of `Test*` classes without `__init__`;
   `unittest.TestCase` methods starting with `test`. The symbol is kind `test`; a test is a `table` for
-  `parametrize` or a loop over a literal list of rows. `conventions.test_naming` is `test_` in snake case.
+  `parametrize` or a loop over a literal list of rows; `nesting` is the number of test classes around the test.
+  `conventions.test_naming` is `test_` in snake case.
 - Types: `signature` and `type_ref` come from annotations (`Any` where there is none); `returns` counts a returned or
   yielded value of an unannotated function. `implementation` marks a method that overrides one of a project base class,
   protocol or abstract class, or carries `@override`; `constructs` marks `__init__` and defs that return their own class.
