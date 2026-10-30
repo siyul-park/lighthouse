@@ -12,6 +12,9 @@ use lighthouse_model::{
 };
 use serde_json::json;
 
+mod chain;
+mod edit;
+
 use super::{Account, Class, Event, extent, verify::judge};
 use crate::{
     Run,

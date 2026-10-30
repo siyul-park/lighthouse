@@ -7,9 +7,9 @@ use lighthouse_model::{Diagnostic, Fingerprint, Severity};
 use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Example, ExampleFile, ExampleKind, FixScope};
 
-use super::{
+use super::{FILE, finding, proposal, run};
+use crate::fix::model::{
     Class,
-    tests::{FILE, finding, proposal, run},
     verify::{Verdict, judge},
 };
 use crate::{

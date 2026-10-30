@@ -17,13 +17,8 @@ use lighthouse_plugin::{
 use lighthouse_protocol::hash;
 use lighthouse_spec::{FixScope, Models};
 
-use super::{
-    Account, ModelFixer,
-    edit::conflict,
-    reach::reach,
-    tests::{FILE, finding, proposal, run, symbol},
-    verify::judge,
-};
+use super::{FILE, finding, proposal, run, symbol};
+use crate::fix::model::{Account, ModelFixer, edit::conflict, reach::reach, verify::judge};
 use crate::{
     Overlays, Run,
     cache::KeyBuilder,
@@ -158,7 +153,7 @@ fn with_module_level_use(without_f: bool) -> Project {
         from: Node::Module("m".to_owned()),
         to: Target::Resolved(Node::Symbol(f.id.clone())),
         resolution: Resolution::Semantic,
-        site: Some(crate::fix::model::tests::span((1, 1), (1, 9))),
+        site: Some(super::span((1, 1), (1, 9))),
     };
     let (symbols, functions) = if without_f {
         (Vec::new(), Vec::new())

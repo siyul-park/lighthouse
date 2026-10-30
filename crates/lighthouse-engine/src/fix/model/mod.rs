@@ -135,9 +135,3 @@ impl<'e> ModelFixer<'e> {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod chain_tests;
-
-#[cfg(test)]
-mod edit_tests;
