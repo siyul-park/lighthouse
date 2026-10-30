@@ -46,6 +46,9 @@ pub const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
 /// What the command of every hook starts with.
 pub const COMMAND: &str = "lighthouse hook claude-code";
 /// Said with a report that had no baseline to be measured against.
+const NOT_CHECKING: &str = "Lighthouse is not checking this project: run `lighthouse trust` to let it check, or ignore this; it is said once per session.";
+/// The name of the notice a session is told once when its project is not trusted.
+const UNTRUSTED: &str = "untrusted";
 const NO_BASELINE: &str = "Lighthouse: no pre-edit baseline, so every finding in the file is shown, including ones that were there before this session; `lighthouse init --agent claude-code` adds the PreToolUse hook that records it.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -141,6 +144,9 @@ fn answer_event(
     };
     let root = session.root.canonicalize()?;
     let id = baseline::session_id(payload["session_id"].as_str());
+    if let Some(why) = untrusted_for(event, &session) {
+        return untrusted_notice(event, &session, id, stop_hook_active, &why);
+    }
     match event {
         Event::UserPromptSubmit => {
             let Some(prompt) = payload["prompt"].as_str() else {
@@ -215,6 +221,36 @@ fn answer_event(
             }
             Ok(with_open_signals(&session, id, stop_hook_active, stopped))
         }
+    }
+}
+
+/// Why `session` cannot be checked for `event` until the user trusts the
+/// project. UserPromptSubmit and SessionStart start no plugin, so they never
+/// wait for trust.
+fn untrusted_for(event: Event, session: &Session) -> Option<String> {
+    match event {
+        Event::UserPromptSubmit | Event::SessionStart => None,
+        Event::PreToolUse | Event::PostToolUse | Event::Stop => session.untrusted(),
+    }
+}
+
+/// Not being trusted is a state, not a failure: the session is told once,
+/// without blocking, and then hears nothing more of it. At Stop the open
+/// signals are still asked about when the notice has been given before.
+fn untrusted_notice(
+    event: Event,
+    session: &Session,
+    id: Option<&str>,
+    stop_hook_active: bool,
+    why: &str,
+) -> Result<Option<Value>> {
+    let first = baseline::first_telling(&session.root, id.unwrap_or(NO_SESSION), UNTRUSTED)?;
+    if first {
+        return Ok(Some(context(event, format!("{NOT_CHECKING} {why}"))));
+    }
+    match event {
+        Event::Stop => Ok(with_open_signals(session, id, stop_hook_active, None)),
+        _ => Ok(None),
     }
 }
 

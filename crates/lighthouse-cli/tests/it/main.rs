@@ -21,6 +21,7 @@ mod fx;
 mod help;
 mod hook_session;
 mod hook_signals;
+mod hook_trust;
 mod internal;
 mod judgments;
 mod layers;
