@@ -40,7 +40,7 @@ class Analysis {
     this.workspace = new Workspace(request.root, overlays);
   }
 
-  run(): Map<Snippet, Fragment> {
+  index(): Map<Snippet, Fragment> {
     for (const members of this.groups()) this.indexGroup(members);
     this.summarize();
     return this.fenced;
@@ -149,8 +149,8 @@ class Analysis {
  * through it. The fragments of files go into the result; those of fences
  * come back in the host's coordinates, for the caller to merge by host file.
  */
-export function analyze(request: Request): Map<Snippet, Fragment> {
-  return new Analysis(request).run();
+export function index(request: Request): Map<Snippet, Fragment> {
+  return new Analysis(request).index();
 }
 
 function language(snippet: Snippet): string {

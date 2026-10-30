@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Handler } from "./server.ts";
 import { PROTOCOL_VERSION } from "./server.ts";
-import { analyze } from "./analyze.ts";
+import { index } from "./index.ts";
 import { isDeclarationFile, isIgnored, slashed } from "./paths.ts";
 import { type Snippet, planSnippets } from "./regions.ts";
 import type { EmbeddedFile, Fragment, IndexParams, IndexResult, InitializeResult, LanguageManifest } from "./wire.ts";
@@ -56,7 +56,7 @@ export class Provider implements Handler {
     const requested = run.admit(files);
     const snippets = planSnippets(hosts);
     const { root, overlays, result } = run;
-    const regionFragments = analyze({ root, overlays, requested, snippets, result });
+    const regionFragments = index({ root, overlays, requested, snippets, result });
     run.merge(hosts, snippets, regionFragments);
     result.fragments.sort((a, b) => (a.file.path < b.file.path ? -1 : a.file.path > b.file.path ? 1 : 0));
     return result;

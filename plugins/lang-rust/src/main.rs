@@ -7,7 +7,7 @@ mod cache;
 mod cargo;
 mod comments;
 mod events;
-mod extract;
+mod index;
 mod macros;
 mod names;
 mod provider;

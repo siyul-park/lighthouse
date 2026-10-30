@@ -23,7 +23,7 @@ use lighthouse_protocol::{
 
 use crate::{
     cargo::{Manifests, Package, TargetKind},
-    extract,
+    index,
     names::Index,
     provider::{Governor, Options, governor, normalize, overlays, roots},
     tree::{Root, Tree},
@@ -114,7 +114,7 @@ pub(crate) fn index(
             ));
             continue;
         }
-        let (fragment, _) = extract::fragment(&index, file);
+        let (fragment, _) = index::fragment(&index, file);
         if imports_unknown(&fragment, &tree) {
             unresolved.push(snippet.host.path.as_str());
         }

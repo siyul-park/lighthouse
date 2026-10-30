@@ -16,7 +16,7 @@ use serde::Deserialize;
 use crate::{
     cache::Cache,
     cargo::{self, Manifests, Package, Target, TargetKind},
-    extract,
+    index,
     names::Index,
     region,
     tree::{Root, Tree},
@@ -166,7 +166,7 @@ struct MacroSummary {
 }
 
 impl MacroSummary {
-    fn add(&mut self, file: &str, stats: &extract::MacroStats) {
+    fn add(&mut self, file: &str, stats: &index::MacroStats) {
         self.defining += usize::from(stats.defines);
         self.unread += stats.unread;
         if (stats.defines || stats.unread > 0) && self.example.is_none() {
@@ -308,12 +308,12 @@ fn analyzed(
     idx: &Index,
     file: usize,
     mut cache: Option<&mut Cache>,
-) -> (Fragment, extract::MacroStats) {
+) -> (Fragment, index::MacroStats) {
     let source = &idx.tree.files[file];
     if let Some(hit) = cache.as_deref_mut().and_then(|c| c.get(source)) {
         return hit;
     }
-    let (fragment, stats) = extract::fragment(idx, file);
+    let (fragment, stats) = index::fragment(idx, file);
     if let Some(c) = cache {
         c.put(source, &fragment, &stats);
     }

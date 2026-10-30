@@ -20,7 +20,7 @@ use sha2::{Digest, Sha256};
 use syn::{ImplItem, Item, TraitItem};
 
 use crate::{
-    extract::MacroStats,
+    index::MacroStats,
     tree::{SourceFile, Tree},
 };
 

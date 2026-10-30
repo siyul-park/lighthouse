@@ -12,7 +12,7 @@ The Rust language provider: reads sources with `syn`, resolves names through its
 - `tree`, `cargo`: packages and crate targets from `Cargo.toml`, the module tree.
 - `names/` (declare, resolve, export, query): what every module declares and imports, and path resolution.
 - `body/` (flow, calls): calls, references and normalized control flow of a function.
-- `extract.rs`: the fragment of one file; `cache.rs`: the fragment cache.
+- `index.rs`: the fragment of one file; `cache.rs`: the fragment cache.
 - `region.rs`, `region/`: the Rust fences of host files (see below).
 
 ## Invariants

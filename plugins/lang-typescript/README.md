@@ -8,7 +8,7 @@ The TypeScript and JavaScript language provider: loads one TypeScript 6.0.3 prog
 
 - `server.ts`: the JSON-RPC loop (`initialize`, `lighthouse/index`, `shutdown`, `exit`); `provider.ts`: the manifest and one `index` request.
 - `projects.ts`, `selfref.ts`: one program per owning `tsconfig.json` or `jsconfig.json` (project references followed), a default program for files in none, the overlay-aware compiler host.
-- `analyze.ts`: groups files and fences by program; `unit.ts`: the fragment of one file.
+- `index.ts`: groups files and fences by program; `unit.ts`: the fragment of one file.
 - `decls.ts`, `model.ts`, `visibility.ts`: declarations, merged declarations and exports, visibility.
 - `uses.ts`: edges; `flow.ts`, `forward.ts`, `types.ts`: summaries; `tests.ts`: test cases; `comments.ts`, `extent.ts`.
 - `regions.ts`: the TypeScript and JavaScript fences of host files (see below).
