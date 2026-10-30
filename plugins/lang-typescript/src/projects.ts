@@ -97,6 +97,8 @@ export class Workspace {
       emitDeclarationOnly: false,
       tsBuildInfoFile: undefined,
       skipLibCheck: true,
+      // The protocol owns stdout: a project's tracing options must not print to it.
+      traceResolution: false,
     };
     const host = this.host(options);
     const program = ts.createProgram({ rootNames: roots, options, host, projectReferences: references });
@@ -108,6 +110,7 @@ export class Workspace {
     const { readFile, fileExists, getSourceFile } = host;
     const overlays = this.overlays;
     host.getCurrentDirectory = () => this.root;
+    host.trace = undefined;
     host.readFile = (file) => overlays.get(file) ?? readFile.call(host, file);
     host.fileExists = (file) => overlays.has(file) || fileExists.call(host, file);
     host.getSourceFile = (file, languageVersionOrOptions, onError, shouldCreate) => {
