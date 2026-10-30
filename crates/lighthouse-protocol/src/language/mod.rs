@@ -4,7 +4,7 @@
 pub(crate) mod frame;
 pub(crate) mod host;
 pub mod selector;
-pub(crate) mod serve;
+pub(crate) mod server;
 mod source;
 pub use source::{TextOffsets, coalesce_text_map};
 pub(crate) mod wire;

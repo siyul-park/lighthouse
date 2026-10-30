@@ -10,7 +10,7 @@ pub use language::{
     TextOffsets, coalesce_text_map,
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
     host::{HostError, HostLanguage, HostParser, HostTree, host_handler, serve_host},
-    serve::{Handler, ServeError, serve},
+    server::{Handler, ServeError, serve},
     wire::{
         CacheRef, Call, Comment, Context, Conventions, Edge, EdgeKind, EmbeddedFile,
         EmbeddedSource, Event, EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment,

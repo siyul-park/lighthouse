@@ -14,7 +14,7 @@ use std::{
 
 use serde_json::Value;
 
-use super::serve::Handler;
+use super::server::Handler;
 use crate::{
     Comment, Conventions, EmbeddedFile, ErrorObject, FileInfo, FileRef, Fragment, Incomplete,
     IndexInput, IndexParams, IndexResult, InitializeParams, InitializeResult, LanguageManifest,
