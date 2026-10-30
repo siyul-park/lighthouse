@@ -19,7 +19,7 @@ The Python language provider: parses each file with the `ast` of the interpreter
 | `modules` | one per file; a package's `__init__.py` is its directory; `test_of` for test files: the module the file name points at, mirrored from a `tests/` directory (`tests/test_b.py` names the one module `b`), else the directory |
 | `symbols` | functions, classes (`interface` for `Protocol`), methods, class and dataclass fields, the fields a method sets (`self.name = ...`, the first write declares it), `Enum` members, assignments, tests; `extent`, `doc` (PEP 257), `role` in test files |
 | `edges` | `calls`, `references`, `imports`, `implements` with sites; `semantic` where scopes, imports and annotations settle the name, else `syntactic` |
-| `functions` | flow, nesting, statements, tokens, parameters, returns, signature, `forwards_to`, `implementation`, `constructs`, `manual_assertions` |
+| `functions` | flow, nesting, statements, tokens, parameters, returns, signature, `forwards_to`, `implementation`, `constructs`, `manual_assertions` (an `if` that compares and only raises `AssertionError`, `Failed` or a `...Failure`, or calls `fail`) |
 | `tests` | `test_*` functions, `Test*` classes, `unittest.TestCase` methods; `parametrize` and loops over literal rows are tables; `nesting` counts the test classes around a test |
 | `comments`, `generated` | every comment; `# @generated` and `DO NOT EDIT` above the first statement |
 
@@ -29,6 +29,10 @@ Capabilities: `semantic-edges` (partial: annotations, imports and local inferenc
 
 - Import roots: the project root, `src` where the layout says so, the package directories `pyproject.toml` declares statically (`[tool.setuptools]`, `[tool.hatch]`), and the directory above the topmost package of the importing file. Regular packages and modules win over PEP 420 namespace packages.
 - Public means: no leading `_` (dunder names are public), or listed in the module's static `__all__` when it has one, or imported and listed in the `__all__` of a package `__init__.py` above it. A public name of a module whose path has an underscore component is `internal`; everything in a test file is `private`, and so is everything in a fence (an example nothing imports) unless the fence has its own `__all__`.
+- `implementation` marks a method that fixes no contract of its own: a special method (`__repr__`, `__call__`), an override of a project base class, of a class of the standard library or of the builtins (read by importing the standard library module in the provider, never a project module or a third party), a method every other method of a project `Protocol` is matched by (PEP 544), and the module hooks `__getattr__` and `__dir__` (PEP 562). An override of a third-party base is not known without its `site-packages`.
+- `self.name = ...` declares a field only when the class body, read whole, has no method of that name: a property setter is a use of the property.
+- `getattr(self, f"_on_{kind}")` is a `syntactic` use of the members of the receiver's class whose names start with the literal part.
+- A file the host cannot read as UTF-8 is `incomplete` (the host hands text, as it does for every language); the provider itself honours a PEP 263 coding cookie and a byte order mark when it reads a file.
 - A use on a receiver of unknown type (an untyped parameter, `getattr`, a dynamic attribute) is a `syntactic` edge to every project member that bears the name, when at most eight do. Third-party imports are `syntactic` (no `site-packages` lookup); the standard library is `semantic`.
 - Syntax newer than the running interpreter, or any syntax error, is an `incomplete` entry (`line:col: message`); the file keeps an empty fragment. `.pyi` files, `testdata` and hidden directories get empty fragments.
 - Only the options of the protocol exist: `[languages.python]` has no keys, and any key is an `incomplete` entry. The interpreter is the `python3` on `PATH`.

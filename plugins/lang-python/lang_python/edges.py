@@ -10,6 +10,7 @@ from lang_python.extent import Lines, span, span_of
 from lang_python.project import STDLIB, ModuleLoc
 from lang_python.project import (
     DeclVal,
+    InstanceVal,
     ModuleVal,
     Resolver,
     constants,
@@ -23,6 +24,17 @@ MAX_CANDIDATES = 8
 CALLABLE = ("function", "method", "test")
 TYPES = ("type", "interface")
 GUESS_CALLS = frozenset({"getattr", "hasattr", "setattr", "delattr"})
+
+
+def _literal_prefix(expr: ast.expr) -> str:
+    """The text a name starts with before its dynamic part: `f"_on_{x}"` and `"_on_" + x` start with `_on_`."""
+    if isinstance(expr, ast.JoinedStr) and expr.values:
+        first = expr.values[0]
+        return first.value if isinstance(first, ast.Constant) and isinstance(first.value, str) else ""
+    if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
+        left = expr.left
+        return left.value if isinstance(left, ast.Constant) and isinstance(left.value, str) else ""
+    return ""
 
 
 class _EdgeSink(Protocol):
@@ -273,6 +285,30 @@ class Uses:
             return
         for literal in constants(node.args[1]):
             self._by_name(literal.value, span_of(literal), owner, call=False, members=True)
+        self._guess_prefixed(node, scope, owner)
+
+    def _guess_prefixed(self, node: ast.Call, scope: Scope, owner: Node) -> None:
+        """`getattr(self, f"_handle_{kind}")` uses the members of the receiver's class whose names start with
+        the literal part; a receiver of unknown type names nothing."""
+        prefix = _literal_prefix(node.args[1])
+        base = self.resolver.expr_value(node.args[0], scope)
+        cls = base.cls if isinstance(base, InstanceVal) else base.decl if isinstance(base, DeclVal) else None
+        if not prefix or cls is None or cls.kind not in TYPES:
+            return
+        site = span_of(node.args[1])
+        for decl in self._members_starting(cls, prefix):
+            self._to_decl(decl, site, owner, False, "syntactic")
+
+    def _members_starting(self, cls: Decl, prefix: str) -> list[Decl]:
+        """The members of a class and of the project classes it derives from whose names start with `prefix`."""
+        found: list[Decl] = []
+        for holder in [cls, *self.resolver.ancestors(cls)]:
+            declared = self.model.decls(self.resolver.file_of(holder))
+            if declared is not None:
+                found += [
+                    d for d in declared.list if d.owner is holder and d.name.startswith(prefix) and d.name != prefix
+                ]
+        return found
 
     def _is_bound(self, name: str, scope: Scope) -> bool:
         return self.resolver.lookup(name, scope) is not None or name in self.decls.top

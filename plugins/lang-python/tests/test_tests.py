@@ -87,8 +87,11 @@ class TestCaseTests(unittest.TestCase):
             "    if not x:\n        fail('no')\n"
             "    if x > 1:\n        print(x)\n"
             "    if x == 2:\n        raise ValueError\n    else:\n        pass\n"
+            "    if x > 5:\n        raise TestFailure('big')\n"
+            "    if x < 0:\n        raise OSError('simulated')\n"
+            "    if x < 0:\n        raise\n"
         )
-        self.assertEqual(manual_assertions(ast.parse(source).body[0]), 2)
+        self.assertEqual(manual_assertions(ast.parse(source).body[0]), 3)
 
     def test_role_of(self):
         found, _ = decls()

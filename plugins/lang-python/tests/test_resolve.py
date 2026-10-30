@@ -11,7 +11,7 @@ from lang_python.project import (
     static_all,
     unwrap_annotation,
 )
-from tests.support import model_of
+from tests.support import index, model_of
 
 FILES = {
     "pkg/__init__.py": "from .core import Engine\n__all__ = ['Engine']\n",
@@ -202,6 +202,25 @@ class ResolverTests(unittest.TestCase):
         engine = world.decl("pkg/core.py", "Engine")
         self.assertEqual([c.name for c in world.resolver.ancestors(engine)], ["Base"])
         self.assertEqual(world.resolver.ancestors(world.decl("pkg/core.py", "Base")), [])
+
+    def test_resolver_methods_of(self):
+        world = World("app.py")
+        engine = world.decl("pkg/core.py", "Engine")
+        self.assertEqual(world.resolver.methods_of(engine), ["start"])
+
+    def test_resolver_external_bases(self):
+        files = {
+            "m.py": "import ast\nfrom logging import Handler\n\n\nclass A(ast.NodeVisitor, Handler, Gone):\n    pass\n"
+        }
+        model = model_of(files)
+        parsed = model.file("m.py")
+        found = resolver_of(model, parsed).external_bases(parsed.decls.top["A"])
+        self.assertEqual([c.__name__ for c in found], ["NodeVisitor", "Handler"])
+
+    def test_a_variable_defined_through_itself_settles_no_type(self):
+        files = {"loop.py": "for name in ('a', 'b'):\n    name = name.replace('a', 'c')\n    print(name.upper())\n"}
+        result = index(files)
+        self.assertEqual(result["incomplete"], [])
 
 
 if __name__ == "__main__":

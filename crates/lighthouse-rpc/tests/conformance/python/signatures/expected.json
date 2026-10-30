@@ -57,14 +57,6 @@
           },
           "kind": "contains",
           "resolution": "semantic",
-          "to": "signatures::Service::config#field"
-        },
-        {
-          "from": {
-            "symbol": "signatures::Service#type"
-          },
-          "kind": "contains",
-          "resolution": "semantic",
           "to": "signatures::Service::fetch#method"
         },
         {
@@ -106,6 +98,14 @@
           "kind": "contains",
           "resolution": "semantic",
           "to": "signatures::Service::untyped#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "signatures::Service::config#field"
         },
         {
           "from": {
@@ -993,24 +993,6 @@
           "visibility": "public"
         },
         {
-          "file": "signatures.py",
-          "id": "signatures::Service::config#field",
-          "kind": "field",
-          "name": "config",
-          "owner": "signatures::Service#type",
-          "span": {
-            "end": {
-              "col": 20,
-              "line": 19
-            },
-            "start": {
-              "col": 9,
-              "line": 19
-            }
-          },
-          "visibility": "public"
-        },
-        {
           "extent": {
             "end": {
               "col": 58,
@@ -1174,6 +1156,24 @@
             "start": {
               "col": 5,
               "line": 38
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "signatures.py",
+          "id": "signatures::Service::config#field",
+          "kind": "field",
+          "name": "config",
+          "owner": "signatures::Service#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 19
+            },
+            "start": {
+              "col": 9,
+              "line": 19
             }
           },
           "visibility": "public"

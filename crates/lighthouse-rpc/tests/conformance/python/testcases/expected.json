@@ -1480,14 +1480,6 @@
           },
           "kind": "contains",
           "resolution": "semantic",
-          "to": "test_unit::SubTests::value#field"
-        },
-        {
-          "from": {
-            "symbol": "test_unit::SubTests#type"
-          },
-          "kind": "contains",
-          "resolution": "semantic",
           "to": "test_unit::SubTests::test_sub#test"
         },
         {
@@ -1497,6 +1489,14 @@
           "kind": "contains",
           "resolution": "semantic",
           "to": "test_unit::SubTests::test_rows#test"
+        },
+        {
+          "from": {
+            "symbol": "test_unit::SubTests#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "test_unit::SubTests::value#field"
         },
         {
           "from": {
@@ -1613,6 +1613,7 @@
       "functions": [
         {
           "flow": [],
+          "implementation": true,
           "max_nesting": 0,
           "params": 0,
           "returns": 0,
@@ -1710,24 +1711,6 @@
           "visibility": "private"
         },
         {
-          "file": "test_unit.py",
-          "id": "test_unit::SubTests::value#field",
-          "kind": "field",
-          "name": "value",
-          "owner": "test_unit::SubTests#type",
-          "span": {
-            "end": {
-              "col": 19,
-              "line": 8
-            },
-            "start": {
-              "col": 9,
-              "line": 8
-            }
-          },
-          "visibility": "private"
-        },
-        {
           "extent": {
             "end": {
               "col": 48,
@@ -1779,6 +1762,24 @@
             "start": {
               "col": 5,
               "line": 13
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "test_unit.py",
+          "id": "test_unit::SubTests::value#field",
+          "kind": "field",
+          "name": "value",
+          "owner": "test_unit::SubTests#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 8
+            },
+            "start": {
+              "col": 9,
+              "line": 8
             }
           },
           "visibility": "private"

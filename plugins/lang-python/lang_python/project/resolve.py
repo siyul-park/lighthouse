@@ -1,12 +1,15 @@
 """Names to project declarations: imports, attributes of modules and classes, and the types annotations state."""
 
 import ast
+import builtins
+import importlib
 import posixpath
 from dataclasses import dataclass
-from typing import Iterator
+from types import ModuleType
+from typing import Callable, Iterator
 
 from lang_python.symbols import FUNCTION_NODES, Decl, dotted, walk_flat
-from lang_python.project.files import ModuleLoc
+from lang_python.project.files import STDLIB, ModuleLoc
 from lang_python.project.model import Model, ParsedFile
 from lang_python.modules import module_path
 from lang_python.project.scopes import Scope, binding_scope
@@ -17,6 +20,8 @@ ALL_MEMBERS = "__all__"
 CLASS_RECEIVERS = frozenset({"__new__", "__init_subclass__", "__class_getitem__"})
 SUBMODULE_SUFFIXES = (".py", ".pyi", "/__init__.py", "/__init__.pyi")
 PLAIN_BASES = frozenset({"object", "ABC", "Protocol", "Generic"})
+NOT_IMPORTED = frozenset({"antigravity", "this"})
+"""Standard library modules whose import does something: they are never imported to read a class."""
 
 
 @dataclass(frozen=True)
@@ -365,10 +370,21 @@ class Resolver:
         return None if found is None else DeclVal(found)
 
     def _declared_type(self, decl: Decl) -> Decl | None:
-        """The project class a field or variable is annotated with, or assigned a call of."""
+        """The project class a field or variable is annotated with, or assigned a call of; None when the
+        value is defined through itself (`x = x.y()`), which settles nothing."""
         target = self.model.file(self.file_of(decl))
         if target is None or target.decls is None:
             return None
+        active = self.model.resolving
+        if decl.id in active:
+            return None
+        active.add(decl.id)
+        try:
+            return self._declared_type_of(decl, target)
+        finally:
+            active.discard(decl.id)
+
+    def _declared_type_of(self, decl: Decl, target: ParsedFile) -> Decl | None:
         resolver = Resolver(self.model, target)
         scope = target.scopes().module(target.tree)
         if decl.annotation is not None:
@@ -413,6 +429,56 @@ class Resolver:
                 external = True
         return found, external
 
+    def methods_of(self, cls: Decl) -> list[str]:
+        """The names of the methods a class declares."""
+        found = self.model.decls(self.file_of(cls))
+        return [d.name for d in found.list if d.owner is cls and d.kind == "method"] if found is not None else []
+
+    def external_bases(self, cls: Decl) -> list[type]:
+        """The classes of the standard library and the builtins a class derives from, read by importing the
+        standard library module in this process (never a module of the project, never a third party)."""
+        target = self.model.file(self.file_of(cls))
+        node = cls.node
+        if target is None or target.decls is None or not isinstance(node, ast.ClassDef):
+            return []
+        resolver = Resolver(self.model, target)
+        scope = target.scopes().module(target.tree)
+        found: list[type] = []
+        for base in node.bases:
+            expr = base.value if isinstance(base, ast.Subscript) else base
+            if resolver._class_of(expr, scope) is None:
+                value = resolver._stdlib_class(expr, scope)
+                if value is not None:
+                    found.append(value)
+        return found
+
+    def _stdlib_class(self, expr: ast.expr, scope: Scope) -> type | None:
+        """The class a base expression names when it is a builtin or a name of the standard library."""
+        name = dotted(expr)
+        if name is None:
+            return None
+        head, _, rest = name.partition(".")
+        binding = self.module_imports().get(head)
+        if binding is None:
+            declared = self.decls is not None and head in self.decls.top
+            return None if declared else _attr_chain(getattr(builtins, head, None), rest)
+        if isinstance(binding, _ImportModule):
+            return _attr_chain(self._stdlib_module(binding.dotted), rest, self._stdlib_module)
+        if binding.level != 0 or binding.module is None:
+            return None
+        return _attr_chain(getattr(self._stdlib_module(binding.module), binding.name, None), rest)
+
+    def _stdlib_module(self, dotted_name: str) -> object | None:
+        """The module of the standard library with a dotted name, imported; None for a module of the project
+        or anything else."""
+        top = dotted_name.split(".")[0]
+        if top not in STDLIB or top in NOT_IMPORTED or self.project.find(dotted_name, self.parsed.rel) is not None:
+            return None
+        try:
+            return importlib.import_module(dotted_name)
+        except Exception:  # a module that cannot load here names nothing
+            return None
+
     def member(self, cls: Decl, name: str, seen: frozenset[int] = frozenset()) -> Decl | None:
         """A member of a class or of the project classes it derives from."""
         if id(cls) in seen:
@@ -439,6 +505,17 @@ class Resolver:
             found.append(base)
             found.extend(self.ancestors(base, seen | {id(cls), id(base)}))
         return found
+
+
+def _attr_chain(value: object | None, rest: str, load: Callable[[str], object | None] | None = None) -> type | None:
+    """The class at the end of `rest`, a dotted path below a value; `load` imports a submodule the value
+    does not have yet (`import logging.handlers` makes `logging.handlers` a name)."""
+    for part in rest.split(".") if rest else []:
+        found = getattr(value, part, None)
+        if found is None and load is not None and isinstance(value, ModuleType):
+            found = load(f"{value.__name__}.{part}")
+        value = found
+    return value if isinstance(value, type) else None
 
 
 def _plain_assignments(body: list[ast.stmt]) -> Iterator[tuple[str, ast.expr | None, ast.expr | None]]:

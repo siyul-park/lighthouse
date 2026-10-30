@@ -75,6 +75,23 @@ class UsesTests(unittest.TestCase):
         Uses(model, model.file("m.py"), sink).run()
         self.assertIn(("references", "m", "m::f#function", "semantic"), sink.edges)
 
+    def test_getattr_with_a_literal_prefix_uses_the_members_of_the_receivers_class(self):
+        source = (
+            "class Validator:\n"
+            "    def check(self, kind):\n"
+            "        return getattr(self, f'_check_{kind}')()\n\n"
+            "    def _check_name(self): ...\n\n"
+            "    def _check_size(self): ...\n\n"
+            "    def _other(self): ...\n\n\n"
+            "def loose(thing, kind):\n"
+            "    return getattr(thing, '_check_' + kind)\n"
+        )
+        model = model_of({"m.py": source})
+        sink = Sink()
+        Uses(model, model.file("m.py"), sink).run()
+        used = {to for kind, frm, to, res in sink.edges if kind == "references" and res == "syntactic"}
+        self.assertEqual(used, {"m::Validator::_check_name#method", "m::Validator::_check_size#method"})
+
 
 if __name__ == "__main__":
     unittest.main()

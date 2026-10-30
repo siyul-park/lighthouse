@@ -148,6 +148,26 @@ class ExecutableTests(unittest.TestCase):
         for source in sources:
             self.assertFalse(executable(statement(source)), source)
 
+    def test_a_property_set_in_a_method_is_no_field(self):
+        source = (
+            "class Box:\n"
+            "    def __init__(self, size):\n"
+            "        self.size = size\n"
+            "        self.label = 'x'\n\n"
+            "    @property\n"
+            "    def size(self):\n"
+            "        return self._size\n\n"
+            "    @size.setter\n"
+            "    def size(self, value):\n"
+            "        self._size = value\n"
+        )
+        decls = FileDecls("m.py", "m", ast.parse(source), source, False)
+        kinds = {(d.name, d.kind) for d in decls.list if d.owner is not None}
+        self.assertIn(("size", "method"), kinds)
+        self.assertNotIn(("size", "field"), kinds)
+        self.assertIn(("label", "field"), kinds)
+        self.assertIn(("_size", "field"), kinds)
+
 
 if __name__ == "__main__":
     unittest.main()

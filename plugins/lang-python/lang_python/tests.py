@@ -1,11 +1,15 @@
 """Test cases: how a test is told a table, what checks on behalf of tests, and hand-written checks."""
 
 import ast
+import re
 
 from lang_python.sdk.wire import TestCase
 from lang_python.symbols import FUNCTION_NODES, MODULE_BODY, Decl, dotted, has_decorator, is_docstring
 
 ASSERTING = ("assert", "raises", "warns", "fail", "approx_raises")
+FAILURES = re.compile(r"AssertionError|Failed|failureException|\w+Failure")
+"""The exceptions a test raises to fail: `AssertionError`, pytest's `Failed`, unittest's `failureException` and
+the `...Failure` classes projects define for it."""
 
 
 def is_test_file(rel: str) -> bool:
@@ -80,19 +84,21 @@ def _comparing(expr: ast.expr) -> bool:
 
 
 def _fails_only(body: list[ast.stmt]) -> bool:
-    """A body of one statement that fails the test: a `raise`, or a call of `fail`."""
+    """A body of one statement that fails the test: raising an exception that means a failed check, or a call of
+    `fail`. Any other exception is a simulated failure of what the test drives, not a check."""
     if len(body) != 1:
         return False
     stmt = body[0]
     if isinstance(stmt, ast.Raise):
-        return True
+        raised = stmt.exc.func if isinstance(stmt.exc, ast.Call) else stmt.exc
+        return raised is not None and FAILURES.fullmatch((dotted(raised) or "").rsplit(".", 1)[-1]) is not None
     if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
         return (dotted(stmt.value.func) or "").rsplit(".", 1)[-1] == "fail"
     return False
 
 
 def manual_assertions(node: ast.AST) -> int:
-    """The checks written out by hand: an `if` with no `else` that compares or negates and only fails."""
+    """The checks written out by hand: an `if` with no `else` that compares or negates and only fails the test."""
     count = 0
     for child in ast.walk(node):
         if isinstance(child, ast.If) and not child.orelse and _comparing(child.test) and _fails_only(child.body):

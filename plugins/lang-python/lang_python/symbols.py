@@ -214,6 +214,8 @@ class _Collector:
 
     def __init__(self, decls: FileDecls):
         self.decls = decls
+        self._setters: dict[int, list[ast.FunctionDef | ast.AsyncFunctionDef]] = {}
+        """The instance methods of each class being collected: what they set is declared once the class body is."""
 
     def run(self) -> None:
         self._statements(self.decls.tree.body, None, None)
@@ -241,7 +243,7 @@ class _Collector:
         body = None if has_decorator(node, "overload") else node
         self.decls.add(self._function_kind(node, owner), node.name, owner, Origin(node, node, body))
         if owner is not None and not (has_decorator(node, "staticmethod") or has_decorator(node, "classmethod")):
-            self._instance_fields(node, owner)
+            self._setters.setdefault(id(owner), []).append(node)
 
     def _function_kind(self, node: ast.FunctionDef | ast.AsyncFunctionDef, owner: Decl | None) -> SymbolKind:
         if owner is None:
@@ -260,6 +262,8 @@ class _Collector:
         decl.traits = traits
         for stmt in walk_flat(node.body):
             self._statement(stmt, decl, node)
+        for method in self._setters.pop(id(decl), []):
+            self._instance_fields(method, decl)
 
     def _traits(self, node: ast.ClassDef) -> frozenset[str]:
         found: set[str] = set()

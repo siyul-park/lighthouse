@@ -2,7 +2,7 @@
 
 import ast
 
-from lang_python.symbols import FUNCTION_NODES, Decl, dotted, has_decorator
+from lang_python.symbols import FUNCTION_NODES, Decl, dotted, has_decorator, is_dunder
 from lang_python.project import DeclVal, Model, ParsedFile, Resolver, Scope, has_name, resolver_of, unwrap_annotation
 from lang_python.extent import start_of
 from lang_python.visibility import Reach
@@ -11,6 +11,8 @@ from lang_python.sdk.wire import FunctionSummary, Signature, TypeRef
 from lang_python.tests import body_statements, is_test_file, manual_assertions
 
 NO_OVERRIDE = frozenset({"__init__", "__new__", "__init_subclass__", "__class_getitem__"})
+MODULE_HOOKS = frozenset({"__getattr__", "__dir__"})
+"""The functions a module defines for the interpreter to call (PEP 562)."""
 NOTHING = frozenset({"None", "NoReturn", "Never"})
 UNTYPED = "Any"
 
@@ -225,15 +227,39 @@ class Functions:
         return isinstance(value, DeclVal) and value.decl is decl
 
     def _implementation(self, decl: Decl) -> bool:
-        """Whether a method overrides one of a project base class, an interface or an abstract class, or says so."""
+        """Whether a function implements a contract it does not own: a module hook (PEP 562), a special method
+        of the data model, an override of a project base class, an interface, an abstract class or a class of
+        the standard library, a method a project `Protocol` declares (PEP 544), or one that says so."""
         node = decl.body
+        if decl.kind == "function" and decl.owner is None:
+            return decl.name in MODULE_HOOKS
         if decl.kind != "method" or decl.owner is None or decl.name in NO_OVERRIDE or node is None:
             return False
-        if has_name(node, "override"):
+        if is_dunder(decl.name) or has_name(node, "override"):
             return True
-        for base in self.resolver.ancestors(decl.owner):
+        return self._overrides(decl) or self._satisfies_protocol(decl)
+
+    def _overrides(self, decl: Decl) -> bool:
+        """Whether a method overrides one of a project base class or of a class of the standard library."""
+        ancestors = self.resolver.ancestors(decl.owner)
+        for base in ancestors:
             target = self.model.decls(self.resolver.file_of(base))
             if target is not None and target.member(base, decl.name) is not None:
+                return True
+        return any(
+            hasattr(external, decl.name)
+            for cls in [decl.owner, *ancestors]
+            for external in self.resolver.external_bases(cls)
+        )
+
+    def _satisfies_protocol(self, decl: Decl) -> bool:
+        """Whether the class of a method has every method of a project `Protocol` that declares it."""
+        for other in self.model.named(decl.name):
+            protocol = other.owner
+            if protocol is None or protocol is decl.owner or "protocol" not in protocol.traits:
+                continue
+            wanted = self.resolver.methods_of(protocol)
+            if wanted and all(self.resolver.member(decl.owner, name) is not None for name in wanted):
                 return True
         return False
 

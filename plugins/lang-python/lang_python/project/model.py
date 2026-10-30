@@ -55,6 +55,8 @@ class Model:
         self.project = project
         self._files: dict[str, ParsedFile | None] = {}
         self._names: dict[str, list[Decl]] | None = None
+        self.resolving: set[str] = set()
+        """The variables whose declared type is being worked out: a value that names itself settles nothing."""
 
     def file(self, rel: str) -> ParsedFile | None:
         """The parsed file at a project-relative path; None when it cannot be read."""

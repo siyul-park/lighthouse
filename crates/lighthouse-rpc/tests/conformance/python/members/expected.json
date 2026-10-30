@@ -65,22 +65,6 @@
           },
           "kind": "contains",
           "resolution": "semantic",
-          "to": "classes::Outer::name#field"
-        },
-        {
-          "from": {
-            "symbol": "classes::Outer#type"
-          },
-          "kind": "contains",
-          "resolution": "semantic",
-          "to": "classes::Outer::_cache#field"
-        },
-        {
-          "from": {
-            "symbol": "classes::Outer#type"
-          },
-          "kind": "contains",
-          "resolution": "semantic",
           "to": "classes::Outer::title#method"
         },
         {
@@ -114,6 +98,22 @@
           "kind": "contains",
           "resolution": "semantic",
           "to": "classes::Outer::other#method"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::name#field"
+        },
+        {
+          "from": {
+            "symbol": "classes::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "classes::Outer::_cache#field"
         },
         {
           "from": {
@@ -153,7 +153,7 @@
           },
           "kind": "contains",
           "resolution": "semantic",
-          "to": "classes::Counter::count#field"
+          "to": "classes::Counter::reset#method"
         },
         {
           "from": {
@@ -161,7 +161,7 @@
           },
           "kind": "contains",
           "resolution": "semantic",
-          "to": "classes::Counter::reset#method"
+          "to": "classes::Counter::count#field"
         },
         {
           "from": {
@@ -956,42 +956,6 @@
           "visibility": "public"
         },
         {
-          "file": "classes.py",
-          "id": "classes::Outer::name#field",
-          "kind": "field",
-          "name": "name",
-          "owner": "classes::Outer#type",
-          "span": {
-            "end": {
-              "col": 18,
-              "line": 25
-            },
-            "start": {
-              "col": 9,
-              "line": 25
-            }
-          },
-          "visibility": "public"
-        },
-        {
-          "file": "classes.py",
-          "id": "classes::Outer::_cache#field",
-          "kind": "field",
-          "name": "_cache",
-          "owner": "classes::Outer#type",
-          "span": {
-            "end": {
-              "col": 20,
-              "line": 26
-            },
-            "start": {
-              "col": 9,
-              "line": 26
-            }
-          },
-          "visibility": "private"
-        },
-        {
           "extent": {
             "end": {
               "col": 26,
@@ -1132,6 +1096,42 @@
           "visibility": "public"
         },
         {
+          "file": "classes.py",
+          "id": "classes::Outer::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 25
+            },
+            "start": {
+              "col": 9,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "classes.py",
+          "id": "classes::Outer::_cache#field",
+          "kind": "field",
+          "name": "_cache",
+          "owner": "classes::Outer#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 26
+            },
+            "start": {
+              "col": 9,
+              "line": 26
+            }
+          },
+          "visibility": "private"
+        },
+        {
           "extent": {
             "end": {
               "col": 43,
@@ -1242,24 +1242,6 @@
           "visibility": "public"
         },
         {
-          "file": "classes.py",
-          "id": "classes::Counter::count#field",
-          "kind": "field",
-          "name": "count",
-          "owner": "classes::Counter#type",
-          "span": {
-            "end": {
-              "col": 19,
-              "line": 60
-            },
-            "start": {
-              "col": 9,
-              "line": 60
-            }
-          },
-          "visibility": "public"
-        },
-        {
           "extent": {
             "end": {
               "col": 24,
@@ -1283,6 +1265,24 @@
             "start": {
               "col": 5,
               "line": 62
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "classes.py",
+          "id": "classes::Counter::count#field",
+          "kind": "field",
+          "name": "count",
+          "owner": "classes::Counter#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 60
+            },
+            "start": {
+              "col": 9,
+              "line": 60
             }
           },
           "visibility": "public"
