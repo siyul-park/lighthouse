@@ -402,56 +402,6 @@ pub fn catalog_at(root: &Path) -> Result<Catalog> {
     layered(comp.bundled()?, local.as_ref())
 }
 
-/// Every program the project would run: the programs of the fix
-/// verification of its configuration, its command model providers, the
-/// plugins that come with the project, and the command fixes and command
-/// checks of its own decisions. The programs of a plugin's catalog are not
-/// among them: that catalog is trusted with its plugin.
-fn commands(config: &Config, local: Option<&Catalog>, root: &Path) -> Vec<Program> {
-    let mut found: Vec<Program> = config
-        .fix()
-        .verify
-        .iter()
-        .map(|program| Program {
-            what: format!("fix verification: {}", program.command.join(" ")),
-            argv: program.command.clone(),
-        })
-        .collect();
-    for plugin in lighthouse_rpc::local_plugins(config, root, &lighthouse_rpc::search_dirs(root)) {
-        found.push(Program {
-            what: format!("plugin {}: {}", plugin.id, plugin.argv.join(" ")),
-            argv: plugin.argv,
-        });
-    }
-    for (name, provider) in config.providers() {
-        if let lighthouse_spec::ModelProvider::Command { program, .. } = provider {
-            found.push(Program {
-                what: format!("model provider {name}: {}", program.command.join(" ")),
-                argv: program.command.clone(),
-            });
-        }
-    }
-    for decision in local.iter().flat_map(|local| local.decisions()) {
-        let checks = decision.check.as_ref().and_then(|check| match &check.kind {
-            CheckKind::Command(command) => Some(command.programs(decision)),
-            _ => None,
-        });
-        let fixes = decision.fix.as_ref().and_then(|fix| match &fix.kind {
-            FixKind::Command(command) => Some(command.programs(decision)),
-            _ => None,
-        });
-        for (what, programs) in [("check", checks), ("fixer", fixes)] {
-            for program in programs.iter().flat_map(|p| p.all()) {
-                found.push(Program {
-                    what: format!("{what} of {}: {}", decision.id(), program.shown()),
-                    argv: program.command.clone(),
-                });
-            }
-        }
-    }
-    found
-}
-
 /// The bundled catalog with the catalogs of `plugins` added, as the plugins
 /// ship them.
 pub(crate) fn shipped(comp: &Composition, plugins: &[PluginCatalog]) -> Result<Catalog> {
@@ -506,6 +456,56 @@ pub(crate) fn repository_catalog(
         });
     }
     Ok((shipped(comp, &plugins)?, homes))
+}
+
+/// Every program the project would run: the programs of the fix
+/// verification of its configuration, its command model providers, the
+/// plugins that come with the project, and the command fixes and command
+/// checks of its own decisions. The programs of a plugin's catalog are not
+/// among them: that catalog is trusted with its plugin.
+fn commands(config: &Config, local: Option<&Catalog>, root: &Path) -> Vec<Program> {
+    let mut found: Vec<Program> = config
+        .fix()
+        .verify
+        .iter()
+        .map(|program| Program {
+            what: format!("fix verification: {}", program.command.join(" ")),
+            argv: program.command.clone(),
+        })
+        .collect();
+    for plugin in lighthouse_rpc::local_plugins(config, root, &lighthouse_rpc::search_dirs(root)) {
+        found.push(Program {
+            what: format!("plugin {}: {}", plugin.id, plugin.argv.join(" ")),
+            argv: plugin.argv,
+        });
+    }
+    for (name, provider) in config.providers() {
+        if let lighthouse_spec::ModelProvider::Command { program, .. } = provider {
+            found.push(Program {
+                what: format!("model provider {name}: {}", program.command.join(" ")),
+                argv: program.command.clone(),
+            });
+        }
+    }
+    for decision in local.iter().flat_map(|local| local.decisions()) {
+        let checks = decision.check.as_ref().and_then(|check| match &check.kind {
+            CheckKind::Command(command) => Some(command.programs(decision)),
+            _ => None,
+        });
+        let fixes = decision.fix.as_ref().and_then(|fix| match &fix.kind {
+            FixKind::Command(command) => Some(command.programs(decision)),
+            _ => None,
+        });
+        for (what, programs) in [("check", checks), ("fixer", fixes)] {
+            for program in programs.iter().flat_map(|p| p.all()) {
+                found.push(Program {
+                    what: format!("{what} of {}: {}", decision.id(), program.shown()),
+                    argv: program.command.clone(),
+                });
+            }
+        }
+    }
+    found
 }
 
 fn layered(base: &Catalog, local: Option<&Catalog>) -> Result<Catalog> {

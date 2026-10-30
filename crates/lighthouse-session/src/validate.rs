@@ -246,20 +246,6 @@ impl Sets {
     }
 }
 
-/// The bundled catalog with the catalogs of the plugins `config` lists, found
-/// from the directory of the document at `path`.
-fn provided_by(
-    session: &Session,
-    config: &Config,
-    path: &str,
-) -> std::result::Result<Catalog, String> {
-    let dir = Path::new(path).parent().unwrap_or(Path::new(""));
-    let search = lighthouse_rpc::search_dirs(&session.root);
-    let listed =
-        lighthouse_rpc::plugin_catalogs(config, dir, &search).map_err(|e| e.to_string())?;
-    crate::project::shipped(&session.comp, &listed).map_err(|e| e.to_string())
-}
-
 /// Validates the documents under `paths` (files or directories).
 /// `examples` also runs the examples of the decisions found, in the languages
 /// the project's plugins provide.
@@ -292,6 +278,20 @@ pub fn validate_paths(session: &Session, paths: &[PathBuf], examples: bool) -> R
     }
     sets.check(session, &registry, examples, &mut found.problems)?;
     Ok(found)
+}
+
+/// The bundled catalog with the catalogs of the plugins `config` lists, found
+/// from the directory of the document at `path`.
+fn provided_by(
+    session: &Session,
+    config: &Config,
+    path: &str,
+) -> std::result::Result<Catalog, String> {
+    let dir = Path::new(path).parent().unwrap_or(Path::new(""));
+    let search = lighthouse_rpc::search_dirs(&session.root);
+    let listed =
+        lighthouse_rpc::plugin_catalogs(config, dir, &search).map_err(|e| e.to_string())?;
+    crate::project::shipped(&session.comp, &listed).map_err(|e| e.to_string())
 }
 
 /// The rules that run in this process. A local decision that does not build
