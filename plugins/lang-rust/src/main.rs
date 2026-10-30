@@ -51,7 +51,7 @@ fn main() -> ExitCode {
 fn serve() -> ExitCode {
     let mut provider = provider::Provider::new(ID, VERSION);
     let input = BufReader::new(io::stdin().lock());
-    match lighthouse_protocol::serve(input, io::stdout().lock(), &mut provider) {
+    match lighthouse_protocol::language::serve(input, io::stdout().lock(), &mut provider) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{ID}: {error}");

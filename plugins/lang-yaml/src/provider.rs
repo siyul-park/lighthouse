@@ -2,13 +2,36 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_protocol::{HostError, HostTree, Mapping, pointer_child};
+use lighthouse_protocol::{
+    Mapping,
+    language::{HostError, HostLanguage, HostParser, HostTree},
+    pointer_child,
+};
 use saphyr::{LoadableYamlNode, MarkedYaml, Scalar, YamlData};
 use serde_json::{Number, Value, json};
 
-use crate::scalar::{self, MappedScalar};
+use crate::regions::{self, MappedScalar};
 
 /// A walk over the nodes of a document, which records where each lies.
+pub(crate) struct Yaml;
+
+impl HostParser for Yaml {
+    fn language(&self) -> HostLanguage {
+        HostLanguage {
+            plugin: "lang-yaml",
+            version: env!("CARGO_PKG_VERSION"),
+            id: "yaml",
+            name: "YAML",
+            aliases: &["yaml", "yml"],
+            globs: &["**/*.yaml", "**/*.yml"],
+        }
+    }
+
+    fn parse(&self, text: &str) -> Result<HostTree, HostError> {
+        parse(text)
+    }
+}
+
 pub(crate) struct Walk<'h> {
     host: &'h str,
     /// The byte offset of each character index the parser reports.
@@ -95,7 +118,7 @@ impl<'h> Walk<'h> {
                 .get(start..end)
                 .ok_or_else(|| "invalid YAML scalar span after mapping separator".to_owned())?;
         }
-        scalar::map_scalar(self.host, raw, start, value)
+        regions::map_scalar(self.host, raw, start, value)
     }
 
     /// A scalar the parser resolved, as the core schema of YAML 1.2 has it. A

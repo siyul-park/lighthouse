@@ -1,33 +1,20 @@
 //! The `lang-toml` plugin: the syntax tree of TOML files, with the map from
 //! each value to its bytes, for the host to select source regions from.
 
-use lighthouse_protocol::{HostError, HostLanguage, HostParser, HostTree, serve_host};
+use std::io::{self, BufReader};
 
-mod strings;
-mod tree;
+use lighthouse_protocol::language::{self, HostProvider};
 
-struct Toml;
-
-impl HostParser for Toml {
-    fn parse(&self, text: &str) -> Result<HostTree, HostError> {
-        tree::parse(text)
-    }
-}
+mod comments;
+mod provider;
+mod regions;
 
 fn main() {
-    serve_host(
-        HostLanguage {
-            plugin: "lang-toml",
-            version: env!("CARGO_PKG_VERSION"),
-            id: "toml",
-            name: "TOML",
-            aliases: &["toml"],
-            globs: &["**/*.toml"],
-        },
-        Toml,
-        std::io::BufReader::new(std::io::stdin().lock()),
-        std::io::stdout().lock(),
-    );
+    let mut provider = HostProvider::new(provider::Toml);
+    let input = BufReader::new(io::stdin().lock());
+    if let Err(error) = language::serve(input, io::stdout().lock(), &mut provider) {
+        eprintln!("lang-toml: {error}");
+    }
 }
 
 #[cfg(test)]

@@ -4,7 +4,10 @@
 
 use lighthouse_protocol::TextMapSegment;
 
-use crate::lines::Lines;
+pub(crate) mod fence;
+pub(crate) mod lines;
+
+use lines::Lines;
 
 /// What the parser says of a code block's place.
 pub(crate) struct Block<'a> {

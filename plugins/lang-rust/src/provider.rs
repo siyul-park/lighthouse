@@ -8,8 +8,8 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexInput, IndexParams,
-    IndexResult, InitializeParams, InitializeResult, LanguageManifest, TestNaming,
+    Conventions, ErrorObject, FileInfo, Fragment, Incomplete, IndexInput, IndexParams, IndexResult,
+    LanguageManifest, TestNaming, language,
 };
 use serde::Deserialize;
 
@@ -29,9 +29,17 @@ pub struct Provider {
     version: String,
 }
 
-impl Handler for Provider {
-    fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
-        let language = LanguageManifest {
+impl language::Provider for Provider {
+    fn name(&self) -> &str {
+        &self.id
+    }
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn manifest(&self) -> Vec<LanguageManifest> {
+        vec![LanguageManifest {
             id: LANGUAGE.to_owned(),
             aliases: vec!["rust".to_owned(), "rs".to_owned()],
             globs: vec!["**/*.rs".to_owned()],
@@ -56,13 +64,7 @@ impl Handler for Provider {
             capabilities: ["extent", "reference-sites", "overlays", "source-ast"]
                 .map(str::to_owned)
                 .to_vec(),
-        };
-        Ok(InitializeResult::new(
-            &self.id,
-            &self.version,
-            vec![language],
-            Vec::new(),
-        ))
+        }]
     }
 
     fn index(&mut self, params: IndexParams) -> Result<IndexResult, ErrorObject> {

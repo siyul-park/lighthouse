@@ -7,17 +7,36 @@ use comrak::{
     nodes::{ListType, Node, NodeValue, TableAlignment},
     parse_document,
 };
-use lighthouse_protocol::{HostError, HostTree, Mapping, pointer_child};
+use lighthouse_protocol::{
+    Mapping,
+    language::{HostError, HostLanguage, HostParser, HostTree},
+    pointer_child,
+};
 use serde_json::{Map, Value, json};
 
-use crate::{
-    body::{self, Block},
-    fence::Info,
-    lines::Lines,
-};
+use crate::regions::{self, Block, fence::Info, lines::Lines};
 
 /// How deep blocks may nest before the tree is refused rather than walked.
 const MAX_DEPTH: usize = 256;
+
+pub(crate) struct Markdown;
+
+impl HostParser for Markdown {
+    fn language(&self) -> HostLanguage {
+        HostLanguage {
+            plugin: "lang-markdown",
+            version: env!("CARGO_PKG_VERSION"),
+            id: "markdown",
+            name: "Markdown",
+            aliases: &["markdown", "md"],
+            globs: &["**/*.md", "**/*.markdown"],
+        }
+    }
+
+    fn parse(&self, text: &str) -> Result<HostTree, HostError> {
+        parse(text)
+    }
+}
 
 struct Walk<'t> {
     lines: Lines<'t>,
@@ -84,7 +103,7 @@ impl Walk<'_> {
         code: &comrak::nodes::NodeCodeBlock,
         start: usize,
         end: usize,
-    ) -> body::Body {
+    ) -> regions::Body {
         let info = Info::of(&code.info);
         object.insert("fenced".to_owned(), json!(code.fenced));
         if code.fenced {
@@ -102,7 +121,7 @@ impl Walk<'_> {
         object.insert("lang".to_owned(), json!(info.lang));
         object.insert("attributes".to_owned(), json!(info.attributes));
         object.insert("text".to_owned(), json!(code.literal));
-        body::locate(
+        regions::locate(
             &self.lines,
             &Block {
                 fenced: code.fenced,

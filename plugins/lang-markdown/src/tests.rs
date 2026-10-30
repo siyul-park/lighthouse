@@ -1,10 +1,10 @@
-use lighthouse_protocol::{HostTree, Source, pointer_value};
+use lighthouse_protocol::{Source, language::HostTree, pointer_value};
 use serde_json::Value;
 
-use crate::tree;
+use crate::provider;
 
 fn tree_of(text: &str) -> HostTree {
-    tree::parse(text).expect("the document parses")
+    provider::parse(text).expect("the document parses")
 }
 
 fn source(text: &str) -> Source {

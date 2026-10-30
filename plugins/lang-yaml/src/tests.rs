@@ -1,11 +1,14 @@
-use lighthouse_protocol::{Source, coalesce_text_map};
+use lighthouse_protocol::{
+    Source, coalesce_text_map,
+    language::{HostError, HostTree},
+};
 use serde_json::{Value, json};
 
-use super::*;
+use crate::provider;
 
 /// The tree of one YAML document, as the host sees it.
 fn tree_of(host: &str) -> HostTree {
-    tree::parse(host).unwrap()
+    provider::parse(host).unwrap()
 }
 
 fn document(host: &str) -> Value {
@@ -136,18 +139,21 @@ fn a_quoted_scalar_with_escapes_is_mapped_in_several_segments() {
 #[test]
 fn an_escape_that_is_cut_short_is_a_gap_and_no_panic() {
     let host = "name: \"a\\u00\"\n";
-    assert!(tree::parse(host).is_err());
+    assert!(provider::parse(host).is_err());
 }
 
 #[test]
 fn invalid_documents_and_non_string_keys_are_not_trees() {
     assert!(matches!(
-        tree::parse("a: 1\na: 2\n"),
+        provider::parse("a: 1\na: 2\n"),
         Err(HostError::Syntax(_))
     ));
     assert!(matches!(
-        tree::parse("? [a]\n: 1\n"),
+        provider::parse("? [a]\n: 1\n"),
         Err(HostError::Tree(_))
     ));
-    assert!(matches!(tree::parse("a: [1\n"), Err(HostError::Syntax(_))));
+    assert!(matches!(
+        provider::parse("a: [1\n"),
+        Err(HostError::Syntax(_))
+    ));
 }

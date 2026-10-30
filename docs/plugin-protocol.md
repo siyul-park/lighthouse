@@ -627,7 +627,7 @@ keeps them; YAML: the parser drops them, so none) and, for each file whose
 `source_ast` is true, its `Source`. The core selects the regions other providers analyze (the CEL
 expressions of a decision, for `lang-cel`) from the tree, so the provider only
 parses and maps; the answers to `initialize` and `index` are the same for all
-(`lighthouse_protocol::serve_host`). A selected-regions input has the provider read each
+(`HostProvider::new(parser)` served by `lighthouse_protocol::language::serve`). A selected-regions input has the provider read each
 region as a document of its language: a region that is not one is a notice, and one it
 cannot map is an `incomplete` entry; the answer is a fragment of the host file alone.
 

@@ -2,23 +2,17 @@
 //! the tree of each file it owns, with the map from its values to the bytes of
 //! the file, and the host selects the source regions that other providers
 //! analyze. A plugin supplies the parser; this module is the rest of the
-//! provider: reading the files (or their overlays), the answers to
-//! `initialize` and `index`, and the loop.
+//! provider: reading the files (or their overlays) and the answers to
+//! `initialize` and `index`.
 
-use std::{
-    collections::BTreeMap,
-    fs,
-    io::{BufRead, Write},
-    path::Path,
-};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use serde_json::Value;
 
-use super::server::Handler;
+use super::provider::Provider;
 use crate::{
     Comment, Conventions, EmbeddedFile, ErrorObject, FileInfo, FileRef, Fragment, Incomplete,
-    IndexInput, IndexParams, IndexResult, InitializeParams, InitializeResult, LanguageManifest,
-    Mapping, Source, serve,
+    IndexInput, IndexParams, IndexResult, LanguageManifest, Mapping, Source,
 };
 
 /// The capability of a provider that exposes syntax trees.
@@ -66,17 +60,27 @@ pub struct HostLanguage {
     pub globs: &'static [&'static str],
 }
 
-/// What a plugin knows of its language: how a document becomes a tree.
+/// What a plugin knows of its language: which it is, and how a document becomes
+/// a tree.
 pub trait HostParser {
+    fn language(&self) -> HostLanguage;
     fn parse(&self, text: &str) -> Result<HostTree, HostError>;
 }
 
-struct HostProvider<P> {
+/// The [`Provider`] of a language that a parser reads.
+pub struct HostProvider<P> {
     language: HostLanguage,
     parser: P,
 }
 
 impl<P: HostParser> HostProvider<P> {
+    pub fn new(parser: P) -> Self {
+        Self {
+            language: parser.language(),
+            parser,
+        }
+    }
+
     /// The tree of the file at `path` with `text`, or what is missing of it.
     fn tree(&self, path: &str, text: &str) -> Result<(Source, Vec<Comment>), Incomplete> {
         let name = self.language.name;
@@ -133,31 +137,34 @@ impl<P: HostParser> HostProvider<P> {
     }
 }
 
-impl<P: HostParser> Handler for HostProvider<P> {
-    fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
+impl<P: HostParser> Provider for HostProvider<P> {
+    fn name(&self) -> &str {
+        self.language.plugin
+    }
+
+    fn version(&self) -> &str {
+        self.language.version
+    }
+
+    fn manifest(&self) -> Vec<LanguageManifest> {
         let language = self.language;
-        Ok(InitializeResult::new(
-            language.plugin,
-            language.version,
-            vec![LanguageManifest {
-                id: language.id.to_owned(),
-                aliases: language
-                    .aliases
-                    .iter()
-                    .map(|alias| (*alias).to_owned())
-                    .collect(),
-                globs: language
-                    .globs
-                    .iter()
-                    .map(|glob| (*glob).to_owned())
-                    .collect(),
-                priority: PRIORITY,
-                fallback: false,
-                conventions: Conventions::default(),
-                capabilities: vec![SOURCE_AST.to_owned(), OVERLAYS.to_owned()],
-            }],
-            Vec::new(),
-        ))
+        vec![LanguageManifest {
+            id: language.id.to_owned(),
+            aliases: language
+                .aliases
+                .iter()
+                .map(|alias| (*alias).to_owned())
+                .collect(),
+            globs: language
+                .globs
+                .iter()
+                .map(|glob| (*glob).to_owned())
+                .collect(),
+            priority: PRIORITY,
+            fallback: false,
+            conventions: Conventions::default(),
+            capabilities: vec![SOURCE_AST.to_owned(), OVERLAYS.to_owned()],
+        }]
     }
 
     fn index(&mut self, params: IndexParams) -> Result<IndexResult, ErrorObject> {
@@ -213,25 +220,6 @@ impl<P: HostParser> Handler for HostProvider<P> {
             }
         }
         Ok(result)
-    }
-}
-
-/// The provider of `language` that `parser` reads.
-pub fn host_handler(language: HostLanguage, parser: impl HostParser) -> impl Handler {
-    HostProvider { language, parser }
-}
-
-/// Serves `language` from `reader` to `writer` until the host exits, as a
-/// plugin serves its standard input and output.
-pub fn serve_host(
-    language: HostLanguage,
-    parser: impl HostParser,
-    reader: impl BufRead,
-    writer: impl Write,
-) {
-    let mut provider = host_handler(language, parser);
-    if let Err(error) = serve(reader, writer, &mut provider) {
-        eprintln!("{}: {error}", language.plugin);
     }
 }
 

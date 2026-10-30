@@ -4,15 +4,19 @@
 use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
-    Context, EmbeddedFile, EmbeddedSource, FileRef, Handler, HostError, HostLanguage, HostParser,
-    HostTree, IndexInput, IndexParams, InitializeParams, Overlay, ProjectRef, TextOffsets,
-    host_handler,
+    Context, EmbeddedFile, EmbeddedSource, FileRef, IndexInput, IndexParams, Overlay, ProjectRef,
+    TextOffsets,
+    language::{HostError, HostLanguage, HostParser, HostProvider, HostTree, Provider},
 };
 use serde_json::json;
 
 struct Lines;
 
 impl HostParser for Lines {
+    fn language(&self) -> HostLanguage {
+        LANGUAGE
+    }
+
     fn parse(&self, text: &str) -> Result<HostTree, HostError> {
         if text.contains('!') {
             return Err(HostError::Syntax("a bang".to_owned()));
@@ -71,19 +75,10 @@ fn params(overlays: &[(&str, &str)]) -> IndexParams {
 
 #[test]
 fn the_provider_announces_its_language_and_the_source_ast_capability() {
-    let mut handler = host_handler(LANGUAGE, Lines);
-    let answer = handler
-        .initialize(InitializeParams {
-            protocol_version: String::new(),
-            client_info: lighthouse_protocol::Implementation {
-                name: "host".to_owned(),
-                version: "1".to_owned(),
-            },
-            workspace_folders: Vec::new(),
-        })
-        .unwrap();
-    assert_eq!(answer.server_info.name, "lang-lines");
-    let manifest = &answer.capabilities.languages[0];
+    let handler = HostProvider::new(Lines);
+    assert_eq!(handler.name(), "lang-lines");
+    let manifests = handler.manifest();
+    let manifest = &manifests[0];
     assert_eq!(manifest.id, "lines");
     assert_eq!(manifest.globs, ["**/*.lines"]);
     assert_eq!(manifest.capabilities, ["source-ast", "overlays"]);
@@ -91,7 +86,7 @@ fn the_provider_announces_its_language_and_the_source_ast_capability() {
 
 #[test]
 fn a_file_asked_for_its_tree_has_one_and_a_fragment() {
-    let mut handler = host_handler(LANGUAGE, Lines);
+    let mut handler = HostProvider::new(Lines);
     let result = handler.index(params(&[("a.lines", "x=1")])).unwrap();
     assert_eq!(result.sources.len(), 1, "a file not asked for has no tree");
     assert_eq!(result.sources[0].path, "a.lines");
@@ -108,7 +103,7 @@ fn a_file_asked_for_its_tree_has_one_and_a_fragment() {
 
 #[test]
 fn a_file_that_cannot_be_read_or_parsed_is_a_gap() {
-    let mut handler = host_handler(LANGUAGE, Lines);
+    let mut handler = HostProvider::new(Lines);
     let unreadable = handler.index(params(&[])).unwrap();
     assert!(unreadable.sources.is_empty());
     assert!(
@@ -144,7 +139,7 @@ fn region(pointer: &str, text: &str) -> EmbeddedSource {
 
 #[test]
 fn regions_that_are_documents_are_read_and_the_others_are_a_notice() {
-    let mut handler = host_handler(LANGUAGE, Lines);
+    let mut handler = HostProvider::new(Lines);
     let mut request = params(&[]);
     request.inputs = vec![IndexInput::Regions {
         regions: EmbeddedFile {
@@ -183,11 +178,11 @@ fn text_offsets_repeat_the_source_range_for_each_byte_of_a_character() {
 }
 
 #[test]
-fn serve_host_answers_the_handshake_and_an_index_request_until_exit() {
+fn serve_answers_the_handshake_and_an_index_request_until_exit() {
     use std::io::Cursor;
 
     use lighthouse_protocol::{
-        EXIT, INDEX, INITIALIZE, Message, SHUTDOWN, read_message, serve_host, write_message,
+        EXIT, INDEX, INITIALIZE, Message, SHUTDOWN, language::serve, read_message, write_message,
     };
     use serde_json::Value;
 
@@ -222,7 +217,12 @@ fn serve_host_answers_the_handshake_and_an_index_request_until_exit() {
     }
     let mut output = Vec::new();
 
-    serve_host(LANGUAGE, Lines, Cursor::new(input), &mut output);
+    serve(
+        Cursor::new(input),
+        &mut output,
+        &mut HostProvider::new(Lines),
+    )
+    .unwrap();
 
     let mut reader = Cursor::new(output);
     let replies: Vec<Message> = std::iter::from_fn(|| read_message(&mut reader).unwrap()).collect();

@@ -2,35 +2,19 @@
 //! from each node to its bytes and from each code block's text to the bytes
 //! it was read from, for the host to select source regions from.
 
-use lighthouse_protocol::{HostError, HostLanguage, HostParser, HostTree, serve_host};
+use std::io::{self, BufReader};
 
-mod body;
-mod fence;
-mod lines;
-mod tree;
+use lighthouse_protocol::language::{self, HostProvider};
 
-struct Markdown;
-
-impl HostParser for Markdown {
-    fn parse(&self, text: &str) -> Result<HostTree, HostError> {
-        tree::parse(text)
-    }
-}
+mod provider;
+mod regions;
 
 fn main() {
-    serve_host(
-        HostLanguage {
-            plugin: "lang-markdown",
-            version: env!("CARGO_PKG_VERSION"),
-            id: "markdown",
-            name: "Markdown",
-            aliases: &["markdown", "md"],
-            globs: &["**/*.md", "**/*.markdown"],
-        },
-        Markdown,
-        std::io::BufReader::new(std::io::stdin().lock()),
-        std::io::stdout().lock(),
-    );
+    let mut provider = HostProvider::new(provider::Markdown);
+    let input = BufReader::new(io::stdin().lock());
+    if let Err(error) = language::serve(input, io::stdout().lock(), &mut provider) {
+        eprintln!("lang-markdown: {error}");
+    }
 }
 
 #[cfg(test)]

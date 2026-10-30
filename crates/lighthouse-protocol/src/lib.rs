@@ -2,18 +2,17 @@
 //! with the host. It depends on no other Lighthouse crate.
 
 mod canonical;
-mod language;
 mod model;
 mod route;
 
 pub mod hash;
+pub mod language;
 pub mod stats;
 
 pub use canonical::canonical;
 pub use language::{
     TextOffsets, coalesce_text_map,
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
-    host::{HostError, HostLanguage, HostParser, HostTree, host_handler, serve_host},
     server::{Handler, ServeError, serve},
     wire::{
         CacheRef, Call, Comment, Context, Conventions, Edge, EdgeKind, EmbeddedFile,

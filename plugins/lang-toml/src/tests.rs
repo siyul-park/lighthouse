@@ -1,10 +1,13 @@
-use lighthouse_protocol::{Source, coalesce_text_map};
+use lighthouse_protocol::{
+    Source, coalesce_text_map,
+    language::{HostError, HostTree},
+};
 use serde_json::json;
 
-use super::*;
+use crate::provider;
 
 fn tree_of(host: &str) -> HostTree {
-    tree::parse(host).unwrap()
+    provider::parse(host).unwrap()
 }
 
 #[test]
@@ -123,7 +126,10 @@ fn a_hash_inside_a_string_is_no_comment() {
 
 #[test]
 fn an_invalid_document_is_a_syntax_error() {
-    assert!(matches!(tree::parse("a = \n"), Err(HostError::Syntax(_))));
+    assert!(matches!(
+        provider::parse("a = \n"),
+        Err(HostError::Syntax(_))
+    ));
 }
 
 #[test]
