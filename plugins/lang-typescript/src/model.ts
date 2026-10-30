@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { type Decl, FileDecls } from "./decls.ts";
+import { type Decl, FileDecls, assignmentTarget } from "./decls.ts";
 import { isDeclarationFile, isIgnored, isTestFile, modulePath, relative, slashed } from "./paths.ts";
 import { selfReference } from "./selfref.ts";
 import { declareTests, importsRunner } from "./tests.ts";
@@ -112,19 +112,40 @@ export class Model {
     let found = this.exports.get(file);
     if (found === undefined) {
       found = new Set();
-      // The module symbol of a file is not reachable through the public API; the binder keeps it here.
-      const module = (file as ts.SourceFile & { symbol?: ts.Symbol }).symbol;
+      // The checker answers for ES modules; a CommonJS file is no module to it, so its exports are read off its assignments.
+      const module = this.checker.getSymbolAtLocation(file);
       if (module !== undefined) {
         for (const exported of this.checker.getExportsOfModule(module)) found.add(this.resolve(exported));
       }
       for (const statement of file.statements) {
-        if (!ts.isExportAssignment(statement) || !ts.isIdentifier(statement.expression)) continue;
-        const target = this.checker.getSymbolAtLocation(statement.expression);
-        if (target !== undefined) found.add(this.resolve(target));
+        for (const target of this.exportedNames(statement)) {
+          const symbol = ts.isShorthandPropertyAssignment(target.parent)
+            ? this.checker.getShorthandAssignmentValueSymbol(target.parent)
+            : this.checker.getSymbolAtLocation(target);
+          if (symbol !== undefined) found.add(this.resolve(symbol));
+        }
       }
       this.exports.set(file, found);
     }
     return found;
+  }
+
+  /** The identifiers a statement hands out by name: `export default x`, `module.exports = x`, `module.exports = { x }`. */
+  private exportedNames(statement: ts.Statement): ts.Identifier[] {
+    if (ts.isExportAssignment(statement)) {
+      return ts.isIdentifier(statement.expression) ? [statement.expression] : [];
+    }
+    if (!ts.isExpressionStatement(statement) || !ts.isBinaryExpression(statement.expression)) return [];
+    const { left, operatorToken, right } = statement.expression;
+    if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return [];
+    const target = assignmentTarget(left);
+    if (target === undefined || (target.base !== "module.exports" && target.base !== "exports")) return [];
+    if (ts.isIdentifier(right)) return [right];
+    if (!ts.isObjectLiteralExpression(right) || target.base !== "module.exports") return [];
+    return right.properties.flatMap((property) => {
+      if (ts.isShorthandPropertyAssignment(property)) return [property.name];
+      return ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer) ? [property.initializer] : [];
+    });
   }
 
   /** The symbol a declaration's name introduces. */
