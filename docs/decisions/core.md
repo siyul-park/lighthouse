@@ -86,7 +86,7 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 
 ### Allow a finding in source, with a reason
 
-`core/allow-reason` · file · error · cel · go, rust, toml, typescript
+`core/allow-reason` · file · error · cel · go, python, rust, toml, typescript
 
 *A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change, and an exception without a reason cannot be reviewed or revisited. A silenced check is the smell Martin calls Overridden Safeties, so the way to silence one is narrow and explained. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids (ESLint `eslint-comments/require-description`, golangci `nolintlint` with `require-explanation`, clippy `allow_attributes_without_reason`). `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive. The check reports a directive that gives no reason (kind `reason`); the directive is then ignored. One that suppresses nothing is `core/no-unused-allow`. A finding that is right to leave in place MAY be allowed this way: the comment suppresses the named rules there, whatever their severity, and allowed findings are counted in the report.*
 
@@ -108,11 +108,11 @@ package sample
 func Open() {}
 ```
 
-Also: rust, toml, typescript
+Also: rust, toml, typescript, python
 
 ### Allow annotations suppress something
 
-`core/no-unused-allow` · file · warn · cel · fix: unsafe · go, rust, toml, typescript
+`core/no-unused-allow` · file · warn · cel · fix: unsafe · go, python, rust, toml, typescript
 
 *An exception that no longer applies is noise that hides the next real one. A `lighthouse-disable` range that covers no finding is as stale as a single directive, and so is a `lighthouse-enable` that closes no range, or a directive that names no decision (there is no form without ids).*
 
@@ -127,7 +127,7 @@ Derived from: Martin, Clean Code (2008), G4 Overridden Safeties; Martin, Clean C
 -# lighthouse-disable-next-line design/exported-doc -- stale
 ```
 
-Also: go, rust, typescript
+Also: go, rust, typescript, python
 
 ## Naming
 
@@ -171,13 +171,13 @@ Source formatting is decided by the language standard, not by review.
 
 ### Source files use their standard formatter
 
-`core/formatted` · file · error · command · fix: safe · go, rust, typescript
+`core/formatted` · file · error · command · fix: safe · go, python, rust, typescript
 
 *Formatting is a repository convention, not a review topic. Each language states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses rustfmt with the edition of the crate that contains the file, supplied by the Rust provider as the `edition` fact. TypeScript and JavaScript use Prettier, found on `PATH` like markdownlint-cli2 and never the project's own `node_modules`; the examples are verified with Prettier 3.9.10, and the project's Prettier configuration still applies. Without Prettier on `PATH` the analysis of those files is incomplete, never clean. A project that formats with Biome swaps the program through `rules."core/formatted"`.*
 
 Source files MUST equal the output of their language standard formatter.
 
-Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; gofmt: https://pkg.go.dev/cmd/gofmt; rustfmt: https://rust-lang.github.io/rustfmt/; Prettier: https://prettier.io/docs/cli (examples verified with 3.9.10; `--list-different`, `--stdin-filepath`); Martin, Clean Code (2008), ch. 5 Vertical openness and density; Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation; Martin, Clean Code (2008), ch. 5 Team rules
+Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; gofmt: https://pkg.go.dev/cmd/gofmt; rustfmt: https://rust-lang.github.io/rustfmt/; Prettier: https://prettier.io/docs/cli (examples verified with 3.9.10; `--list-different`, `--stdin-filepath`); ruff format: https://docs.astral.sh/ruff/formatter/ (examples verified with 0.17.3; `--check`, `--output-format concise`, `--stdin-filename`); PEP 8: https://peps.python.org/pep-0008/ (layout; ruff format is Black-compatible); Martin, Clean Code (2008), ch. 5 Vertical openness and density; Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation; Martin, Clean Code (2008), ch. 5 Team rules
 
 ```diff
 --- a/example.go
@@ -187,4 +187,4 @@ Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; gofmt:
 +func Run() int { return 1 }
 ```
 
-Also: rust, typescript
+Also: rust, typescript, python

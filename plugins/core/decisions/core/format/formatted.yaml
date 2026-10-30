@@ -59,6 +59,30 @@ spec:
         - stdout
         stdin: file
         output: stdout
+    python:
+      check:
+        command:
+        - ruff
+        - format
+        - "--check"
+        - "--quiet"
+        - "--no-cache"
+        - "--force-exclude"
+        - "--output-format"
+        - concise
+        - "{files}"
+      fix:
+        command:
+        - ruff
+        - format
+        - "--quiet"
+        - "--no-cache"
+        - "--force-exclude"
+        - "--stdin-filename"
+        - "{file}"
+        - "-"
+        stdin: file
+        output: stdout
     typescript:
       check:
         command:
@@ -78,6 +102,8 @@ spec:
     - 'gofmt: https://pkg.go.dev/cmd/gofmt'
     - 'rustfmt: https://rust-lang.github.io/rustfmt/'
     - 'Prettier: https://prettier.io/docs/cli (examples verified with 3.9.10; `--list-different`, `--stdin-filepath`)'
+    - 'ruff format: https://docs.astral.sh/ruff/formatter/ (examples verified with 0.17.3; `--check`, `--output-format concise`, `--stdin-filename`)'
+    - 'PEP 8: https://peps.python.org/pep-0008/ (layout; ruff format is Black-compatible)'
     - Martin, Clean Code (2008), ch. 5 Vertical openness and density
     - Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation
     - Martin, Clean Code (2008), ch. 5 Team rules
@@ -203,3 +229,27 @@ spec:
           return 1;
         }
         module.exports = { run };
+  - name: python-unformatted
+    language: python
+    kind: invalid
+    files:
+    - path: example.py
+      body: |
+        def run( ) ->int:
+            return  1
+    expect:
+    - line: 1
+    fixed:
+    - path: example.py
+      body: |
+        def run() -> int:
+            return 1
+  - name: python-formatted
+    language: python
+    kind: valid
+    files:
+    - path: example.py
+      body: |
+        def run() -> int:
+            return 1
+    canonical: true
