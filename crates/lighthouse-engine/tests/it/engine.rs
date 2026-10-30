@@ -16,7 +16,7 @@ use lighthouse_model::{
 use lighthouse_model::{RunScope, TestScope, ucm::Applicability};
 use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Context, Conventions, Error as PluginError, Indexed,
-    LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
+    LanguageManifest, LanguageProvider, Plugin, PluginManifest, Registry, Rule, RuleManifest,
     Source, Workspace,
 };
 use lighthouse_spec::Catalog;
@@ -28,7 +28,7 @@ use tempfile::TempDir;
 type Batches = Arc<Mutex<Vec<usize>>>;
 
 struct Any {
-    manifest: ProviderManifest,
+    manifest: LanguageManifest,
     /// Files with this suffix are reported incomplete.
     fail_on: &'static str,
     /// A batch containing a file with this suffix fails as a whole.
@@ -37,7 +37,7 @@ struct Any {
 }
 
 impl LanguageProvider for Any {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.manifest
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
@@ -145,12 +145,12 @@ impl Plugin for FakePlugin {
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         vec![Box::new(Any {
-            manifest: ProviderManifest {
+            manifest: LanguageManifest {
                 conventions: Conventions {
                     test_globs: vec!["tests/**".to_owned()],
                     ..Conventions::default()
                 },
-                ..ProviderManifest::new("any", vec!["**".to_owned()])
+                ..LanguageManifest::new("any", vec!["**".to_owned()])
             },
             fail_on: self.fail_on,
             crash_on: self.crash_on,
@@ -219,19 +219,19 @@ fn plugin_manifest(id: &str) -> PluginManifest {
 }
 
 /// A fallback provider, as a plain-text plugin would be.
-struct Fallback(ProviderManifest);
+struct Fallback(LanguageManifest);
 
 impl Fallback {
     fn new() -> Self {
-        Self(ProviderManifest {
+        Self(LanguageManifest {
             fallback: true,
-            ..ProviderManifest::new("bin", vec!["**".to_owned()])
+            ..LanguageManifest::new("bin", vec!["**".to_owned()])
         })
     }
 }
 
 impl LanguageProvider for Fallback {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
@@ -249,10 +249,10 @@ impl LanguageProvider for Fallback {
 }
 
 /// A provider that records the cache directory of every workspace it is given.
-struct CacheProbe(ProviderManifest, Arc<Mutex<Vec<Option<PathBuf>>>>);
+struct CacheProbe(LanguageManifest, Arc<Mutex<Vec<Option<PathBuf>>>>);
 
 impl LanguageProvider for CacheProbe {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
     fn index(&self, ws: &Workspace, _: &[Source]) -> Result<Indexed, PluginError> {
@@ -269,7 +269,7 @@ impl Plugin for CacheProbePlugin {
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         vec![Box::new(CacheProbe(
-            ProviderManifest::new("any", vec!["**".to_owned()]),
+            LanguageManifest::new("any", vec!["**".to_owned()]),
             Arc::clone(&self.1),
         ))]
     }

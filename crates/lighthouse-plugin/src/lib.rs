@@ -232,7 +232,7 @@ impl Context<'_> {
 /// what it guarantees about them. The `initialize` result of a plugin process
 /// carries one per language, field for field.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProviderManifest {
+pub struct LanguageManifest {
     /// The language id, such as `go`.
     pub id: String,
     /// The names the language goes by in a document, as GitHub Linguist's
@@ -259,7 +259,7 @@ pub struct Source<'a> {
     pub regions: &'a [EmbeddedSource],
 }
 
-impl ProviderManifest {
+impl LanguageManifest {
     /// A regular provider of `id` for `globs`, with no conventions or
     /// capabilities; set those directly.
     pub fn new(id: impl Into<String>, globs: Vec<String>) -> Self {
@@ -298,7 +298,7 @@ pub struct Indexed {
 /// Turns the files of one language into UCM fragments. Implementations must
 /// be thread-safe, and `index` must not read outside `files` and `workspace`.
 pub trait LanguageProvider: Send + Sync {
-    fn manifest(&self) -> &ProviderManifest;
+    fn manifest(&self) -> &LanguageManifest;
     /// Indexes every physical file of this provider in one call. An `Err` means
     /// the whole batch failed; every file is then incomplete.
     fn index(&self, workspace: &Workspace, files: &[Source]) -> Result<Indexed, Error>;

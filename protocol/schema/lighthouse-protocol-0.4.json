@@ -1218,6 +1218,64 @@
       ],
       "type": "object"
     },
+    "LanguageManifest": {
+      "description": "What a language provider declares: the language it indexes, how the host\nroutes files to it and what it guarantees. A plugin's `initialize` result\nlists one per language.",
+      "properties": {
+        "aliases": {
+          "description": "The names the language goes by in a document, as GitHub Linguist's\n`aliases` are: what a fenced code block may call it (`golang`, `rs`).\nMatched without regard to case; no two languages of a project have one\nalike.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "capabilities": {
+          "default": [],
+          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, and `source-ast`. Hosts ignore\nunknown values.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "conventions": {
+          "$ref": "#/$defs/Conventions",
+          "default": {
+            "constructor_prefixes": [],
+            "test_globs": [],
+            "test_naming": {
+              "ancestors": false,
+              "prefix": "Test",
+              "snake_case": false,
+              "variants": true
+            }
+          }
+        },
+        "fallback": {
+          "description": "A fallback language claims a file only when no other language does.",
+          "type": "boolean"
+        },
+        "globs": {
+          "description": "Project-relative path globs; `*` and `?` never cross `/`, a `**`\ncomponent matches any number of directories.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "priority": {
+          "default": 0,
+          "description": "Among providers matching a file, the higher priority wins.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "globs"
+      ],
+      "type": "object"
+    },
     "ListModelResponse": {
       "description": "OpenAI's list object of models: how a plugin says which it offers.",
       "properties": {
@@ -1452,64 +1510,6 @@
       ],
       "type": "object"
     },
-    "ProviderManifest": {
-      "description": "What a language provider declares: the language it indexes, how the host\nroutes files to it and what it guarantees. A plugin's `initialize` result\nlists one per language.",
-      "properties": {
-        "aliases": {
-          "description": "The names the language goes by in a document, as GitHub Linguist's\n`aliases` are: what a fenced code block may call it (`golang`, `rs`).\nMatched without regard to case; no two languages of a project have one\nalike.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "capabilities": {
-          "default": [],
-          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, and `source-ast`. Hosts ignore\nunknown values.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "conventions": {
-          "$ref": "#/$defs/Conventions",
-          "default": {
-            "constructor_prefixes": [],
-            "test_globs": [],
-            "test_naming": {
-              "ancestors": false,
-              "prefix": "Test",
-              "snake_case": false,
-              "variants": true
-            }
-          }
-        },
-        "fallback": {
-          "description": "A fallback language claims a file only when no other language does.",
-          "type": "boolean"
-        },
-        "globs": {
-          "description": "Project-relative path globs; `*` and `?` never cross `/`, a `**`\ncomponent matches any number of directories.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "id": {
-          "type": "string"
-        },
-        "priority": {
-          "default": 0,
-          "description": "Among providers matching a file, the higher priority wins.",
-          "format": "int32",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "globs"
-      ],
-      "type": "object"
-    },
     "Question": {
       "description": "One yes/no question: System One's `noul`, the probability of yes.",
       "properties": {
@@ -1556,7 +1556,7 @@
       "properties": {
         "languages": {
           "items": {
-            "$ref": "#/$defs/ProviderManifest"
+            "$ref": "#/$defs/LanguageManifest"
           },
           "type": "array"
         },

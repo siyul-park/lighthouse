@@ -41,12 +41,12 @@ type InitializeResult struct {
 
 // ServerCapabilities is what the plugin offers.
 type ServerCapabilities struct {
-	Languages []ProviderManifest `json:"languages"`
+	Languages []LanguageManifest `json:"languages"`
 }
 
-// ProviderManifest is what a language provider declares: the language a
+// LanguageManifest is what a language provider declares: the language a
 // plugin serves, how files select it and what it guarantees.
-type ProviderManifest struct {
+type LanguageManifest struct {
 	ID string `json:"id"`
 	// Aliases are the names the language goes by in a document, as GitHub
 	// Linguist's aliases are: what a fenced code block may call it.

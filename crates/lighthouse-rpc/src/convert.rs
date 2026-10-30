@@ -6,7 +6,7 @@ use std::{
 };
 
 use lighthouse_model::{Incomplete, Position, Span, ucm as core};
-use lighthouse_plugin::{Indexed, ProviderManifest, Source};
+use lighthouse_plugin::{Indexed, LanguageManifest, Source};
 use lighthouse_protocol as wire;
 
 /// `fn $name` converting a wire enum to the core enum of the same variants.
@@ -34,8 +34,8 @@ variants! {
 }
 
 /// The core manifest of a language a plugin declared in `initialize`.
-pub(crate) fn provider_manifest(language: &wire::ProviderManifest) -> ProviderManifest {
-    ProviderManifest {
+pub(crate) fn provider_manifest(language: &wire::LanguageManifest) -> LanguageManifest {
+    LanguageManifest {
         id: language.id.clone(),
         aliases: language.aliases.clone(),
         globs: language.globs.clone(),

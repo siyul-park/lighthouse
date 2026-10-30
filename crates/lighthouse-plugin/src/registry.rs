@@ -4,8 +4,8 @@ use std::{
 };
 
 use crate::{
-    Analyzer, CelCatalog, CelLibrary, Error, Fixer, LanguageProvider, ModelClient, Plugin,
-    PluginManifest, ProviderManifest, Rule,
+    Analyzer, CelCatalog, CelLibrary, Error, Fixer, LanguageManifest, LanguageProvider,
+    ModelClient, Plugin, PluginManifest, Rule,
 };
 
 /// A language provider with the id of the plugin that registered it.
@@ -355,7 +355,7 @@ fn claim<'a>(
 }
 
 /// The aliases of a provider in lower case, each with the id it names.
-fn aliases_of(manifest: &ProviderManifest) -> impl Iterator<Item = (String, String)> + '_ {
+fn aliases_of(manifest: &LanguageManifest) -> impl Iterator<Item = (String, String)> + '_ {
     manifest
         .aliases
         .iter()

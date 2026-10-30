@@ -35,7 +35,7 @@ func newHandler() handler {
 			return sdk.InitializeResult{
 				ProtocolVersion: sdk.ProtocolVersion,
 				ServerInfo:      sdk.Implementation{Name: "x", Version: "1"},
-				Capabilities:    sdk.ServerCapabilities{Languages: []sdk.ProviderManifest{{ID: root}}},
+				Capabilities:    sdk.ServerCapabilities{Languages: []sdk.LanguageManifest{{ID: root}}},
 			}, nil
 		},
 		index: func(p sdk.IndexParams) (sdk.IndexResult, error) {

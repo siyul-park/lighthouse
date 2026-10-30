@@ -9,8 +9,8 @@ use lighthouse_model::{
     ucm::{Edge, EdgeKind, Fragment, Module, Node, Resolution, Symbol, SymbolId, Target},
 };
 use lighthouse_plugin::{
-    CelLibraryManifest, EmbeddedFile, EmbeddedSource, Error, Indexed, LanguageProvider,
-    ProviderManifest, Source, Workspace,
+    CelLibraryManifest, EmbeddedFile, EmbeddedSource, Error, Indexed, LanguageManifest,
+    LanguageProvider, Source, Workspace,
 };
 
 mod analysis;
@@ -20,12 +20,12 @@ use analysis::{Analysis, PackVariables, external_module, function_catalog};
 use source::{FileDraft, Host, MappedText, Parameter, Snippet, VariableDecl};
 
 pub struct Language {
-    manifest: ProviderManifest,
+    manifest: LanguageManifest,
 }
 
 impl Language {
     pub fn new() -> Self {
-        let mut manifest = ProviderManifest::new("cel", Vec::new());
+        let mut manifest = LanguageManifest::new("cel", Vec::new());
         manifest.aliases = vec!["cel".to_owned()];
         manifest.capabilities = [
             lighthouse_model::ucm::Capability::SemanticEdges,
@@ -46,7 +46,7 @@ impl Default for Language {
 }
 
 impl LanguageProvider for Language {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.manifest
     }
 

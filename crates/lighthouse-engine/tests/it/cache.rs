@@ -17,18 +17,18 @@ use lighthouse_model::{
     ucm::{Applicability, Fragment},
 };
 use lighthouse_plugin::{
-    Caching, Context, Error as PluginError, Indexed, LanguageProvider, Plugin, PluginManifest,
-    ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
+    Caching, Context, Error as PluginError, Indexed, LanguageManifest, LanguageProvider, Plugin,
+    PluginManifest, Registry, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::Config;
 use tempfile::TempDir;
 
 const CONFIG: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/local\" = \"warn\"\n\"counting/global\" = \"warn\"\n";
 
-struct Files(ProviderManifest);
+struct Files(LanguageManifest);
 
 impl LanguageProvider for Files {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
@@ -98,7 +98,7 @@ impl Plugin for CountingPlugin {
         &self.manifest
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Files(ProviderManifest::new(
+        vec![Box::new(Files(LanguageManifest::new(
             "any",
             vec!["**".to_owned()],
         )))]

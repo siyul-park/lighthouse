@@ -15,24 +15,24 @@ use lighthouse_model::{
 use lighthouse_model::{RunScope, ucm::Applicability};
 use lighthouse_plugin::{
     Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
-    LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
+    LanguageManifest, LanguageProvider, Plugin, PluginManifest, Registry, Rule, RuleManifest,
     Source, Workspace,
 };
 use lighthouse_spec::Config;
 use tempfile::TempDir;
 
 /// The provider manifest of the toy language: it analyzes overlays.
-pub fn toy() -> ProviderManifest {
-    ProviderManifest {
+pub fn toy() -> LanguageManifest {
+    LanguageManifest {
         capabilities: vec![lighthouse_model::ucm::Capability::Overlays],
-        ..ProviderManifest::new("toy", vec!["**/*.toy".to_owned()])
+        ..LanguageManifest::new("toy", vec!["**/*.toy".to_owned()])
     }
 }
 
-pub struct Toy(pub ProviderManifest);
+pub struct Toy(pub LanguageManifest);
 
 impl LanguageProvider for Toy {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
 

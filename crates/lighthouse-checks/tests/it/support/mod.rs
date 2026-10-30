@@ -14,7 +14,7 @@ use lighthouse_model::{
     },
 };
 use lighthouse_plugin::{
-    Conventions, Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest,
+    Conventions, Error, Indexed, LanguageManifest, LanguageProvider, Plugin, PluginManifest,
     Registry, Source, Workspace,
 };
 use lighthouse_spec::Catalog;
@@ -22,10 +22,10 @@ use lighthouse_spec::Config;
 use serde_json::Value;
 
 /// Reads a UCM fragment as JSON, the way an out-of-process provider would send it.
-struct Wire(ProviderManifest);
+struct Wire(LanguageManifest);
 
 impl LanguageProvider for Wire {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
@@ -59,13 +59,13 @@ impl Plugin for Fixture {
     }
     // The world is a Go project in a made-up syntax: decisions apply to the languages they list.
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Wire(ProviderManifest {
+        vec![Box::new(Wire(LanguageManifest {
             conventions: Conventions {
                 test_globs: vec!["**/*_test.ucm".to_owned()],
                 constructor_prefixes: vec!["New".to_owned(), "new".to_owned()],
                 ..Conventions::default()
             },
-            ..ProviderManifest::new("go", vec!["**/*.ucm".to_owned()])
+            ..LanguageManifest::new("go", vec!["**/*.ucm".to_owned()])
         }))]
     }
 }

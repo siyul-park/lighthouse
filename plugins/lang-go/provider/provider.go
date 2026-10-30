@@ -19,7 +19,7 @@ func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error
 	return sdk.InitializeResult{
 		ProtocolVersion: sdk.ProtocolVersion,
 		ServerInfo:      sdk.Implementation{Name: p.id, Version: p.version},
-		Capabilities: sdk.ServerCapabilities{Languages: []sdk.ProviderManifest{{
+		Capabilities: sdk.ServerCapabilities{Languages: []sdk.LanguageManifest{{
 			ID:      language,
 			Aliases: []string{"go", "golang"},
 			Globs:   []string{"**/*.go"},

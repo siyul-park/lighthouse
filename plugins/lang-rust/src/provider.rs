@@ -9,7 +9,7 @@ use std::{
 
 use lighthouse_protocol::{
     Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexInput, IndexParams,
-    IndexResult, InitializeParams, InitializeResult, ProviderManifest, TestNaming,
+    IndexResult, InitializeParams, InitializeResult, LanguageManifest, TestNaming,
 };
 use serde::Deserialize;
 
@@ -31,7 +31,7 @@ pub struct Provider {
 
 impl Handler for Provider {
     fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
-        let language = ProviderManifest {
+        let language = LanguageManifest {
             id: LANGUAGE.to_owned(),
             aliases: vec!["rust".to_owned(), "rs".to_owned()],
             globs: vec!["**/*.rs".to_owned()],

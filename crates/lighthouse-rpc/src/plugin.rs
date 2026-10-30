@@ -10,7 +10,7 @@ use lighthouse_model::Incomplete;
 
 use globset::{Glob, GlobSetBuilder};
 use lighthouse_plugin::{
-    Error, Indexed, LanguageProvider, ModelClient, Plugin, PluginManifest, ProviderManifest,
+    Error, Indexed, LanguageManifest, LanguageProvider, ModelClient, Plugin, PluginManifest,
     Source, Workspace,
 };
 use lighthouse_process::Policy;
@@ -27,7 +27,7 @@ const DIGEST_CHARS: usize = 16;
 /// declared in the handshake, sharing one connection.
 pub struct RpcPlugin {
     manifest: PluginManifest,
-    languages: Vec<wire::ProviderManifest>,
+    languages: Vec<wire::LanguageManifest>,
     models: Vec<lighthouse_plugin::Model>,
     client: Arc<Client>,
     /// Digest of the binary the process runs, which keys its cache directory:
@@ -161,13 +161,13 @@ impl Plugin for RpcPlugin {
 struct Provider {
     language: String,
     source_ast: bool,
-    manifest: ProviderManifest,
+    manifest: LanguageManifest,
     client: Arc<Client>,
     digest: String,
 }
 
 impl LanguageProvider for Provider {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.manifest
     }
 

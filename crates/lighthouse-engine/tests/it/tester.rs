@@ -5,15 +5,15 @@ use lighthouse_model::{
 };
 use lighthouse_model::{RunScope, ucm::Applicability};
 use lighthouse_plugin::{
-    Context, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageProvider, Plugin,
-    PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
+    Context, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageManifest, LanguageProvider,
+    Plugin, PluginManifest, Registry, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::Catalog;
 
-struct Notes(ProviderManifest);
+struct Notes(LanguageManifest);
 
 impl LanguageProvider for Notes {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
@@ -120,9 +120,9 @@ impl Plugin for Fake {
     }
 
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Notes(ProviderManifest {
+        vec![Box::new(Notes(LanguageManifest {
             capabilities: vec![Capability::Overlays],
-            ..ProviderManifest::new("notes", vec!["**/*.txt".to_owned()])
+            ..LanguageManifest::new("notes", vec!["**/*.txt".to_owned()])
         }))]
     }
 

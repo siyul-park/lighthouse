@@ -1,7 +1,7 @@
 use lighthouse_model::RunScope;
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Context, Error, Indexed, LanguageProvider, Plugin, PluginManifest,
-    ProviderManifest, Registry, Source, Workspace, options,
+    Analyzer, AnalyzerManifest, Context, Error, Indexed, LanguageManifest, LanguageProvider,
+    Plugin, PluginManifest, Registry, Source, Workspace, options,
 };
 use serde_json::Value;
 
@@ -138,10 +138,10 @@ fn registry_manifests_carry_the_version_of_each_plugin_in_registration_order() {
     assert_eq!(listed, [("b", "0"), ("a", "0")]);
 }
 
-struct Lang(ProviderManifest);
+struct Lang(LanguageManifest);
 
 impl LanguageProvider for Lang {
-    fn manifest(&self) -> &ProviderManifest {
+    fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
     fn index(&self, _: &Workspace, _: &[Source]) -> Result<Indexed, Error> {
@@ -169,10 +169,10 @@ impl Plugin for Langs {
         self.1
             .iter()
             .map(|&(id, fallback, priority)| {
-                Box::new(Lang(ProviderManifest {
+                Box::new(Lang(LanguageManifest {
                     fallback,
                     priority,
-                    ..ProviderManifest::new(id, Vec::new())
+                    ..LanguageManifest::new(id, Vec::new())
                 })) as Box<dyn LanguageProvider>
             })
             .collect()
@@ -275,9 +275,9 @@ impl Plugin for Aliased {
         self.1
             .iter()
             .map(|&(id, aliases)| {
-                Box::new(Lang(ProviderManifest {
+                Box::new(Lang(LanguageManifest {
                     aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
-                    ..ProviderManifest::new(id, Vec::new())
+                    ..LanguageManifest::new(id, Vec::new())
                 })) as Box<dyn LanguageProvider>
             })
             .collect()

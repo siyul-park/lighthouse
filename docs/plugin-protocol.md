@@ -113,7 +113,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   has Go's convention. A project replaces any part in
   `[languages.<id>] testNaming = { prefix, snakeCase, variants, ancestors }`.
 - Each entry of `capabilities.languages` is the language's **provider manifest**
-  (`ProviderManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `priority`, `fallback`, `conventions` and
+  (`LanguageManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `priority`, `fallback`, `conventions` and
   `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field
   for field; the plugin's own identity (`serverInfo`) is the plugin manifest.
 - The `capabilities` of a language list what its provider guarantees. `semantic-edges`: `calls`,

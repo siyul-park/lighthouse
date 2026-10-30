@@ -294,7 +294,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
             &self.0
         }
         fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-            vec![Box::new(Toy(lighthouse_plugin::ProviderManifest::new(
+            vec![Box::new(Toy(lighthouse_plugin::LanguageManifest::new(
                 "toy",
                 vec!["**/*.toy".to_owned()],
             )))]

@@ -5,7 +5,7 @@ import { PROTOCOL_VERSION } from "./server.ts";
 import { analyze } from "./analyze.ts";
 import { isDeclarationFile, isIgnored, slashed } from "./paths.ts";
 import { type Snippet, planSnippets } from "./regions.ts";
-import type { EmbeddedFile, Fragment, IndexParams, IndexResult, InitializeResult, ProviderManifest } from "./wire.ts";
+import type { EmbeddedFile, Fragment, IndexParams, IndexResult, InitializeResult, LanguageManifest } from "./wire.ts";
 
 const LANGUAGE = "typescript";
 const SOURCE_GLOB = "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}";
@@ -19,7 +19,7 @@ export class Provider implements Handler {
   ) {}
 
   initialize(): InitializeResult {
-    const manifest: ProviderManifest = {
+    const manifest: LanguageManifest = {
       id: LANGUAGE,
       aliases: ["typescript", "ts", "tsx", "typescriptreact", "javascript", "js", "node"],
       globs: [SOURCE_GLOB],

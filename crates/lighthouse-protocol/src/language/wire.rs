@@ -112,7 +112,7 @@ pub struct InitializeResult {
 /// What a plugin offers: the languages it indexes and the models it serves.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ServerCapabilities {
-    pub languages: Vec<ProviderManifest>,
+    pub languages: Vec<LanguageManifest>,
     /// The models the plugin offers, as OpenAI's list object; empty for a
     /// language plugin.
     #[serde(default, skip_serializing_if = "crate::ListModelResponse::is_empty")]
@@ -124,7 +124,7 @@ impl InitializeResult {
     pub fn new(
         id: impl Into<String>,
         version: impl Into<String>,
-        languages: Vec<ProviderManifest>,
+        languages: Vec<LanguageManifest>,
         models: Vec<crate::Model>,
     ) -> Self {
         Self {
@@ -145,7 +145,7 @@ impl InitializeResult {
 /// routes files to it and what it guarantees. A plugin's `initialize` result
 /// lists one per language.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ProviderManifest {
+pub struct LanguageManifest {
     pub id: String,
     /// The names the language goes by in a document, as GitHub Linguist's
     /// `aliases` are: what a fenced code block may call it (`golang`, `rs`).

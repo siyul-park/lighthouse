@@ -49,14 +49,14 @@ out-of-process plugins satisfy the same traits. Every kind describes itself thro
 | Kind | Manifest | Behavior |
 | --- | --- | --- |
 | `Plugin` | `PluginManifest { id, version }` | `languages`, `analyzers`, `rules`, `fixers`, `cel_libraries` |
-| `LanguageProvider` | `ProviderManifest { id, globs, conventions, capabilities, fallback, priority }` | `index` |
+| `LanguageProvider` | `LanguageManifest { id, globs, conventions, capabilities, fallback, priority }` | `index` |
 | `Analyzer` | `AnalyzerManifest { id, requires, scope }` | `run` |
 | `Rule` | `RuleManifest { id, severity, scope, description, docs, analyzers, capabilities, applicability }` | `validate`, `check` |
 | `Fixer` | `FixerManifest { id, requires }` | `fix` |
 | `CelLibrary` | `CelLibraryManifest { id, version, functions }` (in-process only) | `register` |
 
 The `initialize` result of a plugin process is its `PluginManifest` plus one
-`ProviderManifest` per language, field for field (see
+`LanguageManifest` per language, field for field (see
 [plugin-protocol.md](plugin-protocol.md)).
 
 Dependencies point down only (see [Crates](#crates)): `spec` and `plugin` never depend on each other, `plugin` knows no configuration, and protocol stays dependency-free.

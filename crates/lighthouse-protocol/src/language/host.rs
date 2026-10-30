@@ -17,8 +17,8 @@ use serde_json::Value;
 use super::serve::Handler;
 use crate::{
     Comment, Conventions, EmbeddedFile, ErrorObject, FileInfo, FileRef, Fragment, Incomplete,
-    IndexInput, IndexParams, IndexResult, InitializeParams, InitializeResult, Mapping,
-    ProviderManifest, Source, serve,
+    IndexInput, IndexParams, IndexResult, InitializeParams, InitializeResult, LanguageManifest,
+    Mapping, Source, serve,
 };
 
 /// The capability of a provider that exposes syntax trees.
@@ -61,7 +61,7 @@ pub struct HostLanguage {
     /// The name of the language in messages.
     pub name: &'static str,
     /// The names the language goes by in a document, see
-    /// `ProviderManifest::aliases`.
+    /// `LanguageManifest::aliases`.
     pub aliases: &'static [&'static str],
     pub globs: &'static [&'static str],
 }
@@ -139,7 +139,7 @@ impl<P: HostParser> Handler for HostProvider<P> {
         Ok(InitializeResult::new(
             language.plugin,
             language.version,
-            vec![ProviderManifest {
+            vec![LanguageManifest {
                 id: language.id.to_owned(),
                 aliases: language
                     .aliases
