@@ -15,7 +15,7 @@ The Python language provider: parses each file with the `ast` of the interpreter
 ## Facts and capabilities
 
 | Fact | Source |
-|---|---|
+| --- | --- |
 | `modules` | one per file; a package's `__init__.py` is its directory; `test_of` for test files |
 | `symbols` | functions, classes (`interface` for `Protocol`), methods, class and dataclass fields, `Enum` members, assignments, tests; `extent`, `doc` (PEP 257), `role` in test files |
 | `edges` | `calls`, `references`, `imports`, `implements` with sites; `semantic` where scopes, imports and annotations settle the name, else `syntactic` |
