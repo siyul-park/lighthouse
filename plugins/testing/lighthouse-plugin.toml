@@ -1,0 +1,9 @@
+apiVersion = "lighthouse/v1alpha1"
+kind = "Plugin"
+
+[metadata]
+name = "testing"
+
+[spec]
+version = "0.1.0"
+catalog = "decisions"

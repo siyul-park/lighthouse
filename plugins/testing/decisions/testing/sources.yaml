@@ -1,0 +1,284 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: SourceMap
+metadata:
+  name: sources
+spec:
+  sources:
+  - ref: testing#contract-4985e9bf
+    text: "A test MUST show public usage and promised behavior."
+    decisions:
+    - testing/public-boundary
+  - ref: testing#contract-364c28d1
+    text: "Test structure MUST serve the contract rather than implementation shape or coverage."
+    decisions:
+    - testing/no-structure-tests
+  - ref: testing#contract-31731df3
+    text: "A test MUST expose the target, input, operation, and expected result in the case."
+    decisions:
+    - testing/no-hidden-target
+  - ref: testing#contract-3415da0f
+    text: "A case MUST represent behavior, not a branch or implementation path."
+    decisions:
+    - testing/behavior-cases
+  - ref: testing#public-boundary-efc435b9
+    text: "Feature contract tests MUST use only target-package public symbols and MUST live in `package <target>_test`."
+    decisions:
+    - testing/public-boundary
+  - ref: testing#public-boundary-b8681587
+    text: "Wrappers that hide target API usage MUST NOT be added merely for reuse."
+    decisions:
+    - testing/no-hidden-target
+  - ref: testing#public-boundary-8f4b8444
+    text: "Setup helpers MAY exist only when the specified behavior remains visible."
+    decisions:
+    - testing/no-hidden-target
+  - ref: testing#public-boundary-182c5f9f
+    text: "Private-symbol testing MUST be resolved at the public boundary rather than by exposing internals solely for tests."
+    decisions:
+    - testing/public-boundary
+  - ref: testing#readability-e0875430
+    text: "The target and its behavior MUST remain visible."
+    decisions:
+    - testing/no-hidden-target
+  - ref: testing#readability-668c9a46
+    text: "Wrappers, builders, or helpers MUST NOT hide the call or result being specified."
+    decisions:
+    - testing/no-hidden-target
+  - ref: testing#readability-1bf75d03
+    text: "Tests MUST NOT mix different writing styles or abstraction levels at one level."
+    decisions:
+    - testing/consistent-case-style
+  - ref: testing#readability-fa58951a
+    text: "Table data and generation code MUST remain simple enough to read as specification."
+    decisions:
+    - testing/simple-tables
+  - ref: testing#readability-71cbc25a
+    text: "A case MUST contain the behavior it claims to specify."
+    decisions:
+    - testing/behavior-cases
+  - ref: testing#organization-4b4e2627
+    text: "Owner | Each public symbol SHOULD have one top-level test function; a missing owner test is a warning, and multiple semantic owner tests are an error."
+    decisions:
+    - testing/no-missing-owner
+    - testing/no-duplicate-owner
+  - ref: testing#organization-c3e1ee9a
+    text: "Depth | At most two levels: the test function and its direct cases."
+    decisions:
+    - testing/max-case-depth
+  - ref: testing#organization-dac1a854
+    text: "Same behavior, many inputs | Use an inline anonymous struct table of named inputs and expected outputs; each entry is one case."
+    decisions:
+    - testing/prefer-table
+  - ref: testing#organization-bd4d8f2c
+    text: "Different scenarios | Use one case per scenario, named for the behavior it states."
+    decisions:
+    - testing/scenario-cases
+  - ref: testing#organization-a47f4191
+    text: "Similar cases | Merge cases that specify the same behavior into one case or one table."
+    decisions:
+    - testing/prefer-table
+  - ref: testing#organization-17ab163b
+    text: "Style | A test function uses either table cases or scenario cases, never both."
+    decisions:
+    - testing/consistent-case-style
+  - ref: testing#organization-abc40ec2
+    text: "A test SHOULD use one case style per level."
+    decisions:
+    - testing/consistent-case-style
+  - ref: testing#organization-2aa48e36
+    text: "Assertions outside cases SHOULD describe setup, preconditions, or test-wide invariants, not case behavior."
+    decisions:
+    - testing/case-assertions
+  - ref: testing#organization-05384f94
+    text: "Readiness polling MUST NOT outlive teardown or retain resources after the case closes them."
+    decisions:
+    - testing/no-polling-after-teardown
+  - ref: testing#organization-5dabb856
+    text: "Polling conditions MUST return readiness and observed results/errors only; assertions belong after readiness is established."
+    decisions:
+    - testing/pure-polling
+  - ref: testing#f-i-r-s-t-05a59702
+    text: "Tests MUST be **Fast, Independent, Repeatable, Self-validating, and Timely**."
+    decisions:
+    - testing/independent-tests
+    - testing/self-validating
+  - ref: testing#f-i-r-s-t-5e44df14
+    text: "Tests MUST NOT depend on other tests, uncontrolled mutable state, manual inspection, or unnecessary setup."
+    decisions:
+    - testing/independent-tests
+  - ref: testing#tdd-6186f09b
+    text: "For each behavior change, the agent MUST:"
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#tdd-eebadd8a
+    text: "state the contract and invariants;"
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#tdd-7718dd5a
+    text: "write the narrowest falsifying test;"
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#tdd-0efd0280
+    text: "observe the expected failure when practical;"
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#tdd-ee9a07d4
+    text: "implement the smallest owning change;"
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#tdd-4fbb4b48
+    text: "run focused checks, then applicable structural and repository gates."
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#tdd-f5c4ca98
+    text: "Tests MUST cover applicable success, failure, boundaries, ownership/lifecycle, compatibility, parity, and architecture contracts."
+    decisions:
+    - testing/contract-coverage
+  - ref: testing#tdd-9cd4d927
+    text: "The lowest test layer that proves the contract MUST be used."
+    decisions:
+    - testing/lowest-layer
+  - ref: testing#tdd-64ebcce6
+    text: "Structure-only tests MUST NOT be added merely to exercise implementation details."
+    decisions:
+    - testing/no-structure-tests
+  - ref: testing#evidence-e51ffdb8
+    text: "Coverage proves reachability, not quality or completeness."
+    decisions:
+    - testing/contract-coverage
+  - ref: testing#evidence-c3f3f8dc
+    text: "When no red phase is available, coverage SHOULD prove execution without changing production behavior to manufacture failure."
+    decisions:
+    - testing/contract-coverage
+  - ref: testing#evidence-56f5d151
+    text: "Public | exported behavior, errors, lifecycle"
+    omitted: "descriptive evidence-layer taxonomy, not a normative code rule"
+  - ref: testing#evidence-45222e55
+    text: "Runtime | opcode behavior, traps, ownership"
+    omitted: "descriptive evidence-layer taxonomy, not a normative code rule"
+  - ref: testing#evidence-d038b612
+    text: "Parity | equivalent public behavior across distinct execution paths"
+    omitted: "descriptive evidence-layer taxonomy, not a normative code rule"
+  - ref: testing#evidence-8f8ad7ec
+    text: "Frontend | acceptance and intermediate-representation contracts"
+    omitted: "JIT-specific evidence taxonomy, not a general code rule"
+  - ref: testing#evidence-b2d39020
+    text: "Backend | machine layout, bindings, moves, metadata, and bridge/deopt contracts"
+    omitted: "JIT-specific evidence taxonomy, not a general code rule"
+  - ref: testing#evidence-7bf5a1dc
+    text: "Golden | exact low-level output for a specified input shape"
+    omitted: "descriptive evidence-layer taxonomy, not a normative code rule"
+  - ref: testing#evidence-69d67454
+    text: "Async | publication, shutdown, and race behavior"
+    omitted: "descriptive evidence-layer taxonomy, not a normative code rule"
+  - ref: testing#evidence-e44a28e3
+    text: "Fuzz | bounded trust-boundary or differential properties"
+    omitted: "descriptive evidence-layer taxonomy, not a normative code rule"
+  - ref: testing#evidence-8b0af56d
+    text: "Integration | public end-to-end behavior"
+    omitted: "descriptive evidence-layer taxonomy, not a normative code rule"
+  - ref: testing#native-jit-413d8a13
+    text: "Frontend tests MUST prove frontend contracts."
+    omitted: "project-specific"
+    note: "Frontend/backend/interpreter split is specific to a compiler with a JIT."
+  - ref: testing#native-jit-7c5ee604
+    text: "Backend tests MUST prove machine layout, bindings, moves, metadata, and bridge/deopt contracts where applicable."
+    omitted: "project-specific"
+    note: "Machine layout and deopt contracts of the minivm JIT."
+  - ref: testing#native-jit-8607c87e
+    text: "Interpreter tests MUST prove public results, errors, ownership, and execution behavior."
+    omitted: "project-specific"
+    note: "Interpreter contract of minivm."
+  - ref: testing#native-jit-20e6de03
+    text: "Parity MUST be tested wherever multiple execution paths are required to implement the same public contract."
+    decisions:
+    - testing/path-parity
+  - ref: testing#native-jit-7e35f7e0
+    text: "Golden tests MUST define expected low-level output independently of the implementation that produced it, with the required complete output and metadata checks."
+    decisions:
+    - testing/independent-golden
+  - ref: testing#validation-b3f33959
+    text: "Run the smallest falsifying check first."
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#validation-abad7d96
+    text: "Apply package, race, coverage, architecture, and repository checks when relevant."
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#validation-83fe3fb1
+    text: "Skip only genuinely inapplicable checks, and state the reason."
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#completeness-b1182e1b
+    text: "Repeated execution units MUST have the required metadata and runtime coverage."
+    omitted: "project-specific"
+    note: "Opcode metadata coverage in minivm."
+  - ref: testing#completeness-592cec2c
+    text: "Verification policy MUST be covered at its defined boundaries."
+    omitted: "project-specific"
+    note: "Bytecode verifier coverage in minivm."
+  - ref: testing#completeness-ccf9ae64
+    text: "Backend support status MUST match the implemented contract."
+    omitted: "project-specific"
+    note: "Backend support status table of minivm."
+  - ref: testing#completeness-955a8a36
+    text: "Exported contracts MUST have an owning test."
+    decisions:
+    - testing/no-missing-owner
+  - ref: testing#completeness-f61f5237
+    text: "Architecture-specific contracts MUST have architecture-specific evidence."
+    decisions:
+    - testing/specific-evidence
+  - ref: testing#completeness-7dc259e7
+    text: "Generated output and documentation freshness are repository gates, not test-completeness rules."
+    omitted: "process guidance, moved to docs/testing-guidance.md and the Lighthouse skill"
+    note: "Moved to docs/testing-guidance.md and the Lighthouse skill."
+  - ref: testing#ownership-63979bd0
+    text: "Test contracts and structure | `testing.md`"
+    omitted: "document-ownership table, not a code rule"
+  - ref: testing#ownership-f312c163
+    text: "General test code style | `coding-patterns.md`"
+    omitted: "document-ownership table, not a code rule"
+  - ref: testing#ownership-86984d55
+    text: "Opcode metadata | opcode definitions and their contract tests"
+    omitted: "project-specific"
+    note: "Owner map for minivm documents and packages."
+  - ref: testing#ownership-17a021f6
+    text: "Verification | verifier and verifier tests"
+    omitted: "project-specific"
+    note: "Owner map for minivm documents and packages."
+  - ref: testing#ownership-d0f5b9ba
+    text: "Runtime opcode behavior | interpreter/runtime contract tests"
+    omitted: "project-specific"
+    note: "Owner map for minivm documents and packages."
+  - ref: testing#ownership-46b9a27b
+    text: "Backend status | backend instruction contract"
+    omitted: "project-specific"
+    note: "Owner map for minivm documents and packages."
+  - ref: testing#ownership-c0d25b3f
+    text: "JIT contracts | JIT contract documentation and tests"
+    omitted: "project-specific"
+    note: "Owner map for minivm documents and packages."
+  - ref: testing#ownership-bf689afd
+    text: "Performance evidence | benchmark documentation and benchmarks"
+    omitted: "project-specific"
+    note: "Owner map for minivm documents and packages."
+  - ref: testing#related-679b4282
+    text: "`coding-patterns.md` — general code design and style"
+    omitted: "project-specific"
+  - ref: testing#related-52218c9d
+    text: "`refactoring.md` — structural review"
+    omitted: "project-specific"
+  - ref: testing#related-d313593c
+    text: "`instruction-set.md` — opcode/backend contracts"
+    omitted: "project-specific"
+  - ref: testing#related-8a0d6523
+    text: "`verification.md` — bytecode validation"
+    omitted: "project-specific"
+  - ref: testing#related-843c822e
+    text: "`jit-internals.md` — JIT contracts"
+    omitted: "project-specific"
+  - ref: testing#related-39860d76
+    text: "`benchmarks.md` — performance evidence"
+    omitted: "project-specific"

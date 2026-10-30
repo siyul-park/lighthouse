@@ -4,6 +4,8 @@ The Go language provider: loads packages with `go/packages`, type-checks with `g
 
 **Layer.** Out-of-process plugin (a Go module, outside the cargo workspace); implements the protocol by hand in `sdk/` and imports no host crate. Built by `make plugins` into `target/plugins/lang-go`.
 
+**Pack.** The plugin also provides the decision pack `go` (`decisions/go/`, named by `spec.catalog` in the manifest). The host reads it without starting the process, so listing `lang-go` in `plugins` makes `go/recommended` available to `extends`; `make plugins` copies `decisions/` next to the binary.
+
 ## Entry points
 
 - `cmd/lang-go`: the binary, `sdk.Serve(provider.New(...))`.

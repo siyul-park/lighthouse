@@ -4,6 +4,8 @@ The Rust language provider: reads sources with `syn`, resolves names through its
 
 **Layer.** Out-of-process plugin; depends on `lighthouse-protocol` and its own libraries, never on a host crate. Built by `make plugins` into `target/plugins/lang-rust`.
 
+**Pack.** The plugin also provides the decision pack `rust` (`decisions/rust/`, named by `spec.catalog` in the manifest). The host reads it without starting the process, so listing `lang-rust` in `plugins` makes `rust/recommended` available to `extends`; `make plugins` copies `decisions/` next to the binary.
+
 ## Entry points
 
 - `provider.rs`: `initialize` and `index` (capabilities `extent`, `reference-sites`, `overlays`; globs `**/*.rs`).

@@ -4,6 +4,8 @@ The Markdown host-file provider: parses Markdown files with `comrak` (pinned, Gi
 
 **Layer.** Out-of-process plugin; depends on `lighthouse-protocol` only, whose `serve_host` is the rest of the provider. Built by `make plugins` into `target/plugins/lang-markdown`.
 
+**Pack.** The plugin also provides the decision pack `markdown` (`decisions/markdown/`, named by `spec.catalog` in the manifest). The host reads it without starting the process, so listing `lang-markdown` in `plugins` makes `markdown/recommended` available to `extends`; `make plugins` copies `decisions/` next to the binary.
+
 ## Entry points
 
 - `main.rs`: the language (`markdown`, globs `**/*.md`, `**/*.markdown`) and `serve_host`.

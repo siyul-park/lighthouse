@@ -1,0 +1,8 @@
+apiVersion = "lighthouse/v1alpha1"
+kind = "Plugin"
+
+[metadata]
+name = "lang-cel"
+
+[spec]
+version = "0.1.0"

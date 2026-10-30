@@ -7,15 +7,16 @@ export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
 
 .PHONY: plugins test lint ci
 
-# Builds the bundled out-of-process plugins; each directory holds the binary
-# and its lighthouse-plugin.toml, the layout plugin discovery expects. Binaries
-# are replaced by rename, never overwritten in place: macOS caches a binary's
+# Builds the out-of-process plugins; each directory holds the binary, its
+# lighthouse-plugin.toml and, for a plugin that provides packs, its `decisions/`:
+# the layout plugin discovery expects. Binaries are replaced by rename, never overwritten in place: macOS caches a binary's
 # code signature per file, and new bytes under the old file are killed on launch.
 plugins:
 	mkdir -p $(PLUGINS)/lang-go
 	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
 	mv -f $(PLUGINS)/lang-go/lang-go.new $(PLUGINS)/lang-go/lang-go
 	cp plugins/lang-go/lighthouse-plugin.toml $(PLUGINS)/lang-go/
+	rm -rf $(PLUGINS)/lang-go/decisions && cp -R plugins/lang-go/decisions $(PLUGINS)/lang-go/
 	rm -rf $(PLUGINS)/lang-typescript.new
 	mkdir -p $(PLUGINS)/lang-typescript.new/dist
 	cd plugins/lang-typescript && npm ci --ignore-scripts && npm run build
@@ -30,6 +31,10 @@ plugins:
 		cp target/release/$$plugin $(PLUGINS)/$$plugin/$$plugin.new; \
 		mv -f $(PLUGINS)/$$plugin/$$plugin.new $(PLUGINS)/$$plugin/$$plugin; \
 		cp plugins/$$plugin/lighthouse-plugin.toml $(PLUGINS)/$$plugin/; \
+		if [ -d plugins/$$plugin/decisions ]; then \
+			rm -rf $(PLUGINS)/$$plugin/decisions; \
+			cp -R plugins/$$plugin/decisions $(PLUGINS)/$$plugin/; \
+		fi; \
 	done
 
 test: plugins
@@ -43,7 +48,7 @@ lint: plugins
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets -- -D warnings
 	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./...
-	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check decisions/
+	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check $(wildcard plugins/*/decisions)
 	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check . --allow-incomplete
 	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- decision test 'markdown/*'
 

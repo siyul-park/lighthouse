@@ -2,7 +2,7 @@
 
 The bundled CEL plugin: the CEL functions Lighthouse implements beyond the `cel` crate, and the language provider that indexes the CEL expressions embedded in YAML and TOML files (the decisions of a catalog).
 
-**Layer.** In-process plugin, compiled into the binary; depends on `lighthouse-plugin` and `lighthouse-model`, and registers its libraries into the environment the composition root builds (`lighthouse-checks::compose`). Its functions are domain-free: node fields stay in the fact builder.
+**Layer.** Bundled plugin: it has a manifest (`lighthouse-plugin.toml`) but no `runtime`, and is compiled into the binary; depends on `lighthouse-plugin` and `lighthouse-model`, and registers its libraries into the environment the composition root builds (`lighthouse-checks::compose`). Its functions are domain-free: node fields stay in the fact builder.
 
 ## Entry points
 
