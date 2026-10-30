@@ -12,12 +12,13 @@ mod env;
 mod error;
 mod expression;
 mod fix;
-mod model;
+mod example;
 mod model_check;
 mod options;
 mod pack;
 mod program;
 mod project;
+mod scope;
 mod sources;
 mod union;
 mod validate;
@@ -38,7 +39,9 @@ pub use expression::{
     program_calls, program_identifiers,
 };
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
-pub use model::{DecisionStatus, Example, ExampleFile, ExampleKind, Expect, Scope, Subject};
+pub use decision::DecisionStatus;
+pub use example::{Example, ExampleFile, ExampleKind, Expect};
+pub use scope::{Scope, Subject};
 pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};
 pub use pack::{Pack, Section};
