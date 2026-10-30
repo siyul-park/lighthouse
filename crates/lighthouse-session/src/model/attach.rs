@@ -40,37 +40,32 @@ pub struct Detachment {
     pub model: String,
 }
 
-/// A minor revision of a decision, on top of its latest.
-struct Revision<'a> {
-    records: &'a Records,
-    decision: &'a Decision,
-    /// Who approves it.
+/// Appends a minor revision of `decision` on top of its latest to the log of
+/// `session`, approved by `approval`, binding `model` (none unbinds), and
+/// gives its id.
+fn append(
+    session: &Session,
+    records: &Records,
+    decision: &Decision,
     approval: Attribution,
-    /// The model it binds; none unbinds.
-    model: Option<&'a str>,
-    /// What justifies it.
+    model: Option<&str>,
     evaluation: Value,
-}
-
-impl Revision<'_> {
-    /// Appends the revision to the log under `root` and gives its id.
-    fn append(self, root: &Path) -> Result<String> {
-        let key = self.decision.key();
-        Ok(append_revision(
-            root,
-            RevisionSpec {
-                decision: key.to_owned(),
-                parent: self.records.latest(key).map(|latest| latest.id.clone()),
-                meaning_version: Some(self.decision.meaning_version()),
-                check_revision: Some(self.decision.check_revision()),
-                change: Change::Minor,
-                evaluation: self.evaluation,
-                approval: self.approval,
-                model: self.model.map(str::to_owned),
-                generated_at_time: now(),
-            },
-        )?)
-    }
+) -> Result<String> {
+    let key = decision.key();
+    Ok(append_revision(
+        &session.root,
+        RevisionSpec {
+            decision: key.to_owned(),
+            parent: records.latest(key).map(|latest| latest.id.clone()),
+            meaning_version: Some(decision.meaning_version()),
+            check_revision: Some(decision.check_revision()),
+            change: Change::Minor,
+            evaluation,
+            approval,
+            model: model.map(str::to_owned),
+            generated_at_time: now(),
+        },
+    )?)
 }
 
 /// Evaluates `request.model` as the first layer of the decision and, when the
@@ -93,14 +88,14 @@ pub fn attach(request: &EvalRequest, approval: Attribution) -> Result<Attachment
         reasons.push(format!("`{model}` is already attached"));
     }
     let revision = if reasons.is_empty() {
-        let revision = Revision {
-            records: &records,
+        Some(append(
+            &session,
+            &records,
             decision,
             approval,
-            model: Some(&model),
-            evaluation: evaluation.clone(),
-        };
-        Some(revision.append(&session.root)?)
+            Some(&model),
+            evaluation.clone(),
+        )?)
     } else {
         None
     };
@@ -126,14 +121,14 @@ pub fn detach(config: Option<&Path>, decision: &str, approval: Attribution) -> R
         .attached()
         .remove(found.key())
         .ok_or_else(|| format!("no model is attached to `{decision}`"))?;
-    let revision = Revision {
-        records: &records,
-        decision: found,
+    let revision = append(
+        &session,
+        &records,
+        found,
         approval,
-        model: None,
-        evaluation: json!({ "detached": model }),
-    }
-    .append(&session.root)?;
+        None,
+        json!({ "detached": model }),
+    )?;
     Ok(Detachment {
         revision,
         decision: found.id().to_owned(),
