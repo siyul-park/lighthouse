@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: When multiple execution paths implement the same public contract, tests
@@ -42,3 +43,45 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+  - name: python-only-the-success-path-tested
+    language: python
+    kind: invalid
+    files:
+    - path: parse.py
+      body: |-
+        def parse_port(text: str) -> int:
+            if not text.isdigit():
+                raise ValueError("not a number")
+            return int(text)
+    - path: test_parse.py
+      body: |-
+        from parse import parse_port
+
+
+        def test_parse_port() -> None:
+            assert parse_port("80") == 80
+  - name: python-both-paths-tested
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: parse.py
+      body: |-
+        def parse_port(text: str) -> int:
+            if not text.isdigit():
+                raise ValueError("not a number")
+            return int(text)
+    - path: test_parse.py
+      body: |-
+        import pytest
+
+        from parse import parse_port
+
+
+        def test_parse_port() -> None:
+            assert parse_port("80") == 80
+
+
+        def test_parse_port_rejects_text() -> None:
+            with pytest.raises(ValueError):
+                parse_port("http")

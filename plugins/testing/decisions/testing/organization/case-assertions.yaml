@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Assertions that belong to a scenario SHOULD be inside that scenario’s
@@ -44,3 +45,34 @@ spec:
       body: |
         package sample
         func TestStore(t *testing.T) { t.Run("present", func(t *testing.T) { got := store.Get(); if got != want { t.Fatal() } }) }
+  - name: python-table-rows-without-case-identity
+    language: python
+    kind: invalid
+    files:
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
+        def test_get(text: str, want: int) -> None:
+            got = get(text)
+            if got != want:
+                raise AssertionError("mismatch")
+  - name: python-table-rows-assert-each-case
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
+        def test_get(text: str, want: int) -> None:
+            assert get(text) == want

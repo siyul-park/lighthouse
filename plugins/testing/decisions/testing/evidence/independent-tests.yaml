@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Each test SHOULD produce the same result regardless of execution order
@@ -47,3 +48,38 @@ spec:
         package sample
         func TestFirst(t *testing.T) { got := compute(); if got != 1 { t.Fatal() } }
         func TestSecond(t *testing.T) { got := compute(); if got != 2 { t.Fatal() } }
+  - name: python-test-reimplements-the-code
+    language: python
+    kind: invalid
+    files:
+    - path: sums.py
+      body: |-
+        def total(values: list[int]) -> int:
+            return sum(values)
+    - path: test_sums.py
+      body: |-
+        from sums import total
+
+
+        def test_total() -> None:
+            values = [1, 2, 3]
+            expected = 0
+            for v in values:
+                expected += v
+            assert total(values) == expected
+  - name: python-test-literal-expectation
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: sums.py
+      body: |-
+        def total(values: list[int]) -> int:
+            return sum(values)
+    - path: test_sums.py
+      body: |-
+        from sums import total
+
+
+        def test_total() -> None:
+            assert total([1, 2, 3]) == 6

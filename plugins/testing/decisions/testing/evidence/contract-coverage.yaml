@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Tests SHOULD cover applicable success, failure, boundaries, ownership,
@@ -46,3 +47,42 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+  - name: python-one-of-two-public-functions-tested
+    language: python
+    kind: invalid
+    files:
+    - path: codec.py
+      body: |-
+        def encode(text: str) -> bytes:
+            return text.encode()
+
+
+        def decode(data: bytes) -> str:
+            return data.decode()
+    - path: test_codec.py
+      body: |-
+        from codec import encode
+
+
+        def test_encode_round_trip() -> None:
+            assert encode("a") == b"a"
+  - name: python-both-public-functions-tested
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: codec.py
+      body: |-
+        def encode(text: str) -> bytes:
+            return text.encode()
+
+
+        def decode(data: bytes) -> str:
+            return data.decode()
+    - path: test_codec.py
+      body: |-
+        from codec import decode, encode
+
+
+        def test_encode_then_decode() -> None:
+            assert decode(encode("a")) == "a"

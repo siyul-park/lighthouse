@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Tests of the same behavior with different inputs SHOULD use a named
@@ -43,3 +44,37 @@ spec:
       body: |
         package sample
         func TestGet(t *testing.T) { tests := []struct{ input int; want string }{{1,"one"},{2,"two"}}; for _, tt := range tests { t.Run(tt.want, func(t *testing.T) { if got := Get(tt.input); got != tt.want { t.Fatal() } }) } }
+  - name: python-three-near-identical-tests
+    language: python
+    kind: invalid
+    files:
+    - path: test_sample.py
+      body: |-
+        from sample import get
+
+
+        def test_get_empty() -> None:
+            assert get("") == 0
+
+
+        def test_get_one() -> None:
+            assert get("a") == 1
+
+
+        def test_get_two() -> None:
+            assert get("ab") == 2
+  - name: python-one-parametrized-test
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1), ("ab", 2)])
+        def test_get(text: str, want: int) -> None:
+            assert get(text) == want

@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Each behaviorally distinct scenario SHOULD have its own named case
@@ -43,3 +44,44 @@ spec:
         package sample
         func TestDeposit(t *testing.T) { a := NewAccount(); a.Deposit(2); if a.Balance() != 2 { t.Fatal() } }
         func TestWithdraw(t *testing.T) { a := NewAccount(); a.Deposit(2); a.Withdraw(1); if a.Balance() != 1 { t.Fatal() } }
+  - name: python-unrelated-scenarios-in-one-table
+    language: python
+    kind: invalid
+    files:
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(
+            ("text", "want"),
+            [("", 0), ("a", 1), ("dir/", "error"), ("é", 1)],
+        )
+        def test_get(text: str, want: object) -> None:
+            if want == "error":
+                with pytest.raises(ValueError):
+                    get(text)
+            else:
+                assert get(text) == want
+  - name: python-named-scenarios
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
+        def test_get_counts_characters(text: str, want: int) -> None:
+            assert get(text) == want
+
+
+        def test_get_rejects_a_path() -> None:
+            with pytest.raises(ValueError):
+                get("dir/")

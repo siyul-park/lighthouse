@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Tests SHOULD NOT be added solely to exercise implementation structure
@@ -42,3 +43,49 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+  - name: python-asserts-private-layout
+    language: python
+    kind: invalid
+    files:
+    - path: cache.py
+      body: |-
+        class Cache:
+            def __init__(self) -> None:
+                self._slots: dict[str, int] = {}
+
+            def put(self, key: str, value: int) -> None:
+                self._slots[key] = value
+    - path: test_cache.py
+      body: |-
+        from cache import Cache
+
+
+        def test_put_uses_a_dict() -> None:
+            cache = Cache()
+            cache.put("a", 1)
+            assert isinstance(cache._slots, dict)
+  - name: python-asserts-behavior
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: cache.py
+      body: |-
+        class Cache:
+            def __init__(self) -> None:
+                self._slots: dict[str, int] = {}
+
+            def put(self, key: str, value: int) -> None:
+                self._slots[key] = value
+
+            def get(self, key: str) -> int | None:
+                return self._slots.get(key)
+    - path: test_cache.py
+      body: |-
+        from cache import Cache
+
+
+        def test_put_then_get() -> None:
+            cache = Cache()
+            cache.put("a", 1)
+            assert cache.get("a") == 1

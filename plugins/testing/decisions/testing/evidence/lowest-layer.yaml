@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: The lowest test layer that can prove a contract SHOULD be used, while
@@ -42,3 +43,41 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+  - name: python-rule-tested-only-through-the-api
+    language: python
+    kind: invalid
+    files:
+    - path: rules.py
+      body: |-
+        def is_adult(age: int) -> bool:
+            return age >= 18
+    - path: api.py
+      body: |-
+        from rules import is_adult
+
+
+        def check(age: int) -> dict:
+            return {"adult": is_adult(age)}
+    - path: test_api.py
+      body: |-
+        from api import check
+
+
+        def test_check_adult() -> None:
+            assert check(18) == {"adult": True}
+  - name: python-rule-tested-at-its-layer
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: rules.py
+      body: |-
+        def is_adult(age: int) -> bool:
+            return age >= 18
+    - path: test_rules.py
+      body: |-
+        from rules import is_adult
+
+
+        def test_is_adult_at_eighteen() -> None:
+            assert is_adult(18)

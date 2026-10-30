@@ -33,6 +33,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: >-
@@ -213,3 +214,42 @@ spec:
               expect(get()).toBe(want);
             });
           });
+    - name: python-fixture-after-test-invalid
+      language: python
+      kind: invalid
+      files:
+      - path: test_store.py
+        body: |-
+          import pytest
+
+          from store import Store
+
+
+          def test_get_is_one(store: Store) -> None:
+              assert store.get() == 1
+
+
+          @pytest.fixture
+          def store() -> Store:
+              return Store()
+      expect:
+      - line: 10
+    - name: python-fixture-above-test-valid
+      language: python
+      kind: valid
+      canonical: true
+      files:
+      - path: test_store.py
+        body: |-
+          import pytest
+
+          from store import Store
+
+
+          @pytest.fixture
+          def store() -> Store:
+              return Store()
+
+
+          def test_get_is_one(store: Store) -> None:
+              assert store.get() == 1

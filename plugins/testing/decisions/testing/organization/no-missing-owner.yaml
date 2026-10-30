@@ -68,6 +68,16 @@ spec:
     go:
       options:
         includeInternal: true
+    python:
+      options:
+        includeInternal: true
+        # The constructor and the protocol methods that Python defines on every class have no test of their own.
+        exemptMethods:
+        - __init__
+        - __repr__
+        - __str__
+        - __eq__
+        - __hash__
     rust:
       options:
         exemptMethods:
@@ -406,3 +416,37 @@ spec:
         });
     expect:
     - line: 5
+  - name: python-public-function-without-test
+    language: python
+    kind: invalid
+    options:
+      includeInternal: true
+    files:
+    - path: sample.py
+      body: |-
+        def get() -> int:
+            return 1
+    - path: test_sample.py
+      body: |-
+        def test_other() -> None:
+            assert True
+    expect:
+    - line: 1
+  - name: python-public-function-with-test
+    language: python
+    kind: valid
+    canonical: true
+    options:
+      includeInternal: true
+    files:
+    - path: sample.py
+      body: |-
+        def get() -> int:
+            return 1
+    - path: test_sample.py
+      body: |-
+        from sample import get
+
+
+        def test_get() -> None:
+            assert get() == 1

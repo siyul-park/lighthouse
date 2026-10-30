@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Test table data SHOULD be literal and easy to inspect; complex generation
@@ -42,3 +43,32 @@ spec:
       body: |
         package sample
         func TestGet(t *testing.T) { cases := []struct{ input string; want int }{{"a",1},{"b",2}}; for _, tc := range cases { t.Run(tc.input, func(t *testing.T) { if got := Get(tc.input); got != tc.want { t.Fatal() } }) } }
+  - name: python-logic-in-table-rows
+    language: python
+    kind: invalid
+    files:
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1 if True else 0)])
+        def test_get(text: str, want: int) -> None:
+            assert get(text) == want
+  - name: python-plain-table-rows
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
+        def test_get(text: str, want: int) -> None:
+            assert get(text) == want

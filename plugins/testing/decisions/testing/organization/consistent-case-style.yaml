@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     typescript: {}
   requirement: A test level SHOULD use either data-driven table cases or individually
     named scenario cases, not a mixture for the same behavior.
@@ -157,3 +158,44 @@ spec:
             expect(get(input)).toBe(want);
           });
         });
+  - name: python-mixed-invalid
+    language: python
+    kind: invalid
+    files:
+    - path: sample.py
+      body: |-
+        def get(text: str) -> int:
+            return len(text)
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        def test_get_handles_empty() -> None:
+            assert get("") == 0
+
+
+        @pytest.mark.parametrize(("text", "want"), [("a", 1), ("ab", 2)])
+        def test_get_measures(text: str, want: int) -> None:
+            assert get(text) == want
+  - name: python-table-valid
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.py
+      body: |-
+        def get(text: str) -> int:
+            return len(text)
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        @pytest.mark.parametrize(("text", "want"), [("", 0), ("a", 1)])
+        def test_get_measures(text: str, want: int) -> None:
+            assert get(text) == want

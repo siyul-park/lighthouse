@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Golden tests SHOULD define expected low-level output independently
@@ -42,3 +43,34 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+  - name: python-expected-from-the-code-under-test
+    language: python
+    kind: invalid
+    files:
+    - path: pricing.py
+      body: |-
+        def total(cents: int, rate: int) -> int:
+            return cents + cents * rate // 100
+    - path: test_pricing.py
+      body: |-
+        from pricing import total
+
+
+        def test_total_with_tax() -> None:
+            assert total(100, 20) == 100 + 100 * 20 // 100
+  - name: python-expected-literal
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: pricing.py
+      body: |-
+        def total(cents: int, rate: int) -> int:
+            return cents + cents * rate // 100
+    - path: test_pricing.py
+      body: |-
+        from pricing import total
+
+
+        def test_total_with_tax() -> None:
+            assert total(100, 20) == 120

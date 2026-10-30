@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Architecture-specific contracts SHOULD have evidence that exercises
@@ -42,3 +43,26 @@ spec:
       body: |
         package sample
         func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { t.Fatalf("got %q", got) } }
+  - name: python-truthy-assertion
+    language: python
+    kind: invalid
+    files:
+    - path: test_sample.py
+      body: |-
+        from sample import get
+
+
+        def test_get() -> None:
+            assert get("ab")
+  - name: python-specific-assertion
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: test_sample.py
+      body: |-
+        from sample import get
+
+
+        def test_get() -> None:
+            assert get("ab") == 2

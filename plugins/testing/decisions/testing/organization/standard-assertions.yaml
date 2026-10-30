@@ -15,6 +15,10 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python:
+      options:
+        libraries:
+        - pytest
     rust: {}
     typescript:
       options:
@@ -184,6 +188,44 @@ spec:
             }
           });
         });
+  - name: python-manual-comparison-invalid
+    language: python
+    kind: invalid
+    files:
+    - path: sample.py
+      body: |-
+        def get(text: str) -> int:
+            return len(text)
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        def test_get_counts() -> None:
+            if get("ab") != 2:
+                raise AssertionError("wrong count")
+    expect:
+    - line: 6
+  - name: python-assert-valid
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.py
+      body: |-
+        def get(text: str) -> int:
+            return len(text)
+    - path: test_sample.py
+      body: |-
+        import pytest
+
+        from sample import get
+
+
+        def test_get_counts() -> None:
+            assert get("ab") == 2
   fix:
     safety: unsafe
     type: model

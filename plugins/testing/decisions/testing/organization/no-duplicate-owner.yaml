@@ -43,6 +43,9 @@ spec:
     go:
       options:
         includeInternal: true
+    python:
+      options:
+        includeInternal: true
     rust: {}
     typescript:
       options:
@@ -215,3 +218,48 @@ spec:
             expect(new Store().get()).toBe(1);
           });
         });
+  - name: python-duplicate-owner-invalid
+    language: python
+    kind: invalid
+    files:
+    - path: store.py
+      body: |-
+        def get() -> int:
+            return 1
+    - path: test_store.py
+      body: |-
+        from store import get
+
+
+        def test_get() -> None:
+            assert get() == 1
+    - path: store_test.py
+      body: |-
+        from store import get
+
+
+        def test_get() -> None:
+            assert get() == 1
+    expect:
+    - line: 1
+  - name: python-owner-with-cases-valid
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: store.py
+      body: |-
+        class Store:
+            def get(self) -> int:
+                return 1
+    - path: test_store.py
+      body: |-
+        from store import Store
+
+
+        class TestStore:
+            def test_is_constructed(self) -> None:
+                assert Store() is not None
+
+            def test_get_returns_one(self) -> None:
+                assert Store().get() == 1
