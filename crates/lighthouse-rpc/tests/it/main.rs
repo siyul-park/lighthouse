@@ -1,6 +1,7 @@
 //! The out-of-process plugin host against fixture and real providers, one binary.
 
 mod agent;
+mod catalogs;
 mod command;
 mod conformance;
 mod events;

@@ -76,6 +76,16 @@ pub struct LocalPlugin {
     pub argv: Vec<String>,
 }
 
+/// The decision catalog of a listed plugin, not yet read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PluginCatalog {
+    pub plugin: String,
+    pub dir: PathBuf,
+    /// Whether the plugin comes with the project, so that its catalog is
+    /// trusted with the project (see [`local_plugins`]).
+    pub local: bool,
+}
+
 /// A listed plugin whose handshake failed: registered without languages so the
 /// configuration stays valid, while its gap is reported as incomplete.
 struct Unavailable(lighthouse_plugin::PluginManifest);
@@ -168,17 +178,69 @@ pub fn local_plugins(config: &Config, root: &Path, search: &[PathBuf]) -> Vec<Lo
                 .ok()?
                 .into_iter()
                 .next()?;
-            // The directory a plugin sits in is resolved, the plugin's own
-            // directory is not: one that links elsewhere is still the project's.
-            let sits_in_project = one.dir.parent().is_some_and(|dir| canonical(dir) == own);
-            (listed.path.is_some() || sits_in_project).then(|| LocalPlugin {
+            comes_with_project(listed, &one, &own).then(|| LocalPlugin {
                 id: one.id().to_owned(),
-                argv: std::iter::once(one.command_path().to_string_lossy().into_owned())
-                    .chain(one.resource.spec.runtime.args.iter().cloned())
-                    .collect(),
+                argv: one.argv(),
             })
         })
         .collect()
+}
+
+/// The catalogs of the listed plugins that ship one, in listing order, found
+/// the way [`register`] finds the plugins. A listed plugin that is found
+/// nowhere ships none here: the engine reports it as unknown. A broken
+/// manifest of a listed plugin is an error.
+pub fn plugin_catalogs(
+    config: &Config,
+    root: &Path,
+    search: &[PathBuf],
+) -> Result<Vec<PluginCatalog>, Error> {
+    let discovered = discover(search)?;
+    note_broken(discovered.broken, config, &mut Registered::default())?;
+    let own = canonical(&root.join(STATE_DIR).join("plugins"));
+    let root = canonical(root);
+    let mut catalogs = Vec::new();
+    for listed in config.plugins() {
+        let Some(one) = choose(listed, false, &discovered.found, &root)?
+            .into_iter()
+            .next()
+        else {
+            continue;
+        };
+        let Some(dir) = one.catalog_dir() else {
+            continue;
+        };
+        catalogs.push(PluginCatalog {
+            plugin: one.id().to_owned(),
+            dir,
+            local: comes_with_project(listed, &one, &own),
+        });
+    }
+    Ok(catalogs)
+}
+
+/// The plugin that provides the pack `pack`, for the message of a config that
+/// uses a pack whose plugin is not loaded: the one of `listed` or of the
+/// search locations whose catalog holds the pack, else the plugin of the
+/// language, which is named `lang-<pack>`.
+pub fn plugin_of_pack(pack: &str, listed: &[PluginCatalog], search: &[PathBuf]) -> String {
+    let holds = |dir: &Path| dir.join(pack).join("pack.yaml").is_file();
+    if let Some(one) = listed.iter().find(|one| holds(&one.dir)) {
+        return one.plugin.clone();
+    }
+    let found = discover(search).map(|d| d.found).unwrap_or_default();
+    found
+        .iter()
+        .find(|one| one.catalog_dir().is_some_and(|dir| holds(&dir)))
+        .map_or_else(|| format!("lang-{pack}"), |one| one.id().to_owned())
+}
+
+/// Whether the listed plugin `one` is part of the project: it has a `path`, or
+/// sits in the project's own plugin directory `own`. The directory a plugin
+/// sits in is resolved, the plugin's own directory is not: one that links
+/// elsewhere is still the project's.
+fn comes_with_project(listed: &PluginRef, one: &Found, own: &Path) -> bool {
+    listed.path.is_some() || one.dir.parent().is_some_and(|dir| canonical(dir) == own)
 }
 
 /// `path` with its links resolved, else as it is.

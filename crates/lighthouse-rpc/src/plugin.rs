@@ -85,7 +85,10 @@ impl RpcPlugin {
         let digest = if languages.is_empty() {
             String::new()
         } else {
-            let binary = fs::read(found.command_path());
+            let binary = found
+                .command_path()
+                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound))
+                .and_then(fs::read);
             let version = &found.resource.spec.version;
             hash::sha256(binary.as_deref().unwrap_or(version.as_bytes()))
         };
@@ -98,15 +101,7 @@ impl RpcPlugin {
             models,
             client: Arc::new(client),
             digest,
-            agent: Agent::new(
-                id,
-                std::iter::once(found.command_path().to_string_lossy().into_owned())
-                    .chain(found.resource.spec.runtime.args.iter().cloned())
-                    .collect(),
-                &Policy::default(),
-                root,
-                timeout,
-            ),
+            agent: Agent::new(id, found.argv(), &Policy::default(), root, timeout),
         })
     }
 

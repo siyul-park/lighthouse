@@ -20,7 +20,12 @@ pub struct Plugin {
 impl Plugin {
     /// Starts the binary listed in the manifest of the plugin directory.
     pub fn start(dir: &Path, root: &Path) -> Self {
-        let runtime = lighthouse_rpc::load(dir).unwrap().resource.spec.runtime;
+        let runtime = lighthouse_rpc::load(dir)
+            .unwrap()
+            .resource
+            .spec
+            .runtime
+            .unwrap();
         let mut child = Command::new(dir.join(&runtime.command))
             .args(&runtime.args)
             .current_dir(root)

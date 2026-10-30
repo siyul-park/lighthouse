@@ -1,3 +1,5 @@
 fn main() {
-    println!("cargo:rerun-if-changed=../../decisions");
+    for plugin in ["core", "design", "testing"] {
+        println!("cargo:rerun-if-changed=../../plugins/{plugin}/decisions");
+    }
 }

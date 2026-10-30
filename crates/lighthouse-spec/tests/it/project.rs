@@ -685,3 +685,19 @@ fn object_options_merge_per_key_across_layers_in_toml() {
     assert_eq!(max["default"], 8, "the later layer wins per key");
     assert_eq!(max["test"], -1, "and keeps the keys it does not name");
 }
+
+#[test]
+fn enabling_adds_plugins_that_are_not_listed_and_providers_are_the_projects_own() {
+    let config = Config::parse_inline(
+        "plugins = [\"a\"]\n[models.providers.p]\ncommand = [\"run\"]\nprotocol = \"typesafe\"\n",
+    )
+    .unwrap();
+
+    let enabled = config.clone().enabling(["a", "core", "design"]);
+
+    let ids: Vec<_> = enabled.plugins().iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids, ["a", "core", "design"]);
+    assert_eq!(config.plugins().len(), 1);
+    assert!(config.providers().contains_key("p"));
+    assert_eq!(config.providers().len(), 1);
+}

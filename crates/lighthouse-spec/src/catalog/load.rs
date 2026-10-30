@@ -12,7 +12,12 @@ use crate::{
     sources::{SourceLine, SourceMapSpec},
 };
 
-static BUNDLED: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../decisions");
+/// The catalogs of the bundled plugins, each keyed from its own root.
+static BUNDLED: [Dir; 3] = [
+    include_dir!("$CARGO_MANIFEST_DIR/../../plugins/core/decisions"),
+    include_dir!("$CARGO_MANIFEST_DIR/../../plugins/design/decisions"),
+    include_dir!("$CARGO_MANIFEST_DIR/../../plugins/testing/decisions"),
+];
 
 /// Catalog files keyed by `/`-separated path relative to the catalog root.
 pub type Files = BTreeMap<String, String>;
@@ -28,7 +33,9 @@ pub(super) struct Loaded {
 
 pub(crate) fn embedded() -> Files {
     let mut files = Files::new();
-    collect_embedded(&BUNDLED, &mut files);
+    for root in &BUNDLED {
+        collect_embedded(root, &mut files);
+    }
     files
 }
 

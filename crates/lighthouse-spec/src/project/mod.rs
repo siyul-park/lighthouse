@@ -334,6 +334,24 @@ impl Config {
         self.plugins.iter().any(|p| p.id == id)
     }
 
+    /// The same configuration with the plugins `ids` enabled besides the
+    /// listed ones: the plugins that need no listing (the bundled ones, the
+    /// project's own decisions, the packs of the plugins it lists).
+    pub fn enabling<'a>(mut self, ids: impl IntoIterator<Item = &'a str>) -> Self {
+        for id in ids {
+            if !self.lists(id) {
+                self.plugins.push(PluginRef::new(id));
+            }
+        }
+        self.resolved = Resolved::default();
+        self
+    }
+
+    /// The model providers the project defines itself, by name.
+    pub fn providers(&self) -> &BTreeMap<String, ModelProvider> {
+        &self.models.providers
+    }
+
     /// `languages.<id>` options handed to the language's provider; the
     /// `constructorPrefixes` key is the host's and is not among them.
     pub fn languages(&self) -> impl Iterator<Item = (&str, &Options)> {

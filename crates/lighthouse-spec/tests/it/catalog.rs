@@ -10,13 +10,22 @@ fn bundled(id: &str) -> &'static Decision {
 }
 
 #[test]
-fn bundled_catalog_has_the_core_design_language_and_testing_packs() {
+fn bundled_catalog_has_the_packs_of_the_bundled_plugins_and_full_adds_the_languages() {
     let ids: Vec<_> = lighthouse_test_support::bundled()
         .packs()
         .iter()
         .map(|p| &*p.id)
         .collect();
-    assert_eq!(ids, ["core", "design", "go", "markdown", "rust", "testing"]);
+    assert_eq!(ids, ["core", "design", "testing"]);
+    let full: Vec<_> = lighthouse_test_support::full()
+        .packs()
+        .iter()
+        .map(|p| &*p.id)
+        .collect();
+    assert_eq!(
+        full,
+        ["core", "design", "go", "markdown", "rust", "testing"]
+    );
 }
 
 #[test]
@@ -545,4 +554,30 @@ fn embedded() {
     let catalog = Catalog::embedded(&lighthouse_test_support::cel()).unwrap();
 
     assert!(catalog.decision("core/max-lines").is_some());
+}
+
+#[test]
+fn embedded_with_adds_the_packs_of_a_plugin_to_the_bundled_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    for (path, text) in base() {
+        let path = dir.path().join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+    let files = Catalog::read_files(dir.path()).unwrap();
+    assert_eq!(
+        files.keys().collect::<Vec<_>>(),
+        ["p/pack.yaml", "p/s/a.yaml"]
+    );
+
+    let catalog = Catalog::embedded_with(&lighthouse_test_support::cel(), files).unwrap();
+
+    let ids: Vec<_> = catalog.packs().iter().map(|p| &*p.id).collect();
+    assert_eq!(ids, ["core", "design", "p", "testing"]);
+    assert!(catalog.decision("p/a").is_some() && catalog.decision("core/max-lines").is_some());
+
+    let mut clash = Catalog::read_files(dir.path()).unwrap();
+    clash.insert("core/pack.yaml".to_owned(), String::new());
+    let error = Catalog::embedded_with(&lighthouse_test_support::cel(), clash).unwrap_err();
+    assert!(error.to_string().contains("core/pack.yaml"), "{error}");
 }

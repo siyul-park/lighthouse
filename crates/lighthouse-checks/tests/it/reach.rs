@@ -162,7 +162,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
 
 #[test]
 fn rules_reach_as_far_as_what_they_read() {
-    let registry = lighthouse_test_support::registry();
+    let registry = lighthouse_test_support::full_registry();
     let found: Vec<(String, Option<(Reach, bool)>)> = registry
         .rules()
         .map(|rule| {

@@ -26,7 +26,15 @@ const FILE_NAMES: [&str; 3] = [
 #[serde(deny_unknown_fields)]
 pub struct PluginSpec {
     pub version: String,
-    pub runtime: Runtime,
+    /// How to start the plugin's process; a bundled plugin, which the binary
+    /// compiles in, has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<Runtime>,
+    /// Directory of the plugin's decision catalog, relative to the manifest
+    /// directory: the packs the plugin provides, read without starting the
+    /// process.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catalog: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "provides_nothing")]
     pub provides: Provides,
 }
@@ -74,15 +82,45 @@ impl Found {
         &self.resource.metadata.name
     }
 
+    /// The directory of the plugin's decision catalog, when it ships one.
+    pub fn catalog_dir(&self) -> Option<PathBuf> {
+        self.resource
+            .spec
+            .catalog
+            .as_ref()
+            .map(|catalog| self.dir.join(catalog))
+    }
+
     /// The executable, resolved against the manifest directory unless it is a
     /// bare name.
-    pub(crate) fn command_path(&self) -> PathBuf {
-        let command = &self.resource.spec.runtime.command;
-        if Path::new(command).is_relative() && command.contains('/') {
-            self.dir.join(command)
-        } else {
-            PathBuf::from(command)
-        }
+    /// `None` for a plugin with no process.
+    pub(crate) fn command_path(&self) -> Option<PathBuf> {
+        let command = &self.resource.spec.runtime.as_ref()?.command;
+        Some(
+            if Path::new(command).is_relative() && command.contains('/') {
+                self.dir.join(command)
+            } else {
+                PathBuf::from(command)
+            },
+        )
+    }
+
+    /// The executable and its arguments, as they are started.
+    pub(crate) fn argv(&self) -> Vec<String> {
+        self.command_path()
+            .map(|command| command.to_string_lossy().into_owned())
+            .into_iter()
+            .chain(self.args().iter().cloned())
+            .collect()
+    }
+
+    /// The arguments the executable is started with.
+    pub(crate) fn args(&self) -> &[String] {
+        self.resource
+            .spec
+            .runtime
+            .as_ref()
+            .map_or(&[], |runtime| runtime.args.as_slice())
     }
 }
 

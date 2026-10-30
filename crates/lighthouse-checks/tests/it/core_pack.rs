@@ -249,6 +249,12 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
     let plugins: Vec<_> = registry.manifests().iter().map(|p| p.id.as_str()).collect();
     assert_eq!(
         plugins,
+        ["lang-cel", "core", "metrics", "design", "testing"]
+    );
+    let full = lighthouse_test_support::full_registry();
+    let plugins: Vec<_> = full.manifests().iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(
+        plugins,
         [
             "lang-cel", "core", "metrics", "design", "go", "markdown", "rust", "testing"
         ]

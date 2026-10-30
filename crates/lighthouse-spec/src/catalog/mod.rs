@@ -49,9 +49,35 @@ impl Catalog {
         Self::from_files(load::read_dir(dir)?, cel)
     }
 
-    /// The catalog compiled into the binary, validated against `cel`.
+    /// The catalog compiled into the binary, validated against `cel`: the
+    /// packs of the bundled plugins only.
     pub fn embedded(cel: &Cel) -> Result<Self, Error> {
         Self::from_files(load::embedded(), cel)
+    }
+
+    /// The embedded catalog with the catalogs of language plugins added to
+    /// it: the files of each, keyed relative to its own catalog root, as
+    /// [`Catalog::read_files`] returns them. A pack of a plugin may use what
+    /// the bundled packs define, so the union is validated as one layer.
+    /// Fails when two files claim the same path.
+    pub fn embedded_with(cel: &Cel, plugins: Files) -> Result<Self, Error> {
+        let mut files = load::embedded();
+        for (path, text) in plugins {
+            if files.contains_key(&path) {
+                return Err(Error::layout(
+                    &path,
+                    "a plugin catalog file has the path of a bundled one",
+                ));
+            }
+            files.insert(path, text);
+        }
+        Self::from_files(files, cel)
+    }
+
+    /// The files of the catalog root `dir`, keyed by `/`-separated paths
+    /// relative to it, as a plugin ships them.
+    pub fn read_files(dir: &Path) -> Result<Files, Error> {
+        load::read_dir(dir)
     }
 
     /// Builds a validated layer from files keyed by `/`-separated paths

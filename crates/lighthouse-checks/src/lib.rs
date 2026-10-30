@@ -31,7 +31,7 @@ pub mod probe;
 mod table;
 mod text;
 
-pub use bundled::registry;
+pub use bundled::{ids, registry, registry_of};
 pub use checks::Checks;
 pub use compose::{Composition, Entry, compose, compose_from};
 

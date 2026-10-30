@@ -471,8 +471,8 @@ fn every_checked_decision_passes_its_catalog_examples() {
     let registry = || registry(&go_plugin().expect("checked above"));
     let failures = lighthouse_engine::RuleTester::new(
         registry,
-        lighthouse_test_support::bundled(),
-        lighthouse_test_support::bundled(),
+        lighthouse_test_support::full(),
+        lighthouse_test_support::full(),
     )
     .language("go")
     .trusted(true)

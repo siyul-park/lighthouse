@@ -25,6 +25,30 @@ pub fn registry() -> Registry {
     lighthouse_checks::registry(shared()).expect("the bundled plugins build")
 }
 
+/// The language plugins of this repository that provide a pack.
+const PACK_PLUGINS: [&str; 3] = ["lang-go", "lang-markdown", "lang-rust"];
+
+/// The bundled catalog with the packs of the language plugins of this
+/// repository (`go`, `markdown`, `rust`), validated once like [`bundled`]:
+/// what a project that lists those plugins has.
+pub fn full() -> &'static Catalog {
+    static FULL: OnceLock<Catalog> = OnceLock::new();
+    FULL.get_or_init(|| {
+        let mut files = lighthouse_spec::Files::new();
+        for plugin in PACK_PLUGINS {
+            let dir = workspace().join("plugins").join(plugin).join("decisions");
+            files.extend(Catalog::read_files(&dir).expect("a plugin catalog reads"));
+        }
+        Catalog::embedded_with(shared().cel(), files).expect("the catalogs of the plugins load")
+    })
+}
+
+/// The plugins of the packs of [`full`], compiled in the composition
+/// [`bundled`] belongs to.
+pub fn full_registry() -> Registry {
+    lighthouse_checks::registry_of(shared(), full()).expect("the plugins of the packs build")
+}
+
 fn shared() -> &'static Composition {
     static SHARED: OnceLock<Composition> = OnceLock::new();
     SHARED.get_or_init(composition)
@@ -64,6 +88,25 @@ pub fn project(spec: &str) -> String {
         "apiVersion = \"{API_VERSION}\"\nkind = \"Project\"\nmetadata = {{ name = \"test\" }}\nspec = {}\n",
         inline(&toml::Value::Table(spec))
     )
+}
+
+/// `config`, a `lighthouse.toml` written by [`project`], with `plugin` (a TOML
+/// string or inline table) added to its `plugins`.
+pub fn listing(config: &str, plugin: &str) -> String {
+    let mut document: toml::Table = toml::from_str(config).expect("a project is TOML");
+    let spec = document
+        .get_mut("spec")
+        .and_then(toml::Value::as_table_mut)
+        .expect("a project has a spec");
+    let entry = toml::from_str::<toml::Table>(&format!("entry = {plugin}"))
+        .expect("a plugin entry is TOML")["entry"]
+        .clone();
+    spec.entry("plugins")
+        .or_insert_with(|| toml::Value::Array(Vec::new()))
+        .as_array_mut()
+        .expect("plugins is a list")
+        .push(entry);
+    project(&toml::to_string(spec).expect("a spec is TOML"))
 }
 
 /// Directory of the `lang-go` plugin (manifest and binary, the layout
@@ -308,6 +351,20 @@ fn install_manifest(source: &Path, out: &Path, goroot: &str) {
     install(&out.join("lighthouse-plugin.toml"), |tmp| {
         fs::write(tmp, text).unwrap();
     });
+    link_catalog(source, out);
+}
+
+/// Makes the `decisions` directory of the plugin source `source`, if it has
+/// one, the catalog of the installed plugin `out`.
+fn link_catalog(source: &Path, out: &Path) {
+    let catalog = source.join("decisions");
+    if !catalog.is_dir() {
+        return;
+    }
+    #[cfg(unix)]
+    install(&out.join("decisions"), |tmp| {
+        std::os::unix::fs::symlink(&catalog, tmp).expect("link plugin catalog");
+    });
 }
 
 /// Puts the file `make` writes at `to`: it is written beside it under a name of
@@ -347,6 +404,7 @@ fn build_rust_plugin(name: &str) -> PathBuf {
     install(&out.join("lighthouse-plugin.toml"), |tmp| {
         fs::copy(&manifest, tmp).expect("copy plugin manifest");
     });
+    link_catalog(&workspace().join("plugins").join(name), &out);
     out
 }
 

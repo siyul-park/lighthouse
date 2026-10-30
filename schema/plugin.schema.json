@@ -39,19 +39,33 @@
       "additionalProperties": false,
       "description": "The spec of the `Plugin` kind: how to start a plugin process, and what the\nplugin provides.",
       "properties": {
+        "catalog": {
+          "description": "Directory of the plugin's decision catalog, relative to the manifest\ndirectory: the packs the plugin provides, read without starting the\nprocess.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "provides": {
           "$ref": "#/$defs/Provides"
         },
         "runtime": {
-          "$ref": "#/$defs/Runtime"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Runtime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How to start the plugin's process; a bundled plugin, which the binary\ncompiles in, has none."
         },
         "version": {
           "type": "string"
         }
       },
       "required": [
-        "version",
-        "runtime"
+        "version"
       ],
       "type": "object"
     },

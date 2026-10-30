@@ -73,10 +73,12 @@ pub(crate) struct Client {
 
 impl Client {
     pub(crate) fn spawn(found: &Found, cwd: &Path, timeout: Duration) -> Result<Self, String> {
-        let command = found.command_path();
+        let command = found
+            .command_path()
+            .ok_or("a bundled plugin has no process to start")?;
         let mut process = Command::new(&command);
         process
-            .args(&found.resource.spec.runtime.args)
+            .args(found.args())
             .current_dir(cwd)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

@@ -333,7 +333,7 @@ fn plugin_manifest_reads_command_and_defaults_args_and_rejects_unknown_keys() {
     )
     .unwrap();
     let found = lighthouse_rpc::load(dir.path()).unwrap();
-    let runtime = &found.resource.spec.runtime;
+    let runtime = found.resource.spec.runtime.as_ref().unwrap();
     assert_eq!((found.id(), runtime.command.as_str()), ("x", "./run"));
     assert_eq!(runtime.args, ["-v"]);
 
@@ -348,6 +348,7 @@ fn plugin_manifest_reads_command_and_defaults_args_and_rejects_unknown_keys() {
             .resource
             .spec
             .runtime
+            .unwrap()
             .args
             .is_empty()
     );
@@ -378,8 +379,16 @@ fn a_manifest_is_a_document_in_toml_yaml_or_json() {
         let found = lighthouse_rpc::load(dir.path()).unwrap();
 
         assert_eq!(found.id(), "x", "{file}");
-        assert_eq!(found.resource.spec.runtime.command, "./run", "{file}");
-        assert_eq!(found.resource.spec.runtime.args, ["-v"], "{file}");
+        assert_eq!(
+            found.resource.spec.runtime.as_ref().unwrap().command,
+            "./run",
+            "{file}"
+        );
+        assert_eq!(
+            found.resource.spec.runtime.as_ref().unwrap().args,
+            ["-v"],
+            "{file}"
+        );
     }
 }
 
