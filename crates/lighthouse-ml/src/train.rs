@@ -185,7 +185,10 @@ fn teaches(label: &Sample) -> bool {
 }
 
 /// The labels with a subject to learn from, as rows, and the keys they cover.
-fn rows_of(labels: &[Sample], observed: &BTreeMap<String, Subject>) -> (Vec<Row>, BTreeSet<String>) {
+fn rows_of(
+    labels: &[Sample],
+    observed: &BTreeMap<String, Subject>,
+) -> (Vec<Row>, BTreeSet<String>) {
     let mut rows = Vec::new();
     let mut seen = BTreeSet::new();
     for label in labels.iter().filter(|l| teaches(l)) {

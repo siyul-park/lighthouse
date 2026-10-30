@@ -45,8 +45,9 @@ pub(super) fn labels(
 
 fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Sample> {
     let prefix = format!("example:{decision}:{}", example.name);
-    let label =
-        |key, judgment, outcome, subject| Sample::example(decision, key, judgment, outcome, subject);
+    let label = |key, judgment, outcome, subject| {
+        Sample::example(decision, key, judgment, outcome, subject)
+    };
     match example.kind {
         ExampleKind::Invalid => example
             .expect

@@ -10,9 +10,9 @@ mod decision;
 mod edit;
 mod env;
 mod error;
+mod example;
 mod expression;
 mod fix;
-mod example;
 mod model_check;
 mod options;
 mod pack;
@@ -30,18 +30,17 @@ pub use catalog::Catalog;
 pub use catalog::load::{Files, load_local, local_dir, local_files};
 pub use check::{At, CelCheck, Check, CheckKind, Identity, Select, Variable};
 pub use command::CommandCheck;
+pub use decision::DecisionStatus;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
 pub use edit::KIND as EDIT_KIND;
 pub use env::{Env, base};
 pub use error::Error;
+pub use example::{Example, ExampleFile, ExampleKind, Expect};
 pub use expression::{
     Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, parse_template,
     program_calls, program_identifiers,
 };
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
-pub use decision::DecisionStatus;
-pub use example::{Example, ExampleFile, ExampleKind, Expect};
-pub use scope::{Scope, Subject};
 pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};
 pub use pack::{Pack, Section};
@@ -57,6 +56,7 @@ pub use project::{
     RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, SignalsSpec,
     SourceLanguageSpec, SourceRuleSpec, Surface, Task, TestNamingSpec, glob_set,
 };
+pub use scope::{Scope, Subject};
 pub(crate) use sources::SourceMapSpec;
 
 /// The JSON Schema of every kind this crate defines.

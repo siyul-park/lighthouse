@@ -347,7 +347,6 @@ impl VariableResolver for Shared<'_> {
 
 mod evaluation;
 
-
 /// Per variable, whether it is file-level: it names no selected value and no
 /// variable that does.
 pub(crate) fn file_level(variables: &[(String, Arc<Program>)]) -> Vec<bool> {

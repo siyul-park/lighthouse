@@ -4,9 +4,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use lighthouse_protocol::{
-    Criteria, Criterion, Instructions, Question, State, SystemOneRequest,
-};
+use lighthouse_protocol::{Criteria, Criterion, Instructions, Question, State, SystemOneRequest};
 use serde_json::{Value, json};
 
 use super::*;

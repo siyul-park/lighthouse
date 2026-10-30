@@ -2,7 +2,7 @@
 
 use std::{env, path::PathBuf};
 
-use lighthouse_ml::labels::{Judged, Sample, Labels, Table};
+use lighthouse_ml::labels::{Judged, Labels, Sample, Table};
 use lighthouse_spec::Decision;
 use lighthouse_store::Records;
 

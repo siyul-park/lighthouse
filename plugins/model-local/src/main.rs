@@ -13,10 +13,10 @@ mod fit;
 mod fixture;
 mod folds;
 mod newton;
-#[cfg(test)]
-mod tests;
 mod rows;
 mod serve;
+#[cfg(test)]
+mod tests;
 mod train;
 
 use std::{

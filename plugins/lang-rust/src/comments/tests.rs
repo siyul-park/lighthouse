@@ -24,8 +24,7 @@ fn trailing_comments_do_not_join_the_next_line() {
 
 #[test]
 fn literals_hide_comment_markers() {
-    let source =
-        "let a = \"// no\"; let b = r#\"/* no\"#; let c = '/'; let d: &'a str; // yes\n";
+    let source = "let a = \"// no\"; let b = r#\"/* no\"#; let c = '/'; let d: &'a str; // yes\n";
     assert_eq!(texts(source), ["// yes"]);
 }
 

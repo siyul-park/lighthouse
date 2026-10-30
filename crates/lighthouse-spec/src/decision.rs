@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    Catalog, Check, CheckKind, Error, Example, ExampleKind, Fix, OptionsSchema,
-    Program, Scope,
+    Catalog, Check, CheckKind, Error, Example, ExampleKind, Fix, OptionsSchema, Program, Scope,
 };
 use lighthouse_protocol::{DecisionRef, hash};
 

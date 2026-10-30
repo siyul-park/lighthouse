@@ -133,8 +133,7 @@ fn body_overrides_the_logprobs_request_including_max_tokens() {
 
 #[test]
 fn p_fail_renormalizes_the_probabilities_of_true_and_false() {
-    let reply =
-        logprobs_reply(&[("true", &[("true", -0.1), ("False", -2.4), ("maybe", -3.0)])]);
+    let reply = logprobs_reply(&[("true", &[("true", -0.1), ("False", -2.4), ("maybe", -3.0)])]);
     let p = read(reply).unwrap().unwrap();
     assert!((p - p_of(-0.1, -2.4)).abs() < 1e-9);
 }

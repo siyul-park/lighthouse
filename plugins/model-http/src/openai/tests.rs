@@ -1,6 +1,4 @@
-use async_openai::types::chat::{
-    ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
-};
+use async_openai::types::chat::{ChatCompletionRequestMessage, ChatCompletionRequestUserMessage};
 use serde_json::json;
 
 use super::*;
@@ -56,8 +54,7 @@ fn an_error_body_is_carried_as_data() {
     let error = json!({"message": "rate limited", "type": "requests"});
     let client = Recording::replying(vec![json!({ "error": error })]);
     let endpoint = Endpoint::at("openai", "https://x");
-    let failed =
-        create_chat_completion(&client, &endpoint, &request(), Map::new()).unwrap_err();
+    let failed = create_chat_completion(&client, &endpoint, &request(), Map::new()).unwrap_err();
     assert_eq!(failed.data, Some(error));
 }
 

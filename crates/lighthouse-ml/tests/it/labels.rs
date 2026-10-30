@@ -1,7 +1,7 @@
 use std::fs;
 
 use lighthouse_ml::{
-    labels::{Judged, Sample, Labels, Source, Table},
+    labels::{Judged, Labels, Sample, Source, Table},
     metrics::Outcome,
 };
 use lighthouse_model::{AgentKind, Attribution, Judgment};

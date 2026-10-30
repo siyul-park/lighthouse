@@ -10,7 +10,12 @@ use serde_json::json;
 
 const RULE: &str = "core/max-lines";
 
-fn graded(repo: &str, labels: &[Sample], found: &Found, candidate: Option<Candidate>) -> RepoResult {
+fn graded(
+    repo: &str,
+    labels: &[Sample],
+    found: &Found,
+    candidate: Option<Candidate>,
+) -> RepoResult {
     grade(RULE, None, Some(repo), policy(), labels, found, candidate)
 }
 
