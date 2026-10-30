@@ -2,9 +2,11 @@
 
 The Python language provider: parses each file with the `ast` of the interpreter that runs it, reads scopes from `symtable`, and speaks the plugin protocol on stdin and stdout.
 
+## Role
+
 **Layer.** Out-of-process Python plugin (Python 3.11 or newer, standard library only); depends on no package and no host crate. Built by `make plugins` into `target/plugins/lang-python`. It always runs in isolated mode (`python3 -I`): no user site, no `PYTHON*` environment, no script directory on `sys.path`; only its own package is added, by absolute path. Code of the project is parsed, never imported or executed.
 
-## Entry points
+## Modules
 
 - `sdk/`: the JSON-RPC loop and its framing (`server.py`, `serve(provider)`), and the wire types (`wire.py`, generated from the protocol schema by `scripts/wire.py` and checked in; `make lint` fails when it is stale). Nothing in it is about a language.
 - `main.py`, `provider.py`: the entry, and the `Provider` with `manifest()` and `index(params)`; one request is one `Indexing`.
@@ -37,15 +39,19 @@ Capabilities: `semantic-edges` (partial: annotations, imports and local inferenc
 - Syntax newer than the running interpreter, or any syntax error, is an `incomplete` entry (`line:col: message`); the file keeps an empty fragment. `.pyi` files, `testdata` and hidden directories get empty fragments.
 - Only the options of the protocol exist: `[languages.python]` has no keys, and any key is an `incomplete` entry. The interpreter is the `python3` on `PATH`.
 
-## Fences of host files
+### Fences of host files
 
 A `python`, `py`, `py3`, `python3` or `rusthon` fence of a Markdown file is a module of its own, analysed as `<dir>/.lighthouse-snippets/<file>.<n>/snippet.py`, that consumes the project from outside through the same import roots. A fence that is not valid Python is a notice. Names the prose defines are `syntactic` edges to the project declarations that bear them, counted in one notice. Spans and comments are mapped to the host through `text_map`.
 
 ## Conformance
 
-Goldens: `crates/lighthouse-rpc/tests/conformance/python`. Shared case names: `comments`, `excluded`, `extents`, `flow`, `generated`, `members`, `projects`, `roles`, `signatures`, `testcases`, `visibility`, `syntax`, `unicode`, `references`. Python's own: `annotations`, `asyncs`, `imports`, `models`, `modulebody`, `namespaces`, `scopes`.
+Goldens: `crates/lighthouse-rpc/tests/conformance/python`. Shared cases (the same name in every language plugin): `comments`, `errors`, `excluded`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`. Own cases: `annotations`, `asyncs`, `imports`, `members`, `models`, `modulebody`, `namespaces`, `projects`, `references`, `roles`, `scopes`, `unicode`.
 
-Not applicable, with the reason: `aliases` (a Python alias is an assignment, a `var`), `embedded` (no embedding of types), `errors` and `events` (no error-handling or event facts for Python), `generics` (type parameters are not symbols), `layout` and `tags` (Go file layout and build tags), `nomod`, `xtest`, `wider` (Go modules and packages).
+Not applicable: `events` (the provider reports no body events). Python has no counterpart of Go's `aliases`, `embedded`, `generics`, `layout`, `nomod`, `tags`, `wider` and `xtest`, so it has no case of those names.
+
+## Build
+
+`make plugins` copies the `lang_python` package to `target/plugins/lang-python`. `python3 -I scripts/wire.py` rewrites `lang_python/sdk/wire.py`.
 
 ## Tests
 
