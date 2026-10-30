@@ -49,31 +49,27 @@ fn entry(project: &Project, ty: &Symbol) -> Value {
         .copied()
         .filter(|m| !project.function(&m.id).is_some_and(|f| f.implementation))
         .collect();
-    let all = groups(project, ty, &methods, false);
-    // The cohesion of what the type itself decides: no implementation of a
-    // contract someone else fixes, nothing that relates to no sibling.
-    let core = groups(project, ty, &own, true);
+    let groups = groups(project, ty, &own);
     json!({
         "id": ty.id.as_str(),
         "name": ty.name,
         "file": ty.file.to_string_lossy(),
-        "lang": project.file(&ty.file).map_or("", |f| f.lang.as_str()),
         "line": ty.span.start.line,
         "methods": own.len(),
         "public_methods": own.iter().filter(|m| m.visibility == Visibility::Public).count(),
-        "lcom4": all.len(),
-        "groups": all,
-        "lcom4_core": core.len(),
-        "groups_core": core,
+        "lcom4": groups.len(),
+        "groups": groups,
     })
 }
 
 /// The names of the methods of each connected component, the largest
 /// component first. The methods of an interface declare no bodies and share
-/// nothing: they are one group. With `core`, a method that uses no field and
-/// neither calls nor is called by a sibling is left out: it has no instance
-/// state to be cohesive with, as a static method has none.
-fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol], core: bool) -> Vec<Vec<String>> {
+/// nothing: they are one group. Methods that do not belong to the type's own
+/// design are not nodes: implementations of a contract someone else fixes (the
+/// host's `implementation` role) and methods that use no field and
+/// neither call nor are called by a sibling, which have no instance state to be
+/// cohesive with, as a static method has none.
+fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol]) -> Vec<Vec<String>> {
     if methods.is_empty() {
         return Vec::new();
     }
@@ -86,7 +82,7 @@ fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol], core: bool) -> Ve
     };
     let mut components: BTreeMap<usize, Vec<String>> = BTreeMap::new();
     for (at, method) in methods.iter().enumerate() {
-        if core && !related[at] {
+        if !related[at] {
             continue;
         }
         let root = root(&mut parent, at);

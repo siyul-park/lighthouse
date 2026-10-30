@@ -75,10 +75,10 @@ spec:
             func (s *Store) total() int { return len(s.items) }
       expect:
         - line: 3
-    - name: a-method-of-no-field-is-its-own-group
+    - name: a-method-of-no-field-is-no-group
       language: go
       kind: invalid
-      options: { methods: 2, public: 2, lcom4: 2, groups: [[Count], [Version]] }
+      options: { methods: 2, public: 2, lcom4: 1, groups: [[Count]] }
       files:
         - path: example.go
           body: |-
@@ -107,10 +107,10 @@ spec:
 
             func (s *Store) Count() int    { return len(s.items) }
             func (s *Store) Version() int  { return 1 }
-    - name: trait-methods-join-the-groups-but-are-not-counted
+    - name: trait-methods-are-neither-counted-nor-grouped
       language: rust
       kind: invalid
-      options: { methods: 1, public: 1, lcom4: 1, groups: [[fmt, size]] }
+      options: { methods: 1, public: 1, lcom4: 1, groups: [[size]] }
       files:
         - path: src/lib.rs
           body: |-
