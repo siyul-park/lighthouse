@@ -22,12 +22,13 @@ mod scan;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use lighthouse_model::{Fingerprint, Preview, Safety, ucm::Capability};
 use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Programs, Task};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 pub use edits::unified_diff;
@@ -306,13 +307,22 @@ pub struct AppliedFix {
 }
 
 /// A finding that was left as it was, and why.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct DeclinedFix {
+    #[schemars(with = "String")]
     pub fingerprint: Fingerprint,
+    #[serde(rename = "decision")]
     pub rule_id: String,
+    #[serde(rename = "path", serialize_with = "slashed_path")]
+    #[schemars(with = "String")]
     pub file: PathBuf,
     pub line: u32,
     pub reason: String,
+}
+
+/// A path as the reports write it, with `/` on every platform.
+fn slashed_path<S: serde::Serializer>(path: &Path, out: S) -> Result<S::Ok, S::Error> {
+    out.serialize_str(&lighthouse_resource::slashed(path))
 }
 
 /// A file's text before and after the run.

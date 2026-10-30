@@ -9,12 +9,14 @@ use std::{
 };
 
 use lighthouse_protocol::{Tool, ToolEvent};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 /// What stands in `reads` for every file outside the project the agent opened.
 const OUTSIDE: &str = "(outside the project)";
 
 /// The calls of each tool.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ToolCounts {
     pub read: usize,
     pub search: usize,

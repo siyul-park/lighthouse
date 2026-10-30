@@ -187,7 +187,11 @@ fn declined() {
     assert_eq!(done.declined.len(), 1, "{:?}", done.lines());
     let left = &done.declined[0];
     assert_eq!(
-        (left.decision.as_str(), left.path.as_str(), left.line),
+        (
+            left.rule_id.as_str(),
+            left.file.to_str().unwrap(),
+            left.line
+        ),
         ("local/long-note", "a.txt", 1)
     );
     assert_eq!(left.reason, "the agent changed no file");
@@ -233,7 +237,7 @@ fn batch() {
     // It opened the file of the finding, which the brief includes, and
     // another one, which it does not.
     assert_eq!(batch.reads, ["other.txt"]);
-    assert_eq!(batch.calls.read, 2);
+    assert_eq!(batch.counts.read, 2);
     assert!(!batch.incomplete);
     assert!(batch.note.is_none());
 }

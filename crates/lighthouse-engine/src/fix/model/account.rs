@@ -5,6 +5,9 @@ use std::{
     sync::{Mutex, PoisonError},
 };
 
+use schemars::JsonSchema;
+use serde::Serialize;
+
 /// Why a fix by a model was declined, as a class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::fix) enum Class {
@@ -60,20 +63,22 @@ pub(in crate::fix) enum Event {
     Declined(Class),
 }
 
-/// What happened to the findings of one decision given to a model.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// What became of the findings of one decision that were given to a model.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ModelCounts {
     /// Findings the model was asked about.
     pub asked: usize,
     /// Of them, those it replied to.
     pub answered: usize,
-    /// Replies the checks accepted: the finding gone, nothing new in the file.
+    /// Replies the checks accepted.
     pub verified: usize,
     /// Verified fixes that were written.
     pub applied: usize,
     /// Verified fixes left as previews.
     pub previewed: usize,
-    /// Findings left as they were, by the class of the reason.
+    /// Findings left as they were, by the class of the reason: `no-extent`,
+    /// `unanswered`, `out-of-scope`, `conflict`, `unchanged`, `unresolved`,
+    /// `introduced`, `incomplete` or `rolled-back`.
     pub declined: BTreeMap<String, usize>,
 }
 

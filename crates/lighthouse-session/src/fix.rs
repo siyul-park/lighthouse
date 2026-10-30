@@ -10,7 +10,7 @@ use std::{
 
 use lighthouse_engine::{
     AppliedFix, BatchTrace, DeclinedFix, Engine, FixPlan, FixRun, FixedBy, ModelCounts,
-    ModelOptions, PreviewedFix, cache, unified_diff,
+    ModelOptions, PreviewedFix, ToolCounts, cache, unified_diff,
 };
 use lighthouse_model::{Fingerprint, Preview};
 use lighthouse_protocol::ToolEvent;
@@ -68,7 +68,7 @@ pub struct Fixed {
     /// The unified diff of every changed file, in path order.
     pub diff: String,
     pub applied: Vec<Applied>,
-    pub declined: Vec<Declined>,
+    pub declined: Vec<DeclinedFix>,
     /// How many times fixing was repeated until nothing was left.
     pub rounds: usize,
     /// `unsafe` fixes, by any provider, that the checks accepted and that were
@@ -80,7 +80,7 @@ pub struct Fixed {
     /// What became of the findings given to a model, by decision. Absent when
     /// no model was asked.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub models: BTreeMap<String, Models>,
+    pub models: BTreeMap<String, ModelCounts>,
     /// The requests that went to a model this run, and what they cost.
     /// Absent when no model was asked.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -109,25 +109,6 @@ pub struct Previewed {
     /// Applies exactly this fix, as a command line and as a tool call.
     #[serde(flatten)]
     pub apply: Apply,
-}
-
-/// What became of the findings of one decision that were given to a model.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct Models {
-    /// Findings the model was asked about.
-    pub asked: usize,
-    /// Of them, those it replied to.
-    pub answered: usize,
-    /// Replies the checks accepted.
-    pub verified: usize,
-    /// Verified fixes that were written.
-    pub applied: usize,
-    /// Verified fixes left as previews.
-    pub previewed: usize,
-    /// Findings left as they were, by the class of the reason: `no-extent`,
-    /// `unanswered`, `out-of-scope`, `conflict`, `unchanged`, `unresolved`,
-    /// `introduced`, `incomplete` or `rolled-back`.
-    pub declined: BTreeMap<String, usize>,
 }
 
 /// Requests to models and what they cost.
@@ -167,7 +148,8 @@ pub struct Batch {
     /// What it searched, and the listings it made, in order.
     pub searches: Vec<ToolEvent>,
     /// How many calls of each tool it made.
-    pub calls: Calls,
+    #[serde(rename = "calls")]
+    pub counts: ToolCounts,
     /// This is not all the agent did: `note` says what is missing.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub incomplete: bool,
@@ -177,29 +159,13 @@ pub struct Batch {
     pub note: Option<String>,
 }
 
-/// Calls of each tool.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct Calls {
-    pub read: usize,
-    pub search: usize,
-    pub list: usize,
-    pub edit: usize,
-    pub run: usize,
-}
-
 impl From<&BatchTrace> for Batch {
     fn from(trace: &BatchTrace) -> Self {
         Self {
             file: slashed(&trace.file),
             reads: trace.reads.clone(),
             searches: trace.searches.clone(),
-            calls: Calls {
-                read: trace.counts.read,
-                search: trace.counts.search,
-                list: trace.counts.list,
-                edit: trace.counts.edit,
-                run: trace.counts.run,
-            },
+            counts: trace.counts,
             incomplete: trace.incomplete.is_some(),
             note: trace.incomplete.clone(),
         }
@@ -220,16 +186,6 @@ pub struct Applied {
     /// edited it is part of that fix.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub follow_up: bool,
-}
-
-/// A finding that was left as it was, and why.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct Declined {
-    pub fingerprint: String,
-    pub decision: String,
-    pub path: String,
-    pub line: u32,
-    pub reason: String,
 }
 
 impl Fixed {
@@ -274,13 +230,16 @@ impl Fixed {
         for fix in &self.declined {
             lines.push(format!(
                 "not fixed {}:{} {}: {}",
-                fix.path, fix.line, fix.decision, fix.reason
+                slashed(&fix.file),
+                fix.line,
+                fix.rule_id,
+                fix.reason
             ));
         }
         lines.extend(
             self.models
                 .iter()
-                .map(|(decision, counts)| counts.line(decision)),
+                .map(|(decision, counts)| model_line(counts, decision)),
         );
         if let Some(usage) = &self.usage {
             let runs = usage.agent.as_ref().map_or(String::new(), |agent| {
@@ -334,10 +293,10 @@ impl Fixed {
     }
 }
 
-impl Models {
-    /// A person's line for the counts of `decision`.
-    fn line(&self, decision: &str) -> String {
-        let declined: Vec<String> = self
+/// A person's line for the counts of `decision`.
+fn model_line(counts: &ModelCounts, decision: &str) -> String {
+    {
+        let declined: Vec<String> = counts
             .declined
             .iter()
             .map(|(class, n)| format!("{class} {n}"))
@@ -347,27 +306,14 @@ impl Models {
         } else {
             format!(
                 "{} ({})",
-                self.declined.values().sum::<usize>(),
+                counts.declined.values().sum::<usize>(),
                 declined.join(", ")
             )
         };
         format!(
             "model fixes {decision}: asked {}, answered {}, verified {}, applied {}, previewed {}, declined {declined}",
-            self.asked, self.answered, self.verified, self.applied, self.previewed
+            counts.asked, counts.answered, counts.verified, counts.applied, counts.previewed
         )
-    }
-}
-
-impl From<&ModelCounts> for Models {
-    fn from(counts: &ModelCounts) -> Self {
-        Self {
-            asked: counts.asked,
-            answered: counts.answered,
-            verified: counts.verified,
-            applied: counts.applied,
-            previewed: counts.previewed,
-            declined: counts.declined.clone(),
-        }
     }
 }
 
@@ -417,18 +363,6 @@ impl Applied {
             description: fix.description.clone(),
             files: fix.files.iter().map(|f| slashed(f)).collect(),
             follow_up: fix.follow_up,
-        }
-    }
-}
-
-impl From<&DeclinedFix> for Declined {
-    fn from(fix: &DeclinedFix) -> Self {
-        Self {
-            fingerprint: fix.fingerprint.as_str().to_owned(),
-            decision: fix.rule_id.clone(),
-            path: slashed(&fix.file),
-            line: fix.line,
-            reason: fix.reason.clone(),
         }
     }
 }
@@ -495,18 +429,14 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
             .iter()
             .map(|fix| Applied::new(fix, &plan))
             .collect(),
-        declined: report.declined.iter().map(Declined::from).collect(),
+        declined: report.declined.clone(),
         rounds: report.rounds,
         previews: report
             .previews
             .iter()
             .map(|fix| Previewed::new(fix, &plan, &widths))
             .collect(),
-        models: report
-            .models
-            .iter()
-            .map(|(decision, counts)| (decision.clone(), Models::from(counts)))
-            .collect(),
+        models: report.models.clone(),
         usage: (!report.models.is_empty()).then_some(Usage {
             usage: report.usage,
             agent: report.model_edits.as_ref().map(|agent| Runs {
