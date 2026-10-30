@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::Result;
+use lighthouse_model::{Attribution, Result};
 use lighthouse_plugin::{
     DATASETS_DIR, DecisionRef, LineKeys, Question, Subject, TrainingLine, dataset_path,
 };
@@ -26,7 +26,7 @@ pub(crate) struct Row {
     pub(crate) fail: bool,
     pub(crate) source: Source,
     pub(crate) key: String,
-    pub(crate) attribution: Value,
+    pub(crate) attribution: Attribution,
 }
 
 /// A line of a stored dataset: what the cross-fit needs to place it, and its
@@ -58,7 +58,7 @@ pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> 
                 group,
                 decision: &decision.id,
                 key: &row.key,
-                attribution: row.attribution.clone(),
+                attribution: serde_json::to_value(&row.attribution)?,
             },
         );
         lines.push(canonical(&serde_json::to_value(&line)?));

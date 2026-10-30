@@ -8,14 +8,14 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Judgment, ModelRef, Result};
+use lighthouse_model::{AgentKind, Attribution, Judgment, ModelRef, Result, Role};
 use lighthouse_plugin::{
     CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
     FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, ModelClient, Subject, fails, request_of,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::{
     artifact,
@@ -215,7 +215,11 @@ fn taught(
     decision: &DecisionRef,
     unlabelled: Vec<(String, Subject)>,
 ) -> Result<Vec<Row>> {
-    let attribution = json!({"type": "SoftwareAgent", "hadRole": "model"});
+    let attribution = Attribution {
+        kind: AgentKind::SoftwareAgent,
+        id: None,
+        role: Some(Role::Model),
+    };
     let mut labelled = Vec::new();
     for (key, subject) in unlabelled {
         let answered = teacher.classify(&request_of(subject.state.clone(), [decision]))?;

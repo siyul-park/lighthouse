@@ -127,6 +127,16 @@ impl Attribution {
     }
 }
 
+/// A judgment on a subject of a decision, as the store records it: what
+/// learning reads of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Judged {
+    pub fingerprint: String,
+    pub meaning_version: Option<String>,
+    pub judgment: Judgment,
+    pub by: Attribution,
+}
+
 /// What a judgment teaches a model about the decision that raised the
 /// finding. An unjudged finding has no label: it is not a negative.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

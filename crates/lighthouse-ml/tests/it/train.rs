@@ -4,7 +4,7 @@ use lighthouse_ml::{
     labels::{Sample, Source},
     train::{Fit, Rows, train},
 };
-use lighthouse_model::Judgment;
+use lighthouse_model::{AgentKind, Attribution, Judgment};
 use lighthouse_plugin::{DATASETS_DIR, Subject, dataset_path};
 use serde_json::json;
 
@@ -15,7 +15,7 @@ fn label(key: &str, judgment: Judgment, source: Source) -> Sample {
         key: key.to_owned(),
         judgment,
         source,
-        attribution: json!({"type": "Person"}),
+        attribution: Attribution::new(AgentKind::Person, None),
         observed: None,
         subject: None,
     }

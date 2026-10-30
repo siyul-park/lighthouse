@@ -12,7 +12,9 @@ use lighthouse_ml::{
     labels::{Sample, Source},
     metrics::Outcome,
 };
-use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Result, Severity, Span};
+use lighthouse_model::{
+    AgentKind, Attribution, Diagnostic, Fingerprint, Judgment, Position, Result, Severity, Span,
+};
 use lighthouse_plugin::{
     Answer, Capabilities, CreateFineTuningJobRequest, DecisionRef, Error, FineTuningJob,
     FineTuningJobStatus, Model, ModelClient, State, Subject, Supports, SystemOneRequest,
@@ -215,7 +217,7 @@ pub fn label(
         key: key.to_owned(),
         judgment,
         source: Source::Person,
-        attribution: json!({"type": "Person", "id": "p"}),
+        attribution: Attribution::new(AgentKind::Person, Some("p".to_owned())),
         observed,
         subject,
     }

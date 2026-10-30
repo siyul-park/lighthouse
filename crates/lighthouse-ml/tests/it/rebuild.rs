@@ -5,7 +5,7 @@ use lighthouse_ml::{
     rebuild::{Learned, Status, unrebuildable},
     train::Rows,
 };
-use lighthouse_model::Judgment;
+use lighthouse_model::{AgentKind, Attribution, Judgment};
 use lighthouse_plugin::{DecisionRef, Subject};
 use lighthouse_protocol::{canonical, hash::sha256};
 use serde_json::json;
@@ -35,7 +35,7 @@ fn dataset(root: &Path, texts: &[&str]) -> String {
             key: (*text).to_owned(),
             judgment: Judgment::Fail,
             source: Source::Person,
-            attribution: json!({"type": "Person"}),
+            attribution: Attribution::new(AgentKind::Person, None),
             observed: None,
             subject: None,
         })

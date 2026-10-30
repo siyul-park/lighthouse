@@ -9,10 +9,9 @@
 
 use std::{collections::BTreeMap, fs, path::Path};
 
-use lighthouse_model::{AgentKind, Attribution, Judgment, Result, Role};
+use lighthouse_model::{AgentKind, Attribution, Judged, Judgment, Result, Role};
 use lighthouse_plugin::Subject;
 use lighthouse_spec::Decision;
-use serde_json::{Value, json};
 
 use crate::metrics::Outcome;
 
@@ -84,7 +83,7 @@ pub struct Sample {
     pub judgment: Judgment,
     pub source: Source,
     /// PROV `wasAttributedTo` of the label.
-    pub attribution: Value,
+    pub attribution: Attribution,
     /// An example subject: how the check came out on it.
     pub observed: Option<Outcome>,
     /// An example subject: what a model is asked about it.
@@ -108,7 +107,7 @@ impl Sample {
             key,
             judgment,
             source: Source::Example,
-            attribution: json!({"type": "Person", "id": format!("example:{decision}")}),
+            attribution: Attribution::new(AgentKind::Person, Some(format!("example:{decision}"))),
             observed: Some(outcome),
             subject,
         }
@@ -128,7 +127,8 @@ impl Table<'_> {
     fn rows(&self) -> Result<Vec<Sample>> {
         let text =
             fs::read_to_string(self.file).map_err(|e| format!("{}: {e}", self.file.display()))?;
-        let attribution = json!({"type": "Person", "id": self.file.display().to_string()});
+        let attribution =
+            Attribution::new(AgentKind::Person, Some(self.file.display().to_string()));
         let mut rows = Vec::new();
         for line in text.lines().filter(|l| !l.starts_with('#')) {
             let cells: Vec<&str> = line.split('\t').collect();
@@ -157,14 +157,6 @@ impl Table<'_> {
         }
         Ok(rows)
     }
-}
-
-/// A judgment on a subject of the decision, as the store records it.
-pub struct Judged {
-    pub fingerprint: String,
-    pub meaning_version: Option<String>,
-    pub judgment: Judgment,
-    pub by: Attribution,
 }
 
 /// What to collect the labels of.
@@ -217,7 +209,7 @@ impl Labels<'_> {
                 key: event.fingerprint.clone(),
                 judgment: event.judgment,
                 source: Source::from(&event.by),
-                attribution: serde_json::to_value(&event.by)?,
+                attribution: event.by.clone(),
                 observed: None,
                 subject: None,
             });

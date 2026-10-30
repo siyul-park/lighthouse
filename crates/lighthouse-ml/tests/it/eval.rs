@@ -4,9 +4,10 @@ use lighthouse_ml::{
     labels::{Sample, Source},
     metrics::Outcome,
 };
-use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Severity, Span};
+use lighthouse_model::{
+    AgentKind, Attribution, Diagnostic, Fingerprint, Judgment, Position, Severity, Span,
+};
 use lighthouse_spec::Evaluation;
-use serde_json::json;
 
 const RULE: &str = "core/max-lines";
 
@@ -24,7 +25,7 @@ fn label(key: &str, judgment: Judgment, observed: Option<Outcome>) -> Sample {
         key: key.to_owned(),
         judgment,
         source: Source::Person,
-        attribution: json!({}),
+        attribution: Attribution::new(AgentKind::Person, None),
         observed,
         subject: None,
     }

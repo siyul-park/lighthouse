@@ -1,10 +1,10 @@
 use std::fs;
 
 use lighthouse_ml::{
-    labels::{Judged, Labels, Sample, Source, Table},
+    labels::{Labels, Sample, Source, Table},
     metrics::Outcome,
 };
-use lighthouse_model::{AgentKind, Attribution, Judgment};
+use lighthouse_model::{AgentKind, Attribution, Judged, Judgment, Role};
 
 const RULE: &str = "core/max-lines";
 
@@ -120,7 +120,7 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
     );
     let m = by("m").unwrap();
     assert_eq!((m.source.weight(), m.source), (0.5, Source::Model));
-    assert_eq!(m.attribution["hadRole"], "model");
+    assert_eq!(m.attribution.role, Some(Role::Model));
     assert!(
         by("self").is_none(),
         "a model never trains on its own labels"
@@ -175,5 +175,5 @@ fn label_example_is_a_subject_of_the_decision_with_the_outcome_the_check_gave() 
         (label.judgment, label.source, label.observed),
         (Judgment::Fail, Source::Example, Some(Outcome::Fail))
     );
-    assert_eq!(label.attribution["id"], format!("example:{RULE}"));
+    assert_eq!(label.attribution.id, Some(format!("example:{RULE}")));
 }

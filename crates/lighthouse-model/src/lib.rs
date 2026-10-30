@@ -28,7 +28,7 @@ pub use diagnostic::{
 pub use document::Document;
 pub use fix::{Preview, PreviewEdit, PreviewFile, Safety, Unavailable};
 pub use model_ref::ModelRef;
-pub use review::{AgentKind, Attribution, Judgment, Label, Role};
+pub use review::{AgentKind, Attribution, Judged, Judgment, Label, Role};
 pub use scope::{ExampleScope, Reach, RunScope, TestScope};
 pub use signal::{SignalClass, SignalStatus};
 pub use text::{
