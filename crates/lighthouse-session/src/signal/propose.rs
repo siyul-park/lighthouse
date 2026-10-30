@@ -164,7 +164,7 @@ pub(crate) fn settle_derived(
                     SignalStatus::Linked { decision }
                 };
                 store.settle_signal(&signal.id, &status, &spelled(by))?;
-                settled.signals.push(signal.id);
+                settled.signals.push(signal.signal.id);
             }
             Err(lighthouse_store::Error::UnknownSignal(_)) => settled.unknown.push(id),
             Err(e) => return Err(e.into()),
@@ -219,7 +219,7 @@ pub fn support(session: &Session, decision: &Decision) -> Result<Option<Support>
             .or_default()
             .entry(source)
             .or_default() += 1;
-        seen.push(signal.id);
+        seen.push(signal.signal.id);
     }
     Ok(Some(Support {
         signals,

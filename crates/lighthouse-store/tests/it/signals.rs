@@ -108,7 +108,7 @@ fn writing_purges_the_signals_past_the_retention() {
         .signals(&SignalFilter::default())
         .unwrap()
         .into_iter()
-        .map(|s| s.id)
+        .map(|s| s.signal.id)
         .collect();
     assert_eq!(ids, ["000000000002"]);
 }

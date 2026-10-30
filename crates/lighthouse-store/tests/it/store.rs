@@ -27,7 +27,7 @@ fn fingerprints(store: &Store, filter: &Filter) -> Vec<String> {
         .list(filter)
         .unwrap()
         .into_iter()
-        .map(|f| f.fingerprint)
+        .map(|f| f.observed.fingerprint)
         .collect()
 }
 

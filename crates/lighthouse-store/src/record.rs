@@ -9,11 +9,13 @@ use crate::JudgmentEvent;
 
 /// One finding as a run saw it. The locator and evidence are JSON so that
 /// artifacts other than source code fit the same record.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Observed {
     pub fingerprint: String,
     pub decision: String,
-    /// The uid of the finding's decision.
+    /// The uid of the finding's decision, when the catalog gave it one.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub decision_uid: Option<String>,
     pub severity: Severity,
     /// The severity its decision authored: what decides whether a judgment may
@@ -36,12 +38,16 @@ pub struct Observed {
     /// Hash of what the rule's decision means; judgments expire when it moves.
     pub meaning_version: Option<String>,
     /// Hash of how the decision is checked. Recorded, never compared to
-    /// expire a judgment.
+    /// expire a judgment; a record does not show it.
+    #[serde(skip)]
     pub check_revision: Option<String>,
     /// The model that decided the finding and the version of its program
     /// (`provider/model@hash`). Recorded, never compared to expire a judgment.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub model_version: Option<String>,
-    /// Hash of the whole decision definition, wording and examples included.
+    /// Hash of the whole decision definition, wording and examples included;
+    /// a record does not show it.
+    #[serde(skip)]
     pub decision_hash: Option<String>,
 }
 
@@ -261,16 +267,9 @@ impl fmt::Display for State {
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FindingRecord {
-    pub fingerprint: String,
-    pub decision: String,
-    /// The uid of the finding's decision, when the catalog gave it one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub decision_uid: Option<String>,
-    pub severity: Severity,
-    pub authored_severity: Severity,
-    pub path: String,
-    pub locator: Value,
-    pub symbol: Option<String>,
+    /// The latest sighting.
+    #[serde(flatten)]
+    pub observed: Observed,
     pub first_seen: String,
     pub last_seen: String,
     /// Set when a complete run no longer reported the finding.
@@ -280,20 +279,11 @@ pub struct FindingRecord {
     pub state: State,
     /// How many times it came back after being resolved.
     pub reopened: u32,
-    pub message: String,
-    pub evidence: Value,
-    pub facts: Value,
-    pub options: Value,
     /// Commit and cleanliness of the working tree at the last sighting.
     pub commit: Option<String>,
     pub dirty: Option<bool>,
     pub lighthouse_version: Option<String>,
     pub catalog_version: Option<String>,
-    pub meaning_version: Option<String>,
-    /// The model that decided the finding at its last sighting, with the
-    /// version of its program.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub model_version: Option<String>,
     /// The latest judgment, if the finding was judged.
     pub judgment: Option<Judgment>,
     /// What that judgment does to the finding now.
@@ -303,6 +293,14 @@ pub struct FindingRecord {
     pub justification: Option<String>,
     /// The judgment said the decision does not apply here.
     pub narrowing: bool,
+}
+
+impl std::ops::Deref for FindingRecord {
+    type Target = Observed;
+
+    fn deref(&self) -> &Observed {
+        &self.observed
+    }
 }
 
 impl FindingRecord {

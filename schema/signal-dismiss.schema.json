@@ -159,16 +159,21 @@
       ]
     },
     "event": {
+      "description": "The hook event that saw it: `UserPromptSubmit`, `PostToolUse`, `Stop`.",
       "type": "string"
     },
     "excerpt": {
+      "description": "Scrubbed and short: never the whole message.",
       "type": "string"
     },
-    "features": true,
+    "features": {
+      "description": "What was measured of it, never the text."
+    },
     "id": {
       "type": "string"
     },
     "rule": {
+      "description": "The classifier rule that fired, or the decision of a finding.",
       "type": "string"
     },
     "session": {
@@ -188,13 +193,13 @@
   "required": [
     "id",
     "session",
-    "time",
     "event",
     "class",
     "excerpt",
     "features",
     "rule",
     "by",
+    "time",
     "asked"
   ],
   "title": "SignalDismiss",

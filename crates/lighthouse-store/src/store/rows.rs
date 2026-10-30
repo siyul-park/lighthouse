@@ -10,8 +10,8 @@ use rusqlite::{
 use serde_json::{Value, json};
 
 use crate::{
-    Error, FindingRecord, JudgmentEvent, JudgmentSpec, NewJudgment, Standing, State, Subject,
-    SuppressionEvent, SuppressionSpec, Versions, standings::Standings,
+    Error, FindingRecord, JudgmentEvent, JudgmentSpec, NewJudgment, Observed, Standing, State,
+    Subject, SuppressionEvent, SuppressionSpec, Versions, standings::Standings,
 };
 
 use super::{JUDGMENT_COLUMNS, MAX_CANDIDATES, SNAPSHOT_VERSION};
@@ -254,30 +254,34 @@ pub(super) fn finding_record(row: &Row, standings: &Standings) -> rusqlite::Resu
         State::Open
     };
     Ok(FindingRecord {
-        fingerprint: subject.fingerprint.clone(),
-        decision: row.get("decision")?,
-        decision_uid: row.get("decision_uid")?,
-        severity: severity(row, "severity")?,
-        authored_severity,
-        path: row.get("path")?,
-        locator: json_column(row, "locator")?,
-        symbol: row.get("symbol")?,
+        observed: Observed {
+            fingerprint: subject.fingerprint.clone(),
+            decision: row.get("decision")?,
+            decision_uid: row.get("decision_uid")?,
+            severity: severity(row, "severity")?,
+            authored_severity,
+            path: row.get("path")?,
+            locator: json_column(row, "locator")?,
+            symbol: row.get("symbol")?,
+            message: row.get("last_message")?,
+            evidence: json_column(row, "last_evidence")?,
+            facts: json_column(row, "last_facts")?,
+            options: json_column(row, "last_options")?,
+            meaning_version: subject.meaning_version,
+            check_revision: row.get("check_revision")?,
+            model_version: row.get("model_version")?,
+            decision_hash: row.get("decision_hash")?,
+        },
         first_seen: row.get("first_seen")?,
         last_seen: row.get("last_seen")?,
         resolved_at,
         inactive_at,
         state,
         reopened: row.get("reopened")?,
-        message: row.get("last_message")?,
-        evidence: json_column(row, "last_evidence")?,
-        facts: json_column(row, "last_facts")?,
-        options: json_column(row, "last_options")?,
         commit: row.get("last_commit")?,
         dirty: row.get("last_dirty")?,
         lighthouse_version: row.get("lighthouse_version")?,
         catalog_version: row.get("catalog_version")?,
-        meaning_version: subject.meaning_version,
-        model_version: row.get("model_version")?,
         judgment: ruling.as_ref().map(|r| r.judgment),
         standing,
         justification: ruling.as_ref().and_then(|r| r.justification.clone()),

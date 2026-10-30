@@ -92,7 +92,7 @@ impl Store {
             1 => Ok(found.remove(0)),
             _ => Err(Error::AmbiguousSignal {
                 prefix: id.to_owned(),
-                candidates: found.into_iter().map(|s| s.id).collect(),
+                candidates: found.into_iter().map(|s| s.signal.id).collect(),
             }),
         }
     }
@@ -187,19 +187,21 @@ fn signal(row: &Row) -> rusqlite::Result<Signal> {
     let features: String = row.get(6)?;
     let status = row.get::<_, String>(11)?;
     Ok(Signal {
-        id: row.get(0)?,
-        session: row.get(1)?,
-        time: row.get(2)?,
-        event: row.get(3)?,
-        class: parse(&row.get::<_, String>(4)?)?,
-        excerpt: row.get(5)?,
-        features: serde_json::from_str(&features).map_err(conversion)?,
-        rule: row.get(7)?,
-        by: Attribution {
-            kind: parse(&row.get::<_, String>(8)?)?,
-            id: row.get(9)?,
-            role: role_of(row.get(10)?)?,
+        signal: NewSignal {
+            id: row.get(0)?,
+            session: row.get(1)?,
+            event: row.get(3)?,
+            class: parse(&row.get::<_, String>(4)?)?,
+            excerpt: row.get(5)?,
+            features: serde_json::from_str(&features).map_err(conversion)?,
+            rule: row.get(7)?,
+            by: Attribution {
+                kind: parse(&row.get::<_, String>(8)?)?,
+                id: row.get(9)?,
+                role: role_of(row.get(10)?)?,
+            },
         },
+        time: row.get(2)?,
         status: SignalStatus::from_parts(&status, row.get(12)?).ok_or_else(|| {
             conversion(Error::Io {
                 path: "signals".to_owned(),

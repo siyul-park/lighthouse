@@ -8,7 +8,8 @@ use serde_json::Value;
 
 /// A signal to record. Its `id` is the caller's, so that seeing the same
 /// thing twice records it once.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct NewSignal {
     pub id: String,
     pub session: String,
@@ -21,6 +22,8 @@ pub struct NewSignal {
     pub features: Value,
     /// The classifier rule that fired, or the decision of a finding.
     pub rule: String,
+    /// Who it is attributed to: the person for what they said, the agent for
+    /// what its edits caused, a model for what one classified.
     pub by: Attribution,
 }
 
@@ -28,17 +31,9 @@ pub struct NewSignal {
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Signal {
-    pub id: String,
-    pub session: String,
+    #[serde(flatten)]
+    pub signal: NewSignal,
     pub time: String,
-    pub event: String,
-    pub class: SignalClass,
-    pub excerpt: String,
-    pub features: Value,
-    pub rule: String,
-    /// Who it is attributed to: the person for what they said, the agent for
-    /// what its edits caused, a model for what one classified.
-    pub by: Attribution,
     #[serde(flatten)]
     pub status: SignalStatus,
     /// Who settled it, as `--attributed-to` spells it.
@@ -46,6 +41,14 @@ pub struct Signal {
     pub settled_by: Option<String>,
     /// Whether a stop has asked the agent about it.
     pub asked: bool,
+}
+
+impl std::ops::Deref for Signal {
+    type Target = NewSignal;
+
+    fn deref(&self) -> &NewSignal {
+        &self.signal
+    }
 }
 
 /// Which signals a listing reads.

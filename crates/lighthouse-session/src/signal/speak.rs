@@ -139,7 +139,7 @@ fn open_findings(root: &Path) -> Result<BTreeMap<String, usize>> {
             decision: None,
             status: StatusFilter::Open,
         })? {
-            *counts.entry(f.decision).or_default() += 1;
+            *counts.entry(f.observed.decision).or_default() += 1;
         }
     }
     Ok(counts)

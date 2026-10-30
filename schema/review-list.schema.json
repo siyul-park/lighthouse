@@ -93,7 +93,7 @@
             "description": "A finding as stored: its latest sighting, its history and its standing.",
             "properties": {
               "authoredSeverity": {
-                "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
+                "description": "The severity its decision authored: what decides whether a judgment may\nhide the finding. For a rule without a decision, the severity it\nreported.",
                 "oneOf": [
                   {
                     "const": "error",
@@ -142,7 +142,9 @@
                 ]
               },
               "evidence": true,
-              "facts": true,
+              "facts": {
+                "description": "What the analysis knew about the subject: language, symbol shape,\nmeasures. Frozen into a judgment's feature snapshot."
+              },
               "fingerprint": {
                 "type": "string"
               },
@@ -200,8 +202,11 @@
                   "null"
                 ]
               },
-              "locator": true,
+              "locator": {
+                "description": "Where in the artifact: `{\"span\": {\"start\": {\"line\", \"col\"}, \"end\": ...}}`\nfor text."
+              },
               "meaningVersion": {
+                "description": "Hash of what the rule's decision means; judgments expire when it moves.",
                 "type": [
                   "string",
                   "null"
@@ -211,7 +216,7 @@
                 "type": "string"
               },
               "modelVersion": {
-                "description": "The model that decided the finding at its last sighting, with the\nversion of its program.",
+                "description": "The model that decided the finding and the version of its program\n(`provider/model@hash`). Recorded, never compared to expire a judgment.",
                 "type": [
                   "string",
                   "null"
@@ -221,8 +226,11 @@
                 "description": "The judgment said the decision does not apply here.",
                 "type": "boolean"
               },
-              "options": true,
+              "options": {
+                "description": "The options the rule ran with, defaults included."
+              },
               "path": {
+                "description": "The artifact, project-relative with `/` separators.",
                 "type": "string"
               },
               "reopened": {
@@ -321,21 +329,21 @@
               "path",
               "locator",
               "symbol",
+              "message",
+              "evidence",
+              "facts",
+              "options",
+              "meaningVersion",
               "firstSeen",
               "lastSeen",
               "resolvedAt",
               "inactiveAt",
               "state",
               "reopened",
-              "message",
-              "evidence",
-              "facts",
-              "options",
               "commit",
               "dirty",
               "lighthouseVersion",
               "catalogVersion",
-              "meaningVersion",
               "judgment",
               "standing",
               "narrowing"
