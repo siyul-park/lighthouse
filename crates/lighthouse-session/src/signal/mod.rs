@@ -22,9 +22,8 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 pub use classify::{EXCERPT_CHARS, Hit, Reading, classify, read as read_prompt, rules, truncated};
-pub use propose::{
-    DUPLICATE_THRESHOLD, Duplicate, Support, candidates, record_proposal, settle_derived, support,
-};
+pub use propose::{DUPLICATE_THRESHOLD, Duplicate, Support, candidates, support};
+pub(crate) use propose::{record_proposal, settle_derived};
 pub use read::{DERIVED_PREFIX, Said, features, said, signal_id};
 pub use scrub::{REDACTED, scrub};
 pub use speak::{digest, prompt_context, stop_context};

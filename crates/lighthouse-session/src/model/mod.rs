@@ -12,7 +12,7 @@ mod train;
 
 pub use attach::{Attachment, Detachment, attach, detach};
 pub(crate) use bound::attached;
-pub use bound::{Binding, BoundModel, list, remote_bound};
+pub use bound::{Binding, BoundModel, bound_models, remote_bound};
 pub use eval::{EvalRequest, eval};
 pub use labelling::{Labelling, Repo};
 pub use lighthouse_ml::{

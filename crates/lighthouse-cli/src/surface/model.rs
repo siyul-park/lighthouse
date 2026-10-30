@@ -27,7 +27,7 @@ pub(super) struct ModelList {
 /// `model list`.
 pub fn list(ctx: &Context, args: &ModelListArgs, format: Format) -> Result<Reply> {
     let session = ctx.session()?;
-    let shown = page(model::list(&session, &args.decision)?, args.limit);
+    let shown = page(model::bound_models(&session, &args.decision)?, args.limit);
     let list = ModelList {
         models: shown.items,
         omitted: shown.omitted,

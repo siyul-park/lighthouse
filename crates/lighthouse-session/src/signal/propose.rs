@@ -141,7 +141,7 @@ pub(crate) fn first_line(text: &str) -> String {
 
 /// Settles the signals `document` derives from: `recorded` when it is a new
 /// decision, `linked` when it changes an existing one.
-pub fn settle_derived(
+pub(crate) fn settle_derived(
     session: &Session,
     document: &Value,
     uid: &str,
@@ -174,7 +174,12 @@ pub fn settle_derived(
 }
 
 /// Records a new proposal and what the dedupe check named, for the measures.
-pub fn record_proposal(session: &Session, uid: &str, id: &str, found: &[Duplicate]) -> Result<()> {
+pub(crate) fn record_proposal(
+    session: &Session,
+    uid: &str,
+    id: &str,
+    found: &[Duplicate],
+) -> Result<()> {
     let names: Vec<String> = found.iter().map(|d| d.id.clone()).collect();
     Ok(Store::open(&session.root)?.add_proposal(uid, id, &names)?)
 }

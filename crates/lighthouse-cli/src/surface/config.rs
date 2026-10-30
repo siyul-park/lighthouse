@@ -24,7 +24,7 @@ pub(super) struct ConfigShow {
 pub fn show(ctx: &Context, args: &ConfigShowArgs, format: Format) -> Result<Reply> {
     let session = ctx.session()?;
     let shown = ConfigShow {
-        settings: environment::show(&session, args.origin),
+        settings: environment::settings(&session, args.origin),
     };
     Reply::data(format, &shown, || {
         let mut out = String::new();

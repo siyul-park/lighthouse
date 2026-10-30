@@ -92,7 +92,7 @@ impl Session {
 
     /// The same project keeping its datasets and models in the store at
     /// `store`.
-    pub fn stored_in(self, store: &Path) -> Self {
+    pub(crate) fn stored_in(self, store: &Path) -> Self {
         Self {
             store: store.to_owned(),
             ..self
@@ -227,7 +227,7 @@ impl Session {
     /// The same project with another local layer, such as a candidate that
     /// has not been written yet. Fails when the layer does not stack on the
     /// bundled one.
-    pub fn with_local(&self, local: Option<Catalog>) -> Result<Self> {
+    pub(crate) fn with_local(&self, local: Option<Catalog>) -> Result<Self> {
         // The candidate was never read by the user, so it is never trusted.
         Ok(Self {
             catalog: Arc::new(layered(&self.comp, local.as_ref())?),

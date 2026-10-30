@@ -127,7 +127,7 @@ pub(crate) fn check_local(root: &Path, personal: &[Personal], catalog: &Catalog)
 
 /// The effective environment of the session's project, key by key; with
 /// `origin`, each with the layer it came from.
-pub fn show(session: &Session, origin: bool) -> Vec<Setting> {
+pub fn settings(session: &Session, origin: bool) -> Vec<Setting> {
     let shown = |origin: String| relative(&session.root, origin);
     session
         .layers

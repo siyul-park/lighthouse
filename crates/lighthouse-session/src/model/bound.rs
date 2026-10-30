@@ -42,7 +42,7 @@ pub struct BoundModel {
 
 /// The models of the project bound to decisions matching `decisions` (ids and
 /// globs; all when empty), in a stable order.
-pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> {
+pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> {
     let catalog = &session.catalog;
     let bound = session.config.models(catalog.projects())?;
     let known: Vec<&str> = catalog.decisions().map(|d| d.id()).collect();
@@ -95,7 +95,7 @@ pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> 
 /// Whether the project binds a model that reaches a service outside the
 /// machine.
 pub fn remote_bound(session: &Session) -> bool {
-    list(session, &[]).is_ok_and(|models| models.iter().any(|m| m.remote))
+    bound_models(session, &[]).is_ok_and(|models| models.iter().any(|m| m.remote))
 }
 
 /// The model each decision is bound to by an approved revision, by decision
