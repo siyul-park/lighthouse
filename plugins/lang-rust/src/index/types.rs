@@ -7,10 +7,10 @@ use syn::Attribute;
 
 use super::{Extractor, Owner, Shape, cap};
 use crate::{
+    extent::{extent_of, span_of},
+    functions::signature::{field_type, optional_field, serde_default},
     names::{ModId, symbol_id},
     project::vis,
-    signature::{field_type, optional_field, serde_default},
-    spans::{extent_of, span_of},
     syntax::doc_of,
 };
 

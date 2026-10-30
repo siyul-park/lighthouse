@@ -1,10 +1,12 @@
 //! What is reachable from outside a library, and so how visible an item is.
 
-use super::*;
+use lighthouse_protocol::Visibility;
+
+use crate::names::{Def, Index, ModId, Ns, Res, UseEntry};
 
 impl Index<'_> {
     /// Marks everything `pub use` makes reachable from outside a library.
-    pub(super) fn settle_exports(&mut self) {
+    pub(crate) fn settle_exports(&mut self) {
         loop {
             let before = (self.exported.len(), self.exported_mods.len());
             for m in 0..self.tree.mods.len() {

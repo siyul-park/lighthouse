@@ -9,9 +9,9 @@ use syn::{
 };
 
 use crate::{
+    extent::{ident_span, span_of},
     macros,
     project::SourceFile,
-    spans::{ident_span, span_of},
 };
 
 /// The macros that panic or mark code that must not run.

@@ -2,8 +2,10 @@
 //! name index and the receiver types that are syntactically known), its
 //! normalized control flow, and the counts of its summary.
 
-mod calls;
+mod edges;
+pub(crate) mod events;
 mod flow;
+pub(crate) mod signature;
 
 use std::collections::{HashMap, HashSet};
 
@@ -17,10 +19,10 @@ use syn::{
 use flow::is_logic;
 
 use crate::{
+    extent::{ident_span, span_of},
     macros,
     names::{Index, Ns, Res, Sym, TyCx, UseEntry, flatten, symbol_id},
     project::SourceFile,
-    spans::{ident_span, span_of},
 };
 
 /// A method name shared by more private methods than this is too common for a

@@ -3,7 +3,6 @@
 //! `super`, `crate`) and the extern prelude of workspace crates.
 
 mod declare;
-mod export;
 mod query;
 mod resolve;
 
@@ -17,8 +16,8 @@ use quote::ToTokens;
 use syn::{Item, UseTree};
 
 use crate::{
+    extent::span_of,
     project::{Tree, vis},
-    spans::span_of,
     syntax::doc_of,
 };
 

@@ -2,22 +2,20 @@
 //! names through its own module tree and speaks the plugin protocol on stdin
 //! and stdout.
 
-mod body;
 mod cache;
-
 mod comments;
-mod events;
+mod extent;
+mod functions;
 mod index;
 mod macros;
 mod names;
 mod project;
 mod provider;
 mod regions;
-mod signature;
 mod source;
-mod spans;
 mod syntax;
 mod tests;
+mod visibility;
 
 use std::{
     io::{self, BufReader},

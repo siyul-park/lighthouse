@@ -11,14 +11,14 @@ use quote::ToTokens;
 use syn::{Attribute, Block, Item};
 
 use crate::{
-    body::{self, Home},
-    comments, events,
+    comments,
+    extent::{extent_of, span_of},
+    functions::signature::signature_of,
+    functions::{self, Home},
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
     },
     project::{SourceFile, vis},
-    signature::signature_of,
-    spans::{extent_of, span_of},
     syntax::{built_type, constructs, count_tokens, doc_of, signature_counts},
     tests,
 };
@@ -254,7 +254,7 @@ impl Extractor<'_> {
         block: &Block,
         (test, role): (Option<&[Attribute]>, Role),
     ) {
-        let facts = body::analyze(self.idx, self.src, home, sig, block);
+        let facts = functions::analyze(self.idx, self.src, home, sig, block);
         self.stats.unread += facts.unread_macros;
         for u in &facts.sites {
             self.edge_as(
@@ -283,7 +283,7 @@ impl Extractor<'_> {
             flow: facts.flow,
             forwards_to: facts.forwards_to,
             signature,
-            events: events::of(self.src, block),
+            events: functions::events::of(self.src, block),
             manual_assertions: 0,
             implementation: role.implementation,
             constructs: role.constructs,
@@ -357,7 +357,7 @@ impl Extractor<'_> {
                 generics: generics_of(&syn::Generics::default(), None),
             },
         };
-        let facts = body::analyze(self.idx, self.src, &home, &sig, &block);
+        let facts = functions::analyze(self.idx, self.src, &home, &sig, &block);
         for u in &facts.sites {
             self.edge_as(
                 u.kind,
