@@ -1,0 +1,17 @@
+[project]
+name = "lang-python"
+version = "0.1.0"
+description = "Lighthouse language provider for Python"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["tests/fixtures", "lang_python/wire.py"]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+
+[tool.ruff.format]
+quote-style = "double"

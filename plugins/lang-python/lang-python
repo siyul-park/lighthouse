@@ -1,0 +1,16 @@
+#!/usr/bin/env -S python3 -I
+# Starts the provider with the python3 on PATH, in isolated mode: no user site,
+# no PYTHON* environment, no script directory on sys.path. Only the package
+# beside this file is added, by absolute path; a project's code is never imported.
+import os
+import sys
+
+if sys.version_info < (3, 11):
+    sys.stderr.write("lang-python: Python 3.11 or newer is required, found %d.%d\n" % sys.version_info[:2])
+    sys.exit(1)
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
+from lang_python.main import main  # noqa: E402
+
+sys.exit(main())

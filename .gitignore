@@ -6,3 +6,4 @@ target/
 node_modules/
 dist/
 plugins/lang-typescript/src/wire.ts
+__pycache__/
