@@ -9,6 +9,7 @@ mod error;
 mod fs;
 mod listing;
 mod schema;
+mod vars;
 mod xdg;
 mod yaml;
 
@@ -23,6 +24,7 @@ pub use error::Error;
 pub use fs::{file_in, read_optional, slashed, write_atomic, write_atomic_guarded};
 pub use listing::{Listed, listed};
 pub use schema::{SCHEMA_URL_BASE, Schema, header, schema, schema_file};
+pub use vars::{replace_vars, var, var_os};
 pub use xdg::{Base, dir as xdg_dir, dir_in as xdg_dir_in, plugins as xdg_plugins};
 pub use yaml::to_yaml;
 

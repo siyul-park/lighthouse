@@ -96,7 +96,7 @@ impl Basis {
 
     /// Whether the user trusts the project at `root` as this basis describes it.
     pub fn trusted(&self, root: &Path) -> bool {
-        if env::var(TRUST_VAR).is_ok_and(|v| v == "1") {
+        if lighthouse_resource::var(TRUST_VAR).is_some_and(|v| v == "1") {
             return true;
         }
         if self.digest.is_empty() {

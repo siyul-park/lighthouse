@@ -14,7 +14,7 @@ use lighthouse_session::{
     trust,
 };
 
-use crate::{cache_fixtures::write, checks::UserHome, mcp::Client};
+use crate::{cache_fixtures::write, checks::user_home, mcp::Client};
 
 /// A decision that flags the lines of `a.txt` that match `pattern`, and whose
 /// fix is the `sed` script; `invalid` is an example it flags and `fixed` what
@@ -223,7 +223,7 @@ fn a_preview_carries_the_follow_ups_of_its_own_change() {
 #[test]
 fn a_dry_run_shows_the_follow_up_with_the_preview_of_its_own_change() {
     let dir = notes(&["one", "two"], "safe");
-    let _user = UserHome::at(&dir.path().join(".home"));
+    user_home();
     let session = Session::find_in(dir.path()).unwrap().unwrap();
     trust(&session.root, &session.basis).unwrap();
 

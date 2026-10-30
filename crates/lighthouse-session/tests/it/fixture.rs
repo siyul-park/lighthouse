@@ -77,14 +77,13 @@ pub fn isolate() {
         let home = tempfile::tempdir().unwrap();
         let path = home.path().join("home");
         std::mem::forget(home);
-        for name in ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"] {
-            // SAFETY: done once, before any test of this binary reads them.
-            unsafe { env::set_var(name, &path) };
-        }
-        // SAFETY: as above.
-        unsafe { env::remove_var("LIGHTHOUSE_TRUST") };
-        // SAFETY: as above.
-        unsafe { env::remove_var("LIGHTHOUSE_ATTRIBUTED_TO") };
+        let moved = ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"]
+            .map(|name| (name.to_owned(), Some(path.clone().into_os_string())));
+        let unset =
+            ["LIGHTHOUSE_TRUST", "LIGHTHOUSE_ATTRIBUTED_TO"].map(|name| (name.to_owned(), None));
+        assert!(lighthouse_resource::replace_vars(
+            moved.into_iter().chain(unset)
+        ));
     });
 }
 

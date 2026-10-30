@@ -1,7 +1,7 @@
 //! Judgments: who is judging, which findings wait for one, and recording a
 //! judgment on a finding. The store stays behind these functions.
 
-use std::{env, path::Path};
+use std::path::Path;
 
 use lighthouse_engine::{
     FixPlan,
@@ -84,9 +84,7 @@ pub struct Shown {
 /// `$LIGHTHOUSE_ATTRIBUTED_TO` says; without that `default` does. A missing id
 /// is the default's when it is of the same kind.
 pub fn attribute_to(spec: Option<&str>, default: &Attribution) -> Result<Attribution> {
-    let from_env = env::var(ATTRIBUTED_VAR)
-        .ok()
-        .filter(|text| !text.is_empty());
+    let from_env = lighthouse_resource::var(ATTRIBUTED_VAR).filter(|text| !text.is_empty());
     let Some(text) = spec.map(str::to_owned).or(from_env) else {
         return Ok(default.clone());
     };
@@ -114,7 +112,7 @@ pub fn attribute_to(spec: Option<&str>, default: &Attribution) -> Result<Attribu
 /// The person at the keyboard: the name configured for the repository, else
 /// `$USER`.
 pub fn person(root: &Path) -> Attribution {
-    let id = user_name(root).or_else(|| env::var("USER").ok());
+    let id = user_name(root).or_else(|| lighthouse_resource::var("USER"));
     Attribution::new(AgentKind::Person, id.filter(|id| !id.is_empty()))
 }
 

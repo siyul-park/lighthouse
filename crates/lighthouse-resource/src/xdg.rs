@@ -2,7 +2,7 @@
 //! kind has a variable and a default below `$HOME`; a relative value of the
 //! variable is invalid and ignored.
 
-use std::{env, ffi::OsString, path::PathBuf};
+use std::{ffi::OsString, path::PathBuf};
 
 /// The directory below each base that is Lighthouse's.
 const APP: &str = "lighthouse";
@@ -39,7 +39,7 @@ impl Base {
 /// `$XDG_<KIND>_HOME/lighthouse`, else `$HOME/<default>/lighthouse`; `None`
 /// when neither is usable.
 pub fn dir(base: Base) -> Option<PathBuf> {
-    dir_in(base, |name| env::var_os(name))
+    dir_in(base, crate::vars::var_os)
 }
 
 /// [`dir`] reading the variables through `var`.

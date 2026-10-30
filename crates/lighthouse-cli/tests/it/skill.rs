@@ -6,14 +6,15 @@ use std::fs;
 use lighthouse_engine::active;
 use lighthouse_session::{Session, skill_for};
 
-use crate::checks::UserHome;
+use crate::checks::user_home;
 
 #[test]
 fn skill_for_lists_every_rule_the_engines_registry_enables() {
     let dir = tempfile::tempdir().unwrap();
-    let home = dir.path().join(".home");
-    lighthouse_test_support::installed(&home, &lighthouse_test_support::lang_rust());
-    let _user = UserHome::at(&home);
+    let home = user_home();
+    if !home.join("lighthouse/plugins/lang-rust").exists() {
+        lighthouse_test_support::installed(home, &lighthouse_test_support::lang_rust());
+    }
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(
