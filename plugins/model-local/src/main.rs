@@ -14,7 +14,7 @@ mod fixture;
 mod folds;
 mod newton;
 #[cfg(test)]
-mod plugin_tests;
+mod tests;
 mod rows;
 mod serve;
 mod train;

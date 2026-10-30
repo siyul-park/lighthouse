@@ -23,4 +23,4 @@ The model that is trained from the labels of a project: it embeds the labelled s
 
 ## Tests
 
-Unit tests in `src/` and process tests in `plugin_tests.rs` with a fake embedder; `cargo test -p model-local`. The test that downloads the embedder's weights is ignored. Models in [docs/models.md](../../docs/models.md).
+Unit tests in `src/` and process tests in `src/tests.rs` with a fake embedder; `cargo test -p model-local`. The test that downloads the embedder's weights is ignored. Models in [docs/models.md](../../docs/models.md).
