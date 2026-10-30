@@ -223,6 +223,28 @@ impl Session {
         Ok((registry, registered))
     }
 
+    /// An engine over `root` with `registry`, `config` and `catalog`, that
+    /// trusts what the user trusts and runs the models the project's
+    /// providers name.
+    pub fn engine_with(
+        &self,
+        registry: Registry,
+        config: Config,
+        catalog: &Catalog,
+        root: &Path,
+    ) -> Result<Engine> {
+        let policy = self.config.sandbox().clone();
+        let cel = self.comp.cel().clone();
+        let commands_root = self.root.clone();
+        let commands: CommandModels = Arc::new(move |name, model, provider| {
+            CommandModel::new(&cel, &commands_root, name, model, provider, &policy)
+                .map(|command| Box::new(command) as Box<dyn ModelClient>)
+        });
+        Ok(Engine::new(registry, config, catalog, root)?
+            .with_trust(self.trusted())
+            .with_commands(commands))
+    }
+
     /// The engine of the project with its plugins started, and what starting
     /// them had to say. It trusts what the user trusts and runs the models the
     /// project's providers name.
@@ -234,17 +256,9 @@ impl Session {
         let (registry, plugins) = self.registry()?;
         self.require_packs(true, |pack| registry.has_plugin(pack))?;
         let config = self.enabled_in(&registry);
-        let root = self.root.clone();
-        let policy = sandbox.clone();
-        let cel = self.comp.cel().clone();
-        let commands: CommandModels = Arc::new(move |name, model, provider| {
-            CommandModel::new(&cel, &root, name, model, provider, &policy)
-                .map(|command| Box::new(command) as Box<dyn ModelClient>)
-        });
-        let engine = Engine::new(registry, config, &self.catalog, &self.root)?
-            .with_incomplete(plugins.incomplete)
-            .with_trust(self.trusted())
-            .with_commands(commands);
+        let engine = self
+            .engine_with(registry, config, &self.catalog, &self.root)?
+            .with_incomplete(plugins.incomplete);
         let listed = permitted(&self.config, &self.catalog, &|id| engine.active(id))?;
         let mut notices = plugins.notices;
         if !sandbox.enabled {

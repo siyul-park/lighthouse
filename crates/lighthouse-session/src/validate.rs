@@ -13,7 +13,6 @@ use std::{
 };
 
 use lighthouse_checks::Composition;
-use lighthouse_engine::Engine;
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
@@ -366,7 +365,8 @@ fn naming(session: &Session, root: &Path, problems: &mut Vec<Problem>) -> Result
     let config = Config::parse_inline(&format!(
         "plugins = [\"core\"]\n[rules]\n\"{DECISION_NAMING}\" = \"warn\"\n"
     ))?;
-    let engine = Engine::new(registry_of(session)?, config, session.comp.bundled()?, root)?;
+    let engine =
+        session.engine_with(registry_of(session)?, config, session.comp.bundled()?, root)?;
     let outcome = engine.check(&[], &[DECISION_NAMING.to_owned()])?;
     problems.extend(outcome.diagnostics.iter().map(|d| {
         let at = root.join(&d.file);
