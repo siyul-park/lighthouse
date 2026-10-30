@@ -9,7 +9,8 @@ spec:
   context: Nonstandard abbreviations increase the number of terms readers must learn
     and make the same concept appear under multiple spellings. Go writes common initialisms
     in capitals (golint `commonInitialisms`, revive `var-naming`); Rust writes an acronym
-    as one word (Rust API Guidelines, C-CASE), so its list is empty.
+    as one word (Rust API Guidelines, C-CASE), so its list is empty; TypeScript does the same (Google
+    TypeScript Style Guide, treat acronyms as words, so `loadHttpUrl` and not `loadHTTPURL`).
   scope:
     subject: symbol
   requirement: Names SHOULD use standard abbreviations and initialisms in their conventional
@@ -36,6 +37,7 @@ spec:
   provenance:
     wasDerivedFrom:
     - 'Lighthouse, coding-patterns#naming-49da70c5'
+    - 'Google TypeScript Style Guide, Naming, Camel case: treat acronyms as words: https://google.github.io/styleguide/tsguide.html#naming-camel-case-defined'
   options:
     properties:
       style:

@@ -5,9 +5,8 @@
 #
 # Builds the release binary and the plugins, then checks each repository with
 # the strict configuration (baseline/strict-root.toml for a Cargo workspace,
-# baseline/strict-go.toml for a Go module; baseline/strict-ts.toml is the
-# TypeScript and JavaScript twin, run by hand with `lighthouse check --config`),
-# three times, and writes
+# baseline/strict-go.toml for a Go module, baseline/strict-ts.toml for a
+# package.json project), three times, and writes
 # baseline/<name>.json: the commit, the size, the exit code, the findings per
 # decision, the median time of each phase and the reach of its modules and
 # symbols (the stability example, as "system"). Everything but the times is
@@ -29,7 +28,8 @@ binary = f"{root}/target/release/lighthouse"
 probe = f"{root}/target/release/examples/stability"
 plugins = f"{root}/target/plugins"
 RUNS = 3
-SOURCES = {".go": "go", ".rs": "rust"}
+SOURCES = {".go": "go", ".rs": "rust", ".ts": "typescript", ".tsx": "typescript", ".js": "typescript", ".jsx": "typescript",
+           ".mjs": "typescript", ".cjs": "typescript", ".mts": "typescript", ".cts": "typescript"}
 SKIP = {".git", "target", ".lighthouse", "node_modules", "vendor"}
 
 
@@ -63,7 +63,14 @@ def commit(path):
 
 
 def config(path, directory):
-    name = "strict-root" if os.path.exists(f"{path}/Cargo.toml") else "strict-go"
+    if os.path.exists(f"{path}/Cargo.toml"):
+        name = "strict-root"
+    elif os.path.exists(f"{path}/go.mod"):
+        name = "strict-go"
+    elif os.path.exists(f"{path}/package.json"):
+        name = "strict-ts"
+    else:
+        raise SystemExit(f"{path}: no Cargo.toml, go.mod or package.json to choose a strict configuration by")
     text = open(f"{root}/baseline/{name}.toml").read().replace("@PLUGINS@", plugins)
     out = f"{directory}/{name}.toml"
     open(out, "w").write(text)
