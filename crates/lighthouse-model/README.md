@@ -1,8 +1,10 @@
 # lighthouse-model
 
+The vocabulary: UCM, findings, records and signals. Layer L0. Never: I/O.
+
 The vocabulary every other crate shares: the code model (UCM: project, symbol, edge, fragment) and the fix edit ops over it in `ucm`, diagnostics and fingerprints, the fix preview, and the review types (judgment, suppression, label).
 
-**Layer.** L0; depends on protocol only, for its hash. Used by every other crate but protocol and the plugins.
+**Depends on:** `lighthouse-protocol`.
 
 ## Entry points
 

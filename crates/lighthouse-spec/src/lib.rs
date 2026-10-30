@@ -1,3 +1,7 @@
+//! The spec kinds (decisions, packs, project configuration), the `Catalog`
+//! that merges them, and the CEL environment their expressions run in. It
+//! knows no plugins and no libraries.
+
 mod attributes;
 mod catalog;
 mod check;

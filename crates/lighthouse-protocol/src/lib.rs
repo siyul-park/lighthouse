@@ -1,8 +1,12 @@
+//! The wire types, framing and JSON schemas that plugins and models speak
+//! with the host. It depends on no other Lighthouse crate.
+
 mod canonical;
-pub mod hash;
 mod language;
 mod model;
 mod route;
+
+pub mod hash;
 pub mod stats;
 
 pub use canonical::canonical;

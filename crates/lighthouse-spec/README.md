@@ -1,8 +1,10 @@
 # lighthouse-spec
 
+The kinds, the Catalog, the Project config and the CEL environment. Layer L1. Never: plugins and libraries.
+
 The spec kinds (Decision, Pack, Project, check and fix specs, options schema) and the `Catalog` that loads, layers and validates them.
 
-**Layer.** L1; depends on model, protocol and resource. Never on plugin: checks bind to decisions by id string.
+**Depends on:** `lighthouse-model`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-resource`.
 
 ## Entry points
 

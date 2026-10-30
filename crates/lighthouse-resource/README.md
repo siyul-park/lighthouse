@@ -1,8 +1,10 @@
 # lighthouse-resource
 
+The KRM envelope, documents and kind schemas. Layer L0. Never: spec semantics.
+
 The resource model of every spec document: an envelope (`apiVersion`, `kind`, `metadata`, `spec`) over a kind-specific spec, read from YAML, TOML or JSON, written as YAML, and described by a JSON Schema per kind.
 
-**Layer.** L0; depends on no workspace crate.
+**Depends on:** no workspace crate.
 
 ## Entry points
 

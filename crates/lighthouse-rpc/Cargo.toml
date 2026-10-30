@@ -11,17 +11,17 @@ doctest = false
 [dependencies]
 cel.workspace = true
 globset.workspace = true
-schemars.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-tempfile.workspace = true
-thiserror.workspace = true
-lighthouse-spec.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
 lighthouse-resource.workspace = true
+lighthouse-spec.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 lighthouse-engine.workspace = true

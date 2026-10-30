@@ -1,8 +1,10 @@
 # lighthouse-protocol
 
+Wire types, framing and schemas for plugins and models. Layer L0. Never: any lighthouse crate.
+
 The wire contract between the host and plugin processes: the language-provider protocol (`initialize`, `index`) and the model protocol (`lighthouse/classify`, `lighthouse/train`), as Content-Length frames over stdio.
 
-**Layer.** The bottom of L0; depends on no workspace crate. Used by model and every crate above it, and by the plugins.
+**Depends on:** no workspace crate.
 
 ## Entry points
 

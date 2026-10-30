@@ -1,8 +1,10 @@
 # lighthouse-cli
 
+The argv and MCP surfaces, the terminal and hook adapters. Layer L5. Never: logic beyond parsing and printing.
+
 The `lighthouse` binary and the frontends over the session: one table of operations (`surface/`), the terminal (`terminal/`) and the MCP server (`mcp/`).
 
-**Layer.** L5; depends on session and report, and the L0 vocabulary crates model, resource and protocol. No engine, store, ml or plugin edge.
+**Depends on:** `lighthouse-model`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-report`, `lighthouse-resource`, `lighthouse-session`.
 
 ## Entry points
 

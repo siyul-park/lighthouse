@@ -9,9 +9,9 @@ name = "lang-toml"
 path = "src/main.rs"
 
 [dependencies]
-lighthouse-protocol.workspace = true
+globset.workspace = true
 lighthouse-plugin.workspace = true
+lighthouse-protocol.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 toml_edit.workspace = true
-globset.workspace = true

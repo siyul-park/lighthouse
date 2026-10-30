@@ -9,9 +9,9 @@ doctest = false
 
 [dependencies]
 cel.workspace = true
-regex.workspace = true
-lighthouse-plugin.workspace = true
 lighthouse-model.workspace = true
+lighthouse-plugin.workspace = true
+regex.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]

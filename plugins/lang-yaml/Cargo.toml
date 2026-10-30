@@ -9,9 +9,9 @@ name = "lang-yaml"
 path = "src/main.rs"
 
 [dependencies]
-lighthouse-protocol.workspace = true
+globset.workspace = true
 lighthouse-plugin.workspace = true
+lighthouse-protocol.workspace = true
+saphyr.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-saphyr.workspace = true
-globset.workspace = true

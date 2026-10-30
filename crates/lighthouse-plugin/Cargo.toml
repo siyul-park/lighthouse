@@ -10,9 +10,9 @@ doctest = false
 
 [dependencies]
 cel.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true
 lighthouse-model.workspace = true
 lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

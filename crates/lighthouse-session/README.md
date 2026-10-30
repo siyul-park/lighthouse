@@ -1,8 +1,10 @@
 # lighthouse-session
 
+The composition root and the per-command wiring (check, fix, model, signal, hooks logic). Layer L4. Never: terminal I/O.
+
 The operations every frontend shares, and the composition root that wires store, engine, checks, rpc, report and ml: load a project, check and remember it, fix, review, test and author decisions, validate specs, evaluate and train models, write the agent skill.
 
-**Layer.** L4; depends on every layer below except protocol and process.
+**Depends on:** `lang-cel`, `lighthouse-checks`, `lighthouse-engine`, `lighthouse-ml`, `lighthouse-model`, `lighthouse-plugin`, `lighthouse-protocol`, `lighthouse-report`, `lighthouse-resource`, `lighthouse-rpc`, `lighthouse-spec`, `lighthouse-store`.
 
 ## Entry points
 

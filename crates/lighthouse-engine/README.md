@@ -1,8 +1,10 @@
 # lighthouse-engine
 
+The orchestration of one run: index, analyze, check, suppress inSource, fix rounds. Layer L2. Never: store and frontends.
+
 Runs the decisions over an indexed project: reads and indexes the files, runs the rules, applies annotations, caches and batches model questions, and runs the fix loop that re-checks.
 
-**Layer.** L2; depends on model, plugin, process, resource and spec (no protocol, no checks).
+**Depends on:** `lighthouse-model`, `lighthouse-plugin`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-resource`, `lighthouse-spec`.
 
 ## Entry points
 

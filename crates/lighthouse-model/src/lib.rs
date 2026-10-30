@@ -1,17 +1,22 @@
+//! The vocabulary every other crate speaks: the code model (UCM), findings,
+//! judgments and records, and signals. Types and their invariants only; it
+//! does no I/O.
+
 #[macro_use]
 mod vocabulary;
 
-pub mod annotation;
 mod clock;
 mod diagnostic;
 mod document;
 mod fix;
-pub mod glob;
 mod model_ref;
 mod review;
 mod scope;
 mod signal;
 mod text;
+
+pub mod annotation;
+pub mod glob;
 pub mod ucm;
 
 pub use clock::now;

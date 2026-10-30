@@ -9,13 +9,13 @@ name = "model-local"
 path = "src/main.rs"
 
 [dependencies]
-base64 = "0.22"
-hf-hub = { version = "0.5", default-features = false, features = ["ureq", "native-tls"] }
+base64.workspace = true
+hf-hub.workspace = true
 lighthouse-protocol.workspace = true
-ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "api-24", "download-binaries", "tls-native"] }
+ort.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokenizers = { version = "0.23", default-features = false, features = ["onig"] }
+tokenizers.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

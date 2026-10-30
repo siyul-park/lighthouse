@@ -9,14 +9,14 @@ test = false
 doctest = false
 
 [dependencies]
+lighthouse-model.workspace = true
+lighthouse-protocol.workspace = true
+lighthouse-resource.workspace = true
 rusqlite.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-lighthouse-model.workspace = true
-lighthouse-protocol.workspace = true
-lighthouse-resource.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

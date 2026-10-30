@@ -9,12 +9,12 @@ test = false
 doctest = false
 
 [dependencies]
+lighthouse-model.workspace = true
+lighthouse-spec.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 similar.workspace = true
-lighthouse-model.workspace = true
-lighthouse-spec.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

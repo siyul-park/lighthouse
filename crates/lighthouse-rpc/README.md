@@ -1,8 +1,10 @@
 # lighthouse-rpc
 
+The process-plugin adapter, wire to core. Layer L2. Never: engine.
+
 Providers that run as processes: discovers and starts plugin processes, adapts them to `Plugin` and `ModelClient` over the protocol, and runs a model that is any program.
 
-**Layer.** L2; depends on model, plugin, process, protocol, resource and spec.
+**Depends on:** `lighthouse-model`, `lighthouse-plugin`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-resource`, `lighthouse-spec`.
 
 ## Entry points
 

@@ -10,35 +10,41 @@ publish = false
 [workspace.dependencies]
 assert_cmd = "2"
 async-openai = { version = "=0.42.0", default-features = false, features = ["chat-completion-types"] }
+base64 = "0.22"
 cel = "0.15"
-comrak = { version = "=0.59.0", default-features = false }
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
+comrak = { version = "=0.59.0", default-features = false }
 globset = "0.4"
-libc = "0.2"
+hf-hub = { version = "0.5", default-features = false, features = ["ureq", "native-tls"] }
 ignore = "0.4"
 include_dir = "0.7"
 insta = "1"
 jsonschema = "0.58"
-rayon = "1"
+libc = "0.2"
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "api-24", "download-binaries", "tls-native"] }
+predicates = "3"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
+rayon = "1"
 regex = "1"
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
+saphyr = "0.2.2"
 schemars = { version = "1", default-features = false, features = ["derive", "std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 serde_norway = "0.9"
-saphyr = "0.2.2"
-similar = "2"
 sha2 = "0.10"
+similar = "2"
 syn = { version = "2", features = ["full", "visit"] }
 tempfile = "3"
 thiserror = "2"
+tokenizers = { version = "0.23", default-features = false, features = ["onig"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 toml = "0.9"
 toml_edit = "0.25"
+ureq = { version = "3.4.2", features = ["json"] }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 

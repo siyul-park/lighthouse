@@ -1,8 +1,10 @@
 # lighthouse-store
 
+The SQLite store: findings, judgments, signals and records. Layer L3. Never: engine.
+
 The quality store: findings with their history in a local SQLite cache, and the judgments, suppressions and revisions on them in a committed, append-only decision log.
 
-**Layer.** L3; depends on model and resource.
+**Depends on:** `lighthouse-model`, `lighthouse-protocol`, `lighthouse-resource`.
 
 ## Entry points
 

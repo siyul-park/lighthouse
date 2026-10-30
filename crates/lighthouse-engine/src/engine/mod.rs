@@ -6,6 +6,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::{
+    Error, annotations,
+    cache::{Cache, Error as CacheError},
+    documents::Documents,
+    facts::FindingFacts,
+    timings::Timings,
+};
 use ignore::WalkBuilder;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
@@ -17,20 +24,11 @@ use lighthouse_plugin::{
     Workspace,
 };
 use lighthouse_spec::{
-    Attributes, Catalog, Config, Error as SpecError, GeneratedCheck, GlobSet,
-    Models as BoundModels, Projects, Routing, RuleConfig, Subject as DecisionSubject,
+    Attributes, Catalog, Config, GeneratedCheck, GlobSet, Models as BoundModels, Projects, Routing,
+    RuleConfig, Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
-use thiserror::Error;
-
-use crate::{
-    annotations,
-    cache::{Cache, Error as CacheError},
-    documents::Documents,
-    facts::FindingFacts,
-    timings::Timings,
-};
 
 mod availability;
 mod batch;
@@ -66,39 +64,6 @@ pub const EXIT_INCOMPLETE: u8 = 3;
 
 /// A model that fails this many requests is skipped for the rest of the run.
 const MAX_FAILURES: usize = 3;
-
-/// Why a run could not start or finish: invalid configuration, unknown or
-/// unlisted plugin or rule, or an unreadable path. Analysis gaps are not
-/// errors; they are [`Run::incomplete`].
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error(transparent)]
-    Spec(#[from] SpecError),
-    #[error(transparent)]
-    Plugin(#[from] lighthouse_plugin::Error),
-    #[error("{}: {source}", path.display())]
-    Io { path: PathBuf, source: io::Error },
-    #[error("unknown plugin `{0}`")]
-    UnknownPlugin(String),
-    #[error("unknown language `{0}` in `languages` configuration")]
-    UnknownLanguage(String),
-    #[error("unknown source provider `{0}` in sources[].language.provider")]
-    UnknownSourceProvider(String),
-    #[error("`{0}` belongs to a plugin not listed in `plugins`")]
-    PluginNotListed(String),
-    #[error("unknown model `{0}`: declare it under `[models.<name>]`")]
-    UnknownModel(String),
-    #[error("model `{name}`: {reason}")]
-    Model { name: String, reason: String },
-    #[error("unknown rule `{0}`")]
-    UnknownRule(String),
-    #[error("rule `{0}` is not enabled by the configuration")]
-    RuleNotEnabled(String),
-    /// A fix run that cannot start or finish safely: incomplete analysis, a
-    /// file changed under it, a formatter that cannot run, an unknown fixer.
-    #[error("{0}")]
-    Fix(String),
-}
 
 /// The result of a run: findings, notices and the parts that were not analyzed.
 #[derive(Debug, Default)]

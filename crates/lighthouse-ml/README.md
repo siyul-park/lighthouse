@@ -1,8 +1,10 @@
 # lighthouse-ml
 
+The mlops host pipeline: labels, dataset, train, grade, attach. Layer L3. Never: project and catalog.
+
 The host side of mlops: the labels of a decision, the dataset they make, the training of a model on it, and the evaluation of a check against the labels.
 
-**Layer.** L3; depends on engine, model, plugin and spec. Never on checks, rpc, store or session.
+**Depends on:** `lighthouse-engine`, `lighthouse-model`, `lighthouse-plugin`, `lighthouse-protocol`, `lighthouse-spec`.
 
 ## Entry points
 

@@ -10,45 +10,30 @@
 mod abstain;
 mod builder;
 mod bundled;
-pub mod caching;
 mod cel_rule;
 mod check;
 mod checks;
-pub mod command;
 mod compose;
+mod error;
 mod eval;
 mod facts;
 mod fix;
 mod glob;
-pub mod layout;
 mod library;
 mod manifest;
-pub mod metrics;
 mod modules;
 mod naming;
-#[doc(hidden)]
-pub mod probe;
 mod table;
 mod text;
+
+pub mod caching;
+pub mod command;
+pub mod layout;
+pub mod metrics;
+#[doc(hidden)]
+pub mod probe;
 
 pub use bundled::{ids, registry, registry_of};
 pub use checks::Checks;
 pub use compose::{Composition, Entry, compose, compose_from};
-
-impl Error {
-    pub(crate) fn invalid(rule: &str, message: impl Into<String>) -> Self {
-        Self::Invalid {
-            rule: rule.to_owned(),
-            message: message.into(),
-        }
-    }
-}
-
-/// Why a check could not be built.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("{rule}: {message}")]
-    Invalid { rule: String, message: String },
-    #[error(transparent)]
-    Spec(#[from] lighthouse_spec::Error),
-}
+pub use error::Error;

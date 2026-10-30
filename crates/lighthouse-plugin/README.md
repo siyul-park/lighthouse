@@ -1,8 +1,10 @@
 # lighthouse-plugin
 
+The plugin SPI (traits, manifests) and the Registry. Layer L1. Never: spec and config.
+
 The in-process plugin SPI: the traits and the registry through which rules, analyzers, fixers, language providers and models enter the host.
 
-**Layer.** L1; depends on model and protocol only. Never on spec or on configuration.
+**Depends on:** `lighthouse-model`, `lighthouse-process`, `lighthouse-protocol`.
 
 ## Entry points
 

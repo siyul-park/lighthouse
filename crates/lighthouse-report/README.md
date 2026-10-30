@@ -1,8 +1,10 @@
 # lighthouse-report
 
+Reporters, docs rendering and descriptors. Layer L3. Never: store.
+
 Renders what a run found: text, SARIF and the agent format (findings grouped by decision), fix proposals, and the generated documentation of the decisions.
 
-**Layer.** L3; depends on model and spec. Never on ml or store (session converts).
+**Depends on:** `lighthouse-model`, `lighthouse-spec`.
 
 ## Entry points
 

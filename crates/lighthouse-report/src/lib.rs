@@ -1,10 +1,15 @@
+//! Reporters and docs rendering: the text, JSON and SARIF reports of a run,
+//! the descriptors of checks and fixes, and the generated reference pages. It
+//! never reads the store.
+
 mod descriptor;
-pub mod docs;
 mod expected;
 mod group;
 mod report;
 mod sarif;
 mod text;
+
+pub mod docs;
 
 use std::fmt::Write;
 
