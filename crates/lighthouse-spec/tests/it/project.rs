@@ -270,6 +270,16 @@ fn config_plugins() {
 }
 
 #[test]
+fn a_plugin_table_without_a_path_is_the_bare_id() {
+    let bare = Config::parse_inline("plugins = [\"core\", \"lang-cel\"]").unwrap();
+    let table = Config::parse_inline("plugins = [\"core\", { id = \"lang-cel\" }]").unwrap();
+
+    assert_eq!(table.plugins(), bare.plugins());
+    assert_eq!(table.plugins()[1], PluginRef::new("lang-cel"));
+    assert!(table.lists("lang-cel"));
+}
+
+#[test]
 fn plugin_ref_timeout_is_a_duration_string() {
     let config =
         Config::parse_inline("plugins = [\"a\", { id = \"b\", timeout = \"2m\" }]").unwrap();

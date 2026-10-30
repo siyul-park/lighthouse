@@ -1695,13 +1695,13 @@ Declaration order should let a reader follow ownership and behavior from public 
 
 ### Callers precede private callees
 
-`design/top-down-order` · symbol · warn · cel · fix: unsafe · go, rust, typescript
+`design/top-down-order` · symbol · warn · cel · fix: unsafe · go, rust
 
-*Readers follow a public operation into its private implementation. A callee placed first forces readers to understand a helper before the behavior that uses it. A constructor is not placed by its callers, and a helper that the statements of a module call as it loads is not either, because it has to be defined before they run.*
+*Readers follow a public operation into its private implementation. A callee placed first forces readers to understand a helper before the behavior that uses it. TypeScript and JavaScript are not covered, since ESLint `no-use-before-define`, whose default warns on every reference to a function before its declaration, asks for the opposite order, and neither the Google TypeScript Style Guide nor the TypeScript Handbook orders functions by their callers.*
 
 A private function SHOULD be declared after the production callers that explain why it exists; public entry points and wiring remain in their appropriate declaration groups.
 
-Derived from: Martin, Clean Code (2008), G10 Vertical Separation; Martin, Clean Code (2008), G11 Inconsistency; Martin, Clean Code (2008), G32 Don't Be Arbitrary; Martin, Clean Code (2008), ch. 5 Vertical distance; Martin, Clean Code (2008), ch. 5 Vertical size and ordering
+Derived from: Martin, Clean Code (2008), G10 Vertical Separation; Martin, Clean Code (2008), G11 Inconsistency; Martin, Clean Code (2008), G32 Don't Be Arbitrary; Martin, Clean Code (2008), ch. 5 Vertical distance; Martin, Clean Code (2008), ch. 5 Vertical size and ordering; ESLint, no-use-before-define (TypeScript is unlisted, the default asks for callees first): https://eslint.org/docs/latest/rules/no-use-before-define
 
 | option | default | meaning |
 | --- | --- | --- |
@@ -1718,7 +1718,7 @@ Derived from: Martin, Clean Code (2008), G10 Vertical Separation; Martin, Clean 
 -func Run() int { return helper() }
 ```
 
-Also: rust, typescript
+Also: rust
 
 ### Related declarations stay close
 
