@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { assignsToExports } from "./commonjs.ts";
-import type { FileDecls } from "./decls.ts";
+import type { FileDecls } from "./symbols.ts";
 
 /** The name of the function that stands for the statements a module runs at its top level, as CPython names the code of a module. */
 export const MODULE_BODY = "<module>";

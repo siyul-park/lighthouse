@@ -18,7 +18,7 @@ use crate::{
     cargo::{self, Manifests, Package, Target, TargetKind},
     index,
     names::Index,
-    region,
+    regions,
     tree::{Root, Tree},
 };
 
@@ -99,7 +99,7 @@ impl Handler for Provider {
         if regions.is_empty() {
             return Ok(index_files(&params, &options, &provider));
         }
-        let mut result = region::index(&params, &regions, &options);
+        let mut result = regions::index(&params, &regions, &options);
         if has_files {
             let files = index_files(&params, &options, &provider);
             result.fragments.extend(files.fragments);

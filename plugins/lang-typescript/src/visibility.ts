@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
-import type { Decl } from "./decls.ts";
+import type { Decl } from "./symbols.ts";
 import { MODULE_BODY } from "./modulebody.ts";
 import type { Model } from "./model.ts";
 import { isTestFile, relative, slashed } from "./paths.ts";

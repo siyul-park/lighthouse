@@ -1,6 +1,6 @@
 import { builtinModules } from "node:module";
 import ts from "typescript";
-import { type Decl, type FileDecls, isScript } from "./decls.ts";
+import { type Decl, type FileDecls, isScript } from "./symbols.ts";
 import { assignmentTarget } from "./commonjs.ts";
 import type { Lines } from "./positions.ts";
 import type { Model } from "./model.ts";

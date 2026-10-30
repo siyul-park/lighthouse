@@ -13,7 +13,7 @@ The Rust language provider: reads sources with `syn`, resolves names through its
 - `names/` (declare, resolve, export, query): what every module declares and imports, and path resolution.
 - `body/` (flow, calls): calls, references and normalized control flow of a function.
 - `index.rs`: the fragment of one file; `cache.rs`: the fragment cache.
-- `region.rs`, `region/`: the Rust fences of host files (see below).
+- `regions.rs`, `regions/`: the Rust fences of host files (see below).
 
 ## Invariants
 

@@ -1,7 +1,7 @@
 import ts from "typescript";
 import { manualAssertions } from "./assertions.ts";
 import { commentsOf, isGenerated } from "./comments.ts";
-import type { Decl } from "./decls.ts";
+import type { Decl } from "./symbols.ts";
 import { MODULE_BODY } from "./modulebody.ts";
 import { docOf, extentOf } from "./extent.ts";
 import { FlowWalker, countTokens, statementCount } from "./flow.ts";

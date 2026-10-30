@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { type FileDecls, type FunctionBody, functionInitializer } from "./decls.ts";
+import { type FileDecls, type FunctionBody, functionInitializer } from "./symbols.ts";
 import { unwrap } from "./commonjs.ts";
 
 const TEST_NAMES = new Set(["describe", "it", "test", "suite", "context", "specify"]);

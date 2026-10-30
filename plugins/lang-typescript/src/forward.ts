@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { Decl } from "./decls.ts";
+import type { Decl } from "./symbols.ts";
 import type { Model } from "./model.ts";
 
 /**

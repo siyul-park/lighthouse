@@ -19,7 +19,7 @@ use crate::{
     signature::signature_of,
     spans::{extent_of, span_of},
     syntax::{built_type, constructs, count_tokens, doc_of, signature_counts},
-    testcase,
+    tests,
     tree::{SourceFile, vis},
 };
 
@@ -292,7 +292,7 @@ impl Extractor<'_> {
             self.frag.tests.push(TestCase {
                 symbol: id.to_owned(),
                 nesting: 0,
-                style: testcase::style(attrs, block),
+                style: tests::style(attrs, block),
                 targets: facts
                     .uses
                     .iter()

@@ -11,12 +11,12 @@ mod index;
 mod macros;
 mod names;
 mod provider;
-mod region;
+mod regions;
 mod signature;
 mod source;
 mod spans;
 mod syntax;
-mod testcase;
+mod tests;
 mod tree;
 
 use std::{

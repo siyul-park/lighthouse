@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { Decl, FunctionBody } from "./decls.ts";
+import type { Decl, FunctionBody } from "./symbols.ts";
 import type { Model } from "./model.ts";
 import type { Reach } from "./visibility.ts";
 import type { Signature, TypeRef } from "./wire.ts";

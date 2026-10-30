@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { exportedNames } from "./commonjs.ts";
-import { type Decl, FileDecls } from "./decls.ts";
+import { type Decl, FileDecls } from "./symbols.ts";
 import { declareModuleBody } from "./modulebody.ts";
 import { isDeclarationFile, isIgnored, isTestFile, modulePath, relative, slashed } from "./paths.ts";
 import { selfReference } from "./selfref.ts";

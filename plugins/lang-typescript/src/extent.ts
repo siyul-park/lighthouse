@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { Decl } from "./decls.ts";
+import type { Decl } from "./symbols.ts";
 import type { Lines } from "./positions.ts";
 import type { Span } from "./wire.ts";
 
