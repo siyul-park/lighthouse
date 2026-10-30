@@ -1,0 +1,114 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "src/broken.rs"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "name": "broken",
+          "path": "errors/broken"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [
+        {
+          "attached_to": "errors::fine#function",
+          "span": {
+            "end": {
+              "col": 49,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "/// Fine: a file beside one that does not parse."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "errors"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "errors::fine#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "errors::fine#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "errors",
+          "path": "errors"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Fine: a file beside one that does not parse.",
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "errors::fine#function",
+          "kind": "function",
+          "name": "fine",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [
+    {
+      "path": "src/broken.rs",
+      "reason": "1:16: cannot parse string into token stream"
+    }
+  ],
+  "notices": [],
+  "sources": []
+}

@@ -1,0 +1,118 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": ".hidden/skipped.rs"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [
+        {
+          "attached_to": "excluded::kept#function",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "/// Kept: a file of the module tree."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "excluded"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "excluded::kept#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "excluded::kept#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "excluded",
+          "path": "excluded"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Kept: a file of the module tree.",
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "excluded::kept#function",
+          "kind": "function",
+          "name": "kept",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "testdata/skipped.rs"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

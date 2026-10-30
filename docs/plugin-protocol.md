@@ -559,6 +559,11 @@ edges, visibility, ownership, spans, flow, tests, capabilities and a
 deterministic order. `cargo test -p lighthouse-rpc` runs the suite against the
 built plugin and validates every result against the schema.
 
+The cases `comments`, `errors`, `excluded`, `extents`, `flow`, `generated`, `signatures`, `tests`
+and `visibility` exist under the same name in every language, and `events` in every provider that
+reports body events; each language adds its own beside them. A shared case a language cannot
+run is listed with its reason in `NOT_APPLICABLE` of `crates/lighthouse-rpc/tests/it/conformance.rs`.
+
 The exchanges of the protocol itself are recorded in `protocol/conformance/*.json`: each file
 has `applies` (`language`, `model`) and an ordered list of `exchanges`, each a message to send
 and the reply it must get (`expect`, `null` for a notification), where `"$any"` stands for any

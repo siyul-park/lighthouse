@@ -1,0 +1,388 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": "tests::add#function",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "text": "/// Adds two numbers."
+        },
+        {
+          "attached_to": "tests::sub#function",
+          "span": {
+            "end": {
+              "col": 39,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "text": "/// Subtracts one number from another."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "tests::add#function"
+        },
+        {
+          "from": {
+            "module": "tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "tests::sub#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              },
+              {
+                "text": "i32"
+              }
+            ],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "tests::add#function",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              },
+              {
+                "text": "i32"
+              }
+            ],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "tests::sub#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "tests",
+          "path": "tests"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Adds two numbers.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "tests::add#function",
+          "kind": "function",
+          "name": "add",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Subtracts one number from another.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "tests::sub#function",
+          "kind": "function",
+          "name": "sub",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "tests/tests"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "tests"
+        },
+        {
+          "from": {
+            "module": "tests/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "tests/tests::adds_two_numbers#test"
+        },
+        {
+          "from": {
+            "symbol": "tests/tests::adds_two_numbers#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 5
+            },
+            "start": {
+              "col": 16,
+              "line": 5
+            }
+          },
+          "to": "tests::add#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "src/tests.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "tests/tests::adds_two_numbers#test",
+          "tokens": 15,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "tests",
+          "path": "tests/tests",
+          "test_of": "tests"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/tests.rs",
+          "id": "tests/tests::adds_two_numbers#test",
+          "kind": "test",
+          "name": "adds_two_numbers",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "tests/tests::adds_two_numbers#test",
+          "targets": [
+            "tests::add#function"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "tests[test:it]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "tests[test:it]::subtracts_two_numbers#test"
+        },
+        {
+          "from": {
+            "symbol": "tests[test:it]::subtracts_two_numbers#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 3
+            },
+            "start": {
+              "col": 23,
+              "line": 3
+            }
+          },
+          "to": "tests::sub#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "tests/it.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "tests[test:it]::subtracts_two_numbers#test",
+          "tokens": 17,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "tests[test:it]",
+          "path": "tests[test:it]",
+          "test_of": "tests"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "tests/it.rs",
+          "id": "tests[test:it]::subtracts_two_numbers#test",
+          "kind": "test",
+          "name": "subtracts_two_numbers",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "tests[test:it]::subtracts_two_numbers#test",
+          "targets": [
+            "tests::sub#function"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

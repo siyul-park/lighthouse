@@ -112,6 +112,63 @@ const PYTHON: Lang = Lang {
 
 const LANGS: [&Lang; 4] = [&GO, &RUST, &TYPESCRIPT, &PYTHON];
 
+/// The cases every language runs under the same name; each language adds its
+/// own beside them.
+const SHARED: [&str; 9] = [
+    "comments",
+    "errors",
+    "excluded",
+    "extents",
+    "flow",
+    "generated",
+    "signatures",
+    "tests",
+    "visibility",
+];
+
+/// Cases a language does not run, and why: the reason a case is absent.
+const NOT_APPLICABLE: [(&str, &str, &str); 2] = [
+    (
+        "events",
+        "typescript",
+        "the provider reports no body events (`FunctionSummary.events`)",
+    ),
+    (
+        "events",
+        "python",
+        "the provider reports no body events (`FunctionSummary.events`)",
+    ),
+];
+
+#[test]
+fn every_language_runs_the_shared_cases() {
+    for lang in LANGS {
+        let dir = conformance().join(lang.id);
+        for case in SHARED {
+            assert!(dir.join(case).is_dir(), "{} lacks the case {case}", lang.id);
+        }
+        for (case, language, reason) in NOT_APPLICABLE {
+            if language == lang.id {
+                assert!(!reason.is_empty(), "{language} {case} needs a reason");
+                assert!(
+                    !dir.join(case).exists(),
+                    "{language} runs {case} and is listed as not applicable"
+                );
+            }
+        }
+    }
+    // A case that is not applicable somewhere is run everywhere else.
+    for (case, _, _) in NOT_APPLICABLE {
+        for lang in LANGS {
+            let listed = NOT_APPLICABLE
+                .iter()
+                .any(|(c, l, _)| *c == case && *l == lang.id);
+            let present = conformance().join(lang.id).join(case).is_dir();
+            assert!(listed != present, "{} and {case}", lang.id);
+        }
+    }
+}
+
 fn files(dir: &Path, base: &Path, suffixes: &[&str], out: &mut Vec<String>) {
     let mut entries: Vec<_> = fs::read_dir(dir)
         .unwrap()

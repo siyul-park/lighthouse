@@ -1,0 +1,565 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Public#type",
+          "span": {
+            "end": {
+              "col": 39,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Public is used outside the package."
+        },
+        {
+          "attached_to": ".::Exported#function",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "text": "// Exported is a function anyone may call."
+        },
+        {
+          "attached_to": ".::Public::Show#method",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "text": "// Show is a method anyone may call."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Public#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Public#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Public::Name#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Public#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Public::secret#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::private#type"
+        },
+        {
+          "from": {
+            "symbol": ".::private#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::private::Value#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Exported#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Exported#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 12
+            },
+            "start": {
+              "col": 34,
+              "line": 12
+            }
+          },
+          "to": ".::private"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::unexported#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Public#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Public::Show#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Public::Show#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 48,
+              "line": 17
+            },
+            "start": {
+              "col": 42,
+              "line": 17
+            }
+          },
+          "to": ".::Public::secret"
+        },
+        {
+          "from": {
+            "symbol": ".::Public#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Public::hide#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Limit#const"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::limit#const"
+        }
+      ],
+      "file": {
+        "path": "visibility.go"
+      },
+      "functions": [
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": false,
+                "symbol": ".::private",
+                "text": "example.com/visibility.private"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Exported#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": ".::unexported#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Public::Show#method",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": ".::Public::hide#method",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "visibility",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Public is used outside the package.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::Public#type",
+          "kind": "type",
+          "name": "Public",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::Public::Name#field",
+          "kind": "field",
+          "name": "Name",
+          "owner": ".::Public#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::Public::secret#field",
+          "kind": "field",
+          "name": "secret",
+          "owner": ".::Public#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::private#type",
+          "kind": "type",
+          "name": "private",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 9
+            },
+            "start": {
+              "col": 6,
+              "line": 9
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 31,
+              "line": 9
+            },
+            "start": {
+              "col": 22,
+              "line": 9
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::private::Value#field",
+          "kind": "field",
+          "name": "Value",
+          "owner": ".::private#type",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 9
+            },
+            "start": {
+              "col": 22,
+              "line": 9
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Exported is a function anyone may call.",
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::Exported#function",
+          "kind": "function",
+          "name": "Exported",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::unexported#function",
+          "kind": "function",
+          "name": "unexported",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Show is a method anyone may call.",
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::Public::Show#method",
+          "kind": "method",
+          "name": "Show",
+          "owner": ".::Public#type",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::Public::hide#method",
+          "kind": "method",
+          "name": "hide",
+          "owner": ".::Public#type",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::Limit#const",
+          "kind": "const",
+          "name": "Limit",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 21
+            },
+            "start": {
+              "col": 7,
+              "line": 21
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
+          "file": "visibility.go",
+          "id": ".::limit#const",
+          "kind": "const",
+          "name": "limit",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 23
+            },
+            "start": {
+              "col": 7,
+              "line": 23
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}
