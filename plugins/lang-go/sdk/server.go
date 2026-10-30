@@ -8,9 +8,14 @@ import (
 	"io"
 )
 
-// Handler implements the methods of a language provider.
-type Handler interface {
-	Initialize(InitializeParams) (InitializeResult, error)
+// Provider is a language provider: its identity, the languages it declares
+// and how it indexes the files of one request.
+type Provider interface {
+	// Name is the plugin id.
+	Name() string
+	Version() string
+	// Manifest lists the languages the provider answers `initialize` with.
+	Manifest() []LanguageManifest
 	Index(IndexParams) (IndexResult, error)
 }
 
@@ -42,7 +47,7 @@ const (
 // other request before an `initialize` that succeeded. It returns nil after a
 // `shutdown` followed by `exit`, and an error when the input ends or breaks
 // first.
-func Serve(r io.Reader, w io.Writer, h Handler) error {
+func Serve(r io.Reader, w io.Writer, p Provider) error {
 	in := bufio.NewReader(r)
 	var s session
 	for {
@@ -63,7 +68,7 @@ func Serve(r io.Reader, w io.Writer, h Handler) error {
 		if m.Method == "" {
 			continue
 		}
-		result, rerr := dispatch(h, m, &s)
+		result, rerr := dispatch(p, m, &s)
 		if m.ID == nil {
 			continue
 		}
@@ -79,7 +84,7 @@ func Serve(r io.Reader, w io.Writer, h Handler) error {
 	}
 }
 
-func dispatch(h Handler, m *Message, s *session) (result json.RawMessage, rerr *ResponseError) {
+func dispatch(p Provider, m *Message, s *session) (result json.RawMessage, rerr *ResponseError) {
 	defer func() {
 		if p := recover(); p != nil {
 			result, rerr = nil, &ResponseError{Code: codeInternal, Message: fmt.Sprintf("panic: %v", p)}
@@ -87,29 +92,38 @@ func dispatch(h Handler, m *Message, s *session) (result json.RawMessage, rerr *
 	}()
 	switch {
 	case m.Method == MethodInitialize:
-		var p InitializeParams
-		if rerr := decode(m.Params, &p, "protocolVersion", "clientInfo", "workspaceFolders"); rerr != nil {
+		var params InitializeParams
+		if rerr := decode(m.Params, &params, "protocolVersion", "clientInfo", "workspaceFolders"); rerr != nil {
 			return nil, rerr
 		}
-		if p.ProtocolVersion != ProtocolVersion {
-			return nil, &ResponseError{Code: codeRequestFailed, Message: fmt.Sprintf("host speaks protocol %s, this plugin speaks %s", p.ProtocolVersion, ProtocolVersion)}
+		if params.ProtocolVersion != ProtocolVersion {
+			return nil, &ResponseError{Code: codeRequestFailed, Message: fmt.Sprintf("host speaks protocol %s, this plugin speaks %s", params.ProtocolVersion, ProtocolVersion)}
 		}
-		result, rerr = marshal(h.Initialize(p))
+		result, rerr = marshal(initialize(p), nil)
 		s.initialized = s.initialized || rerr == nil
 		return result, rerr
 	case !s.initialized:
 		return nil, &ResponseError{Code: codeNotInitialized, Message: fmt.Sprintf("`%s` before `initialize`", m.Method)}
 	case m.Method == MethodIndex:
-		var p IndexParams
-		if rerr := decode(m.Params, &p, "project", "language", "inputs"); rerr != nil {
+		var params IndexParams
+		if rerr := decode(m.Params, &params, "project", "language", "inputs"); rerr != nil {
 			return nil, rerr
 		}
-		return marshal(h.Index(p))
+		return marshal(p.Index(params))
 	case m.Method == MethodShutdown:
 		s.shutdown = true
 		return json.RawMessage("null"), nil
 	default:
 		return nil, &ResponseError{Code: codeMethod, Message: "unknown method " + m.Method}
+	}
+}
+
+// initialize is the answer to the handshake.
+func initialize(p Provider) InitializeResult {
+	return InitializeResult{
+		ProtocolVersion: ProtocolVersion,
+		ServerInfo:      Implementation{Name: p.Name(), Version: p.Version()},
+		Capabilities:    ServerCapabilities{Languages: p.Manifest()},
 	}
 }
 

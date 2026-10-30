@@ -29,13 +29,15 @@ func fileInputs(files []sdk.FileRef) []sdk.IndexInput {
 	return inputs
 }
 
-func TestProviderInitialize(t *testing.T) {
+func TestProviderManifest(t *testing.T) {
 	t.Run("describes Go as the protocol schema defines it", func(t *testing.T) {
 		g := provider.New("lang-go", "test")
+		result := sdk.InitializeResult{
+			ProtocolVersion: sdk.ProtocolVersion,
+			ServerInfo:      sdk.Implementation{Name: g.Name(), Version: g.Version()},
+			Capabilities:    sdk.ServerCapabilities{Languages: g.Manifest()},
+		}
 
-		result, err := g.Initialize(sdk.InitializeParams{ProtocolVersion: sdk.ProtocolVersion})
-
-		require.NoError(t, err)
 		assertValid(t, validator(t, "InitializeResult"), result, "initialize result")
 	})
 }

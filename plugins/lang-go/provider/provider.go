@@ -5,7 +5,7 @@ package provider
 
 import "github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 
-// Provider is the language provider of Go; it implements sdk.Handler.
+// Provider is the language provider of Go; it implements sdk.Provider.
 type Provider struct {
 	id      string
 	version string
@@ -14,23 +14,25 @@ type Provider struct {
 
 const language = "go"
 
-// Initialize describes the Go language.
-func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error) {
-	return sdk.InitializeResult{
-		ProtocolVersion: sdk.ProtocolVersion,
-		ServerInfo:      sdk.Implementation{Name: p.id, Version: p.version},
-		Capabilities: sdk.ServerCapabilities{Languages: []sdk.LanguageManifest{{
-			ID:      language,
-			Aliases: []string{"go", "golang"},
-			Globs:   []string{"**/*.go"},
-			Conventions: sdk.Conventions{
-				TestGlobs:           []string{"**/*_test.go"},
-				ConstructorPrefixes: []string{"New", "new"},
-				TestNaming:          sdk.TestNaming{Prefix: "Test", Variants: true},
-			},
-			Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast"},
-		}}},
-	}, nil
+// Name is the plugin id.
+func (p *Provider) Name() string { return p.id }
+
+// Version is the plugin version.
+func (p *Provider) Version() string { return p.version }
+
+// Manifest describes the Go language.
+func (p *Provider) Manifest() []sdk.LanguageManifest {
+	return []sdk.LanguageManifest{{
+		ID:      language,
+		Aliases: []string{"go", "golang"},
+		Globs:   []string{"**/*.go"},
+		Conventions: sdk.Conventions{
+			TestGlobs:           []string{"**/*_test.go"},
+			ConstructorPrefixes: []string{"New", "new"},
+			TestNaming:          sdk.TestNaming{Prefix: "Test", Variants: true},
+		},
+		Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast"},
+	}}
 }
 
 // Index analyzes every requested file, and the regions of host files, which

@@ -15,7 +15,7 @@ func TestSourceSerializesNestedGoSyntaxAndRanges(t *testing.T) {
 	host := "package p\nfunc greet() { _ = \"snow: \\u96ea\" }\n"
 	parsed, _ := indexSource(t, host)
 	var tree map[string]any
-	require.NoError(t, json.Unmarshal(parsed.Ast, &tree))
+	require.NoError(t, json.Unmarshal(parsed.AST, &tree))
 	decls := tree["Decls"].([]any)
 	fn := decls[0].(map[string]any)
 	require.Equal(t, "FuncDecl", fn["kind"])

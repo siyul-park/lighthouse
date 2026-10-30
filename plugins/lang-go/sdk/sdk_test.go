@@ -14,30 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type handler struct {
-	initialize func(sdk.InitializeParams) (sdk.InitializeResult, error)
-	index      func(sdk.IndexParams) (sdk.IndexResult, error)
+type stub struct {
+	index func(sdk.IndexParams) (sdk.IndexResult, error)
 }
 
-func (h handler) Initialize(p sdk.InitializeParams) (sdk.InitializeResult, error) {
-	return h.initialize(p)
-}
+func (stub) Name() string                     { return "x" }
+func (stub) Version() string                  { return "1" }
+func (stub) Manifest() []sdk.LanguageManifest { return []sdk.LanguageManifest{{ID: "stub"}} }
 
-func (h handler) Index(p sdk.IndexParams) (sdk.IndexResult, error) { return h.index(p) }
+func (s stub) Index(p sdk.IndexParams) (sdk.IndexResult, error) { return s.index(p) }
 
-func newHandler() handler {
-	return handler{
-		initialize: func(p sdk.InitializeParams) (sdk.InitializeResult, error) {
-			root, err := p.WorkspaceFolders[0].Path()
-			if err != nil {
-				return sdk.InitializeResult{}, err
-			}
-			return sdk.InitializeResult{
-				ProtocolVersion: sdk.ProtocolVersion,
-				ServerInfo:      sdk.Implementation{Name: "x", Version: "1"},
-				Capabilities:    sdk.ServerCapabilities{Languages: []sdk.LanguageManifest{{ID: root}}},
-			}, nil
-		},
+func newHandler() stub {
+	return stub{
 		index: func(p sdk.IndexParams) (sdk.IndexResult, error) {
 			if p.Language == "panic" {
 				panic("boom")
@@ -158,7 +146,7 @@ func TestServe(t *testing.T) {
 		var init sdk.InitializeResult
 		require.NoError(t, json.Unmarshal(got[0].Result, &init))
 		require.Equal(t, "x", init.ServerInfo.Name)
-		require.Equal(t, "/r x", init.Capabilities.Languages[0].ID)
+		require.Equal(t, "stub", init.Capabilities.Languages[0].ID)
 		require.JSONEq(t, `{"fragments":[],"notices":["/r"],"incomplete":[]}`, string(got[1].Result))
 		for i, code := range map[int]int{2: -32601, 3: -32603, 4: -32803, 5: -32602} {
 			require.NotNil(t, got[i].Error, "reply %d", i)
@@ -172,7 +160,7 @@ func TestServe(t *testing.T) {
 		var in strings.Builder
 		in.WriteString(request(t, 1, sdk.MethodIndex, sdk.IndexParams{Language: "go"}))
 		in.WriteString(request(t, 2, "nope", struct{}{}))
-		in.WriteString(request(t, 3, sdk.MethodInitialize, sdk.InitializeParams{ProtocolVersion: sdk.ProtocolVersion, WorkspaceFolders: []sdk.WorkspaceFolder{{URI: "http://x/"}}}))
+		in.WriteString(request(t, 3, sdk.MethodInitialize, sdk.InitializeParams{ProtocolVersion: "0.0"}))
 		in.WriteString(request(t, 4, sdk.MethodIndex, sdk.IndexParams{Language: "go"}))
 		in.WriteString(request(t, 5, sdk.MethodInitialize, struct{}{}))
 		in.WriteString(request(t, 6, sdk.MethodShutdown, nil))

@@ -70,7 +70,7 @@ func sourceAST(rel string, file *ast.File, fset *token.FileSet, host string) (sd
 	if err != nil {
 		return sdk.Source{}, fmt.Errorf("encode Go AST: %w", err)
 	}
-	return sdk.Source{Path: rel, Ast: encoded, Mapping: sourceMap}, nil
+	return sdk.Source{Path: rel, AST: encoded, Mapping: sourceMap}, nil
 }
 
 // astValue serializes a parser node by its real AST fields and maps each node's
@@ -101,7 +101,7 @@ func astValue(value reflect.Value, pointer string, fset *token.FileSet, host str
 				rangeValue := [2]uint32{uint32(start), uint32(end)}
 				textPointer := pointer + "/source"
 				sourceMap[pointer] = sdk.Mapping{
-					Range: &rangeValue, TextPointer: &textPointer,
+					Range: &rangeValue, TextPointer: textPointer,
 				}
 				text := host[start:end]
 				sourceMap[textPointer] = sdk.Mapping{

@@ -55,7 +55,7 @@ test: plugins
 lint: plugins
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets -- -D warnings
-	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./...
+	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./... && cd sdk && go run ./gen -check
 	cd plugins/lang-python && ruff format --check . && ruff check . && python3 -I scripts/wire.py --check
 	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check $(wildcard plugins/*/decisions)
 	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check . --allow-incomplete
