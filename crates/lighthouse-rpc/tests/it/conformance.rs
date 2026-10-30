@@ -29,7 +29,8 @@ fn conformance() -> PathBuf {
 
 struct Lang {
     id: &'static str,
-    ext: &'static str,
+    /// The suffixes of the files of a case that are indexed.
+    exts: &'static [&'static str],
     min_cases: usize,
     plugin: fn() -> Option<PathBuf>,
     /// A file of `generated/project` and an options table the plugin rejects.
@@ -43,7 +44,7 @@ struct Lang {
 
 const GO: Lang = Lang {
     id: "go",
-    ext: ".go",
+    exts: &[".go"],
     min_cases: 16,
     plugin: lighthouse_test_support::lang_go,
     probe: ("plain.go", || json!({ "go": { "tagz": [] } })),
@@ -62,7 +63,7 @@ const GO: Lang = Lang {
 
 const RUST: Lang = Lang {
     id: "rust",
-    ext: ".rs",
+    exts: &[".rs"],
     min_cases: 15,
     plugin: || Some(lighthouse_test_support::lang_rust()),
     probe: ("src/plain.rs", || json!({ "rust": { "nope": 1 } })),
@@ -73,9 +74,26 @@ const RUST: Lang = Lang {
     capabilities: &["extent", "reference-sites", "overlays", "source-ast"],
 };
 
-const LANGS: [&Lang; 2] = [&GO, &RUST];
+const TYPESCRIPT: Lang = Lang {
+    id: "typescript",
+    exts: &[".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
+    min_cases: 20,
+    plugin: lighthouse_test_support::lang_typescript,
+    probe: ("plain.ts", || json!({ "typescript": { "nope": 1 } })),
+    manifest_id: "lang-typescript",
+    globs: &["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+    test_globs: &[
+        "**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "**/__tests__/**",
+    ],
+    constructor_prefixes: &["new", "create"],
+    capabilities: &["semantic-edges", "extent", "reference-sites", "overlays"],
+};
 
-fn files(dir: &Path, base: &Path, glob_suffix: &str, out: &mut Vec<String>) {
+const LANGS: [&Lang; 3] = [&GO, &RUST, &TYPESCRIPT];
+
+fn files(dir: &Path, base: &Path, suffixes: &[&str], out: &mut Vec<String>) {
     let mut entries: Vec<_> = fs::read_dir(dir)
         .unwrap()
         .map(|e| e.unwrap().path())
@@ -83,8 +101,11 @@ fn files(dir: &Path, base: &Path, glob_suffix: &str, out: &mut Vec<String>) {
     entries.sort();
     for path in entries {
         if path.is_dir() {
-            files(&path, base, glob_suffix, out);
-        } else if path.to_string_lossy().ends_with(glob_suffix) {
+            files(&path, base, suffixes, out);
+        } else if suffixes
+            .iter()
+            .any(|suffix| path.to_string_lossy().ends_with(suffix))
+        {
             let rel = path.strip_prefix(base).unwrap();
             out.push(rel.to_string_lossy().replace('\\', "/"));
         }
@@ -191,7 +212,7 @@ fn golden(lang: &Lang) {
     for case in names {
         let root = case.join("project").canonicalize().unwrap();
         let mut sources = Vec::new();
-        files(&root, &root, lang.ext, &mut sources);
+        files(&root, &root, lang.exts, &mut sources);
         for (variant, options) in variants(&case) {
             let mut plugin = Plugin::start(&dir, &root);
             plugin.initialize(&root);
@@ -234,7 +255,7 @@ fn cached_runs_equal_uncached(lang: &Lang) {
     for case in names {
         let root = case.join("project").canonicalize().unwrap();
         let mut sources = Vec::new();
-        files(&root, &root, lang.ext, &mut sources);
+        files(&root, &root, lang.exts, &mut sources);
         for (variant, options) in variants(&case) {
             let cache = tempfile::tempdir().unwrap();
             let run = |cache: Option<&Path>| {
@@ -273,6 +294,11 @@ fn rust_plugin_answers_the_same_with_a_cache() {
 }
 
 #[test]
+fn typescript_plugin_answers_the_same_with_a_cache() {
+    cached_runs_equal_uncached(&TYPESCRIPT);
+}
+
+#[test]
 fn go_plugin_matches_the_golden_wire_output() {
     golden(&GO);
 }
@@ -280,6 +306,11 @@ fn go_plugin_matches_the_golden_wire_output() {
 #[test]
 fn rust_plugin_matches_the_golden_wire_output() {
     golden(&RUST);
+}
+
+#[test]
+fn typescript_plugin_matches_the_golden_wire_output() {
+    golden(&TYPESCRIPT);
 }
 
 #[test]
@@ -391,7 +422,7 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
         // Requests and responses of several hundred KB: ignored paths cost the
         // plugin nothing but still produce one fragment each.
         let files: Vec<String> = (0..6000)
-            .map(|n| format!("testdata/{n:0>40}{}", lang.ext))
+            .map(|n| format!("testdata/{n:0>40}{}", lang.exts[0]))
             .collect();
         let mut options = BTreeMap::new();
         options.insert("other".to_owned(), json!({ "blob": "x".repeat(300_000) }));
@@ -451,7 +482,7 @@ fn overlays_replace_the_text_a_provider_reads() {
             .unwrap();
         let on_disk = fs::read_to_string(root.join(file)).unwrap();
         let mut sources = Vec::new();
-        files(&root, &root, lang.ext, &mut sources);
+        files(&root, &root, lang.exts, &mut sources);
         let ids = |result: &Value| -> Vec<String> {
             result["fragments"]
                 .as_array()

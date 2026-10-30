@@ -1,0 +1,253 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": "src/jsx.d.ts"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/view"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/view::Greeting#function"
+        },
+        {
+          "from": {
+            "module": "src/view"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/view::Layout#const"
+        },
+        {
+          "from": {
+            "module": "src/view"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/view::Page#type"
+        },
+        {
+          "from": {
+            "symbol": "src/view::Page#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/view::Page::render#method"
+        },
+        {
+          "from": {
+            "symbol": "src/view::Page::render#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 13
+            },
+            "start": {
+              "col": 10,
+              "line": 13
+            }
+          },
+          "to": "src/view::Layout#const"
+        },
+        {
+          "from": {
+            "symbol": "src/view::Page::render#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 14
+            },
+            "start": {
+              "col": 10,
+              "line": 14
+            }
+          },
+          "to": "src/view::Greeting#function"
+        }
+      ],
+      "file": {
+        "path": "src/view.tsx"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "{ name: string; }"
+              }
+            ],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/view::Greeting#function",
+          "tokens": 17,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/view::Page::render#method",
+          "tokens": 30,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/view"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/view.tsx",
+          "id": "src/view::Greeting#function",
+          "kind": "function",
+          "name": "Greeting",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "src/view.tsx",
+          "id": "src/view::Layout#const",
+          "kind": "const",
+          "name": "Layout",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 14,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "src/view.tsx",
+          "id": "src/view::Page#type",
+          "kind": "type",
+          "name": "Page",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 10
+            }
+          },
+          "file": "src/view.tsx",
+          "id": "src/view::Page::render#method",
+          "kind": "method",
+          "name": "render",
+          "owner": "src/view::Page#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

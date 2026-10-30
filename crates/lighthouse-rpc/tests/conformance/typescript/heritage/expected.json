@@ -1,0 +1,916 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/h"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Animal#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Animal#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Animal::speak#method"
+        },
+        {
+          "from": {
+            "module": "src/h"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Base#type"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Base::speak#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Base::describe#method"
+        },
+        {
+          "from": {
+            "module": "src/h"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Dog#type"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Dog::speak#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Dog::describe#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Dog::forward#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Dog::wrap#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::Dog::make#method"
+        },
+        {
+          "from": {
+            "module": "src/h"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::build#function"
+        },
+        {
+          "from": {
+            "module": "src/h"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::forwarded#function"
+        },
+        {
+          "from": {
+            "module": "src/h"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/h::add#function"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Base#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 45,
+              "line": 5
+            },
+            "start": {
+              "col": 39,
+              "line": 5
+            }
+          },
+          "to": "src/h::Animal#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Base::describe#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 9
+            },
+            "start": {
+              "col": 17,
+              "line": 9
+            }
+          },
+          "to": "src/h::Base::speak#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog#type"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 13
+            },
+            "start": {
+              "col": 26,
+              "line": 13
+            }
+          },
+          "to": "src/h::Base#type"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog::describe#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 19
+            },
+            "start": {
+              "col": 18,
+              "line": 19
+            }
+          },
+          "to": "src/h::Base::describe#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog::forward#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 23
+            },
+            "start": {
+              "col": 17,
+              "line": 23
+            }
+          },
+          "to": "src/h::Dog::wrap#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog::make#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 30
+            },
+            "start": {
+              "col": 18,
+              "line": 30
+            }
+          },
+          "to": "src/h::Dog#type"
+        },
+        {
+          "from": {
+            "symbol": "src/h::Dog::make#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 31
+            },
+            "start": {
+              "col": 16,
+              "line": 31
+            }
+          },
+          "to": "src/h::Dog#type"
+        },
+        {
+          "from": {
+            "symbol": "src/h::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 35
+            },
+            "start": {
+              "col": 26,
+              "line": 35
+            }
+          },
+          "to": "src/h::Dog#type"
+        },
+        {
+          "from": {
+            "symbol": "src/h::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 36
+            },
+            "start": {
+              "col": 10,
+              "line": 36
+            }
+          },
+          "to": "src/h::Dog#type"
+        },
+        {
+          "from": {
+            "symbol": "src/h::build#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 36
+            },
+            "start": {
+              "col": 14,
+              "line": 36
+            }
+          },
+          "to": "src/h::Dog::make#method"
+        },
+        {
+          "from": {
+            "symbol": "src/h::forwarded#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 40
+            },
+            "start": {
+              "col": 10,
+              "line": 40
+            }
+          },
+          "to": "src/h::add#function"
+        }
+      ],
+      "file": {
+        "path": "src/h.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": "src/h::Base::speak#method",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::Base::describe#method",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::Dog::speak#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::Dog::describe#method",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "src/h::Dog::wrap#method",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::Dog::forward#method",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::Dog::wrap#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/h::Dog",
+                "text": "Dog"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::Dog::make#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/h::Dog",
+                "text": "Dog"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::build#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "src/h::add#function",
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              },
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::forwarded#function",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              },
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/h::add#function",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/h"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Animal#interface",
+          "kind": "interface",
+          "name": "Animal",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Animal::speak#method",
+          "kind": "method",
+          "name": "speak",
+          "owner": "src/h::Animal#interface",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Base#type",
+          "kind": "type",
+          "name": "Base",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 6
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Base::speak#method",
+          "kind": "method",
+          "name": "speak",
+          "owner": "src/h::Base#type",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 6
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 10
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Base::describe#method",
+          "kind": "method",
+          "name": "describe",
+          "owner": "src/h::Base#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 10
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Dog#type",
+          "kind": "type",
+          "name": "Dog",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 16
+            },
+            "start": {
+              "col": 3,
+              "line": 14
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Dog::speak#method",
+          "kind": "method",
+          "name": "speak",
+          "owner": "src/h::Dog#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 16
+            },
+            "start": {
+              "col": 3,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 20
+            },
+            "start": {
+              "col": 3,
+              "line": 18
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Dog::describe#method",
+          "kind": "method",
+          "name": "describe",
+          "owner": "src/h::Dog#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 20
+            },
+            "start": {
+              "col": 3,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 24
+            },
+            "start": {
+              "col": 3,
+              "line": 22
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Dog::forward#method",
+          "kind": "method",
+          "name": "forward",
+          "owner": "src/h::Dog#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 24
+            },
+            "start": {
+              "col": 3,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 28
+            },
+            "start": {
+              "col": 3,
+              "line": 26
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Dog::wrap#method",
+          "kind": "method",
+          "name": "wrap",
+          "owner": "src/h::Dog#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 28
+            },
+            "start": {
+              "col": 3,
+              "line": 26
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 32
+            },
+            "start": {
+              "col": 3,
+              "line": 30
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::Dog::make#method",
+          "kind": "method",
+          "name": "make",
+          "owner": "src/h::Dog#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 32
+            },
+            "start": {
+              "col": 3,
+              "line": 30
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::build#function",
+          "kind": "function",
+          "name": "build",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::forwarded#function",
+          "kind": "function",
+          "name": "forwarded",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 45
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "file": "src/h.ts",
+          "id": "src/h::add#function",
+          "kind": "function",
+          "name": "add",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 45
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

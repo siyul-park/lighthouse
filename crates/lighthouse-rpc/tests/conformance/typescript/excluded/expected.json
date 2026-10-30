@@ -1,0 +1,81 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": ".hidden/skipped.ts"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/kept"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/kept::kept#const"
+        }
+      ],
+      "file": {
+        "path": "src/kept.ts"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "src/kept"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/kept.ts",
+          "id": "src/kept::kept#const",
+          "kind": "const",
+          "name": "kept",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 1
+            },
+            "start": {
+              "col": 14,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": "testdata/skipped.ts"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

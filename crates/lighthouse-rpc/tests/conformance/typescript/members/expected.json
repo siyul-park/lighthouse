@@ -1,0 +1,722 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/m"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Mode#type"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Mode#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Mode::Read#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Mode#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Mode::Write#variant"
+        },
+        {
+          "from": {
+            "module": "src/m"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Reader#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Reader#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Reader::path#field"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Reader#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Reader::open#field"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Reader#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Reader::read#method"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Reader#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Reader::size#method"
+        },
+        {
+          "from": {
+            "module": "src/m"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Options#type"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Options#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Options::mode#field"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Options#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Options::timeout#field"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Options#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Options::run#method"
+        },
+        {
+          "from": {
+            "module": "src/m"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Handler#type"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Handler#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Handler::handle#method"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Handler#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Handler::defaults#field"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Handler#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Handler::callback#method"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Options::mode#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 14
+            },
+            "start": {
+              "col": 9,
+              "line": 14
+            }
+          },
+          "to": "src/m::Mode#type"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Handler::defaults#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 21
+            },
+            "start": {
+              "col": 20,
+              "line": 21
+            }
+          },
+          "to": "src/m::Options#type"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Handler::defaults#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 42,
+              "line": 21
+            },
+            "start": {
+              "col": 38,
+              "line": 21
+            }
+          },
+          "to": "src/m::Mode#type"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Handler::defaults#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 47,
+              "line": 21
+            },
+            "start": {
+              "col": 43,
+              "line": 21
+            }
+          },
+          "to": "src/m::Mode::Read#variant"
+        }
+      ],
+      "file": {
+        "path": "src/m.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/m::Handler::handle#method",
+          "tokens": 1,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "src/m::Handler::callback#method",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/m"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Mode#type",
+          "kind": "type",
+          "name": "Mode",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Mode::Read#variant",
+          "kind": "variant",
+          "name": "Read",
+          "owner": "src/m::Mode#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 3
+            },
+            "start": {
+              "col": 3,
+              "line": 3
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Mode::Write#variant",
+          "kind": "variant",
+          "name": "Write",
+          "owner": "src/m::Mode#type",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 3
+            },
+            "start": {
+              "col": 3,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Reader#interface",
+          "kind": "interface",
+          "name": "Reader",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 7
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Reader::path#field",
+          "kind": "field",
+          "name": "path",
+          "owner": "src/m::Reader#interface",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 7
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 8
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Reader::open#field",
+          "kind": "field",
+          "name": "open",
+          "optional": true,
+          "owner": "src/m::Reader#interface",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 8
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "type_ref": {
+            "text": "boolean"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 9
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Reader::read#method",
+          "kind": "method",
+          "name": "read",
+          "owner": "src/m::Reader#interface",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 9
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 10
+            },
+            "start": {
+              "col": 3,
+              "line": 10
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Reader::size#method",
+          "kind": "method",
+          "name": "size",
+          "owner": "src/m::Reader#interface",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 10
+            },
+            "start": {
+              "col": 3,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Options#type",
+          "kind": "type",
+          "name": "Options",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 14
+            },
+            "start": {
+              "col": 3,
+              "line": 14
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Options::mode#field",
+          "kind": "field",
+          "name": "mode",
+          "owner": "src/m::Options#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 14
+            },
+            "start": {
+              "col": 3,
+              "line": 14
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": "src/m::Mode",
+            "text": "Mode"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 15
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Options::timeout#field",
+          "kind": "field",
+          "name": "timeout",
+          "optional": true,
+          "owner": "src/m::Options#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 15
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 16
+            },
+            "start": {
+              "col": 3,
+              "line": 16
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Options::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "src/m::Options#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 16
+            },
+            "start": {
+              "col": 3,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Handler#type",
+          "kind": "type",
+          "name": "Handler",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 20
+            },
+            "start": {
+              "col": 3,
+              "line": 20
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Handler::handle#method",
+          "kind": "method",
+          "name": "handle",
+          "owner": "src/m::Handler#type",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 20
+            },
+            "start": {
+              "col": 3,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 60,
+              "line": 21
+            },
+            "start": {
+              "col": 3,
+              "line": 21
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Handler::defaults#field",
+          "kind": "field",
+          "name": "defaults",
+          "owner": "src/m::Handler#type",
+          "span": {
+            "end": {
+              "col": 60,
+              "line": 21
+            },
+            "start": {
+              "col": 3,
+              "line": 21
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": "src/m::Options",
+            "text": "Options"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 35,
+              "line": 22
+            },
+            "start": {
+              "col": 3,
+              "line": 22
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Handler::callback#method",
+          "kind": "method",
+          "name": "callback",
+          "owner": "src/m::Handler#type",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 22
+            },
+            "start": {
+              "col": 3,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

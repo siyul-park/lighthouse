@@ -1,0 +1,231 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "// ---- Helpers ----"
+        },
+        {
+          "attached_to": "src/c::run#function",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Run runs the thing.\n// It returns one."
+        },
+        {
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 6
+            },
+            "start": {
+              "col": 16,
+              "line": 6
+            }
+          },
+          "text": "// trailing"
+        },
+        {
+          "attached_to": "src/c::block#const",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "text": "/* block comment */"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "text": "// not attached"
+        },
+        {
+          "attached_to": "src/c::Last#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "text": "/** doc for last */"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "src/c"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/c::run#function"
+        },
+        {
+          "from": {
+            "module": "src/c"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/c::block#const"
+        },
+        {
+          "from": {
+            "module": "src/c"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/c::Last#type"
+        }
+      ],
+      "file": {
+        "path": "src/c.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": "src/c::run#function",
+          "tokens": 10,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/c"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/c.ts",
+          "id": "src/c::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "src/c.ts",
+          "id": "src/c::block#const",
+          "kind": "const",
+          "name": "block",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 11
+            },
+            "start": {
+              "col": 14,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "doc for last",
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "file": "src/c.ts",
+          "id": "src/c::Last#type",
+          "kind": "type",
+          "name": "Last",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

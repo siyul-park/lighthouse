@@ -1,0 +1,370 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/flow::shapes#function"
+        },
+        {
+          "from": {
+            "module": "src/flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/flow::pick#function"
+        },
+        {
+          "from": {
+            "module": "src/flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/flow::fact#function"
+        },
+        {
+          "from": {
+            "module": "src/flow"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/flow::arrow#function"
+        },
+        {
+          "from": {
+            "symbol": "src/flow::fact#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 62
+            },
+            "start": {
+              "col": 27,
+              "line": 62
+            }
+          },
+          "to": "src/flow::fact#function"
+        }
+      ],
+      "file": {
+        "path": "src/flow.ts"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "else-if",
+              "nesting": 0
+            },
+            {
+              "kind": "else",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "if",
+              "nesting": 1
+            },
+            {
+              "kind": "logic",
+              "nesting": 1,
+              "operators": 1
+            },
+            {
+              "kind": "logic",
+              "nesting": 1,
+              "operators": 1
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 1
+            },
+            {
+              "kind": "if",
+              "nesting": 2
+            },
+            {
+              "kind": "jump",
+              "nesting": 3
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "arms": 3,
+              "kind": "switch",
+              "nesting": 0
+            },
+            {
+              "kind": "catch",
+              "nesting": 0
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            },
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "if",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 3,
+          "params": 3,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              },
+              {
+                "text": "number[]"
+              },
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 33,
+          "symbol": "src/flow::shapes#function",
+          "tokens": 241,
+          "top_level": 11
+        },
+        {
+          "flow": [
+            {
+              "arms": 2,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 7,
+          "symbol": "src/flow::pick#function",
+          "tokens": 25,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/flow::fact#function",
+          "tokens": 18,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/flow::arrow#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/flow"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 48
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/flow.ts",
+          "id": "src/flow::shapes#function",
+          "kind": "function",
+          "name": "shapes",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 48
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 59
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "file": "src/flow.ts",
+          "id": "src/flow::pick#function",
+          "kind": "function",
+          "name": "pick",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 59
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 63
+            },
+            "start": {
+              "col": 1,
+              "line": 61
+            }
+          },
+          "file": "src/flow.ts",
+          "id": "src/flow::fact#function",
+          "kind": "function",
+          "name": "fact",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 63
+            },
+            "start": {
+              "col": 1,
+              "line": 61
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 65
+            },
+            "start": {
+              "col": 1,
+              "line": 65
+            }
+          },
+          "file": "src/flow.ts",
+          "id": "src/flow::arrow#function",
+          "kind": "function",
+          "name": "arrow",
+          "span": {
+            "end": {
+              "col": 42,
+              "line": 65
+            },
+            "start": {
+              "col": 14,
+              "line": 65
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

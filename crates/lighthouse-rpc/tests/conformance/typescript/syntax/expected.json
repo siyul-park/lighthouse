@@ -1,0 +1,116 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/broken"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/broken::broken#function"
+        }
+      ],
+      "file": {
+        "path": "src/broken.ts"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "src/broken"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/broken.ts",
+          "id": "src/broken::broken#function",
+          "kind": "function",
+          "name": "broken",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/ok"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ok::ok#const"
+        }
+      ],
+      "file": {
+        "path": "src/ok.ts"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "src/ok"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/ok.ts",
+          "id": "src/ok::ok#const",
+          "kind": "const",
+          "name": "ok",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 1
+            },
+            "start": {
+              "col": 14,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [
+    {
+      "path": "src/broken.ts",
+      "reason": "2:10: ':' expected. (and 2 more)"
+    }
+  ],
+  "notices": [],
+  "sources": []
+}

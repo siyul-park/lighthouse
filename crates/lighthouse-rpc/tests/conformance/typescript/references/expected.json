@@ -1,0 +1,189 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "packages/app/src/app"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "packages/app/src/app::app#function"
+        },
+        {
+          "from": {
+            "module": "packages/app/src/app"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 44,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "packages/core/src/core"
+        },
+        {
+          "from": {
+            "symbol": "packages/app/src/app::app#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 4
+            },
+            "start": {
+              "col": 10,
+              "line": 4
+            }
+          },
+          "to": "packages/core/src/core::core#function"
+        }
+      ],
+      "file": {
+        "path": "packages/app/src/app.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "packages/app/src/app::app#function",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "packages/app/src/app"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "packages/app/src/app.ts",
+          "id": "packages/app/src/app::app#function",
+          "kind": "function",
+          "name": "app",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "packages/core/src/core"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "packages/core/src/core::core#function"
+        }
+      ],
+      "file": {
+        "path": "packages/core/src/core.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "packages/core/src/core::core#function",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "packages/core/src/core"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "packages/core/src/core.ts",
+          "id": "packages/core/src/core::core#function",
+          "kind": "function",
+          "name": "core",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

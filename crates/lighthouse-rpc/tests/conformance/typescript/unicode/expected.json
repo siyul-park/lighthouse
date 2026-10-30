@@ -1,0 +1,203 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/u"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/u::grüße#const"
+        },
+        {
+          "from": {
+            "module": "src/u"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/u::日本語#function"
+        },
+        {
+          "from": {
+            "module": "src/u"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/u::after#function"
+        },
+        {
+          "from": {
+            "symbol": "src/u::日本語#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 93,
+              "line": 1
+            },
+            "start": {
+              "col": 86,
+              "line": 1
+            }
+          },
+          "to": "src/u::grüße#const"
+        },
+        {
+          "from": {
+            "symbol": "src/u::after#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 51,
+              "line": 3
+            },
+            "start": {
+              "col": 42,
+              "line": 3
+            }
+          },
+          "to": "src/u::日本語#function"
+        }
+      ],
+      "file": {
+        "path": "src/u.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/u::日本語#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "src/u::日本語#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/u::after#function",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/u"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/u.ts",
+          "id": "src/u::grüße#const",
+          "kind": "const",
+          "name": "grüße",
+          "span": {
+            "end": {
+              "col": 39,
+              "line": 1
+            },
+            "start": {
+              "col": 14,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 104,
+              "line": 1
+            },
+            "start": {
+              "col": 41,
+              "line": 1
+            }
+          },
+          "file": "src/u.ts",
+          "id": "src/u::日本語#function",
+          "kind": "function",
+          "name": "日本語",
+          "span": {
+            "end": {
+              "col": 104,
+              "line": 1
+            },
+            "start": {
+              "col": 41,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 56,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/u.ts",
+          "id": "src/u::after#function",
+          "kind": "function",
+          "name": "after",
+          "span": {
+            "end": {
+              "col": 56,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

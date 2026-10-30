@@ -1,0 +1,857 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/ns"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::Shape#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::Shape#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::Shape::area#method"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::Circle#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::Circle#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::Circle::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::Circle#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::Circle::radius#field"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::Circle#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::Circle::area#method"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::hidden#const"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Shapes::unit#function"
+        },
+        {
+          "from": {
+            "module": "src/ns"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Outer#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Outer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Outer::Inner#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Outer::Inner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Outer::Inner::depth#const"
+        },
+        {
+          "from": {
+            "module": "src/ns"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Local#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Local#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::Local::value#const"
+        },
+        {
+          "from": {
+            "module": "src/ns"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/ns::total#const"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::Circle#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 39,
+              "line": 6
+            },
+            "start": {
+              "col": 34,
+              "line": 6
+            }
+          },
+          "to": "src/ns::Shapes::Shape#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::Circle::area#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 9
+            },
+            "start": {
+              "col": 29,
+              "line": 9
+            }
+          },
+          "to": "src/ns::Shapes::Circle::radius#field"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::unit#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 14
+            },
+            "start": {
+              "col": 27,
+              "line": 14
+            }
+          },
+          "to": "src/ns::Shapes::Circle#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::unit#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 15
+            },
+            "start": {
+              "col": 16,
+              "line": 15
+            }
+          },
+          "to": "src/ns::Shapes::Circle::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::Shapes::unit#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 15
+            },
+            "start": {
+              "col": 23,
+              "line": 15
+            }
+          },
+          "to": "src/ns::Shapes::hidden#const"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 27
+            },
+            "start": {
+              "col": 22,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Shapes#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 27
+            },
+            "start": {
+              "col": 29,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Shapes::unit#function"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 27
+            },
+            "start": {
+              "col": 36,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Shapes::Circle::area#method"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 50,
+              "line": 27
+            },
+            "start": {
+              "col": 45,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Outer#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 56,
+              "line": 27
+            },
+            "start": {
+              "col": 51,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Outer::Inner#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 62,
+              "line": 27
+            },
+            "start": {
+              "col": 57,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Outer::Inner::depth#const"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 70,
+              "line": 27
+            },
+            "start": {
+              "col": 65,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Local#type"
+        },
+        {
+          "from": {
+            "symbol": "src/ns::total#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 76,
+              "line": 27
+            },
+            "start": {
+              "col": 71,
+              "line": 27
+            }
+          },
+          "to": "src/ns::Local::value#const"
+        }
+      ],
+      "file": {
+        "path": "src/ns.ts"
+      },
+      "functions": [
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": []
+          },
+          "statements": 0,
+          "symbol": "src/ns::Shapes::Circle::constructor#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/ns::Shapes::Circle::area#method",
+          "tokens": 13,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/ns::Shapes::Circle",
+                "text": "Circle"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/ns::Shapes::unit#function",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/ns"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes#type",
+          "kind": "type",
+          "name": "Shapes",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::Shape#interface",
+          "kind": "interface",
+          "name": "Shape",
+          "owner": "src/ns::Shapes#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::Shape::area#method",
+          "kind": "method",
+          "name": "area",
+          "owner": "src/ns::Shapes::Shape#interface",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::Circle#type",
+          "kind": "type",
+          "name": "Circle",
+          "owner": "src/ns::Shapes#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 42,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::Circle::constructor#method",
+          "kind": "method",
+          "name": "constructor",
+          "owner": "src/ns::Shapes::Circle#type",
+          "span": {
+            "end": {
+              "col": 42,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 38,
+              "line": 7
+            },
+            "start": {
+              "col": 17,
+              "line": 7
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::Circle::radius#field",
+          "kind": "field",
+          "name": "radius",
+          "owner": "src/ns::Shapes::Circle#type",
+          "span": {
+            "end": {
+              "col": 38,
+              "line": 7
+            },
+            "start": {
+              "col": 17,
+              "line": 7
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::Circle::area#method",
+          "kind": "method",
+          "name": "area",
+          "owner": "src/ns::Shapes::Circle#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 13
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::hidden#const",
+          "kind": "const",
+          "name": "hidden",
+          "owner": "src/ns::Shapes#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 13
+            },
+            "start": {
+              "col": 9,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 16
+            },
+            "start": {
+              "col": 3,
+              "line": 14
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Shapes::unit#function",
+          "kind": "function",
+          "name": "unit",
+          "owner": "src/ns::Shapes#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 16
+            },
+            "start": {
+              "col": 3,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Outer#type",
+          "kind": "type",
+          "name": "Outer",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 21
+            },
+            "start": {
+              "col": 24,
+              "line": 19
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Outer::Inner#type",
+          "kind": "type",
+          "name": "Inner",
+          "owner": "src/ns::Outer#type",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 21
+            },
+            "start": {
+              "col": 24,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 20
+            },
+            "start": {
+              "col": 3,
+              "line": 20
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Outer::Inner::depth#const",
+          "kind": "const",
+          "name": "depth",
+          "owner": "src/ns::Outer::Inner#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 20
+            },
+            "start": {
+              "col": 16,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Local#type",
+          "kind": "type",
+          "name": "Local",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 24
+            },
+            "start": {
+              "col": 3,
+              "line": 24
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::Local::value#const",
+          "kind": "const",
+          "name": "value",
+          "owner": "src/ns::Local#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 24
+            },
+            "start": {
+              "col": 16,
+              "line": 24
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 77,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "file": "src/ns.ts",
+          "id": "src/ns::total#const",
+          "kind": "const",
+          "name": "total",
+          "span": {
+            "end": {
+              "col": 76,
+              "line": 27
+            },
+            "start": {
+              "col": 14,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

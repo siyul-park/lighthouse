@@ -1,0 +1,857 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/merge"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Account#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Account#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Account::id#field"
+        },
+        {
+          "from": {
+            "module": "src/merge"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Account#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Account#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Account::label#field"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Account#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Account::limit#const"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Account#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Account::make#function"
+        },
+        {
+          "from": {
+            "module": "src/merge"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Level#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Level::Low#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Level::High#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Level::parse#function"
+        },
+        {
+          "from": {
+            "module": "src/merge"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::counter#function"
+        },
+        {
+          "from": {
+            "module": "src/merge"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::counter#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::counter#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::counter::count#var"
+        },
+        {
+          "from": {
+            "module": "src/merge"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Options#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Options#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Options::a#field"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Options#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/merge::Options::b#field"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Account::make#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 11
+            },
+            "start": {
+              "col": 27,
+              "line": 11
+            }
+          },
+          "to": "src/merge::Account#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Account::make#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 12
+            },
+            "start": {
+              "col": 16,
+              "line": 12
+            }
+          },
+          "to": "src/merge::Account#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Account::make#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 36,
+              "line": 12
+            },
+            "start": {
+              "col": 29,
+              "line": 12
+            }
+          },
+          "to": "src/merge::Account#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level::parse#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 45,
+              "line": 22
+            },
+            "start": {
+              "col": 40,
+              "line": 22
+            }
+          },
+          "to": "src/merge::Level#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level::parse#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 23
+            },
+            "start": {
+              "col": 30,
+              "line": 23
+            }
+          },
+          "to": "src/merge::Level#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level::parse#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 23
+            },
+            "start": {
+              "col": 36,
+              "line": 23
+            }
+          },
+          "to": "src/merge::Level::High#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level::parse#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 48,
+              "line": 23
+            },
+            "start": {
+              "col": 43,
+              "line": 23
+            }
+          },
+          "to": "src/merge::Level#type"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::Level::parse#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 52,
+              "line": 23
+            },
+            "start": {
+              "col": 49,
+              "line": 23
+            }
+          },
+          "to": "src/merge::Level::Low#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::counter#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 28
+            },
+            "start": {
+              "col": 10,
+              "line": 28
+            }
+          },
+          "to": "src/merge::counter#function"
+        },
+        {
+          "from": {
+            "symbol": "src/merge::counter#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 28
+            },
+            "start": {
+              "col": 18,
+              "line": 28
+            }
+          },
+          "to": "src/merge::counter::count#var"
+        }
+      ],
+      "file": {
+        "path": "src/merge.ts"
+      },
+      "functions": [
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/merge::Account",
+                "text": "Account"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/merge::Account::make#function",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/merge::Level",
+                "text": "Level"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/merge::Level::parse#function",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/merge::counter#function",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/merge"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Account#type",
+          "kind": "type",
+          "name": "Account",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 10,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Account::id#field",
+          "kind": "field",
+          "name": "id",
+          "owner": "src/merge::Account#type",
+          "span": {
+            "end": {
+              "col": 10,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Account#interface",
+          "kind": "interface",
+          "name": "Account",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Account::label#field",
+          "kind": "field",
+          "name": "label",
+          "owner": "src/merge::Account#interface",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 10
+            },
+            "start": {
+              "col": 3,
+              "line": 10
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Account::limit#const",
+          "kind": "const",
+          "name": "limit",
+          "owner": "src/merge::Account#type",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 10
+            },
+            "start": {
+              "col": 16,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 13
+            },
+            "start": {
+              "col": 3,
+              "line": 11
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Account::make#function",
+          "kind": "function",
+          "name": "make",
+          "owner": "src/merge::Account#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 13
+            },
+            "start": {
+              "col": 3,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Level#type",
+          "kind": "type",
+          "name": "Level",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 17
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Level::Low#variant",
+          "kind": "variant",
+          "name": "Low",
+          "owner": "src/merge::Level#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 7,
+              "line": 18
+            },
+            "start": {
+              "col": 3,
+              "line": 18
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Level::High#variant",
+          "kind": "variant",
+          "name": "High",
+          "owner": "src/merge::Level#type",
+          "span": {
+            "end": {
+              "col": 7,
+              "line": 18
+            },
+            "start": {
+              "col": 3,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 24
+            },
+            "start": {
+              "col": 3,
+              "line": 22
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Level::parse#function",
+          "kind": "function",
+          "name": "parse",
+          "owner": "src/merge::Level#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 24
+            },
+            "start": {
+              "col": 3,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::counter#function",
+          "kind": "function",
+          "name": "counter",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::counter#type",
+          "kind": "type",
+          "name": "counter",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 32
+            },
+            "start": {
+              "col": 3,
+              "line": 32
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::counter::count#var",
+          "kind": "var",
+          "name": "count",
+          "owner": "src/merge::counter#type",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 32
+            },
+            "start": {
+              "col": 14,
+              "line": 32
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Options#interface",
+          "kind": "interface",
+          "name": "Options",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 36
+            },
+            "start": {
+              "col": 3,
+              "line": 36
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Options::a#field",
+          "kind": "field",
+          "name": "a",
+          "owner": "src/merge::Options#interface",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 36
+            },
+            "start": {
+              "col": 3,
+              "line": 36
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 40
+            },
+            "start": {
+              "col": 3,
+              "line": 40
+            }
+          },
+          "file": "src/merge.ts",
+          "id": "src/merge::Options::b#field",
+          "kind": "field",
+          "name": "b",
+          "optional": true,
+          "owner": "src/merge::Options#interface",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 40
+            },
+            "start": {
+              "col": 3,
+              "line": 40
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

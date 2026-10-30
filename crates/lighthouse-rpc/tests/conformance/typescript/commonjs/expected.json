@@ -1,0 +1,668 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "lib"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "lib::helper#function"
+        },
+        {
+          "from": {
+            "module": "lib"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "lib::Widget#function"
+        },
+        {
+          "from": {
+            "symbol": "lib::Widget#function"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "lib::Widget::render#method"
+        },
+        {
+          "from": {
+            "symbol": "lib::Widget#function"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "lib::Widget::create#method"
+        },
+        {
+          "from": {
+            "module": "lib"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "lib::twice#function"
+        },
+        {
+          "from": {
+            "symbol": "lib::Widget::render#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 12
+            },
+            "start": {
+              "col": 10,
+              "line": 12
+            }
+          },
+          "to": "lib::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "lib::Widget::create#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 16
+            },
+            "start": {
+              "col": 14,
+              "line": 16
+            }
+          },
+          "to": "lib::Widget#function"
+        },
+        {
+          "from": {
+            "module": "lib"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 19
+            },
+            "start": {
+              "col": 18,
+              "line": 19
+            }
+          },
+          "to": "lib::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "lib::twice#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 21
+            },
+            "start": {
+              "col": 10,
+              "line": 21
+            }
+          },
+          "to": "lib::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "lib::twice#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 21
+            },
+            "start": {
+              "col": 17,
+              "line": 21
+            }
+          },
+          "to": "lib::helper#function"
+        },
+        {
+          "from": {
+            "module": "lib"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 23
+            },
+            "start": {
+              "col": 18,
+              "line": 23
+            }
+          },
+          "to": "lib::Widget#function"
+        }
+      ],
+      "file": {
+        "path": "lib.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              }
+            ],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "lib::helper#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "lib::Widget#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "lib::Widget::render#method",
+          "tokens": 12,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              }
+            ],
+            "results": [
+              {
+                "text": "Widget"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "lib::Widget::create#method",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              }
+            ],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "lib::twice#function",
+          "tokens": 11,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "lib"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "lib.js",
+          "id": "lib::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "lib.js",
+          "id": "lib::Widget#function",
+          "kind": "function",
+          "name": "Widget",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "file": "lib.js",
+          "id": "lib::Widget::render#method",
+          "kind": "method",
+          "name": "render",
+          "owner": "lib::Widget#function",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "file": "lib.js",
+          "id": "lib::Widget::create#method",
+          "kind": "method",
+          "name": "create",
+          "owner": "lib::Widget#function",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "lib.js",
+          "id": "lib::twice#function",
+          "kind": "function",
+          "name": "twice",
+          "span": {
+            "end": {
+              "col": 3,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "main::lib#const"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "main::twice#const"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "main::run#function"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "main::VERSION#const"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 1
+            },
+            "start": {
+              "col": 13,
+              "line": 1
+            }
+          },
+          "to": "lib"
+        },
+        {
+          "from": {
+            "symbol": "main::twice#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 2
+            },
+            "start": {
+              "col": 9,
+              "line": 2
+            }
+          },
+          "to": "lib::twice#function"
+        },
+        {
+          "from": {
+            "module": "main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 2
+            },
+            "start": {
+              "col": 19,
+              "line": 2
+            }
+          },
+          "to": "lib"
+        },
+        {
+          "from": {
+            "symbol": "main::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 12,
+              "line": 6
+            }
+          },
+          "to": "lib::twice#function"
+        },
+        {
+          "from": {
+            "symbol": "main::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 6
+            },
+            "start": {
+              "col": 27,
+              "line": 6
+            }
+          },
+          "to": "lib::helper#function"
+        }
+      ],
+      "file": {
+        "path": "main.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "main::run#function",
+          "tokens": 15,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "main"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "main.js",
+          "id": "main::lib#const",
+          "kind": "const",
+          "name": "lib",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 1
+            },
+            "start": {
+              "col": 7,
+              "line": 1
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "main.js",
+          "id": "main::twice#const",
+          "kind": "const",
+          "name": "twice",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 2
+            },
+            "start": {
+              "col": 7,
+              "line": 2
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 5
+            }
+          },
+          "file": "main.js",
+          "id": "main::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 5
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 8
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "file": "main.js",
+          "id": "main::VERSION#const",
+          "kind": "const",
+          "name": "VERSION",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 8
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

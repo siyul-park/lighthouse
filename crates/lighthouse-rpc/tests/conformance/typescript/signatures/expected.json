@@ -1,0 +1,1002 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/sig"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Config#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Config::name#field"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Config#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Config::retries#field"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Config#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Config::parent#field"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Config#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Config::items#field"
+        },
+        {
+          "from": {
+            "module": "src/sig"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Local#type"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Local#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Local::x#field"
+        },
+        {
+          "from": {
+            "module": "src/sig"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Service#type"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Service::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Service::config#field"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Service::load#method"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Service::touch#method"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Service::find#method"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::Service::create#method"
+        },
+        {
+          "from": {
+            "module": "src/sig"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::build#function"
+        },
+        {
+          "from": {
+            "module": "src/sig"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/sig::fail#function"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Config::parent#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 4
+            },
+            "start": {
+              "col": 11,
+              "line": 4
+            }
+          },
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Config::items#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 5
+            },
+            "start": {
+              "col": 10,
+              "line": 5
+            }
+          },
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::config#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 11
+            },
+            "start": {
+              "col": 31,
+              "line": 11
+            }
+          },
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::load#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 13
+            },
+            "start": {
+              "col": 35,
+              "line": 13
+            }
+          },
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::load#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 14
+            },
+            "start": {
+              "col": 22,
+              "line": 14
+            }
+          },
+          "to": "src/sig::Service::config#field"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::find#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 19
+            },
+            "start": {
+              "col": 15,
+              "line": 19
+            }
+          },
+          "to": "src/sig::Local#type"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::find#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 48,
+              "line": 19
+            },
+            "start": {
+              "col": 42,
+              "line": 19
+            }
+          },
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::create#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 25
+            },
+            "start": {
+              "col": 25,
+              "line": 25
+            }
+          },
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::create#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 25
+            },
+            "start": {
+              "col": 34,
+              "line": 25
+            }
+          },
+          "to": "src/sig::Service#type"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::Service::create#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 26
+            },
+            "start": {
+              "col": 16,
+              "line": 26
+            }
+          },
+          "to": "src/sig::Service::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 30
+            },
+            "start": {
+              "col": 31,
+              "line": 30
+            }
+          },
+          "to": "src/sig::Config#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 47,
+              "line": 30
+            },
+            "start": {
+              "col": 40,
+              "line": 30
+            }
+          },
+          "to": "src/sig::Service#type"
+        },
+        {
+          "from": {
+            "symbol": "src/sig::build#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 31
+            },
+            "start": {
+              "col": 14,
+              "line": 31
+            }
+          },
+          "to": "src/sig::Service::constructor#method"
+        }
+      ],
+      "file": {
+        "path": "src/sig.ts"
+      },
+      "functions": [
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "src/sig::Config",
+                "text": "Config"
+              }
+            ],
+            "results": []
+          },
+          "statements": 0,
+          "symbol": "src/sig::Service::constructor#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/sig::Config",
+                "text": "Config"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/sig::Service::load#method",
+          "tokens": 14,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "src/sig::Service::touch#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": false,
+                "symbol": "src/sig::Local",
+                "text": "Local"
+              },
+              {
+                "text": "string[]"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/sig::Config",
+                "text": "Config | undefined"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": "src/sig::Service::find#method",
+          "tokens": 11,
+          "top_level": 3
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "src/sig::Config",
+                "text": "Config"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/sig::Service",
+                "text": "Service"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/sig::Service::create#method",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "src/sig::Config",
+                "text": "Config"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/sig::Service",
+                "text": "Service"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/sig::build#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "src/sig::fail#function",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/sig"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Config#interface",
+          "kind": "interface",
+          "name": "Config",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Config::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "src/sig::Config#interface",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 3
+            },
+            "start": {
+              "col": 3,
+              "line": 3
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Config::retries#field",
+          "kind": "field",
+          "name": "retries",
+          "optional": true,
+          "owner": "src/sig::Config#interface",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 3
+            },
+            "start": {
+              "col": 3,
+              "line": 3
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 4
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Config::parent#field",
+          "kind": "field",
+          "name": "parent",
+          "optional": true,
+          "owner": "src/sig::Config#interface",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 4
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": "src/sig::Config",
+            "text": "Config | null"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 5
+            },
+            "start": {
+              "col": 3,
+              "line": 5
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Config::items#field",
+          "kind": "field",
+          "name": "items",
+          "owner": "src/sig::Config#interface",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 5
+            },
+            "start": {
+              "col": 3,
+              "line": 5
+            }
+          },
+          "type_ref": {
+            "text": "Config[]"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Local#type",
+          "kind": "type",
+          "name": "Local",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 8
+            },
+            "start": {
+              "col": 16,
+              "line": 8
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Local::x#field",
+          "kind": "field",
+          "name": "x",
+          "owner": "src/sig::Local#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 8
+            },
+            "start": {
+              "col": 16,
+              "line": 8
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Service#type",
+          "kind": "type",
+          "name": "Service",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 41,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 11
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Service::constructor#method",
+          "kind": "method",
+          "name": "constructor",
+          "owner": "src/sig::Service#type",
+          "span": {
+            "end": {
+              "col": 41,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 37,
+              "line": 11
+            },
+            "start": {
+              "col": 15,
+              "line": 11
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Service::config#field",
+          "kind": "field",
+          "name": "config",
+          "owner": "src/sig::Service#type",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 11
+            },
+            "start": {
+              "col": 15,
+              "line": 11
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": "src/sig::Config",
+            "text": "Config"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Service::load#method",
+          "kind": "method",
+          "name": "load",
+          "owner": "src/sig::Service#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 34,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 17
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Service::touch#method",
+          "kind": "method",
+          "name": "touch",
+          "owner": "src/sig::Service#type",
+          "span": {
+            "end": {
+              "col": 34,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 23
+            },
+            "start": {
+              "col": 3,
+              "line": 19
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Service::find#method",
+          "kind": "method",
+          "name": "find",
+          "owner": "src/sig::Service#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 23
+            },
+            "start": {
+              "col": 3,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 27
+            },
+            "start": {
+              "col": 3,
+              "line": 25
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::Service::create#method",
+          "kind": "method",
+          "name": "create",
+          "owner": "src/sig::Service#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 27
+            },
+            "start": {
+              "col": 3,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::build#function",
+          "kind": "function",
+          "name": "build",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "file": "src/sig.ts",
+          "id": "src/sig::fail#function",
+          "kind": "function",
+          "name": "fail",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

@@ -1,0 +1,649 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "/**\n * @typedef {object} Point\n * @property {number} x\n * @property {number} y\n */"
+        },
+        {
+          "attached_to": "src/shapes::move#function",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "text": "/**\n * Moves a point.\n * @param {Point} point the point\n * @param {number} dx\n * @returns {Point}\n */"
+        },
+        {
+          "attached_to": "src/shapes::Grid::constructor#method",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 18
+            },
+            "start": {
+              "col": 3,
+              "line": 18
+            }
+          },
+          "text": "/** @param {number} size */"
+        },
+        {
+          "attached_to": "src/shapes::Grid::cells#field",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 20
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
+          "text": "/** @type {Point[]} */"
+        },
+        {
+          "attached_to": "src/shapes::Grid::count#method",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 25
+            },
+            "start": {
+              "col": 3,
+              "line": 25
+            }
+          },
+          "text": "/** @returns {number} */"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "src/shapes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shapes::move#function"
+        },
+        {
+          "from": {
+            "module": "src/shapes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shapes::Grid#type"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::Grid#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shapes::Grid::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::Grid#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shapes::Grid::cells#field"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::Grid#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shapes::Grid::size#field"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::Grid#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shapes::Grid::count#method"
+        },
+        {
+          "from": {
+            "module": "src/shapes"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shapes::origin#const"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::Grid::cells#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 21
+            },
+            "start": {
+              "col": 10,
+              "line": 21
+            }
+          },
+          "to": "src/shapes::Grid::cells#field"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::Grid::size#field"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 22
+            },
+            "start": {
+              "col": 10,
+              "line": 22
+            }
+          },
+          "to": "src/shapes::Grid::size#field"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::Grid::count#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 27
+            },
+            "start": {
+              "col": 17,
+              "line": 27
+            }
+          },
+          "to": "src/shapes::Grid::cells#field"
+        },
+        {
+          "from": {
+            "symbol": "src/shapes::origin#const"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 31
+            },
+            "start": {
+              "col": 23,
+              "line": 31
+            }
+          },
+          "to": "src/shapes::move#function"
+        }
+      ],
+      "file": {
+        "path": "src/shapes.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Point"
+              },
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "Point"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/shapes::move#function",
+          "tokens": 19,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": []
+          },
+          "statements": 2,
+          "symbol": "src/shapes::Grid::constructor#method",
+          "tokens": 15,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/shapes::Grid::count#method",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/shapes"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Moves a point.\n@param {Point} point the point\n@param {number} dx\n@returns {Point}",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "src/shapes.js",
+          "id": "src/shapes::move#function",
+          "kind": "function",
+          "name": "move",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "file": "src/shapes.js",
+          "id": "src/shapes::Grid#type",
+          "kind": "type",
+          "name": "Grid",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "@param {number} size",
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 23
+            },
+            "start": {
+              "col": 3,
+              "line": 18
+            }
+          },
+          "file": "src/shapes.js",
+          "id": "src/shapes::Grid::constructor#method",
+          "kind": "method",
+          "name": "constructor",
+          "owner": "src/shapes::Grid#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 23
+            },
+            "start": {
+              "col": 3,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "@type {Point[]}",
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 21
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
+          "file": "src/shapes.js",
+          "id": "src/shapes::Grid::cells#field",
+          "kind": "field",
+          "name": "cells",
+          "owner": "src/shapes::Grid#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 21
+            },
+            "start": {
+              "col": 5,
+              "line": 21
+            }
+          },
+          "type_ref": {
+            "text": "Point[]"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "file": "src/shapes.js",
+          "id": "src/shapes::Grid::size#field",
+          "kind": "field",
+          "name": "size",
+          "owner": "src/shapes::Grid#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "type_ref": {
+            "text": "any"
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "@returns {number}",
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 28
+            },
+            "start": {
+              "col": 3,
+              "line": 25
+            }
+          },
+          "file": "src/shapes.js",
+          "id": "src/shapes::Grid::count#method",
+          "kind": "method",
+          "name": "count",
+          "owner": "src/shapes::Grid#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 28
+            },
+            "start": {
+              "col": 3,
+              "line": 26
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 47,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "file": "src/shapes.js",
+          "id": "src/shapes::origin#const",
+          "kind": "const",
+          "name": "origin",
+          "span": {
+            "end": {
+              "col": 46,
+              "line": 31
+            },
+            "start": {
+              "col": 14,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/use"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/use::run#function"
+        },
+        {
+          "from": {
+            "module": "src/use"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 42,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/shapes"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 4
+            },
+            "start": {
+              "col": 20,
+              "line": 4
+            }
+          },
+          "to": "src/shapes::Grid::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 5
+            },
+            "start": {
+              "col": 10,
+              "line": 5
+            }
+          },
+          "to": "src/shapes::move#function"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 5
+            },
+            "start": {
+              "col": 20,
+              "line": 5
+            }
+          },
+          "to": "src/shapes::Grid::cells#field"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 5
+            },
+            "start": {
+              "col": 35,
+              "line": 5
+            }
+          },
+          "to": "src/shapes::Grid::count#method"
+        }
+      ],
+      "file": {
+        "path": "src/use.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Point"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": "src/use::run#function",
+          "tokens": 28,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/use"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/use.js",
+          "id": "src/use::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

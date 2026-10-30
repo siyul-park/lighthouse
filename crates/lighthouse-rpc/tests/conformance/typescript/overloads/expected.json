@@ -1,0 +1,384 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "/** Parses. */"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "src/over"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/over::parse#function"
+        },
+        {
+          "from": {
+            "module": "src/over"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/over::Writer#type"
+        },
+        {
+          "from": {
+            "symbol": "src/over::Writer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/over::Writer::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/over::Writer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/over::Writer::target#field"
+        },
+        {
+          "from": {
+            "symbol": "src/over::Writer#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/over::Writer::write#method"
+        },
+        {
+          "from": {
+            "module": "src/over"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/over::use#function"
+        },
+        {
+          "from": {
+            "symbol": "src/over::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 21
+            },
+            "start": {
+              "col": 3,
+              "line": 21
+            }
+          },
+          "to": "src/over::parse#function"
+        },
+        {
+          "from": {
+            "symbol": "src/over::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 22
+            },
+            "start": {
+              "col": 7,
+              "line": 22
+            }
+          },
+          "to": "src/over::Writer::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/over::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 22
+            },
+            "start": {
+              "col": 17,
+              "line": 22
+            }
+          },
+          "to": "src/over::Writer::write#method"
+        }
+      ],
+      "file": {
+        "path": "src/over.ts"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string | number"
+              }
+            ],
+            "results": [
+              {
+                "text": "string | number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/over::parse#function",
+          "tokens": 18,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "string | number"
+              }
+            ],
+            "results": []
+          },
+          "statements": 0,
+          "symbol": "src/over::Writer::constructor#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "string | Uint8Array<ArrayBufferLike>"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "src/over::Writer::write#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "src/over::use#function",
+          "tokens": 18,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/over"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Parses.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/over.ts",
+          "id": "src/over::parse#function",
+          "kind": "function",
+          "name": "parse",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "file": "src/over.ts",
+          "id": "src/over::Writer#type",
+          "kind": "type",
+          "name": "Writer",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 51,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "file": "src/over.ts",
+          "id": "src/over::Writer::constructor#method",
+          "kind": "method",
+          "name": "constructor",
+          "owner": "src/over::Writer#type",
+          "span": {
+            "end": {
+              "col": 51,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 47,
+              "line": 11
+            },
+            "start": {
+              "col": 15,
+              "line": 11
+            }
+          },
+          "file": "src/over.ts",
+          "id": "src/over::Writer::target#field",
+          "kind": "field",
+          "name": "target",
+          "owner": "src/over::Writer#type",
+          "span": {
+            "end": {
+              "col": 47,
+              "line": 11
+            },
+            "start": {
+              "col": 15,
+              "line": 11
+            }
+          },
+          "type_ref": {
+            "text": "string | number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "file": "src/over.ts",
+          "id": "src/over::Writer::write#method",
+          "kind": "method",
+          "name": "write",
+          "owner": "src/over::Writer#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 17
+            },
+            "start": {
+              "col": 3,
+              "line": 15
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "src/over.ts",
+          "id": "src/over::use#function",
+          "kind": "function",
+          "name": "use",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

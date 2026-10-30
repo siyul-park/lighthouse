@@ -1,0 +1,1058 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": "src/box::Box#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "text": "/** A box of one value. */"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "src/box"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Named#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Named::name#field"
+        },
+        {
+          "from": {
+            "module": "src/box"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Box#type"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Box::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Box::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Box::map#method"
+        },
+        {
+          "from": {
+            "module": "src/box"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Pair::first#field"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::Pair::second#field"
+        },
+        {
+          "from": {
+            "module": "src/box"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::first#function"
+        },
+        {
+          "from": {
+            "module": "src/box"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::describe#function"
+        },
+        {
+          "from": {
+            "module": "src/box"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/box::identity#function"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box#type"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 6
+            },
+            "start": {
+              "col": 28,
+              "line": 6
+            }
+          },
+          "to": "src/box::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box::constructor#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 10
+            },
+            "start": {
+              "col": 10,
+              "line": 10
+            }
+          },
+          "to": "src/box::Box::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box::map#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 13
+            },
+            "start": {
+              "col": 17,
+              "line": 13
+            }
+          },
+          "to": "src/box::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box::map#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 53,
+              "line": 13
+            },
+            "start": {
+              "col": 50,
+              "line": 13
+            }
+          },
+          "to": "src/box::Box#type"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box::map#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 14
+            },
+            "start": {
+              "col": 16,
+              "line": 14
+            }
+          },
+          "to": "src/box::Box::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/box::Box::map#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 14
+            },
+            "start": {
+              "col": 32,
+              "line": 14
+            }
+          },
+          "to": "src/box::Box::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/box::describe#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 24
+            },
+            "start": {
+              "col": 36,
+              "line": 24
+            }
+          },
+          "to": "src/box::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/box::describe#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 51,
+              "line": 24
+            },
+            "start": {
+              "col": 48,
+              "line": 24
+            }
+          },
+          "to": "src/box::Box#type"
+        },
+        {
+          "from": {
+            "symbol": "src/box::describe#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 25
+            },
+            "start": {
+              "col": 14,
+              "line": 25
+            }
+          },
+          "to": "src/box::Box::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/box::describe#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 25
+            },
+            "start": {
+              "col": 26,
+              "line": 25
+            }
+          },
+          "to": "src/box::Box::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/box::describe#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 36,
+              "line": 25
+            },
+            "start": {
+              "col": 32,
+              "line": 25
+            }
+          },
+          "to": "src/box::Named::name#field"
+        }
+      ],
+      "file": {
+        "path": "src/box.ts"
+      },
+      "functions": [
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "T"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "src/box::Box::constructor#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "(value: T) => U"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/box::Box",
+                "text": "Box<U>"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/box::Box::map#method",
+          "tokens": 16,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "T[]"
+              }
+            ],
+            "results": [
+              {
+                "text": "T | undefined"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/box::first#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "src/box::Box",
+                "text": "Box<T>"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/box::describe#function",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "T"
+              }
+            ],
+            "results": [
+              {
+                "text": "T"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/box::identity#function",
+          "tokens": 1,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/box"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Named#interface",
+          "kind": "interface",
+          "name": "Named",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Named::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "src/box::Named#interface",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "A box of one value.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Box#type",
+          "kind": "type",
+          "name": "Box",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 7
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Box::value#field",
+          "kind": "field",
+          "name": "value",
+          "optional": true,
+          "owner": "src/box::Box#type",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 7
+            }
+          },
+          "type_ref": {
+            "text": "T"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Box::constructor#method",
+          "kind": "method",
+          "name": "constructor",
+          "owner": "src/box::Box#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Box::map#method",
+          "kind": "method",
+          "name": "map",
+          "owner": "src/box::Box#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 58,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Pair#type",
+          "kind": "type",
+          "name": "Pair",
+          "span": {
+            "end": {
+              "col": 58,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 37,
+              "line": 18
+            },
+            "start": {
+              "col": 28,
+              "line": 18
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Pair::first#field",
+          "kind": "field",
+          "name": "first",
+          "owner": "src/box::Pair#type",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 18
+            },
+            "start": {
+              "col": 28,
+              "line": 18
+            }
+          },
+          "type_ref": {
+            "text": "A"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 55,
+              "line": 18
+            },
+            "start": {
+              "col": 38,
+              "line": 18
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::Pair::second#field",
+          "kind": "field",
+          "name": "second",
+          "optional": true,
+          "owner": "src/box::Pair#type",
+          "span": {
+            "end": {
+              "col": 55,
+              "line": 18
+            },
+            "start": {
+              "col": 38,
+              "line": 18
+            }
+          },
+          "type_ref": {
+            "text": "B | null"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::first#function",
+          "kind": "function",
+          "name": "first",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::describe#function",
+          "kind": "function",
+          "name": "describe",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 52,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "file": "src/box.ts",
+          "id": "src/box::identity#function",
+          "kind": "function",
+          "name": "identity",
+          "span": {
+            "end": {
+              "col": 51,
+              "line": 28
+            },
+            "start": {
+              "col": 14,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/use"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/use::run#function"
+        },
+        {
+          "from": {
+            "module": "src/use"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 69,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/box"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 3
+            },
+            "start": {
+              "col": 28,
+              "line": 3
+            }
+          },
+          "to": "src/box::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 42,
+              "line": 3
+            },
+            "start": {
+              "col": 38,
+              "line": 3
+            }
+          },
+          "to": "src/box::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 48,
+              "line": 3
+            },
+            "start": {
+              "col": 43,
+              "line": 3
+            }
+          },
+          "to": "src/box::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 53,
+              "line": 3
+            },
+            "start": {
+              "col": 50,
+              "line": 3
+            }
+          },
+          "to": "src/box::Box#type"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 59,
+              "line": 3
+            },
+            "start": {
+              "col": 54,
+              "line": 3
+            }
+          },
+          "to": "src/box::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 4
+            },
+            "start": {
+              "col": 16,
+              "line": 4
+            }
+          },
+          "to": "src/box::first#function"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 4
+            },
+            "start": {
+              "col": 32,
+              "line": 4
+            }
+          },
+          "to": "src/box::identity#function"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 5
+            },
+            "start": {
+              "col": 19,
+              "line": 5
+            }
+          },
+          "to": "src/box::Box::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/use::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 6
+            },
+            "start": {
+              "col": 37,
+              "line": 6
+            }
+          },
+          "to": "src/box::Box::map#method"
+        }
+      ],
+      "file": {
+        "path": "src/use.ts"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Named[]"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "src/box::Pair",
+                "text": "Pair<Named, Box<Named>>"
+              }
+            ]
+          },
+          "statements": 4,
+          "symbol": "src/use::run#function",
+          "tokens": 48,
+          "top_level": 3
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/use"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/use.ts",
+          "id": "src/use::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

@@ -1,0 +1,1062 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "private-app/lib"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "private-app/lib::fromApp#function"
+        }
+      ],
+      "file": {
+        "path": "private-app/lib.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "private-app/lib::fromApp#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "private-app/lib"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "private-app/lib.ts",
+          "id": "private-app/lib::fromApp#function",
+          "kind": "function",
+          "name": "fromApp",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "published/lib"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "published/lib::fromLibrary#function"
+        }
+      ],
+      "file": {
+        "path": "published/lib.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "published/lib::fromLibrary#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "published/lib"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "published/lib.ts",
+          "id": "published/lib::fromLibrary#function",
+          "kind": "function",
+          "name": "fromLibrary",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/owner"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner#type"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::open#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::secret#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::%23hidden#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::shared#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::fixed#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::count#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::dep#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::name#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::help#method"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::inherit#method"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Owner::total#method"
+        },
+        {
+          "from": {
+            "module": "src/owner"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Internal#type"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Internal#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::Internal::member#field"
+        },
+        {
+          "from": {
+            "module": "src/owner"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::reach#const"
+        },
+        {
+          "from": {
+            "module": "src/owner"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/owner::local#const"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner::help#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 14
+            },
+            "start": {
+              "col": 17,
+              "line": 14
+            }
+          },
+          "to": "src/owner::Owner::secret#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner::help#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 14
+            },
+            "start": {
+              "col": 31,
+              "line": 14
+            }
+          },
+          "to": "src/owner::Owner::%23hidden#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner::inherit#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 18
+            },
+            "start": {
+              "col": 17,
+              "line": 18
+            }
+          },
+          "to": "src/owner::Owner::help#method"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner::inherit#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 18
+            },
+            "start": {
+              "col": 31,
+              "line": 18
+            }
+          },
+          "to": "src/owner::Owner::shared#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner::total#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 22
+            },
+            "start": {
+              "col": 17,
+              "line": 22
+            }
+          },
+          "to": "src/owner::Owner::inherit#method"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner::total#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 26
+            },
+            "start": {
+              "col": 10,
+              "line": 26
+            }
+          },
+          "to": "src/owner::Owner::secret#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::reach#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 34
+            },
+            "start": {
+              "col": 26,
+              "line": 34
+            }
+          },
+          "to": "src/owner::Internal#type"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::reach#const"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 43,
+              "line": 34
+            },
+            "start": {
+              "col": 37,
+              "line": 34
+            }
+          },
+          "to": "src/owner::Internal::member#field"
+        },
+        {
+          "from": {
+            "module": "src/owner"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 35
+            },
+            "start": {
+              "col": 10,
+              "line": 35
+            }
+          },
+          "to": "src/owner::Internal#type"
+        },
+        {
+          "from": {
+            "module": "src/owner"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 38
+            },
+            "start": {
+              "col": 16,
+              "line": 38
+            }
+          },
+          "to": "src/owner::local#const"
+        }
+      ],
+      "file": {
+        "path": "src/owner.ts"
+      },
+      "functions": [
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 3,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              },
+              {
+                "text": "string"
+              },
+              {
+                "text": "number"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "src/owner::Owner::constructor#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/owner::Owner::help#method",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/owner::Owner::inherit#method",
+          "tokens": 13,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "src/owner::Owner::inherit#method",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/owner::Owner::total#method",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/owner"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner#type",
+          "kind": "type",
+          "name": "Owner",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::open#field",
+          "kind": "field",
+          "name": "open",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 2
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 3
+            },
+            "start": {
+              "col": 3,
+              "line": 3
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::secret#field",
+          "kind": "field",
+          "name": "secret",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 3
+            },
+            "start": {
+              "col": 3,
+              "line": 3
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 4
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::%23hidden#field",
+          "kind": "field",
+          "name": "#hidden",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 4
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 5
+            },
+            "start": {
+              "col": 3,
+              "line": 5
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::shared#field",
+          "kind": "field",
+          "name": "shared",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 5
+            },
+            "start": {
+              "col": 3,
+              "line": 5
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 6
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::fixed#field",
+          "kind": "field",
+          "name": "fixed",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 6
+            },
+            "start": {
+              "col": 3,
+              "line": 6
+            }
+          },
+          "type_ref": {
+            "text": "5"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 7
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::count#field",
+          "kind": "field",
+          "name": "count",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 7
+            },
+            "start": {
+              "col": 3,
+              "line": 7
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::constructor#method",
+          "kind": "method",
+          "name": "constructor",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 11
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 9
+            },
+            "start": {
+              "col": 15,
+              "line": 9
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::dep#field",
+          "kind": "field",
+          "name": "dep",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 9
+            },
+            "start": {
+              "col": 15,
+              "line": 9
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 64,
+              "line": 9
+            },
+            "start": {
+              "col": 45,
+              "line": 9
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 64,
+              "line": 9
+            },
+            "start": {
+              "col": 45,
+              "line": 9
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::help#method",
+          "kind": "method",
+          "name": "help",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 19
+            },
+            "start": {
+              "col": 3,
+              "line": 17
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::inherit#method",
+          "kind": "method",
+          "name": "inherit",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 19
+            },
+            "start": {
+              "col": 3,
+              "line": 17
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 23
+            },
+            "start": {
+              "col": 3,
+              "line": 21
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Owner::total#method",
+          "kind": "method",
+          "name": "total",
+          "owner": "src/owner::Owner#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 23
+            },
+            "start": {
+              "col": 3,
+              "line": 21
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Internal#type",
+          "kind": "type",
+          "name": "Internal",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 31
+            },
+            "start": {
+              "col": 3,
+              "line": 31
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::Internal::member#field",
+          "kind": "field",
+          "name": "member",
+          "owner": "src/owner::Internal#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 31
+            },
+            "start": {
+              "col": 3,
+              "line": 31
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 44,
+              "line": 34
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::reach#const",
+          "kind": "const",
+          "name": "reach",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 34
+            },
+            "start": {
+              "col": 14,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "file": "src/owner.ts",
+          "id": "src/owner::local#const",
+          "kind": "const",
+          "name": "local",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 37
+            },
+            "start": {
+              "col": 7,
+              "line": 37
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

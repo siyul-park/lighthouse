@@ -1,0 +1,652 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/consumer::lazy#function"
+        },
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/consumer::use#function"
+        },
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 54,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/index"
+        },
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 32,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "src/util"
+        },
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "src/util"
+        },
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "to": "src/side"
+        },
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "to": "node:fs"
+        },
+        {
+          "from": {
+            "module": "src/consumer"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 65,
+              "line": 7
+            },
+            "start": {
+              "col": 49,
+              "line": 7
+            }
+          },
+          "to": "src/util"
+        },
+        {
+          "from": {
+            "symbol": "src/consumer::use#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 9
+            },
+            "start": {
+              "col": 25,
+              "line": 9
+            }
+          },
+          "to": "src/util::Id#type"
+        },
+        {
+          "from": {
+            "symbol": "src/consumer::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 11
+            },
+            "start": {
+              "col": 10,
+              "line": 11
+            }
+          },
+          "to": "src/util::slug#function"
+        },
+        {
+          "from": {
+            "symbol": "src/consumer::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 11
+            },
+            "start": {
+              "col": 17,
+              "line": 11
+            }
+          },
+          "to": "src/util::slug#function"
+        },
+        {
+          "from": {
+            "symbol": "src/consumer::use#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 36,
+              "line": 11
+            },
+            "start": {
+              "col": 29,
+              "line": 11
+            }
+          },
+          "to": "src/util::VERSION#const"
+        },
+        {
+          "from": {
+            "symbol": "src/consumer::use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 43,
+              "line": 11
+            },
+            "start": {
+              "col": 39,
+              "line": 11
+            }
+          },
+          "to": "src/util::main#function"
+        }
+      ],
+      "file": {
+        "path": "src/consumer.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Promise<typeof import(\"src/util\")>"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/consumer::lazy#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": "src/consumer::use#function",
+          "tokens": 24,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/consumer"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 66,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "src/consumer.ts",
+          "id": "src/consumer::lazy#function",
+          "kind": "function",
+          "name": "lazy",
+          "span": {
+            "end": {
+              "col": 65,
+              "line": 7
+            },
+            "start": {
+              "col": 14,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "src/consumer.ts",
+          "id": "src/consumer::use#function",
+          "kind": "function",
+          "name": "use",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/util"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "src/util"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "src/util"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "to": "src/util"
+        }
+      ],
+      "file": {
+        "path": "src/index.ts"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "src/index"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "path": "src/side.ts"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "path": "src/side"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/util"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/util::VERSION#const"
+        },
+        {
+          "from": {
+            "module": "src/util"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/util::slug#function"
+        },
+        {
+          "from": {
+            "module": "src/util"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/util::main#function"
+        },
+        {
+          "from": {
+            "module": "src/util"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/util::Id#type"
+        },
+        {
+          "from": {
+            "symbol": "src/util::main#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 8
+            },
+            "start": {
+              "col": 10,
+              "line": 8
+            }
+          },
+          "to": "src/util::VERSION#const"
+        }
+      ],
+      "file": {
+        "path": "src/util.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/util::slug#function",
+          "tokens": 13,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/util::main#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/util"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/util.ts",
+          "id": "src/util::VERSION#const",
+          "kind": "const",
+          "name": "VERSION",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 1
+            },
+            "start": {
+              "col": 14,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/util.ts",
+          "id": "src/util::slug#function",
+          "kind": "function",
+          "name": "slug",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "src/util.ts",
+          "id": "src/util::main#function",
+          "kind": "function",
+          "name": "main",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "file": "src/util.ts",
+          "id": "src/util::Id#type",
+          "kind": "type",
+          "name": "Id",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

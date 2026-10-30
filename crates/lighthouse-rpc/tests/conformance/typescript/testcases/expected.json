@@ -1,0 +1,1025 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/__tests__/sub"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/__tests__/sub::sub#test"
+        },
+        {
+          "from": {
+            "module": "src/__tests__/sub"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/calc"
+        },
+        {
+          "from": {
+            "symbol": "src/__tests__/sub::sub#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 5
+            },
+            "start": {
+              "col": 9,
+              "line": 5
+            }
+          },
+          "to": "src/calc::sub#function"
+        }
+      ],
+      "file": {
+        "path": "src/__tests__/sub.ts"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 2,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "src/__tests__/sub::sub#test",
+          "tokens": 31,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/__tests__/sub",
+          "test_of": "src"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/__tests__/sub.ts",
+          "id": "src/__tests__/sub::sub#test",
+          "kind": "test",
+          "name": "sub",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 1,
+          "style": "scenario",
+          "symbol": "src/__tests__/sub::sub#test",
+          "targets": [
+            "src/calc::sub#function"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::rows#const"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::Row#type"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::Row#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::Row::a#field"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::check#function"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::FIXTURE#const"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::add#test"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::Calc#test"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::table#test"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::each %i#test"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 53,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "vitest"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 36,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "src/calc"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::add#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 19
+            },
+            "start": {
+              "col": 5,
+              "line": 19
+            }
+          },
+          "to": "src/calc.test::check#function"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::add#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 19
+            },
+            "start": {
+              "col": 11,
+              "line": 19
+            }
+          },
+          "to": "src/calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::add#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 24
+            },
+            "start": {
+              "col": 14,
+              "line": 24
+            }
+          },
+          "to": "src/calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::Calc#test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 30
+            },
+            "start": {
+              "col": 14,
+              "line": 30
+            }
+          },
+          "to": "src/calc::Calc#type"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::Calc#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 30
+            },
+            "start": {
+              "col": 21,
+              "line": 30
+            }
+          },
+          "to": "src/calc::Calc::mul#method"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::table#test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 34
+            },
+            "start": {
+              "col": 21,
+              "line": 34
+            }
+          },
+          "to": "src/calc.test::rows#const"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::table#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 35
+            },
+            "start": {
+              "col": 12,
+              "line": 35
+            }
+          },
+          "to": "src/calc::add#function"
+        },
+        {
+          "from": {
+            "symbol": "src/calc.test::each %i#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 40
+            },
+            "start": {
+              "col": 10,
+              "line": 40
+            }
+          },
+          "to": "src/calc::add#function"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 43
+            },
+            "start": {
+              "col": 15,
+              "line": 43
+            }
+          },
+          "to": "src/calc.test::Row#type"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 44
+            },
+            "start": {
+              "col": 10,
+              "line": 44
+            }
+          },
+          "to": "src/calc.test::FIXTURE#const"
+        }
+      ],
+      "file": {
+        "path": "src/calc.test.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "src/calc.test::check#function",
+          "tokens": 12,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 2,
+          "params": 0,
+          "returns": 0,
+          "statements": 5,
+          "symbol": "src/calc.test::add#test",
+          "tokens": 60,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "src/calc.test::Calc#test",
+          "tokens": 22,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "src/calc.test::table#test",
+          "tokens": 32,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              },
+              {
+                "text": "any"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "src/calc.test::each %i#test",
+          "tokens": 17,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/calc.test",
+          "test_of": "src/calc"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 3,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::rows#const",
+          "kind": "const",
+          "name": "rows",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 7,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::Row#type",
+          "kind": "type",
+          "name": "Row",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 9
+            },
+            "start": {
+              "col": 14,
+              "line": 9
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::Row::a#field",
+          "kind": "field",
+          "name": "a",
+          "owner": "src/calc.test::Row#type",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 9
+            },
+            "start": {
+              "col": 14,
+              "line": 9
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::check#function",
+          "kind": "function",
+          "name": "check",
+          "role": "test-helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::FIXTURE#const",
+          "kind": "const",
+          "name": "FIXTURE",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 15
+            },
+            "start": {
+              "col": 7,
+              "line": 15
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::add#test",
+          "kind": "test",
+          "name": "add",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::Calc#test",
+          "kind": "test",
+          "name": "Calc",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 33
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::table#test",
+          "kind": "test",
+          "name": "table",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 33
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::each %i#test",
+          "kind": "test",
+          "name": "each %i",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 2,
+          "style": "scenario",
+          "symbol": "src/calc.test::add#test",
+          "targets": [
+            "src/calc.test::check#function",
+            "src/calc::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "src/calc.test::Calc#test",
+          "targets": [
+            "src/calc::Calc#type",
+            "src/calc::Calc::mul#method"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "src/calc.test::table#test",
+          "targets": [
+            "src/calc.test::rows#const",
+            "src/calc::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "src/calc.test::each %i#test",
+          "targets": [
+            "src/calc::add#function"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc::add#function"
+        },
+        {
+          "from": {
+            "module": "src/calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc::sub#function"
+        },
+        {
+          "from": {
+            "module": "src/calc"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc::Calc#type"
+        },
+        {
+          "from": {
+            "symbol": "src/calc::Calc#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc::Calc::mul#method"
+        }
+      ],
+      "file": {
+        "path": "src/calc.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              },
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/calc::add#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              },
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/calc::sub#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              },
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/calc::Calc::mul#method",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/calc"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/calc.ts",
+          "id": "src/calc::add#function",
+          "kind": "function",
+          "name": "add",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "src/calc.ts",
+          "id": "src/calc::sub#function",
+          "kind": "function",
+          "name": "sub",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "src/calc.ts",
+          "id": "src/calc::Calc#type",
+          "kind": "type",
+          "name": "Calc",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 12
+            },
+            "start": {
+              "col": 3,
+              "line": 10
+            }
+          },
+          "file": "src/calc.ts",
+          "id": "src/calc::Calc::mul#method",
+          "kind": "method",
+          "name": "mul",
+          "owner": "src/calc::Calc#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 12
+            },
+            "start": {
+              "col": 3,
+              "line": 10
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 import(s) resolve to no file (dependencies not installed, or paths the configuration does not map); their edges are syntactic"
+  ],
+  "sources": []
+}

@@ -1,0 +1,269 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "lib/src/text"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "lib/src/text::shout#function"
+        }
+      ],
+      "file": {
+        "path": "lib/src/text.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "lib/src/text::shout#function",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "lib/src/text"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "lib/src/text.ts",
+          "id": "lib/src/text::shout#function",
+          "kind": "function",
+          "name": "shout",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "orphan/loose"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "orphan/loose::loose#function"
+        }
+      ],
+      "file": {
+        "path": "orphan/loose.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "orphan/loose::loose#function",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "orphan/loose"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "orphan/loose.ts",
+          "id": "orphan/loose::loose#function",
+          "kind": "function",
+          "name": "loose",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "web/src/page"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "web/src/page::title#function"
+        },
+        {
+          "from": {
+            "module": "web/src/page"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "lib/src/text"
+        },
+        {
+          "from": {
+            "symbol": "web/src/page::title#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 4
+            },
+            "start": {
+              "col": 10,
+              "line": 4
+            }
+          },
+          "to": "lib/src/text::shout#function"
+        }
+      ],
+      "file": {
+        "path": "web/src/page.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": "lib/src/text::shout#function",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "web/src/page::title#function",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "web/src/page"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "web/src/page.ts",
+          "id": "web/src/page::title#function",
+          "kind": "function",
+          "name": "title",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

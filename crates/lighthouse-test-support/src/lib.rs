@@ -43,6 +43,7 @@ use lighthouse_resource::API_VERSION;
 use lighthouse_spec::{Catalog, Cel};
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
+static LANG_TYPESCRIPT: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 
@@ -73,6 +74,15 @@ pub fn project(spec: &str) -> String {
 pub fn lang_go() -> Option<PathBuf> {
     LANG_GO.get_or_init(build_lang_go).clone()
 }
+/// Directory of the `lang-typescript` plugin (manifest, launcher, compiled
+/// provider and its pinned dependencies), built once per process. `None` after
+/// printing a skip message when no Node 24 or newer runs, unless `CI` or
+/// `LIGHTHOUSE_REQUIRE_NODE` is set, where a missing Node panics; a failing
+/// build panics.
+pub fn lang_typescript() -> Option<PathBuf> {
+    LANG_TYPESCRIPT.get_or_init(build_lang_typescript).clone()
+}
+
 /// Directory of the `lang-rust` plugin (manifest and binary), built once per
 /// process with the cargo that runs the tests; a failing build panics.
 pub fn lang_rust() -> PathBuf {
@@ -167,6 +177,106 @@ fn build_lang_go() -> Option<PathBuf> {
     });
     install_manifest(&source, &out, &goroot(&source));
     Some(out)
+}
+
+/// The oldest Node the provider runs on.
+const MIN_NODE: u32 = 24;
+
+fn build_lang_typescript() -> Option<PathBuf> {
+    let source = workspace().join("plugins/lang-typescript");
+    if node_major(&source).is_none_or(|major| major < MIN_NODE) {
+        assert!(
+            env::var_os("CI").is_none() && env::var_os("LIGHTHOUSE_REQUIRE_NODE").is_none(),
+            "Node {MIN_NODE} or newer is required here to run plugins/lang-typescript"
+        );
+        eprintln!("skipping: no Node {MIN_NODE} or newer for plugins/lang-typescript");
+        return None;
+    }
+    install_node_modules(&source);
+    let out = workspace().join("target/plugins-test/lang-typescript");
+    fs::create_dir_all(&out).expect("create plugin dir");
+    let built = out.join(format!("build.{}.tmp", std::process::id()));
+    let status = Command::new("node")
+        .arg("scripts/wire.mjs")
+        .current_dir(&source)
+        .status()
+        .expect("run wire.mjs");
+    assert!(
+        status.success(),
+        "wire.mjs of plugins/lang-typescript failed"
+    );
+    let status = Command::new("node")
+        .arg("node_modules/typescript/bin/tsc")
+        .args(["-p", "tsconfig.json", "--outDir"])
+        .arg(&built)
+        .current_dir(&source)
+        .status()
+        .expect("run tsc");
+    assert!(status.success(), "tsc of plugins/lang-typescript failed");
+    install_tree(&built.join("src"), &out.join("dist/src"));
+    fs::remove_dir_all(&built).expect("remove build directory");
+    for name in ["lang-typescript", "lighthouse-plugin.toml", "package.json"] {
+        install(&out.join(name), |tmp| {
+            fs::copy(source.join(name), tmp).expect("copy plugin file");
+            #[cfg(unix)]
+            fs::set_permissions(tmp, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+        });
+    }
+    #[cfg(unix)]
+    let _ = std::os::unix::fs::symlink(source.join("node_modules"), out.join("node_modules"));
+    Some(out)
+}
+
+/// The major version of the Node on `PATH`, when there is one.
+fn node_major(dir: &Path) -> Option<u32> {
+    let output = Command::new("node")
+        .arg("--version")
+        .current_dir(dir)
+        .output()
+        .ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    text.trim()
+        .strip_prefix('v')?
+        .split('.')
+        .next()?
+        .parse()
+        .ok()
+}
+
+/// Installs the pinned dependencies without running any script, unless the
+/// last install is newer than the lock file.
+fn install_node_modules(source: &Path) {
+    let installed = fs::metadata(source.join("node_modules/.package-lock.json"))
+        .and_then(|m| m.modified())
+        .ok();
+    let locked = fs::metadata(source.join("package-lock.json"))
+        .and_then(|m| m.modified())
+        .expect("package-lock.json of plugins/lang-typescript");
+    if installed.is_some_and(|installed| installed >= locked) {
+        return;
+    }
+    let status = Command::new("npm")
+        .args(["ci", "--ignore-scripts"])
+        .current_dir(source)
+        .status()
+        .expect("run npm ci");
+    assert!(status.success(), "npm ci of plugins/lang-typescript failed");
+}
+
+/// Puts every file of the tree `from` at the same place under `to`, each as `install` does.
+fn install_tree(from: &Path, to: &Path) {
+    fs::create_dir_all(to).expect("create directory");
+    for entry in fs::read_dir(from).expect("read build directory") {
+        let entry = entry.expect("directory entry");
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("file type").is_dir() {
+            install_tree(&entry.path(), &target);
+        } else {
+            install(&target, |tmp| {
+                fs::copy(entry.path(), tmp).expect("copy compiled file");
+            });
+        }
+    }
 }
 
 fn goroot(dir: &Path) -> String {

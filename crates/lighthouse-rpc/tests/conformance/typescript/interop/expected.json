@@ -1,0 +1,471 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/esm"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/esm::fromEsm#function"
+        }
+      ],
+      "file": {
+        "path": "src/esm.mts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/esm::fromEsm#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/esm"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/esm.mts",
+          "id": "src/esm::fromEsm#function",
+          "kind": "function",
+          "name": "fromEsm",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/legacy"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/legacy::Legacy#type"
+        },
+        {
+          "from": {
+            "symbol": "src/legacy::Legacy#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/legacy::Legacy::run#method"
+        },
+        {
+          "from": {
+            "module": "src/legacy"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 10,
+              "line": 7
+            }
+          },
+          "to": "src/legacy::Legacy#type"
+        }
+      ],
+      "file": {
+        "path": "src/legacy.cts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/legacy::Legacy::run#method",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/legacy"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/legacy.cts",
+          "id": "src/legacy::Legacy#type",
+          "kind": "type",
+          "name": "Legacy",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "file": "src/legacy.cts",
+          "id": "src/legacy::Legacy::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "src/legacy::Legacy#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 4
+            },
+            "start": {
+              "col": 3,
+              "line": 2
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/main"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/main::both#function"
+        },
+        {
+          "from": {
+            "module": "src/main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "src/legacy"
+        },
+        {
+          "from": {
+            "module": "src/main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "src/shared"
+        },
+        {
+          "from": {
+            "module": "src/main"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "src/esm"
+        },
+        {
+          "from": {
+            "symbol": "src/main::both#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 6
+            },
+            "start": {
+              "col": 14,
+              "line": 6
+            }
+          },
+          "to": "src/legacy::Legacy#type"
+        },
+        {
+          "from": {
+            "symbol": "src/main::both#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 6
+            },
+            "start": {
+              "col": 23,
+              "line": 6
+            }
+          },
+          "to": "src/legacy::Legacy::run#method"
+        },
+        {
+          "from": {
+            "symbol": "src/main::both#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 6
+            },
+            "start": {
+              "col": 31,
+              "line": 6
+            }
+          },
+          "to": "src/shared::fromCjs#function"
+        },
+        {
+          "from": {
+            "symbol": "src/main::both#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 50,
+              "line": 6
+            },
+            "start": {
+              "col": 43,
+              "line": 6
+            }
+          },
+          "to": "src/esm::fromEsm#function"
+        }
+      ],
+      "file": {
+        "path": "src/main.mts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/main::both#function",
+          "tokens": 20,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/main"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "src/main.mts",
+          "id": "src/main::both#function",
+          "kind": "function",
+          "name": "both",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/shared"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shared::fromCjs#function"
+        }
+      ],
+      "file": {
+        "path": "src/shared.cts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/shared::fromCjs#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/shared"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/shared.cts",
+          "id": "src/shared::fromCjs#function",
+          "kind": "function",
+          "name": "fromCjs",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

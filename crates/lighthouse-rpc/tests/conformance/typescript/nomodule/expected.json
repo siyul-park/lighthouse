@@ -1,0 +1,256 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "a"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "a::a#function"
+        },
+        {
+          "from": {
+            "module": "a"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "b"
+        },
+        {
+          "from": {
+            "symbol": "a::a#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 3
+            },
+            "start": {
+              "col": 10,
+              "line": 3
+            }
+          },
+          "to": "b::b#function"
+        }
+      ],
+      "file": {
+        "path": "a.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "a::a#function",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "a"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "file": "a.ts",
+          "id": "a::a#function",
+          "kind": "function",
+          "name": "a",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "b"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "b::b#function"
+        }
+      ],
+      "file": {
+        "path": "b.js"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "b::b#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "b"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "b.js",
+          "id": "b::b#function",
+          "kind": "function",
+          "name": "b",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "c"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "c::C#function"
+        }
+      ],
+      "file": {
+        "path": "c.tsx"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "c::C#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "c"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 32,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "c.tsx",
+          "id": "c::C#function",
+          "kind": "function",
+          "name": "C",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 1
+            },
+            "start": {
+              "col": 14,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

@@ -1,0 +1,546 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 51,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "// Header comment kept apart from the declaration."
+        },
+        {
+          "attached_to": "src/index::Thing#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "/**\n * Documented.\n */"
+        },
+        {
+          "attached_to": "src/index::Thing::value#field",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 8
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "text": "/** Field doc. */"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 9
+            },
+            "start": {
+              "col": 14,
+              "line": 9
+            }
+          },
+          "text": "// trailing"
+        },
+        {
+          "attached_to": "src/index::Thing::method#method",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 12
+            },
+            "start": {
+              "col": 3,
+              "line": 11
+            }
+          },
+          "text": "// leading line\n  // leading line two"
+        },
+        {
+          "attached_to": "src/index::single#const",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
+          "text": "/** One. */"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 41,
+              "line": 22
+            },
+            "start": {
+              "col": 26,
+              "line": 22
+            }
+          },
+          "text": "// after single"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 29
+            },
+            "start": {
+              "col": 8,
+              "line": 29
+            }
+          },
+          "text": "// red"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::Thing#type"
+        },
+        {
+          "from": {
+            "symbol": "src/index::Thing#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::Thing::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/index::Thing#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::Thing::method#method"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::a#const"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::b#const"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::single#const"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::sealed#function"
+        },
+        {
+          "from": {
+            "module": "src/index"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::Color#type"
+        },
+        {
+          "from": {
+            "symbol": "src/index::Color#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::Color::Red#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/index::Color#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/index::Color::Green#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/index::Thing#type"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "to": "src/index::sealed#function"
+        },
+        {
+          "from": {
+            "symbol": "src/index::Thing::method#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 14
+            },
+            "start": {
+              "col": 17,
+              "line": 14
+            }
+          },
+          "to": "src/index::Thing::value#field"
+        }
+      ],
+      "file": {
+        "path": "src/index.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/index::Thing::method#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "unknown"
+              }
+            ],
+            "results": []
+          },
+          "statements": 1,
+          "symbol": "src/index::sealed#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/index"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Documented.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::Thing#type",
+          "kind": "type",
+          "name": "Thing",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Field doc.",
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 9
+            },
+            "start": {
+              "col": 3,
+              "line": 8
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::Thing::value#field",
+          "kind": "field",
+          "name": "value",
+          "owner": "src/index::Thing#type",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 9
+            },
+            "start": {
+              "col": 3,
+              "line": 9
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 11
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::Thing::method#method",
+          "kind": "method",
+          "name": "method",
+          "owner": "src/index::Thing#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 15
+            },
+            "start": {
+              "col": 3,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/index.ts",
+          "id": "src/index::a#const",
+          "kind": "const",
+          "name": "a",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 18
+            },
+            "start": {
+              "col": 14,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/index.ts",
+          "id": "src/index::b#const",
+          "kind": "const",
+          "name": "b",
+          "span": {
+            "end": {
+              "col": 8,
+              "line": 19
+            },
+            "start": {
+              "col": 3,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "One.",
+          "extent": {
+            "end": {
+              "col": 41,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::single#const",
+          "kind": "const",
+          "name": "single",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 22
+            },
+            "start": {
+              "col": 14,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::sealed#function",
+          "kind": "function",
+          "name": "sealed",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::Color#type",
+          "kind": "type",
+          "name": "Color",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 29
+            },
+            "start": {
+              "col": 3,
+              "line": 29
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::Color::Red#variant",
+          "kind": "variant",
+          "name": "Red",
+          "owner": "src/index::Color#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 29
+            },
+            "start": {
+              "col": 3,
+              "line": 29
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 8,
+              "line": 30
+            },
+            "start": {
+              "col": 3,
+              "line": 30
+            }
+          },
+          "file": "src/index.ts",
+          "id": "src/index::Color::Green#variant",
+          "kind": "variant",
+          "name": "Green",
+          "owner": "src/index::Color#type",
+          "span": {
+            "end": {
+              "col": 8,
+              "line": 30
+            },
+            "start": {
+              "col": 3,
+              "line": 30
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

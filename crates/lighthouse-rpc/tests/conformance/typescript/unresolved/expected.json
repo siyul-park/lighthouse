@@ -1,0 +1,272 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/shared"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shared::shared#const"
+        },
+        {
+          "from": {
+            "module": "src/shared"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/shared::dynamic#function"
+        }
+      ],
+      "file": {
+        "path": "src/shared.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "src/shared::dynamic#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/shared"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 36,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/shared.ts",
+          "id": "src/shared::shared#const",
+          "kind": "const",
+          "name": "shared",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 1
+            },
+            "start": {
+              "col": 14,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 35,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "file": "src/shared.ts",
+          "id": "src/shared::dynamic#function",
+          "kind": "function",
+          "name": "dynamic",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "src/u"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/u::run#function"
+        },
+        {
+          "from": {
+            "module": "src/u"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "to": "missing-package"
+        },
+        {
+          "from": {
+            "module": "src/u"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "to": "src/gone"
+        },
+        {
+          "from": {
+            "module": "src/u"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "to": "src/shared"
+        },
+        {
+          "from": {
+            "symbol": "src/u::run#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "to": "dynamic"
+        },
+        {
+          "from": {
+            "symbol": "src/u::run#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 10
+            },
+            "start": {
+              "col": 10,
+              "line": 10
+            }
+          },
+          "to": "src/shared::shared#const"
+        }
+      ],
+      "file": {
+        "path": "src/u.ts"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              }
+            ],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 5,
+          "symbol": "src/u::run#function",
+          "tokens": 27,
+          "top_level": 5
+        }
+      ],
+      "modules": [
+        {
+          "path": "src/u"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "src/u.ts",
+          "id": "src/u::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "2 import(s) resolve to no file (dependencies not installed, or paths the configuration does not map); their edges are syntactic"
+  ],
+  "sources": []
+}
