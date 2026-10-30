@@ -149,7 +149,7 @@ impl Plugin for RpcPlugin {
                         .capabilities
                         .iter()
                         .any(|capability| capability == "source-ast"),
-                    manifest: convert::provider_manifest(language),
+                    manifest: convert::language_manifest(language),
                     client: Arc::clone(&self.client),
                     digest: self.digest.clone(),
                 }) as Box<dyn LanguageProvider>

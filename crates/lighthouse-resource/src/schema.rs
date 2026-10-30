@@ -15,7 +15,7 @@ pub struct Schema {
 }
 
 impl Schema {
-    /// The descriptor of the kind whose spec is `S`.
+    /// The schema of the kind whose spec is `S`.
     pub fn new<S: Spec + JsonSchema>() -> Self {
         Self {
             kind: S::KIND,
@@ -23,7 +23,7 @@ impl Schema {
         }
     }
 
-    /// The descriptor of the kind whose spec is `S`, for a file that is the
+    /// The schema of the kind whose spec is `S`, for a file that is the
     /// spec alone, without the envelope.
     pub fn bare<S: Spec + JsonSchema>() -> Self {
         let root = Value::from(schemars::schema_for!(S));

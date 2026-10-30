@@ -21,7 +21,7 @@ use lighthouse_plugin::{
 use lighthouse_spec::Config;
 use tempfile::TempDir;
 
-/// The provider manifest of the toy language: it analyzes overlays.
+/// The language manifest of the toy language: it analyzes overlays.
 pub fn toy() -> LanguageManifest {
     LanguageManifest {
         capabilities: vec![lighthouse_model::ucm::Capability::Overlays],

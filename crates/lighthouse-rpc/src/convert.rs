@@ -34,7 +34,7 @@ variants! {
 }
 
 /// The core manifest of a language a plugin declared in `initialize`.
-pub(crate) fn provider_manifest(language: &wire::LanguageManifest) -> LanguageManifest {
+pub(crate) fn language_manifest(language: &wire::LanguageManifest) -> LanguageManifest {
     LanguageManifest {
         id: language.id.clone(),
         aliases: language.aliases.clone(),
