@@ -3,11 +3,11 @@
 import ast
 from dataclasses import dataclass
 
-from lang_python.decls import FUNCTION_NODES, Decl, dotted, walk_flat
-from lang_python.model import Model, ParsedFile
-from lang_python.paths import module_path
-from lang_python.project import ModuleLoc
-from lang_python.scopes import Scope, binding_scope
+from lang_python.symbols import FUNCTION_NODES, Decl, dotted, walk_flat
+from lang_python.project.files import ModuleLoc
+from lang_python.project.model import Model, ParsedFile
+from lang_python.modules import module_path
+from lang_python.project.scopes import Scope, binding_scope
 
 MAX_DEPTH = 8
 OPTIONAL_WRAPPERS = frozenset({"Optional", "Annotated", "Final", "ClassVar", "Required", "NotRequired", "ReadOnly"})

@@ -8,7 +8,23 @@ import tomllib
 from dataclasses import dataclass
 from typing import Any
 
-from lang_python.paths import IGNORED_DIRS, SOURCE_SUFFIXES, is_ignored, module_path
+from lang_python.modules import SOURCE_SUFFIXES, module_path
+
+SNIPPETS_DIR = ".lighthouse-snippets"
+IGNORED_DIRS = frozenset({"node_modules", "testdata", "__pycache__", "site-packages"})
+
+
+def is_stub(rel: str) -> bool:
+    return rel.endswith(".pyi")
+
+
+def is_ignored(rel: str) -> bool:
+    """Paths the provider answers with an empty fragment: dependencies, hidden directories, test data."""
+    parts = rel.split("/")
+    if SNIPPETS_DIR in parts:
+        return any(part in IGNORED_DIRS for part in parts[:-1])
+    return any(part in IGNORED_DIRS or part.startswith(".") for part in parts[:-1])
+
 
 STDLIB = frozenset(sys.stdlib_module_names)
 

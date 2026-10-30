@@ -1,6 +1,7 @@
 """The JSON-RPC loop of the plugin protocol: LSP framing on a byte stream, requests answered in order."""
 
 import json
+import sys
 from typing import Any, BinaryIO, Protocol
 
 PROTOCOL_VERSION = "0.4"
@@ -13,10 +14,13 @@ REQUEST_FAILED = -32803
 NOT_INITIALIZED = -32002
 
 
-class Handler(Protocol):
-    """The methods of a language provider."""
+class Provider(Protocol):
+    """What a language provider is: its identity, the languages it declares and how it indexes."""
 
-    def initialize(self, params: dict[str, Any]) -> dict[str, Any]: ...
+    name: str
+    version: str
+
+    def manifest(self) -> list[dict[str, Any]]: ...
 
     def index(self, params: dict[str, Any]) -> dict[str, Any]: ...
 
@@ -88,8 +92,8 @@ def require(params: Any, names: tuple[str, ...]) -> dict[str, Any]:
 class Session:
     """What the loop knows of the conversation."""
 
-    def __init__(self, handler: Handler):
-        self.handler = handler
+    def __init__(self, provider: Provider):
+        self.provider = provider
         self.initialized = False
         self.shutdown = False
 
@@ -101,13 +105,16 @@ class Session:
                     REQUEST_FAILED,
                     "host speaks protocol %s, this plugin speaks %s" % (body["protocolVersion"], PROTOCOL_VERSION),
                 )
-            result = self.handler.initialize(body)
             self.initialized = True
-            return result
+            return {
+                "protocolVersion": PROTOCOL_VERSION,
+                "serverInfo": {"name": self.provider.name, "version": self.provider.version},
+                "capabilities": {"languages": self.provider.manifest()},
+            }
         if not self.initialized:
             raise Failure(NOT_INITIALIZED, "`%s` before `initialize`" % method)
         if method == "lighthouse/index":
-            return self.handler.index(require(params, ("project", "language", "inputs")))
+            return self.provider.index(require(params, ("project", "language", "inputs")))
         if method == "shutdown":
             self.shutdown = True
             return None
@@ -131,9 +138,11 @@ class Session:
         return {"jsonrpc": "2.0", "id": request_id, **outcome}
 
 
-def serve(source: BinaryIO, sink: BinaryIO, handler: Handler) -> int:
-    """Serves until `exit` or the end of the input; 0 after `shutdown`, 1 otherwise."""
-    session = Session(handler)
+def serve(provider: Provider, source: BinaryIO | None = None, sink: BinaryIO | None = None) -> int:
+    """Serves a provider on stdin and stdout until `exit` or the end of the input; 0 after `shutdown`, 1 otherwise."""
+    source = source if source is not None else sys.stdin.buffer
+    sink = sink if sink is not None else sys.stdout.buffer
+    session = Session(provider)
     while True:
         try:
             message = read_message(source)

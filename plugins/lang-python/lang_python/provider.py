@@ -3,21 +3,20 @@
 import os
 from typing import Any
 
-from lang_python.model import Model
-from lang_python.paths import is_ignored, is_stub, module_path
+from lang_python.project import Model
+from lang_python.project import is_ignored, is_stub
+from lang_python.modules import module_path
 from lang_python.project import Project
 from lang_python.regions import Remap, Snippet, host_line, plan_snippets
-from lang_python.server import PROTOCOL_VERSION
-from lang_python.types import Types
-from lang_python.unit import Indexed, Unit
+from lang_python.functions import Types
+from lang_python.index import Indexed, Unit
 from lang_python.visibility import Reach
-from lang_python.wire import (
+from lang_python.sdk.wire import (
     EmbeddedFile,
     Fragment,
     Incomplete,
     IndexParams,
     IndexResult,
-    InitializeResult,
     LanguageManifest,
 )
 
@@ -30,7 +29,7 @@ CONSTRUCTOR_PREFIXES = ["new", "create", "from"]
 CAPABILITIES = ["semantic-edges", "extent", "reference-sites", "overlays"]
 
 
-def manifest() -> LanguageManifest:
+def language() -> LanguageManifest:
     return {
         "id": LANGUAGE,
         "aliases": ALIASES,
@@ -58,18 +57,14 @@ def empty_fragment(rel: str) -> Fragment:
 
 
 class Provider:
-    """The language provider of Python; it implements the server's `Handler`."""
+    """The language provider of Python: it implements the SDK's `Provider`."""
 
-    def __init__(self, identity: str, version: str):
-        self.identity = identity
+    def __init__(self, name: str, version: str):
+        self.name = name
         self.version = version
 
-    def initialize(self, params: dict[str, Any]) -> InitializeResult:
-        return {
-            "protocolVersion": PROTOCOL_VERSION,
-            "serverInfo": {"name": self.identity, "version": self.version},
-            "capabilities": {"languages": [manifest()]},
-        }
+    def manifest(self) -> list[LanguageManifest]:
+        return [language()]
 
     def index(self, params: IndexParams) -> IndexResult:
         """Analyzes every requested file and the fences of host files. A failure on one file is an incomplete

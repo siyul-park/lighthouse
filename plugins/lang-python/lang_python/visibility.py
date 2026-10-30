@@ -2,11 +2,12 @@
 
 import posixpath
 
-from lang_python.decls import Decl, is_dunder
-from lang_python.model import Model
-from lang_python.paths import is_private_module, is_test_file, module_path
-from lang_python.resolve import DeclVal, Resolver, resolver_of, static_all
-from lang_python.wire import Visibility
+from lang_python.symbols import Decl, is_dunder
+from lang_python.project import Model
+from lang_python.modules import is_private_module, module_path
+from lang_python.tests import is_test_file
+from lang_python.project import DeclVal, Resolver, resolver_of, static_all
+from lang_python.sdk.wire import Visibility
 
 RANK: dict[Visibility, int] = {"private": 0, "internal": 1, "public": 2}
 

@@ -4,7 +4,7 @@ import unittest
 from typing import Any
 
 from lang_python.provider import Provider
-from lang_python.server import PROTOCOL_VERSION, read_message, serve, write_message
+from lang_python.sdk.server import PROTOCOL_VERSION, read_message, serve, write_message
 
 
 def frame(message: dict[str, Any]) -> bytes:
@@ -15,7 +15,7 @@ def frame(message: dict[str, Any]) -> bytes:
 def run(*messages: bytes) -> tuple[int, list[dict[str, Any]]]:
     source = io.BytesIO(b"".join(messages))
     sink = io.BytesIO()
-    code = serve(source, sink, Provider("lang-python", "0"))
+    code = serve(Provider("lang-python", "0"), source, sink)
     replies = []
     out = io.BytesIO(sink.getvalue())
     while (message := read_message(out)) is not None:

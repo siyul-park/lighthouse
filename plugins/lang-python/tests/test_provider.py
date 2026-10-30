@@ -1,13 +1,13 @@
 import unittest
 
-from lang_python.provider import ALIASES, manifest
+from lang_python.provider import ALIASES, language
 
 from tests.support import edges, fragment, index, symbols
 
 
 class ManifestTests(unittest.TestCase):
     def test_the_manifest_declares_python_with_linguist_aliases(self):
-        declared = manifest()
+        declared = language()
         self.assertEqual(declared["id"], "python")
         self.assertEqual(declared["globs"], ["**/*.{py,pyi}"])
         self.assertEqual(declared["aliases"], ["python", "py", "py3", "python3", "rusthon"])

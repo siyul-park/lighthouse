@@ -8,7 +8,7 @@ dependencies = []
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-extend-exclude = ["tests/fixtures", "lang_python/wire.py"]
+extend-exclude = ["tests/fixtures", "lang_python/sdk/wire.py"]
 
 [tool.ruff.lint]
 select = ["E", "F"]

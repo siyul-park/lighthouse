@@ -3,12 +3,13 @@
 import ast
 from dataclasses import dataclass, field
 
-from lang_python.decls import Decl, FileDecls
-from lang_python.paths import is_stub, is_test_file, module_path
-from lang_python.positions import Lines
-from lang_python.project import Project
-from lang_python.scopes import ScopeTree
-from lang_python.tokens import Tokens
+from lang_python.symbols import Decl, FileDecls
+from lang_python.tests import is_test_file
+from lang_python.modules import module_path
+from lang_python.extent import Lines
+from lang_python.project.files import Project, is_stub
+from lang_python.project.scopes import ScopeTree
+from lang_python.comments import Tokens
 
 
 @dataclass(eq=False)

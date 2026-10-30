@@ -4,11 +4,11 @@ import ast
 import builtins
 from typing import Protocol
 
-from lang_python.decls import FUNCTION_NODES, Decl, bound_names
-from lang_python.model import Model, ParsedFile
-from lang_python.positions import Lines, span, span_of
+from lang_python.symbols import FUNCTION_NODES, Decl, bound_names
+from lang_python.project import Model, ParsedFile
+from lang_python.extent import Lines, span, span_of
 from lang_python.project import STDLIB, ModuleLoc
-from lang_python.resolve import (
+from lang_python.project import (
     DeclVal,
     ModuleVal,
     Resolver,
@@ -16,8 +16,8 @@ from lang_python.resolve import (
     resolver_of,
     static_all,
 )
-from lang_python.scopes import COMPREHENSIONS, Scope
-from lang_python.wire import EdgeKind, Node, Resolution, Span
+from lang_python.project import COMPREHENSIONS, Scope
+from lang_python.sdk.wire import EdgeKind, Node, Resolution, Span
 
 MAX_CANDIDATES = 8
 CALLABLE = ("function", "method", "test")

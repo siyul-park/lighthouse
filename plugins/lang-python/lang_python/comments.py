@@ -1,13 +1,12 @@
 """The tokens of a file: its comments and how many significant tokens a range holds."""
 
-import ast
 import bisect
 import io
 import tokenize
 from dataclasses import dataclass
 
-from lang_python.positions import Lines, span
-from lang_python.wire import Comment, Span
+from lang_python.extent import Lines, span
+from lang_python.sdk.wire import Comment, Span
 
 SKIPPED = {
     tokenize.COMMENT,
@@ -20,7 +19,6 @@ SKIPPED = {
 }
 STRING_STARTS = {getattr(tokenize, name) for name in ("FSTRING_START", "TSTRING_START") if hasattr(tokenize, name)}
 STRING_ENDS = {getattr(tokenize, name) for name in ("FSTRING_END", "TSTRING_END") if hasattr(tokenize, name)}
-GENERATED_MARKER = "@generated"
 
 
 @dataclass(frozen=True)
@@ -107,14 +105,3 @@ class Tokens:
                 entry["attached_to"] = symbols_at[last.line + 1]
             result.append(entry)
         return result
-
-    def generated(self, tree: ast.Module) -> bool:
-        """Whether a comment above the first statement marks the file as generated."""
-        first = tree.body[0].lineno if tree.body else float("inf")
-        for comment in self.comments:
-            if comment.line >= first:
-                break
-            upper = comment.text.upper()
-            if GENERATED_MARKER in comment.text or "DO NOT EDIT" in upper:
-                return True
-        return False

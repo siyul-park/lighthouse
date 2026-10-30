@@ -4,8 +4,8 @@ import posixpath
 from dataclasses import dataclass
 from typing import Any
 
-from lang_python.paths import SNIPPETS_DIR
-from lang_python.wire import Comment, Edge, EmbeddedFile, EmbeddedSource, Fragment, Position, Span, Symbol
+from lang_python.project import SNIPPETS_DIR
+from lang_python.sdk.wire import Comment, Edge, EmbeddedFile, EmbeddedSource, Fragment, Position, Span, Symbol
 
 UNMAPPED = (-1, -1)
 

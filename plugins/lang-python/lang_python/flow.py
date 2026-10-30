@@ -3,8 +3,8 @@
 import ast
 from typing import Callable
 
-from lang_python.decls import is_docstring
-from lang_python.wire import Flow
+from lang_python.symbols import is_docstring
+from lang_python.sdk.wire import Flow
 
 SelfCall = Callable[[ast.Call], bool]
 TRY_NODES = tuple(t for t in (ast.Try, getattr(ast, "TryStar", None)) if t is not None)

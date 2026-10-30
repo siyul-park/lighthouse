@@ -2,9 +2,20 @@
 
 import ast
 
-from lang_python.decls import FUNCTION_NODES, dotted, has_decorator, is_docstring
+from lang_python.sdk.wire import TestCase
+from lang_python.symbols import FUNCTION_NODES, MODULE_BODY, Decl, dotted, has_decorator, is_docstring
 
 ASSERTING = ("assert", "raises", "warns", "fail", "approx_raises")
+
+
+def is_test_file(rel: str) -> bool:
+    """Whether a project-relative file is a test file by the conventions the manifest declares."""
+    parts = rel.split("/")
+    name = parts[-1]
+    stem = name.rsplit(".", 1)[0]
+    if stem == "conftest" or stem.startswith("test_") or stem.endswith("_test"):
+        return True
+    return "tests" in parts[:-1] or "test" in parts[:-1]
 
 
 def is_parametrized(node: ast.AST) -> bool:
@@ -93,3 +104,21 @@ def body_statements(node: ast.AST) -> list[ast.stmt]:
     """The statements of a def's body without its docstring."""
     body = node.body  # type: ignore[attr-defined]
     return body[1:] if body and is_docstring(body[0]) else body
+
+
+def role_of(decl: Decl, test: bool) -> str | None:
+    """The role of a declaration of a test file: fixtures are data, helpers check on behalf of tests."""
+    if not test or decl.owner is not None or decl.name == MODULE_BODY:
+        return None
+    if decl.kind == "function":
+        return "test-helper" if calls_assertion(decl.body) else "fixture"
+    if decl.kind in ("type", "interface") and decl.traits & {"testcase", "test-class"}:
+        return None
+    return "fixture" if decl.kind in ("type", "interface", "const", "var") else None
+
+
+def test_case(decl: Decl, tree: ast.Module, targets: dict[str, None]) -> TestCase:
+    """The test case of a `test` symbol: a table when it runs over rows written in the file."""
+    node = decl.body
+    table = isinstance(node, FUNCTION_NODES) and is_table(node, tree)
+    return {"symbol": decl.id, "nesting": 0, "style": "table" if table else "scenario", "targets": list(targets)}

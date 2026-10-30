@@ -4,8 +4,13 @@ import ast
 from dataclasses import dataclass, field
 from typing import Iterator
 
-from lang_python.paths import id_part
-from lang_python.wire import SymbolKind
+from lang_python.sdk.wire import SymbolKind
+
+
+def id_part(name: str) -> str:
+    """A part of a symbol id, with the characters the id format reserves escaped."""
+    return name.replace("#", "%23").replace("::", ":%3A")
+
 
 MODULE_BODY = "<module>"
 ENUM_BASES = frozenset({"Enum", "IntEnum", "StrEnum", "Flag", "IntFlag", "ReprEnum"})

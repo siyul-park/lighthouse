@@ -1,22 +1,8 @@
-"""Paths, module names and the conventions that tell test files and ignored paths apart."""
+"""Modules: a module is a file, named by its path, and a test file names the module it tests."""
 
 import posixpath
 
-SNIPPETS_DIR = ".lighthouse-snippets"
 SOURCE_SUFFIXES = (".py", ".pyi")
-IGNORED_DIRS = frozenset({"node_modules", "testdata", "__pycache__", "site-packages"})
-
-
-def is_stub(rel: str) -> bool:
-    return rel.endswith(".pyi")
-
-
-def is_ignored(rel: str) -> bool:
-    """Paths the provider answers with an empty fragment: dependencies, hidden directories, test data."""
-    parts = rel.split("/")
-    if SNIPPETS_DIR in parts:
-        return any(part in IGNORED_DIRS for part in parts[:-1])
-    return any(part in IGNORED_DIRS or part.startswith(".") for part in parts[:-1])
 
 
 def module_path(rel: str) -> str:
@@ -28,16 +14,6 @@ def module_path(rel: str) -> str:
     if posixpath.basename(rel) == "__init__":
         return posixpath.dirname(rel) or "."
     return rel
-
-
-def is_test_file(rel: str) -> bool:
-    """Whether a project-relative file is a test file by the conventions the manifest declares."""
-    parts = rel.split("/")
-    name = parts[-1]
-    stem = name.rsplit(".", 1)[0]
-    if stem == "conftest" or stem.startswith("test_") or stem.endswith("_test"):
-        return True
-    return "tests" in parts[:-1] or "test" in parts[:-1]
 
 
 def tested_module(module: str) -> str | None:
@@ -67,8 +43,3 @@ def is_private_module(module: str) -> bool:
         if part.startswith("_") and not (part.startswith("__") and part.endswith("__")):
             return True
     return False
-
-
-def id_part(name: str) -> str:
-    """A part of a symbol id, with the characters the id format reserves escaped."""
-    return name.replace("#", "%23").replace("::", ":%3A")
