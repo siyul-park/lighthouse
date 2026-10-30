@@ -34,11 +34,10 @@ pub use events::EventsSpec;
 pub use fixing::{FixEnvironment, FixPolicy, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
 pub use layers::{BUNDLED, Entry, Layer, Layers};
-use lighthouse_model::{Options, Severity};
+use lighthouse_model::{Duration, Options, Severity, documents, resource};
+pub use lighthouse_model::{Format, Metadata, Resource};
 pub use lighthouse_process::Policy;
 use lighthouse_protocol::Selector;
-use lighthouse_resource::{Duration, documents, resource};
-pub use lighthouse_resource::{Format, Metadata, Resource};
 pub use models::{Evaluation, Models, Routing};
 pub use provider::{CommandProtocol, ModelProvider, ProviderSpec, RESERVED_PROVIDERS, Task};
 use resolved::Resolved;
@@ -209,7 +208,7 @@ impl Config {
     /// runs under. The project is named `inline`.
     pub fn parse_inline(text: &str) -> Result<Self, Error> {
         let spec: ProjectSpec =
-            toml::from_str(text).map_err(|e| lighthouse_resource::Error::Invalid {
+            toml::from_str(text).map_err(|e| lighthouse_model::Error::Invalid {
                 path: "<inline>".to_owned(),
                 message: e.to_string(),
             })?;
@@ -311,7 +310,7 @@ impl Config {
 
     /// The configuration file in `dir`, if it has one.
     pub fn file_in(dir: &Path) -> Option<PathBuf> {
-        lighthouse_resource::file_in(dir, &FILE_NAMES)
+        lighthouse_model::file_in(dir, &FILE_NAMES)
     }
 
     /// The `metadata.name` of the project.

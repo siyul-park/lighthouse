@@ -11,8 +11,8 @@ use std::{
 
 use lighthouse_checks::{Checks, Composition};
 use lighthouse_engine::{CommandModels, Engine};
+use lighthouse_model::Format;
 use lighthouse_plugin::{ModelClient, Registry};
-use lighthouse_resource::Format;
 use lighthouse_rpc::{CommandModel, PluginCatalog, Registered};
 use lighthouse_spec::{Catalog, CheckKind, Files, FixKind, load_local, local_files};
 use lighthouse_spec::{Config, FILE_NAME, Layers};

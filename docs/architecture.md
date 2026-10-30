@@ -790,9 +790,8 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 | Crate | L | Owns | Never |
 | --- | --- | --- | --- |
 | [protocol](../crates/lighthouse-protocol/README.md) | 0 | wire types, framing and schemas for plugins and models; also the hashes and folds that host and plugin must compute alike | any lighthouse crate |
-| [resource](../crates/lighthouse-resource/README.md) | 0 | the KRM envelope, documents and kind schemas | spec semantics |
 | [process](../crates/lighthouse-process/README.md) | 0 | running a process: group, timeout, caps and the [sandbox](#sandbox) policy | what it runs |
-| [model](../crates/lighthouse-model/README.md) | 0 | the vocabulary: UCM, findings, records and signals | I/O |
+| [model](../crates/lighthouse-model/README.md) | 0 | every data shape Lighthouse speaks, and how a document is read and stored | processes, network, the store |
 | [plugin](../crates/lighthouse-plugin/README.md) | 1 | the plugin SPI (traits, manifests) and the Registry | spec and config |
 | [spec](../crates/lighthouse-spec/README.md) | 1 | the kinds, the Catalog, the Project config and the CEL environment | plugins and libraries |
 | [engine](../crates/lighthouse-engine/README.md) | 2 | the orchestration of one run: index, analyze, check, suppress inSource, fix rounds | store and frontends |

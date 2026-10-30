@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_resource::Resource;
+use lighthouse_model::Resource;
 
 use crate::{
     Decision, Env, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec, validate,

@@ -10,11 +10,10 @@ use std::{
     sync::PoisonError,
 };
 
-use lighthouse_model::{Diagnostic, Span, Unavailable};
+use lighthouse_model::{Diagnostic, Span, Unavailable, slashed};
 use lighthouse_plugin::{EditRequest, Edited, FixDecision};
 use lighthouse_protocol::ToolEvent;
 use lighthouse_protocol::hash;
-use lighthouse_resource::slashed;
 use lighthouse_spec::FixScope;
 use serde::{Deserialize, Serialize};
 

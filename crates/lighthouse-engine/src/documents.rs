@@ -1,8 +1,7 @@
 use std::{fs, path::Path};
 
 use ignore::WalkBuilder;
-use lighthouse_model::{Document, Position};
-use lighthouse_resource::{Format, listed};
+use lighthouse_model::{Document, Error, Format};
 
 use crate::engine::{IGNORE_FILE, Overlays};
 
@@ -77,31 +76,13 @@ impl Documents {
     /// Adds the Lighthouse documents of one file.
     fn read(&mut self, file: &Path, format: Format, text: &str) {
         let label = file.display().to_string();
-        let (documents, errors) = listed(format, &label, text);
-        self.notices.extend(
-            errors
-                .iter()
-                .map(|e| format!("{label}: not read as a document: {e}")),
-        );
-        for document in documents {
-            let at = document.at.map_or_else(
-                || {
-                    self.notices.push(format!(
-                        "{label}: could not find where `{}` is written; it is reported at the top of the file",
-                        document.name
-                    ));
-                    Position { line: 1, col: 1 }
-                },
-                |(line, col)| Position { line, col },
-            );
-            self.documents.push(Document {
-                file: file.to_owned(),
-                at,
-                kind: document.kind,
-                name: document.name,
-                uid: document.uid,
-                labels: document.labels,
-            });
-        }
+        let (documents, errors) = Document::list(format, file, text);
+        self.notices.extend(errors.iter().map(|e| match e {
+            Error::Unplaced { name, .. } => format!(
+                "{label}: could not find where `{name}` is written; it is reported at the top of the file"
+            ),
+            e => format!("{label}: not read as a document: {e}"),
+        }));
+        self.documents.extend(documents);
     }
 }

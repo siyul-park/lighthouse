@@ -13,7 +13,7 @@ fn bundled(id: &str) -> &'static Decision {
 }
 
 mod write {
-    use lighthouse_resource::Metadata;
+    use lighthouse_model::Metadata;
     use lighthouse_spec::{
         DecisionSpec, Example, ExampleKind, Expect, LanguageSpec, OptionSchema, OptionType,
         OptionsSchema, Scope,

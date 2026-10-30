@@ -20,6 +20,9 @@ pub enum Error {
     /// The document has the right kind but its content does not fit it.
     #[error("{path}: {message}")]
     Invalid { path: String, message: String },
+    /// The name of a listed document could not be found in its text.
+    #[error("{path}: could not find where `{name}` is written")]
+    Unplaced { path: String, name: String },
 }
 
 impl Error {

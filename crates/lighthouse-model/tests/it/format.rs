@@ -1,5 +1,48 @@
-use lighthouse_resource::{Format, documents, to_yaml};
+use std::path::Path;
+
+use lighthouse_model::{Format, documents, kind_of, resource, to_yaml};
 use serde_json::{Value, json};
+
+use crate::resource::{JSON, TOML, Toy, YAML, toy};
+
+#[test]
+fn one_resource_reads_from_yaml_toml_and_json() {
+    for (format, text) in [
+        (Format::Yaml, YAML),
+        (Format::Toml, TOML),
+        (Format::Json, JSON),
+    ] {
+        let docs = documents(format, "toy", text).unwrap();
+        assert_eq!(docs.len(), 1);
+        assert_eq!(kind_of(&docs[0]), Some("ToyKind"));
+        assert_eq!(resource::<Toy>("toy", &docs[0]).unwrap(), toy());
+    }
+}
+
+#[test]
+fn yaml_may_hold_several_documents_and_skips_empty_ones() {
+    let text = format!("# only a comment\n---\n{YAML}---\n---\n{YAML}");
+    assert_eq!(documents(Format::Yaml, "toy", &text).unwrap().len(), 2);
+}
+
+#[test]
+fn written_yaml_reads_back() {
+    let text = to_yaml(&serde_json::to_value(toy()).unwrap());
+    assert_eq!(text, YAML);
+}
+
+#[test]
+fn the_format_follows_the_extension() {
+    assert_eq!(Format::of_path(Path::new("a/b.yaml")), Some(Format::Yaml));
+    assert_eq!(Format::of_path(Path::new("b.yml")), Some(Format::Yaml));
+    assert_eq!(
+        Format::of_path(Path::new("lighthouse.toml")),
+        Some(Format::Toml)
+    );
+    assert_eq!(Format::of_path(Path::new("x.json")), Some(Format::Json));
+    assert_eq!(Format::of_path(Path::new("x.md")), None);
+    assert_eq!(Format::of_path(Path::new("Makefile")), None);
+}
 
 fn roundtrip(value: &Value) -> Value {
     let text = to_yaml(value);

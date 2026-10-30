@@ -221,7 +221,7 @@ fn every_bundled_decision_has_its_own_uid() {
         let uid = decision
             .uid()
             .unwrap_or_else(|| panic!("{} has no uid", decision.id()));
-        assert!(lighthouse_resource::is_uid(uid), "{}: {uid}", decision.id());
+        assert!(lighthouse_model::is_uid(uid), "{}: {uid}", decision.id());
         assert!(seen.insert(uid), "{} repeats a uid", decision.id());
     }
 }

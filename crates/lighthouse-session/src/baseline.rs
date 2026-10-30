@@ -18,9 +18,8 @@ use std::{
 };
 
 use lighthouse_engine::{SKIPPED_DIRS, cache};
-use lighthouse_model::{Diagnostic, evidence_digest};
+use lighthouse_model::{Diagnostic, STATE_DIR, evidence_digest, slashed, write_atomic};
 use lighthouse_protocol::hash;
-use lighthouse_resource::{STATE_DIR, slashed, write_atomic};
 use serde::{Deserialize, Serialize};
 
 use crate::Result;

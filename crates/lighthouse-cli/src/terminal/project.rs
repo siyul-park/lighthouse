@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_resource::{STATE_DIR, read_optional, write_atomic};
+use lighthouse_model::{STATE_DIR, read_optional, write_atomic};
 use lighthouse_session::{DEFAULT_CONFIG, FILE_NAME, Session};
 
 use crate::terminal::{Result, command::Agent, setup};

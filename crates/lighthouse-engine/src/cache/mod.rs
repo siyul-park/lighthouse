@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::STATE_DIR;
+use lighthouse_model::STATE_DIR;
 use thiserror::Error;
 
 mod digest;

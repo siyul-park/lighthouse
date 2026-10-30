@@ -2,7 +2,7 @@
 //! the repository-local file over it. Meaning is the project's alone; the
 //! environment keys are the later layer's, key by key.
 
-use lighthouse_resource::Format;
+use lighthouse_model::Format;
 use lighthouse_spec::{BUNDLED, Config, EnvironmentSpec, Layer, Layers, Models, Projects, Routing};
 use serde_json::json;
 

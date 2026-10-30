@@ -11,7 +11,7 @@ doctest = false
 [dependencies]
 lang-cel.workspace = true
 lighthouse-checks.workspace = true
+lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
-lighthouse-resource.workspace = true
 lighthouse-spec.workspace = true
 toml.workspace = true

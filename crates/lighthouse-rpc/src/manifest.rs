@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::{Format, Resource, STATE_DIR, Spec, documents, resource};
+use lighthouse_model::{Format, Resource, STATE_DIR, Spec, documents, resource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -139,7 +139,7 @@ pub struct Discovered {
 /// development checkout is reached only through an explicit `path`.
 pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
     let mut dirs = vec![root.join(STATE_DIR).join("plugins")];
-    dirs.extend(lighthouse_resource::xdg_plugins());
+    dirs.extend(lighthouse_model::xdg_plugins());
     if let Some(dir) = env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|p| p.join("plugins")))
@@ -212,7 +212,7 @@ pub fn discover(search: &[PathBuf]) -> Result<Discovered, Error> {
 
 /// The manifest file in `dir`, if it has one.
 fn file_in(dir: &Path) -> Option<PathBuf> {
-    lighthouse_resource::file_in(dir, &FILE_NAMES)
+    lighthouse_model::file_in(dir, &FILE_NAMES)
 }
 
 fn provides_nothing(provides: &Provides) -> bool {

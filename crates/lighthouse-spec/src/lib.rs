@@ -23,7 +23,7 @@ mod sources;
 mod union;
 mod validate;
 
-use lighthouse_resource::Schema;
+use lighthouse_model::Schema;
 
 pub use attributes::Attributes;
 pub use catalog::Catalog;

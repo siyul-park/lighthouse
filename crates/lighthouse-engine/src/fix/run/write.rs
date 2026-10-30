@@ -7,10 +7,9 @@ use std::{
     path::PathBuf,
 };
 
-use lighthouse_model::Fingerprint;
+use lighthouse_model::{Fingerprint, write_atomic, write_atomic_guarded};
 
 use lighthouse_protocol::hash;
-use lighthouse_resource::{write_atomic, write_atomic_guarded};
 
 use super::{
     super::edits::{TextEdit, apply},

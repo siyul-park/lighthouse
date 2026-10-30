@@ -10,8 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::Attribution;
-use lighthouse_resource::{API_VERSION, STATE_DIR, new_uid};
+use lighthouse_model::{API_VERSION, Attribution, STATE_DIR, new_uid};
 use lighthouse_spec::{Catalog, local_dir, local_files};
 use schemars::JsonSchema;
 use serde::Serialize;

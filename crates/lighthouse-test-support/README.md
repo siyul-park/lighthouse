@@ -4,7 +4,7 @@ The shared test fixtures and the bundled composition for tests. A dev dependency
 
 Builds the bundled CEL libraries, composition, catalog and plugin registries the way the composition root does, builds the language plugins of this repository from source, and writes the documents tests put in a project.
 
-**Depends on:** `lang-cel`, `lighthouse-checks`, `lighthouse-plugin`, `lighthouse-resource`, `lighthouse-spec`.
+**Depends on:** `lang-cel`, `lighthouse-checks`, `lighthouse-model`, `lighthouse-plugin`, `lighthouse-spec`.
 
 ## Entry points
 

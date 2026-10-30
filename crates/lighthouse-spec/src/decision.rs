@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use lighthouse_model::{Safety, Severity, squash, ucm::Applicability};
-use lighthouse_resource::{Metadata, Resource, Spec};
+use lighthouse_model::{Metadata, Resource, Safety, Severity, Spec, squash, ucm::Applicability};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};

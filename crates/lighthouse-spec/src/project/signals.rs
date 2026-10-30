@@ -3,7 +3,7 @@
 
 use std::time;
 
-use lighthouse_resource::Duration;
+use lighthouse_model::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

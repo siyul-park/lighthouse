@@ -9,10 +9,10 @@ use std::{
 };
 
 use lighthouse_checks::Composition;
+use lighthouse_model::{Schema, schema_file};
 use lighthouse_report::docs::{
     DOCS_DIR, FunctionDoc, cel_functions_markdown, fix_operations_markdown, pages,
 };
-use lighthouse_resource::{Schema, schema_file};
 use lighthouse_spec::{Catalog, authored_severity};
 
 use crate::{Result, Session};

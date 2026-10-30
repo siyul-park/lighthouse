@@ -12,10 +12,9 @@ use lighthouse_engine::{
     AppliedFix, BatchTrace, DeclinedFix, Engine, FixPlan, FixRun, FixedBy, ModelCounts,
     ModelOptions, PreviewedFix, ToolCounts, cache, unified_diff,
 };
-use lighthouse_model::{Fingerprint, Preview};
+use lighthouse_model::{Fingerprint, Preview, slashed};
 use lighthouse_protocol::ToolEvent;
 use lighthouse_report::{Aim, Apply, FixBy};
-use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use schemars::JsonSchema;
 use serde::Serialize;

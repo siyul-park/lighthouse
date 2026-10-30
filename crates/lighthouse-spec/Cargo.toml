@@ -15,7 +15,6 @@ include_dir.workspace = true
 lighthouse-model.workspace = true
 lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
-lighthouse-resource.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

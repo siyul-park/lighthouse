@@ -26,6 +26,3 @@ pub fn var(name: &str) -> Option<String> {
 pub fn replace_vars(vars: impl IntoIterator<Item = (String, Option<OsString>)>) -> bool {
     REPLACED.set(vars.into_iter().collect()).is_ok()
 }
-
-#[cfg(test)]
-mod tests;

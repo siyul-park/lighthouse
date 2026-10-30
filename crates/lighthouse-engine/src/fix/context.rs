@@ -15,11 +15,10 @@ use std::{
 };
 
 use lighthouse_model::{
-    Diagnostic, Span,
+    Diagnostic, Span, slashed,
     ucm::{EdgeKind, Node, Project, Symbol, Target},
 };
 use lighthouse_process::is_project_secret;
-use lighthouse_resource::slashed;
 use lighthouse_spec::FixScope;
 
 use super::{

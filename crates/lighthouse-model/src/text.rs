@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
 /// 1-based line and column.
@@ -167,4 +169,9 @@ pub fn byte_position(text: &str, at: Position, unit: ColumnUnit) -> Position {
 /// trimmed: what the text says, whatever its layout.
 pub fn squash(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// `path` with `/` as its separator, as documents and reports spell paths.
+pub fn slashed(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }

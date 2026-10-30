@@ -4,7 +4,7 @@ The kinds, the Catalog, the Project config and the CEL environment. Layer L1. Ne
 
 The spec kinds (Decision, Pack, Project, check and fix specs, options schema) and the `Catalog` that loads, layers and validates them.
 
-**Depends on:** `lighthouse-model`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-resource`.
+**Depends on:** `lighthouse-model`, `lighthouse-process`, `lighthouse-protocol`.
 
 ## Entry points
 
@@ -18,7 +18,7 @@ The spec kinds (Decision, Pack, Project, check and fix specs, options schema) an
 
 - The bundled catalog is compiled into the binary and must load; a decision that fails validation is an `Error`, never skipped.
 - Spec only describes; the bridge from a decision to a `Rule` lives in checks.
-- Kinds live here, their envelope and formats in resource; docs rendering lives in report.
+- Kinds live here, their envelope and formats in model; docs rendering lives in report.
 - A decision's meaning version hashes its requirement, severity, scope and options, never its `check`; changing those stops judgments from standing.
 
 ## Tests

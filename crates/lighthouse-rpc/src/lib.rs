@@ -18,9 +18,8 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::Incomplete;
+use lighthouse_model::{Incomplete, STATE_DIR};
 use lighthouse_plugin::{Plugin, Registry};
-use lighthouse_resource::STATE_DIR;
 use lighthouse_spec::{Config, PluginRef};
 use thiserror::Error;
 
@@ -72,8 +71,8 @@ impl Plugin for Unavailable {
 }
 
 /// The JSON Schema of the kinds this crate defines.
-pub fn descriptors() -> Vec<lighthouse_resource::Schema> {
-    vec![lighthouse_resource::Schema::new::<PluginSpec>()]
+pub fn descriptors() -> Vec<lighthouse_model::Schema> {
+    vec![lighthouse_model::Schema::new::<PluginSpec>()]
 }
 
 /// Starts every plugin listed in `config` that is not already registered and

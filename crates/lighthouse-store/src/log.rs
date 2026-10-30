@@ -25,10 +25,12 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Attribution, Judgment, Label, SuppressionKind, SuppressionStatus};
+use lighthouse_model::{
+    API_VERSION, Attribution, Judgment, Label, Metadata, Resource, Spec, SuppressionKind,
+    SuppressionStatus,
+};
 
 use lighthouse_protocol::{canonical, hash};
-use lighthouse_resource::{API_VERSION, Metadata, Resource, Spec};
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::{Value, json};

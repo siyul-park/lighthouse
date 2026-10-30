@@ -3,8 +3,7 @@
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use lighthouse_model::Options;
-use lighthouse_resource::{Duration, Spec};
+use lighthouse_model::{Duration, Options, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;

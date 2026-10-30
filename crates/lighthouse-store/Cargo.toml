@@ -11,7 +11,6 @@ doctest = false
 [dependencies]
 lighthouse-model.workspace = true
 lighthouse-protocol.workspace = true
-lighthouse-resource.workspace = true
 rusqlite.workspace = true
 schemars.workspace = true
 serde.workspace = true

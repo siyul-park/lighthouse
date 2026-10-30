@@ -53,7 +53,7 @@ pub(crate) fn decision(decision: &Decision, cel: &Env) -> Result<(), Error> {
     kebab(pack)?;
     kebab(name)?;
     if let Some(uid) = decision.uid()
-        && !lighthouse_resource::is_uid(uid)
+        && !lighthouse_model::is_uid(uid)
     {
         return Err(Error::invalid(
             id,

@@ -73,8 +73,8 @@ use std::{
 };
 
 use lighthouse_checks::Composition;
+use lighthouse_model::API_VERSION;
 use lighthouse_plugin::Registry;
-use lighthouse_resource::API_VERSION;
 use lighthouse_spec::{Catalog, Env};
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();

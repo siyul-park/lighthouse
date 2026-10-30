@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::{read_optional, write_atomic};
+use lighthouse_model::{read_optional, write_atomic};
 use lighthouse_session::{DOCS_DIR, Session, pack_docs, project_root, skill_for};
 
 use crate::terminal::{Result, reference};

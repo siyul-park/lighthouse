@@ -4,7 +4,7 @@ The composition root and the per-command wiring (check, fix, model, signal, hook
 
 The operations every frontend shares, and the composition root that wires store, engine, checks, rpc, report and ml: load a project, check and remember it, fix, review, test and author decisions, validate specs, evaluate and train models, write the agent skill.
 
-**Depends on:** `lang-cel`, `lighthouse-checks`, `lighthouse-engine`, `lighthouse-ml`, `lighthouse-model`, `lighthouse-plugin`, `lighthouse-protocol`, `lighthouse-report`, `lighthouse-resource`, `lighthouse-rpc`, `lighthouse-spec`, `lighthouse-store`.
+**Depends on:** `lang-cel`, `lighthouse-checks`, `lighthouse-engine`, `lighthouse-ml`, `lighthouse-model`, `lighthouse-plugin`, `lighthouse-protocol`, `lighthouse-report`, `lighthouse-rpc`, `lighthouse-spec`, `lighthouse-store`.
 
 ## Entry points
 

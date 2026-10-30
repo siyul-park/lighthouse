@@ -406,5 +406,5 @@ fn decision_of(decision: &Decision) -> FixDecision {
 
 /// A path as the reports write it, with `/` on every platform.
 fn slashed_path<S: serde::Serializer>(path: &Path, out: S) -> Result<S::Ok, S::Error> {
-    out.serialize_str(&lighthouse_resource::slashed(path))
+    out.serialize_str(&lighthouse_model::slashed(path))
 }

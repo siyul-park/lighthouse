@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_resource::API_VERSION;
+use lighthouse_model::API_VERSION;
 
 /// The spec of decision `p/a`, indented as it sits under `spec:`.
 pub const SPEC: &str = "  title: A

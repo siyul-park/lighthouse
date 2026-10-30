@@ -218,14 +218,14 @@ fn shape_describe() {
 
 #[test]
 fn a_bare_kind_is_described_without_the_envelope() {
-    let bare = lighthouse_resource::Schema::bare::<lighthouse_spec::EnvironmentSpec>();
+    let bare = lighthouse_model::Schema::bare::<lighthouse_spec::EnvironmentSpec>();
 
     assert_eq!(bare.kind, "Environment");
     assert_eq!(
         bare.schema["$id"],
         format!(
             "{}/environment.schema.json",
-            lighthouse_resource::SCHEMA_URL_BASE
+            lighthouse_model::SCHEMA_URL_BASE
         )
     );
     assert!(bare.schema["properties"].get("apiVersion").is_none());

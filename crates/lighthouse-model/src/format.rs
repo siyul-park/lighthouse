@@ -1,14 +1,57 @@
-//! A YAML writer for documents people read and review: long sentences fold
-//! across lines, multi-line text is a literal block, short lists of words stay
-//! on one line. Everything it writes reads back as the same value.
+//! Reading and writing resource text: YAML, TOML and JSON in, readable YAML
+//! out. A YAML writer for documents people read and review: long sentences
+//! fold across lines, multi-line text is a literal block, short lists of
+//! words stay on one line. Everything it writes reads back as the same value.
 
-use std::fmt::Write;
+use std::{fmt::Write, path::Path};
 
-use serde::Serialize;
-use serde_norway::{Mapping, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use serde_norway::{Mapping, Value as Yaml};
+
+use crate::Error;
 
 const WIDTH: usize = 80;
 const INDENT: usize = 2;
+
+/// A syntax a document can be written in. Every format reads into the same
+/// JSON data model, so one set of types serves all of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Format {
+    Yaml,
+    Toml,
+    Json,
+}
+
+impl Format {
+    /// The format a file name's extension says, if any.
+    pub fn of_path(path: &Path) -> Option<Self> {
+        match path.extension()?.to_str()? {
+            "yaml" | "yml" => Some(Self::Yaml),
+            "toml" => Some(Self::Toml),
+            "json" => Some(Self::Json),
+            _ => None,
+        }
+    }
+}
+
+/// The documents of `text` as JSON values: any number for YAML (separated by
+/// `---`), one for TOML, one or a list for JSON. Empty YAML documents are
+/// skipped. `path` only names the text in errors.
+pub fn documents(format: Format, path: &str, text: &str) -> Result<Vec<Value>, Error> {
+    match format {
+        Format::Yaml => yaml_documents(path, text),
+        Format::Toml => toml::from_str::<Value>(text)
+            .map(|doc| vec![doc])
+            .map_err(|e| Error::parse(path, e)),
+        Format::Json => {
+            match serde_json::from_str::<Value>(text).map_err(|e| Error::parse(path, e))? {
+                Value::Array(docs) => Ok(docs),
+                doc => Ok(vec![doc]),
+            }
+        }
+    }
+}
 
 /// `value` as YAML. Keys keep the order the value serializes them in: the
 /// order of a struct's fields, the sorted order of a map.
@@ -16,14 +59,25 @@ pub fn to_yaml<T: Serialize>(value: &T) -> String {
     let value = serde_norway::to_value(value).expect("a document serializes to YAML");
     let mut out = String::new();
     match &value {
-        Value::Mapping(map) if !map.is_empty() => block_map(&mut out, map, 0, false),
-        Value::Sequence(items) if !items.is_empty() => block_list(&mut out, items, 0),
+        Yaml::Mapping(map) if !map.is_empty() => block_map(&mut out, map, 0, false),
+        Yaml::Sequence(items) if !items.is_empty() => block_list(&mut out, items, 0),
         other => {
             out.push_str(&scalar_or_empty(other));
             out.push('\n');
         }
     }
     out
+}
+
+fn yaml_documents(path: &str, text: &str) -> Result<Vec<Value>, Error> {
+    let mut docs = Vec::new();
+    for doc in serde_norway::Deserializer::from_str(text) {
+        let value = Value::deserialize(doc).map_err(|e| Error::parse(path, e))?;
+        if !value.is_null() {
+            docs.push(value);
+        }
+    }
+    Ok(docs)
 }
 
 /// The entries of `map`, each at `indent`; the first starts where the line
@@ -38,15 +92,15 @@ fn block_map(out: &mut String, map: &Mapping, indent: usize, inline_first: bool)
     }
 }
 
-fn block_list(out: &mut String, items: &[Value], indent: usize) {
+fn block_list(out: &mut String, items: &[Yaml], indent: usize) {
     for item in items {
         let _ = write!(out, "{:indent$}", "");
         match item {
-            Value::Mapping(map) if !map.is_empty() => {
+            Yaml::Mapping(map) if !map.is_empty() => {
                 out.push_str("- ");
                 block_map(out, map, indent + INDENT, true);
             }
-            Value::Sequence(nested) if !nested.is_empty() && !flow_fits(nested, indent + 2) => {
+            Yaml::Sequence(nested) if !nested.is_empty() && !flow_fits(nested, indent + 2) => {
                 out.push_str("-\n");
                 block_list(out, nested, indent + INDENT);
             }
@@ -59,13 +113,13 @@ fn block_list(out: &mut String, items: &[Value], indent: usize) {
 }
 
 /// What follows `key:` for `value`, ending the line.
-fn entry(out: &mut String, value: &Value, indent: usize) {
+fn entry(out: &mut String, value: &Yaml, indent: usize) {
     match value {
-        Value::Mapping(map) if !map.is_empty() => {
+        Yaml::Mapping(map) if !map.is_empty() => {
             out.push('\n');
             block_map(out, map, indent + INDENT, false);
         }
-        Value::Sequence(items) if !items.is_empty() => {
+        Yaml::Sequence(items) if !items.is_empty() => {
             if flow_fits(items, indent + 2) {
                 let _ = writeln!(out, " {}", flow(items));
             } else {
@@ -81,10 +135,10 @@ fn entry(out: &mut String, value: &Value, indent: usize) {
 }
 
 /// A scalar, a short flow list, or a block string, ending the line.
-fn inline_value(out: &mut String, value: &Value, indent: usize) {
+fn inline_value(out: &mut String, value: &Yaml, indent: usize) {
     match value {
-        Value::String(text) => string(out, text, indent),
-        Value::Sequence(items) if !items.is_empty() => {
+        Yaml::String(text) => string(out, text, indent),
+        Yaml::Sequence(items) if !items.is_empty() => {
             if flow_fits(items, indent) {
                 let _ = writeln!(out, "{}", flow(items));
             } else {
@@ -164,35 +218,35 @@ fn folded(text: &str, indent: usize) -> Option<String> {
     Some(out)
 }
 
-fn flow(items: &[Value]) -> String {
+fn flow(items: &[Yaml]) -> String {
     let parts: Vec<String> = items.iter().map(scalar_or_empty).collect();
     format!("[{}]", parts.join(", "))
 }
 
 /// A list of scalars that fits on the line it starts on.
-fn flow_fits(items: &[Value], indent: usize) -> bool {
+fn flow_fits(items: &[Yaml], indent: usize) -> bool {
     items.iter().all(|v| match v {
-        Value::String(s) => !s.contains('\n'),
-        Value::Mapping(_) | Value::Sequence(_) | Value::Tagged(_) => false,
+        Yaml::String(s) => !s.contains('\n'),
+        Yaml::Mapping(_) | Yaml::Sequence(_) | Yaml::Tagged(_) => false,
         _ => true,
     }) && flow(items).chars().count() + indent <= WIDTH
 }
 
-fn scalar_or_empty(value: &Value) -> String {
+fn scalar_or_empty(value: &Yaml) -> String {
     match value {
-        Value::Null => "null".to_owned(),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::String(s) => scalar_text(s),
-        Value::Sequence(_) => "[]".to_owned(),
-        Value::Mapping(_) => "{}".to_owned(),
-        Value::Tagged(tagged) => scalar_or_empty(&tagged.value),
+        Yaml::Null => "null".to_owned(),
+        Yaml::Bool(b) => b.to_string(),
+        Yaml::Number(n) => n.to_string(),
+        Yaml::String(s) => scalar_text(s),
+        Yaml::Sequence(_) => "[]".to_owned(),
+        Yaml::Mapping(_) => "{}".to_owned(),
+        Yaml::Tagged(tagged) => scalar_or_empty(&tagged.value),
     }
 }
 
-fn key_text(key: &Value) -> String {
+fn key_text(key: &Yaml) -> String {
     match key {
-        Value::String(text) => scalar_text(text),
+        Yaml::String(text) => scalar_text(text),
         other => scalar_or_empty(other),
     }
 }

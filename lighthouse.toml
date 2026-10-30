@@ -79,7 +79,7 @@ options.layers = [
   ["lighthouse_engine/**", "lighthouse_checks/**", "lighthouse_rpc/**"],
   ["lang_cel/**"],
   ["lighthouse_plugin/**", "lighthouse_spec/**"],
-  ["lighthouse_model/**", "lighthouse_resource/**", "lighthouse_process/**"],
+  ["lighthouse_model/**", "lighthouse_process/**"],
   ["lighthouse_protocol/**"],
   ["plugins/lang-go/cmd/**"],
   ["plugins/lang-go/provider/**"],

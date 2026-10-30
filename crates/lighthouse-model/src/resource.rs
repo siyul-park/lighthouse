@@ -1,36 +1,13 @@
-//! The standard resource model of every Lighthouse spec document: an
-//! envelope (`apiVersion`, `kind`, `metadata`, `spec`) over a kind-specific
-//! spec, readable from YAML, TOML or JSON, writable as readable YAML, and
-//! described by a JSON Schema per kind.
-
-mod document;
-mod duration;
-mod error;
-mod fs;
-mod listing;
-mod schema;
-mod vars;
-mod xdg;
-mod yaml;
+//! The envelope of every spec document (`apiVersion`, `kind`, `metadata`,
+//! `spec`) over a kind-specific spec, and the identity it carries.
 
 use std::{borrow::Cow, collections::BTreeMap};
 
 use schemars::{JsonSchema, SchemaGenerator, json_schema};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
+use serde_json::Value;
 
-pub use document::{Format, documents, kind_of, resource};
-pub use duration::{Duration, InvalidDuration};
-pub use error::Error;
-pub use fs::{file_in, read_optional, slashed, write_atomic, write_atomic_guarded};
-pub use listing::{Listed, listed};
-pub use schema::{SCHEMA_URL_BASE, Schema, header, schema, schema_file};
-pub use vars::{replace_vars, var, var_os};
-pub use xdg::{Base, dir as xdg_dir, dir_in as xdg_dir_in, plugins as xdg_plugins};
-pub use yaml::to_yaml;
-
-/// The directory below a project's root that holds what Lighthouse keeps for
-/// it: the cache, the store, its own decisions, models and datasets.
-pub const STATE_DIR: &str = ".lighthouse";
+use crate::Error;
 
 /// The version every document of this model declares.
 pub const API_VERSION: &str = "lighthouse/v1alpha1";
@@ -170,4 +147,30 @@ pub fn new_uid() -> String {
 pub fn is_uid(text: &str) -> bool {
     uuid::Uuid::parse_str(text)
         .is_ok_and(|u| u.get_version() == Some(uuid::Version::Random) && u.to_string() == text)
+}
+
+/// The `kind` a parsed document declares.
+pub fn kind_of(document: &Value) -> Option<&str> {
+    document.get("kind")?.as_str()
+}
+
+/// Reads `document` as the resource of spec `S`. A document without an
+/// `apiVersion` is refused.
+pub fn resource<S: Spec + DeserializeOwned>(
+    path: &str,
+    document: &Value,
+) -> Result<Resource<S>, Error> {
+    let version = document.get("apiVersion").and_then(Value::as_str);
+    let found = kind_of(document).unwrap_or("(none)");
+    if version != Some(API_VERSION) || found != S::KIND {
+        return Err(Error::Mismatch {
+            path: path.to_owned(),
+            expected: format!("{API_VERSION} {}", S::KIND),
+            found: version.map_or_else(|| "(none)".to_owned(), |v| format!("{v} {found}")),
+        });
+    }
+    serde_json::from_value(document.clone()).map_err(|e| Error::Invalid {
+        path: path.to_owned(),
+        message: e.to_string(),
+    })
 }

@@ -8,8 +8,8 @@
 
 use std::{collections::BTreeMap, fmt, time::Duration as Limit};
 
+use lighthouse_model::Duration;
 use lighthouse_process::{Policy, check_host, check_write, variables};
-use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;

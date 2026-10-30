@@ -7,7 +7,7 @@ use std::{fmt::Write, io};
 use clap::{Command, CommandFactory};
 use clap_complete::Shell;
 use lighthouse_cli::surface::tools::{self, Tool};
-use lighthouse_resource::schema_file;
+use lighthouse_model::schema_file;
 use serde_json::Value;
 
 use crate::terminal::command::Cli;

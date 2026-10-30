@@ -81,7 +81,7 @@ pub fn isolate() {
             .map(|name| (name.to_owned(), Some(path.clone().into_os_string())));
         let unset =
             ["LIGHTHOUSE_TRUST", "LIGHTHOUSE_ATTRIBUTED_TO"].map(|name| (name.to_owned(), None));
-        assert!(lighthouse_resource::replace_vars(
+        assert!(lighthouse_model::replace_vars(
             moved.into_iter().chain(unset)
         ));
     });

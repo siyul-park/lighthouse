@@ -1838,7 +1838,6 @@ dependencies = [
  "lighthouse-plugin",
  "lighthouse-process",
  "lighthouse-protocol",
- "lighthouse-resource",
  "lighthouse-rpc",
  "lighthouse-spec",
  "lighthouse-test-support",
@@ -1865,7 +1864,6 @@ dependencies = [
  "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-report",
- "lighthouse-resource",
  "lighthouse-rpc",
  "lighthouse-session",
  "lighthouse-spec",
@@ -1894,7 +1892,6 @@ dependencies = [
  "lighthouse-plugin",
  "lighthouse-process",
  "lighthouse-protocol",
- "lighthouse-resource",
  "lighthouse-spec",
  "lighthouse-test-support",
  "rayon",
@@ -1932,7 +1929,11 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "serde_norway",
+ "tempfile",
  "thiserror",
+ "toml",
+ "uuid",
 ]
 
 [[package]]
@@ -1985,20 +1986,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lighthouse-resource"
-version = "0.1.0"
-dependencies = [
- "schemars",
- "serde",
- "serde_json",
- "serde_norway",
- "tempfile",
- "thiserror",
- "toml",
- "uuid",
-]
-
-[[package]]
 name = "lighthouse-rpc"
 version = "0.1.0"
 dependencies = [
@@ -2009,7 +1996,6 @@ dependencies = [
  "lighthouse-plugin",
  "lighthouse-process",
  "lighthouse-protocol",
- "lighthouse-resource",
  "lighthouse-spec",
  "lighthouse-test-support",
  "schemars",
@@ -2032,7 +2018,6 @@ dependencies = [
  "lighthouse-plugin",
  "lighthouse-protocol",
  "lighthouse-report",
- "lighthouse-resource",
  "lighthouse-rpc",
  "lighthouse-spec",
  "lighthouse-store",
@@ -2057,7 +2042,6 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-process",
  "lighthouse-protocol",
- "lighthouse-resource",
  "lighthouse-test-support",
  "schemars",
  "serde",
@@ -2074,7 +2058,6 @@ version = "0.1.0"
 dependencies = [
  "lighthouse-model",
  "lighthouse-protocol",
- "lighthouse-resource",
  "rusqlite",
  "schemars",
  "serde",
@@ -2089,8 +2072,8 @@ version = "0.1.0"
 dependencies = [
  "lang-cel",
  "lighthouse-checks",
+ "lighthouse-model",
  "lighthouse-plugin",
- "lighthouse-resource",
  "lighthouse-spec",
  "toml",
 ]
@@ -2220,9 +2203,9 @@ name = "model-http"
 version = "0.1.0"
 dependencies = [
  "async-openai",
+ "lighthouse-model",
  "lighthouse-process",
  "lighthouse-protocol",
- "lighthouse-resource",
  "serde",
  "serde_json",
  "ureq",

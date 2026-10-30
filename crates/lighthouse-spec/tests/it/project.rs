@@ -1,7 +1,6 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
-use lighthouse_model::{Safety, Severity};
-use lighthouse_resource::{Format, Metadata, Resource};
+use lighthouse_model::{Format, Metadata, Resource, Safety, Severity};
 use lighthouse_spec::{
     Config, Error, Level, PluginRef, ProjectSpec, Projects, RuleConfig, RuleSetting, Rules,
     glob_set,

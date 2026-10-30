@@ -7,8 +7,7 @@ use std::{
 };
 
 use lighthouse_engine as engine;
-use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Suppressed, Suppression};
-use lighthouse_resource::slashed;
+use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Suppressed, Suppression, slashed};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use lighthouse_store::{Observed, Ruling, Run, Standing, Store, Subject, Unchecked};
 use serde_json::{Value, json};

@@ -15,7 +15,6 @@ lighthouse-model.workspace = true
 lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
 lighthouse-report.workspace = true
-lighthouse-resource.workspace = true
 lighthouse-session.workspace = true
 regex.workspace = true
 rmcp.workspace = true

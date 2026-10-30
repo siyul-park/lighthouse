@@ -10,7 +10,7 @@ pub enum Error {
     Io { path: PathBuf, source: io::Error },
     /// A document that is not a valid resource of the kind it declares.
     #[error(transparent)]
-    Document(#[from] lighthouse_resource::Error),
+    Document(#[from] lighthouse_model::Error),
     /// Files that do not form a catalog: ordering, naming, missing files.
     #[error("{path}: {message}")]
     Layout { path: String, message: String },

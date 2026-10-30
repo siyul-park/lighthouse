@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use lighthouse_resource::{read_optional, write_atomic};
+use lighthouse_model::{read_optional, write_atomic};
 use lighthouse_session::SKILL_MARKER;
 use serde_json::{Value, json};
 

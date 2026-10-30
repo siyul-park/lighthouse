@@ -430,7 +430,7 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
         written
             .lines()
             .filter_map(|l| l.trim().strip_prefix("uid: "))
-            .any(|uid| lighthouse_resource::is_uid(uid.trim_matches('"'))),
+            .any(|uid| lighthouse_model::is_uid(uid.trim_matches('"'))),
         "a new decision gets a uid: {written}"
     );
     assert!(created.get("localPluginListed").is_none(), "{created}");

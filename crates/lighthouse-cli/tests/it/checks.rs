@@ -30,7 +30,7 @@ pub(crate) fn user_home() -> &'static Path {
         std::mem::forget(home);
         let moved = ["XDG_CONFIG_HOME", "XDG_DATA_HOME"]
             .map(|name| (name.to_owned(), Some(path.clone().into_os_string())));
-        assert!(lighthouse_resource::replace_vars(moved));
+        assert!(lighthouse_model::replace_vars(moved));
         path
     })
 }

@@ -1,6 +1,6 @@
 //! The `variables` a pack shares with its decisions.
 
-use lighthouse_resource::API_VERSION;
+use lighthouse_model::API_VERSION;
 use lighthouse_spec::{Catalog, CheckKind};
 use lighthouse_test_support::catalog::{Files, decision, files};
 

@@ -18,7 +18,7 @@ mod signal;
 mod standings;
 mod store;
 
-use lighthouse_resource::Schema;
+use lighthouse_model::Schema;
 
 pub use error::Error;
 pub use log::{

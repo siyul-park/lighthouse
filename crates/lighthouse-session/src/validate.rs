@@ -13,8 +13,8 @@ use std::{
 };
 
 use lighthouse_checks::Composition;
+use lighthouse_model::{Format, Resource, documents, kind_of, resource};
 use lighthouse_plugin::{Registry, plugin_of};
-use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
 use lighthouse_spec::Catalog;
 use lighthouse_spec::{Config, ProjectSpec};

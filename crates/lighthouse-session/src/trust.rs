@@ -96,7 +96,7 @@ impl Basis {
 
     /// Whether the user trusts the project at `root` as this basis describes it.
     pub fn trusted(&self, root: &Path) -> bool {
-        if lighthouse_resource::var(TRUST_VAR).is_some_and(|v| v == "1") {
+        if lighthouse_model::var(TRUST_VAR).is_some_and(|v| v == "1") {
             return true;
         }
         if self.digest.is_empty() {
@@ -190,12 +190,12 @@ fn write(known: &BTreeMap<String, String>) -> Result<PathBuf> {
     let text = toml::to_string(&Table {
         trusted: known.clone(),
     })?;
-    lighthouse_resource::write_atomic(&path, &text)?;
+    lighthouse_model::write_atomic(&path, &text)?;
     Ok(path)
 }
 
 fn path() -> Result<PathBuf> {
-    let dir = lighthouse_resource::xdg_dir(lighthouse_resource::Base::Config)
+    let dir = lighthouse_model::xdg_dir(lighthouse_model::Base::Config)
         .ok_or("no config directory for the trust file (set XDG_CONFIG_HOME or HOME)")?;
     Ok(dir.join(FILE))
 }

@@ -8,11 +8,10 @@ use std::{
 };
 
 use lighthouse_engine::{Engine, ModelOptions, Run, cache};
-use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed};
+use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed, slashed};
 use lighthouse_report::{
     Briefing, Compact, Descriptor, Detail, Format, Full, Report, render, report,
 };
-use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use schemars::JsonSchema;
 use serde::Serialize;

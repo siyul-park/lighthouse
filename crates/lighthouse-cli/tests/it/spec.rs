@@ -150,7 +150,7 @@ fn checked_in_schemas_match_the_types() {
                 .map(|(kind, schema)| (kind.to_owned(), schema)),
         );
     for (kind, schema) in wanted {
-        let file = root.join(lighthouse_resource::schema_file(&kind));
+        let file = root.join(lighthouse_model::schema_file(&kind));
         let mut want = serde_json::to_string_pretty(&schema).unwrap();
         want.push('\n');
         let have = fs::read_to_string(&file).unwrap_or_default();

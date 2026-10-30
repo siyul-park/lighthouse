@@ -4,7 +4,7 @@ The builtin, cel and command checks, the bundled pack plugins and the compositio
 
 The checks of the bundled decision packs and the machinery that compiles a decision's `check` and `fix` into a `Rule` and a `Fixer`.
 
-**Depends on:** `lighthouse-model`, `lighthouse-plugin`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-resource`, `lighthouse-spec`.
+**Depends on:** `lighthouse-model`, `lighthouse-plugin`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-spec`.
 
 ## Entry points
 

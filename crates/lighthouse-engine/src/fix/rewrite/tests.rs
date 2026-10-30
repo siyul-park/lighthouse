@@ -143,7 +143,7 @@ fn the_verify_programs_run_over_a_copy_that_holds_the_fixed_texts() {
     let texts = crate::Overlays::from([(PathBuf::from("a.txt"), "new\n".to_owned())]);
     let sh = |script: &str| {
         let mut program = Program::of(vec!["sh".to_owned(), "-c".to_owned(), script.to_owned()]);
-        program.timeout = Some(lighthouse_resource::Duration::from_secs(20));
+        program.timeout = Some(lighthouse_model::Duration::from_secs(20));
         program
     };
 

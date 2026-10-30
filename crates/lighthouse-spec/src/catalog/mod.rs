@@ -4,8 +4,8 @@ use std::{
     path::Path,
 };
 
+use lighthouse_model::{Resource, SCHEMA_URL_BASE, Spec, header, to_yaml, write_atomic};
 use lighthouse_protocol::hash;
-use lighthouse_resource::{Resource, SCHEMA_URL_BASE, Spec, header, to_yaml, write_atomic};
 
 use crate::{
     Decision, DecisionSpec, Env, Error, Pack, ProjectSpec, Projects, Section, project,

@@ -6,13 +6,11 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::Judgment;
+use lighthouse_model::{Judgment, STATE_DIR};
 use rusqlite::{
     Connection, ErrorCode, OptionalExtension, Transaction, TransactionBehavior, named_params,
     params,
 };
-
-use lighthouse_resource::STATE_DIR;
 
 use crate::{
     Error, Filter, FindingRecord, JudgmentEvent, NewJudgment, Observed, Resolved, Ruling, Run,

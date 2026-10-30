@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::{Base, read_optional, xdg_dir};
+use lighthouse_model::{Base, read_optional, xdg_dir};
 use lighthouse_spec::{Catalog, Layer};
 use schemars::JsonSchema;
 use serde::Serialize;

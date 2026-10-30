@@ -5,7 +5,7 @@ use std::{
 };
 
 use include_dir::{Dir, DirEntry, include_dir};
-use lighthouse_resource::{Format, Resource, STATE_DIR, Spec, documents, kind_of, resource};
+use lighthouse_model::{Format, Resource, STATE_DIR, Spec, documents, kind_of, resource};
 
 use crate::{
     Catalog, Decision, DecisionSpec, Env, Error, PackSpec, ProjectSpec,

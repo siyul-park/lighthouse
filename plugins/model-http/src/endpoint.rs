@@ -2,9 +2,9 @@
 
 use std::{collections::BTreeMap, time::Duration};
 
+use lighthouse_model::Duration as Span;
 use lighthouse_process::expand_value;
 use lighthouse_protocol::ErrorObject;
-use lighthouse_resource::Duration as Span;
 use serde_json::{Map, Value};
 
 /// How long a request may take when the provider does not say.

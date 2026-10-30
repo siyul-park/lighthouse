@@ -10,7 +10,7 @@ fn user_file() {
     crate::fixture::isolate();
     let file = environment::user_file().unwrap();
     assert!(file.ends_with("lighthouse/config.toml"), "{file:?}");
-    assert!(file.starts_with(lighthouse_resource::var("XDG_CONFIG_HOME").unwrap()));
+    assert!(file.starts_with(lighthouse_model::var("XDG_CONFIG_HOME").unwrap()));
 }
 
 #[test]

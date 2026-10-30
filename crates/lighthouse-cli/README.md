@@ -4,7 +4,7 @@ The argv and MCP surfaces, the terminal and hook adapters. Layer L5. Never: logi
 
 The `lighthouse` binary and the frontends over the session: one table of operations (`surface/`), the terminal (`terminal/`) and the MCP server (`mcp/`).
 
-**Depends on:** `lighthouse-model`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-report`, `lighthouse-resource`, `lighthouse-session`.
+**Depends on:** `lighthouse-model`, `lighthouse-process`, `lighthouse-protocol`, `lighthouse-report`, `lighthouse-session`.
 
 ## Entry points
 

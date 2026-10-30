@@ -3,8 +3,8 @@
 
 use std::{collections::BTreeMap, net::IpAddr};
 
+use lighthouse_model::Duration;
 use lighthouse_process::{Policy, variables};
-use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

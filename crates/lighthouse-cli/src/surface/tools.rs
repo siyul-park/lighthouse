@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_resource::{SCHEMA_URL_BASE, schema_file};
+use lighthouse_model::{SCHEMA_URL_BASE, schema_file};
 use lighthouse_session::{
     Authored, CheckReport, Session,
     fix::Fixed,
