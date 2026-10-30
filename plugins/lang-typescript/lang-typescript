@@ -1,0 +1,5 @@
+#!/bin/sh
+# Starts the provider with the Node on PATH. The compiled provider and its
+# pinned dependencies sit beside this file; a project's own node_modules are
+# never read.
+exec node "$(dirname "$0")/dist/src/main.js" "$@"

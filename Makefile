@@ -16,6 +16,14 @@ plugins:
 	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
 	mv -f $(PLUGINS)/lang-go/lang-go.new $(PLUGINS)/lang-go/lang-go
 	cp plugins/lang-go/lighthouse-plugin.toml $(PLUGINS)/lang-go/
+	rm -rf $(PLUGINS)/lang-typescript.new
+	mkdir -p $(PLUGINS)/lang-typescript.new/dist
+	cd plugins/lang-typescript && npm ci --ignore-scripts && npm run build
+	cp -R plugins/lang-typescript/dist/src $(PLUGINS)/lang-typescript.new/dist/
+	cp plugins/lang-typescript/lang-typescript plugins/lang-typescript/lighthouse-plugin.toml plugins/lang-typescript/package.json plugins/lang-typescript/package-lock.json $(PLUGINS)/lang-typescript.new/
+	cd $(PLUGINS)/lang-typescript.new && npm ci --omit=dev --ignore-scripts
+	rm -rf $(PLUGINS)/lang-typescript
+	mv $(PLUGINS)/lang-typescript.new $(PLUGINS)/lang-typescript
 	for plugin in lang-rust lang-yaml lang-toml lang-markdown model-http model-local; do \
 		mkdir -p $(PLUGINS)/$$plugin; \
 		cargo build --release -p $$plugin; \
@@ -27,6 +35,7 @@ plugins:
 test: plugins
 	cargo test --workspace
 	cd plugins/lang-go && go test ./...
+	cd plugins/lang-typescript && npm test
 
 # Formatters, compilers' linters, then the dogfood gate: Lighthouse checks its
 # own sources with the rules this repository enforces (lighthouse.toml).

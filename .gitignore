@@ -3,3 +3,6 @@ target/
 .lighthouse/*.db*
 .lighthouse/cache/
 .env
+node_modules/
+dist/
+plugins/lang-typescript/src/wire.ts

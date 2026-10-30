@@ -1,0 +1,23 @@
+{
+  "name": "lang-typescript",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lighthouse language provider for TypeScript and JavaScript",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/wire.mjs && tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "wire": "node scripts/wire.mjs"
+  },
+  "dependencies": {
+    "typescript": "6.0.3",
+    "vscode-jsonrpc": "9.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "json-schema-to-typescript": "16.0.0"
+  }
+}
