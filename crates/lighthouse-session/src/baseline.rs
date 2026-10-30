@@ -184,7 +184,13 @@ fn resolved(path: &Path) -> Option<PathBuf> {
     let mut here = path;
     loop {
         if let Ok(found) = here.canonicalize() {
-            return Some(found.join(missing));
+            // Joining nothing would end the path of a file that is there in a
+            // separator, and no such path exists.
+            return Some(if missing.as_os_str().is_empty() {
+                found
+            } else {
+                found.join(missing)
+            });
         }
         missing = Path::new(here.file_name()?).join(missing);
         here = here.parent()?;
