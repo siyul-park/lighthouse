@@ -4,17 +4,17 @@ import { describe, it } from "node:test";
 import { Provider } from "../src/provider.ts";
 import { serve } from "../src/server.ts";
 
-interface Reply {
-  id: number | null;
-  result?: unknown;
-  error?: { code: number; message: string };
-}
-
 const INITIALIZE = {
   protocolVersion: "0.4",
   clientInfo: { name: "test", version: "0" },
   workspaceFolders: [{ uri: "file:///workspace", name: "workspace" }],
 };
+
+interface Reply {
+  id: number | null;
+  result?: unknown;
+  error?: { code: number; message: string };
+}
 
 function frame(message: object): string {
   const body = JSON.stringify({ jsonrpc: "2.0", ...message });

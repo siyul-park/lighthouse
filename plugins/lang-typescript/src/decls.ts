@@ -1,5 +1,6 @@
 import ts from "typescript";
-import { idPart } from "./paths.ts";
+import { SNIPPETS_DIR, idPart } from "./paths.ts";
+import { Lines } from "./positions.ts";
 import type { SymbolKind } from "./wire.ts";
 
 /** Anything with a body whose shape the provider measures. */
@@ -29,11 +30,16 @@ export class FileDecls {
   readonly list: Decl[] = [];
   private readonly ids = new Map<string, Decl>();
   private readonly nodes = new Map<ts.Node, Decl>();
+  readonly lines: Lines;
+  /** Whether the file is a fence of a host file: analysed as a unit of its own beside the host. */
+  readonly fence: boolean;
 
   constructor(
     readonly file: ts.SourceFile,
     readonly module: string,
   ) {
+    this.lines = new Lines(file.text);
+    this.fence = file.fileName.includes(`/${SNIPPETS_DIR}/`);
     new Collector(this).statements(file.statements, undefined);
   }
 
@@ -83,43 +89,6 @@ export class FileDecls {
   private ownerNames(owner: Decl | undefined): string[] {
     return owner === undefined ? [] : [...this.ownerNames(owner.owner), owner.name];
   }
-}
-
-/** The text of the name of a member or declaration, or undefined when it is computed. */
-export function nameText(name: ts.Node | undefined): string | undefined {
-  if (name === undefined) return undefined;
-  if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) return name.text;
-  if (ts.isStringLiteralLike(name) || ts.isNumericLiteral(name)) return name.text;
-  if (ts.isComputedPropertyName(name)) return nameText(name.expression);
-  return undefined;
-}
-
-/** The function an initializer is, through parentheses and assertions. */
-export function functionInitializer(
-  init: ts.Expression | undefined,
-): ts.ArrowFunction | ts.FunctionExpression | undefined {
-  const inner = init === undefined ? undefined : unwrap(init);
-  return inner !== undefined && (ts.isArrowFunction(inner) || ts.isFunctionExpression(inner)) ? inner : undefined;
-}
-
-/** The class an initializer is, through parentheses and assertions. */
-export function classInitializer(init: ts.Expression | undefined): ts.ClassExpression | undefined {
-  const inner = init === undefined ? undefined : unwrap(init);
-  return inner !== undefined && ts.isClassExpression(inner) ? inner : undefined;
-}
-
-export function unwrap(expression: ts.Expression): ts.Expression {
-  let current = expression;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
 }
 
 /** Collects the declarations of a statement list into a [FileDecls]. */
@@ -269,21 +238,17 @@ class Collector {
   }
 
   private variableStatement(statement: ts.VariableStatement, owner: Decl | undefined): void {
-    const list = statement.declarationList;
-    const single = list.declarations.length === 1;
-    const isConst = (list.flags & ts.NodeFlags.Const) !== 0 || (list.flags & ts.NodeFlags.Using) !== 0;
-    for (const declaration of list.declarations) {
-      this.binding(declaration.name, declaration, single ? statement : undefined, isConst, owner);
+    for (const declaration of statement.declarationList.declarations) {
+      this.binding(declaration.name, declaration, owner);
     }
   }
 
-  private binding(
-    name: ts.BindingName,
-    declaration: ts.VariableDeclaration,
-    extent: ts.Node | undefined,
-    isConst: boolean,
-    owner: Decl | undefined,
-  ): void {
+  /** Declares the names a variable declaration binds: one, or those of a destructuring pattern. */
+  private binding(name: ts.BindingName, declaration: ts.VariableDeclaration, owner: Decl | undefined): void {
+    const list = declaration.parent as ts.VariableDeclarationList;
+    const isConst = (list.flags & ts.NodeFlags.Const) !== 0 || (list.flags & ts.NodeFlags.Using) !== 0;
+    const single = name === declaration.name && list.declarations.length === 1;
+    const extent = single && ts.isVariableStatement(list.parent) ? list.parent : undefined;
     if (ts.isIdentifier(name)) {
       const fn = isConst ? functionInitializer(declaration.initializer) : undefined;
       const cls = isConst ? classInitializer(declaration.initializer) : undefined;
@@ -299,7 +264,7 @@ class Collector {
       return;
     }
     for (const element of name.elements) {
-      if (ts.isBindingElement(element)) this.binding(element.name, declaration, undefined, isConst, owner);
+      if (ts.isBindingElement(element)) this.binding(element.name, declaration, owner);
     }
   }
 
@@ -395,6 +360,43 @@ class Collector {
   private byName(name: string): Decl | undefined {
     return this.decls.list.find((decl) => decl.name === name && decl.owner === undefined);
   }
+}
+
+/** The text of the name of a member or declaration, or undefined when it is computed. */
+export function nameText(name: ts.Node | undefined): string | undefined {
+  if (name === undefined) return undefined;
+  if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) return name.text;
+  if (ts.isStringLiteralLike(name) || ts.isNumericLiteral(name)) return name.text;
+  if (ts.isComputedPropertyName(name)) return nameText(name.expression);
+  return undefined;
+}
+
+/** The function an initializer is, through parentheses and assertions. */
+export function functionInitializer(
+  init: ts.Expression | undefined,
+): ts.ArrowFunction | ts.FunctionExpression | undefined {
+  const inner = init === undefined ? undefined : unwrap(init);
+  return inner !== undefined && (ts.isArrowFunction(inner) || ts.isFunctionExpression(inner)) ? inner : undefined;
+}
+
+/** The class an initializer is, through parentheses and assertions. */
+export function classInitializer(init: ts.Expression | undefined): ts.ClassExpression | undefined {
+  const inner = init === undefined ? undefined : unwrap(init);
+  return inner !== undefined && ts.isClassExpression(inner) ? inner : undefined;
+}
+
+export function unwrap(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isTypeAssertionExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
 }
 
 /** The base and name of `exports.f`, `module.exports.f`, `A.f` and `A.prototype.f`; `module.exports` alone has the name "". */

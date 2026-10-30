@@ -59,6 +59,7 @@
               "nesting": 1
             }
           ],
+          "manual_assertions": 1,
           "max_nesting": 2,
           "params": 0,
           "returns": 0,
@@ -180,6 +181,14 @@
           "kind": "contains",
           "resolution": "semantic",
           "to": "src/calc.test::table#test"
+        },
+        {
+          "from": {
+            "module": "src/calc.test"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/calc.test::by hand#test"
         },
         {
           "from": {
@@ -353,6 +362,24 @@
         },
         {
           "from": {
+            "symbol": "src/calc.test::by hand#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 40
+            },
+            "start": {
+              "col": 7,
+              "line": 40
+            }
+          },
+          "to": "src/calc::add#function"
+        },
+        {
+          "from": {
             "symbol": "src/calc.test::each %i#test"
           },
           "kind": "calls",
@@ -360,11 +387,11 @@
           "site": {
             "end": {
               "col": 13,
-              "line": 40
+              "line": 46
             },
             "start": {
               "col": 10,
-              "line": 40
+              "line": 46
             }
           },
           "to": "src/calc::add#function"
@@ -378,11 +405,11 @@
           "site": {
             "end": {
               "col": 18,
-              "line": 43
+              "line": 49
             },
             "start": {
               "col": 15,
-              "line": 43
+              "line": 49
             }
           },
           "to": "src/calc.test::Row#type"
@@ -396,11 +423,11 @@
           "site": {
             "end": {
               "col": 17,
-              "line": 44
+              "line": 50
             },
             "start": {
               "col": 10,
-              "line": 44
+              "line": 50
             }
           },
           "to": "src/calc.test::FIXTURE#const"
@@ -461,6 +488,22 @@
           "statements": 2,
           "symbol": "src/calc.test::table#test",
           "tokens": 32,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "manual_assertions": 1,
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "src/calc.test::by hand#test",
+          "tokens": 22,
           "top_level": 1
         },
         {
@@ -720,11 +763,38 @@
           "extent": {
             "end": {
               "col": 4,
-              "line": 41
+              "line": 43
             },
             "start": {
               "col": 1,
               "line": 39
+            }
+          },
+          "file": "src/calc.test.ts",
+          "id": "src/calc.test::by hand#test",
+          "kind": "test",
+          "name": "by hand",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 43
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 45
             }
           },
           "file": "src/calc.test.ts",
@@ -734,11 +804,11 @@
           "span": {
             "end": {
               "col": 4,
-              "line": 41
+              "line": 47
             },
             "start": {
               "col": 1,
-              "line": 39
+              "line": 45
             }
           },
           "visibility": "private"
@@ -769,6 +839,14 @@
           "symbol": "src/calc.test::table#test",
           "targets": [
             "src/calc.test::rows#const",
+            "src/calc::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "src/calc.test::by hand#test",
+          "targets": [
             "src/calc::add#function"
           ]
         },

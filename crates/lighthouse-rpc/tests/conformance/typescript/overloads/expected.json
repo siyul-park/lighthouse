@@ -67,6 +67,24 @@
         },
         {
           "from": {
+            "symbol": "src/over::Writer::constructor#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 47,
+              "line": 11
+            },
+            "start": {
+              "col": 15,
+              "line": 11
+            }
+          },
+          "to": "src/over::Writer::target#field"
+        },
+        {
+          "from": {
             "symbol": "src/over::use#function"
           },
           "kind": "calls",

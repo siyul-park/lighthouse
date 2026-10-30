@@ -2,13 +2,13 @@ import ts from "typescript";
 import type { Lines } from "./positions.ts";
 import type { Comment, Symbol as Sym } from "./wire.ts";
 
+const GENERATED = /@generated\b/;
+
 interface Range {
   pos: number;
   end: number;
   multiline: boolean;
 }
-
-const GENERATED = /@generated\b/;
 
 /** Every comment of the file, with adjacent line comments joined, and the symbol each documents. */
 export function commentsOf(file: ts.SourceFile, lines: Lines, symbols: readonly Sym[]): Comment[] {

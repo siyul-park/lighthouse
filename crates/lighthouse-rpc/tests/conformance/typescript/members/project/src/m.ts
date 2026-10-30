@@ -21,3 +21,11 @@ export class Handler {
   static defaults: Options = { mode: Mode.Read, run() {} };
   callback: () => void = () => {};
 }
+
+export class Box {
+  constructor(private readonly value: number) {}
+
+  get(): number {
+    return this.value;
+  }
+}

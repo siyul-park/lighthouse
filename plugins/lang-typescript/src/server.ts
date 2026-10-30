@@ -2,20 +2,20 @@ import type { Readable, Writable } from "node:stream";
 import { StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
 import type { IndexParams, IndexResult, InitializeParams, InitializeResult } from "./wire.ts";
 
-/** The methods of a language provider. */
-export interface Handler {
-  initialize(params: InitializeParams): InitializeResult;
-  index(params: IndexParams): IndexResult;
-}
-
 export const PROTOCOL_VERSION = "0.4";
 
 const PARSE_ERROR = -32700;
+
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
 const REQUEST_FAILED = -32803;
 const NOT_INITIALIZED = -32002;
+/** The methods of a language provider. */
+export interface Handler {
+  initialize(params: InitializeParams): InitializeResult;
+  index(params: IndexParams): IndexResult;
+}
 
 interface Incoming {
   id?: number | string | null;
@@ -34,50 +34,68 @@ interface Session {
   shutdown: boolean;
 }
 
+type Outcome = { result: unknown } | Failure;
+
+/** The requests of one conversation, answered in the order they arrive. */
+class Loop {
+  private queue: Promise<void> = Promise.resolve();
+  private done = false;
+  private readonly session: Session = { initialized: false, shutdown: false };
+
+  constructor(
+    private readonly handler: Handler,
+    private readonly writer: StreamMessageWriter,
+    private readonly resolve: (code: number) => void,
+  ) {}
+
+  attach(reader: StreamMessageReader): void {
+    reader.onError((error) =>
+      this.enqueue(async () => {
+        await reply(this.writer, null, { code: PARSE_ERROR, message: error.message });
+        this.finish(1);
+      }),
+    );
+    reader.onClose(() => this.enqueue(() => this.finish(this.exitCode())));
+    reader.listen((message) => this.enqueue(() => this.handle(message as Incoming)));
+  }
+
+  private enqueue(task: () => void | Promise<void>): void {
+    this.queue = this.queue.then(task);
+  }
+
+  private exitCode(): number {
+    return this.session.shutdown ? 0 : 1;
+  }
+
+  private finish(code: number): void {
+    if (this.done) return;
+    this.done = true;
+    this.resolve(code);
+  }
+
+  private async handle(incoming: Incoming): Promise<void> {
+    if (this.done) return;
+    if (incoming.method === "exit") {
+      this.finish(this.exitCode());
+      return;
+    }
+    if (incoming.method === undefined) return;
+    const outcome = dispatch(this.handler, incoming, this.session);
+    if (incoming.id === undefined || incoming.id === null) return;
+    await reply(this.writer, incoming.id, outcome);
+  }
+}
+
 /**
  * Serves requests from `input` on `output` until the host sends `exit` or
  * closes the input, and returns the exit code: 0 after `shutdown` and `exit`
  * (or an input that closes after `shutdown`), 1 otherwise.
  */
 export function serve(input: Readable, output: Writable, handler: Handler): Promise<number> {
-  const reader = new StreamMessageReader(input);
-  const writer = new StreamMessageWriter(output);
-  const session: Session = { initialized: false, shutdown: false };
   return new Promise((resolve) => {
-    let queue: Promise<void> = Promise.resolve();
-    let done = false;
-    const finish = (code: number): void => {
-      if (done) return;
-      done = true;
-      resolve(code);
-    };
-    reader.onError(async (error) => {
-      queue = queue.then(async () => {
-        await reply(writer, null, { code: PARSE_ERROR, message: error.message });
-        finish(1);
-      });
-    });
-    reader.onClose(() => {
-      queue = queue.then(() => finish(session.shutdown ? 0 : 1));
-    });
-    reader.listen((message) => {
-      queue = queue.then(async () => {
-        if (done) return;
-        const incoming = message as Incoming;
-        if (incoming.method === "exit") {
-          finish(session.shutdown ? 0 : 1);
-          return;
-        }
-        if (incoming.method === undefined) return;
-        const outcome = dispatch(handler, incoming, session);
-        if (incoming.id === undefined || incoming.id === null) return;
-        await reply(writer, incoming.id, outcome);
-      });
-    });
+    new Loop(handler, new StreamMessageWriter(output), resolve).attach(new StreamMessageReader(input));
   });
 }
-
-type Outcome = { result: unknown } | Failure;
 
 async function reply(writer: StreamMessageWriter, id: number | string | null, outcome: Outcome): Promise<void> {
   const body =

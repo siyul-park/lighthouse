@@ -17,6 +17,12 @@ const EXTENSIONS: [string, ts.Extension][] = [
 
 const BUILD_DIRS = /^(dist|build|lib|out)\//;
 
+interface Package {
+  dir: string;
+  name: string;
+  manifest: Record<string, unknown>;
+}
+
 /**
  * The module a fence imports when it names the package around its Markdown
  * file, as a consumer would: `import { f } from "pkg"` is the package's entry,
@@ -40,12 +46,6 @@ export function selfReference(
     if (resolved !== undefined) return { ...resolved, isExternalLibraryImport: false };
   }
   return undefined;
-}
-
-interface Package {
-  dir: string;
-  name: string;
-  manifest: Record<string, unknown>;
 }
 
 function packageAbove(start: string): Package | undefined {

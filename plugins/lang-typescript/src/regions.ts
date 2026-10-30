@@ -44,64 +44,6 @@ export interface Snippet {
   text: RegionText;
 }
 
-/** The units of the fences of the host files of a request, in the order of the fences. */
-export function planSnippets(hosts: readonly EmbeddedFile[]): Snippet[] {
-  const snippets: Snippet[] = [];
-  for (const host of hosts) {
-    const sources = [...host.sources].sort((a, b) => a.source_range[0] - b.source_range[0]);
-    sources.forEach((source, index) => {
-      const dir = path.posix.dirname(host.path);
-      const name = `${path.posix.basename(host.path)}.${index + 1}`;
-      const rel = path.posix.join(dir, SNIPPETS_DIR, name, `snippet${extensionOf(source)}`);
-      snippets.push({ host, source, rel, text: wrap(regionText(source)) });
-    });
-  }
-  return snippets;
-}
-
-function extensionOf(source: EmbeddedSource): string {
-  const info = source.context?.["info"];
-  const word =
-    typeof info === "string"
-      ? info
-          .trim()
-          .split(/[\s,{]/)[0]
-          ?.toLowerCase()
-      : undefined;
-  return (word === undefined ? undefined : EXTENSIONS[word]) ?? ".ts";
-}
-
-/** A fence is a module of its own: one that neither imports nor exports is made one, so its names stay its own. */
-function wrap(body: RegionText): RegionText {
-  const probe = ts.createSourceFile("snippet.tsx", body.text, ts.ScriptTarget.ESNext, false);
-  if (ts.isExternalModule(probe)) return body;
-  return around(body, "", MODULE_TAIL);
-}
-
-/** The fence as it is written, each byte at its place in the host. */
-function regionText(source: EmbeddedSource): RegionText {
-  const bytes = Buffer.byteLength(source.text);
-  const [from, to] = source.source_range;
-  const host: [number, number][] = Array.from({ length: bytes }, () => [from, to]);
-  if (source.text_map == null && to - from === bytes) {
-    for (let i = 0; i < bytes; i++) host[i] = [from + i, from + i + 1];
-  }
-  for (const segment of source.text_map ?? []) {
-    const [textFrom, textTo] = segment.text_range;
-    const [hostFrom, hostTo] = segment.source_range;
-    const linear = textTo - textFrom === hostTo - hostFrom;
-    for (let i = textFrom; i < textTo && i < host.length; i++) {
-      host[i] = linear ? [hostFrom + i - textFrom, hostFrom + i - textFrom + 1] : [hostFrom, hostTo];
-    }
-  }
-  return { text: source.text, host };
-}
-
-function around(body: RegionText, head: string, tail: string): RegionText {
-  const hidden = (text: string): [number, number][] => Array.from({ length: Buffer.byteLength(text) }, () => UNMAPPED);
-  return { text: head + body.text + tail, host: [...hidden(head), ...body.host, ...hidden(tail)] };
-}
-
 /** Puts the spans of the fragment of a fence's file where the host file shows them. */
 export class Remap {
   private readonly lines: number[];
@@ -196,4 +138,62 @@ export class Remap {
     }
     return undefined;
   }
+}
+
+/** The units of the fences of the host files of a request, in the order of the fences. */
+export function planSnippets(hosts: readonly EmbeddedFile[]): Snippet[] {
+  const snippets: Snippet[] = [];
+  for (const host of hosts) {
+    const sources = [...host.sources].sort((a, b) => a.source_range[0] - b.source_range[0]);
+    sources.forEach((source, index) => {
+      const dir = path.posix.dirname(host.path);
+      const name = `${path.posix.basename(host.path)}.${index + 1}`;
+      const rel = path.posix.join(dir, SNIPPETS_DIR, name, `snippet${extensionOf(source)}`);
+      snippets.push({ host, source, rel, text: wrap(regionText(source)) });
+    });
+  }
+  return snippets;
+}
+
+function extensionOf(source: EmbeddedSource): string {
+  const info = source.context?.["info"];
+  const word =
+    typeof info === "string"
+      ? info
+          .trim()
+          .split(/[\s,{]/)[0]
+          ?.toLowerCase()
+      : undefined;
+  return (word === undefined ? undefined : EXTENSIONS[word]) ?? ".ts";
+}
+
+/** A fence is a module of its own: one that neither imports nor exports is made one, so its names stay its own. */
+function wrap(body: RegionText): RegionText {
+  const probe = ts.createSourceFile("snippet.tsx", body.text, ts.ScriptTarget.ESNext, false);
+  if (ts.isExternalModule(probe)) return body;
+  return around(body, "", MODULE_TAIL);
+}
+
+/** The fence as it is written, each byte at its place in the host. */
+function regionText(source: EmbeddedSource): RegionText {
+  const bytes = Buffer.byteLength(source.text);
+  const [from, to] = source.source_range;
+  const host: [number, number][] = Array.from({ length: bytes }, () => [from, to]);
+  if (source.text_map == null && to - from === bytes) {
+    for (let i = 0; i < bytes; i++) host[i] = [from + i, from + i + 1];
+  }
+  for (const segment of source.text_map ?? []) {
+    const [textFrom, textTo] = segment.text_range;
+    const [hostFrom, hostTo] = segment.source_range;
+    const linear = textTo - textFrom === hostTo - hostFrom;
+    for (let i = textFrom; i < textTo && i < host.length; i++) {
+      host[i] = linear ? [hostFrom + i - textFrom, hostFrom + i - textFrom + 1] : [hostFrom, hostTo];
+    }
+  }
+  return { text: source.text, host };
+}
+
+function around(body: RegionText, head: string, tail: string): RegionText {
+  const hidden = (text: string): [number, number][] => Array.from({ length: Buffer.byteLength(text) }, () => UNMAPPED);
+  return { text: head + body.text + tail, host: [...hidden(head), ...body.host, ...hidden(tail)] };
 }

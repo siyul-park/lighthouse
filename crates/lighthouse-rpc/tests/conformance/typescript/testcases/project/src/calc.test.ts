@@ -36,6 +36,12 @@ it("table", () => {
   }
 });
 
+it("by hand", () => {
+  if (add(1, 2) !== 3) {
+    throw new Error("add");
+  }
+});
+
 it.each([[1, 2]])("each %i", (a, b) => {
   expect(add(a, b)).toBe(3);
 });

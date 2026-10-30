@@ -6,24 +6,36 @@ import type { Model } from "./model.ts";
 import { isIgnored, modulePath, relative, slashed } from "./paths.ts";
 import type { EdgeKind, Node, Resolution, Span } from "./wire.ts";
 
+const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
+
+const BUILTINS = new Set(builtinModules);
+
+/** A name used at a place: by whom, whether it is called, and the value it is accessed on. */
+interface Reference {
+  name: ts.Node;
+  from: Node;
+  call?: boolean;
+  receiver?: ts.Expression;
+}
 /** Takes the edges a file states. */
 export interface EdgeSink {
   edge(kind: EdgeKind, from: Node, to: string, site: Span | undefined, resolution: Resolution): void;
 }
 
-const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
-const BUILTINS = new Set(builtinModules);
-
 /** Walks a file once and states what each declaration calls, references, imports and implements. */
 export class Uses {
+  private readonly lines: Lines;
+  /** Whether the file is a fence: names no declaration binds are the prose's, and stated by name. */
+  private readonly fence: boolean;
+
   constructor(
     private readonly model: Model,
     private readonly decls: FileDecls,
-    private readonly lines: Lines,
     private readonly sink: EdgeSink,
-    /** Whether the file is a fence: names no declaration binds are the prose's, and stated by name. */
-    private readonly fence: boolean,
-  ) {}
+  ) {
+    this.lines = decls.lines;
+    this.fence = decls.fence;
+  }
 
   run(file: ts.SourceFile): void {
     this.visit(file, { module: this.decls.module });
@@ -32,27 +44,53 @@ export class Uses {
   private visit(node: ts.Node, from: Node): void {
     const declared = this.declaredAt(node);
     const here: Node = declared === undefined ? from : { symbol: declared.id };
-    if (ts.isImportDeclaration(node)) return this.importEdge(node.moduleSpecifier, node);
-    if (ts.isExportDeclaration(node)) return this.exportDeclaration(node, here);
-    if (ts.isImportEqualsDeclaration(node)) return this.importEquals(node, here);
-    if (ts.isBinaryExpression(node) && this.declaresByAssignment(node)) return this.visit(node.right, here);
-    if (ts.isCallExpression(node)) return this.call(node, here);
-    if (ts.isNewExpression(node)) return this.construct(node, here);
-    if (ts.isTaggedTemplateExpression(node)) return this.tagged(node, here);
-    if (ts.isDecorator(node)) return this.decorator(node, here);
-    if (ts.isJsxOpeningLikeElement(node)) return this.jsx(node, here);
-    if (ts.isPropertyAccessExpression(node)) return this.access(node, here, false);
-    if (ts.isElementAccessExpression(node)) return this.elementAccess(node, here, false);
-    if (ts.isQualifiedName(node)) return this.qualified(node, here);
-    if (ts.isHeritageClause(node)) return this.heritage(node, here);
-    if (ts.isShorthandPropertyAssignment(node)) return this.shorthand(node, here);
-    if (ts.isBindingElement(node)) return this.bindingElement(node, here);
-    if (ts.isImportTypeNode(node)) return this.importType(node, here);
-    if (ts.isIdentifier(node)) {
-      if (isBareUse(node)) this.use(node, node, here, false);
-      return;
-    }
+    if (ts.isConstructorDeclaration(node)) this.parameterProperties(node, here);
+    if (this.visitModuleItem(node, here) || this.visitCall(node, here) || this.visitName(node, here)) return;
     ts.forEachChild(node, (child) => this.visit(child, here));
+  }
+
+  /** Imports, exports and the assignments that declare: true when the node is one and has been read. */
+  private visitModuleItem(node: ts.Node, here: Node): boolean {
+    if (ts.isImportDeclaration(node)) this.importEdge(node.moduleSpecifier, node);
+    else if (ts.isExportDeclaration(node)) this.exportDeclaration(node, here);
+    else if (ts.isImportEqualsDeclaration(node)) this.importEquals(node, here);
+    else if (ts.isBinaryExpression(node) && this.declaresByAssignment(node)) this.visit(node.right, here);
+    else return false;
+    return true;
+  }
+
+  /** What is called or constructed: true when the node is one and has been read. */
+  private visitCall(node: ts.Node, here: Node): boolean {
+    if (ts.isCallExpression(node)) this.call(node, here);
+    else if (ts.isNewExpression(node)) this.construct(node, here);
+    else if (ts.isTaggedTemplateExpression(node)) this.tagged(node, here);
+    else if (ts.isDecorator(node)) this.decorator(node, here);
+    else if (ts.isJsxOpeningLikeElement(node)) this.jsx(node, here);
+    else return false;
+    return true;
+  }
+
+  /** What names something: true when the node is one and has been read. */
+  private visitName(node: ts.Node, here: Node): boolean {
+    if (ts.isPropertyAccessExpression(node)) this.access(node, here, false);
+    else if (ts.isElementAccessExpression(node)) this.elementAccess(node, here, false);
+    else if (ts.isQualifiedName(node)) this.qualified(node, here);
+    else if (ts.isHeritageClause(node)) this.heritage(node, here);
+    else if (ts.isShorthandPropertyAssignment(node)) this.shorthand(node, here);
+    else if (ts.isBindingElement(node)) this.bindingElement(node, here);
+    else if (ts.isImportTypeNode(node)) this.importType(node, here);
+    else if (ts.isIdentifier(node)) {
+      if (isBareUse(node)) this.use({ name: node, from: here, call: false });
+    } else return false;
+    return true;
+  }
+
+  /** The fields a constructor sets through its parameter properties: it references each. */
+  private parameterProperties(node: ts.ConstructorDeclaration, from: Node): void {
+    for (const parameter of node.parameters) {
+      const field = this.decls.of(parameter);
+      if (field !== undefined) this.sink.edge("references", from, field.id, this.spanOf(parameter), "semantic");
+    }
   }
 
   /** Whether an assignment of a JavaScript file declares what it assigns to, so its left side is no use of the name. */
@@ -82,7 +120,10 @@ export class Uses {
     if (clause === undefined || !ts.isNamedExports(clause)) return;
     for (const specifier of clause.elements) {
       const target = this.model.checker.getExportSpecifierLocalTargetSymbol(specifier);
-      this.add("references", this.model.declsOfSymbol(target), specifier.propertyName ?? specifier.name, from);
+      this.add("references", this.model.declsOfSymbol(target), {
+        name: specifier.propertyName ?? specifier.name,
+        from,
+      });
     }
   }
 
@@ -142,7 +183,7 @@ export class Uses {
   }
 
   private callee(callee: ts.Expression, from: Node): void {
-    if (ts.isIdentifier(callee)) this.use(callee, callee, from, true);
+    if (ts.isIdentifier(callee)) this.use({ name: callee, from, call: true });
     else if (ts.isPropertyAccessExpression(callee)) this.access(callee, from, true);
     else if (ts.isElementAccessExpression(callee)) this.elementAccess(callee, from, true);
     else this.visit(callee, from);
@@ -166,8 +207,8 @@ export class Uses {
     const cls = found.find((decl) => decl.kind === "type");
     const constructor =
       cls === undefined ? undefined : this.model.declsOf(cls.nodes[0]!.getSourceFile())?.memberOf(cls, "constructor");
-    if (constructor !== undefined) this.add("calls", [constructor], name, from);
-    else this.use(name, name, from, true);
+    if (constructor !== undefined) this.add("calls", [constructor], { name, from });
+    else this.use({ name: name, from, call: true });
   }
 
   private tagged(node: ts.TaggedTemplateExpression, from: Node): void {
@@ -183,7 +224,7 @@ export class Uses {
 
   private jsx(node: ts.JsxOpeningLikeElement, from: Node): void {
     const tag = node.tagName;
-    if (ts.isIdentifier(tag)) this.use(tag, tag, from, false);
+    if (ts.isIdentifier(tag)) this.use({ name: tag, from, call: false });
     else if (ts.isPropertyAccessExpression(tag)) this.access(tag, from, false);
     this.visitAll(node.typeArguments, from);
     this.visit(node.attributes, from);
@@ -191,19 +232,19 @@ export class Uses {
 
   private access(node: ts.PropertyAccessExpression, from: Node, call: boolean): void {
     this.visit(node.expression, from);
-    this.use(node.name, node.name, from, call, node.expression);
+    this.use({ name: node.name, from, call: call, receiver: node.expression });
   }
 
   private elementAccess(node: ts.ElementAccessExpression, from: Node, call: boolean): void {
     this.visit(node.expression, from);
     const argument = node.argumentExpression;
-    if (ts.isStringLiteralLike(argument)) this.use(argument, argument, from, call, node.expression);
+    if (ts.isStringLiteralLike(argument)) this.use({ name: argument, from, call: call, receiver: node.expression });
     else this.visit(argument, from);
   }
 
   private qualified(node: ts.QualifiedName, from: Node): void {
     this.visit(node.left, from);
-    this.use(node.right, node.right, from, false);
+    this.use({ name: node.right, from, call: false });
   }
 
   private heritage(node: ts.HeritageClause, from: Node): void {
@@ -214,7 +255,7 @@ export class Uses {
         const decl = this.model.declsOfSymbol(symbol)[0];
         if (decl !== undefined) {
           this.sink.edge("implements", from, decl.id, this.spanOf(name), "semantic");
-        } else this.use(name, name, from, false);
+        } else this.use({ name: name, from, call: false });
       } else this.visit(type.expression, from);
       this.visitAll(type.typeArguments, from);
     }
@@ -222,7 +263,7 @@ export class Uses {
 
   private shorthand(node: ts.ShorthandPropertyAssignment, from: Node): void {
     const symbol = this.model.checker.getShorthandAssignmentValueSymbol(node);
-    this.add("references", this.model.declsOfSymbol(symbol), node.name, from);
+    this.add("references", this.model.declsOfSymbol(symbol), { name: node.name, from });
     if (node.objectAssignmentInitializer !== undefined) this.visit(node.objectAssignmentInitializer, from);
   }
 
@@ -235,7 +276,7 @@ export class Uses {
         key === undefined ? undefined : ts.isIdentifier(key) || ts.isStringLiteralLike(key) ? key.text : undefined;
       if (key !== undefined && text !== undefined) {
         const type = this.model.checker.getTypeAtLocation(pattern);
-        this.add("references", this.model.declsOfSymbol(type.getProperty(text)), key, from);
+        this.add("references", this.model.declsOfSymbol(type.getProperty(text)), { name: key, from });
       }
       if (node.propertyName !== undefined && !ts.isIdentifier(node.propertyName)) this.visit(node.propertyName, from);
     }
@@ -244,25 +285,19 @@ export class Uses {
   }
 
   /** A use of a name: a call when it is called and names a function, else a reference. */
-  private use(
-    name: ts.Identifier | ts.PrivateIdentifier | ts.StringLiteralLike,
-    site: ts.Node,
-    from: Node,
-    call: boolean,
-    receiver?: ts.Expression,
-  ): void {
+  private use(at: Reference): void {
+    const { name, from, call = false } = at;
     const symbol = this.model.checker.getSymbolAtLocation(name);
     const found = this.model.declsOfSymbol(symbol);
     if (found.length > 0) {
-      this.add(call ? "calls" : "references", found, site, from);
-    } else if (this.model.declaresName(name.text) && this.unknownTarget(symbol, receiver, call)) {
-      const kind = call ? "calls" : "references";
-      this.sink.edge(kind, from, name.text, this.spanOf(site), "syntactic");
+      this.add(call ? "calls" : "references", found, at);
+    } else if (this.model.declaresName(textOf(name)) && this.unknownTarget(symbol, at)) {
+      this.sink.edge(call ? "calls" : "references", from, textOf(name), this.spanOf(name), "syntactic");
     }
   }
 
   /** Whether a name resolves nowhere because of an unresolved import or a receiver of type `any`. */
-  private unknownTarget(symbol: ts.Symbol | undefined, receiver: ts.Expression | undefined, call: boolean): boolean {
+  private unknownTarget(symbol: ts.Symbol | undefined, { receiver, call = false }: Reference): boolean {
     if (symbol === undefined) {
       if (receiver === undefined) return this.fence;
       const type = this.model.checker.getTypeAtLocation(receiver);
@@ -273,16 +308,26 @@ export class Uses {
     return importedFromProject(symbol);
   }
 
-  private add(kind: "calls" | "references", found: readonly Decl[], site: ts.Node, from: Node): void {
+  private add(kind: "calls" | "references", found: readonly Decl[], at: Reference): void {
     const decl = found[0];
     if (decl === undefined) return;
     const callable = decl.kind === "function" || decl.kind === "method";
-    this.sink.edge(kind === "calls" && callable ? "calls" : "references", from, decl.id, this.spanOf(site), "semantic");
+    this.sink.edge(
+      kind === "calls" && callable ? "calls" : "references",
+      at.from,
+      decl.id,
+      this.spanOf(at.name),
+      "semantic",
+    );
   }
 
   private spanOf(node: ts.Node): Span {
     return this.lines.span(node.getStart(this.decls.file), node.end);
   }
+}
+
+function textOf(node: ts.Node): string {
+  return ts.isIdentifier(node) || ts.isPrivateIdentifier(node) || ts.isStringLiteralLike(node) ? node.text : "";
 }
 
 /** Whether an identifier names something, rather than declaring a name or labelling a statement. */

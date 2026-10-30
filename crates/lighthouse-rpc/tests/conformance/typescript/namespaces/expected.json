@@ -143,6 +143,24 @@
         },
         {
           "from": {
+            "symbol": "src/ns::Shapes::Circle::constructor#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 7
+            },
+            "start": {
+              "col": 17,
+              "line": 7
+            }
+          },
+          "to": "src/ns::Shapes::Circle::radius#field"
+        },
+        {
+          "from": {
             "symbol": "src/ns::Shapes::Circle::area#method"
           },
           "kind": "references",

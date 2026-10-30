@@ -44,45 +44,46 @@ export class Provider implements Handler {
    * Failures are reported as incomplete entries; a bad request never ends the process.
    */
   index(params: IndexParams): IndexResult {
-    const result: Required<IndexResult> = { fragments: [], sources: [], notices: [], incomplete: [] };
     const unknown = unknownOption(params.context?.options?.[LANGUAGE]);
-    if (unknown !== undefined) {
-      result.incomplete.push({ reason: unknown });
-      return result;
-    }
-    const root = fs.realpathSync(params.project.root);
-    const overlays = new Map<string, string>();
-    for (const overlay of params.context?.overlays ?? [])
-      overlays.set(slashed(path.join(root, overlay.path)), overlay.text);
-
+    if (unknown !== undefined) return { fragments: [], sources: [], notices: [], incomplete: [{ reason: unknown }] };
+    const run = new Indexing(params);
     const files: string[] = [];
     const hosts: EmbeddedFile[] = [];
     for (const input of params.inputs) {
       if (input.kind === "file") files.push(input.file.path);
       else hosts.push(input.regions);
     }
-    const requested = this.admit(root, files, overlays, result);
+    const requested = run.admit(files);
     const snippets = planSnippets(hosts);
+    const { root, overlays, result } = run;
     const regionFragments = analyze({ root, overlays, requested, snippets, result });
-    this.merge(result, hosts, snippets, regionFragments);
+    run.merge(hosts, snippets, regionFragments);
     result.fragments.sort((a, b) => (a.file.path < b.file.path ? -1 : a.file.path > b.file.path ? 1 : 0));
     return result;
   }
+}
+
+/** One index request in progress: where it reads from and the result it fills. */
+class Indexing {
+  readonly root: string;
+  readonly overlays = new Map<string, string>();
+  readonly result: Required<IndexResult> = { fragments: [], sources: [], notices: [], incomplete: [] };
+
+  constructor(params: IndexParams) {
+    this.root = fs.realpathSync(params.project.root);
+    for (const overlay of params.context?.overlays ?? [])
+      this.overlays.set(slashed(path.join(this.root, overlay.path)), overlay.text);
+  }
 
   /** The requested files that are analysed; the others get an empty fragment or are incomplete. */
-  private admit(
-    root: string,
-    files: readonly string[],
-    overlays: ReadonlyMap<string, string>,
-    result: Required<IndexResult>,
-  ): string[] {
+  admit(files: readonly string[]): string[] {
     const admitted: string[] = [];
     for (const rel of new Set(files)) {
-      const abs = slashed(path.join(root, rel));
+      const abs = slashed(path.join(this.root, rel));
       if (isIgnored(rel) || isDeclarationFile(rel)) {
-        result.fragments.push(emptyFragment(rel));
-      } else if (!overlays.has(abs) && !fs.existsSync(abs)) {
-        result.incomplete.push({ path: rel, reason: "cannot read the file" });
+        this.result.fragments.push(emptyFragment(rel));
+      } else if (!this.overlays.has(abs) && !fs.existsSync(abs)) {
+        this.result.incomplete.push({ path: rel, reason: "cannot read the file" });
       } else {
         admitted.push(rel);
       }
@@ -91,8 +92,7 @@ export class Provider implements Handler {
   }
 
   /** Adds the fragments of the fences to the fragment of their host file, one per host file. */
-  private merge(
-    result: Required<IndexResult>,
+  merge(
     hosts: readonly EmbeddedFile[],
     snippets: readonly Snippet[],
     regionFragments: ReadonlyMap<Snippet, Fragment>,
@@ -109,7 +109,7 @@ export class Provider implements Handler {
         merged.tests!.push(...(fragment.tests ?? []));
         merged.comments!.push(...(fragment.comments ?? []));
       }
-      result.fragments.push(merged);
+      this.result.fragments.push(merged);
     }
   }
 }

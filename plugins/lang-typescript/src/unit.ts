@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { manualAssertions } from "./assertions.ts";
 import { commentsOf, isGenerated } from "./comments.ts";
 import type { Decl } from "./decls.ts";
 import { docOf, extentOf } from "./extent.ts";
@@ -29,8 +30,18 @@ export interface Indexed {
   unresolved: number;
 }
 
+/** What the units of one program share: its declarations, how far they reach and the types they state. */
+export interface Services {
+  model: Model;
+  reach: Reach;
+  types: Types;
+}
+
 /** Builds the fragment of one source file of the project. */
 export class Unit implements EdgeSink {
+  private readonly model: Model;
+  private readonly reach: Reach;
+  private readonly types: Types;
   private readonly lines: Lines;
   private readonly rel: string;
   private readonly test: boolean;
@@ -40,14 +51,14 @@ export class Unit implements EdgeSink {
   private unresolved = 0;
 
   constructor(
-    private readonly model: Model,
-    private readonly reach: Reach,
-    private readonly types: Types,
-    private readonly file: ts.SourceFile,
+    services: Services,
+    readonly file: ts.SourceFile,
     rel: string,
-    private readonly fence: boolean,
   ) {
-    this.lines = new Lines(file.text);
+    this.model = services.model;
+    this.reach = services.reach;
+    this.types = services.types;
+    this.lines = this.model.declsOf(file)!.lines;
     this.rel = rel;
     this.test = isTestFile(rel);
   }
@@ -73,7 +84,7 @@ export class Unit implements EdgeSink {
       const container: Node = decl.owner === undefined ? { module: decls.module } : { symbol: decl.owner.id };
       this.edge("contains", container, decl.id, undefined, "semantic");
     }
-    new Uses(this.model, decls, this.lines, this, this.fence).run(this.file);
+    new Uses(this.model, decls, this).run(this.file);
     const functions: FunctionSummary[] = [];
     const tests: TestCase[] = [];
     for (const decl of decls.list) {
@@ -161,6 +172,8 @@ export class Unit implements EdgeSink {
     if (signature !== undefined) summary.signature = signature;
     if (this.implementation(decl)) summary.implementation = true;
     if (this.types.constructs(decl)) summary.constructs = true;
+    const manual = manualAssertions(body);
+    if (manual > 0) summary.manual_assertions = manual;
     return summary;
   }
 

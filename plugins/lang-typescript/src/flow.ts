@@ -143,6 +143,35 @@ export class FlowWalker {
   }
 }
 
+/** A node whose body is a function of its own: a closure raises the nesting of what it contains. */
+export function isFunctionLike(node: ts.Node): boolean {
+  return (
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isConstructorDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node)
+  );
+}
+
+/** The statements of a list, empty ones excluded. */
+export function statementCount(list: readonly ts.Statement[]): number {
+  return list.filter((statement) => !ts.isEmptyStatement(statement)).length;
+}
+
+/** The leaf tokens of a node, comments excluded. */
+export function countTokens(node: ts.Node, file: ts.SourceFile): number {
+  if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return 0;
+  if (node.kind === ts.SyntaxKind.EndOfFileToken || node.end === node.pos) return 0;
+  const children = node.getChildren(file);
+  if (children.length === 0) return 1;
+  let total = 0;
+  for (const child of children) total += countTokens(child, file);
+  return total;
+}
+
 function chain(node: ts.Expression, operators: ts.SyntaxKind[], leaves: ts.Expression[]): void {
   let current = node;
   while (ts.isParenthesizedExpression(current)) current = current.expression;
@@ -175,33 +204,4 @@ function isLoop(node: ts.Node): node is ts.IterationStatement {
 
 function isLabeledJump(node: ts.Node): boolean {
   return (ts.isBreakStatement(node) || ts.isContinueStatement(node)) && node.label !== undefined;
-}
-
-/** A node whose body is a function of its own: a closure raises the nesting of what it contains. */
-export function isFunctionLike(node: ts.Node): boolean {
-  return (
-    ts.isFunctionExpression(node) ||
-    ts.isArrowFunction(node) ||
-    ts.isFunctionDeclaration(node) ||
-    ts.isMethodDeclaration(node) ||
-    ts.isConstructorDeclaration(node) ||
-    ts.isGetAccessorDeclaration(node) ||
-    ts.isSetAccessorDeclaration(node)
-  );
-}
-
-/** The statements of a list, empty ones excluded. */
-export function statementCount(list: readonly ts.Statement[]): number {
-  return list.filter((statement) => !ts.isEmptyStatement(statement)).length;
-}
-
-/** The leaf tokens of a node, comments excluded. */
-export function countTokens(node: ts.Node, file: ts.SourceFile): number {
-  if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return 0;
-  if (node.kind === ts.SyntaxKind.EndOfFileToken || node.end === node.pos) return 0;
-  const children = node.getChildren(file);
-  if (children.length === 0) return 1;
-  let total = 0;
-  for (const child of children) total += countTokens(child, file);
-  return total;
 }

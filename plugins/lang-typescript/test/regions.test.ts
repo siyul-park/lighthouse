@@ -61,11 +61,6 @@ function index(root: string, host: EmbeddedFile): IndexResult {
   });
 }
 
-function fragmentOf(result: IndexResult): Fragment {
-  assert.equal(result.fragments.length, 1);
-  return result.fragments[0]!;
-}
-
 describe("fences of a host file", () => {
   it("use the package around the file as a consumer would", () => {
     const root = project();
@@ -179,3 +174,8 @@ describe("fences of a host file", () => {
     assert.deepEqual(symbol?.span.start, { line: 4, col: 16 });
   });
 });
+
+function fragmentOf(result: IndexResult): Fragment {
+  assert.equal(result.fragments.length, 1);
+  return result.fragments[0]!;
+}

@@ -21,17 +21,6 @@ export function extentOf(decl: Decl, file: ts.SourceFile, lines: Lines): Span | 
   return lines.span(from, to);
 }
 
-/** The nodes an extent runs over: all the overloads of a function, else the first declaration alone. */
-function extentNodes(decl: Decl): ts.Node[] | undefined {
-  const marked = decl.extents;
-  if (marked.length === 0 || marked[0] === undefined) return undefined;
-  const sameKind = decl.nodes.every((node) => node.kind === decl.nodes[0]!.kind);
-  if ((decl.kind === "function" || decl.kind === "method") && sameKind && marked.every((node) => node !== undefined)) {
-    return marked as ts.Node[];
-  }
-  return [marked[0]];
-}
-
 /** The documentation comment of a declaration: the last JSDoc block before it, without its markers. */
 export function docOf(decl: Decl, file: ts.SourceFile): string | undefined {
   const node = decl.extents[0] ?? decl.node;
@@ -47,4 +36,15 @@ export function docOf(decl: Decl, file: ts.SourceFile): string | undefined {
     .join("\n")
     .trim();
   return body === "" ? undefined : body;
+}
+
+/** The nodes an extent runs over: all the overloads of a function, else the first declaration alone. */
+function extentNodes(decl: Decl): ts.Node[] | undefined {
+  const marked = decl.extents;
+  if (marked.length === 0 || marked[0] === undefined) return undefined;
+  const sameKind = decl.nodes.every((node) => node.kind === decl.nodes[0]!.kind);
+  if ((decl.kind === "function" || decl.kind === "method") && sameKind && marked.every((node) => node !== undefined)) {
+    return marked as ts.Node[];
+  }
+  return [marked[0]];
 }

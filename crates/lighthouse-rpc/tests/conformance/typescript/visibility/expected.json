@@ -283,6 +283,42 @@
         },
         {
           "from": {
+            "symbol": "src/owner::Owner::constructor#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 43,
+              "line": 9
+            },
+            "start": {
+              "col": 15,
+              "line": 9
+            }
+          },
+          "to": "src/owner::Owner::dep#field"
+        },
+        {
+          "from": {
+            "symbol": "src/owner::Owner::constructor#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 64,
+              "line": 9
+            },
+            "start": {
+              "col": 45,
+              "line": 9
+            }
+          },
+          "to": "src/owner::Owner::name#field"
+        },
+        {
+          "from": {
             "symbol": "src/owner::Owner::help#method"
           },
           "kind": "references",

@@ -133,6 +133,38 @@
         },
         {
           "from": {
+            "module": "src/m"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Box#type"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Box::constructor#method"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Box::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Box#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "src/m::Box::get#method"
+        },
+        {
+          "from": {
             "symbol": "src/m::Options::mode#field"
           },
           "kind": "references",
@@ -202,6 +234,42 @@
             }
           },
           "to": "src/m::Mode::Read#variant"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Box::constructor#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 45,
+              "line": 26
+            },
+            "start": {
+              "col": 15,
+              "line": 26
+            }
+          },
+          "to": "src/m::Box::value#field"
+        },
+        {
+          "from": {
+            "symbol": "src/m::Box::get#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 29
+            },
+            "start": {
+              "col": 17,
+              "line": 29
+            }
+          },
+          "to": "src/m::Box::value#field"
         }
       ],
       "file": {
@@ -239,6 +307,43 @@
           "symbol": "src/m::Handler::callback#method",
           "tokens": 2,
           "top_level": 0
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "number"
+              }
+            ],
+            "results": []
+          },
+          "statements": 0,
+          "symbol": "src/m::Box::constructor#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "number"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "src/m::Box::get#method",
+          "tokens": 7,
+          "top_level": 1
         }
       ],
       "modules": [
@@ -708,6 +813,120 @@
             "start": {
               "col": 3,
               "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Box#type",
+          "kind": "type",
+          "name": "Box",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 49,
+              "line": 26
+            },
+            "start": {
+              "col": 3,
+              "line": 26
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Box::constructor#method",
+          "kind": "method",
+          "name": "constructor",
+          "owner": "src/m::Box#type",
+          "span": {
+            "end": {
+              "col": 49,
+              "line": 26
+            },
+            "start": {
+              "col": 3,
+              "line": 26
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 26
+            },
+            "start": {
+              "col": 15,
+              "line": 26
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Box::value#field",
+          "kind": "field",
+          "name": "value",
+          "owner": "src/m::Box#type",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 26
+            },
+            "start": {
+              "col": 15,
+              "line": 26
+            }
+          },
+          "type_ref": {
+            "text": "number"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 4,
+              "line": 30
+            },
+            "start": {
+              "col": 3,
+              "line": 28
+            }
+          },
+          "file": "src/m.ts",
+          "id": "src/m::Box::get#method",
+          "kind": "method",
+          "name": "get",
+          "owner": "src/m::Box#type",
+          "span": {
+            "end": {
+              "col": 4,
+              "line": 30
+            },
+            "start": {
+              "col": 3,
+              "line": 28
             }
           },
           "visibility": "public"
