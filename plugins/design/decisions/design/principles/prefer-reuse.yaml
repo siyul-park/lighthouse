@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Existing symbols and composition SHOULD be preferred over new layers,
@@ -48,3 +49,28 @@ spec:
 
         type Store struct{}
         func Open() *Store { return &Store{} }
+  - name: python-reimplements-stdlib
+    language: python
+    kind: invalid
+    files:
+    - path: text/words.py
+      body: |-
+        def count_words(text: str) -> int:
+            n = 0
+            in_word = False
+            for ch in text:
+                if ch.isspace():
+                    in_word = False
+                elif not in_word:
+                    in_word = True
+                    n += 1
+            return n
+  - name: python-reuses-stdlib
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: text/words.py
+      body: |-
+        def count_words(text: str) -> int:
+            return len(text.split())

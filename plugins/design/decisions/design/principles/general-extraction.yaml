@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: An extracted symbol SHOULD express a reusable responsibility in the
@@ -47,3 +48,27 @@ spec:
         func pathFor(kind, id string) string { return "/" + kind + "/" + id }
         func buildUserURL(id string) string { return pathFor("users", id) }
         func buildTeamURL(id string) string { return pathFor("teams", id) }
+  - name: python-specific-helper-in-place
+    language: python
+    kind: invalid
+    files:
+    - path: report/render.py
+      body: |-
+        def render(rows: list[tuple[str, int]]) -> str:
+            lines = []
+            for name, count in rows:
+                lines.append(name.strip().lower().replace(" ", "-") + f"={count}")
+            return "\n".join(lines)
+  - name: python-general-helper
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: report/render.py
+      body: |-
+        def slug(name: str) -> str:
+            return name.strip().lower().replace(" ", "-")
+
+
+        def render(rows: list[tuple[str, int]]) -> str:
+            return "\n".join(f"{slug(name)}={count}" for name, count in rows)

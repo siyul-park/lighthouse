@@ -15,6 +15,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A function SHOULD live with the type or module whose behavior it principally
@@ -498,6 +499,58 @@ spec:
           n += store.items.length;
           return n;
         }
+  - name: python-envies-three-fields-of-one-type
+    language: python
+    kind: invalid
+    options:
+      kinds:
+      - type
+    files:
+    - path: stats/summary.py
+      body: |-
+        class Store:
+            def __init__(self) -> None:
+                self.items: list[int] = []
+                self.total = 0
+                self.extra = 0
+
+            def reset(self) -> None:
+                self.items = []
+
+
+        def summary(store: Store) -> int:
+            n = len(store.items)
+            n += store.total
+            n += store.extra
+            return n
+    expect:
+    - line: 11
+  - name: python-uses-members-of-two-types
+    language: python
+    kind: valid
+    options:
+      kinds:
+      - type
+    files:
+    - path: stats/summary.py
+      body: |-
+        class Store:
+            def __init__(self) -> None:
+                self.items: list[int] = []
+                self.total = 0
+                self.extra = 0
+
+
+        class Cache:
+            def __init__(self) -> None:
+                self.hits = 0
+
+
+        def summary(store: Store, cache: Cache) -> int:
+            n = len(store.items)
+            n += store.total + store.extra
+            n += cache.hits
+            return n
   fix:
     safety: unsafe
     type: model

@@ -13,6 +13,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Required constructor values SHOULD be explicit arguments; optional configuration
@@ -46,3 +47,30 @@ spec:
 
         type ClientOptions struct { Timeout time.Duration; Retries int; Insecure bool }
         func NewClient(url string, opts ClientOptions) *Client { return nil }
+  - name: python-positional-flags
+    language: python
+    kind: invalid
+    files:
+    - path: client/http.py
+      body: |-
+        def connect(host: str, port: int, tls: bool, retries: int, timeout: float, proxy: str | None) -> None:
+            ...
+  - name: python-options-object
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: client/http.py
+      body: |-
+        from dataclasses import dataclass
+
+
+        @dataclass(frozen=True)
+        class Options:
+            tls: bool = True
+            retries: int = 3
+            timeout: float = 10.0
+
+
+        def connect(host: str, port: int, options: Options = Options()) -> None:
+            ...

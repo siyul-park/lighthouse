@@ -17,6 +17,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: >-
@@ -90,3 +91,27 @@ spec:
             validate(order)?;
             queue::send(&encode(order))
         }
+  - name: python-mixed-levels
+    language: python
+    kind: invalid
+    files:
+    - path: orders/place.py
+      body: |-
+        def place(order: dict) -> None:
+            total = sum(i["price"] * i["qty"] for i in order["items"])
+            conn = open_socket("db:5432")
+            conn.send(f"INSERT {total}".encode())
+  - name: python-one-level
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: orders/place.py
+      body: |-
+        def place(order: dict) -> None:
+            total = order_total(order)
+            save_order(total)
+
+
+        def order_total(order: dict) -> int:
+            return sum(i["price"] * i["qty"] for i in order["items"])

@@ -13,6 +13,7 @@ spec:
     tests: include
   languages:
     go: {}
+    python: {}
     rust: {}
     toml: {}
     typescript: {}
@@ -224,3 +225,26 @@ spec:
         module.exports = { load };
     expect:
     - line: 1
+  - name: python-todo-invalid
+    language: python
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: example.py
+      body: |-
+        # TODO: handle the empty case
+        def load() -> str:
+            return "x"
+    expect:
+    - line: 1
+  - name: python-prose-valid
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: example.py
+      body: |-
+        # The cache is warm after the first call.
+        def load() -> str:
+            return "x"

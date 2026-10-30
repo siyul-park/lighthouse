@@ -134,6 +134,17 @@ spec:
       subject: func.id
   languages:
     go: {}
+    python:
+      options:
+        limits:
+          # pylint too-many-arguments default 5; results are not limited for Python.
+          params:
+            default: 5
+            constructor: 5
+            implementation: -1
+            entrypoint: -1
+            test: -1
+          results: -1
     rust:
       options:
         limits:
@@ -799,6 +810,25 @@ spec:
     options:
       kinds:
       - params
+  - name: python-too-many-parameters
+    language: python
+    kind: invalid
+    files:
+    - path: net/connect.py
+      body: |-
+        def connect(host: str, port: int, tls: bool, retries: int, timeout: float, proxy: str) -> None:
+            ...
+    expect:
+    - line: 1
+  - name: python-within-the-limit
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: net/connect.py
+      body: |-
+        def connect(host: str, port: int, tls: bool, retries: int, timeout: float) -> None:
+            ...
   fix:
     safety: unsafe
     type: model

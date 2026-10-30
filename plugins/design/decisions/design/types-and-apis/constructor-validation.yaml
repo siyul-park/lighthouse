@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A constructor SHOULD reject invalid required inputs and establish the
@@ -45,3 +46,28 @@ spec:
 
         type Store struct { path string }
         func NewStore(path string) (*Store, error) { if path == "" { return nil, errors.New("empty path") }; return &Store{path: path}, nil }
+  - name: python-constructor-stores-unchecked
+    language: python
+    kind: invalid
+    files:
+    - path: accounts/money.py
+      body: |-
+        class Money:
+            def __init__(self, cents: int, currency: str):
+                self.cents = cents
+                self.currency = currency
+  - name: python-constructor-validates
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: accounts/money.py
+      body: |-
+        class Money:
+            def __init__(self, cents: int, currency: str):
+                if cents < 0:
+                    raise ValueError("cents must not be negative")
+                if len(currency) != 3:
+                    raise ValueError("currency must be an ISO 4217 code")
+                self.cents = cents
+                self.currency = currency

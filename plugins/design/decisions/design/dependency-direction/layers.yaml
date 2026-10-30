@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A module MUST NOT depend on a module in a higher layer, and modules
@@ -448,3 +449,44 @@ spec:
         };
     expect:
     - line: 1
+  - name: python-import-points-up
+    language: python
+    kind: invalid
+    options:
+      layers:
+      - - infra/**
+      - - domain/**
+    files:
+    - path: domain/domain.py
+      body: |-
+        from infra.infra import read
+
+
+        def load() -> str:
+            return read()
+    - path: infra/infra.py
+      body: |-
+        def read() -> str:
+            return ""
+    expect:
+    - line: 1
+  - name: python-import-points-down
+    language: python
+    kind: valid
+    canonical: true
+    options:
+      layers:
+      - - domain/**
+      - - infra/**
+    files:
+    - path: domain/domain.py
+      body: |-
+        from infra.infra import read
+
+
+        def load() -> str:
+            return read()
+    - path: infra/infra.py
+      body: |-
+        def read() -> str:
+            return ""

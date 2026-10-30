@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Lower-level or reusable symbols SHOULD express their responsibility
@@ -67,3 +68,22 @@ spec:
 
         func Read() string { return "" }
     canonical: true
+  - name: python-caller-policy-in-utility
+    language: python
+    kind: invalid
+    files:
+    - path: infra/cache.py
+      body: |-
+        def load(key: str, role: str) -> str:
+            if role == "admin":
+                return key.upper()
+            return key
+  - name: python-general-utility
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: infra/cache.py
+      body: |-
+        def load(key: str, ttl: int) -> str:
+            return key[:ttl]

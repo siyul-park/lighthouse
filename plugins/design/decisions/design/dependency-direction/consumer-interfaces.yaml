@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: An interface SHOULD be defined at the point that consumes behavior,
@@ -66,3 +67,40 @@ spec:
 
         func Read() string { return "" }
     canonical: true
+  - name: python-interface-without-consumer
+    language: python
+    kind: invalid
+    files:
+    - path: infra/store.py
+      body: |-
+        from typing import Protocol
+
+
+        class Store(Protocol):
+            def read(self) -> str: ...
+
+
+        class FileStore:
+            def read(self) -> str:
+                return ""
+  - name: python-interface-with-consumer
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: domain/service.py
+      body: |-
+        from typing import Protocol
+
+
+        class Store(Protocol):
+            def read(self) -> str: ...
+
+
+        def load(store: Store) -> str:
+            return store.read()
+    - path: infra/store.py
+      body: |-
+        class FileStore:
+            def read(self) -> str:
+                return ""

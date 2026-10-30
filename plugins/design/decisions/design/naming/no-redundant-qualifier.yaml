@@ -64,6 +64,9 @@ spec:
     additionalProperties: false
   languages:
     go: {}
+    python:
+      options:
+        symbols: []
     rust:
       options:
         symbols: []
@@ -353,6 +356,34 @@ spec:
           Remote,
           Hybrid,
         }
+  - name: python-member-repeats-its-owner
+    language: python
+    kind: invalid
+    files:
+    - path: stock/color.py
+      body: |-
+        from enum import Enum
+
+
+        class Color(Enum):
+            COLOR_RED = 1
+            COLOR_BLUE = 2
+    expect:
+    - line: 5
+    - line: 6
+  - name: python-member-without-the-owner-name
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: stock/color.py
+      body: |-
+        from enum import Enum
+
+
+        class Color(Enum):
+            RED = 1
+            BLUE = 2
   fix:
     safety: unsafe
     type: model

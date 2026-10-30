@@ -13,6 +13,9 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python:
+      options:
+        enabled: true
     rust: {}
     cel: {}
     typescript:
@@ -197,3 +200,28 @@ spec:
         }
 
         export class Item {}
+  - name: python-interface-prefix
+    language: python
+    kind: invalid
+    files:
+    - path: store/store.py
+      body: |-
+        from typing import Protocol
+
+
+        class IStore(Protocol):
+            def read(self) -> str: ...
+    expect:
+    - line: 4
+  - name: python-interface-name
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: store/store.py
+      body: |-
+        from typing import Protocol
+
+
+        class Store(Protocol):
+            def read(self) -> str: ...

@@ -92,6 +92,7 @@ spec:
     additionalProperties: false
   languages:
     go: {}
+    python: {}
     rust:
       options:
         initialisms: []
@@ -218,3 +219,30 @@ spec:
         export function userId(): string {
           return "";
         }
+  - name: python-function-camel-initialism
+    language: python
+    kind: invalid
+    files:
+    - path: web/fetch.py
+      body: |-
+        def fetchUrl(address: str) -> str:
+            return address
+    expect:
+    - line: 1
+  - name: python-function-snake-case
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: web/fetch.py
+      body: |-
+        def fetch_url(address: str) -> str:
+            return address
+  - name: python-class-acronym-capitalized
+    language: python
+    kind: valid
+    files:
+    - path: web/client.py
+      body: |-
+        class HTTPClient:
+            pass

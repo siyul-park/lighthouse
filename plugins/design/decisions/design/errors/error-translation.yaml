@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A layer SHOULD add its own operation context when propagating an error
@@ -41,3 +42,49 @@ spec:
       body: |
         package sample
         func Load() error { if err := storage.Get(); err != nil { return fmt.Errorf("load account: %w", err) }; return nil }
+  - name: python-every-layer-rewraps
+    language: python
+    kind: invalid
+    files:
+    - path: infra/file.py
+      body: |-
+        def read(path: str) -> str:
+            try:
+                with open(path) as f:
+                    return f.read()
+            except OSError as e:
+                raise RuntimeError(str(e)) from e
+    - path: domain/config.py
+      body: |-
+        from infra.file import read
+
+
+        def load(path: str) -> str:
+            try:
+                return read(path)
+            except RuntimeError as e:
+                raise RuntimeError(str(e)) from e
+  - name: python-boundary-adds-operation
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: infra/file.py
+      body: |-
+        def read(path: str) -> str:
+            with open(path) as f:
+                return f.read()
+    - path: domain/config.py
+      body: |-
+        from infra.file import read
+
+
+        class LoadError(Exception):
+            """The configuration could not be loaded."""
+
+
+        def load(path: str) -> str:
+            try:
+                return read(path)
+            except OSError as e:
+                raise LoadError(f"load config {path}") from e

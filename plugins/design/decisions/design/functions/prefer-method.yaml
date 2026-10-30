@@ -15,6 +15,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Methods SHOULD express receiver-owned behavior; a private free function
@@ -239,3 +240,45 @@ spec:
           }
           return total;
         }
+  - name: python-only-one-owner-calls
+    language: python
+    kind: invalid
+    files:
+    - path: stock/store.py
+      body: |-
+        class Store:
+            def __init__(self) -> None:
+                self.items: list[int] = []
+
+            def total(self) -> int:
+                return _sum_store(self)
+
+            def count(self) -> int:
+                return len(self.items) + _sum_store(self) - _sum_store(self)
+
+
+        def _sum_store(store: Store) -> int:
+            return sum(store.items)
+    expect:
+    - line: 12
+  - name: python-shared-by-exported-function
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: stock/store.py
+      body: |-
+        class Store:
+            def __init__(self) -> None:
+                self.items: list[int] = []
+
+            def total(self) -> int:
+                return _sum_store(self)
+
+
+        def total_of(store: Store) -> int:
+            return _sum_store(store)
+
+
+        def _sum_store(store: Store) -> int:
+            return sum(store.items)

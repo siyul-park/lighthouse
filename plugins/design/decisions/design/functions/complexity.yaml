@@ -122,6 +122,11 @@ spec:
       subject: func.id
   languages:
     go: {}
+    python:
+      options:
+        limits:
+          # ruff C901 default max-complexity 10.
+          cyclomatic: 10
     rust:
       options:
         limits:
@@ -796,3 +801,49 @@ spec:
         }
     expect:
     - line: 1
+  - name: python-too-many-branches
+    language: python
+    kind: invalid
+    files:
+    - path: codes/classify.py
+      body: |-
+        def classify(code: int) -> int:
+            total = 0
+            if code == 1:
+                total += 1
+            if code == 2:
+                total += 2
+            if code == 3:
+                total += 3
+            if code == 4:
+                total += 4
+            if code == 5:
+                total += 5
+            if code == 6:
+                total += 6
+            if code == 7:
+                total += 7
+            if code == 8:
+                total += 8
+            if code == 9:
+                total += 9
+            if code == 10:
+                total += 10
+            if code == 11:
+                total += 11
+            return total
+    expect:
+    - line: 1
+  - name: python-within-limit
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: codes/classify.py
+      body: |-
+        def classify(code: int) -> int:
+            if code == 1:
+                return 10
+            if code == 2:
+                return 20
+            return 0

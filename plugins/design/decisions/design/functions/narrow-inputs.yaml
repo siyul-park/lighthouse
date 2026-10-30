@@ -15,6 +15,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Public inputs SHOULD use the narrowest reusable abstraction that fully
@@ -50,3 +51,20 @@ spec:
 
         type UserReader interface { Find(string) User }
         func FindUser(users UserReader, id string) User { return users.Find(id) }
+  - name: python-whole-object-input
+    language: python
+    kind: invalid
+    files:
+    - path: billing/tax.py
+      body: |-
+        def tax_due(order: "Order") -> int:
+            return order.total * order.rate // 100
+  - name: python-narrow-input
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: billing/tax.py
+      body: |-
+        def tax_due(total: int, rate: int) -> int:
+            return total * rate // 100

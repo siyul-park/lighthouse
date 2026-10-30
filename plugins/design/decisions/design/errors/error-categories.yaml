@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Failures that callers must distinguish SHOULD use named error values
@@ -46,3 +47,28 @@ spec:
         var ErrBadInput = errors.New("bad input")
         var ErrNotFound = errors.New("not found")
         var ErrPermissionDenied = errors.New("permission denied")
+  - name: python-ad-hoc-error-strings
+    language: python
+    kind: invalid
+    files:
+    - path: users/store.py
+      body: |-
+        def find(user_id: str) -> str:
+            raise ValueError("user not found")
+
+
+        def get(user_id: str) -> str:
+            raise ValueError("user not found")
+  - name: python-named-error
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: users/store.py
+      body: |-
+        class UserNotFoundError(LookupError):
+            """No user has the given ID."""
+
+
+        def find(user_id: str) -> str:
+            raise UserNotFoundError(user_id)

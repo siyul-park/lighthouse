@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A type SHOULD NOT mix behavior-bearing object responsibilities with
@@ -49,3 +50,35 @@ spec:
         type User struct { ID string; Name string }
         type UserStore struct { db *sql.DB }
         func (s UserStore) Save(u User) error { return nil }
+  - name: python-data-and-service
+    language: python
+    kind: invalid
+    files:
+    - path: users/user.py
+      body: |-
+        class User:
+            def __init__(self, name: str):
+                self.name = name
+
+            def save(self) -> None:
+                open("users.db", "a").write(self.name)
+  - name: python-data-separate-from-service
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: users/user.py
+      body: |-
+        from dataclasses import dataclass
+
+
+        @dataclass(frozen=True)
+        class User:
+            name: str
+    - path: users/repo.py
+      body: |-
+        from users.user import User
+
+
+        def save(user: User) -> None:
+            open("users.db", "a").write(user.name)

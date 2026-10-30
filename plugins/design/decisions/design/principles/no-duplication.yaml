@@ -13,6 +13,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     cel: {}
     typescript: {}
@@ -93,3 +94,47 @@ spec:
               expression: size(symbol.name)
             where: name_length > 0 && name_length > 1
             message: Example
+  - name: python-duplicated-validation
+    language: python
+    kind: invalid
+    files:
+    - path: api/users.py
+      body: |-
+        def create_user(name: str) -> None:
+            if not name or len(name) > 64:
+                raise ValueError("bad name")
+            save(name)
+
+
+        def rename_user(name: str) -> None:
+            if not name or len(name) > 64:
+                raise ValueError("bad name")
+            save(name)
+
+
+        def save(name: str) -> None:
+            ...
+  - name: python-shared-validation
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: api/users.py
+      body: |-
+        def check_name(name: str) -> None:
+            if not name or len(name) > 64:
+                raise ValueError("bad name")
+
+
+        def create_user(name: str) -> None:
+            check_name(name)
+            save(name)
+
+
+        def rename_user(name: str) -> None:
+            check_name(name)
+            save(name)
+
+
+        def save(name: str) -> None:
+            ...

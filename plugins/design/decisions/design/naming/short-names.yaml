@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: One-letter names SHOULD be limited to conventional receivers, indices,
@@ -90,3 +91,22 @@ spec:
         export function load(): string {
           return "x";
         }
+  - name: python-one-letter-name
+    language: python
+    kind: invalid
+    files:
+    - path: sample.py
+      body: |-
+        def x() -> str:
+            return "x"
+    expect:
+    - line: 1
+  - name: python-descriptive-name
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.py
+      body: |-
+        def load() -> str:
+            return "x"

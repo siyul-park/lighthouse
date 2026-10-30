@@ -24,6 +24,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: >-
@@ -165,6 +166,46 @@ spec:
         export function analyze(): number {
           return 1;
         }
+  - name: python-mixed-level-module
+    language: python
+    kind: invalid
+    options:
+      limits:
+        directDeclarations: 3
+    files:
+    - path: src/engine/__init__.py
+      body: |-
+        from src.engine.language import analyze
+
+        VERSION = "1"
+        DEFAULTS: list[str] = []
+
+
+        class Engine:
+            pass
+
+
+        class Config:
+            pass
+
+
+        def run() -> int:
+            return analyze()
+    - path: src/engine/language.py
+      body: |-
+        def analyze() -> int:
+            return 1
+    expect:
+    - line: 1
+  - name: python-facade-module
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: src/engine/language.py
+      body: |-
+        def analyze() -> int:
+            return 1
   provenance:
     wasDerivedFrom:
       - Ousterhout, A Philosophy of Software Design, chs. 4 and 9

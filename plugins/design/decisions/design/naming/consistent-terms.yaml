@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: One term SHOULD represent one concept across packages, and one concept
@@ -126,3 +127,28 @@ spec:
     - path: second/second.ts
       body: |-
         export class Ledger {}
+  - name: python-homonym-classes
+    language: python
+    kind: invalid
+    files:
+    - path: first/first.py
+      body: |-
+        class Account:
+            pass
+    - path: second/second.py
+      body: |-
+        class Account:
+            pass
+  - name: python-distinct-names
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: first/first.py
+      body: |-
+        class Account:
+            pass
+    - path: second/second.py
+      body: |-
+        class Ledger:
+            pass

@@ -13,6 +13,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A symbol SHOULD NOT expose generic options, extension points, aliases,
@@ -49,3 +50,35 @@ spec:
 
         type Store struct{}
         func (Store) Open() error { return nil }
+  - name: python-unused-hook
+    language: python
+    kind: invalid
+    files:
+    - path: util/format.py
+      body: |-
+        from abc import ABC, abstractmethod
+
+
+        class Formatter(ABC):
+            @abstractmethod
+            def format(self, text: str) -> str: ...
+
+            @abstractmethod
+            def format_all(self, texts: list[str]) -> list[str]: ...
+
+
+        class Upper(Formatter):
+            def format(self, text: str) -> str:
+                return text.upper()
+
+            def format_all(self, texts: list[str]) -> list[str]:
+                return [self.format(t) for t in texts]
+  - name: python-needed-abstraction
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: util/format.py
+      body: |-
+        def upper(text: str) -> str:
+            return text.upper()

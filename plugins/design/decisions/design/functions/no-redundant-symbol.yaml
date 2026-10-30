@@ -16,6 +16,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     cel: {}
     typescript: {}
@@ -704,3 +705,47 @@ spec:
         }
     expect:
     - line: 4
+  - name: python-wrapper-of-wrapper
+    language: python
+    kind: invalid
+    files:
+    - path: cache/store.py
+      body: |-
+        def _read(key: str) -> int | None:
+            return _data.get(key)
+
+
+        def _load(key: str) -> int | None:
+            return _read(key)
+
+
+        def get(key: str) -> int | None:
+            return _load(key)
+
+
+        _data: dict[str, int] = {}
+    expect:
+    - line: 5
+  - name: python-wrapper-adds-a-check
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: cache/store.py
+      body: |-
+        _data: dict[str, int] = {}
+        _closed = False
+
+
+        def _read(key: str) -> int | None:
+            return _data.get(key)
+
+
+        def _load(key: str) -> int | None:
+            if _closed:
+                raise RuntimeError("closed")
+            return _read(key)
+
+
+        def get(key: str) -> int | None:
+            return _load(key)

@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Platform-specific behavior SHOULD be isolated behind a narrow interface
@@ -42,3 +43,32 @@ spec:
         package sample
         type Platform interface { Load(); Save() }
         func NewPlatform() Platform { if runtime.GOOS == "windows" { return windowsPlatform{} }; return unixPlatform{} }
+  - name: python-platform-leaks-through-public-field
+    language: python
+    kind: invalid
+    files:
+    - path: storage/disk.py
+      body: |-
+        import sqlite3
+
+
+        class Store:
+            def __init__(self, path: str):
+                self.connection = sqlite3.connect(path)
+  - name: python-platform-hidden
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: storage/disk.py
+      body: |-
+        import sqlite3
+
+
+        class Store:
+            def __init__(self, path: str):
+                self._connection = sqlite3.connect(path)
+
+            def get(self, key: str) -> str | None:
+                row = self._connection.execute("SELECT v FROM kv WHERE k = ?", (key,)).fetchone()
+                return row[0] if row else None

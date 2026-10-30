@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Each mutable state value SHOULD have one owner and one explicit synchronization
@@ -48,3 +49,30 @@ spec:
 
         type Cache struct { mu sync.Mutex; entries map[string]string }
         func (c *Cache) Set(k, v string) { c.mu.Lock(); c.entries[k] = v; c.mu.Unlock() }
+  - name: python-state-scattered-in-functions
+    language: python
+    kind: invalid
+    files:
+    - path: counter/counter.py
+      body: |-
+        _count = 0
+
+
+        def increment() -> int:
+            global _count
+            _count += 1
+            return _count
+  - name: python-state-owned-by-instance
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: counter/counter.py
+      body: |-
+        class Counter:
+            def __init__(self) -> None:
+                self._count = 0
+
+            def increment(self) -> int:
+                self._count += 1
+                return self._count

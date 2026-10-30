@@ -15,6 +15,16 @@ spec:
     tests: include
   languages:
     go: {}
+    python:
+      options:
+        # Python statements: a keyword opens a line of code only with the shape code gives it;
+        # prose ending in a colon is not a block opener. Assignments and calls with literals are code.
+        codePatterns:
+        - '^(def|class|async def)\s+\w+.*:$'
+        - '^(if|elif|else|for|while|with|try|except|finally)\b.*:$'
+        - '^(import|from)\s+[\w.]+(\s+import\s+\S.*)?$'
+        - '^[A-Za-z_][\w.]*(\[[^\]]*\])?\s*(=|\+=|-=|\*=)\s*\S.*$'
+        - '^[A-Za-z_][\w.]*\(.*["0-9].*\)$'
     rust: {}
     typescript:
       options:
@@ -611,3 +621,36 @@ spec:
         module.exports = { helper };
     expect:
     - line: 1
+  - name: python-banner-invalid
+    language: python
+    kind: invalid
+    files:
+    - path: example.py
+      body: |-
+        # ---------- Helpers ----------
+        def load() -> str:
+            return "x"
+    expect:
+    - line: 1
+  - name: python-commented-code-invalid
+    language: python
+    kind: invalid
+    files:
+    - path: example.py
+      body: |-
+        # value = compute(1)
+
+        def load() -> str:
+            return "x"
+    expect:
+    - line: 1
+  - name: python-prose-valid
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: example.py
+      body: |-
+        # Retry once: the first call warms the cache.
+        def load() -> str:
+            return "x"

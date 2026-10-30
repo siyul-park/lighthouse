@@ -38,6 +38,7 @@ spec:
     additionalProperties: false
   languages:
     go: {}
+    python: {}
     rust:
       options:
         symbols: []
@@ -308,3 +309,30 @@ spec:
         module.exports = { run };
     expect:
     - line: 9
+  - name: python-unused-private-function
+    language: python
+    kind: invalid
+    files:
+    - path: text/trim.py
+      body: |-
+        def _collapse(text: str) -> str:
+            return " ".join(text.split())
+
+
+        def trim(text: str) -> str:
+            return text.strip()
+    expect:
+    - line: 1
+  - name: python-used-private-function
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: text/trim.py
+      body: |-
+        def _collapse(text: str) -> str:
+            return " ".join(text.split())
+
+
+        def trim(text: str) -> str:
+            return _collapse(text.strip())

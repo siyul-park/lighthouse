@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Names for collections and stores SHOULD be plural; names for a single
@@ -58,3 +59,20 @@ spec:
     - path: src/lib.rs
       body: |-
         pub struct Store { pub items: Vec<String> }
+  - name: python-singular-collection
+    language: python
+    kind: invalid
+    files:
+    - path: cart/items.py
+      body: |-
+        def total(item: list[int]) -> int:
+            return sum(item)
+  - name: python-plural-collection
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: cart/items.py
+      body: |-
+        def total(items: list[int]) -> int:
+            return sum(items)

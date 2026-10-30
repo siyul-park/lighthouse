@@ -14,6 +14,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     cel: {}
     typescript: {}
@@ -175,3 +176,31 @@ spec:
         export function buildUser(id: string): User {
           return new User(id);
         }
+  - name: python-build-returns-bool
+    language: python
+    kind: invalid
+    files:
+    - path: users/users.py
+      body: |-
+        def build_user(user_id: str) -> bool:
+            return user_id != ""
+    expect:
+    - line: 1
+  - name: python-has-returns-bool
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: users/users.py
+      body: |-
+        class User:
+            def __init__(self, user_id: str) -> None:
+                self.user_id = user_id
+
+
+        def has_user(user_id: str) -> bool:
+            return user_id != ""
+
+
+        def build_user(user_id: str) -> User:
+            return User(user_id)

@@ -13,6 +13,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     cel: {}
     typescript: {}
@@ -192,3 +193,37 @@ spec:
     - path: example.ts
       body: |-
         export function parseHttpRequestBodyBytes(): void {}
+  - name: python-long-name
+    language: python
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: http/parse.py
+      body: |-
+        def parse_http_request_body_bytes() -> None:
+            ...
+    expect:
+    - line: 1
+  - name: python-short-name
+    language: python
+    kind: valid
+    options:
+      enabled: true
+    canonical: true
+    files:
+    - path: http/parse.py
+      body: |-
+        def parse_http_request() -> None:
+            ...
+  - name: python-higher-limit
+    language: python
+    kind: valid
+    options:
+      maxWords: 5
+      enabled: true
+    files:
+    - path: http/parse.py
+      body: |-
+        def parse_http_request_body_bytes() -> None:
+            ...

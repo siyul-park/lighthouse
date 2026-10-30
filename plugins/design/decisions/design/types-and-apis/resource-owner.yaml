@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A resource SHOULD have one explicit owner responsible for releasing
@@ -43,3 +44,28 @@ spec:
         package sample
 
         func Read(path string) ([]byte, error) { f, err := os.Open(path); if err != nil { return nil, err }; defer f.Close(); return io.ReadAll(f) }
+  - name: python-file-opened-and-leaked
+    language: python
+    kind: invalid
+    files:
+    - path: logs/writer.py
+      body: |-
+        def write_line(path: str, line: str) -> None:
+            f = open(path, "a")
+            f.write(line + "\n")
+  - name: python-resource-closed-by-owner
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: logs/writer.py
+      body: |-
+        class LogWriter:
+            def __init__(self, path: str):
+                self._file = open(path, "a")
+
+            def write_line(self, line: str) -> None:
+                self._file.write(line + "\n")
+
+            def close(self) -> None:
+                self._file.close()

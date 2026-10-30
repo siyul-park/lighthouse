@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: An error SHOULD expose the failed operation and cause, not secrets,
@@ -42,3 +43,26 @@ spec:
         package sample
         type StoreError struct { Op string; Err error }
         func (e StoreError) Error() string { return e.Op + ": " + e.Err.Error() }
+  - name: python-error-carries-secret
+    language: python
+    kind: invalid
+    files:
+    - path: auth/login.py
+      body: |-
+        class LoginError(Exception):
+            def __init__(self, password: str, user: str):
+                super().__init__(f"login failed for {user} with {password}")
+                self.password = password
+  - name: python-error-names-operation
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: auth/login.py
+      body: |-
+        class LoginError(Exception):
+            """A login failed; the message names the operation, not the secret."""
+
+
+        def login(user: str, password: str) -> None:
+            raise LoginError(f"login failed for {user}")

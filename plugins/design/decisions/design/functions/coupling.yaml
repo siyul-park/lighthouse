@@ -13,6 +13,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A function SHOULD NOT be a high fan-in/fan-out dependency hub or an
@@ -273,3 +274,96 @@ spec:
         export function b(): void {
           hub();
         }
+  - name: python-hub-function
+    language: python
+    kind: invalid
+    options:
+      hub:
+        fanIn: 2
+        fanOut: 2
+        statements: 1
+        coordinatorFanOut: 12
+        coordinatorMaxFanIn: 1
+        coordinatorStatements: 15
+    files:
+    - path: hub/hub.py
+      body: |-
+        def hub() -> None:
+            left()
+            right()
+
+
+        def left() -> None:
+            pass
+
+
+        def right() -> None:
+            pass
+
+
+        def a() -> None:
+            hub()
+
+
+        def b() -> None:
+            hub()
+    expect:
+    - line: 1
+  - name: python-coordinator-function
+    language: python
+    kind: invalid
+    options:
+      hub:
+        fanIn: 8
+        fanOut: 6
+        statements: 20
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
+    files:
+    - path: hub/run.py
+      body: |-
+        def run() -> None:
+            one()
+            two()
+            three()
+
+
+        def one() -> None:
+            pass
+
+
+        def two() -> None:
+            pass
+
+
+        def three() -> None:
+            pass
+    expect:
+    - line: 1
+  - name: python-ordinary-fan
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: hub/hub.py
+      body: |-
+        def hub() -> None:
+            left()
+            right()
+
+
+        def left() -> None:
+            pass
+
+
+        def right() -> None:
+            pass
+
+
+        def a() -> None:
+            hub()
+
+
+        def b() -> None:
+            hub()

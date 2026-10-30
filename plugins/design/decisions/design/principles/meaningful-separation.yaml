@@ -12,6 +12,7 @@ spec:
     subject: module
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: A module SHOULD be separate from its users only when it provides an
@@ -123,6 +124,30 @@ spec:
         export function run(): number {
           return 1;
         }
+  - name: python-single-user-module
+    language: python
+    kind: invalid
+    files:
+    - path: src/main.py
+      body: |-
+        from src.part import work
+
+
+        def run() -> int:
+            return work()
+    - path: src/part.py
+      body: |-
+        def work() -> int:
+            return 1
+  - name: python-single-module
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: src/main.py
+      body: |-
+        def run() -> int:
+            return 1
   options:
     properties: {}
     additionalProperties: false

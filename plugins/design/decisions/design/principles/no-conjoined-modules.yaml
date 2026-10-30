@@ -13,6 +13,7 @@ spec:
     subject: module
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Modules SHOULD NOT be split when the parent and child share private implementation
@@ -125,3 +126,19 @@ spec:
         export function work(): number {
           return api() + 1;
         }
+  - name: python-modules-with-public-boundary
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: src/sample/__init__.py
+      body: |-
+        def api() -> int:
+            return 1
+    - path: src/sample/part.py
+      body: |-
+        from src.sample import api
+
+
+        def work() -> int:
+            return api() + 1

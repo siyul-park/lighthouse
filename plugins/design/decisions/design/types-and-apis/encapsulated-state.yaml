@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    python: {}
     rust: {}
     typescript: {}
   requirement: Private mutable state SHOULD be accessed through the owning type’s
@@ -45,3 +46,28 @@ spec:
 
         type Session struct { token string; expiry time.Time }
         func (s *Session) Refresh() { s.token = renew(); s.expiry = time.Now().Add(time.Hour) }
+  - name: python-public-mutable-state
+    language: python
+    kind: invalid
+    files:
+    - path: cart/cart.py
+      body: |-
+        class Cart:
+            def __init__(self) -> None:
+                self.items: list[str] = []
+  - name: python-encapsulated-state
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: cart/cart.py
+      body: |-
+        class Cart:
+            def __init__(self) -> None:
+                self._items: list[str] = []
+
+            def add(self, item: str) -> None:
+                self._items.append(item)
+
+            def items(self) -> tuple[str, ...]:
+                return tuple(self._items)
