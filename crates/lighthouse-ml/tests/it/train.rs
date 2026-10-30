@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fs};
 
 use lighthouse_ml::{
-    labels::{Label, Source},
+    labels::{Sample, Source},
     train::{Fit, Rows, train},
 };
 use lighthouse_model::Judgment;
@@ -10,8 +10,8 @@ use serde_json::json;
 
 const RULE: &str = "core/max-lines";
 
-fn label(key: &str, judgment: Judgment, source: Source) -> Label {
-    Label {
+fn label(key: &str, judgment: Judgment, source: Source) -> Sample {
+    Sample {
         key: key.to_owned(),
         judgment,
         source,

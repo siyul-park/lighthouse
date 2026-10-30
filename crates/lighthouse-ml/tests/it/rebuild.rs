@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fs, path::Path};
 
 use lighthouse_ml::{
-    labels::{Label, Source},
+    labels::{Sample, Source},
     rebuild::{Learned, Status, unrebuildable},
     train::Rows,
 };
@@ -29,9 +29,9 @@ fn dataset(root: &Path, texts: &[&str]) -> String {
             ((*text).to_owned(), subject)
         })
         .collect();
-    let labels: Vec<Label> = texts
+    let labels: Vec<Sample> = texts
         .iter()
-        .map(|text| Label {
+        .map(|text| Sample {
             key: (*text).to_owned(),
             judgment: Judgment::Fail,
             source: Source::Person,

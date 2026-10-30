@@ -5,7 +5,7 @@ use std::fs;
 
 use lighthouse_ml::{
     eval::Found,
-    labels::Label,
+    labels::Sample,
     train::{Fit, Rows, train},
 };
 use lighthouse_model::{Judgment, Result};
@@ -36,7 +36,7 @@ fn a_model_that_fits_its_labels_is_graded_on_them_by_refits() {
             .map(|(f, file, text)| (f.as_str(), file.as_str(), text.as_str()))
             .collect::<Vec<_>>(),
     );
-    let labels: Vec<Label> = places
+    let labels: Vec<Sample> = places
         .iter()
         .map(|(f, _, _)| label(f, Judgment::Fail, None, None))
         .collect();
@@ -155,7 +155,7 @@ fn a_dataset_the_store_lost_is_named() {
 
 /// A model trained on two labelled subjects: the root, the run, the labels,
 /// the model's reference and the decision.
-fn learned(deterministic: bool) -> (tempfile::TempDir, Found, Vec<Label>, String, DecisionRef) {
+fn learned(deterministic: bool) -> (tempfile::TempDir, Found, Vec<Sample>, String, DecisionRef) {
     let root = tempfile::tempdir().unwrap();
     let decision = decision();
     let run = base(&[("one", "a.rs", "first"), ("two", "b.rs", "second")]);

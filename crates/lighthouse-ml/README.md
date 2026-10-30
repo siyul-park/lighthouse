@@ -8,7 +8,7 @@ The host side of mlops: the labels of a decision, the dataset they make, the tra
 
 ## Entry points
 
-- `labels::Labels`, `Judged`, `Table`, `Label`: subjects and their one label each.
+- `labels::Labels`, `Judged`, `Table`, `Sample`: subjects and their one label each.
 - `train::Rows`, `Fit`, `train`, `Trained`: the rows of the labelled subjects, their dataset (the one writer of training files) and the fine-tuning job on it.
 - `rebuild::Learned`: a model that is a file, checked and made again from its dataset.
 - `eval::grade`, `RepoResult`, `EvalReport::pool`, `Overlay`: a check (and a candidate or an attached model beside it) against the labels, pooled over repositories.

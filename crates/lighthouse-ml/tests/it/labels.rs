@@ -1,7 +1,7 @@
 use std::fs;
 
 use lighthouse_ml::{
-    labels::{Judged, Label, Labels, Source, Table},
+    labels::{Judged, Sample, Labels, Source, Table},
     metrics::Outcome,
 };
 use lighthouse_model::{AgentKind, Attribution, Judgment};
@@ -25,7 +25,7 @@ fn model(id: &str) -> Attribution {
     Attribution::model(id)
 }
 
-fn collect(judgments: Vec<Judged>, table: Option<&Table>, exclude: Option<&str>) -> Vec<Label> {
+fn collect(judgments: Vec<Judged>, table: Option<&Table>, exclude: Option<&str>) -> Vec<Sample> {
     let catalog = lighthouse_test_support::bundled().clone();
     let decision = catalog.decision(RULE).unwrap().clone();
     Labels {
@@ -164,7 +164,7 @@ fn name_is_what_a_dataset_line_calls_the_source() {
 
 #[test]
 fn label_example_is_a_subject_of_the_decision_with_the_outcome_the_check_gave() {
-    let label = Label::example(
+    let label = Sample::example(
         RULE,
         "example:core/max-lines:fail:1".to_owned(),
         Judgment::Fail,

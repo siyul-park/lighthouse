@@ -9,7 +9,7 @@ use std::{
 use lighthouse_engine::Run;
 use lighthouse_ml::{
     eval::{EvalReport, Found, Overlaid, Overlay, grade},
-    labels::{Label, Source},
+    labels::{Sample, Source},
     metrics::Outcome,
 };
 use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Result, Severity, Span};
@@ -210,8 +210,8 @@ pub fn label(
     judgment: Judgment,
     observed: Option<Outcome>,
     subject: Option<Subject>,
-) -> Label {
-    Label {
+) -> Sample {
+    Sample {
         key: key.to_owned(),
         judgment,
         source: Source::Person,
@@ -257,7 +257,7 @@ pub fn policy() -> Evaluation {
     }
 }
 
-pub fn report(labels: &[Label], overlaid: &Overlaid) -> EvalReport {
+pub fn report(labels: &[Sample], overlaid: &Overlaid) -> EvalReport {
     let result = grade(RULE, None, None, policy(), labels, &overlaid.found, None);
     EvalReport::pool(vec![result]).unwrap()
 }

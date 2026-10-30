@@ -1,7 +1,7 @@
 use lighthouse_engine::Run;
 use lighthouse_ml::{
     eval::{Candidate, EvalReport, Found, RepoResult, Usage, grade},
-    labels::{Label, Source},
+    labels::{Sample, Source},
     metrics::Outcome,
 };
 use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Severity, Span};
@@ -10,12 +10,12 @@ use serde_json::json;
 
 const RULE: &str = "core/max-lines";
 
-fn graded(repo: &str, labels: &[Label], found: &Found, candidate: Option<Candidate>) -> RepoResult {
+fn graded(repo: &str, labels: &[Sample], found: &Found, candidate: Option<Candidate>) -> RepoResult {
     grade(RULE, None, Some(repo), policy(), labels, found, candidate)
 }
 
-fn label(key: &str, judgment: Judgment, observed: Option<Outcome>) -> Label {
-    Label {
+fn label(key: &str, judgment: Judgment, observed: Option<Outcome>) -> Sample {
+    Sample {
         key: key.to_owned(),
         judgment,
         source: Source::Person,

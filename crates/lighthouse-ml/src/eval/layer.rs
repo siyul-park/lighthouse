@@ -27,7 +27,7 @@ use lighthouse_protocol::{content_dir, stats::assign};
 use super::{Found, Layer};
 use crate::{
     dataset::{self, Line},
-    labels::Label,
+    labels::Sample,
     metrics::Outcome,
     rebuild::{Learned, unrebuildable},
     train::fine_tune,
@@ -47,12 +47,12 @@ pub struct Overlay<'a> {
 /// The labels and the run with a layer's answers laid over them.
 pub struct Overlaid {
     pub found: Found,
-    pub labels: Vec<Label>,
+    pub labels: Vec<Sample>,
 }
 
 impl<'a> Overlay<'a> {
     /// What the base run left for review, answered by the layer's model.
-    pub fn apply(&self, base: &Found, labels: &[Label]) -> Result<Overlaid> {
+    pub fn apply(&self, base: &Found, labels: &[Sample]) -> Result<Overlaid> {
         let model = (self.models)(self.model)?;
         let name = model.manifest().id.clone();
         let scratch = Scratch::of(self.root);

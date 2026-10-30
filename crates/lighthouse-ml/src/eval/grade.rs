@@ -8,7 +8,7 @@ use lighthouse_spec::Evaluation;
 
 use super::{Candidate, EvalReport, Found, Layer, Proposal, Score, Side, Usage};
 use crate::{
-    labels::Label,
+    labels::Sample,
     metrics::{Metrics, Outcome, Rate},
 };
 
@@ -47,7 +47,7 @@ pub fn grade(
     audit: Option<usize>,
     repo: Option<&str>,
     policy: Evaluation,
-    labels: &[Label],
+    labels: &[Sample],
     current: &Found,
     candidate: Option<Candidate>,
 ) -> RepoResult {

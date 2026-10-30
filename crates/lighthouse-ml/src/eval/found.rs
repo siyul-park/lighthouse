@@ -7,7 +7,7 @@ use lighthouse_model::Judgment;
 use lighthouse_plugin::Subject;
 
 use super::{Layer, Score, Usage};
-use crate::{labels::Label, metrics::Outcome};
+use crate::{labels::Sample, metrics::Outcome};
 
 /// What one run of a check found, by subject.
 #[derive(Default, Clone)]
@@ -35,7 +35,7 @@ pub struct Candidate<'a> {
     pub found: &'a Found,
     /// The labels as the candidate shows them: an example carries how the
     /// candidate checked it.
-    pub labels: &'a [Label],
+    pub labels: &'a [Sample],
 }
 
 impl Found {
@@ -89,7 +89,7 @@ impl Found {
 
     /// How the run came out on a label's subject: the outcome an example
     /// carries, else the one the run gave its fingerprint.
-    pub fn outcome_of(&self, label: &Label) -> Outcome {
+    pub fn outcome_of(&self, label: &Sample) -> Outcome {
         label.observed.unwrap_or_else(|| {
             self.by_fingerprint
                 .get(&label.key)
@@ -104,7 +104,7 @@ impl Found {
     pub(super) fn scored(
         &self,
         current: &Found,
-        label: &Label,
+        label: &Sample,
         repo: Option<&str>,
     ) -> Option<Score> {
         let place = current.place.get(&label.key)?;

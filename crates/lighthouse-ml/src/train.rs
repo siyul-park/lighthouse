@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use crate::{
     artifact,
     dataset::{self, Row},
-    labels::{Label, Source},
+    labels::{Sample, Source},
 };
 
 /// What a training run did.
@@ -55,7 +55,7 @@ impl Rows {
     /// the subject; those a `teacher` model is sure of among the subjects
     /// nobody labelled are rows too.
     pub fn of(
-        labels: &[Label],
+        labels: &[Sample],
         observed: &BTreeMap<String, Subject>,
         teacher: Option<&dyn ModelClient>,
         decision: &DecisionRef,
@@ -180,12 +180,12 @@ pub(crate) fn fine_tune(
 /// nothing to a classifier, and a catalog example is not drawn from the
 /// distribution of the labels (every invalid one is a positive): examples
 /// already ride in each line's question.
-fn teaches(label: &Label) -> bool {
+fn teaches(label: &Sample) -> bool {
     label.judgment != Judgment::NotApplicable && label.source != Source::Example
 }
 
 /// The labels with a subject to learn from, as rows, and the keys they cover.
-fn rows_of(labels: &[Label], observed: &BTreeMap<String, Subject>) -> (Vec<Row>, BTreeSet<String>) {
+fn rows_of(labels: &[Sample], observed: &BTreeMap<String, Subject>) -> (Vec<Row>, BTreeSet<String>) {
     let mut rows = Vec::new();
     let mut seen = BTreeSet::new();
     for label in labels.iter().filter(|l| teaches(l)) {

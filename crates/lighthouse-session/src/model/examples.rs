@@ -5,7 +5,7 @@
 //! one is `pass` wherever the check looked.
 
 use lighthouse_engine::{ExampleRun, ModelOptions, Run};
-use lighthouse_ml::{labels::Label, metrics::Outcome};
+use lighthouse_ml::{labels::Sample, metrics::Outcome};
 use lighthouse_model::{Diagnostic, Judgment};
 use lighthouse_spec::{Decision, Example, ExampleKind};
 
@@ -19,7 +19,7 @@ pub(super) fn labels(
     decision: &Decision,
     rule: &str,
     models: &ModelOptions,
-) -> Result<Vec<Label>> {
+) -> Result<Vec<Sample>> {
     let models = ModelOptions {
         attached: attached(&session.root, &session.catalog),
         collect: true,
@@ -43,10 +43,10 @@ pub(super) fn labels(
     Ok(all)
 }
 
-fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Label> {
+fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Sample> {
     let prefix = format!("example:{decision}:{}", example.name);
     let label =
-        |key, judgment, outcome, subject| Label::example(decision, key, judgment, outcome, subject);
+        |key, judgment, outcome, subject| Sample::example(decision, key, judgment, outcome, subject);
     match example.kind {
         ExampleKind::Invalid => example
             .expect

@@ -13,7 +13,7 @@ use std::{
 use lighthouse_engine::ModelOptions;
 use lighthouse_ml::{
     eval::{Candidate, EvalReport, Found, Overlaid, Overlay, RepoResult, grade},
-    labels::{Label, Source},
+    labels::{Sample, Source},
 };
 use lighthouse_model::Severity;
 use lighthouse_spec::{Catalog, Env, local_files};
@@ -125,7 +125,7 @@ fn one(request: &EvalRequest, repo: &Repo, session: &Session, first: bool) -> Re
     // Only the labels a person gave, a reviewed table holds or an example
     // shows grade the check; weak labels (an agent's, a model's) never do.
     let table = request.labelling.table_of(repo);
-    let labels: Vec<Label> = labelling::labels(session, decision, table.as_ref(), None, examples)?
+    let labels: Vec<Sample> = labelling::labels(session, decision, table.as_ref(), None, examples)?
         .into_iter()
         .filter(|l| l.source.weight() >= Source::Person.weight())
         .collect();

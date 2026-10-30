@@ -2,7 +2,7 @@
 
 use std::{env, path::PathBuf};
 
-use lighthouse_ml::labels::{Judged, Label, Labels, Table};
+use lighthouse_ml::labels::{Judged, Sample, Labels, Table};
 use lighthouse_spec::Decision;
 use lighthouse_store::Records;
 
@@ -91,8 +91,8 @@ pub(crate) fn labels(
     decision: &Decision,
     table: Option<&Table>,
     exclude_model: Option<&str>,
-    examples: Vec<Label>,
-) -> Result<Vec<Label>> {
+    examples: Vec<Sample>,
+) -> Result<Vec<Sample>> {
     let judgments = Records::read(&session.root)?
         .judgments
         .into_iter()

@@ -77,7 +77,7 @@ impl From<&Attribution> for Source {
 
 /// What is known about one subject.
 #[derive(Debug, Clone)]
-pub struct Label {
+pub struct Sample {
     /// The subject's fingerprint; for an example, its own key.
     pub key: String,
     /// What the label says; `NotApplicable` is about the selector.
@@ -91,7 +91,7 @@ pub struct Label {
     pub subject: Option<Subject>,
 }
 
-impl Label {
+impl Sample {
     /// A subject an example of `decision` shows: its key is
     /// `example:<decision>:<example>:<line>` for a `fail` and
     /// `example:<decision>:<example>:<fingerprint>` for a `pass`. `outcome` is
@@ -125,7 +125,7 @@ pub struct Table<'a> {
 }
 
 impl Table<'_> {
-    fn rows(&self) -> Result<Vec<Label>> {
+    fn rows(&self) -> Result<Vec<Sample>> {
         let text =
             fs::read_to_string(self.file).map_err(|e| format!("{}: {e}", self.file.display()))?;
         let attribution = json!({"type": "Person", "id": self.file.display().to_string()});
@@ -146,7 +146,7 @@ impl Table<'_> {
             {
                 continue;
             }
-            rows.push(Label {
+            rows.push(Sample {
                 key: fingerprint.to_owned(),
                 judgment,
                 source: Source::Tsv,
@@ -177,14 +177,14 @@ pub struct Labels<'a> {
     pub exclude_model: Option<&'a str>,
     /// The subjects the examples show, checked by the caller; none when the
     /// examples are not subjects.
-    pub examples: Vec<Label>,
+    pub examples: Vec<Sample>,
 }
 
 impl Labels<'_> {
     /// The labels of the decision: its judgments under the current meaning
     /// version, the rows of the table, and its examples.
-    pub fn collect(self) -> Result<Vec<Label>> {
-        let mut best: BTreeMap<String, Label> = BTreeMap::new();
+    pub fn collect(self) -> Result<Vec<Sample>> {
+        let mut best: BTreeMap<String, Sample> = BTreeMap::new();
         let tabled = self.table.map_or_else(|| Ok(Vec::new()), Table::rows)?;
         for label in self.judged()?.into_iter().chain(tabled) {
             let stronger = best
@@ -194,12 +194,12 @@ impl Labels<'_> {
                 best.insert(label.key.clone(), label);
             }
         }
-        let mut labels: Vec<Label> = best.into_values().collect();
+        let mut labels: Vec<Sample> = best.into_values().collect();
         labels.extend(self.examples);
         Ok(labels)
     }
 
-    fn judged(&self) -> Result<Vec<Label>> {
+    fn judged(&self) -> Result<Vec<Sample>> {
         let meaning = self.decision.meaning_version();
         let mut labels = Vec::new();
         for event in &self.judgments {
@@ -213,7 +213,7 @@ impl Labels<'_> {
             {
                 continue;
             }
-            labels.push(Label {
+            labels.push(Sample {
                 key: event.fingerprint.clone(),
                 judgment: event.judgment,
                 source: Source::from(&event.by),
