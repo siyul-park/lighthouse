@@ -21,10 +21,10 @@ pub(crate) const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.pr
 pub(crate) fn with_plugin(dir: &Path) {
     let plugin = lighthouse_test_support::fake_model();
     let text = fs::read_to_string(dir.join("lighthouse.toml")).unwrap();
-    let text = text.replace(
-        "\"core\", \"local\"",
+    let text = lighthouse_test_support::listing(
+        &text,
         &format!(
-            "\"core\", \"local\", {{ id = \"fake-model\", path = {:?} }}",
+            "{{ id = \"fake-model\", path = {:?} }}",
             plugin.to_str().unwrap()
         ),
     );

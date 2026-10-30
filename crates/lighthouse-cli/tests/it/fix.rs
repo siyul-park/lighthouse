@@ -46,27 +46,19 @@ fn go_formatted_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> 
 }
 
 fn go_project_in(files: &[(&str, &str)], extra: &str, pack: &str) -> Option<TempDir> {
-    let (plugin_of, extends_of) = if pack.is_empty() {
-        (String::new(), String::new())
+    let extends_of = if pack.is_empty() {
+        String::new()
     } else {
-        (format!("\"{pack}\", "), format!(", \"{pack}/recommended\""))
+        format!(", \"{pack}/recommended\"")
     };
     let plugin = lighthouse_test_support::lang_go()?;
     let dir = tempfile::tempdir().unwrap();
     lighthouse_test_support::installed(&dir.path().join(".home"), &plugin);
-    let local = if files
-        .iter()
-        .any(|(name, _)| name.starts_with(".lighthouse"))
-    {
-        "\"local\", "
-    } else {
-        ""
-    };
     write(
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"design\", \"testing\", {plugin_of}{local}\"lang-go\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"{extends_of}]\n{extra}"
+            "plugins = [\"lang-go\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"{extends_of}]\n{extra}"
         )),
     );
     write(dir.path(), "go.mod", "module example.com/demo\n\ngo 1.26\n");
@@ -87,26 +79,21 @@ fn rust_formatted_project(source: &str, extra: &str) -> TempDir {
 }
 
 fn rust_project_in(source: &str, extra: &str, pack: &str) -> TempDir {
-    let (plugin_of, extends_of) = if pack.is_empty() {
-        (String::new(), String::new())
+    let extends_of = if pack.is_empty() {
+        String::new()
     } else {
-        (format!("\"{pack}\", "), format!(", \"{pack}/recommended\""))
+        format!(", \"{pack}/recommended\"")
     };
     let dir = tempfile::tempdir().unwrap();
     lighthouse_test_support::installed(
         &dir.path().join(".home"),
         &lighthouse_test_support::lang_rust(),
     );
-    let local = if extra.contains("local/") {
-        "\"local\", "
-    } else {
-        ""
-    };
     write(
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"design\", {plugin_of}{local}\"lang-rust\"]\nextends = [\"design/recommended\"{extends_of}]\n{extra}"
+            "plugins = [\"lang-rust\"]\nextends = [\"design/recommended\"{extends_of}]\n{extra}"
         )),
     );
     write(
@@ -299,7 +286,7 @@ fn flags_that_only_make_sense_with_fix_are_refused_without_it() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project("plugins = [\"core\"]\n"),
+        &lighthouse_test_support::project("plugins = []\n"),
     );
 
     for flag in ["--dry-run", "--unsafe-fixes"] {
@@ -463,9 +450,7 @@ pub(crate) fn text_project(rule: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n",
-        ),
+        &lighthouse_test_support::project("plugins = []\n[rules]\n\"local/shout\" = \"error\"\n"),
     );
     write(dir.path(), ".lighthouse/decisions/shout.yaml", rule);
     write(dir.path(), "a.txt", "hello\n");
@@ -481,9 +466,7 @@ fn a_fixer_can_be_named_for_a_rule_that_has_none() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/plain\" = \"error\"\n",
-        ),
+        &lighthouse_test_support::project("plugins = []\n[rules]\n\"local/plain\" = \"error\"\n"),
     );
     let named = [
         "check",

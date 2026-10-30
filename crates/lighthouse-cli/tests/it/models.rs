@@ -72,7 +72,7 @@ pub(crate) fn project(models: &str) -> tempfile::TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"lang-rust\", \"core\", \"local\", \"rust\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n{models}"
+            "plugins = [\"lang-rust\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n{models}"
         )),
     );
     write(

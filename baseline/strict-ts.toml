@@ -5,6 +5,5 @@ kind = "Project"
 [metadata]
 name = "typescript-strict"
 [spec]
-plugins = ["core","design","testing",
-  { id = "lang-typescript", path = "@PLUGINS@/lang-typescript" }]
+plugins = [{ id = "lang-typescript", path = "@PLUGINS@/lang-typescript" }]
 extends = ["core/recommended","design/strict","testing/recommended"]

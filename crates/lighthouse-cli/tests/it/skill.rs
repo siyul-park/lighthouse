@@ -17,7 +17,7 @@ fn skill_for_lists_every_rule_the_engines_registry_enables() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(
-            "plugins = [\"lang-rust\", \"core\", \"design\", \"testing\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n",
+            "plugins = [\"lang-rust\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n",
         ),
     )
     .unwrap();

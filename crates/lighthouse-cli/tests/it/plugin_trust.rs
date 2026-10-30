@@ -17,7 +17,7 @@ fn with_plugin() -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project("plugins = [\"core\", \"evil\"]\n"),
+        &lighthouse_test_support::project("plugins = [\"evil\"]\n"),
     );
     write(dir.path(), "a.txt", "hello\n");
     write(
@@ -78,7 +78,7 @@ fn a_plugin_the_project_names_by_a_path_outside_it_needs_trust_too() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", {{ id = \"evil\", path = {:?} }}]\n",
+            "plugins = [{{ id = \"evil\", path = {:?} }}]\n",
             elsewhere.path().join("evil")
         )),
     );
@@ -104,7 +104,7 @@ fn a_plugin_of_the_users_plugin_directory_starts_without_trust() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project("plugins = [\"core\", \"evil\"]\n"),
+        &lighthouse_test_support::project("plugins = [\"evil\"]\n"),
     );
     write(dir.path(), "a.txt", "hello\n");
 

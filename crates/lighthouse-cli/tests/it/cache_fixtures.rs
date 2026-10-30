@@ -62,7 +62,7 @@ pub(crate) fn probe(prefix: &str, language: &str) -> String {
 
 pub(crate) fn toml(language: &str, plugin: &Path) -> String {
     lighthouse_test_support::project(&format!(
-        "plugins = [{{ id = \"{language}\", path = {:?} }}, \"core\", \"design\", \"testing\", \"local\"]\nextends = [\"core/recommended\", \"design/recommended\", \"design/strict\", \"testing/recommended\"]\n[rules]\n\"local/probe\" = \"warn\"\n\"design/coupling\" = {{ level = \"warn\", options = {{ hub = {{ fanIn = 2, fanOut = 0, statements = 1, coordinatorFanOut = 12, coordinatorMaxFanIn = 1, coordinatorStatements = 15 }} }} }}\n",
+        "plugins = [{{ id = \"{language}\", path = {:?} }}]\nextends = [\"core/recommended\", \"design/recommended\", \"design/strict\", \"testing/recommended\"]\n[rules]\n\"local/probe\" = \"warn\"\n\"design/coupling\" = {{ level = \"warn\", options = {{ hub = {{ fanIn = 2, fanOut = 0, statements = 1, coordinatorFanOut = 12, coordinatorMaxFanIn = 1, coordinatorStatements = 15 }} }} }}\n",
         plugin.to_str().unwrap()
     ))
 }

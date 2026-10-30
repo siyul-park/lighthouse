@@ -25,7 +25,7 @@ pub(crate) fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"error\", options = { max = 3 } }\n"),
+        lighthouse_test_support::project("plugins = []\n[rules]\n\"core/max-lines\" = { level = \"error\", options = { max = 3 } }\n"),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), BIG).unwrap();
@@ -40,7 +40,7 @@ fn rust_project(extra: &str, source: &str) -> TempDir {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n{extra}",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\", \"design/strict\"]\n{extra}",
             plugin.to_str().unwrap()
         )),
     )

@@ -29,7 +29,7 @@ pub(crate) fn rust_project(files: &[(&str, &str)]) -> TempDir {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/no-panic\" = \"info\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/no-panic\" = \"info\"\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -342,7 +342,7 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
+            "plugins = [{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -391,7 +391,7 @@ fn error_level(dir: &TempDir) {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/exported-doc\" = \"error\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/exported-doc\" = \"error\"\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -418,7 +418,7 @@ fn an_error_stays_reported_whatever_the_judgment() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\", \"core\"]\nextends = [\"design/recommended\", \"core/recommended\"]\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\", \"core/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -503,7 +503,7 @@ fn a_judgment_expires_when_the_evidence_it_judged_changes() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/max-name-words\" = {{ level = \"warn\", options = {{ enabled = true, maxWords = 4 }} }}\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/max-name-words\" = {{ level = \"warn\", options = {{ enabled = true, maxWords = 4 }} }}\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -709,7 +709,7 @@ fn findings_of_a_rule_taken_out_of_the_config_are_inactive_and_can_be_pruned() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n[rules]\n\"design/no-panic\" = \"off\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"]\n[rules]\n\"design/no-panic\" = \"off\"\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -734,7 +734,7 @@ fn changed_resolves_the_findings_of_a_deleted_file() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 5 } }\n"),
+        lighthouse_test_support::project("plugins = []\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 5 } }\n"),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\n").unwrap();
@@ -779,7 +779,7 @@ fn source_annotations_allow_findings_and_are_counted() {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\", \"core\"]\nextends = [\"core/recommended\", \"design/recommended\", \"design/strict\"]\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"core/recommended\", \"design/recommended\", \"design/strict\"]\n",
             plugin.to_str().unwrap()
         )),
     )

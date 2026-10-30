@@ -140,7 +140,7 @@ pub(crate) fn project(approval: &str) -> (TempDir, TempDir) {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n{rules}[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n[fix]\ndecisions = [\"local/model\"]\n{approval}{UNSANDBOXED}",
+            "plugins = []\n[rules]\n{rules}[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n[fix]\ndecisions = [\"local/model\"]\n{approval}{UNSANDBOXED}",
             scripts.path().join("agent.sh").to_str().unwrap()
         )),
     );

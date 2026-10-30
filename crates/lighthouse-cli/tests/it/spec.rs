@@ -27,7 +27,7 @@ fn validate_names_what_is_wrong_across_documents() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\"]\nextends = [\"core/nope\"]\n[rules]\n\"core/nonesuch\" = \"warn\"\n",
+            "plugins = []\nextends = [\"core/nope\"]\n[rules]\n\"core/nonesuch\" = \"warn\"\n",
         ),
     );
     write(
@@ -55,7 +55,7 @@ fn validate_finds_a_function_that_does_not_exist_in_a_branch_nothing_takes() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project("plugins = [\"core\"]\n"),
+        &lighthouse_test_support::project("plugins = []\n"),
     );
     write(
         dir.path(),
@@ -76,7 +76,7 @@ fn validate_refuses_a_decision_that_lists_a_language_no_plugin_provides() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project("plugins = [\"core\"]\n"),
+        &lighthouse_test_support::project("plugins = []\n"),
     );
     write(
         dir.path(),
@@ -195,7 +195,7 @@ fn max_warnings_fails_a_run_with_more_warnings_than_allowed() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
+            "plugins = []\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );
     write(dir.path(), "a.txt", "1\n2\n3\n");
@@ -221,7 +221,7 @@ fn sarif_links_a_rule_to_its_decision_page() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
+            "plugins = []\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );
     write(dir.path(), "a.txt", "1\n2\n3\n");

@@ -129,7 +129,7 @@ pub(crate) fn rust_project() -> TempDir {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(
-            "plugins = [\"lang-rust\", \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n",
+            "plugins = [\"lang-rust\"]\nextends = [\"design/recommended\", \"design/strict\"]\n",
         ),
     )
     .unwrap();
@@ -147,9 +147,7 @@ pub(crate) fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project(
-            "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n",
-        ),
+        lighthouse_test_support::project("plugins = []\nextends = [\"core/recommended\"]\n"),
     )
     .unwrap();
     dir
@@ -435,7 +433,7 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
             .any(|uid| lighthouse_resource::is_uid(uid.trim_matches('"'))),
         "a new decision gets a uid: {written}"
     );
-    assert_eq!(created["localPluginListed"], false);
+    assert!(created.get("localPluginListed").is_none(), "{created}");
 
     let tested = client
         .tool(

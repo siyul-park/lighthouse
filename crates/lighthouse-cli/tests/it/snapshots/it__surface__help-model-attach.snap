@@ -29,7 +29,7 @@ Options:
           [possible values: auto, always, never]
 
       --labels <FILE>
-          A table of reviewed findings (`fingerprint repo location verdict`). Default: `labels/<id>.tsv` when it exists
+          A table of reviewed findings (`fingerprint repo location verdict`). Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists
 
       --repo <NAME=DIR>
           A repository the labels are about, `name=dir`, where `name` is the `repo` column of the table. Repeatable; default: this project

@@ -191,7 +191,7 @@ fn reorder_project(approval: &str, rules: &str) -> (TempDir, TempDir, PathBuf) {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"design\", \"local\", \"rust\"]\n[rules]\n\"local/naming-ban\" = \"warn\"\n\"design/declaration-groups\" = \"error\"\n{rules}[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}{}",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\n[rules]\n\"local/naming-ban\" = \"warn\"\n\"design/declaration-groups\" = \"error\"\n{rules}[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{}{}",
             plugin.to_str().unwrap(),
             script.to_str().unwrap(),
             listed("", approval),

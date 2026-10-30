@@ -76,9 +76,7 @@ fn notes_of(decisions: &[(&str, &str, i32, &str)], fix: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n{rules}[fix]\n{fix}"
-        )),
+        &lighthouse_test_support::project(&format!("plugins = []\n[rules]\n{rules}[fix]\n{fix}")),
     );
     for (name, letter, priority, safety) in decisions {
         let line = if *priority == 0 {
@@ -175,7 +173,7 @@ fn a_fix_that_overlaps_the_formatter_wins_and_the_formatting_follows_it() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"local\", \"rust\"]\n[rules]\n\"core/formatted\" = \"error\"\n\"local/rename\" = \"error\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\n[rules]\n\"core/formatted\" = \"error\"\n\"local/rename\" = \"error\"\n",
             plugin.to_str().unwrap()
         )),
     );

@@ -21,7 +21,7 @@ fn project(signals: &str) -> TempDir {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(&format!(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = {{ level = \"error\", options = {{ max = 3 }} }}\n[signals]\n{signals}\n"
+            "plugins = []\n[rules]\n\"core/max-lines\" = {{ level = \"error\", options = {{ max = 3 }} }}\n[signals]\n{signals}\n"
         )),
     )
     .unwrap();

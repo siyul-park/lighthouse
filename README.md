@@ -147,8 +147,8 @@ kind = "Project"
 metadata = { name = "demo" }
 
 [spec]
-plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }, "design"]
-extends = ["design/recommended"]
+plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }]
+extends = ["design/recommended", "go/recommended"]
 
 [spec.rules]
 "design/signature-size" = { level = "warn", options = { limits = { params = { default = 6, constructor = 8 } } } }
@@ -166,6 +166,13 @@ contract boundary, not necessarily a process: language plugins run as separate
 processes written in their own language (the Go plugin uses `go/packages` and
 `go/types`) and speak a small [JSON-RPC protocol](docs/plugin-protocol.md), so supporting
 a new language never requires Rust.
+
+Every plugin lives in `plugins/<id>/` with the same top level: `lighthouse-plugin.toml`,
+`README.md`, `decisions/<pack>/` when it provides packs, and its implementation. In
+`lighthouse.toml`, `plugins` lists only the external ones (the code that runs as a process)
+and `extends` is what is enabled: naming `go/recommended` loads the plugin that provides the
+pack `go`, `lang-go`. The bundled plugins (`core`, `design`, `testing`, `lang-cel`) are always
+there and are never listed.
 
 Code is the first domain. The engine is built around artifacts and decisions, so
 documents and design files can follow.

@@ -22,7 +22,7 @@ fn workspace() -> TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"rust\"]\n[rules]\n\"core/formatted\" = \"error\"\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\n[rules]\n\"core/formatted\" = \"error\"\n",
             plugin.to_str().unwrap()
         )),
     );

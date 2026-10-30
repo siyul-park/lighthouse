@@ -16,7 +16,7 @@ fn project(max: usize) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
+        lighthouse_test_support::project(&format!("plugins = []\n[rules]\n\"core/max-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n").unwrap();
@@ -181,7 +181,7 @@ fn override_can_turn_a_rule_off_for_a_file() {
     fs::write(
         &config,
         lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-lines\" = \"off\" }\n",
+            "plugins = []\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-lines\" = \"off\" }\n",
         ),
     )
     .unwrap();
@@ -390,7 +390,7 @@ fn go_project(source: &str) -> Option<(TempDir, std::path::PathBuf)> {
     fs::write(
         &config,
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
+            "plugins = [{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -479,7 +479,7 @@ fn config_flag_checks_the_current_directory_with_another_config_file() {
     fs::write(
         &config,
         lighthouse_test_support::project(&format!(
-            "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
+            "plugins = [{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
     )
@@ -628,7 +628,7 @@ fn local_project(rule: &str) -> TempDir {
     fs::write(
         dir.path().join("lighthouse.toml"),
         lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/long-file\" = \"error\"\n",
+            "plugins = []\n[rules]\n\"local/long-file\" = \"error\"\n",
         ),
     )
     .unwrap();

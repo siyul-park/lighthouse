@@ -49,7 +49,7 @@ fn agent_dir() -> (TempDir, TempDir) {
 #[test]
 fn a_meaning_key_in_the_local_file_is_a_load_error_that_names_the_key_and_the_file() {
     let (dir, _agent) = agent_dir();
-    local(&dir, "plugins = [\"core\"]\n");
+    local(&dir, "plugins = []\n");
 
     lighthouse(dir.path())
         .arg("check")

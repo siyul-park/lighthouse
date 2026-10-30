@@ -5,7 +5,7 @@ kind = "Project"
 [metadata]
 name = "lighthouse-strict"
 [spec]
-plugins = ["core","design","testing","go","rust",
+plugins = [
   { id = "lang-go", path = "@PLUGINS@/lang-go" },
   { id = "lang-rust", path = "@PLUGINS@/lang-rust" }]
 extends = ["core/recommended","design/strict","testing/recommended","go/recommended","rust/recommended"]

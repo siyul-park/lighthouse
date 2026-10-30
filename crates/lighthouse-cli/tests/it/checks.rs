@@ -82,9 +82,7 @@ pub(crate) fn project(rule: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n",
-        ),
+        &lighthouse_test_support::project("plugins = []\n[rules]\n\"local/probe\" = \"error\"\n"),
     );
     write(dir.path(), ".lighthouse/decisions/probe.yaml", rule);
     write(dir.path(), "a.txt", "hello\n");

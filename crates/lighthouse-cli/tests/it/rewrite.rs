@@ -99,7 +99,7 @@ fn project(by: By, scope: &str, script: &str) -> (TempDir, TempDir) {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n{ID:?} = \"error\"\n{models}[fix]\nunsafe = true\ndecisions = [{ID:?}]\n"
+            "plugins = []\n[rules]\n{ID:?} = \"error\"\n{models}[fix]\nunsafe = true\ndecisions = [{ID:?}]\n"
         )),
     );
     write(dir.path(), ".lighthouse/decisions/pair.yaml", &pair(&fix));

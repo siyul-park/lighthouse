@@ -82,9 +82,7 @@ fn notes(names: &[&str], safety: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n{rules}"
-        )),
+        &lighthouse_test_support::project(&format!("plugins = []\n[rules]\n{rules}")),
     );
     let decisions = [
         (

@@ -24,7 +24,7 @@ fn project(source: &str) -> TempDir {
     write(
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"design\", {{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"]\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
     );
@@ -162,9 +162,7 @@ fn a_command_fix_says_why_it_does_not_run_untrusted() {
     };
     write(
         "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n",
-        ),
+        &lighthouse_test_support::project("plugins = []\n[rules]\n\"local/shout\" = \"error\"\n"),
     );
     write(".lighthouse/decisions/shout.yaml", SHOUT);
     write("a.txt", "hello\n");

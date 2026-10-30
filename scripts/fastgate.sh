@@ -202,7 +202,7 @@ def main():
             kind = "rust" if os.path.exists(f"{path}/Cargo.toml") else "go"
             base = "strict-root" if kind == "rust" else "strict-go"
             text = open(f"{root}/baseline/{base}.toml").read().replace("@PLUGINS@", plugins)
-            text = text.replace('plugins = ["core","design","testing",', 'plugins = ["core","design","testing","local",') + '[spec.rules]\n"local/fastgate-probe" = "warn"\n'
+            text = text + '[spec.rules]\n"local/fastgate-probe" = "warn"\n'
             cfg = f"{scratch}/{label}.toml"
             open(cfg, "w").write(text)
             bad, good = ("package a\\n\\nfunc {p}x() {{}}\\n", "package a\\n\\nfunc zz() {{}}\\n") if kind == "go" else ("pub fn {p}x() {{}}\\n", "pub fn zz() {{}}\\n")

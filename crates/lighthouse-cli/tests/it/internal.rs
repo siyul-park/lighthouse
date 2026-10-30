@@ -14,7 +14,6 @@ const DOC: &str = "design/exported-doc";
 const MISSING: &str = "testing/no-missing-owner";
 const DUPLICATE: &str = "testing/no-duplicate-owner";
 
-const PACKS: &str = "\"core\", \"design\", \"testing\"";
 const PRESETS: &str = "[\"core/recommended\", \"design/recommended\", \"testing/recommended\"]";
 
 fn write(dir: &Path, name: &str, text: &str) {
@@ -63,7 +62,7 @@ fn go_project() -> Option<TempDir> {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{PACKS}, {{ id = \"lang-go\", path = {:?} }}]\nextends = {PRESETS}\n",
+            "plugins = [{{ id = \"lang-go\", path = {:?} }}]\nextends = {PRESETS}\n",
             plugin.to_str().unwrap()
         )),
     );
@@ -113,7 +112,7 @@ fn rust_does_not_judge_crate_visible_items() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [{PACKS}, {{ id = \"lang-rust\", path = {:?} }}]\nextends = {PRESETS}\n",
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = {PRESETS}\n",
             plugin.to_str().unwrap()
         )),
     );

@@ -70,10 +70,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "id": {
         "type": "string"
       },
-      "localPluginListed": {
-        "description": "Whether `lighthouse.toml` lists the `local` plugin, without which the\nproject's own decisions do not run in `check`.",
-        "type": "boolean"
-      },
       "note": {
         "description": "What to do next.",
         "type": "string"
@@ -143,7 +139,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "path",
       "created",
       "tested",
-      "localPluginListed",
       "note"
     ],
     "title": "DecisionReport",

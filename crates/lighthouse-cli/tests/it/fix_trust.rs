@@ -87,7 +87,7 @@ fn a_fix_table_in_lighthouse_toml_cannot_grant_trust() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[fix]\ncommands = \"allow\"\n[rules]\n\"local/shout\" = \"error\"\n",
+            "plugins = []\n[fix]\ncommands = \"allow\"\n[rules]\n\"local/shout\" = \"error\"\n",
         ),
     );
 
@@ -105,7 +105,7 @@ fn trust_lists_what_it_trusts_and_needs_a_terminal_or_yes() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n[fix]\nverify = [[\"make\", \"check\"]]\n",
+            "plugins = []\n[rules]\n\"local/shout\" = \"error\"\n[fix]\nverify = [[\"make\", \"check\"]]\n",
         ),
     );
 

@@ -62,7 +62,7 @@ fn surveyed(port: u16) -> (TempDir, TempDir) {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n[sandbox]\nnetwork = [\"127.0.0.1:{port}\"]\n"
+            "plugins = []\n[rules]\n\"local/probe\" = \"error\"\n[sandbox]\nnetwork = [\"127.0.0.1:{port}\"]\n"
         )),
     );
     let home = tempfile::tempdir().unwrap();
@@ -175,7 +175,7 @@ fn a_check_writes_a_place_outside_its_own_only_when_the_project_lists_it() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n[sandbox]\nwrite = [\"out\"]\n",
+            "plugins = []\n[rules]\n\"local/probe\" = \"error\"\n[sandbox]\nwrite = [\"out\"]\n",
         ),
     );
     trust(dir.path());

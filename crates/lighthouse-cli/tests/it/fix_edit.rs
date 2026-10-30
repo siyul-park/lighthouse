@@ -299,12 +299,12 @@ fn only_a_command_without_a_protocol_can_be_bound_to_edit() {
         let config = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
         let plugin = lighthouse_test_support::model_http();
         let listed = format!(
-            "\"core\", {{ id = \"model-http\", path = {:?} }}",
+            "{{ id = \"model-http\", path = {:?} }}",
             plugin.to_str().unwrap()
         );
         fs::write(
             dir.path().join("lighthouse.toml"),
-            config.replace("\"core\"", &listed),
+            lighthouse_test_support::listing(&config, &listed),
         )
         .unwrap();
 

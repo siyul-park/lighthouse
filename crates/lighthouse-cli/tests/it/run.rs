@@ -19,11 +19,7 @@ use serde_json::{Value, json};
 fn core_project() -> (tempfile::TempDir, Context) {
     let dir = tempfile::tempdir().unwrap();
     let config = dir.path().join("lighthouse.toml");
-    std::fs::write(
-        &config,
-        lighthouse_test_support::project("plugins = [\"core\"]\n"),
-    )
-    .unwrap();
+    std::fs::write(&config, lighthouse_test_support::project("plugins = []\n")).unwrap();
     (dir, Context::person(Some(config)))
 }
 
