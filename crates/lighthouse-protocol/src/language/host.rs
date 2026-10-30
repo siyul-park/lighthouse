@@ -48,12 +48,12 @@ pub enum HostError {
 #[derive(Debug, Clone, Copy)]
 pub struct HostLanguage {
     /// The plugin id, which is the directory the plugin is installed in.
-    pub plugin: &'static str,
+    pub name: &'static str,
     pub version: &'static str,
     /// The language id.
     pub id: &'static str,
     /// The name of the language in messages.
-    pub name: &'static str,
+    pub title: &'static str,
     /// The names the language goes by in a document, see
     /// `LanguageManifest::aliases`.
     pub aliases: &'static [&'static str],
@@ -83,7 +83,7 @@ impl<P: HostParser> HostProvider<P> {
 
     /// The tree of the file at `path` with `text`, or what is missing of it.
     fn tree(&self, path: &str, text: &str) -> Result<(Source, Vec<Comment>), Incomplete> {
-        let name = self.language.name;
+        let name = self.language.title;
         let gap = |reason: String| Incomplete {
             path: Some(path.to_owned()),
             reason,
@@ -123,13 +123,13 @@ impl<P: HostParser> HostProvider<P> {
                 Ok(_) => {}
                 Err(HostError::Syntax(error)) => result.notices.push(format!(
                     "{}: the {} at {} is not a valid {} document: {error}",
-                    regions.path, self.language.id, source.node_pointer, self.language.name
+                    regions.path, self.language.id, source.node_pointer, self.language.title
                 )),
                 Err(HostError::Tree(reason)) => result.incomplete.push(Incomplete {
                     path: Some(regions.path.clone()),
                     reason: format!(
                         "cannot expose the {} at {}: {reason}",
-                        self.language.name, source.node_pointer
+                        self.language.title, source.node_pointer
                     ),
                 }),
             }
@@ -139,7 +139,7 @@ impl<P: HostParser> HostProvider<P> {
 
 impl<P: HostParser> Provider for HostProvider<P> {
     fn name(&self) -> &str {
-        self.language.plugin
+        self.language.name
     }
 
     fn version(&self) -> &str {
@@ -196,7 +196,7 @@ impl<P: HostParser> Provider for HostProvider<P> {
                             path: Some(file.path.clone()),
                             reason: format!(
                                 "cannot read {} host document: {error}",
-                                self.language.name
+                                self.language.title
                             ),
                         });
                     }

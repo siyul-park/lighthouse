@@ -18,10 +18,10 @@ pub(crate) struct Toml;
 impl HostParser for Toml {
     fn language(&self) -> HostLanguage {
         HostLanguage {
-            plugin: "lang-toml",
+            name: "lang-toml",
             version: env!("CARGO_PKG_VERSION"),
             id: "toml",
-            name: "TOML",
+            title: "TOML",
             aliases: &["toml"],
             globs: &["**/*.toml"],
         }

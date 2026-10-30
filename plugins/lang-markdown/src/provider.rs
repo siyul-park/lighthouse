@@ -24,10 +24,10 @@ pub(crate) struct Markdown;
 impl HostParser for Markdown {
     fn language(&self) -> HostLanguage {
         HostLanguage {
-            plugin: "lang-markdown",
+            name: "lang-markdown",
             version: env!("CARGO_PKG_VERSION"),
             id: "markdown",
-            name: "Markdown",
+            title: "Markdown",
             aliases: &["markdown", "md"],
             globs: &["**/*.md", "**/*.markdown"],
         }

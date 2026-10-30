@@ -33,10 +33,10 @@ impl HostParser for Lines {
 }
 
 const LANGUAGE: HostLanguage = HostLanguage {
-    plugin: "lang-lines",
+    name: "lang-lines",
     version: "1",
     id: "lines",
-    name: "Lines",
+    title: "Lines",
     aliases: &["lines"],
     globs: &["**/*.lines"],
 };

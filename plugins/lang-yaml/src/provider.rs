@@ -18,10 +18,10 @@ pub(crate) struct Yaml;
 impl HostParser for Yaml {
     fn language(&self) -> HostLanguage {
         HostLanguage {
-            plugin: "lang-yaml",
+            name: "lang-yaml",
             version: env!("CARGO_PKG_VERSION"),
             id: "yaml",
-            name: "YAML",
+            title: "YAML",
             aliases: &["yaml", "yml"],
             globs: &["**/*.yaml", "**/*.yml"],
         }
