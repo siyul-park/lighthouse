@@ -201,7 +201,7 @@ def main():
             subprocess.run(["rsync", "-a", "--exclude", ".git", "--exclude", "target", "--exclude", ".claude", "--exclude", ".lighthouse/cache", "--exclude", ".lighthouse/*.db*", src + "/", path + "/"], check=True)
             kind = "rust" if os.path.exists(f"{path}/Cargo.toml") else "go"
             base = "strict-root" if kind == "rust" else "strict-go"
-            text = open(f"{root}/baseline/{base}.toml").read().replace("@PLUGINS@", plugins)
+            text = open(f"{root}/scripts/baseline/{base}.toml").read().replace("@PLUGINS@", plugins)
             text = text + '[spec.rules]\n"local/fastgate-probe" = "warn"\n'
             cfg = f"{scratch}/{label}.toml"
             open(cfg, "w").write(text)

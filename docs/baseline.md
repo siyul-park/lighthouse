@@ -3,12 +3,12 @@
 The numbers that search, learned checks and the caches are judged against: what a strict run finds on four
 reference repositories, how long it takes, and how precise each reviewed decision is. They come from the
 code at R3b (`474266b`) and R3c, on an Apple M4 Pro, 24 GiB. `scripts/baseline.sh` reproduces the first two
-parts; the data lives in `baseline/`.
+parts; the data lives in `scripts/baseline/`.
 
 ## Reference repositories
 
-All four run with the strict project (`baseline/strict-root.toml` for the Cargo workspace,
-`baseline/strict-go.toml` for Go modules): `core/recommended`, `design/strict`, `testing/recommended`.
+All four run with the strict project (`scripts/baseline/strict-root.toml` for the Cargo workspace,
+`scripts/baseline/strict-go.toml` for Go modules): `core/recommended`, `design/strict`, `testing/recommended`.
 
 | repo | language | commit | source files | source lines | findings | exit |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
@@ -22,9 +22,9 @@ All four run with the strict project (`baseline/strict-root.toml` for the Cargo 
 - cel exits 3 because 40 incomplete notices remain (for example a vendored `.binpb` that is not UTF-8); the
   findings stand.
 - The working trees of cel, qlbridge and minivm are the author's checkouts, so their numbers move with them;
-  each `baseline/<repo>.json` lists the dirty files and the SHA-256 of `git diff HEAD` that were measured. The
+  each `scripts/baseline/<repo>.json` lists the dirty files and the SHA-256 of `git diff HEAD` that were measured. The
   strict-root copy is fixed: it is `81b286d`, the Lighthouse tree the R2 gates started from. Findings per decision
-  are in `baseline/<repo>.json`.
+  are in `scripts/baseline/<repo>.json`.
 
 ## Timings
 

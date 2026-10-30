@@ -4,10 +4,10 @@
 # usage: LIGHTHOUSE_TRUST=1 scripts/baseline.sh [name=]repo-dir...
 #
 # Builds the release binary and the plugins, then checks each repository with
-# the strict configuration (baseline/strict-root.toml for a Cargo workspace,
-# baseline/strict-go.toml for a Go module, baseline/strict-ts.toml for a
+# the strict configuration (scripts/baseline/strict-root.toml for a Cargo workspace,
+# scripts/baseline/strict-go.toml for a Go module, scripts/baseline/strict-ts.toml for a
 # package.json project), three times, and writes
-# baseline/<name>.json: the commit, the size, the exit code, the findings per
+# scripts/baseline/<name>.json: the commit, the size, the exit code, the findings per
 # decision, the median time of each phase and the reach of its modules and
 # symbols (the stability example, as "system"). Everything but the times is
 # deterministic. It needs no network. Go must be on PATH (GOENV_VERSION too,
@@ -71,7 +71,7 @@ def config(path, directory):
         name = "strict-ts"
     else:
         raise SystemExit(f"{path}: no Cargo.toml, go.mod or package.json to choose a strict configuration by")
-    text = open(f"{root}/baseline/{name}.toml").read().replace("@PLUGINS@", plugins)
+    text = open(f"{root}/scripts/baseline/{name}.toml").read().replace("@PLUGINS@", plugins)
     out = f"{directory}/{name}.toml"
     open(out, "w").write(text)
     return name, out
@@ -132,7 +132,7 @@ with tempfile.TemporaryDirectory() as scratch:
             "timingsMs": {"runs": RUNS, "median": phases},
             "system": json.loads(system.stdout),
         }
-        with open(f"{root}/baseline/{name}.json", "w") as out:
+        with open(f"{root}/scripts/baseline/{name}.json", "w") as out:
             json.dump(report, out, indent=2, sort_keys=True)
             out.write("\n")
         print(f"{name}: {sum(counts.values())} findings, exit {code}, total {phases.get('total')}ms")
