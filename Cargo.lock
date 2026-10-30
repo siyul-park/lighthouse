@@ -2035,6 +2035,7 @@ dependencies = [
  "lighthouse-rpc",
  "lighthouse-spec",
  "lighthouse-store",
+ "lighthouse-test-support",
  "regex",
  "schemars",
  "serde",
