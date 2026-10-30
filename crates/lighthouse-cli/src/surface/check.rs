@@ -25,7 +25,6 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
     if args.changed && args.diff.is_some() {
         return Err("`changed` and `diff` are alternatives".into());
     }
-    let session = Session::load(ctx.config.as_deref())?;
     let mut messages = Vec::new();
     let mut shown = BTreeMap::new();
     let mut properties = serde_json::Map::new();
@@ -37,7 +36,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
             no_models: args.no_models,
             options: command.options.clone(),
         };
-        let done = apply(ctx, &session, &selection, !args.no_store, !args.no_cache)?;
+        let done = apply(ctx, &selection, !args.no_store, !args.no_cache)?;
         messages = done.lines();
         shown = done.shown.clone();
         properties = done.properties();
@@ -45,7 +44,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
             return Ok(Reply::text(done.diff).with_messages(&messages));
         }
     }
-    let mut checked = analyze(ctx, &session, args)?;
+    let mut checked = analyze(ctx, args)?;
     messages.append(&mut checked.messages);
     checked.messages = messages;
     let reporting = Instant::now();
@@ -77,14 +76,14 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
 
 /// The `fix` tool: fix, and say what happened.
 pub fn fix(ctx: &Context, args: &FixArgs, format: reply::Format) -> Result<Reply> {
-    let session = Session::load(ctx.config.as_deref())?;
-    let fixed = apply(ctx, &session, args, true, true)?;
+    let fixed = apply(ctx, args, true, true)?;
     let reply = Reply::data(format, &fixed, || fixed.diff.clone())?;
     Ok(reply.with_messages(&fixed.lines()))
 }
 
 /// Analyzes the project and keeps what the arguments report.
-fn analyze(ctx: &Context, session: &Session, args: &CheckArgs) -> Result<Checked> {
+fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
+    let session = Session::load(ctx.config.as_deref())?;
     let request = CheckRequest {
         paths: ctx.paths(&session.root, &args.paths)?,
         changed: args.changed,
@@ -100,18 +99,12 @@ fn analyze(ctx: &Context, session: &Session, args: &CheckArgs) -> Result<Checked
         record_model_labels: args.record_model_labels,
         ..CheckRequest::default()
     };
-    lighthouse_session::check(session, &request)
+    lighthouse_session::check(&session, &request)
 }
 
-/// Fixes what `args` selects in `session`. `store` says whether the run is remembered and
+/// Fixes what `args` selects. `store` says whether the run is remembered and
 /// `cache` whether the answers of models are kept.
-fn apply(
-    ctx: &Context,
-    session: &Session,
-    args: &FixArgs,
-    store: bool,
-    cache: bool,
-) -> Result<Fixed> {
+fn apply(ctx: &Context, args: &FixArgs, store: bool, cache: bool) -> Result<Fixed> {
     if ctx.confined()
         && args.fingerprints.is_empty()
         && args.paths.is_empty()
@@ -122,6 +115,7 @@ fn apply(
                 .into(),
         );
     }
+    let session = Session::load(ctx.config.as_deref())?;
     let request = Selection {
         targets: Targets {
             paths: ctx.paths(&session.root, &args.paths)?,
@@ -138,5 +132,5 @@ fn apply(
         },
         cache,
     };
-    fix::run(session, &request)
+    fix::run(&session, &request)
 }
