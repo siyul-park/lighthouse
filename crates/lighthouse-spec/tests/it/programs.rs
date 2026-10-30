@@ -60,5 +60,5 @@ fn all_lists_the_program_of_every_language() {
         .all()
         .map(|program| program.command[0].clone())
         .collect();
-    assert_eq!(names, ["gofmt", "rustfmt", "prettier"]);
+    assert_eq!(names, ["gofmt", "ruff", "rustfmt", "prettier"]);
 }
