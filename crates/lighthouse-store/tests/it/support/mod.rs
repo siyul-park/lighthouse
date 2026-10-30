@@ -3,7 +3,9 @@
 use std::thread;
 
 use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
-use lighthouse_store::{NewJudgment, Observed, Run, Standing, Store, Unchecked, Versions};
+use lighthouse_store::{
+    Filter, NewJudgment, Observed, Run, Standing, StatusFilter, Store, Unchecked, Versions,
+};
 use serde_json::json;
 
 pub fn observed(fingerprint: &str, rule: &str, path: &str) -> Observed {
@@ -106,4 +108,27 @@ pub fn standing_for(store: &Store, finding: &Observed) -> Option<Standing> {
 /// The text of the decision log of the project at `dir`; empty if it has none.
 pub fn log_of(dir: &std::path::Path) -> String {
     std::fs::read_to_string(Store::log_path_in(dir)).unwrap_or_default()
+}
+
+pub fn all() -> Filter {
+    Filter {
+        decision: None,
+        status: StatusFilter::All,
+    }
+}
+
+pub fn status(status: StatusFilter) -> Filter {
+    Filter {
+        decision: None,
+        status,
+    }
+}
+
+pub fn fingerprints(store: &Store, filter: &Filter) -> Vec<String> {
+    store
+        .list(filter)
+        .unwrap()
+        .into_iter()
+        .map(|f| f.observed.fingerprint)
+        .collect()
 }
