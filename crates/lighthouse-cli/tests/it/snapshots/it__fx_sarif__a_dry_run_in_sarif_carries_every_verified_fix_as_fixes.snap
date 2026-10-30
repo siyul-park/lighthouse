@@ -1,5 +1,5 @@
 ---
-source: crates/lighthouse-cli/tests/it/fx.rs
+source: crates/lighthouse-cli/tests/it/fx_sarif.rs
 expression: "serde_json::to_string_pretty(&results).unwrap()"
 ---
 [
