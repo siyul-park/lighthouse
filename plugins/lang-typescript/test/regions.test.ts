@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { Provider } from "../src/provider.ts";
-import type { EmbeddedFile, Fragment, IndexResult } from "../src/wire.ts";
+import type { EmbeddedFile, Fragment, IndexResult } from "../src/sdk/wire.ts";
 
 const GREET = "src/index::greet#function";
 const MANIFEST = '{ "name": "demo", "private": false }\n';

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
-import { selfReference } from "./selfref.ts";
+import { selfReference } from "./project/selfref.ts";
 
 const CONFIG_NAMES = ["tsconfig.json", "jsconfig.json"];
 

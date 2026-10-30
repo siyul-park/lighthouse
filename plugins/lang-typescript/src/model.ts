@@ -1,9 +1,9 @@
 import ts from "typescript";
 import { exportedNames } from "./commonjs.ts";
 import { type Decl, FileDecls } from "./symbols.ts";
-import { declareModuleBody } from "./modulebody.ts";
+import { declareModuleBody } from "./functions.ts";
 import { isDeclarationFile, isIgnored, isTestFile, modulePath, relative, slashed } from "./project/paths.ts";
-import { selfReference } from "./selfref.ts";
+import { selfReference } from "./project/selfref.ts";
 import { declareTests, importsRunner } from "./tests.ts";
 
 /** What one program knows of the project: its declarations, by file, and how symbols reach them. */

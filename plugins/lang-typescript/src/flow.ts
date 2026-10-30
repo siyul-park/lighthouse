@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { Flow as FlowEvent } from "./wire.ts";
+import type { Flow as FlowEvent } from "./sdk/wire.ts";
 
 /** Decides whether a call calls the function being measured. */
 export type SelfCall = (call: ts.CallExpression) => boolean;

@@ -2,10 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import type { Decl } from "./symbols.ts";
-import { MODULE_BODY } from "./modulebody.ts";
+import { MODULE_BODY } from "./functions.ts";
 import type { Model } from "./model.ts";
 import { isTestFile, relative, slashed } from "./project/paths.ts";
-import type { Visibility } from "./wire.ts";
+import type { Visibility } from "./sdk/wire.ts";
 
 const RANK: Record<Visibility, number> = { private: 0, internal: 1, public: 2 };
 

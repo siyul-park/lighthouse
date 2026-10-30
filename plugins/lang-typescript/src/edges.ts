@@ -2,10 +2,10 @@ import { builtinModules } from "node:module";
 import ts from "typescript";
 import { type Decl, type FileDecls, isScript } from "./symbols.ts";
 import { assignmentTarget } from "./commonjs.ts";
-import type { Lines } from "./positions.ts";
+import type { Lines } from "./extent/lines.ts";
 import type { Model } from "./model.ts";
 import { isIgnored, modulePath, relative, slashed } from "./project/paths.ts";
-import type { EdgeKind, Node, Resolution, Span } from "./wire.ts";
+import type { EdgeKind, Node, Resolution, Span } from "./sdk/wire.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 

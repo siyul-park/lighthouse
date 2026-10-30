@@ -1,8 +1,8 @@
 import ts from "typescript";
-import type { Decl, FunctionBody } from "./symbols.ts";
-import type { Model } from "./model.ts";
-import type { Reach } from "./visibility.ts";
-import type { Signature, TypeRef } from "./wire.ts";
+import type { Decl, FunctionBody } from "../symbols.ts";
+import type { Model } from "../model.ts";
+import type { Reach } from "../visibility.ts";
+import type { Signature, TypeRef } from "../sdk/wire.ts";
 
 const PRINT = ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope;
 const NOTHING = ts.TypeFlags.Void | ts.TypeFlags.Undefined | ts.TypeFlags.Never;

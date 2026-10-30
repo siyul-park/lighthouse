@@ -3,9 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import { MODULE_BODY } from "../src/modulebody.ts";
+import { MODULE_BODY } from "../src/functions.ts";
 import { Provider } from "../src/provider.ts";
-import type { Fragment } from "../src/wire.ts";
+import type { Fragment } from "../src/sdk/wire.ts";
 
 const roots: string[] = [];
 

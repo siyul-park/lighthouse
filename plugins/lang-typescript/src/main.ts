@@ -1,7 +1,7 @@
 // lang-typescript is the Lighthouse language plugin for TypeScript and JavaScript.
 // It speaks the plugin protocol on stdin and stdout.
 import { Provider } from "./provider.ts";
-import { serve } from "./server.ts";
+import { serve } from "./sdk/server.ts";
 
 const ID = "lang-typescript";
 const VERSION = "0.1.0";

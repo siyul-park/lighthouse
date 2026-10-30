@@ -1,4 +1,4 @@
-import type { Position, Span } from "./wire.ts";
+import type { Position, Span } from "../sdk/wire.ts";
 
 const NON_ASCII = /[^\u0000-\u007f]/;
 

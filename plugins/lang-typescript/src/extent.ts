@@ -1,7 +1,7 @@
 import ts from "typescript";
 import type { Decl } from "./symbols.ts";
-import type { Lines } from "./positions.ts";
-import type { Span } from "./wire.ts";
+import type { Lines } from "./extent/lines.ts";
+import type { Span } from "./sdk/wire.ts";
 
 /** The whole of a declaration: the comments that lead it without a blank line, through its last token and a comment that trails it. */
 export function extentOf(decl: Decl, file: ts.SourceFile, lines: Lines): Span | undefined {

@@ -5,5 +5,5 @@ target/
 .env
 node_modules/
 dist/
-plugins/lang-typescript/src/wire.ts
+plugins/lang-typescript/src/sdk/wire.ts
 __pycache__/

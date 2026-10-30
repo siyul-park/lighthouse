@@ -1,6 +1,6 @@
 import ts from "typescript";
-import type { Lines } from "./positions.ts";
-import type { Comment, Symbol as Sym } from "./wire.ts";
+import type { Lines } from "./extent/lines.ts";
+import type { Comment, Symbol as Sym } from "./sdk/wire.ts";
 
 const GENERATED = /@generated\b/;
 

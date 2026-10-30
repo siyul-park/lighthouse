@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { Lines } from "./positions.ts";
+import { Lines } from "../extent/lines.ts";
 
 /** The reason a source file is not fully analysed: its first syntax error, with its position. */
 export function syntaxProblem(program: ts.Program, file: ts.SourceFile): string | undefined {

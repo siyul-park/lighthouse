@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { Provider } from "../src/provider.ts";
-import type { Fragment, Visibility } from "../src/wire.ts";
+import type { Fragment, Visibility } from "../src/sdk/wire.ts";
 
 const roots: string[] = [];
 

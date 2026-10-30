@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { describe, it } from "node:test";
 import { Provider } from "../src/provider.ts";
-import { serve } from "../src/server.ts";
+import { serve } from "../src/sdk/server.ts";
 
 const INITIALIZE = {
   protocolVersion: "0.4",

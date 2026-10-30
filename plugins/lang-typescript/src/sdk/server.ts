@@ -1,6 +1,6 @@
 import type { Readable, Writable } from "node:stream";
 import { StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
-import type { IndexParams, IndexResult, InitializeParams, InitializeResult } from "./wire.ts";
+import type { IndexParams, IndexResult, InitializeParams, InitializeResult, LanguageManifest } from "./wire.ts";
 
 export const PROTOCOL_VERSION = "0.4";
 
@@ -11,9 +11,12 @@ const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
 const REQUEST_FAILED = -32803;
 const NOT_INITIALIZED = -32002;
-/** The methods of a language provider. */
-export interface Handler {
-  initialize(params: InitializeParams): InitializeResult;
+/** What a language provider is: its identity, the languages it declares and how it indexes. */
+export interface Provider {
+  /** The plugin id. */
+  readonly name: string;
+  readonly version: string;
+  manifest(): LanguageManifest[];
   index(params: IndexParams): IndexResult;
 }
 
@@ -43,7 +46,7 @@ class Loop {
   private readonly session: Session = { initialized: false, shutdown: false };
 
   constructor(
-    private readonly handler: Handler,
+    private readonly provider: Provider,
     private readonly writer: StreamMessageWriter,
     private readonly resolve: (code: number) => void,
   ) {}
@@ -80,7 +83,7 @@ class Loop {
       return;
     }
     if (incoming.method === undefined) return;
-    const outcome = dispatch(this.handler, incoming, this.session);
+    const outcome = dispatch(this.provider, incoming, this.session);
     if (incoming.id === undefined || incoming.id === null) return;
     await reply(this.writer, incoming.id, outcome);
   }
@@ -91,9 +94,9 @@ class Loop {
  * closes the input, and returns the exit code: 0 after `shutdown` and `exit`
  * (or an input that closes after `shutdown`), 1 otherwise.
  */
-export function serve(input: Readable, output: Writable, handler: Handler): Promise<number> {
+export function serve(input: Readable, output: Writable, provider: Provider): Promise<number> {
   return new Promise((resolve) => {
-    new Loop(handler, new StreamMessageWriter(output), resolve).attach(new StreamMessageReader(input));
+    new Loop(provider, new StreamMessageWriter(output), resolve).attach(new StreamMessageReader(input));
   });
 }
 
@@ -105,16 +108,16 @@ async function reply(writer: StreamMessageWriter, id: number | string | null, ou
   await writer.write(body as never);
 }
 
-function dispatch(handler: Handler, message: Incoming, session: Session): Outcome {
+function dispatch(provider: Provider, message: Incoming, session: Session): Outcome {
   try {
-    return route(handler, message, session);
+    return route(provider, message, session);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     return { code: INTERNAL_ERROR, message: `panic: ${reason}` };
   }
 }
 
-function route(handler: Handler, message: Incoming, session: Session): Outcome {
+function route(provider: Provider, message: Incoming, session: Session): Outcome {
   switch (message.method) {
     case "initialize": {
       const params = decode<InitializeParams>(message.params, ["protocolVersion", "clientInfo", "workspaceFolders"]);
@@ -125,9 +128,8 @@ function route(handler: Handler, message: Incoming, session: Session): Outcome {
           message: `host speaks protocol ${params.protocolVersion}, this plugin speaks ${PROTOCOL_VERSION}`,
         };
       }
-      const result = handler.initialize(params);
       session.initialized = true;
-      return { result };
+      return { result: initialize(provider) };
     }
     default:
       break;
@@ -139,7 +141,7 @@ function route(handler: Handler, message: Incoming, session: Session): Outcome {
     case "lighthouse/index": {
       const params = decode<IndexParams>(message.params, ["project", "language", "inputs"]);
       if ("code" in params) return params;
-      return { result: handler.index(params) };
+      return { result: provider.index(params) };
     }
     case "shutdown":
       session.shutdown = true;
@@ -147,6 +149,15 @@ function route(handler: Handler, message: Incoming, session: Session): Outcome {
     default:
       return { code: METHOD_NOT_FOUND, message: `unknown method ${message.method}` };
   }
+}
+
+/** The answer to the handshake. */
+function initialize(provider: Provider): InitializeResult {
+  return {
+    protocolVersion: PROTOCOL_VERSION,
+    serverInfo: { name: provider.name, version: provider.version },
+    capabilities: { languages: provider.manifest() },
+  };
 }
 
 /** Refuses params that lack a required member, as the Rust server does for the fields its types require. */

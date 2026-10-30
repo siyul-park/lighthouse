@@ -2,15 +2,15 @@ import ts from "typescript";
 import { manualAssertions } from "../tests/assertions.ts";
 import { commentsOf, isGenerated } from "../comments.ts";
 import type { Decl } from "../symbols.ts";
-import { MODULE_BODY } from "../modulebody.ts";
+import { MODULE_BODY } from "../functions.ts";
 import { docOf, extentOf } from "../extent.ts";
 import { FlowWalker, countTokens, statementCount } from "../flow.ts";
 import { forwardTarget } from "../edges/forward.ts";
 import type { Model } from "../model.ts";
 import { isTestFile, testedModule } from "../project/paths.ts";
-import { Lines } from "../positions.ts";
+import { Lines } from "../extent/lines.ts";
 import { isTable, nestingOf, testCallOf } from "../tests.ts";
-import { Types } from "../types.ts";
+import { Types } from "../functions/signature.ts";
 import { type EdgeSink, Uses } from "../edges.ts";
 import type { Reach } from "../visibility.ts";
 import type {
@@ -23,7 +23,7 @@ import type {
   Span,
   Symbol as Sym,
   TestCase,
-} from "../wire.ts";
+} from "../sdk/wire.ts";
 
 /** What indexing a file gave: its fragment and how many of its imports resolve nowhere. */
 export interface Indexed {

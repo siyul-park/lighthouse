@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
 import { SNIPPETS_DIR } from "./project/paths.ts";
-import { byteLineStarts, positionAtByte } from "./positions.ts";
+import { byteLineStarts, positionAtByte } from "./extent/lines.ts";
 import type {
   Comment,
   EmbeddedFile,
@@ -12,7 +12,7 @@ import type {
   Span,
   Symbol as Sym,
   TestCase,
-} from "./wire.ts";
+} from "./sdk/wire.ts";
 
 /** The extension a fence's language is analysed under, by the first word of its info string (Linguist's names). */
 const EXTENSIONS: Record<string, string> = {
