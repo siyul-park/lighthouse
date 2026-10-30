@@ -159,15 +159,16 @@ impl<'a> RuleTester<'a> {
     }
 
     fn run(&self, decision: &Decision, example: &Example) -> Result<(), String> {
-        let dir = materialize(example)?;
         let registry = (self.registry)();
         let config = config(&registry, decision, example, &self.sources)?;
-        let engine = Engine::new(registry, config, self.catalog, dir.path())
-            .map_err(|e| e.to_string())?
-            .with_trust(self.trusted);
-        let outcome = engine
-            .check(&[], &[decision.id().to_owned()])
-            .map_err(|e| e.to_string())?;
+        let (outcome, engine, dir) = ExampleRun {
+            registry,
+            config,
+            catalog: self.catalog,
+            trusted: self.trusted,
+            models: ModelOptions::default(),
+        }
+        .run_in(decision.id(), example)?;
         if !outcome.incomplete.is_empty() {
             return Err(format!("analysis incomplete: {:?}", outcome.incomplete));
         }
@@ -259,14 +260,21 @@ impl ExampleRun<'_> {
     /// Checks the files of `example` in a directory of their own, with the
     /// rule `rule` only.
     pub fn run(self, rule: &str, example: &Example) -> Result<Run, String> {
+        self.run_in(rule, example).map(|(run, ..)| run)
+    }
+
+    /// Like [`run`](Self::run), keeping the engine and the directory, for a
+    /// caller that goes on to fix the files.
+    fn run_in(self, rule: &str, example: &Example) -> Result<(Run, Engine, TempDir), String> {
         let dir = materialize(example)?;
         let engine = Engine::new(self.registry, self.config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted)
             .with_models(self.models);
-        engine
+        let run = engine
             .check(&[], &[rule.to_owned()])
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        Ok((run, engine, dir))
     }
 }
 
