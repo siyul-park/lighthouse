@@ -173,3 +173,16 @@ fn fts5_matches_hangul_through_trigrams_and_nothing_for_a_query_without_shared_t
     assert!(store.rank(&documents(), "ab", 3).unwrap().is_empty());
     assert!(store.rank(&[], "errors", 3).unwrap().is_empty());
 }
+
+#[test]
+fn store_has_signal() {
+    let mut store = Store::open_in_memory().unwrap();
+    assert!(!store.has_signal("aaaaaaaaaaaa").unwrap());
+    store
+        .add_signal(&new("aaaaaaaaaaaa", SignalClass::Directive), WEEK)
+        .unwrap();
+    assert!(store.has_signal("aaaaaaaaaaaa").unwrap());
+    // The id is exact: a prefix is not a signal that is held.
+    assert!(!store.has_signal("aaaaaaa").unwrap());
+    assert!(!store.has_signal("bbbbbbbbbbbb").unwrap());
+}

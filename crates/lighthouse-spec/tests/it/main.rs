@@ -16,6 +16,7 @@ mod pack_variables;
 mod programs;
 mod project;
 mod reference;
+mod signals;
 mod sources;
 mod validation;
 mod versions;

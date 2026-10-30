@@ -10,6 +10,7 @@ mod model_ref;
 mod project;
 mod review;
 mod scope;
+mod signal;
 mod sites;
 mod symbol;
 mod text;
