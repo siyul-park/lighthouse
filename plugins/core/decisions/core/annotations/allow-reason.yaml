@@ -42,6 +42,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     toml: {}
     typescript: {}
@@ -238,3 +239,56 @@ spec:
       body: |-
         // lighthouse-disable-next-line design/exported-doc -- generated shim
         export function open() {}
+  - name: python-missing-reason
+    language: python
+    kind: invalid
+    files:
+    - path: example.py
+      body: |-
+        # lighthouse-disable-next-line design/exported-doc
+        def open() -> None:
+            """Opens the file."""
+    expect:
+    - line: 1
+  - name: python-with-reason
+    language: python
+    kind: valid
+    canonical: true
+    files:
+    - path: example.py
+      body: |-
+        # lighthouse-disable-next-line design/exported-doc -- generated shim
+        def open() -> None:
+            pass
+  - name: python-disable-line-missing-reason
+    language: python
+    kind: invalid
+    files:
+    - path: example.py
+      body: |-
+        def open() -> None:  # lighthouse-disable-line design/exported-doc
+            pass
+    expect:
+    - line: 1
+  - name: python-disable-line-with-reason
+    language: python
+    kind: valid
+    files:
+    - path: example.py
+      body: |-
+        def open() -> None:  # lighthouse-disable-line design/exported-doc -- re-exported
+            pass
+  - name: python-disable-range
+    language: python
+    kind: valid
+    files:
+    - path: example.py
+      body: |-
+        # lighthouse-disable design/exported-doc -- generated shims, documented in the generator
+        def open() -> None:
+            pass
+
+
+        def close() -> None:
+            pass
+        # lighthouse-enable design/exported-doc

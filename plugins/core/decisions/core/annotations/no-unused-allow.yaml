@@ -18,6 +18,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    python: {}
     rust: {}
     toml: {}
     typescript: {}
@@ -197,3 +198,29 @@ spec:
           function open() {}
       expect:
       - line: 1
+    - name: python-stale-allow
+      language: python
+      kind: invalid
+      fixed:
+        - path: example.py
+          body: |-
+            def open() -> None:
+                """Opens the file."""
+      files:
+        - path: example.py
+          body: |-
+            # lighthouse-disable-next-line design/exported-doc -- stale
+            def open() -> None:
+                """Opens the file."""
+      expect:
+        - line: 1
+    - name: python-plain-comment
+      language: python
+      kind: valid
+      canonical: true
+      files:
+        - path: example.py
+          body: |-
+            # open is not exported.
+            def _open() -> None:
+                pass
