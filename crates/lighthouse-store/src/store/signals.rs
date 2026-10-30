@@ -1,8 +1,8 @@
 //! Session signals and the proposals agents recorded from them: local
 //! Evidence of the cache, never committed and never part of the decision log.
 
-use lighthouse_model::{Attribution, Fingerprint, SignalStatus};
-use rusqlite::{OptionalExtension, Row, TransactionBehavior, params};
+use lighthouse_model::{Attribution, Fingerprint, SignalClass, SignalStatus};
+use rusqlite::{OptionalExtension, Row, ToSql, TransactionBehavior, params, params_from_iter};
 
 use super::{
     Store,
@@ -12,6 +12,10 @@ use crate::{Error, NewSignal, Proposal, Signal, SignalFilter};
 
 const COLUMNS: &str = "signal_id, session, generated_at, event, class, excerpt, features, rule, \
      agent_type, agent_id, agent_role, status, detail, settled_by, asked";
+
+/// The number of the first placeholder that holds a said class: the ones
+/// before it are the other filters of [`Store::signals`].
+const FIRST_SAID: usize = 5;
 
 impl Store {
     /// Records a signal unless one with its id is there already, and purges
@@ -49,16 +53,25 @@ impl Store {
 
     /// The signals matching `filter`, oldest first.
     pub fn signals(&self, filter: &SignalFilter) -> Result<Vec<Signal>, Error> {
+        let said: Vec<&str> = SignalClass::SAID.map(SignalClass::as_str).to_vec();
+        let marks = (0..said.len())
+            .map(|i| format!("?{}", i + FIRST_SAID))
+            .collect::<Vec<_>>()
+            .join(", ");
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {COLUMNS} FROM signals WHERE (?1 IS NULL OR session = ?1) \
              AND (?2 IS NULL OR status = ?2) AND (?3 = 0 OR asked = 0) \
-             AND (?4 = 0 OR class IN ('directive', 'correction', 'preference')) \
+             AND (?4 = 0 OR class IN ({marks})) \
              ORDER BY generated_at, signal_id"
         ))?;
-        let rows = stmt.query_map(
-            params![filter.session, filter.status, filter.unasked, filter.said],
-            signal,
-        )?;
+        let mut args: Vec<&dyn ToSql> = vec![
+            &filter.session,
+            &filter.status,
+            &filter.unasked,
+            &filter.said,
+        ];
+        args.extend(said.iter().map(|class| class as &dyn ToSql));
+        let rows = stmt.query_map(params_from_iter(args), signal)?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
