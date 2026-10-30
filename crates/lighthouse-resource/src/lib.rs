@@ -14,7 +14,7 @@ mod yaml;
 
 use std::{borrow::Cow, collections::BTreeMap};
 
-use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
+use schemars::{JsonSchema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub use document::{Format, documents, kind_of, resource};
@@ -22,7 +22,7 @@ pub use duration::{Duration, InvalidDuration};
 pub use error::Error;
 pub use fs::{file_in, read_optional, slashed, write_atomic, write_atomic_guarded};
 pub use listing::{Listed, listed};
-pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};
+pub use schema::{SCHEMA_URL_BASE, Schema, header, schema, schema_file};
 pub use xdg::{Base, dir as xdg_dir, dir_in as xdg_dir_in, plugins as xdg_plugins};
 pub use yaml::to_yaml;
 
@@ -126,7 +126,7 @@ impl<S: Spec + JsonSchema> JsonSchema for Resource<S> {
 
     /// An object with the four fields of the envelope; `apiVersion` and
     /// `kind` are constants, `spec` is the schema of `S`.
-    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+    fn json_schema(generator: &mut SchemaGenerator) -> schemars::Schema {
         json_schema!({
             "type": "object",
             "properties": {

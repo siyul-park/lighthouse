@@ -9,7 +9,7 @@ The resource model of every spec document: an envelope (`apiVersion`, `kind`, `m
 - `Spec` (the `KIND` of a content type), `Resource`, `Metadata`: the envelope.
 - `documents`, `resource`, `kind_of`, `Format`: reading.
 - `to_yaml`: writing.
-- `Descriptor`, `schema`, `schema_file`: one schema per kind, `$id` under `SCHEMA_URL_BASE`.
+- `Schema`, `schema`, `schema_file`: one schema per kind, `$id` under `SCHEMA_URL_BASE`.
 - `write_atomic`, `write_atomic_guarded`: the one file writer (the guard runs before the rename).
 - `parse_duration`, `xdg_plugins`: small shared readers.
 

@@ -9,12 +9,12 @@ pub const SCHEMA_URL_BASE: &str =
 
 /// One kind and its JSON Schema.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Descriptor {
+pub struct Schema {
     pub kind: &'static str,
     pub schema: Value,
 }
 
-impl Descriptor {
+impl Schema {
     /// The descriptor of the kind whose spec is `S`.
     pub fn new<S: Spec + JsonSchema>() -> Self {
         Self {

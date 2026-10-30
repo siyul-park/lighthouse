@@ -18,7 +18,7 @@ mod sources;
 mod union;
 mod validate;
 
-use lighthouse_resource::Descriptor;
+use lighthouse_resource::Schema;
 
 pub use attributes::Attributes;
 pub use catalog::Catalog;
@@ -53,8 +53,8 @@ pub use project::{
 pub(crate) use sources::SourceMapSpec;
 
 /// The JSON Schema of every kind this crate defines.
-pub fn descriptors() -> Vec<Descriptor> {
-    let mut decision = Descriptor::new::<DecisionSpec>();
+pub fn descriptors() -> Vec<Schema> {
+    let mut decision = Schema::new::<DecisionSpec>();
     // The named shape a `$ref` of an option may point to.
     if let Some(defs) = decision
         .schema
@@ -68,9 +68,9 @@ pub fn descriptors() -> Vec<Descriptor> {
     }
     vec![
         decision,
-        Descriptor::bare::<EnvironmentSpec>(),
-        Descriptor::new::<PackSpec>(),
-        Descriptor::new::<ProjectSpec>(),
-        Descriptor::new::<SourceMapSpec>(),
+        Schema::bare::<EnvironmentSpec>(),
+        Schema::new::<PackSpec>(),
+        Schema::new::<ProjectSpec>(),
+        Schema::new::<SourceMapSpec>(),
     ]
 }

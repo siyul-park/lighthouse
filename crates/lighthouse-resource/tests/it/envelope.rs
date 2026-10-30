@@ -1,7 +1,7 @@
 use std::{path::Path, time};
 
 use lighthouse_resource::{
-    API_VERSION, Descriptor, Duration, Error, Format, Metadata, Resource, Spec, documents, header,
+    API_VERSION, Duration, Error, Format, Metadata, Resource, Schema, Spec, documents, header,
     kind_of, resource, schema, schema_file, to_yaml,
 };
 use schemars::JsonSchema;
@@ -82,7 +82,7 @@ fn written_yaml_reads_back() {
 
 #[test]
 fn schema_describes_the_envelope_and_names_its_file() {
-    let schema = Descriptor::new::<Toy>().schema;
+    let schema = Schema::new::<Toy>().schema;
     assert_eq!(
         schema["$schema"],
         "https://json-schema.org/draft/2020-12/schema"
@@ -149,7 +149,7 @@ fn the_format_follows_the_extension() {
 fn the_schema_of_a_spec_is_the_schema_of_its_document() {
     let described = schema::<Toy>();
 
-    assert_eq!(described, Descriptor::new::<Toy>().schema);
+    assert_eq!(described, Schema::new::<Toy>().schema);
     assert_eq!(described["title"], "ToyKind");
     assert!(
         described["$id"]

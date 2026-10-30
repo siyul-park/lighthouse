@@ -97,8 +97,8 @@ impl Plugin for Unavailable {
 }
 
 /// The JSON Schema of the kinds this crate defines.
-pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
-    vec![lighthouse_resource::Descriptor::new::<PluginSpec>()]
+pub fn descriptors() -> Vec<lighthouse_resource::Schema> {
+    vec![lighthouse_resource::Schema::new::<PluginSpec>()]
 }
 
 /// Starts every plugin listed in `config` that is not already registered and

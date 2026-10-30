@@ -18,7 +18,7 @@ mod signal;
 mod standings;
 mod store;
 
-use lighthouse_resource::Descriptor;
+use lighthouse_resource::Schema;
 
 pub use error::Error;
 pub use log::{
@@ -34,10 +34,10 @@ pub use signal::{NewSignal, Proposal, Signal, SignalFilter};
 pub use store::{Ranked, Store};
 
 /// The JSON Schema of every record kind the decision log holds.
-pub fn descriptors() -> Vec<Descriptor> {
+pub fn descriptors() -> Vec<Schema> {
     vec![
-        Descriptor::new::<JudgmentSpec>(),
-        Descriptor::new::<SuppressionSpec>(),
-        Descriptor::new::<RevisionSpec>(),
+        Schema::new::<JudgmentSpec>(),
+        Schema::new::<SuppressionSpec>(),
+        Schema::new::<RevisionSpec>(),
     ]
 }

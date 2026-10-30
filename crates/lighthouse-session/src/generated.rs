@@ -12,7 +12,7 @@ use lighthouse_checks::Composition;
 use lighthouse_report::docs::{
     DOCS_DIR, FunctionDoc, cel_functions_markdown, fix_operations_markdown, pages,
 };
-use lighthouse_resource::{Descriptor, schema_file};
+use lighthouse_resource::{Schema, schema_file};
 use lighthouse_spec::{Catalog, authored_severity};
 
 use crate::{Result, Session};
@@ -51,7 +51,7 @@ pub fn pack_docs(root: &Path) -> Result<BTreeMap<String, String>> {
 }
 
 /// Every kind with its schema, by kind name.
-pub fn schemas() -> BTreeMap<&'static str, Descriptor> {
+pub fn schemas() -> BTreeMap<&'static str, Schema> {
     [
         lighthouse_spec::descriptors(),
         lighthouse_rpc::descriptors(),
@@ -64,7 +64,7 @@ pub fn schemas() -> BTreeMap<&'static str, Descriptor> {
 }
 
 /// The schema of the kind named `kind`, in any letter case.
-pub fn schema_of(kind: &str) -> Option<Descriptor> {
+pub fn schema_of(kind: &str) -> Option<Schema> {
     schemas()
         .into_values()
         .find(|d| d.kind.eq_ignore_ascii_case(kind) || schema_file(d.kind) == kind)
