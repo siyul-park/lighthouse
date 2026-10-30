@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Test table data SHOULD be literal and easy to inspect; complex generation
     and builders SHOULD NOT hide the input/output specification.
   severity: warn

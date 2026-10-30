@@ -20,6 +20,7 @@ spec:
     go: {}
     rust: {}
     toml: {}
+    typescript: {}
   requirement: >-
     An allow annotation SHOULD suppress a finding; one whose rule no longer
     fires there, or is not enabled, SHOULD be removed.
@@ -159,3 +160,40 @@ spec:
             fn open() {}
       expect:
         - line: 1
+    - name: typescript-stale-allow
+      language: typescript
+      kind: invalid
+      fixed:
+      - path: example.ts
+        body: |-
+          function open(): void {}
+      files:
+      - path: example.ts
+        body: |-
+          // lighthouse-disable-next-line design/exported-doc -- stale
+          function open(): void {}
+      expect:
+      - line: 1
+    - name: typescript-plain-comment
+      language: typescript
+      kind: valid
+      canonical: true
+      files:
+      - path: example.ts
+        body: |-
+          // open is not exported.
+          function open(): void {}
+    - name: javascript-stale-allow
+      language: typescript
+      kind: invalid
+      fixed:
+      - path: example.js
+        body: |-
+          function open() {}
+      files:
+      - path: example.js
+        body: |-
+          // lighthouse-disable-next-line design/exported-doc -- stale
+          function open() {}
+      expect:
+      - line: 1

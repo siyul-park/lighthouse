@@ -16,6 +16,10 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript:
+      options:
+        libraries:
+        - chai
   requirement: Tests SHOULD assert outcomes with the standard testing-library or language-native
     assertions rather than manually comparing values and failing without a useful
     diagnostic.
@@ -134,6 +138,52 @@ spec:
             assert_eq!(2 + 2, 4);
         }
     canonical: true
+  - name: hand-written-comparison-typescript
+    language: typescript
+    kind: invalid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+    - path: store.test.ts
+      body: |-
+        import { expect } from "chai";
+        import { describe, it } from "mocha";
+        import { get } from "./store";
+
+        describe("get", () => {
+          it("returns one", () => {
+            expect(get()).to.equal(1);
+            if (get() !== 1) {
+              throw new Error("get");
+            }
+          });
+        });
+    expect:
+    - line: 5
+  - name: no-assertion-library-in-use-typescript
+    language: typescript
+    kind: valid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+    - path: store.test.ts
+      body: |-
+        import { describe, it } from "mocha";
+        import { get } from "./store";
+
+        describe("get", () => {
+          it("returns one", () => {
+            if (get() !== 1) {
+              throw new Error("get");
+            }
+          });
+        });
   fix:
     safety: unsafe
     type: model

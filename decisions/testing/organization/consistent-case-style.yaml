@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    typescript: {}
   requirement: A test level SHOULD use either data-driven table cases or individually
     named scenario cases, not a mixture for the same behavior.
   severity: warn
@@ -106,3 +107,53 @@ spec:
         		})
         	}
         }
+  - name: mixed-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export function get(input: string): number {
+          return input.length;
+        }
+    - path: sample.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./sample";
+
+        describe("get", () => {
+          it("handles empty", () => {
+            expect(get("")).toBe(0);
+          });
+        });
+
+        describe("get cases", () => {
+          it.each([
+            ["a", 1],
+            ["ab", 2],
+          ])("measures %s", (input, want) => {
+            expect(get(input)).toBe(want);
+          });
+        });
+  - name: table-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export function get(input: string): number {
+          return input.length;
+        }
+    - path: sample.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./sample";
+
+        describe("get", () => {
+          it.each([
+            ["", 0],
+            ["a", 1],
+          ])("measures %j", (input, want) => {
+            expect(get(input)).toBe(want);
+          });
+        });

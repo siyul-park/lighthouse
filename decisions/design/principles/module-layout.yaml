@@ -25,6 +25,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: >-
     A module's direct implementation files and its child modules SHOULD form
     one coherent abstraction level.
@@ -129,6 +130,41 @@ spec:
       body: |-
         pub fn analyze() -> usize { parse() }
         fn parse() -> usize { 1 }
+  - name: mixed-level-typescript-module
+    language: typescript
+    kind: invalid
+    files:
+    - path: src/engine.ts
+      body: |-
+        import { analyze } from "./engine/language";
+
+        export class Engine {}
+        export class Config {}
+        export const VERSION = "1";
+        export const DEFAULTS: string[] = [];
+        export function run(): number {
+          return analyze();
+        }
+    - path: src/engine/language.ts
+      body: |-
+        export function analyze(): number {
+          return 1;
+        }
+    options:
+      limits:
+        directDeclarations: 3
+    expect:
+    - line: 1
+  - name: facade-typescript-module
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: src/engine/language.ts
+      body: |-
+        export function analyze(): number {
+          return 1;
+        }
   provenance:
     wasDerivedFrom:
       - Ousterhout, A Philosophy of Software Design, chs. 4 and 9

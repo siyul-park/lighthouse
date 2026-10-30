@@ -68,6 +68,9 @@ spec:
       options:
         symbols: []
     cel: {}
+    typescript:
+      options:
+        symbols: []
   check:
     type: cel
     select: symbol
@@ -313,6 +316,43 @@ spec:
               expression: 'true'
             where: symbol.name == 'example'
             message: Example
+  - name: typescript-enum-member-repeats-its-enum
+    language: typescript
+    kind: invalid
+    files:
+    - path: provider.ts
+      body: |-
+        export enum Kind {
+          KindA,
+          KindB,
+          KindC,
+        }
+    expect:
+    - line: 2
+    - line: 3
+    - line: 4
+  - name: typescript-named-import-supplies-the-context
+    language: typescript
+    kind: valid
+    files:
+    - path: provider.ts
+      body: |-
+        export class ProviderOptions {}
+
+        export function providerFor(): ProviderOptions {
+          return new ProviderOptions();
+        }
+  - name: typescript-enum-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: provider.ts
+      body: |-
+        export enum Kind {
+          Local,
+          Remote,
+          Hybrid,
+        }
   fix:
     safety: unsafe
     type: model

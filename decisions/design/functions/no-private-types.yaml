@@ -8,11 +8,14 @@ spec:
   title: Public signatures expose public types
   context: External callers cannot name a private type even when the function or receiver
     is exported. Go is checked deterministically; Rust already has a compiler lint
-    for this contract.
+    for this contract. TypeScript allows it unless the project emits declarations
+    (the `declaration` option, error TS4058 and its siblings), so the check also covers
+    projects that do not.
   scope:
     subject: symbol
   languages:
     go: {}
+    typescript: {}
   requirement: An exported function or a method of an exported type SHOULD NOT expose
     an unexported type in its parameters or results.
   severity: warn
@@ -21,7 +24,7 @@ spec:
     select: function
     variables:
     - name: reachable
-      expression: func.lang == 'go' && func.visibility != 'private' && (func.kind
+      expression: func.lang in ['go', 'typescript'] && func.visibility != 'private' && (func.kind
         == 'function' || (func.kind == 'method' && (func.owner == null || func.owner.visibility
         != 'private')))
     - name: exposed
@@ -131,3 +134,32 @@ spec:
         func (s *Server) Config() config { return config{} }
     expect:
     - line: 7
+  - name: unexported-type-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        interface Config {
+          verbose: boolean;
+        }
+
+        export function load(): Config {
+          return { verbose: true };
+        }
+    expect:
+    - line: 5
+  - name: unexported-type-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export interface Config {
+          verbose: boolean;
+        }
+
+        export function load(): Config {
+          return { verbose: true };
+        }
+    canonical: true

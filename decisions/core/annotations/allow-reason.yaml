@@ -44,6 +44,7 @@ spec:
     go: {}
     rust: {}
     toml: {}
+    typescript: {}
   requirement: >-
     An allow annotation MUST give a reason after `--`; an annotation without
     one is ignored and reported.
@@ -191,3 +192,49 @@ spec:
       body: |-
         # lighthouse-disable-next-line design/exported-doc -- generated configuration
         key = 'value'
+  - name: typescript-missing-reason
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc
+        export function open(): void {}
+    expect:
+    - line: 1
+  - name: typescript-with-reason
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: example.ts
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc -- re-exported shim
+        export function open(): void {}
+  - name: typescript-disable-line-missing-reason
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export function open(): void {} // lighthouse-disable-line design/exported-doc
+    expect:
+    - line: 1
+  - name: javascript-missing-reason
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.js
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc
+        export function open() {}
+    expect:
+    - line: 1
+  - name: javascript-with-reason
+    language: typescript
+    kind: valid
+    files:
+    - path: example.js
+      body: |-
+        // lighthouse-disable-next-line design/exported-doc -- generated shim
+        export function open() {}

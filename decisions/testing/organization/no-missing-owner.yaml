@@ -91,6 +91,13 @@ spec:
           - index_mut
           - serialize
           - deserialize
+    typescript:
+      options:
+        includeInternal: true
+        exemptMethods:
+        - toString
+        - toJSON
+        - valueOf
   check:
     type: cel
     select: symbol
@@ -303,3 +310,91 @@ spec:
     - path: store_test.go
       body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
         TestStore(t *testing.T) {\n\tif (store.Store{}) != (store.Store{}) {\n\t\tt.Fatal(\"store\")\n\t}\n}"
+  - name: missing-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+
+        export function put(): number {
+          return 2;
+        }
+    - path: store.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./store";
+
+        describe("get", () => {
+          it("returns one", () => {
+            expect(get()).toBe(1);
+          });
+        });
+    expect:
+    - line: 5
+  - name: missing-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+
+        export function put(): number {
+          return 2;
+        }
+    - path: store.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get, put } from "./store";
+
+        describe("get", () => {
+          it("returns one", () => {
+            expect(get()).toBe(1);
+          });
+        });
+
+        describe("put", () => {
+          it("returns two", () => {
+            expect(put()).toBe(2);
+          });
+        });
+  - name: missing-typescript-no-tests-at-all
+    language: typescript
+    kind: valid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+  - name: missing-javascript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: store.js
+      body: |-
+        export function get() {
+          return 1;
+        }
+
+        export function put() {
+          return 2;
+        }
+    - path: store.test.js
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./store.js";
+
+        describe("get", () => {
+          it("returns one", () => {
+            expect(get()).toBe(1);
+          });
+        });
+    expect:
+    - line: 5

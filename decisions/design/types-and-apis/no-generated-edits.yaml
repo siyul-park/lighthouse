@@ -14,6 +14,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Generated files MUST be changed through their generator or source definition,
     not by editing generated output directly.
   severity: error

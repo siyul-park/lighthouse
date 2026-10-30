@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A module MUST NOT depend on a module in a higher layer, and modules
     of one layer MUST remain independent when the layer contract says they are peers.
   severity: error
@@ -361,3 +362,89 @@ spec:
             String::new()
         }
     canonical: true
+  - name: typescript-import-points-up
+    language: typescript
+    kind: invalid
+    options:
+      layers:
+      - - infra/**
+      - - domain/**
+    files:
+    - path: domain/domain.ts
+      body: |-
+        import { read } from "../infra/infra";
+
+        export function load(): string {
+          return read();
+        }
+    - path: infra/infra.ts
+      body: |-
+        export function read(): string {
+          return "";
+        }
+    expect:
+    - line: 1
+  - name: typescript-import-points-down
+    language: typescript
+    kind: valid
+    options:
+      layers:
+      - - domain/**
+      - - infra/**
+    files:
+    - path: domain/domain.ts
+      body: |-
+        import { read } from "../infra/infra";
+
+        export function load(): string {
+          return read();
+        }
+    - path: infra/infra.ts
+      body: |-
+        export function read(): string {
+          return "";
+        }
+  - name: typescript-peers
+    language: typescript
+    kind: invalid
+    options:
+      layers:
+      - - http/**
+        - grpc/**
+    files:
+    - path: http/http.ts
+      body: |-
+        import { serve as inner } from "../grpc/grpc";
+
+        export function serve(): string {
+          return inner();
+        }
+    - path: grpc/grpc.ts
+      body: |-
+        export function serve(): string {
+          return "";
+        }
+    expect:
+    - line: 1
+  - name: javascript-import-points-up
+    language: typescript
+    kind: invalid
+    options:
+      layers:
+      - - infra/**
+      - - domain/**
+    files:
+    - path: domain/domain.js
+      body: |-
+        const { read } = require("../infra/infra");
+
+        exports.load = function load() {
+          return read();
+        };
+    - path: infra/infra.js
+      body: |-
+        exports.read = function read() {
+          return "";
+        };
+    expect:
+    - line: 1

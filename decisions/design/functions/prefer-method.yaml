@@ -16,6 +16,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Methods SHOULD express receiver-owned behavior; a private free function
     called only by methods of one type SHOULD be a method of that type unless it is
     a genuine reusable helper.
@@ -165,3 +166,76 @@ spec:
             total
         }
     canonical: true
+  - name: only-one-owner-calls-typescript
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          items: number[] = [];
+
+          total(): number {
+            return sum(this);
+          }
+
+          count(): number {
+            return this.items.length + sum(this) - sum(this);
+          }
+        }
+
+        function sum(store: Store): number {
+          let total = 0;
+          for (const item of store.items) {
+            total += item;
+          }
+          return total;
+        }
+    expect:
+    - line: 13
+  - name: shared-by-an-exported-function-typescript
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          items: number[] = [];
+
+          total(): number {
+            return sum(this);
+          }
+        }
+
+        export function totalOf(store: Store): number {
+          return sum(store);
+        }
+
+        function sum(store: Store): number {
+          let total = 0;
+          for (const item of store.items) {
+            total += item;
+          }
+          return total;
+        }
+  - name: helper-unrelated-to-the-owner-typescript
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          items: number[] = [];
+
+          total(): number {
+            return sum(this.items);
+          }
+        }
+
+        function sum(items: number[]): number {
+          let total = 0;
+          for (const item of items) {
+            total += item;
+          }
+          return total;
+        }

@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Assertions that belong to a scenario SHOULD be inside that scenario’s
     test case; setup outside cases SHOULD only establish shared preconditions.
   severity: warn

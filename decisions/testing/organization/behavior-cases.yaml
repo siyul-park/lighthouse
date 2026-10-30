@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A test case SHOULD specify one behavior and contain the actions and
     assertions that establish that behavior.
   severity: warn

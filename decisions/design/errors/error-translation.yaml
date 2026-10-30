@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A layer SHOULD add its own operation context when propagating an error
     and SHOULD NOT translate errors repeatedly in layers that do not own the boundary.
   severity: warn

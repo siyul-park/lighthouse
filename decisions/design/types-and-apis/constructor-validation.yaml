@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A constructor SHOULD reject invalid required inputs and establish the
     invariants that all constructed values rely on.
   severity: warn

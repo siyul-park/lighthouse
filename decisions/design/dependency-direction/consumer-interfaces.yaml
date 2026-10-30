@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: An interface SHOULD be defined at the point that consumes behavior,
     and SHOULD exist only when callers need to supply an implementation.
   severity: warn

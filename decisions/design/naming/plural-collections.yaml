@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Names for collections and stores SHOULD be plural; names for a single
     capability or value SHOULD be singular.
   severity: warn

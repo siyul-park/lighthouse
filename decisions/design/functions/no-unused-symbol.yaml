@@ -42,6 +42,7 @@ spec:
       options:
         symbols: []
     cel: {}
+    typescript: {}
   check:
     type: cel
     select: symbol
@@ -220,3 +221,90 @@ spec:
         fn helper() {}
         pub fn used() { helper(); }
     canonical: false
+  - name: dead-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export function run(): number {
+          return helper();
+        }
+
+        function helper(): number {
+          return 1;
+        }
+
+        function unused(): number {
+          return 2;
+        }
+    expect:
+    - line: 9
+  - name: dead-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export function run(): number {
+          return helper();
+        }
+
+        function helper(): number {
+          return 1;
+        }
+  - name: dead-typescript-private-method-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          get(): number {
+            return this.read();
+          }
+
+          private read(): number {
+            return 1;
+          }
+
+          private unused(): number {
+            return 2;
+          }
+        }
+    expect:
+    - line: 10
+  - name: used-as-a-value-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export function run(items: number[]): number[] {
+          return items.map(double);
+        }
+
+        function double(n: number): number {
+          return n * 2;
+        }
+  - name: dead-javascript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.js
+      body: |-
+        function run() {
+          return helper();
+        }
+
+        function helper() {
+          return 1;
+        }
+
+        function unused() {
+          return 2;
+        }
+
+        module.exports = { run };
+    expect:
+    - line: 9

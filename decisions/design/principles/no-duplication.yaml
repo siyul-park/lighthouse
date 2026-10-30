@@ -15,6 +15,7 @@ spec:
     go: {}
     rust: {}
     cel: {}
+    typescript: {}
   requirement: Semantically equivalent behavior SHOULD have one implementation and
     one owner.
   severity: info

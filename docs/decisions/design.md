@@ -20,7 +20,7 @@ Design minimizes conceptual surface while keeping responsibility and ownership b
 
 ### Symbols have one responsibility
 
-`design/single-responsibility` · module · info · cel · go, rust
+`design/single-responsibility` · module · info · cel · go, rust, typescript
 
 *A type that owns unrelated behaviors is difficult to name, test and change. Two signals, reported once per module at its first type that matches (the first is members). Members counts the public methods of a type (Sonar S1448). Cohesion finds a type with at least `minMethods` methods that fall in more than one connected group, where two methods are joined by a field they both use or by a call between them (LCOM4, Hitz and Montazeri 1995). Both are only signals; review the semantic responsibilities rather than splitting by size alone.*
 
@@ -57,11 +57,11 @@ func (s *Store) Put() int { return 2 }
 func (s *Store) Drop() int { return 3 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Modules represent meaningful boundaries
 
-`design/meaningful-separation` · module · info · cel · go, rust
+`design/meaningful-separation` · module · info · cel · go, rust, typescript
 
 *A small module with one user may be a real abstraction or merely that user’s implementation detail. Evaluate the contract and dependencies, not size alone.*
 
@@ -89,11 +89,11 @@ package main
 func main() {}
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Modules do not share private implementation
 
-`design/no-conjoined-modules` · module · info · cel · go, rust
+`design/no-conjoined-modules` · module · info · cel · go, rust, typescript
 
 *Mutually dependent modules that share private state are not an ownership boundary; merge them or extract a single owner. The check identifies the conjoined shape from private reach and parent calls.*
 
@@ -125,11 +125,11 @@ pub fn run() -> i32 { part::work() }
 pub fn work() -> i32 { super::api() + 1 }
 ```
 
-Also: go
+Also: go, typescript
 
 ### Behavior has one implementation
 
-`design/no-duplication` · symbol · info · model · cel, go, rust
+`design/no-duplication` · symbol · info · model · cel, go, rust, typescript
 
 *Duplicated behavior diverges as fixes accumulate. Prefer one implementation when meaning and contract are the same; keep distinct behavior separate. Syntax similarity alone is not enough to require abstraction.*
 
@@ -163,7 +163,7 @@ Also: cel
 
 ### Reuse precedes new abstractions
 
-`design/prefer-reuse` · symbol · info · model · go, rust
+`design/prefer-reuse` · symbol · info · model · go, rust, typescript
 
 *New abstractions add concepts and long-lived contracts. Reuse is preferred when the existing API expresses the behavior without weakening boundaries.*
 
@@ -190,7 +190,7 @@ func Open() *Store { return &Store{} }
 
 ### Extracted behavior is general
 
-`design/general-extraction` · symbol · info · model · go, rust
+`design/general-extraction` · symbol · info · model · go, rust, typescript
 
 *Moving code into a helper without generalizing its contract relocates complexity and adds indirection rather than creating a useful abstraction.*
 
@@ -215,7 +215,7 @@ func buildTeamURL(id string) string { return pathFor("teams", id) }
 
 ### A module groups code at one abstraction level
 
-`design/module-layout` · module · warn · cel · go, rust
+`design/module-layout` · module · warn · cel · go, rust, typescript
 
 *A directory should make one cohesive concept easy to find. Mixing high-level orchestration with implementation-specific files beside a subdirectory for that implementation often leaves two competing ways to navigate the same concept. A module root may remain a small public facade or composition root; the concern is a sustained mixture of peer roles, not the mere presence of a child directory (Martin, Clean Code (2008), G34; Ousterhout, A Philosophy of Software Design, chs. 4 and 9). A parent module that keeps direct code beside a nested `language` directory is a concrete warning candidate, because the language implementation is usually a separate responsibility; other mixed layouts need review rather than an automatic warning, since a small facade or composition root may legitimately assemble its children.*
 
@@ -251,7 +251,7 @@ func Analyze() int { return parse() }
 func parse() int { return 1 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ## Dependency Direction
 
@@ -265,7 +265,7 @@ Dependency direction keeps stable, general code independent from specific policy
 
 ### Dependencies point down the layers
 
-`design/layers` · edge · error · cel · go, rust
+`design/layers` · edge · error · cel · go, rust, typescript
 
 *The project’s declared layer contract is deterministic: dependencies point down, and peer modules in different globs of one layer stay independent. Explicitly justified exceptions are listed in the project options.*
 
@@ -320,11 +320,11 @@ package infra
 func Read() string { return "" }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Interfaces live with their consumers
 
-`design/consumer-interfaces` · symbol · warn · model · go, rust
+`design/consumer-interfaces` · symbol · warn · model · go, rust, typescript
 
 *Defining an interface before a consumer needs substitution creates an unnecessary abstraction; the consumer should own the narrow contract.*
 
@@ -374,7 +374,7 @@ func Read() string { return "" }
 
 ### Reusable code does not depend on caller policy
 
-`design/no-caller-dependency` · symbol · warn · model · go, rust
+`design/no-caller-dependency` · symbol · warn · model · go, rust, typescript
 
 *General code must remain independent of its callers. A dependency on caller policy or a specific lifecycle pulls unstable semantics into a reusable layer.*
 
@@ -442,7 +442,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 ### Functions stay within their complexity limits
 
-`design/complexity` · symbol · warn · cel · cel, go, rust
+`design/complexity` · symbol · warn · cel · cel, go, rust, typescript
 
 *Function size and control-flow metrics are signals for simplifying the function, not for moving the same complexity into another file or a helper used only once; the remedy simplifies the behavior rather than relocating it. A role-specific limit may replace the default for lines, statements, decision paths, cognitive complexity, and nesting.*
 
@@ -454,7 +454,7 @@ Derived from: Lighthouse catalog: the CEL limits are the largest values among th
 | --- | --- | --- |
 | `ignoreDispatch` | `true` | Leave out a function that is a table in code form or a flat dispatch (see the context); `false` counts them like any other function. |
 | `kinds` | `["lines","statements","cyclomatic","cognitive","nesting"]` | What to report; a function is reported once, with every kind that matched in the evidence. |
-| `limits` | `{"cognitive":30,"cyclomatic":30,"lines":60,"nesting":4,"statements":40}`; cel: `{"cognitive":100,"cyclomatic":40,"lines":-1,"nesting":10,"statements":250}`; rust: `{"cognitive":25,"lines":100,"statements":-1}` | The most each measure may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object replaces the whole option. |
+| `limits` | `{"cognitive":30,"cyclomatic":30,"lines":60,"nesting":4,"statements":40}`; cel: `{"cognitive":100,"cyclomatic":40,"lines":-1,"nesting":10,"statements":250}`; rust: `{"cognitive":25,"lines":100,"statements":-1}`; typescript: `{"cyclomatic":20}` | The most each measure may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object replaces the whole option. |
 
 ```go invalid
 package sample
@@ -480,11 +480,11 @@ func total(a, b int) int {
 }
 ```
 
-Also: rust, cel
+Also: rust, cel, typescript
 
 ### Functions are not dependency hubs
 
-`design/coupling` · symbol · warn · cel · go, rust
+`design/coupling` · symbol · warn · cel · go, rust, typescript
 
 *Fan-in, fan-out and statement count identify dependency hubs and high fan-out coordinators (Henry–Kafura). They are advisory signals rather than proof of a defect.*
 
@@ -526,11 +526,11 @@ func a() { hub() }
 func b() { hub() }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### A function reads at one level of abstraction
 
-`design/abstraction-level` · symbol · warn · model · go, rust
+`design/abstraction-level` · symbol · warn · model · go, rust, typescript
 
 *A reader should be able to follow the intent of a function as a sequence of steps, without switching between policy and low-level mechanics. The test is semantic, not a line-count heuristic (Martin, Clean Code (2008), G34). A high-level function reads as a sequence of steps one level below its name; a low-level function performs one concrete operation without narrating higher-level policy.*
 
@@ -570,7 +570,7 @@ Also: rust
 
 ### Signatures stay within their size limits
 
-`design/signature-size` · symbol · warn · cel · fix: unsafe · go, rust
+`design/signature-size` · symbol · warn · cel · fix: unsafe · go, rust, typescript
 
 *Parameter and result limits follow the dominant language linter and the function’s role. Receivers, tests, entry points and interface implementations have specific exemptions; structs used only by one function count by their required fields. A constructor assembles a type, so its limit is higher; a signature is simplified rather than hidden in a one-use parameter object.*
 
@@ -582,7 +582,7 @@ Derived from: revive argument-limit 8: https://revive.run/r#argument-limit; clip
 | --- | --- | --- |
 | `allowSuffixes` | `["Options","Opts","Config"]` | Name endings of a struct that only carries settings: when a struct used only by one function ends in one of these, only its required fields (not a pointer, slice, map, function, channel or interface in Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust) count toward the limit. |
 | `kinds` | `["params","results"]` | What to report; a function is reported once, with every kind that matched in the evidence. |
-| `limits` | `{"params":{"constructor":9,"default":8,"entrypoint":-1,"implementation":-1,"test":-1},"results":{"constructor":-1,"default":3,"implementation":-1,"test":-1}}`; rust: `{"params":{"constructor":8,"default":7,"entrypoint":-1,"implementation":-1,"test":-1}}` | The most each signature part may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object replaces the whole option. `params`: Most parameters a function may have. `results`: Most results a function may have. |
+| `limits` | `{"params":{"constructor":9,"default":8,"entrypoint":-1,"implementation":-1,"test":-1},"results":{"constructor":-1,"default":3,"implementation":-1,"test":-1}}`; rust: `{"params":{"constructor":8,"default":7,"entrypoint":-1,"implementation":-1,"test":-1}}`; typescript: `{"params":{"constructor":3,"default":3,"entrypoint":-1,"implementation":-1,"test":-1},"results":-1}` | The most each signature part may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object replaces the whole option. `params`: Most parameters a function may have. `results`: Most results a function may have. |
 
 ```go invalid
 package sample
@@ -600,13 +600,13 @@ func build(a, b, c, d, e, f, g, h int) int {
 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Public signatures expose public types
 
-`design/no-private-types` · symbol · warn · cel · go
+`design/no-private-types` · symbol · warn · cel · go, typescript
 
-*External callers cannot name a private type even when the function or receiver is exported. Go is checked deterministically; Rust already has a compiler lint for this contract.*
+*External callers cannot name a private type even when the function or receiver is exported. Go is checked deterministically; Rust already has a compiler lint for this contract. TypeScript allows it unless the project emits declarations (the `declaration` option, error TS4058 and its siblings), so the check also covers projects that do not.*
 
 An exported function or a method of an exported type SHOULD NOT expose an unexported type in its parameters or results.
 
@@ -628,9 +628,11 @@ type Config struct{}
 func New() Config { return Config{} }
 ```
 
+Also: typescript
+
 ### Public inputs use narrow abstractions
 
-`design/narrow-inputs` · symbol · warn · model · go, rust
+`design/narrow-inputs` · symbol · warn · model · go, rust, typescript
 
 *A broad project object passed only so a callee can use one capability exposes unrelated dependencies and makes the caller contract harder to substitute. Inputs and outputs are one property of one signature, the abstraction level it asks of callers and promises them (the Go proverb "accept interfaces, return structs"), so they are one decision.*
 
@@ -654,7 +656,7 @@ func FindUser(users UserReader, id string) User { return users.Find(id) }
 
 ### Behavior lives with its owner
 
-`design/prefer-method` · symbol · warn · cel · fix: unsafe · go, rust
+`design/prefer-method` · symbol · warn · cel · fix: unsafe · go, rust, typescript
 
 *Where a function lives tells readers who owns behavior. A private free function called only by methods of one type and that uses or takes that owner is likely that type's behavior under a separate name. Constructors, main and init are not reported. Feature envy and cross-module placement are separate review decisions.*
 
@@ -702,11 +704,11 @@ func sum(s *Store) int {
 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Functions belong with the behavior they use
 
-`design/feature-envy` · symbol · info · cel · fix: unsafe · go, rust
+`design/feature-envy` · symbol · info · cel · fix: unsafe · go, rust, typescript
 
 *A free function that uses several members of one type may be that type's behavior, and a function that uses only one other module may be misplaced. These are low-precision review candidates, not deterministic findings. Constructors and entry points are excluded; exported functions are excluded unless a project explicitly opts them in.*
 
@@ -758,11 +760,11 @@ func summary(s *Store, c *Cache) int {
 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Unused private symbols are removed
 
-`design/no-unused-symbol` · symbol · error · cel · cel, go, rust
+`design/no-unused-symbol` · symbol · error · cel · cel, go, rust, typescript
 
 *A private symbol that is not called or referenced is dead code. Interface declarations, bodyless functions, generated declarations and test fixtures are not unused implementations; Rust dead-code analysis stays with rustc because it understands type positions and macro arguments.*
 
@@ -792,11 +794,11 @@ func Run() int { return helper() }
 func helper() int { return 1 }
 ```
 
-Also: rust, cel
+Also: rust, cel, typescript
 
 ### Redundant symbols are removed or consolidated
 
-`design/no-redundant-symbol` · symbol · warn · cel · fix: unsafe · cel, go, rust
+`design/no-redundant-symbol` · symbol · warn · cel · fix: unsafe · cel, go, rust, typescript
 
 *One-use helpers are reviewed semantically: extract them only when they name a concept, remove duplication, isolate an abstraction level, serve as a function value, or provide a test seam. A private forwarding wrapper that adds no policy is inlined; a private interface with one implementation is replaced with the concrete type until another implementation exists.*
 
@@ -852,11 +854,11 @@ spec:
     message: Example
 ```
 
-Also: go, rust
+Also: go, rust, typescript
 
 ### Abstractions are not speculative
 
-`design/no-speculative-generality` · symbol · warn · model · go, rust
+`design/no-speculative-generality` · symbol · warn · model · go, rust, typescript
 
 *Optional configuration, public extension points, generic wrappers and parallel mechanisms all create contracts that must be maintained. Add them only when a real caller or invariant requires them; a hypothetical future use is not a responsibility.*
 
@@ -898,7 +900,7 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 
 ### Names do not repeat their owner or module
 
-`design/no-redundant-qualifier` · symbol · warn · cel · fix: unsafe · cel, go, rust
+`design/no-redundant-qualifier` · symbol · warn · cel · fix: unsafe · cel, go, rust, typescript
 
 *Names already inherit the package, module or receiver in ordinary use. The primary concept may equal its package name; a member may repeat its owner only when an external wire name or implementation contract requires it. Members that all share one prefix or suffix word repeat their owner's context the same way (kind `affix`, reported once at the owner); three members is the default threshold, following clippy's `struct_field_names` and `enum_variant_names`.*
 
@@ -911,7 +913,7 @@ Derived from: Martin, Clean Code (2008), G20 Function Names Should Say What They
 | `affix` | `false` | Report an owner whose members all share one prefix or suffix word. |
 | `members` | `["variant"]` | Member kinds checked for a repeated owner name and for a shared affix; strict enables fields and methods. |
 | `minMembers` | `3` | Minimum number of members an owner needs before a shared affix is reported. |
-| `symbols` | `["function","type","interface","const","var"]`; rust: `[]` | Kinds of exported top-level symbols whose names are checked for a repeated qualifier. Empty for Rust: see its tuning. |
+| `symbols` | `["function","type","interface","const","var"]`; rust: `[]`; typescript: `[]` | Kinds of exported top-level symbols whose names are checked for a repeated qualifier. Empty for Rust: see its tuning. |
 
 ```go invalid
 package provider
@@ -929,11 +931,11 @@ type Providence struct{}
 type providerState struct{}
 ```
 
-Also: rust, cel
+Also: rust, cel, typescript
 
 ### Names stay within the word limit
 
-`design/max-name-words` · symbol · warn · cel · cel, go, rust
+`design/max-name-words` · symbol · warn · cel · cel, go, rust, typescript
 
 *Long names cost more to read. Name words split at underscores, lower-to-upper transitions, and acronym boundaries (for example, `parseHTTPRequest` has three words).*
 
@@ -958,11 +960,11 @@ package sample
 func parseHTTPRequest() {}
 ```
 
-Also: rust, cel
+Also: rust, cel, typescript
 
 ### Names do not encode representation
 
-`design/no-type-encoding` · symbol · warn · cel · cel, go, rust
+`design/no-type-encoding` · symbol · warn · cel · cel, go, rust, typescript
 
 *Hungarian prefixes, member prefixes and `I`-prefixed interface names duplicate information available from types and declarations. Project-specific patterns can opt into the check under the strict preset.*
 
@@ -972,7 +974,7 @@ Derived from: Martin, Clean Code (2008), G20 Function Names Should Say What They
 
 | option | default | meaning |
 | --- | --- | --- |
-| `enabled` | `false` | Enable type-encoding findings in the strict project. |
+| `enabled` | `false`; typescript: `true` | Enable type-encoding findings in the strict project. |
 | `encodings` | `[{"pattern":"^m_[A-Za-z]"},{"pattern":"^(str|sz|psz|lp|lpsz|arr|dw)[A-Z]"},{"kinds":["interface"],"pattern":"^I[A-Z][a-z]"}]` | Prefixes that encode the type or scope of a name: a `pattern`, and the `kinds` of symbol it applies to (all when absent). |
 
 ```go invalid
@@ -989,11 +991,11 @@ type Reader interface{ Read() }
 type Item struct{}
 ```
 
-Also: rust, cel
+Also: rust, cel, typescript
 
 ### Collection names are plural
 
-`design/plural-collections` · symbol · warn · model · go, rust
+`design/plural-collections` · symbol · warn · model · go, rust, typescript
 
 *Plural names help callers distinguish one value from a collection without inspecting the type or return expression.*
 
@@ -1017,7 +1019,7 @@ Also: rust
 
 ### Predicates state their meaning
 
-`design/predicate-names` · symbol · warn · model · go, rust
+`design/predicate-names` · symbol · warn · model · go, rust, typescript
 
 *Boolean names state a proposition rather than an action. The form should tell the caller which fact the function asks.*
 
@@ -1043,7 +1045,7 @@ Also: rust
 
 ### Action verbs name actions
 
-`design/reserved-verbs` · symbol · warn · cel · cel, go, rust
+`design/reserved-verbs` · symbol · warn · cel · cel, go, rust, typescript
 
 *The configured verb list follows the project convention. A function that starts with a verb and returns a boolean is a query; one that starts with it and returns something else is for a model to judge, since the decision depends on behavior, not only a name prefix.*
 
@@ -1071,11 +1073,11 @@ func HasUser(id string) bool { return id != "" }
 func BuildUser(id string) User { return User{id: id} }
 ```
 
-Also: rust, cel
+Also: rust, cel, typescript
 
 ### Names are long enough for their scope
 
-`design/short-names` · symbol · warn · cel · go, rust
+`design/short-names` · symbol · warn · cel · go, rust, typescript
 
 *A name that escapes a small local scope needs enough information to be read without reconstructing its meaning from distant code.*
 
@@ -1095,11 +1097,11 @@ package sample
 func Load() string { return "x" }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Standard abbreviations keep their spelling
 
-`design/abbreviations` · symbol · warn · cel · cel, go, rust
+`design/abbreviations` · symbol · warn · cel · cel, go, rust, typescript
 
 *Nonstandard abbreviations increase the number of terms readers must learn and make the same concept appear under multiple spellings. Go writes common initialisms in capitals (golint `commonInitialisms`, revive `var-naming`); Rust writes an acronym as one word (Rust API Guidelines, C-CASE), so its list is empty.*
 
@@ -1110,7 +1112,7 @@ Derived from: Lighthouse, coding-patterns#naming-49da70c5
 | option | default | meaning |
 | --- | --- | --- |
 | `initialisms` | `["ACL","API","ASCII","CPU","CSS","DNS","EOF","GUID","HTML","HTTP","HTTPS","ID","IP","JSON","LHS","QPS","RAM","RHS","RPC","SLA","SMTP","SQL","SSH","TCP","TLS","TTL","UDP","UI","UID","UUID","URI","URL","UTF8","VM","XML","XMPP","XSRF","XSS"]`; rust: `[]` | Initialisms that must be written in capitals, as upper-case words. |
-| `style` | `"upper"`; cel: `"lowerCamel"` | Whether initialisms must be uppercase or follow lowerCamelCase. |
+| `style` | `"upper"`; cel: `"lowerCamel"`; typescript: `"lowerCamel"` | Whether initialisms must be uppercase or follow lowerCamelCase. |
 
 ```go invalid
 package sample
@@ -1126,11 +1128,11 @@ type Config struct{ httpURL string }
 func Identity() string { return "" }
 ```
 
-Also: rust, cel
+Also: rust, cel, typescript
 
 ### One concept has one term
 
-`design/consistent-terms` · symbol · warn · cel · go, rust
+`design/consistent-terms` · symbol · warn · cel · go, rust, typescript
 
 *Consistent vocabulary makes cross-package APIs easier to discover. Same-named types are appropriate only when they represent the same concept.*
 
@@ -1150,7 +1152,7 @@ package second
 type Ledger struct{}
 ```
 
-Also: rust
+Also: rust, typescript
 
 ## Types and APIs
 
@@ -1172,7 +1174,7 @@ Public APIs are stable contracts: expose the minimum caller-facing abstraction a
 
 ### Constructors validate their inputs
 
-`design/constructor-validation` · symbol · warn · model · go, rust
+`design/constructor-validation` · symbol · warn · model · go, rust, typescript
 
 *Validation is simplest at the boundary where values enter the owning type; invalid objects should not escape and depend on every caller to validate them.*
 
@@ -1196,7 +1198,7 @@ func NewStore(path string) (*Store, error) { if path == "" { return nil, errors.
 
 ### Constructors separate required arguments from options
 
-`design/optional-options` · symbol · warn · model · go, rust
+`design/optional-options` · symbol · warn · model · go, rust, typescript
 
 *A long positional list hides which values are required and makes optional settings hard to evolve. Required arguments define the contract; optional settings are named.*
 
@@ -1219,7 +1221,7 @@ func NewClient(url string, opts ClientOptions) *Client { return nil }
 
 ### Mutable state has an explicit owner
 
-`design/no-mutable-globals` · symbol · warn · cel · go
+`design/no-mutable-globals` · symbol · warn · cel · go, typescript
 
 *Mutable globals hide who owns lifecycle and concurrency. A local or instance owner makes mutation and synchronization explicit.*
 
@@ -1245,9 +1247,11 @@ var defaults = map[string]string{}
 const Limit = 3
 ```
 
+Also: typescript
+
 ### State has one owner and sync strategy
 
-`design/state-owner` · symbol · warn · model · go, rust
+`design/state-owner` · symbol · warn · model · go, rust, typescript
 
 *Split ownership or multiple synchronization strategies make lifecycle and race behavior difficult to reason about.*
 
@@ -1273,7 +1277,7 @@ func (c *Cache) Set(k, v string) { c.mu.Lock(); c.entries[k] = v; c.mu.Unlock() 
 
 ### Private state goes through its owner
 
-`design/encapsulated-state` · symbol · warn · model · go, rust
+`design/encapsulated-state` · symbol · warn · model · go, rust, typescript
 
 *An owner centralizes invariant preservation and lets callers use a stable API without knowing storage details.*
 
@@ -1297,7 +1301,7 @@ func (s *Session) Refresh() { s.token = renew(); s.expiry = time.Now().Add(time.
 
 ### A type is an object or a data structure
 
-`design/no-hybrid-type` · symbol · warn · model · go, rust
+`design/no-hybrid-type` · symbol · warn · model · go, rust, typescript
 
 *Hybrid types expose internal state while also owning behavior, coupling callers to implementation details.*
 
@@ -1322,7 +1326,7 @@ func (s UserStore) Save(u User) error { return nil }
 
 ### Resources have one release owner
 
-`design/resource-owner` · symbol · warn · model · go, rust
+`design/resource-owner` · symbol · warn · model · go, rust, typescript
 
 *Ambiguous resource ownership leads to leaks, double-close bugs and shutdown races.*
 
@@ -1365,7 +1369,7 @@ pub fn view(p: &Parser) -> &str { p.input.as_str() }
 
 ### Layout declarations do not own application state
 
-`design/stateless-layout` · symbol · warn · model · go, rust
+`design/stateless-layout` · symbol · warn · model · go, rust, typescript
 
 *Mixing application state into layout makes rendering order and reuse affect behavior.*
 
@@ -1387,7 +1391,7 @@ func Render(width, height int) {}
 
 ### Generated files change through their generator
 
-`design/no-generated-edits` · symbol · error · model · go, rust
+`design/no-generated-edits` · symbol · error · model · go, rust, typescript
 
 *Direct edits disappear on regeneration and create two competing sources of truth. The code model holds the file, not the edit, so only a model that sees the change can judge it.*
 
@@ -1414,7 +1418,7 @@ func (k Kind) String() string { return "unknown" }
 
 ### Platform-specific code stays behind a boundary
 
-`design/encapsulated-platform` · symbol · warn · model · go, rust
+`design/encapsulated-platform` · symbol · warn · model · go, rust, typescript
 
 *Scattered platform branches make common behavior harder to test and platform constraints harder to audit.*
 
@@ -1614,7 +1618,7 @@ Also: rust
 
 ### Errors use semantic categories
 
-`design/error-categories` · symbol · warn · model · go, rust
+`design/error-categories` · symbol · warn · model · go, rust, typescript
 
 *Named categories let callers handle a failure without parsing message text and keep error semantics consistent across layers.*
 
@@ -1638,7 +1642,7 @@ var ErrPermissionDenied = errors.New("permission denied")
 
 ### Errors are translated at the owning boundary
 
-`design/error-translation` · symbol · warn · model · go, rust
+`design/error-translation` · symbol · warn · model · go, rust, typescript
 
 *The owning boundary adds useful context once while preserving the underlying cause for classification and diagnosis.*
 
@@ -1658,7 +1662,7 @@ func Load() error { if err := storage.Get(); err != nil { return fmt.Errorf("loa
 
 ### Errors do not expose private state
 
-`design/no-state-in-errors` · symbol · warn · model · go, rust
+`design/no-state-in-errors` · symbol · warn · model · go, rust, typescript
 
 *Errors often cross package or process boundaries and are logged; they should carry only the context needed to classify and diagnose failure.*
 
@@ -1691,7 +1695,7 @@ Declaration order should let a reader follow ownership and behavior from public 
 
 ### Callers precede private callees
 
-`design/top-down-order` · symbol · warn · cel · fix: unsafe · go, rust
+`design/top-down-order` · symbol · warn · cel · fix: unsafe · go, rust, typescript
 
 *Readers follow a public operation into its private implementation. A callee placed first forces readers to understand a helper before the behavior that uses it.*
 
@@ -1714,7 +1718,7 @@ Derived from: Martin, Clean Code (2008), G10 Vertical Separation; Martin, Clean 
 -func Run() int { return helper() }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Related declarations stay close
 
@@ -1773,7 +1777,7 @@ Also: rust
 
 ### Declarations follow ownership groups
 
-`design/declaration-groups` · file · error · cel · fix: safe · go, rust
+`design/declaration-groups` · file · error · cel · fix: safe · go, rust, typescript
 
 *A fixed group order makes every file predictable. Go: types first, then methods grouped by owner, as `golangci-lint` `funcorder` and the Uber Go style guide (Function Grouping and Ordering: group by receiver, constructors before the other methods) ask. The type declarations stay together, a deliberate difference from the Uber example, which puts each type's methods right after the type. Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; one block per type, in the order the types are declared, each with the constructors of the type (a function named `NewType` where `Type` is a type declared in the same file), then its exported methods, then its clone, conversion and interface hooks, then its unexported methods; public functions; private functions. Rust: The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together), where a constructor method (an associated function named like one) comes before the other methods of its type; public free functions; private free functions. The order of the other members of a type is left to `design/top-down-order`. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.*
 
@@ -1783,8 +1787,8 @@ Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; Martin
 
 | option | default | meaning |
 | --- | --- | --- |
-| `groups` | `["public-type","private-type","public-const","private-const","var","init","method","public-function","private-function"]`; rust: `["const","var","type","public-function","private-function"]` | The group order of a file, first to last. A declaration belongs to the first of its candidate groups that this list names; one the list does not name is not ordered. Groups: `public-type`, `private-type`, `type` (types and the members of a type together, in the order they are written), `public-const`, `private-const`, `const`, `var`, `init`, `method` (the members of the types, one block per type, in the order the types are declared, each with the constructors of the type first, then its exported methods, its hooks and its unexported methods), `public-function`, `private-function`. |
-| `hooks` | `["Clone","String","GoString","Error","Unwrap","MarshalJSON","UnmarshalJSON","MarshalText","UnmarshalText","MarshalBinary","UnmarshalBinary"]`; rust: `[]` | Exported methods that implement clone, conversion or interface hooks; they follow the other exported methods of their type. Names are kept to ones that are never ordinary behavior. |
+| `groups` | `["public-type","private-type","public-const","private-const","var","init","method","public-function","private-function"]`; rust: `["const","var","type","public-function","private-function"]`; typescript: `["const","var","type","public-function","private-function"]` | The group order of a file, first to last. A declaration belongs to the first of its candidate groups that this list names; one the list does not name is not ordered. Groups: `public-type`, `private-type`, `type` (types and the members of a type together, in the order they are written), `public-const`, `private-const`, `const`, `var`, `init`, `method` (the members of the types, one block per type, in the order the types are declared, each with the constructors of the type first, then its exported methods, its hooks and its unexported methods), `public-function`, `private-function`. |
+| `hooks` | `["Clone","String","GoString","Error","Unwrap","MarshalJSON","UnmarshalJSON","MarshalText","UnmarshalText","MarshalBinary","UnmarshalBinary"]`; rust: `[]`; typescript: `[]` | Exported methods that implement clone, conversion or interface hooks; they follow the other exported methods of their type. Names are kept to ones that are never ordinary behavior. |
 
 ```diff
 --- a/example.go
@@ -1797,7 +1801,7 @@ Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; Martin
 +func helper() int { return 1 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ## Comments
 
@@ -1812,7 +1816,7 @@ Comments preserve facts that code cannot express; they should not narrate code t
 
 ### Exported symbols are documented
 
-`design/exported-doc` · symbol · warn · cel · fix: unsafe · go, rust
+`design/exported-doc` · symbol · warn · cel · fix: unsafe · go, rust, typescript
 
 *Public API changes need facts callers cannot read from the code: user-visible behavior, constraints, ownership. Go: Normal Go doc comments beginning with the symbol name. A method that implements an interface of the project or of a package the code can import is exempt (revive's `exported` rule, and golint before it, leave the well-known interface methods undocumented too): the interface fixes its name and contract. Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does, and a method of any trait impl is exempt. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.*
 
@@ -1823,7 +1827,7 @@ Derived from: Martin, Clean Code (2008), ch. 4 Good comments
 | option | default | meaning |
 | --- | --- | --- |
 | `exemptInterfaceMethods` | `true` | Do not require docs on a method that implements an interface (or trait) method, since the interface fixes its name and contract. |
-| `exemptMethods` | `["String","Error","Unwrap"]` | Method names that implement well-known interfaces and need no doc comment of their own, when the provider cannot tell they do. |
+| `exemptMethods` | `["String","Error","Unwrap"]`; typescript: `["toString","toJSON","valueOf"]` | Method names that implement well-known interfaces and need no doc comment of their own, when the provider cannot tell they do. |
 | `includeInternal` | `false` | Also require docs for symbols exported only inside the project, such as under an internal path. |
 | `symbols` | `["function","method","type","interface","const","var"]` | Symbol kinds that must be documented when exported. |
 
@@ -1847,11 +1851,11 @@ package sample
 func Helper() {}
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Comments add no noise
 
-`design/no-noise-comment` · file · warn · cel · fix: unsafe · go, rust
+`design/no-noise-comment` · file · warn · cel · fix: unsafe · go, rust, typescript
 
 *Banners, commented-out code, history and closing-brace narration duplicate information that code structure or version control already carries. Other explanatory comments remain review candidates when they repeat code or fail to state a necessary fact.*
 
@@ -1861,7 +1865,7 @@ Derived from: Martin, Clean Code (2008), C1 Inappropriate Information; Martin, C
 
 | option | default | meaning |
 | --- | --- | --- |
-| `codePatterns` | `["[;{]$|^}","^(if|for|switch|select|return|func|fn|let|var|const|import|package|use|match|defer|go|impl|pub|struct|type)\\b.*[({=;]","^[A-Za-z_][\\w.]*(\\[[^\\]]*\\])?\\s*(:=|=|\\+=|-=|\\*=)\\s*\\S","^[A-Za-z_][\\w.]*\\(.*[\"'`0-9].*\\)[;,]?$"]` | Regular expressions a line of commented-out code matches. |
+| `codePatterns` | `["[;{]$|^}","^(if|for|switch|select|return|func|fn|let|var|const|import|package|use|match|defer|go|impl|pub|struct|type)\\b.*[({=;]","^[A-Za-z_][\\w.]*(\\[[^\\]]*\\])?\\s*(:=|=|\\+=|-=|\\*=)\\s*\\S","^[A-Za-z_][\\w.]*\\(.*[\"'`0-9].*\\)[;,]?$"]`; typescript: `["[;{]$|^}","^(if|for|switch|return|function|let|var|const|import|export|class|interface|type|enum|async|await|throw|try|while|do)\\b.*[({=;]","^[A-Za-z_][\\w.]*(\\[[^\\]]*\\])?\\s*(=|\\+=|-=|\\*=)\\s*\\S","^[A-Za-z_][\\w.]*\\(.*[\"'`0-9].*\\)[;,]?$"]` | Regular expressions a line of commented-out code matches. |
 | `historyPatterns` | `["(?i)^(changed|modified|added|removed|fixed|updated)\\s+(by|on)\\b","(?i)^(author|created by|modified by|written by)\\s*:","^\\d{4}-\\d{2}-\\d{2}\\b.*(?i:\\b(added|changed|fixed|removed|by)\\b)"]` | Regular expressions a line that records history matches. |
 | `kinds` | `["banner","commented-code"]` | What to report. |
 | `labels` | `["MARK:","#region","#endregion"]` | Line prefixes that label a section on their own. |
@@ -1876,11 +1880,11 @@ Derived from: Martin, Clean Code (2008), C1 Inappropriate Information; Martin, C
 -
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Comments stay attached to declarations
 
-`design/no-detached-comment` · file · warn · cel · fix: unsafe · go, rust
+`design/no-detached-comment` · file · warn · cel · fix: unsafe · go, rust, typescript
 
 *Detached comments can be dropped from Go documentation or left behind when a declaration moves. A blank line between a comment and the declaration it describes is misleading. Rust `///` followed by a blank line still attaches to the item, but the blank line is misleading there too (clippy `empty_line_after_doc_comments`). Reported only when blank lines alone separate the comment from the next declaration; a comment on the file's first line (a license header, package documentation or build constraint), an inner `//!` documentation comment, a directive, a banner, a comment followed by code or by another comment, and one without a following declaration are not candidates. The fix deletes the blank lines. It is unsafe because the comment may have been meant for the section rather than the declaration.*
 
@@ -1895,11 +1899,11 @@ Derived from: clippy empty_line_after_doc_comments; clippy empty_line_after_oute
 -
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### TODO comments name deferred work
 
-`design/no-todo` · file · info · cel · go, rust, toml
+`design/no-todo` · file · info · cel · go, rust, toml, typescript
 
 *A TODO is a reminder without an owner or completion state in the code itself. It is a review signal, not a build failure, and the strict preset opts into it.*
 
@@ -1926,4 +1930,4 @@ package sample
 func Load() {}
 ```
 
-Also: rust, toml
+Also: rust, toml, typescript

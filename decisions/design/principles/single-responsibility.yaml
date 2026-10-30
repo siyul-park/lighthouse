@@ -18,6 +18,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A symbol SHOULD have one coherent responsibility and a narrow contract;
     a symbol with too many public methods SHOULD be reviewed for multiple reasons
     to change.
@@ -213,4 +214,101 @@ spec:
             fn count(&self) -> usize { self.items.len() }
             fn first(&self) -> i32 { self.items[0] }
             fn last(&self) -> i32 { self.items[self.items.len() - 1] }
+        }
+  - name: members-typescript-invalid
+    language: typescript
+    kind: invalid
+    options:
+      maxMembers: 2
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          get(): number {
+            return 1;
+          }
+
+          put(): number {
+            return 2;
+          }
+
+          drop(): number {
+            return 3;
+          }
+        }
+    expect:
+    - line: 1
+  - name: members-typescript-valid
+    language: typescript
+    kind: valid
+    options:
+      maxMembers: 3
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          get(): number {
+            return 1;
+          }
+
+          put(): number {
+            return 2;
+          }
+
+          drop(): number {
+            return 3;
+          }
+        }
+  - name: cohesion-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          private items: number[] = [];
+          private names: string[] = [];
+
+          addItem(item: number): void {
+            this.items.push(item);
+          }
+
+          countItems(): number {
+            return this.items.length;
+          }
+
+          addName(name: string): void {
+            this.names.push(name);
+          }
+
+          countNames(): number {
+            return this.names.length;
+          }
+        }
+    expect:
+    - line: 1
+  - name: cohesion-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          private items: number[] = [];
+
+          add(item: number): void {
+            this.items.push(item);
+          }
+
+          count(): number {
+            return this.items.length;
+          }
+
+          first(): number | undefined {
+            return this.items[0];
+          }
+
+          last(): number | undefined {
+            return this.items[this.items.length - 1];
+          }
         }

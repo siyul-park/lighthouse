@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Predicate names SHOULD use HasX for containment, IsX for a state, MatchX
     for comparison or validation, AtX for position or time, and bare X for a direct
     boolean value.

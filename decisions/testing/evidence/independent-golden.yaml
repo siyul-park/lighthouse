@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Golden tests SHOULD define expected low-level output independently
     of the implementation that produced it.
   severity: info

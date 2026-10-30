@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: An error SHOULD expose the failed operation and cause, not secrets,
     mutable internal objects, or private implementation state.
   severity: warn

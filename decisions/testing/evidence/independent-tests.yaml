@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Each test SHOULD produce the same result regardless of execution order
     and SHOULD NOT depend on mutable state left by another test.
   severity: warn

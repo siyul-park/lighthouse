@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A type SHOULD NOT mix behavior-bearing object responsibilities with
     unrelated data-transfer structure.
   severity: warn

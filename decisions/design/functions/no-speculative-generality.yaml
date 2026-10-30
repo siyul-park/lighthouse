@@ -14,6 +14,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A symbol SHOULD NOT expose generic options, extension points, aliases,
     or parallel mechanisms without a distinct contract and a current use that needs
     them.

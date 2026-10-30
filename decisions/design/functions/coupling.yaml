@@ -14,6 +14,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A function SHOULD NOT be a high fan-in/fan-out dependency hub or an
     oversized coordinator; such functions deserve review for responsibility and change
     propagation.
@@ -197,3 +198,80 @@ spec:
         pub fn first() { hub(); }
         pub fn second() { hub(); }
     expect: [{ line: 1 }]
+  - name: hub-typescript-hub
+    language: typescript
+    kind: invalid
+    options:
+      hub:
+        fanIn: 2
+        fanOut: 2
+        statements: 1
+        coordinatorFanOut: 12
+        coordinatorMaxFanIn: 1
+        coordinatorStatements: 15
+    files:
+    - path: sample.ts
+      body: |-
+        function hub(): void {
+          left();
+          right();
+        }
+
+        function left(): void {}
+        function right(): void {}
+
+        export function a(): void {
+          hub();
+        }
+        export function b(): void {
+          hub();
+        }
+    expect:
+    - line: 1
+  - name: hub-typescript-coordinator
+    language: typescript
+    kind: invalid
+    options:
+      hub:
+        fanIn: 8
+        fanOut: 6
+        statements: 20
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
+    files:
+    - path: sample.ts
+      body: |-
+        function run(): void {
+          one();
+          two();
+          three();
+        }
+
+        function one(): void {}
+        function two(): void {}
+        function three(): void {}
+
+        run();
+    expect:
+    - line: 1
+  - name: hub-typescript-ordinary-fan
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        function hub(): void {
+          left();
+          right();
+        }
+
+        function left(): void {}
+        function right(): void {}
+
+        export function a(): void {
+          hub();
+        }
+        export function b(): void {
+          hub();
+        }

@@ -136,6 +136,10 @@ spec:
           cyclomatic: 40
           cognitive: 100
           nesting: 10
+    typescript:
+      options:
+        limits:
+          cyclomatic: 20
   provenance:
     wasDerivedFrom:
     - 'Lighthouse catalog: the CEL limits are the largest values among the expressions of the bundled decisions when CEL was first measured; lower them as those expressions are simplified'
@@ -597,3 +601,198 @@ spec:
               expression: '1 > 0 ? 1 : 2'
             where: symbol.name == 'example'
             message: Example
+  - name: lines-typescript-long-function
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - lines
+      limits:
+        lines: 4
+        statements: 40
+        cyclomatic: 30
+        cognitive: 30
+        nesting: 4
+    files:
+    - path: sample.ts
+      body: |-
+        export function total(a: number, b: number): number {
+          let sum = a;
+
+          sum += b;
+
+          return sum;
+        }
+    expect:
+    - line: 1
+  - name: lines-typescript-within-the-limit
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export function total(a: number, b: number): number {
+          let sum = a;
+
+          sum += b;
+
+          return sum;
+        }
+  - name: cyclomatic-typescript-default-is-eslint-complexity
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - cyclomatic
+    files:
+    - path: sample.ts
+      body: |-
+        export function classify(n: number): string {
+          if (n === 0) return "0";
+          if (n === 1) return "1";
+          if (n === 2) return "2";
+          if (n === 3) return "3";
+          if (n === 4) return "4";
+          if (n === 5) return "5";
+          if (n === 6) return "6";
+          if (n === 7) return "7";
+          if (n === 8) return "8";
+          if (n === 9) return "9";
+          if (n === 10) return "10";
+          if (n === 11) return "11";
+          if (n === 12) return "12";
+          if (n === 13) return "13";
+          if (n === 14) return "14";
+          if (n === 15) return "15";
+          if (n === 16) return "16";
+          if (n === 17) return "17";
+          if (n === 18) return "18";
+          if (n === 19) return "19";
+          return "many";
+        }
+    expect:
+    - line: 1
+  - name: cyclomatic-typescript-below-the-limit
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - cyclomatic
+    files:
+    - path: sample.ts
+      body: |-
+        export function classify(n: number): string {
+          if (n < 0) return "negative";
+          if (n === 0) return "zero";
+          return "positive";
+        }
+  - name: cyclomatic-typescript-many-branches
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - cyclomatic
+      limits:
+        lines: 60
+        statements: 40
+        cyclomatic: 2
+        cognitive: 30
+        nesting: 4
+    files:
+    - path: sample.ts
+      body: |-
+        export function classify(n: number): string {
+          if (n < 0) {
+            return "negative";
+          }
+          if (n === 0) {
+            return "zero";
+          }
+          if (n < 10) {
+            return "small";
+          }
+          return "large";
+        }
+    expect:
+    - line: 1
+  - name: cyclomatic-typescript-dispatcher
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - cyclomatic
+      limits:
+        lines: 60
+        statements: 40
+        cyclomatic: 2
+        cognitive: 30
+        nesting: 4
+    files:
+    - path: sample.ts
+      body: |-
+        export function name(kind: number): string {
+          switch (kind) {
+            case 0:
+              return "zero";
+            case 1:
+              return "one";
+            default:
+              return "many";
+          }
+        }
+  - name: nesting-typescript-deeply-nested
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - nesting
+      limits:
+        lines: 60
+        statements: 40
+        cyclomatic: 30
+        cognitive: 30
+        nesting: 2
+    files:
+    - path: sample.ts
+      body: |-
+        export function scan(rows: number[][]): number {
+          let total = 0;
+          for (const row of rows) {
+            for (const v of row) {
+              if (v > 0) {
+                total += v;
+              }
+            }
+          }
+          return total;
+        }
+    expect:
+    - line: 1
+  - name: cognitive-javascript-deep-loops
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - cognitive
+      limits:
+        lines: 60
+        statements: 40
+        cyclomatic: 30
+        cognitive: 2
+        nesting: 4
+    files:
+    - path: sample.js
+      body: |-
+        export function scan(rows) {
+          let total = 0;
+          for (const row of rows) {
+            for (const v of row) {
+              if (v > 0) {
+                total += v;
+              }
+            }
+          }
+          return total;
+        }
+    expect:
+    - line: 1

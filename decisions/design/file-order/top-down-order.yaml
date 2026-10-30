@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A private function SHOULD be declared after the production callers
     that explain why it exists; public entry points and wiring remain in their appropriate
     declaration groups.
@@ -192,3 +193,46 @@ spec:
         fn helper() -> u8 {
             1
         }
+  - name: typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        function helper(): number {
+          return 1;
+        }
+
+        export function run(): number {
+          return helper();
+        }
+    expect:
+    - line: 1
+  - name: typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export function run(): number {
+          return helper();
+        }
+
+        function helper(): number {
+          return 1;
+        }
+  - name: javascript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.js
+      body: |-
+        function helper() {
+          return 1;
+        }
+
+        export function run() {
+          return helper();
+        }
+    expect:
+    - line: 1

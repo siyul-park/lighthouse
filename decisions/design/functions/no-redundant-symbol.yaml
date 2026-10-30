@@ -18,6 +18,7 @@ spec:
     go: {}
     rust: {}
     cel: {}
+    typescript: {}
   requirement: A symbol SHOULD earn its existence by naming reusable behavior, a contract,
     an invariant, or a real abstraction; a forwarding wrapper or one-implementation
     private interface SHOULD be consolidated when it adds no distinct responsibility.
@@ -542,3 +543,164 @@ spec:
         fn scale(n: i32) -> i32 {
             n * 2
         }
+  - name: wrapper-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          private data = new Map<string, number>();
+
+          private load(key: string): number | undefined {
+            return this.read(key);
+          }
+
+          private read(key: string): number | undefined {
+            return this.data.get(key);
+          }
+
+          get(key: string): number | undefined {
+            return this.load(key);
+          }
+        }
+    expect:
+    - line: 4
+  - name: wrapper-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          private closed = false;
+          private data = new Map<string, number>();
+
+          private load(key: string): number | undefined {
+            if (this.closed) {
+              throw new Error("closed");
+            }
+            return this.read(key);
+          }
+
+          private read(key: string): number | undefined {
+            return this.data.get(key);
+          }
+
+          get(key: string): number | undefined {
+            return this.load(key);
+          }
+        }
+  - name: wrapper-typescript-adds-an-argument-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          private data = new Map<string, number>();
+
+          private load(key: string): number | undefined {
+            return this.read(key, true);
+          }
+
+          private read(key: string, fresh: boolean): number | undefined {
+            return fresh ? this.data.get(key) : undefined;
+          }
+
+          get(key: string): number | undefined {
+            return this.load(key);
+          }
+        }
+  - name: interface-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        interface Store {
+          get(): number;
+          put(value: number): void;
+        }
+
+        class Memory implements Store {
+          private value = 0;
+
+          get(): number {
+            return this.value;
+          }
+
+          put(value: number): void {
+            this.value = value;
+          }
+        }
+
+        export function use(): number {
+          const memory = new Memory();
+          memory.put(1);
+          return memory.get();
+        }
+    expect:
+    - line: 1
+  - name: interface-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        interface Store {
+          get(): number;
+          put(value: number): void;
+        }
+
+        class Memory implements Store {
+          private value = 0;
+
+          get(): number {
+            return this.value;
+          }
+
+          put(value: number): void {
+            this.value = value;
+          }
+        }
+
+        class Disk implements Store {
+          private value = 0;
+
+          get(): number {
+            return this.value;
+          }
+
+          put(value: number): void {
+            this.value = value;
+          }
+        }
+
+        export function use(store: Store): number {
+          store.put(new Memory().get() + new Disk().get());
+          return store.get();
+        }
+  - name: wrapper-javascript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.js
+      body: |-
+        export class Store {
+          #data = new Map();
+
+          #load(key) {
+            return this.#read(key);
+          }
+
+          #read(key) {
+            return this.#data.get(key);
+          }
+
+          get(key) {
+            return this.#load(key);
+          }
+        }
+    expect:
+    - line: 4

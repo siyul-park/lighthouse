@@ -21,6 +21,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A comment that describes a declaration SHOULD be adjacent to it, without
     intervening blank lines.
   severity: warn
@@ -126,3 +127,58 @@ spec:
         /// Opens the store.
         pub fn open() {}
     canonical: true
+  - name: detached-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |
+        export const before = 1;
+
+        /** Opens the store. */
+
+        export function open(): void {}
+    expect:
+    - line: 3
+    fixed:
+    - path: sample.ts
+      body: |
+        export const before = 1;
+
+        /** Opens the store. */
+        export function open(): void {}
+  - name: detached-typescript-valid
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.ts
+      body: |
+        /** Opens the store. */
+        export function open(): void {}
+  - name: header-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |
+        // Copyright 2026 The Sample Authors.
+
+        import { open } from "./store";
+
+        export const run = open;
+  - name: detached-javascript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.js
+      body: |
+        const before = 1;
+
+        // Opens the store.
+
+        function open() {}
+
+        module.exports = { before, open };
+    expect:
+    - line: 3

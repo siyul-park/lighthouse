@@ -16,6 +16,13 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript:
+      options:
+        codePatterns:
+        - "[;{]$|^}"
+        - "^(if|for|switch|return|function|let|var|const|import|export|class|interface|type|enum|async|await|throw|try|while|do)\\b.*[({=;]"
+        - "^[A-Za-z_][\\w.]*(\\[[^\\]]*\\])?\\s*(=|\\+=|-=|\\*=)\\s*\\S"
+        - ^[A-Za-z_][\w.]*\(.*["'`0-9].*\)[;,]?$
   requirement: Comments SHOULD NOT label sections, preserve commented-out code, record
     history, or restate a block closing; prefer code structure and version control.
   severity: warn
@@ -413,3 +420,173 @@ spec:
             0
         }
     canonical: false
+  - name: banner-typescript-invalid
+    language: typescript
+    kind: invalid
+    fixed:
+    - path: sample.ts
+      body: |-
+        export function helper(): number {
+          return 1;
+        }
+    files:
+    - path: sample.ts
+      body: |-
+        // ---- Helpers ----
+
+        export function helper(): number {
+          return 1;
+        }
+    expect:
+    - line: 1
+  - name: banner-region-typescript-invalid
+    language: typescript
+    kind: invalid
+    fixed:
+    - path: sample.ts
+      body: |-
+        export function helper(): number {
+          return 1;
+        }
+    files:
+    - path: sample.ts
+      body: |-
+        // #region Helpers
+
+        export function helper(): number {
+          return 1;
+        }
+    expect:
+    - line: 1
+  - name: banner-typescript-valid
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.ts
+      body: |-
+        /**
+         * Parses the header.
+         *
+         * ---
+         */
+        export function parse(): number {
+          return 1;
+        }
+
+        export const x = 1; // --- not a banner: it trails code
+  - name: code-typescript-invalid
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - commented-code
+    fixed:
+    - path: sample.ts
+      body: |-
+        export function run(): void {}
+    files:
+    - path: sample.ts
+      body: |-
+        // const total = compute(a, b);
+        // console.log("total", total);
+
+        export function run(): void {}
+    expect:
+    - line: 1
+  - name: code-typescript-valid
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - commented-code
+    files:
+    - path: sample.ts
+      body: |-
+        // The total is computed once: compute(a, b) is costly.
+
+        export function run(): void {}
+    canonical: false
+  - name: history-typescript-invalid
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - journal
+    files:
+    - path: sample.ts
+      body: |-
+        // Modified by jdoe on 2020-01-01
+
+        export function run(): void {}
+    expect:
+    - line: 1
+  - name: history-typescript-valid
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - journal
+    files:
+    - path: sample.ts
+      body: |-
+        // The format changed in version 2; readers accept both.
+
+        export function run(): void {}
+    canonical: false
+  - name: closing-typescript-invalid
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - closing
+    files:
+    - path: sample.ts
+      body: |-
+        export function run(x: number): number {
+          if (x > 0) {
+            return x;
+          } // end if
+          return 0;
+        }
+    expect:
+    - line: 4
+  - name: closing-typescript-valid
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - closing
+    files:
+    - path: sample.ts
+      body: |-
+        export function run(x: number): number {
+          if (x > 0) {
+            return x;
+          } // a negative value falls back to zero
+          return 0;
+        }
+    canonical: false
+  - name: banner-javascript-invalid
+    language: typescript
+    kind: invalid
+    fixed:
+    - path: sample.js
+      body: |-
+        function helper() {
+          return 1;
+        }
+
+        module.exports = { helper };
+    files:
+    - path: sample.js
+      body: |-
+        // ---- Helpers ----
+
+        function helper() {
+          return 1;
+        }
+
+        module.exports = { helper };
+    expect:
+    - line: 1

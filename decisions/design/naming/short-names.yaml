@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: One-letter names SHOULD be limited to conventional receivers, indices,
     and genuinely tiny scopes.
   severity: warn
@@ -69,3 +70,23 @@ spec:
       body: |-
         fn load() -> &'static str { "x" }
     canonical: true
+  - name: one-letter-typescript-name
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export function x(): string {
+          return "x";
+        }
+    expect:
+    - line: 1
+  - name: descriptive-typescript-name
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export function load(): string {
+          return "x";
+        }

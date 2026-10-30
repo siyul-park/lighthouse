@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Tests of the same behavior with different inputs SHOULD use a named
     table of inputs and expected outputs.
   severity: warn

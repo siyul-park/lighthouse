@@ -14,6 +14,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Modules SHOULD NOT be split when the parent and child share private implementation
     and call into each other.
   severity: info
@@ -107,3 +108,20 @@ spec:
         package app
         type Repository struct{}
         func (Repository) Migrate() {}
+  - name: typescript-modules-with-public-boundary
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: src/sample.ts
+      body: |-
+        export function api(): number {
+          return 1;
+        }
+    - path: src/sample/part.ts
+      body: |-
+        import { api } from "../sample";
+
+        export function work(): number {
+          return api() + 1;
+        }

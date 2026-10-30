@@ -44,6 +44,9 @@ spec:
       options:
         includeInternal: true
     rust: {}
+    typescript:
+      options:
+        includeInternal: true
   check:
     type: cel
     select: symbol
@@ -154,3 +157,61 @@ spec:
         fn get_is_stable() {
             assert_eq!(workspace::get(), workspace::get());
         }
+  - name: duplicate-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+    - path: store.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./store";
+
+        describe("get", () => {
+          it("returns one", () => {
+            expect(get()).toBe(1);
+          });
+        });
+    - path: store.spec.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./store";
+
+        describe("get", () => {
+          it("is stable", () => {
+            expect(get()).toBe(1);
+          });
+        });
+    expect:
+    - line: 1
+  - name: duplicate-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: store.ts
+      body: |-
+        export class Store {
+          get(): number {
+            return 1;
+          }
+        }
+    - path: store.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { Store } from "./store";
+
+        describe("Store", () => {
+          it("is constructed", () => {
+            expect(new Store()).toBeDefined();
+          });
+        });
+
+        describe("Store.get", () => {
+          it("returns one", () => {
+            expect(new Store().get()).toBe(1);
+          });
+        });

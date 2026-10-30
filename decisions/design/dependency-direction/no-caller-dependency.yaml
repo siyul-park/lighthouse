@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Lower-level or reusable symbols SHOULD express their responsibility
     in the most general form that fits it and SHOULD NOT depend on caller-specific
     policy, types, lifecycle, or semantics.

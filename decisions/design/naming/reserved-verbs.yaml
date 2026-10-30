@@ -16,6 +16,7 @@ spec:
     go: {}
     rust: {}
     cel: {}
+    typescript: {}
   requirement: Configured action verbs SHOULD name actions or state transitions, not
     queries that return a boolean or report current state.
   severity: warn
@@ -26,7 +27,7 @@ spec:
     - name: reserved
       expression: "!func.test && size(func.words) > 0 && func.words[0] in options.verbs"
     - name: query
-      expression: "size(func.results) == 1 && func.results[0].text == 'bool'"
+      expression: "size(func.results) == 1 && func.results[0].text in ['bool', 'boolean']"
     where: reserved && query
     abstain: reserved && !query && size(func.results) > 0
     message: "{{ func.name + ' starts with the reserved action verb ' + func.words[0] + ' but answers a question; name it for the question or drop the verb' }}"
@@ -146,3 +147,31 @@ spec:
               expression: 'true'
             where: hasUser('user')
             message: Example
+  - name: invalid-typescript
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export function buildUser(id: string): boolean {
+          return id !== "";
+        }
+    expect:
+    - line: 1
+  - name: valid-typescript
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export class User {
+          constructor(readonly id: string) {}
+        }
+
+        export function hasUser(id: string): boolean {
+          return id !== "";
+        }
+
+        export function buildUser(id: string): User {
+          return new User(id);
+        }

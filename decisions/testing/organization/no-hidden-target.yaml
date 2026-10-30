@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A test SHOULD make the production call and its asserted result visible;
     helpers SHOULD NOT hide the target call, result, or expected value.
   severity: warn
@@ -103,3 +104,45 @@ spec:
         fn gets_one() {
             assert_eq!(get(), 1);
         }
+  - name: hidden-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+    - path: sample.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./sample";
+
+        function assertGetIsOne(): void {
+          expect(get()).toBe(1);
+        }
+
+        describe("get", () => {
+          it("is one", () => {
+            assertGetIsOne();
+          });
+        });
+  - name: visible-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+    - path: sample.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./sample";
+
+        describe("get", () => {
+          it("is one", () => {
+            expect(get()).toBe(1);
+          });
+        });

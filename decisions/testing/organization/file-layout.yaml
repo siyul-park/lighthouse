@@ -34,6 +34,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: >-
     A test file MUST declare its fixtures (test types, constants, variables and
     the functions that build them without the test framework's handle) above its
@@ -168,3 +169,47 @@ spec:
                     assert_eq!(got, WANT);
                 }
             }
+    - name: fixture-after-test-typescript
+      language: typescript
+      kind: invalid
+      files:
+      - path: store.ts
+        body: |-
+          export function get(): number {
+            return 1;
+          }
+      - path: store.test.ts
+        body: |-
+          import { describe, expect, it } from "vitest";
+          import { get } from "./store";
+
+          describe("get", () => {
+            it("returns the wanted value", () => {
+              expect(get()).toBe(want);
+            });
+          });
+
+          const want = 1;
+      expect:
+      - line: 10
+    - name: fixtures-tests-helpers-typescript
+      language: typescript
+      kind: valid
+      files:
+      - path: store.ts
+        body: |-
+          export function get(): number {
+            return 1;
+          }
+      - path: store.test.ts
+        body: |-
+          import { describe, expect, it } from "vitest";
+          import { get } from "./store";
+
+          const want = 1;
+
+          describe("get", () => {
+            it("returns the wanted value", () => {
+              expect(get()).toBe(want);
+            });
+          });

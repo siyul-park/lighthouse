@@ -15,6 +15,12 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript:
+      options:
+        exemptMethods:
+        - toString
+        - toJSON
+        - valueOf
   requirement: Exported symbols SHOULD have doc comments in the language's standard
     form.
   severity: warn
@@ -359,3 +365,118 @@ spec:
         type File struct{}
 
         func (f *File) Flush() {}
+  - name: typescript-undocumented
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export class Store {
+          get(): number {
+            return 0;
+          }
+        }
+
+        export function make(): Store {
+          return new Store();
+        }
+
+        export interface Source {
+          read(): number;
+        }
+
+        export const limit = 3;
+
+        export type Id = string;
+    expect:
+    - line: 1
+    - line: 2
+    - line: 7
+    - line: 11
+    - line: 15
+    - line: 17
+  - name: typescript-well-known-methods
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        /** A failure code. */
+        export class Code {
+          toString(): string {
+            return "code";
+          }
+
+          toJSON(): string {
+            return "code";
+          }
+        }
+  - name: typescript-test-file
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.test.ts
+      body: |-
+        export function helper(): void {}
+  - name: typescript-documented
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.ts
+      body: |-
+        /** Store keeps values. */
+        export class Store {
+          /** Get returns the stored value. */
+          get(): number {
+            return 0;
+          }
+
+          private hide(): void {}
+        }
+
+        class Hidden {
+          run(): void {}
+        }
+
+        /** Limits bound the store. */
+        export const limit = 3;
+
+        function helper(): void {}
+  - name: typescript-implements-an-interface
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        /** Something that can be read. */
+        export interface Source {
+          /** Reads the next value. */
+          read(): number;
+        }
+
+        /** A constant source. */
+        export class Fixed implements Source {
+          read(): number {
+            return 1;
+          }
+        }
+  - name: javascript-undocumented
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.js
+      body: |-
+        export function open() {}
+    expect:
+    - line: 1
+  - name: javascript-commonjs-documented
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.js
+      body: |-
+        /** Opens the store. */
+        function open() {}
+
+        module.exports = { open };

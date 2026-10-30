@@ -12,6 +12,7 @@ spec:
     subject: symbol
   languages:
     go: {}
+    typescript: {}
   requirement: Mutable global variables SHOULD NOT be used for application state;
     state should be owned by an instance with a clear synchronization strategy.
   severity: warn
@@ -19,7 +20,7 @@ spec:
     type: cel
     select: symbol
     where: symbol.kind == "var" && symbol.owner == null && symbol.visibility != "private"
-      && symbol.lang == "go" && !symbol.name.startsWith("Err")
+      && symbol.lang in ["go", "typescript"] && !symbol.name.startsWith("Err")
     abstain: |-
       !symbol.test && !symbol.generated && ((symbol.kind == 'var' && symbol.owner == null)
           || (symbol.kind == 'type' && size(symbol.members) > 0 && !symbol.data_only))
@@ -65,3 +66,34 @@ spec:
         var defaults = map[string]string{}
 
         const Limit = 3
+  - name: global-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export let defaults: Record<string, string> = {};
+    expect:
+    - line: 1
+  - name: global-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export const limit = 3;
+
+        let cache: Record<string, string> = {};
+
+        export function reset(): void {
+          cache = {};
+        }
+  - name: global-javascript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.js
+      body: |-
+        export let defaults = {};
+    expect:
+    - line: 1

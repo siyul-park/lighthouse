@@ -15,6 +15,7 @@ spec:
     go: {}
     rust: {}
     cel: {}
+    typescript: {}
   requirement: A name SHOULD contain no more than the configured number of words and
     SHOULD use only the qualifiers needed to distinguish its meaning.
   severity: warn
@@ -161,3 +162,33 @@ spec:
               expression: 'true'
             where: symbol.name == 'example'
             message: Example
+  - name: words-typescript-long-name
+    language: typescript
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: example.ts
+      body: |-
+        export function parseHttpRequestBodyBytes(): void {}
+    expect:
+    - line: 1
+  - name: words-typescript-short-name
+    language: typescript
+    kind: valid
+    options:
+      enabled: true
+    files:
+    - path: example.ts
+      body: |-
+        export function parseHttpRequest(): void {}
+  - name: words-typescript-higher-limit
+    language: typescript
+    kind: valid
+    options:
+      maxWords: 5
+      enabled: true
+    files:
+    - path: example.ts
+      body: |-
+        export function parseHttpRequestBodyBytes(): void {}

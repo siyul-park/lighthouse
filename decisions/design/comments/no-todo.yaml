@@ -15,6 +15,7 @@ spec:
     go: {}
     rust: {}
     toml: {}
+    typescript: {}
   requirement: TODO, FIXME, BUG, HACK and XXX comments SHOULD be completed, filed
     as actionable work, or removed rather than left without a disposition.
   severity: info
@@ -176,3 +177,50 @@ spec:
         # The address the service listens on.
         address = "localhost"
         note = "TODO: this string is data, not a comment"
+  - name: todo-typescript-invalid
+    language: typescript
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: sample.ts
+      body: |
+        // TODO: remove temporary fallback
+        export function load(): void {}
+    expect:
+    - line: 1
+  - name: todo-owner-typescript-invalid
+    language: typescript
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: sample.ts
+      body: |
+        // TODO(alice): remove temporary fallback
+        export function load(): void {}
+    expect:
+    - line: 1
+  - name: todo-typescript-valid
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: sample.ts
+      body: |
+        // Load reads the configured record.
+        export function load(): void {}
+  - name: todo-javascript-invalid
+    language: typescript
+    kind: invalid
+    options:
+      enabled: true
+    files:
+    - path: sample.js
+      body: |
+        // FIXME: remove temporary fallback
+        function load() {}
+
+        module.exports = { load };
+    expect:
+    - line: 1

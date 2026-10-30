@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Each mutable state value SHOULD have one owner and one explicit synchronization
     strategy.
   severity: warn

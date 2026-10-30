@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A polling predicate SHOULD observe state without mutating it or consuming
     a one-shot result.
   severity: warn

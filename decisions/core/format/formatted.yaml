@@ -9,7 +9,13 @@ spec:
   context: Formatting is a repository convention, not a review topic. Each language
     states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses
     rustfmt with the edition of the crate that contains the file, supplied by the
-    Rust provider as the `edition` fact, and leaves nested modules to their own files.
+    Rust provider as the `edition` fact.
+    TypeScript and JavaScript use Prettier, found on `PATH` like markdownlint-cli2
+    and never the project's own `node_modules`; the examples are verified with
+    Prettier 3.9.10, and the project's Prettier configuration still applies. Without
+    Prettier on `PATH` the analysis of those files is incomplete, never clean. A
+    project that formats with Biome swaps the program through
+    `rules."core/formatted"`.
   scope:
     subject: file
     generated: false
@@ -42,8 +48,6 @@ spec:
         - "--edition"
         - "{file.edition}"
         - "--check"
-        - "--config"
-        - skip_children=true
         - "-l"
         - "{files}"
       fix:
@@ -51,10 +55,21 @@ spec:
         - rustfmt
         - "--edition"
         - "{file.edition}"
-        - "--config"
-        - skip_children=true
         - "--emit"
         - stdout
+        stdin: file
+        output: stdout
+    typescript:
+      check:
+        command:
+        - prettier
+        - "--list-different"
+        - "{files}"
+      fix:
+        command:
+        - prettier
+        - "--stdin-filepath"
+        - "{file}"
         stdin: file
         output: stdout
   provenance:
@@ -62,6 +77,7 @@ spec:
     - Martin, Clean Code (2008), G24 Follow Standard Conventions
     - 'gofmt: https://pkg.go.dev/cmd/gofmt'
     - 'rustfmt: https://rust-lang.github.io/rustfmt/'
+    - 'Prettier: https://prettier.io/docs/cli (examples verified with 3.9.10; `--list-different`, `--stdin-filepath`)'
     - Martin, Clean Code (2008), ch. 5 Vertical openness and density
     - Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation
     - Martin, Clean Code (2008), ch. 5 Team rules
@@ -145,3 +161,45 @@ spec:
             1
         }
     canonical: false
+  - name: typescript-unformatted
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |
+        export function run( ){return 1}
+    expect:
+    - line: 1
+    fixed:
+    - path: example.ts
+      body: |
+        export function run() {
+          return 1;
+        }
+  - name: typescript-formatted
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |
+        export function run() {
+          return 1;
+        }
+    canonical: true
+  - name: javascript-unformatted
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.js
+      body: |
+        function  run( ){return 1}
+        module.exports={run}
+    expect:
+    - line: 1
+    fixed:
+    - path: example.js
+      body: |
+        function run() {
+          return 1;
+        }
+        module.exports = { run };

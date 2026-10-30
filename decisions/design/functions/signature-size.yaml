@@ -143,6 +143,16 @@ spec:
             implementation: -1
             entrypoint: -1
             test: -1
+    typescript:
+      options:
+        limits:
+          params:
+            default: 3
+            constructor: 3
+            implementation: -1
+            entrypoint: -1
+            test: -1
+          results: -1
   provenance:
     wasDerivedFrom:
     - 'revive argument-limit 8: https://revive.run/r#argument-limit'
@@ -677,6 +687,118 @@ spec:
       kinds:
       - results
     canonical: false
+  - name: params-typescript-too-many-parameters
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export function build(a: number, b: number, c: number, d: number): number {
+          return a + b + c + d;
+        }
+    expect:
+    - line: 1
+    options:
+      kinds:
+      - params
+  - name: params-typescript-within-the-limit
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export function build(a: number, b: number, c: number): number {
+          return a + b + c;
+        }
+    options:
+      kinds:
+      - params
+  - name: params-typescript-parameter-interface
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        interface Request {
+          url: string;
+          method: string;
+          body: string;
+        }
+
+        export function send(timeout: number, retries: number, request: Request): void {
+          void [timeout, retries, request];
+        }
+    expect:
+    - line: 7
+    options:
+      kinds:
+      - params
+  - name: params-typescript-method-over-the-limit
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export class Server {
+          handle(a: number, b: number, c: number, d: number): number {
+            return a + b + c + d;
+          }
+        }
+    expect:
+    - line: 2
+    options:
+      kinds:
+      - params
+  - name: params-typescript-interface-implementation
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export interface Writer {
+          write(a: number, b: number, c: number, d: number): void;
+        }
+
+        export class File implements Writer {
+          write(a: number, b: number, c: number, d: number): void {
+            void [a, b, c, d];
+          }
+        }
+    options:
+      kinds:
+      - params
+  - name: params-typescript-options-object-of-optional-fields
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export interface BuildOptions {
+          a?: number;
+          b?: number;
+          c?: number;
+        }
+
+        export function build(a: number, b: number, c: number, options: BuildOptions): number {
+          return a + b + c + (options.a ?? 0);
+        }
+    options:
+      kinds:
+      - params
+  - name: params-javascript-too-many-parameters
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.js
+      body: |-
+        export function build(a, b, c, d) {
+          return a + b + c + d;
+        }
+    expect:
+    - line: 1
+    options:
+      kinds:
+      - params
   fix:
     safety: unsafe
     type: model

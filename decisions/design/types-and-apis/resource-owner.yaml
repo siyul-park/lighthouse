@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A resource SHOULD have one explicit owner responsible for releasing
     it exactly once on every exit path.
   severity: warn

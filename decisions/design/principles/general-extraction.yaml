@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: An extracted symbol SHOULD express a reusable responsibility in the
     most general form that fully fits it, without caller-specific policy or lifecycle.
   severity: info

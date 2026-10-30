@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: When multiple execution paths implement the same public contract, tests
     SHOULD prove parity across those paths.
   severity: info

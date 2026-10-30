@@ -16,6 +16,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A function SHOULD live with the type or module whose behavior it principally
     uses; a function SHOULD NOT be placed elsewhere merely by historical accident.
   severity: info
@@ -426,6 +427,77 @@ spec:
       kinds:
       - module
     canonical: false
+  - name: envy-typescript-uses-three-fields-of-one-type
+    language: typescript
+    kind: invalid
+    options:
+      kinds:
+      - type
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          items: number[] = [];
+          total = 0;
+          extra = 0;
+
+          reset(): void {
+            this.items = [];
+          }
+        }
+
+        function summary(store: Store): number {
+          let n = store.items.length;
+          n += store.total;
+          n += store.extra;
+          return n;
+        }
+    expect:
+    - line: 11
+  - name: envy-typescript-uses-members-of-two-types
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - type
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          items: number[] = [];
+          total = 0;
+          extra = 0;
+        }
+
+        export class Cache {
+          hits = 0;
+        }
+
+        function summary(store: Store, cache: Cache): number {
+          let n = store.items.length;
+          n += store.total + store.extra;
+          n += cache.hits;
+          return n;
+        }
+  - name: envy-typescript-uses-too-few-members
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - type
+    files:
+    - path: example.ts
+      body: |-
+        export class Store {
+          items: number[] = [];
+          total = 0;
+        }
+
+        function report(store: Store): number {
+          let n = store.total;
+          n += store.items.length;
+          return n;
+        }
   fix:
     safety: unsafe
     type: model

@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A module SHOULD be separate from its users only when it provides an
     independent responsibility, invariant, lifecycle, or reusable abstraction.
   severity: info
@@ -95,6 +96,33 @@ spec:
     - path: src/lib.rs
       body: |-
         pub fn run() -> i32 { 1 }
+  - name: single-user-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: src/main.ts
+      body: |-
+        import { work } from "./part";
+
+        export function run(): number {
+          return work();
+        }
+    - path: src/part.ts
+      body: |-
+        export function work(): number {
+          return 1;
+        }
+    expect: []
+  - name: single-user-typescript-valid
+    language: typescript
+    kind: valid
+    canonical: true
+    files:
+    - path: src/main.ts
+      body: |-
+        export function run(): number {
+          return 1;
+        }
   options:
     properties: {}
     additionalProperties: false

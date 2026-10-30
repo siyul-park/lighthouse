@@ -15,6 +15,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Each behaviorally distinct scenario SHOULD have its own named case
     rather than being hidden inside a long test body.
   severity: warn

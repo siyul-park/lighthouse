@@ -25,7 +25,7 @@ Test structure should provide one obvious owner for each public contract and kee
 
 ### Every public symbol has an owner test
 
-`testing/no-missing-owner` · test · warn · cel · go, rust
+`testing/no-missing-owner` · test · warn · cel · go, rust, typescript
 
 *A public symbol without an owner test has no single place to read or extend its specification. A public symbol should have one obvious top-level test whose cases specify its behavior. The naming convention is the language's, not a policy: its provider declares it (`conventions.test_naming`) and a project replaces parts of it in `[languages.<id>] testNaming` (`prefix`, `snakeCase`, `variants`, `ancestors`). Go: A function or type is owned by `TestName`, a method by `TestType_Method`. Only modules that have tests are judged. Types without methods and interfaces do not require a missing-owner test, nor do methods that implement interface methods. A type counts as tested when one of its members is. Names use the longest matching symbol, so `TestStore_Get` belongs to the method `Get`, not the type `Store`. Rust: A function or type is owned by the test with its snake-case name (`get`, `store`), a method by `type_method`. Only crates with tests are judged. Integration tests count for every module in the crate, including public items re-exported from private modules. A method call on a value of unknown type counts for the public methods of that name. Trait-implementation methods and types without methods do not require a missing-owner test.*
 
@@ -35,9 +35,9 @@ Derived from: Martin, Clean Code (2008), T1 Insufficient Tests
 
 | option | default | meaning |
 | --- | --- | --- |
-| `exemptMethods` | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
+| `exemptMethods` | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]`; typescript: `["toString","toJSON","valueOf"]` | Method names that implement well-known interfaces. |
 | `includeDataTypes` | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
-| `includeInternal` | `false`; go: `true` | Also judge symbols public only inside the project. |
+| `includeInternal` | `false`; go: `true`; typescript: `true` | Also judge symbols public only inside the project. |
 | `symbols` | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
 
 ```gomod invalid go.mod
@@ -76,11 +76,11 @@ package store
 func Get() int { return 1 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### A public symbol has at most one owner test
 
-`testing/no-duplicate-owner` · test · error · cel · go, rust
+`testing/no-duplicate-owner` · test · error · cel · go, rust, typescript
 
 *Several semantic owner tests split one public contract across places and let those specifications contradict. Keep one top-level owner test; make the rest cases of it. The naming convention is the language's, not a policy: its provider declares it (`conventions.test_naming`) and a project replaces parts of it in `[languages.<id>] testNaming` (`prefix`, `snakeCase`, `variants`, `ancestors`). Go: A function or type is owned by `TestName`, a method by `TestType_Method`. `TestGet` and `TestGet_Missing` both own `Get`: with variants enabled, the latter is a second owner and should instead be a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to `Get`, not `Store`. Rust: A function or type is owned by the test with its snake-case name (`get`, `store`), a method by `type_method`. Names that merely extend a symbol name are not owners; two tests with exactly the same owner name in different test crates, or inline and in `tests/`, are duplicate owners.*
 
@@ -90,7 +90,7 @@ Derived from: Martin, Clean Code (2008), T3 Don't Skip Trivial Tests
 
 | option | default | meaning |
 | --- | --- | --- |
-| `includeInternal` | `false`; go: `true` | Also judge symbols public only inside the project. |
+| `includeInternal` | `false`; go: `true`; typescript: `true` | Also judge symbols public only inside the project. |
 
 ```go invalid store.go
 package store
@@ -150,11 +150,11 @@ func TestStore_Get(t *testing.T) {
 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Tests use standard assertions
 
-`testing/standard-assertions` · test · warn · cel · fix: unsafe · go, rust
+`testing/standard-assertions` · test · warn · cel · fix: unsafe · go, rust, typescript
 
 *Assertions centralize failure messages and keep tests concise. The configured third-party assertion imports are the boundary for the Go check; tests that do not use one are not judged by the deterministic arm.*
 
@@ -164,7 +164,7 @@ Derived from: Meszaros, xUnit Test Patterns, Obscure Test; Martin, Clean Code (2
 
 | option | default | meaning |
 | --- | --- | --- |
-| `libraries` | `["github.com/stretchr/testify"]` | Import paths (or their prefixes) of the assertion libraries; project-local packages are named by their resolved module paths. A module that imports none of them is not judged. |
+| `libraries` | `["github.com/stretchr/testify"]`; typescript: `["chai"]` | Import paths (or their prefixes) of the assertion libraries; project-local packages are named by their resolved module paths. A module that imports none of them is not judged. |
 
 ```go invalid assertions/assertions.go
 package assertions
@@ -206,11 +206,11 @@ func TestGet(t *testing.T) {
 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### Each test case specifies one behavior
 
-`testing/behavior-cases` · test · warn · model · go, rust
+`testing/behavior-cases` · test · warn · model · go, rust, typescript
 
 *A test that mixes unrelated behaviors is hard to interpret when it fails. Fixtures and setup may be shared, but a case should state one outcome.*
 
@@ -231,7 +231,7 @@ func TestStoreClose(t *testing.T) { store.Close(); if store.IsOpen() { t.Fatal()
 
 ### Assertions stay inside their cases
 
-`testing/case-assertions` · test · warn · model · go, rust
+`testing/case-assertions` · test · warn · model · go, rust, typescript
 
 *Assertions outside a subtest may fail without naming which scenario failed, and their result can depend on case order.*
 
@@ -251,7 +251,7 @@ func TestStore(t *testing.T) { t.Run("present", func(t *testing.T) { got := stor
 
 ### A test level uses one case style
 
-`testing/consistent-case-style` · test · warn · cel · go
+`testing/consistent-case-style` · test · warn · cel · go, typescript
 
 *Mixing table and scenario styles at the same level obscures which inputs are data and which are distinct behaviors.*
 
@@ -307,9 +307,11 @@ func TestGet(t *testing.T) {
 }
 ```
 
+Also: typescript
+
 ### Test cases have at most two levels
 
-`testing/max-case-depth` · test · warn · cel · go
+`testing/max-case-depth` · test · warn · cel · go, typescript
 
 *Deeply nested subtests make the execution tree difficult to read and failures harder to locate.*
 
@@ -329,9 +331,11 @@ import "testing"
 func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { if got := Get(); got != 1 { t.Fatal() } }) }
 ```
 
+Also: typescript
+
 ### Repeated inputs share one table
 
-`testing/prefer-table` · test · warn · model · go, rust
+`testing/prefer-table` · test · warn · model · go, rust, typescript
 
 *A table keeps the invariant and assertion visible once while making the input/output differences explicit.*
 
@@ -352,7 +356,7 @@ func TestGet(t *testing.T) { tests := []struct{ input int; want string }{{1,"one
 
 ### Distinct scenarios have distinct cases
 
-`testing/scenario-cases` · test · warn · model · go, rust
+`testing/scenario-cases` · test · warn · model · go, rust, typescript
 
 *Named scenarios make failure output state which contract path failed and keep the top-level test readable.*
 
@@ -373,7 +377,7 @@ func TestWithdraw(t *testing.T) { a := NewAccount(); a.Deposit(2); a.Withdraw(1)
 
 ### Test tables stay simple
 
-`testing/simple-tables` · test · warn · model · go, rust
+`testing/simple-tables` · test · warn · model · go, rust, typescript
 
 *The table is the test specification. A reader should be able to understand each case without tracing fixture generation.*
 
@@ -393,7 +397,7 @@ func TestGet(t *testing.T) { cases := []struct{ input string; want int }{{"a",1}
 
 ### Tests expose the behavior they exercise
 
-`testing/no-hidden-target` · test · warn · cel · go, rust
+`testing/no-hidden-target` · test · warn · cel · go, rust, typescript
 
 *The test body should read like a specification. Helpers may remove repetition, but a reviewer must still see what production behavior is being tested.*
 
@@ -428,11 +432,11 @@ func TestGet(t *testing.T) {
 }
 ```
 
-Also: rust
+Also: rust, typescript
 
 ### A test file reads fixtures, tests, helpers
 
-`testing/file-layout` · test · error · cel · fix: safe · go, rust
+`testing/file-layout` · test · error · cel · fix: safe · go, rust, typescript
 
 *A test file reads top-down: what the tests use, then the specification, then how it checks. Go: A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration- groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures. Rust: The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers. Scope: the decision is about test code (`tests: only`), which is a symbol of a test file or of a module that exists to test another, such as a `#[cfg(test)]` module in a production file; the Rust example below has one.*
 
@@ -451,7 +455,7 @@ Derived from: Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Marti
 -const want = 1
 ```
 
-Also: rust
+Also: rust, typescript
 
 ## Public Boundary
 
@@ -516,7 +520,7 @@ Tests are reliable evidence, different test layers prove different facts, and va
 
 ### Tests are independent and repeatable
 
-`testing/independent-tests` · test · warn · model · go, rust
+`testing/independent-tests` · test · warn · model · go, rust, typescript
 
 *Shared mutable state and order dependence make tests flaky and conceal missing setup.*
 
@@ -539,7 +543,7 @@ func TestSecond(t *testing.T) { got := compute(); if got != 2 { t.Fatal() } }
 
 ### Tests validate outcomes automatically
 
-`testing/self-validating` · test · warn · model · go, rust
+`testing/self-validating` · test · warn · model · go, rust, typescript
 
 *Automated assertions make the suite reliable evidence in CI and remove the ambiguity of a manual review step.*
 
@@ -559,7 +563,7 @@ func TestOutput(t *testing.T) { if got := run(); got != want { t.Fatalf("got %v 
 
 ### Polling ends before teardown
 
-`testing/no-polling-after-teardown` · test · warn · model · go, rust
+`testing/no-polling-after-teardown` · test · warn · model · go, rust, typescript
 
 *Polling past teardown can observe closed resources, leak goroutines, or make test results timing-dependent.*
 
@@ -579,7 +583,7 @@ func TestWorker(t *testing.T) { t.Cleanup(worker.Stop); worker.Start(); require.
 
 ### Polling predicates are pure observations
 
-`testing/pure-polling` · test · warn · model · go, rust
+`testing/pure-polling` · test · warn · model · go, rust, typescript
 
 *A polling predicate may execute many times. Side effects make success depend on the scheduler and the number of polls.*
 
@@ -599,7 +603,7 @@ require.Eventually(t, func() bool { return store.Ready() }, time.Second, time.Mi
 
 ### Tests cover contract dimensions
 
-`testing/contract-coverage` · test · info · model · go, rust
+`testing/contract-coverage` · test · info · model · go, rust, typescript
 
 *An untested boundary is unspecified behavior. Each applicable contract dimension needs evidence; the goal is completeness, not maximizing a percentage.*
 
@@ -619,7 +623,7 @@ func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { 
 
 ### Tests use the lowest proving layer
 
-`testing/lowest-layer` · test · info · model · go, rust
+`testing/lowest-layer` · test · info · model · go, rust, typescript
 
 *Lower-level tests localize failures and run faster; choosing a higher layer is justified only when the contract itself crosses that boundary.*
 
@@ -639,7 +643,7 @@ func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { 
 
 ### Architecture contracts have specific evidence
 
-`testing/specific-evidence` · test · info · model · go, rust
+`testing/specific-evidence` · test · info · model · go, rust, typescript
 
 *A generic test may prove behavior but miss the module, platform, backend, or lifecycle condition that defines the architectural contract.*
 
@@ -659,7 +663,7 @@ func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { 
 
 ### Equivalent paths have parity tests
 
-`testing/path-parity` · test · info · model · go, rust
+`testing/path-parity` · test · info · model · go, rust, typescript
 
 *Cache, fallback, protocol, platform, or implementation paths may drift independently despite passing their local tests.*
 
@@ -679,7 +683,7 @@ func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { 
 
 ### Golden expectations are independent
 
-`testing/independent-golden` · test · info · model · go, rust
+`testing/independent-golden` · test · info · model · go, rust, typescript
 
 *Generating expected output with the same code under test can reproduce the same defect in both actual and expected values.*
 
@@ -699,7 +703,7 @@ func TestBehavior(t *testing.T) { run(); if got := state(); got != "expected" { 
 
 ### Tests prove contracts, not structure
 
-`testing/no-structure-tests` · test · info · model · go, rust
+`testing/no-structure-tests` · test · info · model · go, rust, typescript
 
 *Coverage proves reachability, not quality. Tests should fail for a contract violation rather than an arbitrary refactor.*
 

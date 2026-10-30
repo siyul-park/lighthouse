@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: One term SHOULD represent one concept across packages, and one concept
     SHOULD have one term; unrelated exported types SHOULD NOT share a name.
   severity: warn
@@ -105,3 +106,23 @@ spec:
         pub struct Customer { pub id: u64 }
         pub fn find_customer(id: u64) -> Option<Customer> { None }
         pub fn save_customer(value: Customer) { let _ = value; }
+  - name: homonym-typescript
+    language: typescript
+    kind: invalid
+    files:
+    - path: first/first.ts
+      body: |-
+        export class Account {}
+    - path: second/second.ts
+      body: |-
+        export class Account {}
+  - name: distinct-names-typescript
+    language: typescript
+    kind: valid
+    files:
+    - path: first/first.ts
+      body: |-
+        export class Account {}
+    - path: second/second.ts
+      body: |-
+        export class Ledger {}

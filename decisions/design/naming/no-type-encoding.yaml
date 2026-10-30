@@ -15,6 +15,9 @@ spec:
     go: {}
     rust: {}
     cel: {}
+    typescript:
+      options:
+        enabled: true
   requirement: A name SHOULD NOT encode its type, scope, or interface status in a
     prefix when the declaration already supplies that information.
   severity: warn
@@ -163,3 +166,34 @@ spec:
               expression: '1'
             where: symbol.name == 'example'
             message: Example
+  - name: encoding-typescript-interface-prefix
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export interface IReader {
+          read(): string;
+        }
+    expect:
+    - line: 1
+  - name: encoding-typescript-hungarian
+    language: typescript
+    kind: invalid
+    files:
+    - path: example.ts
+      body: |-
+        export const strName = "name";
+    expect:
+    - line: 1
+  - name: encoding-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: example.ts
+      body: |-
+        export interface Reader {
+          read(): string;
+        }
+
+        export class Item {}

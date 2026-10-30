@@ -14,6 +14,7 @@ spec:
     examples: exclude
   languages:
     go: {}
+    typescript: {}
   requirement: 'Nested test cases SHOULD be limited to two levels: a test function
     and its direct cases.'
   severity: warn
@@ -71,3 +72,47 @@ spec:
         package sample
         import "testing"
         func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { if got := Get(); got != 1 { t.Fatal() } }) }
+  - name: depth-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+    - path: store.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./store";
+
+        describe("get", () => {
+          describe("when called", () => {
+            describe("twice", () => {
+              it("returns one", () => {
+                expect(get()).toBe(1);
+              });
+            });
+          });
+        });
+    expect:
+    - line: 4
+  - name: depth-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: store.ts
+      body: |-
+        export function get(): number {
+          return 1;
+        }
+    - path: store.test.ts
+      body: |-
+        import { describe, expect, it } from "vitest";
+        import { get } from "./store";
+
+        describe("get", () => {
+          it("returns one", () => {
+            expect(get()).toBe(1);
+          });
+        });

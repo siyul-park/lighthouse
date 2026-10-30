@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: A layout or presentation declaration SHOULD NOT own mutable application
     state that belongs to its model or controller.
   severity: warn

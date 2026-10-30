@@ -96,6 +96,9 @@ spec:
     cel:
       options:
         style: lowerCamel
+    typescript:
+      options:
+        style: lowerCamel
   examples:
   - name: lower-case-initialism
     language: go
@@ -189,3 +192,27 @@ spec:
     - path: src/lib.rs
       body: 'pub struct HttpClient;'
     expect: [{ line: 1 }]
+  - name: lower-camel-typescript-invalid
+    language: typescript
+    kind: invalid
+    files:
+    - path: sample.ts
+      body: |-
+        export class Config {
+          httpURL = "";
+        }
+    expect:
+    - line: 2
+  - name: lower-camel-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |-
+        export class Config {
+          httpUrl = "";
+        }
+
+        export function userId(): string {
+          return "";
+        }

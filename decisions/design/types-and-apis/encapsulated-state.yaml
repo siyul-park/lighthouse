@@ -13,6 +13,7 @@ spec:
   languages:
     go: {}
     rust: {}
+    typescript: {}
   requirement: Private mutable state SHOULD be accessed through the owning type’s
     contract rather than by unrelated callers.
   severity: warn

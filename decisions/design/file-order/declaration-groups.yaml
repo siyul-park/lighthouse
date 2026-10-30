@@ -109,6 +109,15 @@ spec:
       options:
         groups: [const, var, type, public-function, private-function]
         hooks: []
+    typescript:
+      options:
+        groups:
+        - const
+        - var
+        - type
+        - public-function
+        - private-function
+        hooks: []
   check:
     type: cel
     select: symbol
@@ -487,3 +496,110 @@ spec:
             func TestSample(t *testing.T) { _ = sample{} }
       expect:
         - line: 7
+    - name: typescript-invalid
+      language: typescript
+      kind: invalid
+      files:
+      - path: example.ts
+        body: |-
+          function helper(): number {
+            return 1;
+          }
+
+          export class Service {
+            run(): number {
+              return helper();
+            }
+          }
+      expect:
+      - line: 1
+    - name: typescript-valid
+      language: typescript
+      kind: valid
+      files:
+      - path: example.ts
+        body: |-
+          export class Service {
+            run(): number {
+              return helper();
+            }
+          }
+
+          function helper(): number {
+            return 1;
+          }
+    - name: typescript-groups-in-order
+      language: typescript
+      kind: valid
+      files:
+      - path: example.ts
+        body: |-
+          export const limit = 3;
+
+          const floor = 1;
+
+          let ready = false;
+
+          export class Service {
+            constructor(private readonly ok: boolean) {}
+
+            run(): number {
+              return floor + Number(this.ok);
+            }
+          }
+
+          type State = number;
+
+          export function open(): Service {
+            ready = true;
+            return new Service(Boolean(limit as State));
+          }
+
+          function check(): boolean {
+            return floor > 0;
+          }
+    - name: typescript-const-after-public-function
+      language: typescript
+      kind: invalid
+      files:
+      - path: example.ts
+        body: |-
+          export function open(): number {
+            return limit;
+          }
+
+          export const limit = 3;
+      expect:
+      - line: 5
+    - name: typescript-private-function-before-public
+      language: typescript
+      kind: invalid
+      files:
+      - path: example.ts
+        body: |-
+          function helper(): number {
+            return 1;
+          }
+
+          export function open(): number {
+            return helper();
+          }
+      expect:
+      - line: 5
+    - name: javascript-invalid
+      language: typescript
+      kind: invalid
+      files:
+      - path: example.js
+        body: |-
+          function helper() {
+            return 1;
+          }
+
+          export class Service {
+            run() {
+              return helper();
+            }
+          }
+      expect:
+      - line: 1
