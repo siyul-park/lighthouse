@@ -18,10 +18,16 @@ spec:
     rust: {}
     typescript:
       options:
+        # A keyword opens a line of code only in the shape code gives it: prose
+        # such as "let the frame paint (once)" or "type names: a = b" is not code, and
+        # an assignment is code only when it ends the way a statement does.
         codePatterns:
-        - "[;{]$|^}"
-        - "^(if|for|switch|return|function|let|var|const|import|export|class|interface|type|enum|async|await|throw|try|while|do)\\b.*[({=;]"
-        - "^[A-Za-z_][\\w.]*(\\[[^\\]]*\\])?\\s*(=|\\+=|-=|\\*=)\\s*\\S"
+        - ";$|^}|[)\\]]\\s*\\{$|=>\\s*\\{$"
+        - "^(if|for|while|switch|catch)\\s*\\("
+        - "^(const|let|var)\\s+[\\w$]+\\s*[:=]"
+        - "^(function|class|interface|enum)\\s+[\\w$]+\\s*[({<]|^type\\s+[\\w$]+\\s*(<.*>)?\\s*="
+        - "^import\\b.*\\bfrom\\s*['\"]|^import\\s*['\"]|^export\\s+(default\\b|(const|let|var|function|class|interface|type|enum|async)\\s+[\\w$]+)"
+        - "^[A-Za-z_][\\w.]*(\\[[^\\]]*\\])?\\s*(=|\\+=|-=|\\*=)\\s*\\S.*[;,({\\[]$"
         - ^[A-Za-z_][\w.]*\(.*["'`0-9].*\)[;,]?$
   requirement: Comments SHOULD NOT label sections, preserve commented-out code, record
     history, or restate a block closing; prefer code structure and version control.
@@ -506,6 +512,21 @@ spec:
         // The total is computed once: compute(a, b) is costly.
 
         export function run(): void {}
+    canonical: false
+  - name: code-typescript-prose-valid
+    language: typescript
+    kind: valid
+    options:
+      kinds:
+      - commented-code
+    files:
+    - path: sample.ts
+      body: |-
+        export function run(x: number): number {
+          // let the frame paint once (scale-up), then lift it
+          // alpha = rgba(0,0,0,0), so inverted keeps no alpha
+          return x + 1;
+        }
     canonical: false
   - name: history-typescript-invalid
     language: typescript

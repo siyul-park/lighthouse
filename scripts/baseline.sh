@@ -5,7 +5,9 @@
 #
 # Builds the release binary and the plugins, then checks each repository with
 # the strict configuration (baseline/strict-root.toml for a Cargo workspace,
-# baseline/strict-go.toml for a Go module), three times, and writes
+# baseline/strict-go.toml for a Go module; baseline/strict-ts.toml is the
+# TypeScript and JavaScript twin, run by hand with `lighthouse check --config`),
+# three times, and writes
 # baseline/<name>.json: the commit, the size, the exit code, the findings per
 # decision, the median time of each phase and the reach of its modules and
 # symbols (the stability example, as "system"). Everything but the times is

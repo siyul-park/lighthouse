@@ -8,7 +8,8 @@ spec:
   title: Callers precede private callees
   context: Readers follow a public operation into its private implementation. A callee
     placed first forces readers to understand a helper before the behavior that uses
-    it.
+    it. A constructor is not placed by its callers, and a helper that the statements
+    of a module call as it loads is not either, because it has to be defined before they run.
   scope:
     subject: symbol
     examples: exclude
@@ -40,7 +41,7 @@ spec:
         - 1] : local[0]'
     - name: callee_first
       expression: |-
-        (func.kind == 'function' || func.kind == 'method') && size(local) > 0 && func.pos <= anchor.pos && !cel.bind(own, declaration_group(func.id),
+        (func.kind == 'function' || func.kind == 'method') && func.name != 'constructor' && size(local) > 0 && func.pos <= anchor.pos && !cel.bind(own, declaration_group(func.id),
             cel.bind(later, declaration_group(anchor.id),
               own >= 0 && later >= 0 && own < later))
         && !(func.lang == 'rust' && func.kind == 'method' && !func.implementation

@@ -1,0 +1,10 @@
+# The configuration the baseline runs a TypeScript or JavaScript project with:
+# the strict preset of the design decisions. scripts/baseline.sh fills in @PLUGINS@.
+apiVersion = "lighthouse/v1alpha1"
+kind = "Project"
+[metadata]
+name = "typescript-strict"
+[spec]
+plugins = ["core","design","testing",
+  { id = "lang-typescript", path = "@PLUGINS@/lang-typescript" }]
+extends = ["core/recommended","design/strict","testing/recommended"]

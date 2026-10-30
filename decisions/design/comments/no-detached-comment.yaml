@@ -14,14 +14,26 @@ spec:
     a comment on the file's first line (a license header, package documentation or
     build constraint), an inner `//!` documentation comment, a directive, a banner,
     a comment followed by code or by another comment, and one without a following
-    declaration are not candidates. The fix deletes the blank lines. It is unsafe
+    declaration are not candidates. TypeScript and JavaScript attach only a `/** */`
+    comment to the declaration after it (TSDoc, JSDoc), so only those are judged; a
+    `//` comment there labels a section or explains a block, and may stand apart. The fix deletes the blank lines. It is unsafe
     because the comment may have been meant for the section rather than the declaration.
   scope:
     subject: file
   languages:
     go: {}
     rust: {}
-    typescript: {}
+    typescript:
+      options:
+        docPrefix: "/**"
+  options:
+    properties:
+      docPrefix:
+        type: string
+        default: ""
+        description: What a comment starts with to document the declaration after it;
+          comments that start otherwise are not judged. Empty judges every comment.
+    additionalProperties: false
   requirement: A comment that describes a declaration SHOULD be adjacent to it, without
     intervening blank lines.
   severity: warn
@@ -29,7 +41,8 @@ spec:
     type: cel
     select: comment
     where: comment.standalone && comment.gap > 0 && !comment.top && !comment.generated
-      && !comment.banner && !comment.directive && !comment.text.startsWith('//!')
+      && !comment.banner && !comment.directive && comment.text.startsWith(options.docPrefix)
+      && !comment.text.startsWith('//!')
       && !comment.text.startsWith('/*!')
     message: comment above {{ comment.next_name }} is separated from it by {{ string(comment.gap)
       }} blank line(s)
@@ -50,6 +63,7 @@ spec:
     - clippy empty_line_after_doc_comments
     - clippy empty_line_after_outer_attr
     - 'Go documentation comments: https://go.dev/doc/comment'
+    - 'TSDoc: https://tsdoc.org/pages/spec/overview/ (a doc comment is a `/** */` block)'
   examples:
   - name: detached-go-invalid
     language: go
@@ -175,10 +189,21 @@ spec:
       body: |
         const before = 1;
 
-        // Opens the store.
+        /** Opens the store. */
 
         function open() {}
 
         module.exports = { before, open };
     expect:
     - line: 3
+  - name: section-comment-typescript-valid
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |
+        export const before = 1;
+
+        // Opens the store.
+
+        export function open(): void {}

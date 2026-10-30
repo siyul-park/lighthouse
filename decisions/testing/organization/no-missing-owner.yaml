@@ -29,6 +29,10 @@ spec:
     public items re-exported from private modules. A method call on a value of
     unknown type counts for the public methods of that name. Trait-implementation
     methods and types without methods do not require a missing-owner test.
+
+    TypeScript and JavaScript: a function, a class or a method with a body is owned
+    by a top-level test that names it. A signature without a body, such as a method
+    of a type literal, and a constructor are specified through their type.
   scope:
     subject: test
     examples: exclude
@@ -94,7 +98,10 @@ spec:
     typescript:
       options:
         includeInternal: true
+        # A constructor is specified through its type, which counts as tested when
+        # one of its members is.
         exemptMethods:
+        - constructor
         - toString
         - toJSON
         - valueOf
@@ -111,7 +118,8 @@ spec:
       - name: missing
         expression: >-
           (symbol.kind == 'method'
-              ? (owner != null && owner.kind == 'type' && owner.visibility in visible)
+              ? (owner != null && owner.kind == 'type' && owner.visibility in visible
+                 && symbol.func != null)
               : owner == null)
           && !symbol.implementation
           && (options.includeDataTypes || !symbol.data_only)

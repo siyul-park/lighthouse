@@ -242,7 +242,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
-        function run(): void {
+        export function run(): void {
           one();
           two();
           three();
@@ -251,8 +251,6 @@ spec:
         function one(): void {}
         function two(): void {}
         function three(): void {}
-
-        run();
     expect:
     - line: 1
   - name: hub-typescript-ordinary-fan

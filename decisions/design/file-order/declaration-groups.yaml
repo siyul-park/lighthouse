@@ -33,6 +33,11 @@ spec:
     free functions. The order of the other members of a type is left to
     `design/top-down-order`. Items of `#[cfg(test)]` modules are
     not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.
+
+    TypeScript and JavaScript: constants; types and classes with their members;
+    public functions; private functions. `var` and `let` are not ordered: a variable
+    is initialized in file order, and a JavaScript file declares its imports
+    (`var x = require("m")`) and its mutable state with them.
   scope:
     subject: file
     generated: true
@@ -111,9 +116,11 @@ spec:
         hooks: []
     typescript:
       options:
+        # `var` and `let` are left unordered: a JavaScript file declares its imports
+        # (`var x = require("m")`) and its mutable state with them, and their
+        # initializers run in file order, so a const that reads one cannot move above it.
         groups:
         - const
-        - var
         - type
         - public-function
         - private-function
@@ -207,6 +214,7 @@ spec:
       - "Martin, Clean Code (2008), ch. 10 Class organization"
       - "Uber Go Style Guide, Function Grouping and Ordering"
       - "golangci-lint, funcorder"
+      - "ESLint, no-use-before-define (a variable is initialized in file order, so `var` and `let` are not reordered): https://eslint.org/docs/latest/rules/no-use-before-define"
   examples:
     - name: invalid
       language: go
