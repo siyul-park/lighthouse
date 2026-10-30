@@ -16,6 +16,22 @@
    code model (UCM, lighthouse_model::ucm)
 ```
 
+Every plugin has one directory, `plugins/<id>/`, with the same top level:
+`lighthouse-plugin.toml` (the manifest: `metadata.name`, `spec.version`, `spec.runtime`
+only for a process, `spec.catalog = "decisions"` when it provides packs), `README.md`,
+`decisions/<pack>/` for its packs (with the pack's `sources.yaml`) and `labels/` for the
+labels of its decisions, and the implementation in its toolchain's standard layout. The
+bundled plugins (`core`, `design`, `testing`, `lang-cel`) have no `runtime`: the binary compiles
+them in and embeds the catalogs of the first three. A language plugin provides its language's
+pack (`lang-go` provides `go`, `lang-rust` provides `rust`, `lang-markdown` provides `markdown`).
+
+`plugins` in `lighthouse.toml` lists only external plugins, the code that runs as a process;
+`extends` is what is enabled, and naming a preset `<pack>/<name>` loads the plugin that
+provides the pack. The host reads the catalog of a listed plugin from its manifest without
+starting the process, so a pack whose plugin is not listed is a configuration error that names
+the plugin to list. A plugin that comes with the project is trusted together with its catalog:
+an untrusted project loads neither.
+
 The core knows no language and no rule. Languages arrive as providers that turn
 files into the code model (UCM: symbols, edges, function summaries, tests);
 analyzers and rules read only the UCM. In-process providers and out-of-process
@@ -91,9 +107,9 @@ spec: { ... }
 
 | Kind | Holds | Lives in |
 | --- | --- | --- |
-| `Decision` | a decision: `title context scope requirement status supersedes consequences severity options languages check fix provenance examples` | `decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
-| `Pack` | title, intro and the ordered sections, each listing its decisions | `decisions/<pack>/pack.yaml` |
-| `SourceMap` | which decision covers each normative line of the documents a catalog came from | `decisions/sources.yaml` |
+| `Decision` | a decision: `title context scope requirement status supersedes consequences severity options languages check fix provenance examples` | `plugins/<plugin>/decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
+| `Pack` | title, intro and the ordered sections, each listing its decisions | `plugins/<plugin>/decisions/<pack>/pack.yaml` |
+| `SourceMap` | which decision covers each normative line of the documents a catalog came from | `plugins/<plugin>/decisions/<pack>/sources.yaml` |
 | `Project` | `lighthouse.toml`: `plugins extends languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config. `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (`strict` also switches on every kind of a decision whose `kinds` option enables only some by default); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
 | `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
 | `Judgment`, `Suppression` | records of the decision log | `.lighthouse/decisions.jsonl` |

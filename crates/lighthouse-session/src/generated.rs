@@ -5,10 +5,10 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Write,
+    path::Path,
 };
 
 use lighthouse_checks::Composition;
-use lighthouse_engine::active;
 use lighthouse_report::docs::{
     DOCS_DIR, FunctionDoc, cel_functions_markdown, fix_operations_markdown, pages,
 };
@@ -27,11 +27,18 @@ const HEAD: &str = include_str!("skill-head.md");
 /// How an agent fixes findings, stated once: the skill and the hooks both say it.
 pub const AGENT_LOOP: &str = include_str!("agent-loop.md");
 
-/// Every generated page by path under the docs directory: one per pack, and
-/// the fix operations and the CEL functions.
-pub fn bundled_docs() -> Result<BTreeMap<String, String>> {
+/// Every generated page by path under the docs directory: one per pack of the
+/// bundled plugins and of the plugins found in `<root>/plugins`, and the fix
+/// operations and the CEL functions.
+pub fn pack_docs(root: &Path) -> Result<BTreeMap<String, String>> {
     let comp = crate::compose()?;
-    let mut pages = pages(comp.bundled()?);
+    let (catalog, homes) = crate::project::repository_catalog(&comp, root)?;
+    let mut pages = pages(&catalog, &|pack| {
+        homes
+            .get(pack)
+            .cloned()
+            .unwrap_or_else(|| format!("plugins/{pack}/decisions"))
+    });
     pages.insert(
         format!("{DOCS_DIR}/fix-operations.md"),
         fix_operations_markdown(),
@@ -65,7 +72,7 @@ pub fn schema_of(kind: &str) -> Option<Descriptor> {
 
 /// The skill of the project: its catalog layers and its configuration.
 pub fn skill_for(session: &Session) -> Result<String> {
-    let active = active(&session.config, session.catalog.projects())?;
+    let active = crate::active_decisions(session)?;
     Ok(skill(&session.catalog, &active))
 }
 

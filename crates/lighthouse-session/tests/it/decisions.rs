@@ -34,9 +34,7 @@ fn active_decisions() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/short\" = \"off\"\n",
-        ),
+        &lighthouse_test_support::project("[rules]\n\"local/short\" = \"off\"\n"),
     );
     let off = lighthouse_session::active_decisions(&session(dir.path())).unwrap();
     assert!(!off.contains("local/short"));
@@ -46,7 +44,7 @@ fn active_decisions() {
 fn config_summary() {
     let dir = project("error");
     let summary = lighthouse_session::config_summary(&session(dir.path())).unwrap();
-    assert_eq!(summary["plugins"], serde_json::json!(["core", "local"]));
+    assert_eq!(summary["plugins"], serde_json::json!([]));
     assert!(
         summary["activeRules"]
             .as_array()

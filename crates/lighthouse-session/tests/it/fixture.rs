@@ -122,7 +122,7 @@ pub fn project_with(severity: &str, extra: &str) -> TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/short\" = \"{severity}\"\n{extra}"
+            "[rules]\n\"local/short\" = \"{severity}\"\n{extra}"
         )),
     );
     write(

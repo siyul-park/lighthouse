@@ -101,6 +101,7 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
 /// The rules the project's configuration enables for at least one file: the
 /// projects it extends and the entries it sets, resolved over the catalog.
 pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {
+    session.require_extended_packs()?;
     Ok(lighthouse_engine::active(
         &session.config,
         session.catalog.projects(),
@@ -208,7 +209,7 @@ pub(crate) fn test_catalog(
     language: Option<&str>,
 ) -> Result<DecisionTest> {
     let decisions = selected(catalog, ids)?;
-    let shipped = session.comp.bundled()?;
+    let shipped = &session.base;
     let (probe, registered) = session.registry()?;
     if let Some(gap) = registered.incomplete.first() {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());

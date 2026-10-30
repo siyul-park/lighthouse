@@ -63,7 +63,7 @@ fn project(models: &str) -> TempDir {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\", {}]\n[rules]\n\"local/naming-ban\" = \"warn\"\n{models}",
+            "plugins = [{}]\n[rules]\n\"local/naming-ban\" = \"warn\"\n{models}",
             plugin()
         )),
     );

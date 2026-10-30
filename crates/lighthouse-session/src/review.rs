@@ -4,7 +4,7 @@
 use std::{env, path::Path};
 
 use lighthouse_engine::{
-    FixPlan, active,
+    FixPlan,
     brief::{self, Target},
 };
 use lighthouse_model::{AgentKind, Attribution, Severity};
@@ -236,8 +236,8 @@ fn brief_of(session: &Session, decision: &Decision, finding: &FindingRecord) -> 
         evidence: &finding.evidence,
         place: format!("{}:{}:{}", finding.path, finding.line(), finding.col()),
     };
-    let plan = FixPlan::from_catalog(&session.catalog, session.comp.bundled()?);
-    let active = active(&session.config, session.catalog.projects())?;
+    let plan = FixPlan::from_catalog(&session.catalog, &session.base);
+    let active = crate::active_decisions(session)?;
     let tools: Vec<&str> = brief::safe_fixes(&plan, None)
         .into_iter()
         .filter(|id| active.contains(*id))

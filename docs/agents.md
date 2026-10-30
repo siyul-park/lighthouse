@@ -161,7 +161,11 @@ while the analysis is incomplete. Commands run only in a project the user truste
 `lighthouse trust`, and without trust a command fix is declined. Trust is the user's, given at a terminal: `lighthouse trust` lists the
 commands and asks (`--yes` only after reading the list), and `init --agent claude-code`
 adds `Bash(lighthouse trust:*)` to the project's permission deny list so the agent cannot
-trust a project for you. Nothing is written until the whole run verified in memory, and
+trust a project for you. A project that needs trust to be checked (it lists a plugin it brings,
+or turns the sandbox off) and does not have it is a state, not a failure: the hooks that check
+(PreToolUse, PostToolUse, Stop) tell the session once, as context that does not block, that
+Lighthouse is not checking and why, exit 0 and stay silent for the rest of that session; the
+prompt and session-start hooks work as before. Nothing is written until the whole run verified in memory, and
 a file that changed meanwhile is skipped and reported, with every file of a fix that
 spans it. The findings the fixes removed
 are resolved by the run that ends the fixing. Recheck with `check` afterwards.

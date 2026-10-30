@@ -56,7 +56,6 @@ fn create_decision() {
     assert!(made.created);
     assert_eq!((made.test.decisions, made.test.runs), (1, 1));
     assert!(made.test.failures.is_empty(), "{:?}", made.test.failures);
-    assert!(made.local_plugin_listed);
 
     // It is a proposal with a uid, and a person accepts it.
     let written = read(dir.path(), ".lighthouse/decisions/no-logs.yaml");

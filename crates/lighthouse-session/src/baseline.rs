@@ -96,6 +96,23 @@ pub fn load_all(root: &Path, session: &str) -> Vec<Baseline> {
     all
 }
 
+/// Whether `notice` has not been told in the session yet, marking it told:
+/// true exactly once per session and notice, however many hooks ask at once.
+/// The mark lives beside the session's baselines, so it ends with them.
+pub fn first_telling(root: &Path, session: &str, notice: &str) -> Result<bool> {
+    let own = dir(root, session);
+    fs::create_dir_all(&own)?;
+    let marked = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(own.join(format!("{notice}.told")));
+    match marked {
+        Ok(_) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// Writes the baseline and deletes the session directories that are too old.
 pub fn record(root: &Path, session: &str, baseline: &Baseline) -> Result<()> {
     let own = dir(root, session);

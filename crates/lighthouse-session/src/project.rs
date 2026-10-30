@@ -3,6 +3,7 @@
 //! own catalog layer.
 
 use std::{
+    collections::BTreeMap,
     env, fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -12,18 +13,23 @@ use lighthouse_checks::{Checks, Composition};
 use lighthouse_engine::{CommandModels, Engine};
 use lighthouse_plugin::{ModelClient, Registry};
 use lighthouse_resource::Format;
-use lighthouse_rpc::{CommandModel, Registered};
-use lighthouse_spec::{Catalog, CheckKind, FixKind, load_local, local_files};
+use lighthouse_rpc::{CommandModel, PluginCatalog, Registered};
+use lighthouse_spec::{Catalog, CheckKind, Files, FixKind, load_local, local_files};
 use lighthouse_spec::{Config, FILE_NAME, Layers};
 
 use crate::{
-    Result, environment,
+    Result,
+    authoring::LOCAL_PACK,
+    environment,
     permit::permitted,
     trust::{Basis, Program},
 };
 
 /// What `init` writes and what a project without a config is checked with.
-pub const DEFAULT_CONFIG: &str = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Project\"\n\n[metadata]\nname = \"project\"\n\n[spec]\nplugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
+pub const DEFAULT_CONFIG: &str = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Project\"\n\n[metadata]\nname = \"project\"\n\n[spec]\nextends = [\"core/recommended\"]\n";
+
+/// Why a project that turns the sandbox off is not run before it is trusted.
+const NO_SANDBOX_UNTRUSTED: &str = "`[sandbox] enabled = false` needs a trusted project: programs would run with your full access (run `lighthouse trust`)";
 
 /// What every run says when the sandbox is off.
 const SANDBOX_OFF: &str = "sandbox off: programs run with your full access";
@@ -40,7 +46,13 @@ pub struct Session {
     pub store: PathBuf,
     /// The catalog layer of `.lighthouse/decisions`, when the project has one.
     local: Option<Catalog>,
-    /// The bundled catalog with the project's layer on top.
+    /// The catalog as it ships: the bundled packs and the packs of the plugins
+    /// the project lists.
+    pub(crate) base: Arc<Catalog>,
+    /// The catalogs of listed plugins that come with the project and are not
+    /// loaded because the project is not trusted.
+    withheld: Vec<PluginCatalog>,
+    /// The shipped catalog with the project's layer on top.
     pub catalog: Arc<Catalog>,
     /// What the project asks to be trusted for, computed from the same bytes
     /// the configuration and the decisions were loaded from.
@@ -128,20 +140,44 @@ impl Session {
             .collect();
         let layers = personal.iter().map(|p| p.layer.clone()).collect();
         let (config, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;
+        let bundled = lighthouse_checks::ids(&comp)?;
+        if let Some(listed) = config.plugins().iter().find(|p| bundled.contains(&p.id)) {
+            return Err(format!(
+                "plugin `{}` is bundled: remove it from `plugins`",
+                listed.id
+            )
+            .into());
+        }
+        if let Some(listed) = config.lists(LOCAL_PACK).then_some(LOCAL_PACK) {
+            return Err(format!(
+                "plugin `{listed}` is the project's own decisions: remove it from `plugins`"
+            )
+            .into());
+        }
         let files = local_files(&root)?;
         let local = files
             .clone()
             .map(|files| Catalog::from_local(files, comp.cel()))
             .transpose()?;
-        let catalog = layered(&comp, local.as_ref())?;
-        environment::check_local(&root, &personal, &catalog)?;
-        let commands = commands(&config, &catalog, comp.bundled()?, &root)?;
+        let search = lighthouse_rpc::search_dirs(&root);
+        let listed = lighthouse_rpc::plugin_catalogs(&config, &root, &search)?;
+        let commands = commands(&config, local.as_ref(), &root);
         let basis = Basis::of(&root, text, &texts, &files.unwrap_or_default(), &commands);
+        let trusted = basis.trusted(&root);
+        let (loaded, withheld): (Vec<_>, Vec<_>) =
+            listed.into_iter().partition(|c| trusted || !c.local);
+        let base = shipped(&comp, &loaded)?;
+        let catalog = layered(&base, local.as_ref())?;
+        if withheld.is_empty() {
+            environment::check_local(&root, &personal, &catalog)?;
+        }
         Ok(Self {
             config,
             store: root.clone(),
             root,
             local,
+            base: Arc::new(base),
+            withheld,
             catalog: Arc::new(catalog),
             basis,
             layers,
@@ -159,28 +195,23 @@ impl Session {
             store: root.clone(),
             root,
             local: None,
-            catalog: Arc::new(layered(&comp, None)?),
+            base: Arc::new(comp.bundled()?.clone()),
+            withheld: Vec::new(),
+            catalog: Arc::new(comp.bundled()?.clone()),
             basis: Basis::default(),
             layers: Layers::default(),
             comp,
         })
     }
 
-    /// The bundled and local plugins plus the language plugins the config
-    /// lists, which are started here. A plugin that serves models is started
+    /// The bundled and local plugins, the packs of the listed plugins, and the
+    /// language plugins the config lists, which are started here. A plugin that serves models is started
     /// in the store.
     pub fn registry(&self) -> Result<(Registry, Registered)> {
         let mut registry = self.in_process_registry()?;
         let search = lighthouse_rpc::search_dirs(&self.root);
-        if !self.trusted()
-            && let Some(local) =
-                lighthouse_rpc::local_plugins(&self.config, &self.root, &search).first()
-        {
-            return Err(format!(
-                "plugin `{}` comes with the project and would run a program: this project is not trusted (run `lighthouse trust`, or set LIGHTHOUSE_TRUST=1 in CI)",
-                local.id
-            )
-            .into());
+        if let Some(why) = self.untrusted_plugin(&search) {
+            return Err(why.into());
         }
         let registered = lighthouse_rpc::register(
             &mut registry,
@@ -198,12 +229,11 @@ impl Session {
     pub fn engine(&self) -> Result<(Engine, Vec<String>)> {
         let sandbox = self.config.sandbox().clone();
         if !sandbox.enabled && !self.trusted() {
-            return Err(
-                "`[sandbox] enabled = false` needs a trusted project: programs would run with your full access (run `lighthouse trust`)"
-                    .into(),
-            );
+            return Err(NO_SANDBOX_UNTRUSTED.into());
         }
         let (registry, plugins) = self.registry()?;
+        self.require_packs(true, |pack| registry.has_plugin(pack))?;
+        let config = self.enabled_in(&registry);
         let root = self.root.clone();
         let policy = sandbox.clone();
         let cel = self.comp.cel().clone();
@@ -211,7 +241,7 @@ impl Session {
             CommandModel::new(&cel, &root, name, model, provider, &policy)
                 .map(|command| Box::new(command) as Box<dyn ModelClient>)
         });
-        let engine = Engine::new(registry, self.config.clone(), &self.catalog, &self.root)?
+        let engine = Engine::new(registry, config, &self.catalog, &self.root)?
             .with_incomplete(plugins.incomplete)
             .with_trust(self.trusted())
             .with_commands(commands);
@@ -224,13 +254,98 @@ impl Session {
         Ok((engine, notices))
     }
 
+    /// The configuration with every plugin of `registry` enabled: those the
+    /// project lists, and those that need no listing (the bundled ones, the
+    /// project's own decisions, the packs of the plugins it lists).
+    pub(crate) fn enabled_in(&self, registry: &Registry) -> Config {
+        self.config
+            .clone()
+            .enabling(registry.manifests().iter().map(|m| m.id.as_str()))
+    }
+
+    /// Why this project cannot be checked until the user trusts it, when that
+    /// is so: it turns the sandbox off, or lists a plugin that comes with it.
+    /// An untrusted project that needs neither is checked like any other.
+    pub fn untrusted(&self) -> Option<String> {
+        if self.trusted() {
+            return None;
+        }
+        if !self.config.sandbox().enabled {
+            return Some(NO_SANDBOX_UNTRUSTED.to_owned());
+        }
+        self.untrusted_plugin(&lighthouse_rpc::search_dirs(&self.root))
+    }
+
+    /// The error of a listed plugin that comes with the project in a project
+    /// that is not trusted.
+    fn untrusted_plugin(&self, search: &[PathBuf]) -> Option<String> {
+        if self.trusted() {
+            return None;
+        }
+        let local = lighthouse_rpc::local_plugins(&self.config, &self.root, search);
+        local.first().map(|local| {
+            format!(
+                "plugin `{}` comes with the project and would run a program: this project is not trusted (run `lighthouse trust`, or set LIGHTHOUSE_TRUST=1 in CI)",
+                local.id
+            )
+        })
+    }
+
+    /// Fails when the configuration names a pack that `provided` does not
+    /// know, in `extends` and, with `rules`, in `rules` too, and says which
+    /// plugin provides it.
+    pub(crate) fn require_packs(&self, rules: bool, provided: impl Fn(&str) -> bool) -> Result<()> {
+        let configured = self.config.configured().map(|(id, _)| id);
+        let named = self
+            .config
+            .extends()
+            .iter()
+            .map(String::as_str)
+            .chain(configured.filter(|_| rules));
+        for name in named {
+            let Some((pack, _)) = name.split_once('/') else {
+                continue;
+            };
+            if provided(pack) || self.catalog.projects().get(name).is_some() {
+                continue;
+            }
+            return Err(self.missing_pack(name, pack).into());
+        }
+        Ok(())
+    }
+
+    /// Why `name` of the pack `pack` cannot be resolved: the plugin that
+    /// provides the pack is not listed, or comes with the project and is not
+    /// trusted.
+    fn missing_pack(&self, name: &str, pack: &str) -> String {
+        let plugin = lighthouse_rpc::plugin_of_pack(
+            pack,
+            &self.withheld,
+            &lighthouse_rpc::search_dirs(&self.root),
+        );
+        if self.withheld.iter().any(|c| c.plugin == plugin) {
+            format!(
+                "`{name}`: pack `{pack}` comes from plugin `{plugin}`, which comes with the project and is not loaded because this project is not trusted (run `lighthouse trust`, or set LIGHTHOUSE_TRUST=1 in CI)"
+            )
+        } else {
+            format!("`{name}`: pack `{pack}` comes from plugin `{plugin}`; add it to `plugins`")
+        }
+    }
+
+    /// Fails when `extends` names a pack the shipped catalog lacks.
+    pub(crate) fn require_extended_packs(&self) -> Result<()> {
+        self.require_packs(false, |pack| {
+            pack == LOCAL_PACK || self.base.packs().iter().any(|p| p.id == pack)
+        })
+    }
+
     /// The same project with another local layer, such as a candidate that
     /// has not been written yet. Fails when the layer does not stack on the
     /// bundled one.
     pub(crate) fn with_local(&self, local: Option<Catalog>) -> Result<Self> {
         // The candidate was never read by the user, so it is never trusted.
         Ok(Self {
-            catalog: Arc::new(layered(&self.comp, local.as_ref())?),
+            catalog: Arc::new(layered(&self.base, local.as_ref())?),
             local,
             basis: Basis::default(),
             ..self.clone()
@@ -241,7 +356,8 @@ impl Session {
     /// decisions. Nothing is started, so it is cheap and cannot fail on a
     /// language plugin.
     pub fn in_process_registry(&self) -> Result<Registry> {
-        let mut registry = lighthouse_checks::registry(&self.comp).map_err(|e| e.to_string())?;
+        let mut registry =
+            lighthouse_checks::registry_of(&self.comp, &self.base).map_err(|e| e.to_string())?;
         if let Some(local) = &self.local {
             let plugin = Checks::new(&self.comp, "local", local)?;
             if !plugin.is_empty() {
@@ -271,23 +387,27 @@ pub fn config_file(root: &Path) -> Option<PathBuf> {
     Config::file_in(root)
 }
 
-/// The catalog of the project at `root`: the bundled one with the project's
-/// layer on top. Fails when the project's layer is broken.
+/// The catalog of the project at `root`: the bundled one with the packs of the
+/// plugins its configuration lists, and the project's layer on top. When the
+/// configuration does not load, the bundled one with the project's layer. Fails
+/// when the project's layer is broken.
 pub fn catalog_at(root: &Path) -> Result<Catalog> {
     let comp = crate::compose()?;
-    layered(&comp, load_local(root, comp.cel())?.as_ref())
+    let local = load_local(root, comp.cel())?;
+    if let Ok(Some(session)) = Session::find_in(root)
+        && session.root == root
+    {
+        return Ok((*session.catalog).clone());
+    }
+    layered(comp.bundled()?, local.as_ref())
 }
 
 /// Every program the project would run: the programs of the fix
-/// verification of its configuration, its command model providers, and the
-/// command fixes and command checks of its catalog that are not the bundled
-/// catalog's own, and the plugins that come with the project.
-fn commands(
-    config: &Config,
-    catalog: &Catalog,
-    shipped: &Catalog,
-    root: &Path,
-) -> Result<Vec<Program>> {
+/// verification of its configuration, its command model providers, the
+/// plugins that come with the project, and the command fixes and command
+/// checks of its own decisions. The programs of a plugin's catalog are not
+/// among them: that catalog is trusted with its plugin.
+fn commands(config: &Config, local: Option<&Catalog>, root: &Path) -> Vec<Program> {
     let mut found: Vec<Program> = config
         .fix()
         .verify
@@ -297,13 +417,13 @@ fn commands(
             argv: program.command.clone(),
         })
         .collect();
-    for local in lighthouse_rpc::local_plugins(config, root, &lighthouse_rpc::search_dirs(root)) {
+    for plugin in lighthouse_rpc::local_plugins(config, root, &lighthouse_rpc::search_dirs(root)) {
         found.push(Program {
-            what: format!("plugin {}: {}", local.id, local.argv.join(" ")),
-            argv: local.argv,
+            what: format!("plugin {}: {}", plugin.id, plugin.argv.join(" ")),
+            argv: plugin.argv,
         });
     }
-    for (name, provider) in &config.models(catalog.projects())?.providers {
+    for (name, provider) in config.providers() {
         if let lighthouse_spec::ModelProvider::Command { program, .. } = provider {
             found.push(Program {
                 what: format!("model provider {name}: {}", program.command.join(" ")),
@@ -311,7 +431,7 @@ fn commands(
             });
         }
     }
-    for decision in catalog.decisions().filter(|d| !d.bundled(shipped)) {
+    for decision in local.iter().flat_map(|local| local.decisions()) {
         let checks = decision.check.as_ref().and_then(|check| match &check.kind {
             CheckKind::Command(command) => Some(command.programs(decision)),
             _ => None,
@@ -329,13 +449,68 @@ fn commands(
             }
         }
     }
-    Ok(found)
+    found
 }
 
-fn layered(comp: &Composition, local: Option<&Catalog>) -> Result<Catalog> {
-    let shipped = comp.bundled()?;
+/// The bundled catalog with the catalogs of `plugins` added, as the plugins
+/// ship them.
+pub(crate) fn shipped(comp: &Composition, plugins: &[PluginCatalog]) -> Result<Catalog> {
+    if plugins.is_empty() {
+        return Ok(comp.bundled()?.clone());
+    }
+    let mut files = Files::new();
+    for plugin in plugins {
+        for (path, text) in Catalog::read_files(&plugin.dir)? {
+            if files.insert(path.clone(), text).is_some() {
+                return Err(format!(
+                    "plugin `{}`: catalog file `{path}` is also in the catalog of another plugin",
+                    plugin.plugin
+                )
+                .into());
+            }
+        }
+    }
+    Ok(Catalog::embedded_with(comp.cel(), files)?)
+}
+
+/// The bundled catalog with the catalogs of the plugins found in
+/// `<root>/plugins` that the binary does not embed, and where the catalog of
+/// each of their packs lies in the repository: what the docs of a repository
+/// that develops plugins are generated from.
+pub(crate) fn repository_catalog(
+    comp: &Composition,
+    root: &Path,
+) -> Result<(Catalog, BTreeMap<String, String>)> {
+    let bundled = lighthouse_checks::ids(comp)?;
+    let found = lighthouse_rpc::discover(&[root.join("plugins")])?.found;
+    let mut plugins = Vec::new();
+    let mut homes = BTreeMap::new();
+    for one in found
+        .iter()
+        .filter(|one| !bundled.iter().any(|id| id == one.id()))
+    {
+        let Some(dir) = one.catalog_dir() else {
+            continue;
+        };
+        let home = format!("plugins/{}/decisions", one.id());
+        for pack in Catalog::read_files(&dir)?
+            .keys()
+            .filter_map(|p| p.split_once('/'))
+        {
+            homes.insert(pack.0.to_owned(), home.clone());
+        }
+        plugins.push(PluginCatalog {
+            plugin: one.id().to_owned(),
+            dir,
+            local: true,
+        });
+    }
+    Ok((shipped(comp, &plugins)?, homes))
+}
+
+fn layered(base: &Catalog, local: Option<&Catalog>) -> Result<Catalog> {
     match local {
-        Some(local) => Ok(Catalog::overlay(shipped, local)?),
-        None => Ok(shipped.clone()),
+        Some(local) => Ok(Catalog::overlay(base, local)?),
+        None => Ok(base.clone()),
     }
 }

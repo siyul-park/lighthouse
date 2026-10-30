@@ -131,7 +131,7 @@ fn agent_project(script: &str, allow_unsafe: bool) -> (tempfile::TempDir, tempfi
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/long-note\" = \"warn\"\n[fix]\nunsafe = {allow_unsafe}\ndecisions = [\"local/long-note\"]\n[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{EVENTS}[sandbox]\nenabled = false\n",
+            "[rules]\n\"local/long-note\" = \"warn\"\n[fix]\nunsafe = {allow_unsafe}\ndecisions = [\"local/long-note\"]\n[models]\nagent = \"agent/m\"\n[models.providers.agent]\ncommand = [\"sh\", {:?}]\n{EVENTS}[sandbox]\nenabled = false\n",
             scripts.path().join("agent.sh").to_str().unwrap()
         )),
     );

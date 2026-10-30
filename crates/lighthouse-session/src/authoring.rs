@@ -26,7 +26,7 @@ use crate::{
 /// Most possible duplicates a reply names.
 const DUPLICATES: usize = 3;
 
-const LOCAL_PACK: &str = "local";
+pub(crate) const LOCAL_PACK: &str = "local";
 /// Held while a decision is authored. Its name matches the `.lighthouse/*.db*`
 /// ignore that `init` writes, so it stays out of version control.
 const LOCK_FILE: &str = "authoring.db-lock";
@@ -42,9 +42,6 @@ pub struct Authored {
     /// What the gate ran before the decision was written.
     #[serde(rename = "tested")]
     pub test: DecisionTest,
-    /// Whether `lighthouse.toml` lists the `local` plugin, without which the
-    /// project's own decisions do not run in `check`.
-    pub local_plugin_listed: bool,
     /// What to do next.
     pub note: String,
     /// Existing decisions the new one may repeat; the decision is written
@@ -199,7 +196,6 @@ fn commit(
     let duplicates = duplicates.unwrap_or_default();
     ensure_uid(&mut doc);
     let root = session.root.clone();
-    let plugin_listed = session.config.lists(LOCAL_PACK);
     let mut files: BTreeMap<String, String> = local_files(&root)?.unwrap_or_default();
     files.insert(file_name(name), serde_norway::to_string(&doc)?);
     let local = Catalog::from_local(files, session.comp.cel())?;
@@ -229,11 +225,7 @@ fn commit(
     }
     let dir = local_dir(&root);
     Catalog::write_local(&dir, name, &text)?;
-    let mut note = if plugin_listed {
-        "the `local` plugin is listed; enable the decision with `extends = [\"local/recommended\"]` or a [rules] entry if it is not on yet".to_owned()
-    } else {
-        "add \"local\" to `plugins` in lighthouse.toml, and enable the decision, for `check` to run it".to_owned()
-    };
+    let mut note = "enable the decision with `extends = [\"local/recommended\"]` or a [rules] entry if it is not on yet".to_owned();
     let uid = doc
         .pointer("/metadata/uid")
         .and_then(Value::as_str)
@@ -255,7 +247,6 @@ fn commit(
         path: dir.join(file_name(name)),
         created,
         test,
-        local_plugin_listed: plugin_listed,
         note,
         duplicates,
         signals: settled.signals,

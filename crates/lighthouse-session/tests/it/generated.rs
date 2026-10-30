@@ -5,8 +5,9 @@ use std::collections::BTreeSet;
 use crate::fixture::{project, session};
 
 #[test]
-fn bundled_docs() {
-    let docs = lighthouse_session::bundled_docs().unwrap();
+fn pack_docs() {
+    let dir = tempfile::tempdir().unwrap();
+    let docs = lighthouse_session::pack_docs(dir.path()).unwrap();
     let dir = lighthouse_session::DOCS_DIR;
     assert!(docs.contains_key(&format!("{dir}/fix-operations.md")));
     let functions = &docs[&format!("{dir}/cel-functions.md")];

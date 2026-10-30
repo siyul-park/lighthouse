@@ -28,9 +28,10 @@ pub(super) fn labels(
     let mut all = Vec::new();
     for example in &decision.examples {
         let (registry, _) = session.registry()?;
+        let config = session.enabled_in(&registry);
         let run = ExampleRun {
             registry,
-            config: session.config.clone(),
+            config,
             catalog: &session.catalog,
             trusted: session.trusted(),
             models: models.clone(),

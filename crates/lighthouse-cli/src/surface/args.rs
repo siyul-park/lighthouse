@@ -307,7 +307,7 @@ pub struct DecisionTestArgs {
 #[serde(rename_all = "camelCase", default)]
 pub struct LabelSource {
     /// A table of reviewed findings (`fingerprint repo location verdict`).
-    /// Default: `labels/<id>.tsv` when it exists.
+    /// Default: `plugins/<pack>/labels/<name>.tsv` for the decision `<pack>/<name>`, when it exists.
     #[arg(long, value_name = "FILE")]
     pub labels: Option<PathBuf>,
     /// A repository the labels are about, `name=dir`, where `name` is the
@@ -318,7 +318,7 @@ pub struct LabelSource {
 
 impl LabelSource {
     /// What the labels of `decision` are drawn from: the table, else
-    /// `labels/<id>.tsv` when `decision` is one id and the file exists, and
+    /// `plugins/<pack>/labels/<name>.tsv` when `decision` is one id and the file exists, and
     /// the repositories, inside the project when the caller is confined.
     pub fn resolve(&self, ctx: &Context, decision: Option<&str>) -> Result<Labelling> {
         let root = ctx.root()?;
@@ -332,7 +332,11 @@ impl LabelSource {
             })
             .collect::<Result<_>>()?;
         let table = self.labels.clone().or_else(|| {
-            let path = Path::new("labels").join(format!("{}.tsv", decision?));
+            let (pack, name) = decision?.split_once('/')?;
+            let path = Path::new("plugins")
+                .join(pack)
+                .join("labels")
+                .join(format!("{name}.tsv"));
             path.is_file().then_some(path)
         });
         Ok(Labelling {

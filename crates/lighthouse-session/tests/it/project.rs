@@ -37,7 +37,7 @@ fn session_load_or_default() {
     let empty = tempfile::tempdir().unwrap();
     let default = in_dir(empty.path(), || Session::load_or_default(None)).unwrap();
     assert_eq!(canonical(&default.root), canonical(empty.path()));
-    assert!(default.config.plugins().iter().any(|p| p.id == "core"));
+    assert!(default.config.plugins().is_empty());
     assert!(default.catalog.decision("local/short").is_none());
 
     let dir = project("error");
@@ -81,9 +81,7 @@ fn session_engine() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[sandbox]\nenabled = false\n",
-        ),
+        &lighthouse_test_support::project("[sandbox]\nenabled = false\n"),
     );
     let refused = session(dir.path()).engine().err().unwrap();
     assert!(

@@ -10,6 +10,7 @@ mod fix;
 mod fixture;
 mod generated;
 mod model;
+mod plugin_packs;
 mod project;
 mod review;
 mod scope;

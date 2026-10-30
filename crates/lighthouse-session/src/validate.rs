@@ -100,7 +100,7 @@ impl Sets {
         problems: &mut Vec<Problem>,
     ) -> Result<()> {
         let cel = session.comp.cel();
-        let bundled = session.comp.bundled()?;
+        let bundled: &Catalog = &session.base;
         let mut layered: Vec<(Catalog, Vec<String>)> = Vec::new();
         let known: BTreeSet<String> = session
             .catalog
@@ -110,7 +110,7 @@ impl Sets {
             .chain(self.projects.iter().map(|(_, p)| p.metadata.name.clone()))
             .collect();
         for (path, config) in &self.projects {
-            self.project(path, config, &known, registry, bundled, problems);
+            self.project(path, config, &known, (session, registry), problems);
         }
         let mut roots = BTreeSet::new();
         let mut named = BTreeSet::new();
@@ -172,24 +172,92 @@ impl Sets {
         path: &str,
         project: &Resource<ProjectSpec>,
         known: &BTreeSet<String>,
-        registry: &Registry,
-        bundled: &Catalog,
+        (session, registry): (&Session, &Registry),
         problems: &mut Vec<Problem>,
     ) {
-        if let Err(e) = Config::from_resource(project.clone()) {
-            problems.push(problem(path, e));
-            return;
+        let config = match Config::from_resource(project.clone()) {
+            Ok(config) => config,
+            Err(e) => {
+                problems.push(problem(path, e));
+                return;
+            }
+        };
+        let bundled = match lighthouse_checks::ids(&session.comp) {
+            Ok(ids) => ids,
+            Err(e) => {
+                problems.push(problem(path, e));
+                return;
+            }
+        };
+        for listed in config.plugins().iter().filter(|p| bundled.contains(&p.id)) {
+            problems.push(problem(
+                path,
+                format!(
+                    "plugin `{}` is bundled: remove it from `plugins`",
+                    listed.id
+                ),
+            ));
         }
-        for name in project.spec.extends.iter().filter(|n| !known.contains(*n)) {
-            problems.push(problem(path, format!("extends unknown project `{name}`")));
+        let provided = match provided_by(session, &config, path) {
+            Ok(provided) => provided,
+            Err(why) => {
+                problems.push(problem(path, why));
+                return;
+            }
+        };
+        let missing = |name: &str| {
+            let pack = name.split_once('/')?.0;
+            let known = bundled.iter().any(|id| id == pack)
+                || pack == crate::authoring::LOCAL_PACK
+                || config.lists(pack)
+                || provided.packs().iter().any(|p| p.id == pack);
+            (!known).then(|| {
+                let plugin = lighthouse_rpc::plugin_of_pack(
+                    pack,
+                    &[],
+                    &lighthouse_rpc::search_dirs(&session.root),
+                );
+                format!("`{name}`: pack `{pack}` comes from plugin `{plugin}`; add it to `plugins`")
+            })
+        };
+        let rules = project
+            .spec
+            .rules
+            .keys()
+            .chain(project.spec.overrides.iter().flat_map(|o| o.rules.keys()));
+        for name in project.spec.extends.iter().chain(rules) {
+            if let Some(why) = missing(name) {
+                problems.push(problem(path, why));
+            }
+        }
+        for name in project.spec.extends.iter().filter(|n| {
+            !known.contains(*n) && !provided.projects().names().any(|p| p == n.as_str())
+        }) {
+            if missing(name).is_none() {
+                problems.push(problem(path, format!("extends unknown project `{name}`")));
+            }
         }
         let rules = project
             .spec
             .rules
             .keys()
             .chain(project.spec.overrides.iter().flat_map(|o| o.rules.keys()));
-        known_rules(path, rules, registry, bundled, problems);
+        known_rules(path, rules, registry, &provided, problems);
     }
+}
+
+/// The bundled catalog with the catalogs of the plugins `config` lists, found
+/// from the directory of the document at `path`.
+fn provided_by(
+    session: &Session,
+    config: &Config,
+    path: &str,
+) -> std::result::Result<Catalog, String> {
+    let dir = Path::new(path).parent().unwrap_or(Path::new(""));
+    let search = lighthouse_rpc::search_dirs(&session.root);
+    let listed =
+        lighthouse_rpc::plugin_catalogs(config, dir, &search).map_err(|e| e.to_string())?;
+    crate::project::shipped(&session.comp, &listed).map_err(|e| e.to_string())
 }
 
 /// Validates the documents under `paths` (files or directories).

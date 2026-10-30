@@ -40,10 +40,6 @@
     "id": {
       "type": "string"
     },
-    "localPluginListed": {
-      "description": "Whether `lighthouse.toml` lists the `local` plugin, without which the\nproject's own decisions do not run in `check`.",
-      "type": "boolean"
-    },
     "note": {
       "description": "What to do next.",
       "type": "string"
@@ -113,7 +109,6 @@
     "path",
     "created",
     "tested",
-    "localPluginListed",
     "note"
   ],
   "title": "DecisionReport",

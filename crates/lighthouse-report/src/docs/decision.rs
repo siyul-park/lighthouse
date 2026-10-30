@@ -31,14 +31,16 @@ pub enum Density<'a> {
 }
 
 /// Markdown for every pack, keyed by path relative to the docs root.
-pub fn pages(catalog: &Catalog) -> BTreeMap<String, String> {
+/// `catalog_dir` tells where the catalog a pack lies in is, relative to the
+/// repository root, for the links to the files of its examples.
+pub fn pages(catalog: &Catalog, catalog_dir: &dyn Fn(&str) -> String) -> BTreeMap<String, String> {
     catalog
         .packs()
         .iter()
         .map(|pack| {
             (
                 format!("{DOCS_DIR}/{}.md", pack.id),
-                pack::pack_markdown(pack),
+                pack::pack_markdown(pack, &catalog_dir(&pack.id)),
             )
         })
         .collect()

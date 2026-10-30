@@ -87,7 +87,7 @@ is at 83–95%. Where the time goes in the edit run (phases, ms; cold `--no-cach
 
 A reviewer read each sampled finding against the decision's requirement and called it true (TP) or false (FP).
 The interval is Wilson 95%. Rows that are not warn or error rules, or that sample little, are indications only.
-Sample files are `labels/<pack>/<decision>.tsv` (fingerprint, repo, location, verdict, reason).
+Sample files are `plugins/<pack>/labels/<decision>.tsv` (fingerprint, repo, location, verdict, reason).
 Decision ids are those of the review's time. The catalog split of wave 5b renamed them: `design/errors` is now
 `design/error-identity` and `design/no-panic`, `testing/owner` is `testing/no-missing-owner` and
 `testing/no-duplicate-owner`, `design/naming` is `design/no-redundant-qualifier` and its siblings, `design/layout` is

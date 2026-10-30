@@ -5,12 +5,12 @@ use std::{
 };
 
 use lighthouse_resource::{read_optional, write_atomic};
-use lighthouse_session::{DOCS_DIR, Session, bundled_docs, skill_for};
+use lighthouse_session::{DOCS_DIR, Session, pack_docs, project_root, skill_for};
 
 use crate::terminal::{Result, reference};
 
 pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
-    let docs = generated()?;
+    let docs = generated(config)?;
     for orphan in orphans(out, &docs)? {
         fs::remove_file(&orphan)?;
         println!("removed {}", orphan.display());
@@ -27,8 +27,8 @@ pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
 
 /// The docs `out` holds, by path under it: the decision docs of the catalog,
 /// and the references of the commands and of the tools.
-fn generated() -> Result<BTreeMap<String, String>> {
-    let mut docs = bundled_docs()?;
+fn generated(config: Option<&Path>) -> Result<BTreeMap<String, String>> {
+    let mut docs = pack_docs(&project_root(config)?)?;
     docs.insert(reference::CLI_DOC.to_owned(), reference::cli());
     docs.insert(reference::MCP_DOC.to_owned(), reference::mcp());
     Ok(docs)
@@ -40,7 +40,7 @@ pub fn skill_text(config: Option<&Path>) -> Result<String> {
 }
 
 pub fn check(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
-    let docs = generated()?;
+    let docs = generated(config)?;
     let mut problems = Vec::new();
     for (path, text) in &docs {
         let target = out.join(path);
