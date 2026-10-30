@@ -4,7 +4,7 @@ mod check;
 mod command;
 mod decision;
 mod edit;
-mod environment;
+mod env;
 mod error;
 mod expression;
 mod fix;
@@ -27,7 +27,7 @@ pub use check::{At, CelCheck, Check, CheckKind, Identity, Select, Variable};
 pub use command::CommandCheck;
 pub use decision::{Decision, DecisionSpec, LanguageSpec, Provenance, authored_severity};
 pub use edit::KIND as EDIT_KIND;
-pub use environment::{Cel, base};
+pub use env::{Env, base};
 pub use error::Error;
 pub use expression::{
     Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, parse_template,

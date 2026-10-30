@@ -90,7 +90,7 @@ fn tokens_are_counted_by_characters() {
 
 #[test]
 fn the_namespaces_of_the_tables_are_those_of_the_environment() {
-    let cel = lighthouse_spec::Cel::standard().unwrap();
+    let cel = lighthouse_spec::Env::standard().unwrap();
     for namespace in names::namespaces() {
         assert!(cel.is_namespace(namespace), "{namespace}");
     }

@@ -4,14 +4,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Catalog, Cel, CheckKind, Decision, DecisionStatus, Error, Example, ExampleKind, FixKind,
+    Catalog, CheckKind, Decision, DecisionStatus, Env, Error, Example, ExampleKind, FixKind,
     OptionType, Point,
     options::KINDS,
     sources::{SourceLine, has_keyword},
 };
 
 /// Everything a single layer must satisfy on its own.
-pub(crate) fn layer(catalog: &Catalog, cel: &Cel) -> Result<(), Error> {
+pub(crate) fn layer(catalog: &Catalog, cel: &Env) -> Result<(), Error> {
     for pack in catalog.packs() {
         kebab(&pack.id)?;
         for section in &pack.sections {
@@ -45,7 +45,7 @@ pub(crate) fn projects(catalog: &Catalog) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn decision(decision: &Decision, cel: &Cel) -> Result<(), Error> {
+pub(crate) fn decision(decision: &Decision, cel: &Env) -> Result<(), Error> {
     let id = decision.id();
     let (pack, name) = id
         .split_once('/')
@@ -211,7 +211,7 @@ fn supersession_cycle<'c>(catalog: &'c Catalog, start: &'c str) -> Option<Vec<&'
     None
 }
 
-fn fix(decision: &Decision, cel: &Cel) -> Result<(), Error> {
+fn fix(decision: &Decision, cel: &Env) -> Result<(), Error> {
     let id = decision.id();
     if let Some(fix) = &decision.fix {
         if let Some(reason) = fix.problem(cel, decision) {
@@ -397,7 +397,7 @@ fn canonical(decision: &Decision) -> Result<(), Error> {
     Ok(())
 }
 
-fn check(decision: &Decision, cel: &Cel) -> Result<(), Error> {
+fn check(decision: &Decision, cel: &Env) -> Result<(), Error> {
     let id = decision.id();
     let Some(check) = &decision.check else {
         return Ok(());

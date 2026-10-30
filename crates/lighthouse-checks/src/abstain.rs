@@ -9,7 +9,7 @@ use lighthouse_plugin::{
     Answered, Ask, Context, DecisionRef, Neighbor, RuleManifest, State, Subject,
 };
 use lighthouse_protocol::hash;
-use lighthouse_spec::{Cel, CelCheck, Decision, Select};
+use lighthouse_spec::{CelCheck, Decision, Env, Select};
 use serde_json::{Value, json};
 
 use crate::{
@@ -48,7 +48,7 @@ pub(crate) struct Candidate {
 impl Abstain {
     /// Compiles the `abstain` of `check`; `None` for a check without one.
     pub(crate) fn new(
-        cel: &Cel,
+        cel: &Env,
         decision: &Decision,
         check: &CelCheck,
         select: Select,

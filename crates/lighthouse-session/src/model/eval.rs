@@ -16,7 +16,7 @@ use lighthouse_ml::{
     labels::{Label, Source},
 };
 use lighthouse_model::Severity;
-use lighthouse_spec::{Catalog, Cel, local_files};
+use lighthouse_spec::{Catalog, Env, local_files};
 
 use super::{Labelling, Repo, attached, examples, labelling};
 use crate::{CheckRequest, Checked, Result, Session, check};
@@ -44,7 +44,7 @@ struct CandidateFile {
 }
 
 impl CandidateFile {
-    fn read(cel: &Cel, root: &Path, file: &Path) -> Result<Self> {
+    fn read(cel: &Env, root: &Path, file: &Path) -> Result<Self> {
         let text = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
         let name = file.file_name().map_or_else(
             || "candidate.yaml".to_owned(),

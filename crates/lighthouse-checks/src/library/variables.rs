@@ -6,7 +6,7 @@ use std::sync::Arc;
 use cel::{Context, ExecutionError, FunctionContext, Program, Value, extractors::Arguments};
 use lighthouse_spec::Variable;
 
-use lighthouse_spec::Cel;
+use lighthouse_spec::Env;
 
 use crate::{Error, eval::compile_shared};
 
@@ -23,7 +23,7 @@ pub(crate) struct Declared<'a> {
 /// gives the others, with the compiled bodies of the functions. A function sees the `options` and the `file` of its
 /// caller, besides its arguments.
 pub(crate) fn declare<'a>(
-    cel: &Cel,
+    cel: &Env,
     id: &str,
     context: &mut Context<'static, 'static>,
     variables: &'a [Variable],
@@ -59,7 +59,7 @@ pub(crate) fn declare<'a>(
 /// `options`, `file`, or a variable of `shared` (the file-level ones): a
 /// function does not see the variable of whoever calls it.
 pub(crate) fn check_scope(
-    cel: &Cel,
+    cel: &Env,
     id: &str,
     functions: &[&Variable],
     bodies: &[Arc<Program>],

@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Cel, CelCheck, Select, Subject,
+    CelCheck, Env, Select, Subject,
     check::{Identity, Variable},
     expression::compile_problem,
 };
@@ -58,7 +58,7 @@ impl ModelCheck {
     }
 
     /// The first problem with the check for a decision about `subject`.
-    pub(crate) fn problem(&self, cel: &Cel, subject: Subject) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Env, subject: Subject) -> Option<String> {
         // A decision about a project has nothing to range over by default and
         // stays with agent review; its `select` must still compile.
         let Some(check) = self.as_cel(subject) else {

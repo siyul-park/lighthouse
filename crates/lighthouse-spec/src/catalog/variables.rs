@@ -4,11 +4,11 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    Cel, CheckKind, Decision, Error, FixKind, TemplatePart, Variable, identifiers, parse_template,
+    CheckKind, Decision, Env, Error, FixKind, TemplatePart, Variable, identifiers, parse_template,
 };
 
 /// What is wrong with the shared variables of pack `pack`.
-pub(super) fn validate(cel: &Cel, pack: &str, shared: &[Variable]) -> Result<(), Error> {
+pub(super) fn validate(cel: &Env, pack: &str, shared: &[Variable]) -> Result<(), Error> {
     let mut seen = BTreeSet::new();
     for variable in shared {
         if let Some(problem) = variable.problem(cel) {
@@ -28,7 +28,7 @@ pub(super) fn validate(cel: &Cel, pack: &str, shared: &[Variable]) -> Result<(),
 /// shared variable, put before its own. A decision that defines a variable of
 /// the same name is refused: there are no overrides.
 pub(super) fn import(
-    cel: &Cel,
+    cel: &Env,
     decision: Decision,
     shared: &[Variable],
 ) -> Result<Decision, Error> {

@@ -2,9 +2,9 @@
 //! `cel` crate ships, and the official ones it lacks (see `ext`).
 
 use cel::Value;
-use lighthouse_spec::{Cel, children};
+use lighthouse_spec::{Env, children};
 
-fn cel() -> Cel {
+fn cel() -> Env {
     lighthouse_test_support::cel()
 }
 
@@ -50,7 +50,7 @@ fn environment_is_the_same_one_for_every_clone() {
 
 #[test]
 fn two_environments_do_not_share_their_libraries() {
-    let standard = Cel::standard().unwrap();
+    let standard = Env::standard().unwrap();
 
     assert!(
         standard.compile("regex.extract('a', 'a')").is_ok(),
@@ -179,7 +179,7 @@ fn program_calls() {
 
 #[test]
 fn new() {
-    let cel = Cel::new(lighthouse_spec::base().unwrap(), ["mine".to_owned()]);
+    let cel = Env::new(lighthouse_spec::base().unwrap(), ["mine".to_owned()]);
 
     assert!(cel.is_namespace("mine"));
     assert!(cel.is_namespace("math"), "the namespaces of the cel crate");

@@ -11,7 +11,7 @@ use std::{
 };
 
 use lighthouse_plugin::{Function, Plugin, Registry};
-use lighthouse_spec::{Catalog, Cel};
+use lighthouse_spec::{Catalog, Env};
 
 use crate::Error;
 
@@ -27,7 +27,7 @@ pub struct Entry {
 /// functions. Clones share both.
 #[derive(Clone)]
 pub struct Composition {
-    cel: Cel,
+    cel: Env,
     functions: Arc<[Entry]>,
     bundled: Arc<OnceLock<Result<Catalog, String>>>,
     built_in: bool,
@@ -35,7 +35,7 @@ pub struct Composition {
 
 impl Composition {
     /// The environment.
-    pub fn cel(&self) -> &Cel {
+    pub fn cel(&self) -> &Env {
         &self.cel
     }
 
@@ -104,7 +104,7 @@ fn compose_with(registry: &Registry, built_in: bool) -> Result<Composition, Stri
         .filter_map(|e| e.function.namespace().map(str::to_owned))
         .collect();
     Ok(Composition {
-        cel: Cel::new(env, namespaces),
+        cel: Env::new(env, namespaces),
         functions: functions.into(),
         bundled: Arc::default(),
         built_in,

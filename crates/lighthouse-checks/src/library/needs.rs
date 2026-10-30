@@ -9,7 +9,7 @@ use cel::{
         operators::{INDEX, OPT_INDEX, OPT_SELECT},
     },
 };
-use lighthouse_spec::{Cel, TemplatePart};
+use lighthouse_spec::{Env, TemplatePart};
 
 /// The variables of an expression that are options, never nodes: a dynamic
 /// index into them reads no field of the model.
@@ -46,7 +46,7 @@ impl Needs {
     /// What `expressions` read, and the holes of `templates`. A source that
     /// does not compile asks for nothing: compiling it is an error elsewhere.
     pub(crate) fn of<'a>(
-        cel: &Cel,
+        cel: &Env,
         expressions: impl IntoIterator<Item = &'a str>,
         templates: impl IntoIterator<Item = &'a str>,
     ) -> Self {

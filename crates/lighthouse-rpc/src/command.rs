@@ -16,7 +16,7 @@ use lighthouse_plugin::{
 };
 use lighthouse_process::{Environment, Home, Job, Lines, Policy, Ran, referenced};
 use lighthouse_protocol::{canonical, hash, prompt::json_in};
-use lighthouse_spec::{Cel, CommandProtocol, ModelProvider, Point, Program};
+use lighthouse_spec::{CommandProtocol, Env, ModelProvider, Point, Program};
 use serde_json::{Value, json};
 
 use crate::events::{Events, NOTES_BYTES, Reading, Scrubber, tail};
@@ -42,7 +42,7 @@ impl CommandModel {
     /// reference), run from `dir` in the sandbox the project's `sandbox`
     /// says; `None` for a provider of another kind.
     pub fn new(
-        cel: &Cel,
+        cel: &Env,
         dir: &Path,
         name: &str,
         model: &str,

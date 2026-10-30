@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_resource::Resource;
 
 use crate::{
-    Cel, Decision, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec, validate,
+    Decision, Env, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec, validate,
 };
 
 use super::{load::Files, variables};
@@ -11,7 +11,7 @@ use super::{load::Files, variables};
 /// Packs with their decisions, in the order the packs list them. Every
 /// decision is listed once, in the section of the pack its id names.
 pub(super) fn assemble(
-    cel: &Cel,
+    cel: &Env,
     files: &Files,
     packs: Vec<(String, Resource<PackSpec>)>,
     decisions: Vec<(String, Decision)>,

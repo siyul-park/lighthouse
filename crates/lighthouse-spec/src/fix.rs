@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
-    Cel, DecisionSpec, Point, Program, Programs,
+    DecisionSpec, Env, Point, Program, Programs,
     expression::compile_problem,
     union::{refuse_strays, stray_field},
 };
@@ -94,7 +94,7 @@ impl<'de> Deserialize<'de> for Fix {
 impl Fix {
     /// The capabilities the fix needs: the ones it says and, for a CEL fix, the
     /// ones its edits imply, read in `cel`.
-    pub fn needs(&self, cel: &Cel) -> Vec<Capability> {
+    pub fn needs(&self, cel: &Env) -> Vec<Capability> {
         match &self.kind {
             FixKind::Cel { edits, .. } => with_derived(cel, self.requires.clone(), edits),
             _ => self.requires.clone(),
@@ -102,7 +102,7 @@ impl Fix {
     }
 
     /// What is wrong with the fix of `decision`, for the catalog to refuse.
-    pub(crate) fn problem(&self, cel: &Cel, decision: &DecisionSpec) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Env, decision: &DecisionSpec) -> Option<String> {
         if decision.check.is_none() {
             return Some("a decision without a check has no findings to fix".to_owned());
         }
@@ -273,7 +273,7 @@ impl CommandSpec {
 /// replacement needs the extent when it names the node itself (`node`,
 /// `finding.symbol`): a range of text held in the evidence is for the fix to
 /// declare, and the edit declines when the extent is missing.
-fn with_derived(cel: &Cel, mut requires: Vec<Capability>, edits: &str) -> Vec<Capability> {
+fn with_derived(cel: &Env, mut requires: Vec<Capability>, edits: &str) -> Vec<Capability> {
     let mut calls = Vec::new();
     if let Ok(program) = cel.compile(edits) {
         collect(program.expression(), &mut calls);

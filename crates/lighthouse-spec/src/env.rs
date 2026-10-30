@@ -2,7 +2,7 @@
 //! extensions `cel` ships (strings, lists, math, base64 encoders) and the
 //! optional syntax, exactly as that crate provides them, and the edit
 //! constructors of a fix, plus the libraries the plugins register. The
-//! composition root builds one [`Cel`] and hands it to everything that
+//! composition root builds one [`Env`] and hands it to everything that
 //! compiles or runs an expression: the catalog, the checks, the fixes, the
 //! variables and the event mappings of the providers.
 
@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, Mutex, PoisonError},
 };
 
-use cel::{Context, DeclarationError, Env, Program, extensions};
+use cel::{Context, DeclarationError, Program, extensions};
 
 /// The namespaces of the functions the `cel` crate ships (`lists.range`,
 /// `math.greatest`, ...). The libraries a plugin registers add their own.
@@ -20,25 +20,25 @@ const NAMESPACES: [&str; 7] = [
 ];
 
 /// An extension of the `cel` crate, as it installs itself.
-type Extension = fn(&mut Env) -> Result<(), DeclarationError>;
+type Extension = fn(&mut cel::Env) -> Result<(), DeclarationError>;
 
 type Compiled = HashMap<String, Result<Arc<Program>, String>>;
 
 /// One CEL environment, with what is derived from it: the namespaces of its
 /// functions and the programs compiled in it. Clones share all of it.
 #[derive(Clone)]
-pub struct Cel(Arc<Inner>);
+pub struct Env(Arc<Inner>);
 
 struct Inner {
-    env: Arc<Env>,
+    env: Arc<cel::Env>,
     namespaces: BTreeSet<String>,
     compiled: Mutex<Compiled>,
 }
 
-impl Cel {
+impl Env {
     /// The environment `env`, whose libraries added the functions of
     /// `namespaces`.
-    pub fn new(env: Env, namespaces: impl IntoIterator<Item = String>) -> Self {
+    pub fn new(env: cel::Env, namespaces: impl IntoIterator<Item = String>) -> Self {
         Self(Arc::new(Inner {
             env: Arc::new(env),
             namespaces: namespaces.into_iter().collect(),
@@ -52,7 +52,7 @@ impl Cel {
     }
 
     /// The environment itself.
-    pub fn environment(&self) -> Arc<Env> {
+    pub fn environment(&self) -> Arc<cel::Env> {
         self.0.env.clone()
     }
 
@@ -98,9 +98,9 @@ impl Cel {
 /// The environment without any library: the `cel` crate's standard library
 /// and extensions as shipped, and the edit constructors of a fix. The
 /// composition root registers the libraries of its plugins into it and builds
-/// the [`Cel`] with [`Cel::new`]; spec never knows a library.
-pub fn base() -> Result<Env, String> {
-    let mut env = Env::stdlib();
+/// the [`Env`] with [`Env::new`]; spec never knows a library.
+pub fn base() -> Result<cel::Env, String> {
+    let mut env = cel::Env::stdlib();
     let installed: [(&str, Extension); 4] = [
         ("strings", extensions::strings),
         ("lists", extensions::lists),

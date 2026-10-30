@@ -3,7 +3,7 @@
 use super::*;
 
 fn of(source: &str) -> Needs {
-    Needs::of(&lighthouse_spec::Cel::standard().unwrap(), [source], [])
+    Needs::of(&lighthouse_spec::Env::standard().unwrap(), [source], [])
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn a_comprehension_reads_inside_its_range_and_body() {
 #[test]
 fn the_holes_of_a_template_are_read() {
     let needs = Needs::of(
-        &lighthouse_spec::Cel::standard().unwrap(),
+        &lighthouse_spec::Env::standard().unwrap(),
         [],
         ["{{ node.name }} is {{ node.kind }} in prose"],
     );

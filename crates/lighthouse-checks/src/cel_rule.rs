@@ -13,7 +13,7 @@ use lighthouse_model::{
     ucm::{Edge, File, Node, Project, Symbol, SymbolId},
 };
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
-use lighthouse_spec::{Cel, CelCheck, Decision, Select};
+use lighthouse_spec::{CelCheck, Decision, Env, Select};
 use serde_json::{Map, Value};
 
 use crate::{
@@ -57,7 +57,7 @@ struct At {
 }
 
 impl At {
-    fn compile(cel: &Cel, id: &str, at: &lighthouse_spec::At) -> Result<Self, Error> {
+    fn compile(cel: &Env, id: &str, at: &lighthouse_spec::At) -> Result<Self, Error> {
         let maybe = |what: &str, source: &Option<String>| optional(cel, id, what, source);
         Ok(Self {
             symbol: maybe("at.symbol", &at.symbol)?,
@@ -73,7 +73,7 @@ struct Identity {
 }
 
 impl Identity {
-    fn compile(cel: &Cel, id: &str, identity: &lighthouse_spec::Identity) -> Result<Self, Error> {
+    fn compile(cel: &Env, id: &str, identity: &lighthouse_spec::Identity) -> Result<Self, Error> {
         Ok(Self {
             subject: compile(cel, id, "identity.subject", &identity.subject)?,
             snippet: optional(cel, id, "identity.snippet", &identity.snippet)?,
@@ -795,7 +795,7 @@ fn top_of_file() -> Span {
 
 /// `source` compiled, when there is one.
 fn optional(
-    cel: &Cel,
+    cel: &Env,
     id: &str,
     what: &str,
     source: &Option<String>,

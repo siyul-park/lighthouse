@@ -10,7 +10,7 @@ pub fn composition() -> Composition {
 }
 
 /// The CEL environment of [`composition`].
-pub fn cel() -> Cel {
+pub fn cel() -> Env {
     composition().cel().clone()
 }
 
@@ -64,7 +64,7 @@ use std::{
 use lighthouse_checks::Composition;
 use lighthouse_plugin::Registry;
 use lighthouse_resource::API_VERSION;
-use lighthouse_spec::{Catalog, Cel};
+use lighthouse_spec::{Catalog, Env};
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
 static LANG_TYPESCRIPT: OnceLock<Option<PathBuf>> = OnceLock::new();

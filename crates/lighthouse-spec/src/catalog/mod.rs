@@ -8,7 +8,7 @@ use lighthouse_protocol::hash;
 use lighthouse_resource::{Resource, SCHEMA_URL_BASE, Spec, header, to_yaml, write_atomic};
 
 use crate::{
-    Cel, Decision, DecisionSpec, Error, Pack, ProjectSpec, Projects, Section, project,
+    Decision, DecisionSpec, Env, Error, Pack, ProjectSpec, Projects, Section, project,
     sources::{SourceLine, extract},
     validate,
 };
@@ -45,13 +45,13 @@ pub struct Catalog {
 
 impl Catalog {
     /// Reads and validates the catalog under `dir`; see [`Catalog::from_files`].
-    pub fn load(dir: &Path, cel: &Cel) -> Result<Self, Error> {
+    pub fn load(dir: &Path, cel: &Env) -> Result<Self, Error> {
         Self::from_files(load::read_dir(dir)?, cel)
     }
 
     /// The catalog compiled into the binary, validated against `cel`: the
     /// packs of the bundled plugins only.
-    pub fn embedded(cel: &Cel) -> Result<Self, Error> {
+    pub fn embedded(cel: &Env) -> Result<Self, Error> {
         Self::from_files(load::embedded(), cel)
     }
 
@@ -60,7 +60,7 @@ impl Catalog {
     /// [`Catalog::read_files`] returns them. A pack of a plugin may use what
     /// the bundled packs define, so the union is validated as one layer.
     /// Fails when two files claim the same path.
-    pub fn embedded_with(cel: &Cel, plugins: Files) -> Result<Self, Error> {
+    pub fn embedded_with(cel: &Env, plugins: Files) -> Result<Self, Error> {
         let mut files = load::embedded();
         for (path, text) in plugins {
             if files.contains_key(&path) {
@@ -85,7 +85,7 @@ impl Catalog {
     /// `testdata` directory holds documents of the kinds `Pack`, `Decision`,
     /// `Project` and `SourceMap`; a decision belongs to the pack its id
     /// names, and the pack lists it in a section.
-    pub fn from_files(files: Files, cel: &Cel) -> Result<Self, Error> {
+    pub fn from_files(files: Files, cel: &Env) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut packs = Vec::new();
         let mut decisions: Vec<(String, Decision)> = Vec::new();
@@ -111,7 +111,7 @@ impl Catalog {
     /// id `local/<name>` and a CEL check (or none); the loader lists it in the
     /// `local` pack. A `Project` is a shareable configuration that `extends`
     /// can name. Examples must be inline.
-    pub fn from_local(files: Files, cel: &Cel) -> Result<Self, Error> {
+    pub fn from_local(files: Files, cel: &Env) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut decisions = Vec::new();
         for (name, text) in &files {

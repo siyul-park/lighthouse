@@ -5,13 +5,13 @@ use lighthouse_model::ucm::{File, Project, Symbol};
 use lighthouse_plugin::{Context, Error};
 use serde_json::Value;
 
-use lighthouse_spec::Cel;
+use lighthouse_spec::Env;
 
 use crate::{Composition, builder::Builder, facts, library::Needs};
 
 /// The value of `fact` of `symbol`, as an expression that mentions it sees it.
 pub fn symbol_fact(
-    cel: &Cel,
+    cel: &Env,
     ctx: &Context,
     symbol: &Symbol,
     fact: &'static str,
@@ -23,7 +23,7 @@ pub fn symbol_fact(
 
 /// The value of `fact` of `file`, whose text is `text`.
 pub fn file_fact(
-    cel: &Cel,
+    cel: &Env,
     ctx: &Context,
     file: &File,
     text: &str,

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    Cel, CommandCheck, ModelCheck, Subject, command,
+    CommandCheck, Env, ModelCheck, Subject, command,
     expression::{compile_problem, template_problem},
     union::{refuse_strays, stray_field},
 };
@@ -107,7 +107,7 @@ impl CheckKind {
     }
 
     /// What is wrong with the provider this names, for a decision about `subject`.
-    pub(crate) fn problem(&self, cel: &Cel, subject: Subject) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Env, subject: Subject) -> Option<String> {
         match self {
             Self::Cel(check) => check.problem(cel).or_else(|| {
                 let Some(select) = check.selects(subject) else {
@@ -303,7 +303,7 @@ pub struct Variable {
 
 impl Variable {
     /// What is wrong with the name or the expression, described.
-    pub(crate) fn problem(&self, cel: &Cel) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Env) -> Option<String> {
         let name = self.name.as_str();
         let valid = !name.is_empty()
             && name
@@ -365,7 +365,7 @@ impl CelCheck {
     }
 
     /// The first expression that does not compile, described.
-    pub(crate) fn problem(&self, cel: &Cel) -> Option<String> {
+    pub(crate) fn problem(&self, cel: &Env) -> Option<String> {
         if let Some(problem) = self.variables.iter().find_map(|v| v.problem(cel)) {
             return Some(problem);
         }
@@ -416,7 +416,7 @@ impl CelCheck {
     }
 
     /// What is wrong with `abstain` or `prompt`.
-    fn abstain_problem(&self, cel: &Cel) -> Option<String> {
+    fn abstain_problem(&self, cel: &Env) -> Option<String> {
         if self.abstain.is_none() && self.prompt.is_some() {
             return Some("check: `prompt` needs an `abstain`".to_owned());
         }

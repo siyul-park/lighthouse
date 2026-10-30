@@ -8,7 +8,7 @@ use include_dir::{Dir, DirEntry, include_dir};
 use lighthouse_resource::{Format, Resource, STATE_DIR, Spec, documents, kind_of, resource};
 
 use crate::{
-    Catalog, Cel, Decision, DecisionSpec, Error, PackSpec, ProjectSpec,
+    Catalog, Decision, DecisionSpec, Env, Error, PackSpec, ProjectSpec,
     sources::{SourceLine, SourceMapSpec},
 };
 
@@ -52,7 +52,7 @@ pub fn local_dir(root: &Path) -> PathBuf {
 
 /// The catalog layer of `<root>/.lighthouse/decisions/*.yaml`; `None` when the
 /// directory does not exist.
-pub fn load_local(root: &Path, cel: &Cel) -> Result<Option<Catalog>, Error> {
+pub fn load_local(root: &Path, cel: &Env) -> Result<Option<Catalog>, Error> {
     match local_files(root)? {
         Some(files) => Ok(Some(Catalog::from_local(files, cel)?)),
         None => Ok(None),

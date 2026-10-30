@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use cel::common::ast::{EntryExpr, Expr, IdedEntryExpr, IdedExpr, LiteralValue};
 
-use crate::Cel;
+use crate::Env;
 
 /// The variables a check can name for the value it judges, by `select`, and
 /// `node`, the one of a value related to it.
@@ -86,8 +86,8 @@ pub fn program_identifiers(program: &cel::Program) -> BTreeSet<String> {
 }
 
 /// The functions a program calls, each once.
-pub fn program_calls(cel: &Cel, program: &cel::Program) -> BTreeSet<Call> {
-    fn collect(cel: &Cel, expr: &IdedExpr, into: &mut BTreeSet<Call>) {
+pub fn program_calls(cel: &Env, program: &cel::Program) -> BTreeSet<Call> {
+    fn collect(cel: &Env, expr: &IdedExpr, into: &mut BTreeSet<Call>) {
         if let Expr::Call(call) = &expr.expr {
             let namespace = call
                 .target
@@ -119,8 +119,8 @@ pub fn program_calls(cel: &Cel, program: &cel::Program) -> BTreeSet<Call> {
 
 /// The variables a program reads from its scope: the identifiers it names that
 /// no comprehension binds and that are no namespace of a function.
-pub fn free_variables(cel: &Cel, program: &cel::Program) -> BTreeSet<String> {
-    fn collect(cel: &Cel, expr: &IdedExpr, bound: &mut Vec<String>, into: &mut BTreeSet<String>) {
+pub fn free_variables(cel: &Env, program: &cel::Program) -> BTreeSet<String> {
+    fn collect(cel: &Env, expr: &IdedExpr, bound: &mut Vec<String>, into: &mut BTreeSet<String>) {
         match &expr.expr {
             Expr::Ident(name) => {
                 if !bound.contains(name) && !cel.is_namespace(name) {
@@ -152,7 +152,7 @@ pub fn free_variables(cel: &Cel, program: &cel::Program) -> BTreeSet<String> {
 }
 
 /// The identifiers an expression names; a source that does not compile names none.
-pub fn identifiers(cel: &Cel, source: &str) -> BTreeSet<String> {
+pub fn identifiers(cel: &Env, source: &str) -> BTreeSet<String> {
     cel.compile_shared(source)
         .map_or_else(|_| BTreeSet::new(), |p| program_identifiers(&p))
 }
@@ -181,14 +181,14 @@ pub fn parse_template(text: &str) -> Result<Vec<TemplatePart>, String> {
 }
 
 /// Why `source`, written as `what`, is not a CEL expression.
-pub(crate) fn compile_problem(cel: &Cel, what: &str, source: &str) -> Option<String> {
+pub(crate) fn compile_problem(cel: &Env, what: &str, source: &str) -> Option<String> {
     cel.compile_shared(source)
         .err()
         .map(|e| format!("{what}: {e}"))
 }
 
 /// Why the `{{ cel }}` template `text`, written as `what`, is not well formed.
-pub(crate) fn template_problem(cel: &Cel, what: &str, text: &str) -> Option<String> {
+pub(crate) fn template_problem(cel: &Env, what: &str, text: &str) -> Option<String> {
     match parse_template(text) {
         Err(problem) => Some(format!("{what}: {problem}")),
         Ok(parts) => parts.iter().find_map(|part| match part {
