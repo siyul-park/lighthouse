@@ -16,4 +16,4 @@ thiserror.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-async-openai = { version = "=0.42.0", default-features = false, features = ["model-types", "finetuning-types"] }
+async-openai = { version = "=0.42.3", default-features = false, features = ["model-types", "finetuning-types"] }
