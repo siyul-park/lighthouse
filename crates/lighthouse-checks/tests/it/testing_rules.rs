@@ -302,3 +302,47 @@ fn duplicate_owner_keeps_names_within_one_module() {
     w.naming = Some(json!({ "prefix": "", "snakeCase": true, "variants": false }));
     assert!(duplicates(&w, json!({})).is_empty());
 }
+
+/// A package `module` of two functions, `names` in the order `src` declares
+/// them, and its test module: the tests named in `order` each call the
+/// function they are named after.
+fn tested_pair(w: &mut World, module: &str, names: [&str; 2], files: [&str; 2], order: [&str; 2]) {
+    let test_module = format!("{module}[test]");
+    w.module(module, Some(module), None);
+    w.module(&test_module, Some(&test_module), Some(module));
+    let targets: Vec<Symbol> = names.iter().map(|n| w.func(module, n, files[0])).collect();
+    for name in order {
+        let test = w.symbol(&test_module, name, SymbolKind::Test, files[1]);
+        let target = &targets[usize::from(!name.ends_with(names[0]))];
+        w.edge(EdgeKind::Calls, &test, target);
+        w.test_case(&test, &[target]);
+    }
+}
+
+#[test]
+fn file_layout_judges_each_test_by_the_naming_of_its_own_language() {
+    let mut w = World::default();
+    tested_pair(
+        &mut w,
+        "g",
+        ["Get", "Put"],
+        ["g/a.ucm", "g/a_test.ucm"],
+        ["TestPut", "TestGet"],
+    );
+    tested_pair(
+        &mut w,
+        "p",
+        ["get", "put"],
+        ["p/a.pyu", "p/a_pytest.pyu"],
+        ["test_put", "test_get"],
+    );
+
+    // The index of owner tests is built once per run, by whichever file is
+    // checked first: every run answers alike.
+    for run in 0..8 {
+        let mut found = check(&w, "testing/file-layout", json!({}));
+        found.sort();
+        let files: Vec<&str> = found.iter().map(|(file, _)| file.as_str()).collect();
+        assert_eq!(files, ["g/a_test.ucm", "p/a_pytest.pyu"], "run {run}");
+    }
+}

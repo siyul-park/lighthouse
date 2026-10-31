@@ -15,7 +15,7 @@ use lighthouse_model::{
 };
 use lighthouse_plugin::{
     Conventions, Error, Indexed, LanguageManifest, LanguageProvider, Plugin, PluginManifest,
-    Registry, Source, Workspace,
+    Registry, Source, TestNaming, Workspace,
 };
 use lighthouse_spec::Catalog;
 use lighthouse_spec::Config;
@@ -57,16 +57,31 @@ impl Plugin for Fixture {
     fn manifest(&self) -> &PluginManifest {
         &self.0
     }
-    // The world is a Go project in a made-up syntax: decisions apply to the languages they list.
+    // The world is a Go project in a made-up syntax, with files of a Python-like
+    // language (`.pyu`, tests in `*_pytest.pyu`, `test_` names in snake case)
+    // when a test asks for them: decisions apply to the languages they list.
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Wire(LanguageManifest {
+        let go = LanguageManifest {
             conventions: Conventions {
                 test_globs: vec!["**/*_test.ucm".to_owned()],
                 constructor_prefixes: vec!["New".to_owned(), "new".to_owned()],
                 ..Conventions::default()
             },
             ..LanguageManifest::new("go", vec!["**/*.ucm".to_owned()])
-        }))]
+        };
+        let python = LanguageManifest {
+            conventions: Conventions {
+                test_globs: vec!["**/*_pytest.pyu".to_owned()],
+                test_naming: TestNaming {
+                    prefix: "test_".to_owned(),
+                    snake_case: true,
+                    ..TestNaming::default()
+                },
+                ..Conventions::default()
+            },
+            ..LanguageManifest::new("python", vec!["**/*.pyu".to_owned()])
+        };
+        vec![Box::new(Wire(go)), Box::new(Wire(python))]
     }
 }
 
@@ -343,12 +358,13 @@ impl World {
         self.files
             .iter()
             .map(|(path, generated)| {
+                let python = path.ends_with(".pyu");
                 let file = File {
                     path: path.into(),
-                    lang: "go".to_owned(),
+                    lang: if python { "python" } else { "go" }.to_owned(),
                     hash: String::new(),
                     generated: *generated,
-                    test: path.ends_with("_test.ucm"),
+                    test: path.ends_with("_test.ucm") || path.ends_with("_pytest.pyu"),
                     facts: Default::default(),
                 };
                 let own = |s: &Symbol| s.file.to_string_lossy() == path.as_str();

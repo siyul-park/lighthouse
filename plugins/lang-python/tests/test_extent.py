@@ -37,11 +37,6 @@ class PositionTests(unittest.TestCase):
         node = ast.parse("x = 1\nyy = 2\n").body[1]
         self.assertEqual(span_of(node), {"start": {"line": 2, "col": 1}, "end": {"line": 2, "col": 7}})
 
-    def test_before(self):
-        self.assertTrue(before({"line": 1, "col": 9}, {"line": 2, "col": 1}))
-        self.assertTrue(before({"line": 2, "col": 1}, {"line": 2, "col": 2}))
-        self.assertFalse(before({"line": 2, "col": 2}, {"line": 2, "col": 2}))
-
 
 class LinesTests(unittest.TestCase):
     def test_lines_byte_col(self):
@@ -53,6 +48,13 @@ class LinesTests(unittest.TestCase):
     def test_lines_line_text(self):
         lines = Lines("a\nb")
         self.assertEqual([lines.line_text(n) for n in (0, 1, 2, 3)], ["", "a", "b", ""])
+
+
+class OrderTests(unittest.TestCase):
+    def test_before(self):
+        self.assertTrue(before({"line": 1, "col": 9}, {"line": 2, "col": 1}))
+        self.assertTrue(before({"line": 2, "col": 1}, {"line": 2, "col": 2}))
+        self.assertFalse(before({"line": 2, "col": 2}, {"line": 2, "col": 2}))
 
 
 class DeclarationTests(unittest.TestCase):

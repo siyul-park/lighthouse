@@ -91,14 +91,6 @@ class ParametersTests(unittest.TestCase):
             [p.arg for p in parameters(ast.parse("lambda a, /, b, *, c: 0", mode="eval").body)], list("abc")
         )
 
-    def test_returns(self):
-        world = World()
-        self.assertEqual(returns(world.node("load#function")), 1)
-        self.assertEqual(returns(world.node("nothing#function")), 0)
-        self.assertEqual(returns(world.node("untyped#function")), 1)
-        self.assertEqual(returns(ast.parse("def f():\n    return None\n").body[0]), 0)
-        self.assertEqual(returns(ast.parse("lambda: 1", mode="eval").body), 1)
-
 
 class TypesTests(unittest.TestCase):
     def test_types_field(self):
@@ -149,6 +141,16 @@ class TypesTests(unittest.TestCase):
                 "fact#function": False,
             },
         )
+
+
+class ReturnsTests(unittest.TestCase):
+    def test_returns(self):
+        world = World()
+        self.assertEqual(returns(world.node("load#function")), 1)
+        self.assertEqual(returns(world.node("nothing#function")), 0)
+        self.assertEqual(returns(world.node("untyped#function")), 1)
+        self.assertEqual(returns(ast.parse("def f():\n    return None\n").body[0]), 0)
+        self.assertEqual(returns(ast.parse("lambda: 1", mode="eval").body), 1)
 
 
 class FunctionsTests(unittest.TestCase):

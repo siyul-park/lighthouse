@@ -7,6 +7,7 @@ use lighthouse_model::ucm::{Symbol, SymbolId, SymbolKind};
 use serde_json::Value;
 
 use super::Builder;
+use crate::naming::Tests;
 
 impl Builder<'_> {
     /// The node of the symbol that `test` is credited to by the naming
@@ -41,7 +42,11 @@ impl Builder<'_> {
     }
 
     /// Per test, the symbols it is credited to, in the order of their ids.
+    /// The index is shared by every check of the run, so each owner is judged
+    /// by the naming convention of its own language, not of the file whose
+    /// check built it first.
     fn owned_index(&self) -> BTreeMap<SymbolId, Vec<SymbolId>> {
+        let mut conventions: BTreeMap<String, Tests<'_>> = BTreeMap::new();
         let mut index: BTreeMap<SymbolId, Vec<SymbolId>> = BTreeMap::new();
         let owners = self.project.symbols.iter().filter(|s| {
             matches!(
@@ -53,10 +58,14 @@ impl Builder<'_> {
             ) && !self.project.in_test(&s.id)
         });
         for symbol in owners {
-            if self.project.file(&symbol.file).is_none_or(|f| f.generated) {
+            let Some(file) = self.project.file(&symbol.file).filter(|f| !f.generated) else {
                 continue;
-            }
-            for (case, _) in self.naming.credited_tests(symbol) {
+            };
+            let language = file.analysis_language();
+            let naming = conventions
+                .entry(language.to_owned())
+                .or_insert_with(|| self.naming.in_language(self.ws.test_naming(language)));
+            for (case, _) in naming.credited_tests(symbol) {
                 if !self.reaches(&case.symbol, symbol) {
                     continue;
                 }

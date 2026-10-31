@@ -43,6 +43,22 @@ def statement(source: str) -> ast.stmt:
 
 
 class FileDeclsTests(unittest.TestCase):
+    def test_file_decls_member(self):
+        decls = file_decls()
+        shape = decls.top["Shape"]
+        self.assertEqual(decls.member(shape, "area").kind, "method")
+        self.assertEqual(decls.member(shape, "sides").kind, "field")
+        self.assertIsNone(decls.member(shape, "missing"))
+
+    def test_file_decls_of(self):
+        decls = file_decls()
+        shape = decls.top["Shape"]
+        self.assertIs(decls.of(shape.node), shape)
+        side = decls.member(shape, "side")
+        self.assertEqual(len(side.nodes), 2)
+        self.assertTrue(all(decls.of(n) is side for n in side.nodes))
+        self.assertIsNone(decls.of(ast.parse("x\n").body[0]))
+
     def test_file_decls_add(self):
         decls = file_decls("")
         node = ast.parse("def f(): ...\n").body[0]
@@ -59,22 +75,6 @@ class FileDeclsTests(unittest.TestCase):
         decls = file_decls("")
         node = ast.parse("x = 1\n").body[0]
         self.assertEqual(decls.add("var", "a#b::c", None, Origin(node, node)).id, "m::a%23b:%3Ac#var")
-
-    def test_file_decls_member(self):
-        decls = file_decls()
-        shape = decls.top["Shape"]
-        self.assertEqual(decls.member(shape, "area").kind, "method")
-        self.assertEqual(decls.member(shape, "sides").kind, "field")
-        self.assertIsNone(decls.member(shape, "missing"))
-
-    def test_file_decls_of(self):
-        decls = file_decls()
-        shape = decls.top["Shape"]
-        self.assertIs(decls.of(shape.node), shape)
-        side = decls.member(shape, "side")
-        self.assertEqual(len(side.nodes), 2)
-        self.assertTrue(all(decls.of(n) is side for n in side.nodes))
-        self.assertIsNone(decls.of(ast.parse("x\n").body[0]))
 
 
 class ExpressionTests(unittest.TestCase):

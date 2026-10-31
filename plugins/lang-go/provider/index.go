@@ -150,8 +150,13 @@ func (r *run) finish() sdk.IndexResult {
 	for _, path := range paths {
 		r.result.Fragments = append(r.result.Fragments, *r.fragments[path])
 	}
-	for path, data := range r.encoded {
-		r.result.Encoded = append(r.result.Encoded, sdk.EncodedFragment{Path: path, JSON: data})
+	encoded := make([]string, 0, len(r.encoded))
+	for path := range r.encoded {
+		encoded = append(encoded, path)
+	}
+	sort.Strings(encoded)
+	for _, path := range encoded {
+		r.result.Encoded = append(r.result.Encoded, sdk.EncodedFragment{Path: path, JSON: r.encoded[path]})
 	}
 	sort.Slice(r.result.Sources, func(i, j int) bool {
 		return r.result.Sources[i].Path < r.result.Sources[j].Path

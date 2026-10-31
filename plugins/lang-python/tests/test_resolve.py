@@ -73,43 +73,7 @@ class StaticAllTests(unittest.TestCase):
         self.assertEqual(constants(expr("f()")), [])
 
 
-class AnnotationTests(unittest.TestCase):
-    def test_unwrap_annotation(self):
-        def shown(text: str):
-            found = unwrap_annotation(expr(text))
-            return None if found is None else ast.unparse(found)
-
-        for text, expected in {
-            "Engine": "Engine",
-            "pkg.Engine": "pkg.Engine",
-            "Optional[Engine]": "Engine",
-            "Annotated[Engine, 'meta']": "Engine",
-            "Engine | None": "Engine",
-            "Union[None, Engine]": "Engine",
-            "'Engine'": "Engine",
-            "Final[Optional[Engine]]": "Engine",
-            "Engine | Other": None,
-            "Union[A, B]": None,
-            "list[Engine]": None,
-            "'not valid ((' ": None,
-            "3": None,
-        }.items():
-            self.assertEqual(shown(text), expected, text)
-        self.assertIsNone(unwrap_annotation(None))
-
-    def test_has_name(self):
-        node = ast.parse("@a.b.cached\n@plain(1)\ndef f(): ...\n").body[0]
-        self.assertTrue(has_name(node, "cached"))
-        self.assertTrue(has_name(node, "plain"))
-        self.assertFalse(has_name(node, "a"))
-        self.assertFalse(has_name(ast.parse("x = 1").body[0], "plain"))
-
-
 class ResolverTests(unittest.TestCase):
-    def test_resolver_of(self):
-        world = World("app.py")
-        self.assertIs(resolver_of(world.model, world.parsed), world.resolver)
-
     def test_resolver_module_imports(self):
         bindings = World("app.py").resolver.module_imports()
         self.assertEqual(sorted(bindings), ["Engine", "core", "make", "pkg", "x"])
@@ -165,6 +129,13 @@ class ResolverTests(unittest.TestCase):
         self.assertIsNone(world.resolver.expr_value(expr("e.nothing"), scope))
         self.assertIsNone(world.resolver.expr_value(expr("1 + 1"), scope))
 
+    def test_resolver_file_of(self):
+        world = World("app.py")
+        self.assertEqual(world.resolver.file_of(world.decl("pkg/core.py", "Engine")), "pkg/core.py")
+        self.assertEqual(
+            world.resolver.file_of(world.decl("pkg/__init__.py", "Engine")) if False else "pkg/core.py", "pkg/core.py"
+        )
+
     def test_resolver_attribute(self):
         world = World("app.py")
         engine = world.decl("pkg/core.py", "Engine")
@@ -174,13 +145,6 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(world.resolver.attribute(DeclVal(value), "start").decl.name, "start")
         self.assertIsNone(world.resolver.attribute(DeclVal(world.decl("pkg/core.py", "make")), "x"))
 
-    def test_resolver_file_of(self):
-        world = World("app.py")
-        self.assertEqual(world.resolver.file_of(world.decl("pkg/core.py", "Engine")), "pkg/core.py")
-        self.assertEqual(
-            world.resolver.file_of(world.decl("pkg/__init__.py", "Engine")) if False else "pkg/core.py", "pkg/core.py"
-        )
-
     def test_resolver_annotation_class(self):
         world = World("app.py")
         scope = world.function_scope("go")
@@ -189,19 +153,6 @@ class ResolverTests(unittest.TestCase):
             self.assertIs(world.resolver.annotation_class(expr(text), scope), engine, text)
         self.assertIsNone(world.resolver.annotation_class(expr("int"), scope))
         self.assertIsNone(world.resolver.annotation_class(None, scope))
-
-    def test_resolver_member(self):
-        world = World("app.py")
-        engine = world.decl("pkg/core.py", "Engine")
-        self.assertEqual(world.resolver.member(engine, "start").owner, engine)
-        self.assertEqual(world.resolver.member(engine, "run").owner.name, "Base")
-        self.assertIsNone(world.resolver.member(engine, "missing"))
-
-    def test_resolver_ancestors(self):
-        world = World("app.py")
-        engine = world.decl("pkg/core.py", "Engine")
-        self.assertEqual([c.name for c in world.resolver.ancestors(engine)], ["Base"])
-        self.assertEqual(world.resolver.ancestors(world.decl("pkg/core.py", "Base")), [])
 
     def test_resolver_methods_of(self):
         world = World("app.py")
@@ -217,10 +168,59 @@ class ResolverTests(unittest.TestCase):
         found = resolver_of(model, parsed).external_bases(parsed.decls.top["A"])
         self.assertEqual([c.__name__ for c in found], ["NodeVisitor", "Handler"])
 
+    def test_resolver_member(self):
+        world = World("app.py")
+        engine = world.decl("pkg/core.py", "Engine")
+        self.assertEqual(world.resolver.member(engine, "start").owner, engine)
+        self.assertEqual(world.resolver.member(engine, "run").owner.name, "Base")
+        self.assertIsNone(world.resolver.member(engine, "missing"))
+
+    def test_resolver_ancestors(self):
+        world = World("app.py")
+        engine = world.decl("pkg/core.py", "Engine")
+        self.assertEqual([c.name for c in world.resolver.ancestors(engine)], ["Base"])
+        self.assertEqual(world.resolver.ancestors(world.decl("pkg/core.py", "Base")), [])
+
+    def test_resolver_of(self):
+        world = World("app.py")
+        self.assertIs(resolver_of(world.model, world.parsed), world.resolver)
+
     def test_a_variable_defined_through_itself_settles_no_type(self):
         files = {"loop.py": "for name in ('a', 'b'):\n    name = name.replace('a', 'c')\n    print(name.upper())\n"}
         result = index(files)
         self.assertEqual(result["incomplete"], [])
+
+
+class AnnotationTests(unittest.TestCase):
+    def test_has_name(self):
+        node = ast.parse("@a.b.cached\n@plain(1)\ndef f(): ...\n").body[0]
+        self.assertTrue(has_name(node, "cached"))
+        self.assertTrue(has_name(node, "plain"))
+        self.assertFalse(has_name(node, "a"))
+        self.assertFalse(has_name(ast.parse("x = 1").body[0], "plain"))
+
+    def test_unwrap_annotation(self):
+        def shown(text: str):
+            found = unwrap_annotation(expr(text))
+            return None if found is None else ast.unparse(found)
+
+        for text, expected in {
+            "Engine": "Engine",
+            "pkg.Engine": "pkg.Engine",
+            "Optional[Engine]": "Engine",
+            "Annotated[Engine, 'meta']": "Engine",
+            "Engine | None": "Engine",
+            "Union[None, Engine]": "Engine",
+            "'Engine'": "Engine",
+            "Final[Optional[Engine]]": "Engine",
+            "Engine | Other": None,
+            "Union[A, B]": None,
+            "list[Engine]": None,
+            "'not valid ((' ": None,
+            "3": None,
+        }.items():
+            self.assertEqual(shown(text), expected, text)
+        self.assertIsNone(unwrap_annotation(None))
 
 
 if __name__ == "__main__":

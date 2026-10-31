@@ -58,6 +58,11 @@ impl<'p> Tests<'p> {
         }
     }
 
+    /// The same project and indexes under the convention of another language.
+    pub(crate) fn in_language(&self, naming: TestNaming) -> Self {
+        Self::new(naming, self.project, Arc::clone(&self.indexes))
+    }
+
     /// The tests of the modules that test `symbol`'s module from inside or
     /// outside, whose names map to `symbol`. Names resolve within the one
     /// module the symbol belongs to, so a name never maps to two symbols of

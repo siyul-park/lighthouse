@@ -44,6 +44,14 @@ def scopes():
     return module, outer, inner, declares, box, method
 
 
+class ScopeTests(unittest.TestCase):
+    def test_scope_symbol(self):
+        _, outer, _, _, _, _ = scopes()
+        self.assertTrue(outer.symbol("local").is_local())
+        self.assertIsNone(outer.symbol("nowhere"))
+        self.assertIsNone(Scope("function", None, None).symbol("local"))
+
+
 class ScopeTreeTests(unittest.TestCase):
     def test_scope_tree_module(self):
         module = ScopeTree(SOURCE, "m.py").module(ast.parse(SOURCE))
@@ -60,14 +68,6 @@ class ScopeTreeTests(unittest.TestCase):
     def test_scope_tree_of_a_file_that_does_not_parse_has_no_tables(self):
         scopes = ScopeTree("def (:\n", "bad.py")
         self.assertIsNone(scopes.module(ast.parse("")).table)
-
-
-class ScopeTests(unittest.TestCase):
-    def test_scope_symbol(self):
-        _, outer, _, _, _, _ = scopes()
-        self.assertTrue(outer.symbol("local").is_local())
-        self.assertIsNone(outer.symbol("nowhere"))
-        self.assertIsNone(Scope("function", None, None).symbol("local"))
 
 
 class BindingScopeTests(unittest.TestCase):
