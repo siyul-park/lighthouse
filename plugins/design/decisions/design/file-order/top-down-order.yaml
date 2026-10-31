@@ -61,13 +61,13 @@ spec:
           file.symbols.filter(f, f.kind == 'field')
             .map(f, types.filter(b, b.id != f.owner_key && mentions(f, b)).map(b, [f.owner_key, b.id]))
             .flatten())
-    - name: holders
+    - name: held_by
       expression: |-
         symbol.kind == 'type'
-          ? file.symbols.filter(a, a.kind == 'type'
-              && holds.exists(h, h[0] == a.id && h[1] == symbol.id)
-              && !holds.exists(h, h[0] == symbol.id && h[1] == a.id))
+          ? holds.filter(h, h[1] == symbol.id && !holds.exists(g, g[0] == symbol.id && g[1] == h[0])).map(h, h[0])
           : []
+    - name: holders
+      expression: "size(held_by) == 0 ? [] : file.symbols.filter(a, a.kind == 'type' && a.id in held_by)"
     - name: users
       expression: "symbol.func != null ? local : holders.sortBy(a, a.pos)"
     - name: anchor
