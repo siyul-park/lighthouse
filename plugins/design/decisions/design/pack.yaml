@@ -36,6 +36,43 @@ spec:
       expression: options.groups
     - name: hooks
       expression: options.hooks
+    # The owner block of a declaration: the type of its module that a method,
+    # a constructor or an option builder belongs to, else empty.
+    - name: owner_of
+      params: [s]
+      expression: >-
+        s.kind == 'method' ? s.owner_key
+          : s.kind == 'type' || s.kind == 'interface' ? s.id
+          : s.kind == 'function' && s.configures != ''
+          ? (owner_types.filter(t, t.name == s.configures && t.module == s.module).map(t, t.id) + [''])[0]
+          : s.kind == 'function' && s.constructor_named
+          ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id) + [''])[0]
+          : ''
+    # The rank of a declaration in the block of its owner.
+    - name: block_rank
+      params: [s]
+      expression: >-
+        s.kind == 'function' && s.configures != '' ? 0
+          : s.kind == 'function' && s.constructor_named ? 1
+          : s.visibility != 'private' && s.kind == 'method' && s.name in hooks ? 3
+          : s.visibility != 'private' ? 2 : 4
+    # The groups a declaration may belong to, best first, that the order names.
+    - name: candidate_groups
+      params: [s, owner]
+      expression: >-
+        (s.kind == 'type' || s.kind == 'interface'
+          ? [s.visibility != 'private' ? 'public-type' : 'private-type', 'type']
+          : s.kind == 'const'
+          ? (s.owner_key != '' ? ['type']
+             : [s.visibility != 'private' ? 'public-const' : 'private-const', 'const'])
+          : s.kind == 'var' ? ['var']
+          : s.kind == 'function'
+          ? (s.name == 'init' ? ['init'] : [])
+            + (owner != '' ? ['method'] : [])
+            + [s.visibility != 'private' ? 'public-function' : 'private-function']
+          : s.kind == 'method' ? ['type', 'method']
+          : []
+        ).filter(c, c in groups)
     # The place of each placed declaration in the order of
     # `design/declaration-groups`, a number to compare: the index in `groups`
     # of the first of the declaration's candidate groups that the order names,
@@ -49,37 +86,13 @@ spec:
     - name: place
       params: [s]
       expression: >-
-        cel.bind(open, s.visibility != 'private',
-        cel.bind(owner, s.kind == 'method' ? s.owner_key
-            : s.kind == 'type' || s.kind == 'interface' ? s.id
-            : s.kind == 'function' && s.configures != ''
-            ? (owner_types.filter(t, t.name == s.configures && t.module == s.module).map(t, t.id) + [''])[0]
-            : s.kind == 'function' && s.constructor_named
-            ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id) + [''])[0]
-            : '',
-        cel.bind(inner,
-            s.kind == 'function' && s.configures != '' ? 0
-            : s.kind == 'function' && s.constructor_named ? 1
-            : open && s.kind == 'method' && s.name in hooks ? 3
-            : open ? 2 : 4,
-        cel.bind(chosen, (
-            s.kind == 'type' || s.kind == 'interface'
-            ? [open ? 'public-type' : 'private-type', 'type']
-            : s.kind == 'const'
-            ? (s.owner_key != '' ? ['type'] : [open ? 'public-const' : 'private-const', 'const'])
-            : s.kind == 'var' ? ['var']
-            : s.kind == 'function'
-            ? (s.name == 'init' ? ['init'] : [])
-              + (owner != '' ? ['method'] : [])
-              + [open ? 'public-function' : 'private-function']
-            : s.kind == 'method' ? ['type', 'method']
-            : []
-          ).filter(c, c in groups),
+        cel.bind(owner, owner_of(s),
+        cel.bind(chosen, candidate_groups(s, owner),
           size(chosen) == 0 ? -1
           : groups.indexOf(chosen[0]) * 1000000
             + (chosen[0] == 'method'
-               ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 5 + inner
-               : 0)))))
+               ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 5 + block_rank(s)
+               : 0)))
     # Per placed declaration, [module, place, id, name].
     - name: slots
       expression: placed.map(s, [s.module, place(s), s.id, s.name])
