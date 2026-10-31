@@ -182,6 +182,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":18,\"open\":{\"col\":35,\"line\":18},\"close\":{\"col\":52,\"line\":18},\"statements\":[\"return r.ID + n\"],\"plain\":true},{\"line\":20,\"open\":{\"col\":29,\"line\":20},\"close\":{\"col\":49,\"line\":20},\"statements\":[\"return Pair{}, nil\"],\"plain\":true}]"
+        },
         "path": "signatures.go"
       },
       "functions": [

@@ -173,7 +173,8 @@
       ],
       "file": {
         "facts": {
-          "blocks": "[{\"keyword\":\"const\",\"line\":21,\"specs\":[{\"names\":[\"Limit\"],\"line\":21,\"public\":true,\"keys\":[]}]},{\"keyword\":\"const\",\"line\":23,\"specs\":[{\"names\":[\"limit\"],\"line\":23,\"public\":false,\"keys\":[]}]}]"
+          "blocks": "[{\"keyword\":\"const\",\"line\":21,\"specs\":[{\"names\":[\"Limit\"],\"line\":21,\"public\":true,\"keys\":[]}]},{\"keyword\":\"const\",\"line\":23,\"specs\":[{\"names\":[\"limit\"],\"line\":23,\"public\":false,\"keys\":[]}]}]",
+          "inline_bodies": "[{\"line\":12,\"open\":{\"col\":26,\"line\":12},\"close\":{\"col\":44,\"line\":12},\"statements\":[\"return private{}\"],\"plain\":true},{\"line\":17,\"open\":{\"col\":32,\"line\":17},\"close\":{\"col\":49,\"line\":17},\"statements\":[\"return p.secret\"],\"plain\":true}]"
         },
         "path": "visibility.go"
       },

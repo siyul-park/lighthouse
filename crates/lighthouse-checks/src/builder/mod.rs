@@ -317,8 +317,10 @@ impl<'a> Builder<'a> {
                     .collect(),
             );
         }
-        if self.needs.field("blocks") {
-            value["blocks"] = self.blocks(file);
+        for name in ["blocks", "inline_bodies"] {
+            if self.needs.field(name) {
+                value[name] = self.provider_list(file, name);
+            }
         }
         if self.needs.field("pair") {
             value["pair"] = self.pair(file);

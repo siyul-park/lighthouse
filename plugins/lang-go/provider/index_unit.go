@@ -35,6 +35,7 @@ type unit struct {
 	edges    map[edgeKey]bool
 	cmap     ast.CommentMap
 	blocks   []declBlock
+	inlined  []inlineBody
 }
 
 // edgeKey identifies an emitted edge: the same relation at another site is
@@ -79,12 +80,14 @@ func (u *unit) fragment() *sdk.Fragment {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
 			u.function(d)
+			u.inline(d)
 		case *ast.GenDecl:
 			u.general(d)
 			u.block(d)
 		}
 	}
 	u.publishBlocks()
+	u.publishInline()
 	if u.fence {
 		u.unresolved()
 	}
@@ -384,7 +387,9 @@ func (u *unit) declarationRole(kind, owner string) string {
 	}
 }
 
-func (u *unit) edge(kind string, from sdk.Node, to string) { u.edgeAt(kind, from, to, nil) }
+func (u *unit) edge(kind string, from sdk.Node, to string) {
+	u.edgeAt(kind, from, to, nil)
+}
 
 // edgeAt emits an edge once per distinct relation and site.
 func (u *unit) edgeAt(kind string, from sdk.Node, to string, site *sdk.Span) {
@@ -420,7 +425,9 @@ func (u *unit) visibility(name string) string {
 	}
 }
 
-func (u *unit) info() *types.Info { return u.pkg.TypesInfo }
+func (u *unit) info() *types.Info {
+	return u.pkg.TypesInfo
+}
 
 // baseName is the identifier a type expression names, behind pointers,
 // parentheses, type arguments and package qualifiers.

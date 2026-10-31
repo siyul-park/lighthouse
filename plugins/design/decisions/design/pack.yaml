@@ -106,7 +106,7 @@ spec:
         Function structure should make meaningful behavior reusable and
         readable, not merely make functions smaller. Structural metrics are
         review signals, not proof of a design violation.
-      decisions: [complexity, coupling, abstraction-level, signature-size, no-private-types, narrow-inputs, prefer-method, feature-envy, no-unused-symbol, no-redundant-symbol, no-speculative-generality]
+      decisions: [complexity, no-single-line-bodies, coupling, abstraction-level, signature-size, no-private-types, narrow-inputs, prefer-method, feature-envy, no-unused-symbol, no-redundant-symbol, no-speculative-generality]
     - name: naming
       title: Naming
       intro: >-

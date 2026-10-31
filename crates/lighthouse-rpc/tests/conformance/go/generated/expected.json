@@ -282,6 +282,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":15,\"line\":4},\"close\":{\"col\":28,\"line\":4},\"statements\":[\"Generated()\"],\"plain\":true}]"
+        },
         "path": "plain.go"
       },
       "functions": [

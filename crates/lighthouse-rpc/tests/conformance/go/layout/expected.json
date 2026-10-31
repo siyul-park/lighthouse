@@ -131,7 +131,8 @@
       ],
       "file": {
         "facts": {
-          "blocks": "[{\"keyword\":\"var\",\"line\":10,\"specs\":[{\"names\":[\"Version\"],\"line\":10,\"public\":true,\"keys\":[]}]}]"
+          "blocks": "[{\"keyword\":\"var\",\"line\":10,\"specs\":[{\"names\":[\"Version\"],\"line\":10,\"public\":true,\"keys\":[]}]}]",
+          "inline_bodies": "[{\"line\":13,\"open\":{\"col\":25,\"line\":13},\"close\":{\"col\":68,\"line\":13},\"statements\":[\"return fmt.Sprint(helpers.Count(\\\"hello\\\"))\"],\"plain\":true},{\"line\":15,\"open\":{\"col\":14,\"line\":15},\"close\":{\"col\":39,\"line\":15},\"statements\":[\"fmt.Println(Greeting())\"],\"plain\":true}]"
         },
         "path": "cmd/app/main.go"
       },
@@ -307,6 +308,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":5,\"open\":{\"col\":27,\"line\":5},\"close\":{\"col\":42,\"line\":5},\"statements\":[\"return len(s)\"],\"plain\":true}]"
+        },
         "path": "internal/text/words.go"
       },
       "functions": [

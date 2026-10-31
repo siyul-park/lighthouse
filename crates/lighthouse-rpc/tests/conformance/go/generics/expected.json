@@ -314,6 +314,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":14,\"open\":{\"col\":34,\"line\":14},\"close\":{\"col\":67,\"line\":14},\"statements\":[\"s.items = append(s.items, item)\"],\"plain\":true},{\"line\":17,\"open\":{\"col\":31,\"line\":17},\"close\":{\"col\":52,\"line\":17},\"statements\":[\"return len(s.items)\"],\"plain\":true},{\"line\":41,\"open\":{\"col\":23,\"line\":41},\"close\":{\"col\":45,\"line\":41},\"statements\":[\"return Sum(1.5, 2.5)\"],\"plain\":true}]"
+        },
         "path": "generics.go"
       },
       "functions": [

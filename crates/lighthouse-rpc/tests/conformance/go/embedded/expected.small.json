@@ -504,6 +504,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":25,\"open\":{\"col\":33,\"line\":25},\"close\":{\"col\":53,\"line\":25},\"statements\":[\"_ = b.prefix + msg\"],\"plain\":true},{\"line\":28,\"open\":{\"col\":31,\"line\":28},\"close\":{\"col\":43,\"line\":28},\"statements\":[\"return nil\"],\"plain\":true},{\"line\":42,\"open\":{\"col\":31,\"line\":42},\"close\":{\"col\":57,\"line\":42},\"statements\":[\"return s.name + s.prefix\"],\"plain\":true},{\"line\":44,\"open\":{\"col\":24,\"line\":44},\"close\":{\"col\":81,\"line\":44},\"statements\":[\"return \\u0026Service{Base: \\u0026Base{prefix: \\\"\\u003e \\\"}, name: \\\"svc\\\"}\"],\"plain\":true}]"
+        },
         "path": "embedded.go"
       },
       "functions": [

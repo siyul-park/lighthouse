@@ -184,6 +184,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":16,\"open\":{\"col\":28,\"line\":16},\"close\":{\"col\":48,\"line\":16},\"statements\":[\"return len(r.data)\"],\"plain\":true},{\"line\":18,\"open\":{\"col\":28,\"line\":18},\"close\":{\"col\":43,\"line\":18},\"statements\":[\"return h(\\\"x\\\")\"],\"plain\":true},{\"line\":20,\"open\":{\"col\":25,\"line\":20},\"close\":{\"col\":42,\"line\":20},\"statements\":[\"return r.Read()\"],\"plain\":true}]"
+        },
         "path": "aliases.go"
       },
       "functions": [

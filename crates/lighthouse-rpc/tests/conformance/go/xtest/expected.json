@@ -177,6 +177,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":17,\"line\":4},\"close\":{\"col\":34,\"line\":4},\"statements\":[\"return helper()\"],\"plain\":true},{\"line\":6,\"open\":{\"col\":20,\"line\":6},\"close\":{\"col\":30,\"line\":6},\"statements\":[\"return 1\"],\"plain\":true}]"
+        },
         "path": "pkg/pkg.go"
       },
       "functions": [

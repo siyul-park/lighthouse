@@ -235,6 +235,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":8,\"open\":{\"col\":31,\"line\":8},\"close\":{\"col\":43,\"line\":8},\"statements\":[\"return nil\"],\"plain\":true},{\"line\":14,\"open\":{\"col\":44,\"line\":14},\"close\":{\"col\":72,\"line\":14},\"statements\":[\"return fmt.Println(len(p))\"],\"plain\":true}]"
+        },
         "path": "impl/impl.go"
       },
       "functions": [

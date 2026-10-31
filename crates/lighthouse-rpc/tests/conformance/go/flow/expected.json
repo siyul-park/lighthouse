@@ -345,6 +345,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":118,\"open\":{\"col\":36,\"line\":118},\"close\":{\"col\":62,\"line\":118},\"statements\":[\"return inner(a, rest...)\"],\"plain\":true},{\"line\":120,\"open\":{\"col\":29,\"line\":120},\"close\":{\"col\":49,\"line\":120},\"statements\":[\"return inner(b, a)\"],\"plain\":true},{\"line\":122,\"open\":{\"col\":37,\"line\":122},\"close\":{\"col\":59,\"line\":122},\"statements\":[\"return a + len(rest)\"],\"plain\":true},{\"line\":124,\"open\":{\"col\":31,\"line\":124},\"close\":{\"col\":49,\"line\":124},\"statements\":[\"return t.child()\"],\"plain\":true},{\"line\":126,\"open\":{\"col\":31,\"line\":126},\"close\":{\"col\":46,\"line\":126},\"statements\":[\"return t.left\"],\"plain\":true}]"
+        },
         "path": "flow.go"
       },
       "functions": [

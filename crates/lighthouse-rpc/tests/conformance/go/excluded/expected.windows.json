@@ -24,6 +24,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":3,\"open\":{\"col\":21,\"line\":3},\"close\":{\"col\":39,\"line\":3},\"statements\":[\"return \\\"windows\\\"\"],\"plain\":true}]"
+        },
         "path": "os_windows.go"
       },
       "functions": [

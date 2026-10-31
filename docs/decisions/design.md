@@ -437,6 +437,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`design/complexity`](#functions-stay-within-their-complexity-limits) | Functions stay within their complexity limits | info · cel |  |  |
+| [`design/no-single-line-bodies`](#a-function-body-goes-on-its-own-lines) | A function body goes on its own lines | error · cel | safe |  |
 | [`design/coupling`](#functions-are-not-dependency-hubs) | Functions are not dependency hubs | warn · cel |  |  |
 | [`design/abstraction-level`](#a-function-reads-at-one-level-of-abstraction) | A function reads at one level of abstraction | warn · model |  |  |
 | [`design/signature-size`](#signatures-stay-within-their-size-limits) | Signatures stay within their size limits | warn · cel | unsafe |  |
@@ -489,6 +490,26 @@ func total(a, b int) int {
 ```
 
 Also: rust, cel, typescript, python
+
+### A function body goes on its own lines
+
+`design/no-single-line-bodies` · symbol · error · cel · fix: safe · go
+
+*A body written between braces on the line of the declaration hides its statements in the signature and grows as a line the next edit has to reflow. The statements go on their own indented lines, as in the declarations around them. Go: gofmt keeps `func (it *Iterator) Kind() Kind { return KindRef }` as it is, so no Go formatter covers this. An empty body `{}` and a function literal in an expression are not judged. The fix writes each statement of the body on its own line and leaves a body that holds a comment alone. Rust: not applicable. rustfmt's `fn_single_line` is `false` by default, so `core/formatted` already expands the body. Python: pycodestyle E704 ("multiple statements on one line (def)") is the closest precedent, and it is in pycodestyle's default ignore list; Python is not judged here.*
+
+A function or method declaration MUST NOT put a non-empty body on the line of its opening brace and closing brace; the statements go on their own indented lines.
+
+Derived from: rustfmt fn_single_line, default false: https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#fn_single_line; pycodestyle E704, ignored by default: https://pycodestyle.pycqa.org/en/latest/intro.html#error-codes; Martin, Clean Code (2008), ch. 5 Vertical formatting
+
+```diff
+--- a/example.go
++++ b/example.go
+@@ -5 +5,3 @@
+-func (it *Iterator) Kind() int { return 1 }
++func (it *Iterator) Kind() int {
++	return 1
++}
+```
 
 ### Functions are not dependency hubs
 

@@ -57,6 +57,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":21,\"line\":4},\"close\":{\"col\":36,\"line\":4},\"statements\":[\"return flavor\"],\"plain\":true}]"
+        },
         "path": "mode.go"
       },
       "functions": [

@@ -50,6 +50,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":25,\"line\":4},\"close\":{\"col\":39,\"line\":4},\"statements\":[\"return a + b\"],\"plain\":true},{\"line\":7,\"open\":{\"col\":25,\"line\":7},\"close\":{\"col\":39,\"line\":7},\"statements\":[\"return a * 2\"],\"plain\":true}]"
+        },
         "path": "calc.go"
       },
       "functions": [
@@ -354,6 +357,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":22,\"open\":{\"col\":31,\"line\":22},\"close\":{\"col\":42,\"line\":22},\"statements\":[\"helper(t)\"],\"plain\":true},{\"line\":26,\"open\":{\"col\":28,\"line\":26},\"close\":{\"col\":43,\"line\":26},\"statements\":[\"_ = Add(1, 1)\"],\"plain\":true},{\"line\":34,\"open\":{\"col\":23,\"line\":34},\"close\":{\"col\":38,\"line\":34},\"statements\":[\"_ = Double(2)\"],\"plain\":true}]"
+        },
         "path": "calc_test.go"
       },
       "functions": [

@@ -1,0 +1,121 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-single-line-bodies
+  uid: 7c3e9a15-4b2d-4f68-a0e1-93d5b8c47f26
+spec:
+  title: A function body goes on its own lines
+  context: >-
+    A body written between braces on the line of the declaration hides its
+    statements in the signature and grows as a line the next edit has to
+    reflow. The statements go on their own indented lines, as in the
+    declarations around them.
+
+    Go: gofmt keeps `func (it *Iterator) Kind() Kind { return KindRef }` as it
+    is, so no Go formatter covers this. An empty body `{}` and a function
+    literal in an expression are not judged. The fix writes each statement of
+    the body on its own line and leaves a body that holds a comment alone.
+
+    Rust: not applicable. rustfmt's `fn_single_line` is `false` by default,
+    so `core/formatted` already expands the body. Python: pycodestyle E704
+    ("multiple statements on one line (def)") is the closest precedent, and it
+    is in pycodestyle's default ignore list; Python is not judged here.
+  scope:
+    subject: symbol
+    examples: exclude
+  languages:
+    go: {}
+  requirement: >-
+    A function or method declaration MUST NOT put a non-empty body on the line
+    of its opening brace and closing brace; the statements go on their own
+    indented lines.
+  severity: error
+  check:
+    type: cel
+    select: function
+    variables:
+      - name: inline
+        expression: "file.inline_bodies.filter(b, b.line == func.line)"
+    where: "(func.kind == 'function' || func.kind == 'method') && size(inline) > 0"
+    message: >-
+      {{ func.kind + ' ' + func.name + ' has its body on the line of its braces; put the statements on their own lines' }}
+    evidence:
+      statements: string(size(inline[0].statements))
+    identity:
+      subject: func.id
+  fix:
+    safety: safe
+    type: cel
+    edits: >-
+      size(inline) > 0 && inline[0].plain
+      ? [replace({'start': inline[0].open, 'end': inline[0].close},
+                 '\n\t' + inline[0].statements.join('\n\t') + '\n')]
+      : []
+  provenance:
+    wasDerivedFrom:
+      - "rustfmt fn_single_line, default false: https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#fn_single_line"
+      - "pycodestyle E704, ignored by default: https://pycodestyle.pycqa.org/en/latest/intro.html#error-codes"
+      - "Martin, Clean Code (2008), ch. 5 Vertical formatting"
+  examples:
+    - name: single-line-method
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Iterator struct{}
+
+            func (it *Iterator) Kind() int {
+            	return 1
+            }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Iterator struct{}
+
+            func (it *Iterator) Kind() int { return 1 }
+      expect:
+        - line: 5
+    - name: several-statements
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            func pick(a, b int) int {
+            	a++
+            	return a + b
+            }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            func pick(a, b int) int { a++; return a + b }
+      expect:
+        - line: 3
+    - name: expanded-and-empty
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Iterator struct{}
+
+            func (it *Iterator) Kind() int {
+            	return 1
+            }
+
+            func (it *Iterator) Reset() {}
+
+            var _ = func() int { return 1 }

@@ -1,5 +1,5 @@
 //! The `pair` of a test file, the source file it is named after, and the
-//! `blocks` of a file, the declarations its provider groups.
+//! lists a provider states of a file.
 
 use std::path::Path;
 
@@ -8,19 +8,16 @@ use serde_json::{Value, json};
 
 use super::Builder;
 
-/// The file fact in which a provider lists the `const` and `var` declarations.
-const BLOCKS_FACT: &str = "blocks";
-
 /// The stem suffix of a test file, after which comes the source file's stem.
 const TEST_SUFFIX: &str = "_test";
 
 impl Builder<'_> {
-    /// The `const` and `var` declarations of the file as its provider states
-    /// them in the file fact `blocks` (a JSON list of `{ keyword, line, specs
-    /// }`); empty when it states none.
-    pub(super) fn blocks(&self, file: &File) -> Value {
+    /// A list a provider states in the file fact `name` as JSON (the
+    /// `const` and `var` declarations as `blocks`, the functions with a body
+    /// on one line as `inline_bodies`); empty when it states none.
+    pub(super) fn provider_list(&self, file: &File, name: &str) -> Value {
         file.facts
-            .get(BLOCKS_FACT)
+            .get(name)
             .and_then(|text| serde_json::from_str(text).ok())
             .unwrap_or_else(|| json!([]))
     }

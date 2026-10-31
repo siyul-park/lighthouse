@@ -28,6 +28,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":33,\"line\":4},\"close\":{\"col\":54,\"line\":4},\"statements\":[\"return \\\"hi \\\" + name\"],\"plain\":true}]"
+        },
         "path": "roles.go"
       },
       "functions": [
@@ -420,7 +423,8 @@
       ],
       "file": {
         "facts": {
-          "blocks": "[{\"keyword\":\"const\",\"line\":7,\"specs\":[{\"names\":[\"want\"],\"line\":7,\"public\":false,\"keys\":[]}]},{\"keyword\":\"var\",\"line\":9,\"specs\":[{\"names\":[\"names\"],\"line\":9,\"public\":false,\"keys\":[]}]}]"
+          "blocks": "[{\"keyword\":\"const\",\"line\":7,\"specs\":[{\"names\":[\"want\"],\"line\":7,\"public\":false,\"keys\":[]}]},{\"keyword\":\"var\",\"line\":9,\"specs\":[{\"names\":[\"names\"],\"line\":9,\"public\":false,\"keys\":[]}]}]",
+          "inline_bodies": "[{\"line\":11,\"open\":{\"col\":28,\"line\":11},\"close\":{\"col\":57,\"line\":11},\"statements\":[\"return fixture{name: \\\"ann\\\"}\"],\"plain\":true},{\"line\":13,\"open\":{\"col\":34,\"line\":13},\"close\":{\"col\":49,\"line\":13},\"statements\":[\"return f.name\"],\"plain\":true},{\"line\":15,\"open\":{\"col\":31,\"line\":15},\"close\":{\"col\":63,\"line\":15},\"statements\":[\"check(t, newFixture().label())\"],\"plain\":true},{\"line\":17,\"open\":{\"col\":36,\"line\":17},\"close\":{\"col\":48,\"line\":17},\"statements\":[\"measure(b)\"],\"plain\":true},{\"line\":19,\"open\":{\"col\":40,\"line\":19},\"close\":{\"col\":72,\"line\":19},\"statements\":[\"assertGreeting(t, Greet(name))\"],\"plain\":true},{\"line\":28,\"open\":{\"col\":29,\"line\":28},\"close\":{\"col\":50,\"line\":28},\"statements\":[\"_ = Greet(names[0])\"],\"plain\":true}]"
         },
         "path": "roles_test.go"
       },

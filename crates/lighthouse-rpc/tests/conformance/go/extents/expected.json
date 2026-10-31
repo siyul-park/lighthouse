@@ -369,7 +369,8 @@
       ],
       "file": {
         "facts": {
-          "blocks": "[{\"keyword\":\"const\",\"line\":6,\"specs\":[{\"names\":[\"Limit\"],\"line\":6,\"public\":true,\"keys\":[]}]},{\"keyword\":\"var\",\"line\":10,\"specs\":[{\"names\":[\"plain\"],\"line\":10,\"public\":false,\"keys\":[]}]},{\"keyword\":\"const\",\"line\":13,\"specs\":[{\"names\":[\"Fast\"],\"line\":15,\"public\":true,\"keys\":[]},{\"names\":[\"Slow\"],\"line\":16,\"public\":true,\"keys\":[]}]},{\"keyword\":\"var\",\"line\":19,\"specs\":[{\"names\":[\"left\",\"right\"],\"line\":20,\"public\":false,\"keys\":[]},{\"names\":[\"only\"],\"line\":21,\"public\":false,\"keys\":[]}]}]"
+          "blocks": "[{\"keyword\":\"const\",\"line\":6,\"specs\":[{\"names\":[\"Limit\"],\"line\":6,\"public\":true,\"keys\":[]}]},{\"keyword\":\"var\",\"line\":10,\"specs\":[{\"names\":[\"plain\"],\"line\":10,\"public\":false,\"keys\":[]}]},{\"keyword\":\"const\",\"line\":13,\"specs\":[{\"names\":[\"Fast\"],\"line\":15,\"public\":true,\"keys\":[]},{\"names\":[\"Slow\"],\"line\":16,\"public\":true,\"keys\":[]}]},{\"keyword\":\"var\",\"line\":19,\"specs\":[{\"names\":[\"left\",\"right\"],\"line\":20,\"public\":false,\"keys\":[]},{\"names\":[\"only\"],\"line\":21,\"public\":false,\"keys\":[]}]}]",
+          "inline_bodies": "[{\"line\":42,\"open\":{\"col\":20,\"line\":42},\"close\":{\"col\":34,\"line\":42},\"statements\":[\"return plain\"],\"plain\":true}]"
         },
         "path": "extents.go"
       },

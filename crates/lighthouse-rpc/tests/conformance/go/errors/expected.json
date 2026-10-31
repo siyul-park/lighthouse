@@ -28,6 +28,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":18,\"line\":4},\"close\":{\"col\":28,\"line\":4},\"statements\":[\"return 1\"],\"plain\":true}]"
+        },
         "path": "ok.go"
       },
       "functions": [
@@ -154,6 +157,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":3,\"open\":{\"col\":20,\"line\":3},\"close\":{\"col\":36,\"line\":3},\"statements\":[\"return missing\"],\"plain\":true}]"
+        },
         "path": "typed.go"
       },
       "functions": [
