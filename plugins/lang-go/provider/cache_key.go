@@ -10,6 +10,17 @@ import (
 	"strings"
 )
 
+// planner computes the keys of the units of one request.
+type planner struct {
+	r       *run
+	facts   map[string]fileFacts
+	used    map[string]fileFacts
+	modules []moduleRoot
+	units   map[string]*cacheUnit
+	// requestedUnits are the units that hold requested files, by directory.
+	requestedUnits []*cacheUnit
+}
+
 // cacheUnit is a package directory, the unit of the cache. Its key covers
 // everything its fragments are computed from: its own files (all of them, not
 // only the requested ones), the API of the directories it imports, directly or
@@ -31,17 +42,6 @@ type cacheUnit struct {
 // moduleRoot is a module that holds project code: its import path and the
 // directory it lives in.
 type moduleRoot struct{ path, dir string }
-
-// planner computes the keys of the units of one request.
-type planner struct {
-	r       *run
-	facts   map[string]fileFacts
-	used    map[string]fileFacts
-	modules []moduleRoot
-	units   map[string]*cacheUnit
-	// requestedUnits are the units that hold requested files, by directory.
-	requestedUnits []*cacheUnit
-}
 
 // dirDigest collects what the files of one directory contribute to its unit.
 type dirDigest struct {

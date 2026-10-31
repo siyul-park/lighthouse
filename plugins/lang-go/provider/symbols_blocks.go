@@ -8,10 +8,6 @@ import (
 	"slices"
 )
 
-// blocksFact is the name of the file fact that lists the top-level `const` and
-// `var` declarations of a file with the types that relate them.
-const blocksFact = "blocks"
-
 // declBlock is one top-level `const` or `var` declaration: a block when it is
 // parenthesized, else the one spec it holds.
 type declBlock struct {
@@ -29,6 +25,10 @@ type declSpec struct {
 	Public bool     `json:"public"`
 	Keys   []string `json:"keys"`
 }
+
+// blocksFact is the name of the file fact that lists the top-level `const` and
+// `var` declarations of a file with the types that relate them.
+const blocksFact = "blocks"
 
 // block records a top-level `const` or `var` declaration for the file fact.
 func (u *unit) block(d *ast.GenDecl) {

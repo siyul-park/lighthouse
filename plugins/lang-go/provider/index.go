@@ -64,12 +64,6 @@ type declaredType struct {
 	unit *unit
 }
 
-// loaded is what loading the packages of one batch gave.
-type loaded struct {
-	pkgs []*packages.Package
-	err  error
-}
-
 // loader loads the batches in the background, at most one load per CPU in
 // flight or waiting to be read, and hands the results out in batch order, so
 // that what is read from them does not depend on which load finished first.
@@ -77,6 +71,12 @@ type loader struct {
 	ready []chan loaded
 	slots chan struct{}
 	read  int
+}
+
+// loaded is what loading the packages of one batch gave.
+type loaded struct {
+	pkgs []*packages.Package
+	err  error
 }
 
 const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |

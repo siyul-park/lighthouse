@@ -5,17 +5,6 @@ import (
 	"go/types"
 )
 
-type usage struct {
-	kind string
-	to   string
-}
-
-// occurrence is a use at one place: the identifier that names the target.
-type occurrence struct {
-	usage
-	at ast.Node
-}
-
 // uses collects what one function body calls and references, resolved
 // through go/types, in order of first use.
 type uses struct {
@@ -25,6 +14,17 @@ type uses struct {
 	seen    map[usage]bool
 	list    []usage
 	all     []occurrence
+}
+
+type usage struct {
+	kind string
+	to   string
+}
+
+// occurrence is a use at one place: the identifier that names the target.
+type occurrence struct {
+	usage
+	at ast.Node
 }
 
 func (w *uses) Visit(n ast.Node) ast.Visitor {
