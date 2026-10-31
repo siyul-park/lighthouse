@@ -11,6 +11,8 @@ spec:
     in capitals (golint `commonInitialisms`, revive `var-naming`); Rust writes an acronym
     as one word (Rust API Guidelines, C-CASE), so its list is empty; TypeScript does the same (Google
     TypeScript Style Guide, treat acronyms as words, so `loadHttpUrl` and not `loadHTTPURL`).
+    A method whose name a language protocol dictates (`toJSON` for `JSON.stringify`, Go's `String`)
+    keeps it, as the methods `design/exported-doc` exempts, taken from it, so the list is stated once.
   scope:
     subject: symbol
   requirement: Names SHOULD use standard abbreviations and initialisms in their conventional
@@ -25,7 +27,7 @@ spec:
         ? symbol.name.matches('[a-z0-9]' + w + '([A-Z0-9_]|$)')
         : symbol.name.matches('(^|[a-z0-9])' + w.substring(0, 1) + w.substring(1).lowerAscii()
           + '([A-Z0-9_]|$)')) : []"
-    where: size(spelled) > 0
+    where: size(spelled) > 0 && !(symbol.kind == 'method' && options.exemptMethods.exists(m, m == symbol.name))
     message: "{{ symbol.name + (options.style == 'lowerCamel' ? ' uses the upper-case initialism '
       + spelled[0] + '; write it in lower camel case' : ' spells the initialism ' + spelled[0]
       + ' in lower case; write it ' + spelled[0]) }}"
@@ -39,6 +41,7 @@ spec:
     - 'Lighthouse, coding-patterns#naming-49da70c5'
     - 'Google TypeScript Style Guide, Naming, Camel case: treat acronyms as words: https://google.github.io/styleguide/tsguide.html#naming-camel-case-defined'
   options:
+    from: design/exported-doc
     properties:
       style:
         type: string
@@ -103,6 +106,19 @@ spec:
       options:
         style: lowerCamel
   examples:
+  - name: protocol-method-typescript
+    language: typescript
+    kind: valid
+    files:
+    - path: sample.ts
+      body: |
+        /** A failure code. */
+        export class Code {
+          /** The value JSON.stringify writes. */
+          toJSON(): string {
+            return "code";
+          }
+        }
   - name: lower-case-initialism
     language: go
     kind: invalid
