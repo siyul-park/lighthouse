@@ -2,9 +2,10 @@
 # The gate of the result and provider caches: a warm run prints what a cold run
 # prints, byte for byte, and how long each takes.
 #
-# usage: LIGHTHOUSE_TRUST=1 scripts/fastgate.sh [name=]repo-dir...
+# usage: LIGHTHOUSE_TRUST=1 scripts/fastgate.sh [--no-build] [name=]repo-dir...
 #
-# Builds the release binary and the plugins, copies each repository to a
+# Builds the release binary and the plugins (`make plugins cli`: nothing runs
+# when they are fresh; --no-build skips even that), copies each repository to a
 # temporary directory (the repository itself is never touched), and on the copy
 # runs the strict configuration of scripts/baseline.sh:
 #   1. cold with --no-cache, then cold with an empty cache (the write overhead);
@@ -15,17 +16,23 @@
 # each compared with a --no-cache run of the same tree: the JSON on stdout and
 # the exit code must be identical, or the gate fails. It then prints the median
 # of 3 for cold, warm without a change, and warm after a body edit of one
-# function, phase by phase. It needs no network. Go must be on PATH (GOENV_VERSION
+# function, phase by phase. The repositories are gated in parallel and their
+# reports print in the order given (the times then carry the load of the
+# others: compare them with a run of the same shape). It needs no network. Go must be on PATH (GOENV_VERSION
 # too, when goenv selects it); the Go build cache should be warm.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
-make -s plugins
-cargo build -q --release -p lighthouse-cli
+if [ "${1:-}" = "--no-build" ]; then
+    shift
+else
+    make -s plugins cli
+fi
 
 python3 - "$root" "$@" <<'PY'
 import json, os, re, shutil, statistics, subprocess, sys, tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 root, repos = sys.argv[1], sys.argv[2:]
 binary = f"{root}/target/release/lighthouse"
@@ -190,72 +197,81 @@ def script(path, cfg, kind, probe, body_file):
     ]
 
 
+def gate(spec, scratch):
+    """Gates one repository; returns its report lines and whether it failed."""
+    out, failed = [], False
+    say = out.append
+    label, _, src = spec.rpartition("=")
+    src = os.path.abspath(src)
+    label = label or os.path.basename(src)
+    path = f"{scratch}/{label}"
+    subprocess.run(["rsync", "-a", "--exclude", ".git", "--exclude", "target", "--exclude", ".claude", "--exclude", ".lighthouse/cache", "--exclude", ".lighthouse/*.db*", src + "/", path + "/"], check=True)
+    kind = "rust" if os.path.exists(f"{path}/Cargo.toml") else "go"
+    base = "strict-root" if kind == "rust" else "strict-go"
+    text = open(f"{root}/scripts/baseline/{base}.toml").read().replace("@PLUGINS@", plugins)
+    text = text + '[spec.rules]\n"local/fastgate-probe" = "warn"\n'
+    cfg = f"{scratch}/{label}.toml"
+    open(cfg, "w").write(text)
+    bad, good = ("package a\\n\\nfunc {p}x() {{}}\\n", "package a\\n\\nfunc zz() {{}}\\n") if kind == "go" else ("pub fn {p}x() {{}}\\n", "pub fn zz() {{}}\\n")
+    example = ("a.go", "go") if kind == "go" else ("src/lib.rs", "rust")
+    probe = lambda p: PROBE.format(prefix=p, lang=example[1], path=example[0], bad='"' + bad.format(p=p) + '"', good='"' + good + '"')
+    write(path, ".lighthouse/decisions/zz-fastgate-probe.yaml", probe("s"))
+
+    cold = [run(path, cfg, False) for _ in range(RUNS)]
+    if len({(c[0], c[1]) for c in cold}) != 1:
+        say(f"{label}: cold runs disagree")
+        return out, True
+    first = []
+    for _ in range(RUNS):
+        clean(path)
+        first.append(run(path, cfg, True))
+    warm = [run(path, cfg, True) for _ in range(RUNS)]
+    for what, runs in (("first run with an empty cache", first), ("warm, nothing changed", warm)):
+        for r in runs:
+            if (r[0], r[1]) != (cold[0][0], cold[0][1]):
+                say(f"{label}: {what} differs from cold")
+                failed = True
+
+    body_file = medium_file(path, kind, avoid=called(path, kind)[1])
+    steps = script(path, cfg, kind, probe, body_file)
+    for step, apply in steps:
+        apply()
+        expected = run(path, cfg, False)
+        got = run(path, cfg, True)
+        again = run(path, cfg, True)
+        for what, r in (("warm", got), ("warm again", again)):
+            if (r[0], r[1]) != (expected[0], expected[1]):
+                say(f"{label}: {step}: {what} differs from cold")
+                failed = True
+        say(f"{label}: {step}: identical={(got[0], got[1]) == (expected[0], expected[1])} total cold {expected[2]['total']}ms warm {got[2]['total']}ms")
+    # Medians for the body edit: the edit is applied afresh for each run.
+    timed = []
+    for n in range(1, RUNS + 1):
+        body_edit(path, body_file, kind, 100 + n)
+        expected = run(path, cfg, False)
+        got = run(path, cfg, True)
+        if (got[0], got[1]) != (expected[0], expected[1]):
+            say(f"{label}: body edit {n}: differs from cold")
+            failed = True
+        timed.append(got[2])
+    cold_t, first_t, warm_t, edit_t = (median([r[2] for r in cold]), median([r[2] for r in first]), median([r[2] for r in warm]), median(timed))
+    say(f"\n{label} ({kind}), median of {RUNS}, ms")
+    say("| run | " + " | ".join(PHASES) + " |")
+    say("| --- | " + " | ".join("---:" for _ in PHASES) + " |")
+    for title, t in (("cold --no-cache", cold_t), ("cold, empty cache", first_t), ("warm, no change", warm_t), ("warm, body edit", edit_t)):
+        say(f"| {title} | " + " | ".join(str(t.get(p, "")) for p in PHASES) + " |")
+    say(f"write overhead of a cold run: {100 * (first_t['total'] / cold_t['total'] - 1):+.0f}%; body edit at {100 * edit_t['total'] / cold_t['total']:.0f}% of cold\n")
+    return out, failed
+
+
 def main():
     failed = False
-    with tempfile.TemporaryDirectory() as scratch:
-        for spec in repos:
-            label, _, src = spec.rpartition("=")
-            src = os.path.abspath(src)
-            label = label or os.path.basename(src)
-            path = f"{scratch}/{label}"
-            subprocess.run(["rsync", "-a", "--exclude", ".git", "--exclude", "target", "--exclude", ".claude", "--exclude", ".lighthouse/cache", "--exclude", ".lighthouse/*.db*", src + "/", path + "/"], check=True)
-            kind = "rust" if os.path.exists(f"{path}/Cargo.toml") else "go"
-            base = "strict-root" if kind == "rust" else "strict-go"
-            text = open(f"{root}/scripts/baseline/{base}.toml").read().replace("@PLUGINS@", plugins)
-            text = text + '[spec.rules]\n"local/fastgate-probe" = "warn"\n'
-            cfg = f"{scratch}/{label}.toml"
-            open(cfg, "w").write(text)
-            bad, good = ("package a\\n\\nfunc {p}x() {{}}\\n", "package a\\n\\nfunc zz() {{}}\\n") if kind == "go" else ("pub fn {p}x() {{}}\\n", "pub fn zz() {{}}\\n")
-            example = ("a.go", "go") if kind == "go" else ("src/lib.rs", "rust")
-            probe = lambda p: PROBE.format(prefix=p, lang=example[1], path=example[0], bad='"' + bad.format(p=p) + '"', good='"' + good + '"')
-            write(path, ".lighthouse/decisions/zz-fastgate-probe.yaml", probe("s"))
-
-            cold = [run(path, cfg, False) for _ in range(RUNS)]
-            if len({(c[0], c[1]) for c in cold}) != 1:
-                sys.exit(f"{label}: cold runs disagree")
-            first = []
-            for _ in range(RUNS):
-                clean(path)
-                first.append(run(path, cfg, True))
-            warm = [run(path, cfg, True) for _ in range(RUNS)]
-            for what, runs in (("first run with an empty cache", first), ("warm, nothing changed", warm)):
-                for r in runs:
-                    if (r[0], r[1]) != (cold[0][0], cold[0][1]):
-                        print(f"{label}: {what} differs from cold")
-                        failed = True
-
-            body_file = medium_file(path, kind, avoid=called(path, kind)[1])
-            steps = script(path, cfg, kind, probe, body_file)
-            for step, apply in steps:
-                apply()
-                expected = run(path, cfg, False)
-                got = run(path, cfg, True)
-                again = run(path, cfg, True)
-                for what, r in (("warm", got), ("warm again", again)):
-                    if (r[0], r[1]) != (expected[0], expected[1]):
-                        print(f"{label}: {step}: {what} differs from cold")
-                        failed = True
-                print(f"{label}: {step}: identical={(got[0], got[1]) == (expected[0], expected[1])} total cold {expected[2]['total']}ms warm {got[2]['total']}ms")
-            # Medians for the body edit: the edit is applied afresh for each run.
-            timed = []
-            for n in range(1, RUNS + 1):
-                body_edit(path, body_file, kind, 100 + n)
-                expected = run(path, cfg, False)
-                got = run(path, cfg, True)
-                if (got[0], got[1]) != (expected[0], expected[1]):
-                    print(f"{label}: body edit {n}: differs from cold")
-                    failed = True
-                timed.append(got[2])
-            cold_t, first_t, warm_t, edit_t = (median([r[2] for r in cold]), median([r[2] for r in first]), median([r[2] for r in warm]), median(timed))
-            print(f"\n{label} ({kind}), median of {RUNS}, ms")
-            print("| run | " + " | ".join(PHASES) + " |")
-            print("| --- | " + " | ".join("---:" for _ in PHASES) + " |")
-            for title, t in (("cold --no-cache", cold_t), ("cold, empty cache", first_t), ("warm, no change", warm_t), ("warm, body edit", edit_t)):
-                print(f"| {title} | " + " | ".join(str(t.get(p, "")) for p in PHASES) + " |")
-            print(f"write overhead of a cold run: {100 * (first_t['total'] / cold_t['total'] - 1):+.0f}%; body edit at {100 * edit_t['total'] / cold_t['total']:.0f}% of cold\n")
+    with tempfile.TemporaryDirectory() as scratch, ThreadPoolExecutor(max_workers=len(repos)) as pool:
+        # The repositories are independent; their reports print in the order given.
+        for out, bad in pool.map(lambda spec: gate(spec, scratch), repos):
+            print("\n".join(out))
+            failed = failed or bad
     print("FAILED" if failed else "ALL IDENTICAL")
     sys.exit(1 if failed else 0)
-
-
 main()
 PY
