@@ -78,7 +78,7 @@ fn a_rule_exists_for_a_decision_a_program_checks() {
     let registry = lighthouse_test_support::registry();
     let meta = registry.rule("core/max-lines").unwrap().manifest();
     assert_eq!(meta.id, "core/max-lines");
-    assert_eq!(meta.severity, Severity::Warn);
+    assert_eq!(meta.severity, Severity::Info);
     assert_eq!(meta.scope, RunScope::File);
     for annotation in ["core/allow-reason", "core/no-unused-allow"] {
         assert!(registry.rule(annotation).is_some(), "{annotation}");
@@ -96,7 +96,7 @@ fn recommended_preset_derives_levels_from_rule_meta() {
         .collect();
     let got: BTreeMap<_, _> = preset.iter().map(|(id, c)| (id.clone(), c.level)).collect();
     assert_eq!(got, want);
-    assert_eq!(want["core/max-lines"], Some(Severity::Warn));
+    assert_eq!(want["core/max-lines"], Some(Severity::Info));
 }
 
 #[test]
@@ -281,6 +281,7 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
             "design/consumer-interfaces",
             "design/context-first",
             "design/coupling",
+            "design/declaration-blocks",
             "design/declaration-groups",
             "design/encapsulated-platform",
             "design/encapsulated-state",
@@ -307,6 +308,7 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
             "design/no-private-types",
             "design/no-redundant-qualifier",
             "design/no-redundant-symbol",
+            "design/no-single-line-bodies",
             "design/no-speculative-generality",
             "design/no-state-in-errors",
             "design/no-stored-context",
@@ -362,7 +364,7 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
         json!(true)
     );
     let testing = preset("testing/recommended");
-    assert_eq!(testing.len(), 8);
+    assert_eq!(testing.len(), 9);
     assert_eq!(
         testing["testing/no-missing-owner"].level,
         Some(Severity::Warn)
