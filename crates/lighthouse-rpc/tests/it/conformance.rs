@@ -58,6 +58,7 @@ const GO: Lang = Lang {
         "reference-sites",
         "overlays",
         "source-ast",
+        "cache-overlays",
     ],
 };
 

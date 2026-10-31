@@ -40,7 +40,7 @@ func (p *Provider) Manifest() []sdk.LanguageManifest {
 			ConstructorPrefixes: []string{"New", "new"},
 			TestNaming:          sdk.TestNaming{Prefix: "Test", Variants: true},
 		},
-		Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast"},
+		Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast", "cache-overlays"},
 	}}
 }
 

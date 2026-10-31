@@ -1237,7 +1237,7 @@
         },
         "capabilities": {
           "default": [],
-          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, and `source-ast`. Hosts ignore\nunknown values.",
+          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, `cache-overlays`, and `source-ast`.\nHosts ignore unknown values.",
           "items": {
             "type": "string"
           },

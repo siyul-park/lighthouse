@@ -123,6 +123,9 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   `overlays`: the provider analyzes the `overlays` of an index request instead of the
   files on disk; a host declines fixes in files of a provider without it (bundled
   providers declare it).
+  `cache-overlays`: the provider keys what it keeps in `context.cache` on the content of
+  the files it analyzed, the texts of `overlays` included, so the host gives it the cache
+  for a request that carries overlays too (a fix run checks one after another).
   `source-ast`: the provider can expose its serialized AST and per-pointer `mapping`
   when `source_ast` is requested. The provider parses and maps; core evaluates selectors,
   filters and context projections.
@@ -197,8 +200,9 @@ unknown keys in it (as an `incomplete` entry, see below).
 
 `context.cache` is `{ "dir": "/abs/root/.lighthouse/cache/<plugin id>/<binary digest>" }`, a directory
 the host owns, named by the digest of the plugin binary, and the provider MAY keep derived
-results in it between runs. It is absent when the host runs without a cache and when the
-request carries `overlays`: their texts are not what is on disk. A provider reads and writes only inside it, writes
+results in it between runs. It is absent when the host runs without a cache and, unless the
+provider declares `cache-overlays`, when the request carries `overlays`: their texts are not
+what is on disk. A provider reads and writes only inside it, writes
 atomically (a temporary file and a rename), and answers exactly the same with the
 directory empty, full or absent: the same fragments, the same notices (apart from one
 saying the directory cannot be written), the same `incomplete` entries. An entry is

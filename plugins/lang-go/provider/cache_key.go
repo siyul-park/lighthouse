@@ -12,7 +12,9 @@ import (
 
 // planner computes the keys of the units of one request.
 type planner struct {
-	r       *run
+	r *run
+	// edits are the texts that stand in for files, by absolute path.
+	edits   map[string][]byte
 	facts   map[string]fileFacts
 	used    map[string]fileFacts
 	modules []moduleRoot
@@ -185,15 +187,19 @@ func (pl *planner) goFile(u *cacheUnit, d *dirDigest, name string) bool {
 // factsOfFile returns the facts and content hash of a file, parsing it only
 // when the cache has not seen that content.
 func (pl *planner) factsOfFile(abs, rel string) (fileFacts, string, bool) {
-	if f, ok := pl.r.requested[rel]; ok && isContentHash(f.Hash) {
+	path := filepath.Join(abs, filepath.Base(rel))
+	src, edited := pl.edits[path]
+	if f, ok := pl.r.requested[rel]; ok && isContentHash(f.Hash) && !edited {
 		if facts, known := pl.facts[f.Hash]; known {
 			pl.used[f.Hash] = facts
 			return facts, f.Hash, true
 		}
 	}
-	src, err := os.ReadFile(filepath.Join(abs, filepath.Base(rel)))
-	if err != nil {
-		return fileFacts{}, "", false
+	if !edited {
+		var err error
+		if src, err = os.ReadFile(path); err != nil {
+			return fileFacts{}, "", false
+		}
 	}
 	hash := contentHash(src)
 	facts, known := pl.facts[hash]

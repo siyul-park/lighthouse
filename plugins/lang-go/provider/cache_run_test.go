@@ -93,6 +93,33 @@ func TestProviderCache(t *testing.T) {
 		}
 	})
 
+	t.Run("an overlay is a text for the disk's, not a reason to analyze everything", func(t *testing.T) {
+		root, cache := t.TempDir(), t.TempDir()
+		writeTree(t, root, cacheFixture)
+		g := provider.New("lang-go", "test")
+		indexWith(t, g, root, cache, nil)
+		steps := []struct {
+			name     string
+			overlays map[string]string
+			want     []string
+		}{
+			{"a body edit", map[string]string{"a/a.go": "package a\n\ntype T struct{ N int }\n\nfunc A() int { return 9 }\n"}, []string{"a"}},
+			{"the same edit again", map[string]string{"a/a.go": "package a\n\ntype T struct{ N int }\n\nfunc A() int { return 9 }\n"}, nil},
+			{"a new function others see", map[string]string{"a/a.go": "package a\n\ntype T struct{ N int }\n\nfunc A() int { return 9 }\n\nfunc Extra() {}\n"}, []string{"a", "b"}},
+			{"a file that is not on the disk", map[string]string{"c/c2.go": "package c\n\nfunc C2() {}\n"}, nil},
+			{"the disk's text back", nil, []string{"a", "b"}},
+		}
+		for _, step := range steps {
+			got, stats := indexOverlaid(t, g, root, cache, step.overlays)
+			want, _ := indexOverlaid(t, provider.New("lang-go", "test"), root, "", step.overlays)
+
+			require.JSONEq(t, want, got, step.name)
+			if step.name != "a file that is not on the disk" {
+				require.Equal(t, step.want, stats.Misses, step.name)
+			}
+		}
+	})
+
 	t.Run("a replace that names a directory that is not there is no reason to fail", func(t *testing.T) {
 		root, cache := t.TempDir(), t.TempDir()
 		files := map[string]string{}
@@ -158,6 +185,18 @@ func TestProviderCache(t *testing.T) {
 // not empty, and returns the result as JSON.
 func indexWith(t *testing.T, g *provider.Provider, root, cache string, options map[string]json.RawMessage) (string, provider.RunStats) {
 	t.Helper()
+	return indexWithOverlays(t, g, root, cache, options, nil)
+}
+
+// indexOverlaid is indexWith with these texts in place of the files at the
+// project-relative paths.
+func indexOverlaid(t *testing.T, g *provider.Provider, root, cache string, overlays map[string]string) (string, provider.RunStats) {
+	t.Helper()
+	return indexWithOverlays(t, g, root, cache, nil, overlays)
+}
+
+func indexWithOverlays(t *testing.T, g *provider.Provider, root, cache string, options map[string]json.RawMessage, overlays map[string]string) (string, provider.RunStats) {
+	t.Helper()
 	if options == nil {
 		options = map[string]json.RawMessage{}
 	}
@@ -167,6 +206,10 @@ func indexWith(t *testing.T, g *provider.Provider, root, cache string, options m
 		Inputs:   fileInputs(hashedGoFiles(t, root)),
 		Context:  sdk.Context{Options: options},
 	}
+	for path, text := range overlays {
+		params.Context.Overlays = append(params.Context.Overlays, sdk.Overlay{Path: path, Text: text})
+	}
+	sort.Slice(params.Context.Overlays, func(i, j int) bool { return params.Context.Overlays[i].Path < params.Context.Overlays[j].Path })
 	if cache != "" {
 		params.Context.Cache = &sdk.CacheRef{Dir: cache}
 	}

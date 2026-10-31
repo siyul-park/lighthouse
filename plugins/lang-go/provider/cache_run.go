@@ -1,10 +1,12 @@
 package provider
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 )
@@ -42,11 +44,15 @@ type cachePlan struct {
 // only the units it cannot. It changes r only when it answers; false means the
 // caller must run uncached.
 func (p *Provider) indexCached(r *run, params sdk.IndexParams, snippets []*snippet) (*run, bool) {
-	if params.Context.Cache == nil || params.Context.Cache.Dir == "" || len(params.Context.Overlays) > 0 {
+	if params.Context.Cache == nil || params.Context.Cache.Dir == "" {
+		return nil, false
+	}
+	edits, ok := r.edits(params.Context.Overlays)
+	if !ok {
 		return nil, false
 	}
 	store := &cacheStore{dir: params.Context.Cache.Dir}
-	pl := &planner{r: r, used: map[string]fileFacts{}, units: map[string]*cacheUnit{}}
+	pl := &planner{r: r, edits: edits, used: map[string]fileFacts{}, units: map[string]*cacheUnit{}}
 	plan, ok := p.prepare(pl, store, params)
 	if !ok {
 		return nil, false
@@ -137,6 +143,24 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 		}
 	}
 	return plan, true
+}
+
+// edits are the overlays of a request by absolute path, when each stands in
+// for the text of an existing Go file: a unit is keyed on what its files say,
+// so the text of an edit is read where the disk's would be. An overlay that
+// adds, empties or removes a file, or is not Go, changes what the directory
+// holds and so what the units are: the request is then analyzed uncached.
+func (r *run) edits(overlays []sdk.Overlay) (map[string][]byte, bool) {
+	edits := make(map[string][]byte, len(overlays))
+	for _, o := range overlays {
+		path := filepath.Join(r.root, filepath.FromSlash(o.Path))
+		info, err := os.Stat(path)
+		if !strings.HasSuffix(o.Path, ".go") || o.Text == "" || err != nil || !info.Mode().IsRegular() {
+			return nil, false
+		}
+		edits[path] = []byte(o.Text)
+	}
+	return edits, true
 }
 
 // candidates are the requested files a provider analyzes, sorted, and the

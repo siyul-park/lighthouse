@@ -27,7 +27,7 @@ The Go language provider: loads packages with `go/packages`, type-checks with `g
 | `tests` | `Test*` functions and their `t.Run` subtests, with table or scenario style |
 | `comments`, `generated` | comment groups; the `Code generated ... DO NOT EDIT.` marker |
 
-Capabilities: `semantic-edges`, `extent`, `reference-sites`, `overlays`, `source-ast`.
+Capabilities: `semantic-edges`, `extent`, `reference-sites`, `overlays`, `cache-overlays`, `source-ast`.
 
 ## Project model
 

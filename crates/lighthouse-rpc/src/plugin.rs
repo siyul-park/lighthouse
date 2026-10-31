@@ -190,6 +190,10 @@ impl Plugin for RpcPlugin {
                         .capabilities
                         .iter()
                         .any(|capability| capability == "source-ast"),
+                    cache_overlays: language
+                        .capabilities
+                        .iter()
+                        .any(|capability| capability == "cache-overlays"),
                     manifest: convert::language_manifest(language),
                     client: Arc::clone(&self.client),
                     digest: self.digest.clone(),
@@ -202,6 +206,9 @@ impl Plugin for RpcPlugin {
 struct Provider {
     language: String,
     source_ast: bool,
+    /// Whether the provider keys its cache on the texts it analyzed, so that a
+    /// request with overlays may have the cache too.
+    cache_overlays: bool,
     manifest: LanguageManifest,
     client: Arc<Client>,
     digest: String,
@@ -264,9 +271,10 @@ impl Provider {
 
 impl Provider {
     /// The request, and a notice when the cache directory could not be made.
-    /// A request that carries overlays has no cache: the texts it sends are
-    /// not what is on disk, and results from them must not be kept as if they
-    /// were.
+    /// A request that carries overlays has no cache, unless the provider keeps
+    /// results by the content it analyzed (`cache-overlays`): the texts it
+    /// sends are not what is on disk, and results from them must not be kept
+    /// as if they were.
     fn request(&self, ws: &Workspace, files: &[Source]) -> (wire::IndexParams, Option<String>) {
         let overlays = overlays_of(ws, files);
         let source_globs = self.source_ast.then(|| {
@@ -279,8 +287,8 @@ impl Provider {
                 .expect("source globs are validated by Config")
         });
         let (cache, notice) = match overlays {
-            Some(_) => (None, None),
-            None => match self.cache_of(ws) {
+            Some(_) if !self.cache_overlays => (None, None),
+            _ => match self.cache_of(ws) {
                 Ok(cache) => (cache, None),
                 Err(reason) => (None, Some(reason)),
             },

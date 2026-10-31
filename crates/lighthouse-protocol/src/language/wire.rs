@@ -165,8 +165,8 @@ pub struct LanguageManifest {
     #[serde(default)]
     pub conventions: Conventions,
     /// Known values: `semantic-edges`, `extent`, `reference-sites`,
-    /// `complete-references`, `overlays`, and `source-ast`. Hosts ignore
-    /// unknown values.
+    /// `complete-references`, `overlays`, `cache-overlays`, and `source-ast`.
+    /// Hosts ignore unknown values.
     #[serde(default)]
     pub capabilities: Vec<String>,
 }

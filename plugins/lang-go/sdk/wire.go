@@ -71,8 +71,8 @@ type LanguageManifest struct {
 	// alike.
 	Aliases []string `json:"aliases,omitempty"`
 	// Known values: `semantic-edges`, `extent`, `reference-sites`,
-	// `complete-references`, `overlays`, and `source-ast`. Hosts ignore
-	// unknown values.
+	// `complete-references`, `overlays`, `cache-overlays`, and `source-ast`.
+	// Hosts ignore unknown values.
 	Capabilities []string `json:"capabilities"`
 	// Layout conventions of a language that the host cannot infer from its files.
 	Conventions Conventions `json:"conventions"`
