@@ -22,7 +22,9 @@ spec:
     of the type (a function named `NewType` or `newType`, of any visibility,
     where `Type` or `type` is a type declared in the same file: Uber, "newXYZ()/NewXYZ()
     may appear after the type is defined, but before the rest of the methods on
-    the receiver"), then its exported methods,
+    the receiver"; and the bare `New` of a package that exports one type, the
+    Go idiom of Effective Go, "Package names": `ring.New` — a function with no
+    receiver that returns the type), then its exported methods,
     then its clone, conversion and interface hooks, then its unexported
     methods; public functions; private functions.
 
@@ -210,6 +212,45 @@ spec:
       - "golangci-lint, funcorder"
       - "typescript-eslint, member-ordering (TypeScript is unlisted: its default order, fields before constructors before methods and static before instance, is not a group order): https://typescript-eslint.io/rules/member-ordering/"
   examples:
+    - name: bare-new-constructor
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Program is a compiled program.
+            type Program struct{}
+
+            // New returns an empty program.
+            func New() *Program {
+            	return &Program{}
+            }
+
+            // Run runs the program.
+            func (p *Program) Run() int {
+            	return 1
+            }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Program is a compiled program.
+            type Program struct{}
+
+            // Run runs the program.
+            func (p *Program) Run() int {
+            	return 1
+            }
+
+            // New returns an empty program.
+            func New() *Program {
+            	return &Program{}
+            }
+      expect:
+        - line: 12
     - name: invalid
       language: go
       kind: invalid

@@ -40,7 +40,7 @@ impl Builder<'_> {
         }
         if needs.field("role") || needs.field("built") {
             map.insert("role".to_owned(), json!(self.role(symbol, summary)));
-            map.insert("built".to_owned(), json!(self.built(symbol)));
+            map.insert("built".to_owned(), json!(self.built(symbol, summary)));
         }
     }
 
@@ -54,11 +54,20 @@ impl Builder<'_> {
             .any(|p| layout::has_word_prefix(&symbol.name, p))
     }
 
-    /// What a constructor builds: the type of its module that the name without
+    /// What a constructor builds: the type it returns when it constructs
+    /// (Go `func New() *Program`, whose name says nothing); else the type of its module that the name without
     /// its prefix names, as written (`NewServer` builds `Server`) or with a
     /// lowercase first letter (`newServer` builds `server`); else that name
     /// itself; else its owner (`Server::new`); else its own name.
-    pub(super) fn built(&self, symbol: &Symbol) -> String {
+    pub(super) fn built(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> String {
+        let returned = summary
+            .filter(|s| s.constructs)
+            .and_then(|s| s.signature.results.iter().find_map(|r| r.symbol.as_deref()))
+            .and_then(|id| id.rsplit_once("::"))
+            .map(|(_, name)| name);
+        if let Some(name) = returned {
+            return name.to_owned();
+        }
         let named = self
             .ws
             .constructor_prefixes(self.language_of(symbol))

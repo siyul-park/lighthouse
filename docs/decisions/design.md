@@ -1837,7 +1837,7 @@ Also: rust
 
 `design/declaration-groups` · file · error · cel · fix: safe · go, rust
 
-*A fixed group order makes every file predictable. Go: types first, then methods grouped by owner, as `golangci-lint` `funcorder` and the Uber Go style guide (Function Grouping and Ordering: group by receiver, constructors before the other methods) ask. The type declarations stay together, a deliberate difference from the Uber example, which puts each type's methods right after the type. Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; one block per type, in the order the types are declared, each with the constructors of the type (a function named `NewType` or `newType`, of any visibility, where `Type` or `type` is a type declared in the same file: Uber, "newXYZ()/NewXYZ() may appear after the type is defined, but before the rest of the methods on the receiver"), then its exported methods, then its clone, conversion and interface hooks, then its unexported methods; public functions; private functions. Rust: The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together), where a constructor method (an associated function named like one) comes before the other methods of its type; public free functions; private free functions. The order of the other members of a type is left to `design/top-down-order`. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`. TypeScript and JavaScript: not applicable. No guide or tool orders the top-level declarations of a file, and the only ordering that exists for class members, typescript-eslint `member-ordering`, separates fields from methods and static from instance members, which a group of methods does not express: measured on excalidraw, the public-before-private subset flagged arrow-function fields and private static methods that `member-ordering` accepts.*
+*A fixed group order makes every file predictable. Go: types first, then methods grouped by owner, as `golangci-lint` `funcorder` and the Uber Go style guide (Function Grouping and Ordering: group by receiver, constructors before the other methods) ask. The type declarations stay together, a deliberate difference from the Uber example, which puts each type's methods right after the type. Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; one block per type, in the order the types are declared, each with the constructors of the type (a function named `NewType` or `newType`, of any visibility, where `Type` or `type` is a type declared in the same file: Uber, "newXYZ()/NewXYZ() may appear after the type is defined, but before the rest of the methods on the receiver"; and the bare `New` of a package that exports one type, the Go idiom of Effective Go, "Package names": `ring.New` — a function with no receiver that returns the type), then its exported methods, then its clone, conversion and interface hooks, then its unexported methods; public functions; private functions. Rust: The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together), where a constructor method (an associated function named like one) comes before the other methods of its type; public free functions; private free functions. The order of the other members of a type is left to `design/top-down-order`. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`. TypeScript and JavaScript: not applicable. No guide or tool orders the top-level declarations of a file, and the only ordering that exists for class members, typescript-eslint `member-ordering`, separates fields from methods and static from instance members, which a group of methods does not express: measured on excalidraw, the public-before-private subset flagged arrow-function fields and private static methods that `member-ordering` accepts.*
 
 Top-level declarations in a file MUST follow the language's ownership-group order, from public contract to private mechanics. Initializers MUST stay together and MUST precede non-initializer functions and methods. A constructor MUST precede the other methods of its type; where methods are grouped by owner, exported methods MUST precede unexported ones.
 
@@ -1851,12 +1851,18 @@ Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; Martin
 ```diff
 --- a/example.go
 +++ b/example.go
-@@ -3,2 +2,0 @@
--func helper() int { return 1 }
--
-@@ -7,0 +6,2 @@
+@@ -5,0 +6,5 @@
++// New returns an empty program.
++func New() *Program {
++	return &Program{}
++}
 +
-+func helper() int { return 1 }
+@@ -9,5 +13,0 @@
+-}
+-
+-// New returns an empty program.
+-func New() *Program {
+-	return &Program{}
 ```
 
 Also: rust
