@@ -232,14 +232,9 @@ impl Evaluation<'_> {
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
         let rule = self.rule;
+        let judged = Judged::new(&self.shared, value);
         let mut frame = Frame::new(&self.meta.id, &rule.library);
-        frame.set_fact(rule.select.variable(), value);
-        frame.share(&self.shared);
-        for (at, (name, program)) in rule.variables.iter().enumerate() {
-            if rule.used[at] {
-                self.variable(&mut frame, at, name, program)?;
-            }
-        }
+        frame.share(&judged);
         let found = frame.truth(&rule.condition)?;
         let abstain = rule.abstain.as_ref().filter(|_| self.reviewing);
         match (abstain, found) {
@@ -295,26 +290,6 @@ impl Evaluation<'_> {
             }
         }
         Ok(Some(diagnostic))
-    }
-
-    /// Gives variable number `at` its value in the frame: the file's one
-    /// value, found once, when it reads nothing of the subject.
-    fn variable(
-        &self,
-        frame: &mut Frame,
-        at: usize,
-        name: &str,
-        program: &Program,
-    ) -> Result<(), PluginError> {
-        let value = |frame: &Frame| {
-            Fact::try_from(frame.run(program)?).map_err(|_| frame.fail("the value cannot be held"))
-        };
-        // A file-level variable is not held by the frame: whatever reads it
-        // finds it through the resolver, when it first does.
-        if self.shared.names[at].is_none() {
-            frame.set_fact(name, value(frame)?);
-        }
-        Ok(())
     }
 
     fn place(&self, frame: &Frame, default: Anchor) -> Result<Anchor, PluginError> {

@@ -89,10 +89,6 @@ impl<'a> Frame<'a> {
         self.context.set_variable_resolver(shared);
     }
 
-    pub(crate) fn set_fact(&mut self, name: &str, value: Fact) {
-        self.context.add_variable_as_val(name, value);
-    }
-
     pub(crate) fn run(&self, program: &Program) -> Result<cel::Value, PluginError> {
         program.execute(&self.context).map_err(|e| self.fail(e))
     }

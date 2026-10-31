@@ -270,6 +270,77 @@ impl At {
     }
 }
 
+/// The variables of one judgment, read through one resolver: the selected
+/// value, the check's variables that read it, found when first read and never
+/// when nothing reads them (a message and its evidence are read only by a
+/// subject that is found), and, from the file, what its judgments share.
+struct Judged<'a> {
+    shared: &'a Shared<'a>,
+    /// The selected value, under the name the check gives it.
+    value: Fact,
+    /// Per variable of the check, its value for this subject; unused by one
+    /// that reads nothing of the subject, which the file holds.
+    values: Vec<OnceLock<Option<Fact>>>,
+}
+
+impl<'a> Judged<'a> {
+    fn new(shared: &'a Shared<'a>, value: Fact) -> Self {
+        Self {
+            shared,
+            value,
+            values: shared
+                .rule
+                .variables
+                .iter()
+                .map(|_| OnceLock::new())
+                .collect(),
+        }
+    }
+
+    /// The value of variable number `at` for the subject, `None` when it
+    /// could not be found: `failed` says why.
+    fn compute(&self, at: usize) -> Option<Fact> {
+        let (name, program) = &self.shared.rule.variables[at];
+        let mut scope = self.shared.rule.library.new_inner_scope();
+        scope.set_variable_resolver(self);
+        let value = program
+            .execute(&scope)
+            .map_err(|e| format!("variable `{name}`: {e}"))
+            .and_then(|value| {
+                Fact::try_from(value)
+                    .map_err(|_| format!("variable `{name}`: the value cannot be held"))
+            });
+        match value {
+            Ok(fact) => Some(fact),
+            Err(message) => {
+                let _ = self.shared.failed.set(message);
+                None
+            }
+        }
+    }
+}
+
+impl VariableResolver for Judged<'_> {
+    fn resolve<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+        let rule = self.shared.rule;
+        if variable == rule.select.variable() {
+            return Some(CowVal::Borrowed(self.value.as_ref()));
+        }
+        let at = rule
+            .variables
+            .iter()
+            .position(|(name, _)| name == variable)
+            .filter(|at| rule.used[*at] && self.shared.names[*at].is_none());
+        match at {
+            Some(at) => self.values[at]
+                .get_or_init(|| self.compute(at))
+                .as_ref()
+                .map(|fact| CowVal::Borrowed(fact.as_ref())),
+            None => self.shared.resolve(variable),
+        }
+    }
+}
+
 /// The values of one file that all its judgments read without holding a copy
 /// each: the file as a value, for expressions that name `file` while judging
 /// something in it, and the file-level variables, found when first read and

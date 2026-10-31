@@ -250,6 +250,32 @@ fn a_variable_nothing_reads_is_not_evaluated() {
 }
 
 #[test]
+fn a_variable_only_the_message_reads_is_found_for_a_finding_alone() {
+    let plugin = local(
+        "symbol",
+        "select: symbol\nvariables:\n  - { name: shown, expression: 'symbol.name + string(1 / (size(symbol.name) - 5))' }\nwhere: 'symbol.name == \"Run\"'\nmessage: '{{ shown }}'",
+    )
+    .unwrap();
+    let mut w = World::default();
+    w.func("m", "Run", "m/a.ucm");
+    w.func("m", "Other", "m/a.ucm");
+    assert_eq!(w.names(&found(&plugin, &w)), ["Run"]);
+}
+
+#[test]
+fn a_variable_that_reads_the_subject_is_found_when_a_later_one_reads_it() {
+    let plugin = local(
+        "symbol",
+        "select: symbol\nvariables:\n  - { name: size_of, expression: 'size(symbol.name)' }\n  - { name: long, expression: 'size_of > 3' }\nwhere: 'long'\nmessage: x",
+    )
+    .unwrap();
+    let mut w = World::default();
+    w.func("m", "Run", "m/a.ucm");
+    w.func("m", "Longer", "m/a.ucm");
+    assert_eq!(w.names(&found(&plugin, &w)), ["Longer"]);
+}
+
+#[test]
 fn a_file_variable_that_fails_when_read_is_the_error_naming_it() {
     let plugin = local(
         "symbol",
