@@ -2,8 +2,8 @@
 //! given to, and what the fixer proposes, lowered to text edits.
 
 use std::{
-    cell::Cell,
-    collections::{BTreeMap, BTreeSet},
+    cell::{Cell, RefCell},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::PathBuf,
     time::Duration,
 };
@@ -31,6 +31,19 @@ use crate::{Engine, Error, Needs, Overlays, Run, cache::Cache, engine::Scopes};
 /// Why a fix by a model is left to review when the run asks no model.
 const NO_MODELS: &str =
     "left for review: models are off (`--no-models`); `review show` gives the brief";
+
+/// What one round of proposals has worked out, kept for the next finding that
+/// asks the same: findings of one file often propose the same ops, and lowering
+/// them or checking their edits against the scope costs time in the size of the
+/// file each time over.
+#[derive(Default)]
+struct Memo {
+    lowered: RefCell<HashMap<String, Lowered>>,
+    within: RefCell<HashMap<String, Result<(), String>>>,
+}
+
+/// What a fixer's ops lower to, and why not when they do not.
+type Lowered = Result<(Vec<TextEdit>, BTreeMap<PathBuf, String>), String>;
 
 /// A finding's fix, lowered and ready to apply.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,6 +167,7 @@ impl<'e> Proposer<'e> {
         let engine = self.engine;
         let complete = |language: &str| engine.provides(language, Capability::CompleteReferences);
         let lowerer = Lowerer::new(&outcome.project, &sources, &complete);
+        let memo = Memo::default();
         let (mut proposals, mut declined) = (Vec::new(), BTreeMap::new());
         let mut asked_to_edit = Vec::new();
         let mut decline = |finding: &Diagnostic, reason: String| {
@@ -221,7 +235,12 @@ impl<'e> Proposer<'e> {
                 Some(command) => self
                     .propose_command(outcome, finding, (&binding, command), (&sources, texts))
                     .map_err(|(_, reason)| reason),
-                None => self.propose_one(outcome, finding, &binding, (&lowerer, &sources, texts)),
+                None => self.propose_one(
+                    outcome,
+                    finding,
+                    &binding,
+                    (&lowerer, &sources, texts, &memo),
+                ),
             };
             match made {
                 Ok(proposal) => proposals.push(proposal),
@@ -308,12 +327,12 @@ impl<'e> Proposer<'e> {
         })
     }
 
-    pub(super) fn propose_one(
+    fn propose_one(
         &self,
         outcome: &Run,
         finding: &Diagnostic,
         binding: &FixBinding,
-        (lowerer, sources, texts): (&Lowerer, &Sources, &Overlays),
+        (lowerer, sources, texts, memo): (&Lowerer, &Sources, &Overlays, &Memo),
     ) -> Result<Proposal, String> {
         let engine = self.engine;
         let FixedBy::Fixer(id) = &binding.fixer else {
@@ -375,9 +394,16 @@ impl<'e> Proposer<'e> {
                 if safety == Safety::Unsafe && self.applies_previews() {
                     return Err(NOT_KEPT.to_owned());
                 }
-                let (edits, bases) = lowered(&ops, lowerer, sources)?;
+                let key = format!("{ops:?}");
+                let lowered = memo
+                    .lowered
+                    .borrow_mut()
+                    .entry(key)
+                    .or_insert_with(|| lowered(&ops, lowerer, sources))
+                    .clone();
+                let (edits, bases) = lowered?;
                 let scope = self.plan.scope(&finding.rule_id);
-                self.within(scope, outcome, finding, &edits, (sources, texts))?;
+                self.within_memo(memo, scope, (outcome, finding), &edits, (sources, texts))?;
                 Ok(Proposal {
                     fingerprint: finding.fingerprint.clone(),
                     rule_id: finding.rule_id.clone(),
@@ -400,6 +426,29 @@ impl<'e> Proposer<'e> {
 }
 
 impl Proposer<'_> {
+    /// `within`, worked out once for the same edits over the same file. Under
+    /// the scope `symbol` the extents of the finding decide, so each finding
+    /// is checked for itself.
+    fn within_memo(
+        &self,
+        memo: &Memo,
+        scope: FixScope,
+        (outcome, finding): (&Run, &Diagnostic),
+        edits: &[TextEdit],
+        texts: (&Sources, &Overlays),
+    ) -> Result<(), String> {
+        if scope == FixScope::Symbol {
+            return self.within(scope, outcome, finding, edits, texts);
+        }
+        let key = format!("{scope:?} {} {edits:?}", finding.file.display());
+        if let Some(known) = memo.within.borrow().get(&key) {
+            return known.clone();
+        }
+        let found = self.within(scope, outcome, finding, edits, texts);
+        memo.within.borrow_mut().insert(key, found.clone());
+        found
+    }
+
     /// Whether the edits of a fix stay within its scope, else why they do not:
     /// the same check as for the files a command or an agent changed.
     fn within(

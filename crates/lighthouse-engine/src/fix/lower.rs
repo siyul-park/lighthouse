@@ -612,18 +612,27 @@ fn carried(text: &str, block: &Block) -> Range<usize> {
 
 /// The indices of a longest strictly increasing subsequence of `ranks`.
 fn longest_run(ranks: &[usize]) -> Vec<usize> {
-    let mut best: Vec<Vec<usize>> = Vec::with_capacity(ranks.len());
+    // Patience sorting: `tails[k]` is the index ending the best increasing run
+    // of length k + 1, and `back[n]` the index before `n` in its run.
+    let mut tails: Vec<usize> = Vec::new();
+    let mut back: Vec<Option<usize>> = Vec::with_capacity(ranks.len());
     for (n, rank) in ranks.iter().enumerate() {
-        let run = (0..n)
-            .filter(|&m| ranks[m] < *rank)
-            .map(|m| &best[m])
-            .max_by_key(|run| run.len())
-            .map_or_else(Vec::new, Clone::clone);
-        let mut run = run;
-        run.push(n);
-        best.push(run);
+        let at = tails.partition_point(|&t| ranks[t] < *rank);
+        back.push(at.checked_sub(1).map(|k| tails[k]));
+        if at == tails.len() {
+            tails.push(n);
+        } else {
+            tails[at] = n;
+        }
     }
-    best.into_iter().max_by_key(Vec::len).unwrap_or_default()
+    let mut run = Vec::with_capacity(tails.len());
+    let mut at = tails.last().copied();
+    while let Some(n) = at {
+        run.push(n);
+        at = back[n];
+    }
+    run.reverse();
+    run
 }
 
 #[cfg(test)]

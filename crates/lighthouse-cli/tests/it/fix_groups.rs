@@ -232,7 +232,7 @@ fn a_file_of_a_thousand_reversed_declarations_is_ordered_in_bounded_time() {
         .success();
 
     assert!(
-        started.elapsed() < std::time::Duration::from_secs(90),
+        started.elapsed() < std::time::Duration::from_secs(45),
         "{:?}",
         started.elapsed()
     );

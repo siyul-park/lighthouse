@@ -181,3 +181,18 @@ fn reorder_puts_several_blocks_after_a_last_line_without_an_end_of_line() {
         "fn c() {}\n\nfn d() {}\n\nfn e() {}\n\nfn a() {}\n\nfn b() {}\n"
     );
 }
+
+#[test]
+fn the_run_that_stays_is_the_longest_in_order() {
+    assert_eq!(longest_run(&[]), Vec::<usize>::new());
+    assert_eq!(longest_run(&[0, 1, 2]), vec![0, 1, 2]);
+    assert_eq!(longest_run(&[3, 2, 1, 0]).len(), 1);
+    assert_eq!(longest_run(&[2, 0, 1, 4, 3, 5]).len(), 4);
+}
+
+#[test]
+fn a_run_of_a_hundred_thousand_ranks_is_found_at_once() {
+    let ranks: Vec<usize> = (0..100_000).rev().collect();
+
+    assert_eq!(longest_run(&ranks).len(), 1);
+}
