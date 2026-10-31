@@ -131,12 +131,20 @@ spec:
     type: cel
     select: symbol
     variables:
+      # The placed declarations with the tests, in file order, each as
+      # [module, place, id, name]: the tests come after every group, as
+      # `testing/file-layout` has the fixtures above them, so that a move
+      # never puts a fixture below a test.
+      - name: laid
+        expression: >-
+          (placed + file.symbols.filter(s, s.kind == 'test')).sortBy(s, s.pos)
+            .map(s, [s.module, s.kind == 'test' ? size(groups) * 1000000 : place(s), s.id, s.name])
       # The placed declarations of each module, in file order, each as
       # [place, id, name].
       - name: modules
         expression: >-
-          slots.map(r, r[0]).distinct().map(m,
-            slots.filter(r, r[0] == m && r[1] >= 0).map(r, [r[1], r[2], r[3]]))
+          laid.map(r, r[0]).distinct().map(m,
+            laid.filter(r, r[0] == m && r[1] >= 0).map(r, [r[1], r[2], r[3]]))
       # Per module, the placed declarations that are misplaced: the fewest
       # that, moved, put the module in order, each as
       # [id, group, after, before, late]: it is to follow the first later
@@ -154,6 +162,7 @@ spec:
                  (kept.filter(j, j > i && g[j] < g[i]).map(j, at[j][2])
                   + (follows[i] < 0 ? [] : at.slice(follows[i], follows[i] + 1).map(r, r[2]))
                   + [''])[0], '', false])))))).flatten()
+            .filter(d, d[1] < size(groups))
       # The methods of the owners, in file order; one value per file, each as
       # [id, name, owner and module, whether it is a constructor method (a
       # public method named like a constructor), position].
@@ -176,7 +185,7 @@ spec:
       # of the reorder that fixes every finding of the file at once.
       - name: ordered
         expression: >-
-          slots.filter(r, r[1] >= 0).sortBy(r, r[1]).map(r, r[2])
+          laid.filter(r, r[1] >= 0).sortBy(r, r[1]).map(r, r[2])
       # Every finding of the file, as [id, group, after, before, late], and
       # the ids they are about.
       - name: reported
@@ -678,3 +687,45 @@ spec:
             func TestSample(t *testing.T) { _ = sample{} }
       expect:
         - line: 7
+    - name: test-fixture-below-a-test
+      language: go
+      kind: invalid
+      fixed:
+        - path: store_test.go
+          body: |-
+            package store
+
+            import "testing"
+
+            type sample struct{}
+
+            type other struct{}
+
+            const size = 1
+
+            var limit = 3
+
+            func TestSample(t *testing.T) { _ = sample{}; _ = other{}; _ = size; _ = limit }
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store_test.go
+          body: |-
+            package store
+
+            import "testing"
+
+            var limit = 3
+
+            const size = 1
+
+            func TestSample(t *testing.T) { _ = sample{}; _ = other{}; _ = size; _ = limit }
+
+            type sample struct{}
+
+            type other struct{}
+      expect:
+        - line: 5

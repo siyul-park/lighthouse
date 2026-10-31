@@ -64,6 +64,16 @@ spec:
         expression: "file.symbols.filter(s, s.kind == 'test')"
       - name: first
         expression: "size(tests) > 0 ? tests[0] : {}"
+      - name: group_rank
+        params: [s]
+        expression: >-
+          s.kind == 'type' || s.kind == 'interface' ? 0
+            : s.kind == 'const' ? 1 : s.kind == 'var' ? 2 : 3
+      - name: anchor
+        expression: >-
+          cel.bind(c, file.symbols.filter(d, d.id != symbol.id
+              && (d.kind == 'test' || d.declaration && group_rank(d) > group_rank(symbol))).sortBy(d, d.pos),
+            size(c) > 0 ? c[0] : first)
       - name: user
         expression: >-
           cel.bind(c, (symbol.callers + symbol.references).filter(u, u.file == symbol.file && u.pos > symbol.pos),
@@ -111,7 +121,7 @@ spec:
     evidence:
       symbol: symbol.id
       role: symbol.test_role
-      before: "misplaced_fixture ? first.id : misplaced_order && size(above) > 0 ? above[0].id : ''"
+      before: "misplaced_fixture ? anchor.id : misplaced_order && size(above) > 0 ? above[0].id : ''"
       after: "misplaced_helper ? user.id : misplaced_order && size(below) > 0 ? below[0].id : ''"
     identity:
       subject: symbol.id
@@ -119,7 +129,7 @@ spec:
     safety: safe
     type: cel
     edits: >-
-      misplaced_fixture ? [move(symbol, before(first))]
+      misplaced_fixture ? [move(symbol, before(anchor))]
       : misplaced_helper ? [move(symbol, after(user))]
       : misplaced_order ? [reorder(sorted_tests)]
       : []
