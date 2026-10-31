@@ -19,8 +19,10 @@ spec:
     `testing/file-layout`. Order: public types; private types; public
     constants; private constants; variables; all `init` functions; one block
     per type, in the order the types are declared, each with the constructors
-    of the type (a function named `NewType` where `Type` is a type declared in
-    the same file), then its exported methods,
+    of the type (a function named `NewType` or `newType`, of any visibility,
+    where `Type` or `type` is a type declared in the same file: Uber, "newXYZ()/NewXYZ()
+    may appear after the type is defined, but before the rest of the methods on
+    the receiver"), then its exported methods,
     then its clone, conversion and interface hooks, then its unexported
     methods; public functions; private functions.
 
@@ -89,7 +91,7 @@ spec:
           written), `public-const`,
           `private-const`, `const`, `var`, `init`, `method` (the members of the
           types, one block per type, in the order the types are declared, each
-          with the constructors of the type first, then its exported
+          with the constructors of the type (`NewType` or `newType`, any visibility) first, then its exported
           methods, its hooks and its unexported methods),
           `public-function`, `private-function`.
       hooks:
@@ -378,6 +380,31 @@ spec:
             func (s *Service) Run() int { return 1 }
 
             func NewService() *Service { return &Service{} }
+      expect:
+        - line: 7
+    - name: private-constructor-after-methods
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            type lowering struct{}
+
+            func newLowering() *lowering { return &lowering{} }
+
+            func (l *lowering) run() int { return 1 }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type lowering struct{}
+
+            func (l *lowering) run() int { return 1 }
+
+            func newLowering() *lowering { return &lowering{} }
       expect:
         - line: 7
     - name: rust-invalid

@@ -54,8 +54,10 @@ impl Builder<'_> {
             .any(|p| layout::has_word_prefix(&symbol.name, p))
     }
 
-    /// What a constructor builds: the name without its prefix (`NewServer`
-    /// builds `Server`), else its owner (`Server::new`), else its own name.
+    /// What a constructor builds: the type of its module that the name without
+    /// its prefix names, as written (`NewServer` builds `Server`) or with a
+    /// lowercase first letter (`newServer` builds `server`); else that name
+    /// itself; else its owner (`Server::new`); else its own name.
     pub(super) fn built(&self, symbol: &Symbol) -> String {
         let named = self
             .ws
@@ -64,6 +66,28 @@ impl Builder<'_> {
             .filter(|p| layout::has_word_prefix(&symbol.name, p))
             .filter_map(|p| symbol.name.strip_prefix(p.as_str()))
             .find(|rest| !rest.is_empty());
+        if let Some(rest) = named {
+            let mut chars = rest.chars();
+            let lowered: String = chars
+                .next()
+                .into_iter()
+                .flat_map(char::to_lowercase)
+                .chain(chars)
+                .collect();
+            let declared = |name: &str| {
+                self.project.symbols.iter().any(|s| {
+                    matches!(s.kind, SymbolKind::Type | SymbolKind::Interface)
+                        && s.name == name
+                        && s.id.module() == symbol.id.module()
+                })
+            };
+            if declared(rest) {
+                return rest.to_owned();
+            }
+            if declared(&lowered) {
+                return lowered;
+            }
+        }
         let owner = symbol
             .owner
             .as_ref()

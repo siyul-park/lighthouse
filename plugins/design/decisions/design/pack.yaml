@@ -41,7 +41,8 @@ spec:
     # of the first of the declaration's candidate groups that the order names,
     # times a million, plus, in the group `method`, the rank of the declaration
     # in the block of its owner: 4 per owner block, and in the block its
-    # constructors, its exported methods, its hooks, its unexported methods.
+    # constructors (of any visibility, as Uber's `newXYZ()` may follow the
+    # type), its exported methods, its hooks, its unexported methods.
     # -1 when no group names the declaration.
     - name: place
       params: [s]
@@ -49,11 +50,11 @@ spec:
         cel.bind(open, s.visibility != 'private',
         cel.bind(owner, s.kind == 'method' ? s.owner_key
             : s.kind == 'type' || s.kind == 'interface' ? s.id
-            : s.kind == 'function' && open && s.constructor_named
+            : s.kind == 'function' && s.constructor_named
             ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id) + [''])[0]
             : '',
         cel.bind(inner,
-            open && s.kind == 'function' && s.constructor_named ? 0
+            s.kind == 'function' && s.constructor_named ? 0
             : open && s.kind == 'method' && s.name in hooks ? 2
             : open ? 1 : 3,
         cel.bind(chosen, (
