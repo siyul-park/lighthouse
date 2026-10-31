@@ -23,5 +23,5 @@ pub use fix::{
     AppliedFix, BatchTrace, DeclinedFix, EditUsage, FileChange, FixBinding, FixPlan, FixReport,
     FixRun, FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, ToolCounts, brief, unified_diff,
 };
-pub use tester::{ExampleRun, RuleTester};
+pub use tester::{ExampleRun, RuleTester, Tested};
 pub use timings::Timings;

@@ -33,6 +33,7 @@ impl LanguageProvider for Notes {
 /// Flags every line containing the configured word (default `TODO`).
 struct Marker {
     meta: RuleManifest,
+    word: &'static str,
 }
 
 impl Rule for Marker {
@@ -57,7 +58,7 @@ impl Rule for Marker {
         let word = options
             .get("word")
             .and_then(|w| w.as_str())
-            .unwrap_or("TODO");
+            .unwrap_or(self.word);
         let found = text.lines().enumerate().filter(|(_, l)| l.contains(word));
         Ok(found
             .map(|(i, _)| {
@@ -66,12 +67,12 @@ impl Rule for Marker {
                     col: 1,
                 };
                 Diagnostic::new(
-                    "fake/marker",
+                    &self.meta.id,
                     self.meta.severity,
                     format!("found {word}"),
                     &file.path,
                     Span { start: at, end: at },
-                    Fingerprint::new("fake/marker", &file.path.to_string_lossy(), ""),
+                    Fingerprint::new(&self.meta.id, &file.path.to_string_lossy(), ""),
                 )
             })
             .collect())
@@ -105,7 +106,15 @@ impl Fixer for Done {
                     start: at(0),
                     end: at(text.len()),
                 },
-                text: text.replace("TODO", "DONE"),
+                // A line that says so is fixed into another decision's word.
+                text: text.replace(
+                    "TODO",
+                    if text.contains("(wip)") {
+                        "WIP"
+                    } else {
+                        "DONE"
+                    },
+                ),
             }],
             safety: Safety::Safe,
         })
@@ -134,20 +143,24 @@ impl Plugin for Fake {
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![Box::new(Marker {
-            meta: RuleManifest {
-                id: "fake/marker".to_owned(),
-                uid: None,
-                severity: Severity::Warn,
-                scope: RunScope::File,
-                description: String::new(),
-                docs: String::new(),
-                analyzers: Vec::new(),
-                capabilities: Vec::new(),
-                applicability: Applicability::default(),
-                caching: None,
-            },
-        })]
+        let marker = |id: &str, word| -> Box<dyn Rule> {
+            Box::new(Marker {
+                meta: RuleManifest {
+                    id: id.to_owned(),
+                    uid: None,
+                    severity: Severity::Warn,
+                    scope: RunScope::File,
+                    description: String::new(),
+                    docs: String::new(),
+                    analyzers: Vec::new(),
+                    capabilities: Vec::new(),
+                    applicability: Applicability::default(),
+                    caching: None,
+                },
+                word,
+            })
+        };
+        vec![marker("fake/marker", "TODO"), marker("fake/wip", "WIP")]
     }
 }
 
@@ -507,4 +520,199 @@ fn example_run_checks_an_example_with_the_given_configuration() {
 
     assert_eq!(outcome.diagnostics.len(), 1);
     assert_eq!(outcome.diagnostics[0].span.start.line, 2);
+}
+
+/// Two decisions that flag a word: `fake/marker` (`TODO`) with the examples
+/// `marker`, and `fake/wip` (`WIP`) with the examples `wip`.
+fn pair(marker: &str, wip: &str, fix: &str) -> Catalog {
+    let decision = |name: &str, word: &str, fix: &str, examples: &str| {
+        format!(
+            "apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: fake/{name}
+spec:
+  title: {name}
+  context: Words are flagged.
+  scope: {{ subject: file }}
+  requirement: A file MUST NOT contain the word.
+  severity: warn
+  options:
+    properties:
+      word:
+        type: string
+        default: {word}
+        description: Word to flag.
+    additionalProperties: false
+  check:
+    type: cel
+    select: file
+    where: 'true'
+    message: m
+{}  examples:
+{}",
+            under_spec(fix),
+            under_spec(examples)
+        )
+    };
+    let pack = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: fake\nspec:\n  title: Fake\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [marker, wip]\n";
+    let marker = decision("marker", "TODO", fix, marker);
+    let wip = decision("wip", "WIP", "", wip);
+    Catalog::from_files(
+        [
+            ("fake/pack.yaml", pack),
+            ("fake/s/marker.yaml", marker.as_str()),
+            ("fake/s/wip.yaml", wip.as_str()),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect(),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap()
+}
+
+const WIP_CLEAN: &str = "  - name: clean
+    language: notes
+    kind: valid
+    files:
+      - path: a.txt
+        body: fine
+";
+
+const WIP_INVALID: &str = "  - name: flagged
+    language: notes
+    kind: invalid
+    files:
+      - path: a.txt
+        body: WIP
+    expect:
+      - line: 1
+";
+
+fn marker_valid(body: &str, conflicts: &str) -> String {
+    format!(
+        "  - name: clean
+    language: notes
+    kind: valid
+{conflicts}    files:
+      - path: a.txt
+        body: |-
+{}
+",
+        body.lines()
+            .map(|l| format!("          {l}\n"))
+            .collect::<String>()
+            .trim_end()
+    ) + WIP_INVALID_FOR_MARKER
+}
+
+const WIP_INVALID_FOR_MARKER: &str = "  - name: flagged
+    language: notes
+    kind: invalid
+    files:
+      - path: a.txt
+        body: TODO
+    expect:
+      - line: 1
+";
+
+fn failures_of(catalog: &Catalog) -> Vec<String> {
+    RuleTester::new(registry, catalog, lighthouse_test_support::bundled()).check_all()
+}
+
+#[test]
+fn a_valid_example_that_breaks_another_decision_is_a_failure() {
+    let catalog = pair(
+        &marker_valid("fine\nWIP here", ""),
+        &(WIP_CLEAN.to_owned() + WIP_INVALID),
+        "",
+    );
+
+    let failures = failures_of(&catalog);
+
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    assert!(
+        failures[0].starts_with("fake/marker clean: it also breaks fake/wip"),
+        "{failures:?}"
+    );
+}
+
+#[test]
+fn a_declared_conflict_is_reported_and_not_a_failure() {
+    let catalog = pair(
+        &marker_valid("fine\nWIP here", "    conflicts: [fake/wip]\n"),
+        &(WIP_CLEAN.to_owned() + WIP_INVALID),
+        "",
+    );
+    let tester = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
+
+    let tested = tester.tested(catalog.decision("fake/marker").unwrap());
+
+    assert!(tested.failures.is_empty(), "{:?}", tested.failures);
+    assert_eq!(tested.conflicts.len(), 1, "{:?}", tested.conflicts);
+    assert!(tested.conflicts[0].starts_with("fake/marker clean: it also breaks fake/wip"));
+}
+
+#[test]
+fn a_declared_conflict_that_no_longer_fires_is_a_failure() {
+    let catalog = pair(
+        &marker_valid("fine", "    conflicts: [fake/wip]\n"),
+        &(WIP_CLEAN.to_owned() + WIP_INVALID),
+        "",
+    );
+
+    let failures = failures_of(&catalog);
+
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    assert!(
+        failures[0].contains("declares a conflict with fake/wip"),
+        "{failures:?}"
+    );
+}
+
+fn fixing_pair(before: &str, after: &str) -> Catalog {
+    let fix_example = format!(
+        "  - name: todo
+    language: notes
+    kind: invalid
+    files:
+      - path: a.txt
+        body: |-
+          {before}
+    expect:
+      - line: 1
+    fixed:
+      - path: a.txt
+        body: |-
+          {after}
+"
+    );
+    pair(&fix_example, &(WIP_CLEAN.to_owned() + WIP_INVALID), FIX)
+}
+
+#[test]
+fn a_fix_that_introduces_a_finding_of_another_decision_is_a_failure() {
+    let catalog = fixing_pair("TODO (wip)", "WIP (wip)");
+
+    let failures = failures_of(&catalog);
+
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    assert!(
+        failures[0].contains("todo: its fix introduces fake/wip"),
+        "{failures:?}"
+    );
+}
+
+#[test]
+fn a_finding_the_example_had_before_its_fix_is_not_introduced_by_it() {
+    let catalog = fixing_pair("TODO\nWIP", "DONE\nWIP");
+
+    let failures = failures_of(&catalog);
+
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    assert!(
+        failures[0].contains("todo: it also breaks fake/wip"),
+        "{failures:?}"
+    );
 }

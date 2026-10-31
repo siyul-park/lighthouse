@@ -245,14 +245,18 @@ pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Re
         for skipped in &report.ran.skipped {
             let _ = writeln!(out, "SKIP {skipped}");
         }
+        for conflict in &report.ran.conflicts {
+            let _ = writeln!(out, "CONFLICT {conflict}");
+        }
         let _ = writeln!(
             out,
-            "decision test: {} decision(s) in {} language(s), {} run(s), {} failure(s), {} skipped",
+            "decision test: {} decision(s) in {} language(s), {} run(s), {} failure(s), {} skipped, {} conflict(s)",
             report.ran.decisions,
             report.ran.languages,
             report.ran.runs,
             report.ran.failures.len(),
-            report.ran.skipped.len()
+            report.ran.skipped.len(),
+            report.ran.conflicts.len()
         );
         out
     })?;

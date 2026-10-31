@@ -75,6 +75,7 @@ mod write {
                     }],
                     options: Map::from_iter([("max".to_owned(), json!(1))]),
                     fixed: Vec::new(),
+                    conflicts: Vec::new(),
                 },
                 Example {
                     name: "good".into(),
@@ -85,6 +86,7 @@ mod write {
                     expect: Vec::new(),
                     options: Map::new(),
                     fixed: Vec::new(),
+                    conflicts: Vec::new(),
                 },
             ],
         };

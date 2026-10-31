@@ -10,6 +10,10 @@ use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
 
+mod cross;
+
+use cross::{cross, introduced, judge, model_only};
+
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
 
@@ -79,8 +83,15 @@ impl<'a> RuleTester<'a> {
     /// that names the `files` it is run for is the exception: it has examples
     /// for the languages of those files only.
     pub fn check(&self, decision: &Decision) -> Vec<String> {
+        self.tested(decision).failures
+    }
+
+    /// Like [`check`](Self::check), with the conflicts the examples declare and
+    /// still have, which are not failures.
+    pub fn tested(&self, decision: &Decision) -> Tested {
+        let mut tested = Tested::default();
         if !self.applies(decision) {
-            return Vec::new();
+            return tested;
         }
         let selected: Vec<&Example> = decision
             .examples
@@ -88,38 +99,40 @@ impl<'a> RuleTester<'a> {
             .filter(|example| self.selects(example))
             .collect();
         if selected.is_empty() && self.language.is_some() {
-            if exempt(decision, self.language.as_deref().unwrap_or_default()) {
-                return Vec::new();
+            let language = self.language.as_deref().unwrap_or_default();
+            if !exempt(decision, language) {
+                tested.failures.push(format!(
+                    "{}: no example for language `{language}`",
+                    decision.id()
+                ));
             }
-            return vec![format!(
-                "{}: no example for language `{}`",
-                decision.id(),
-                self.language.as_deref().unwrap_or_default()
-            )];
+            return tested;
         }
-        let model_only = decision.check.as_ref().is_some_and(|check| {
-            matches!(
-                &check.kind,
-                CheckKind::Cel(cel)
-                    if cel.abstain.is_some() && cel.condition.trim() == "false"
-            )
-        });
-        selected
-            .into_iter()
-            .filter_map(|example| {
-                // A candidate-only decision is not expected to emit a finding
-                // without a bound model; its invalid example is checked by the
-                // catalog's candidate-shape tests instead.
-                if model_only && example.kind == ExampleKind::Invalid {
-                    return None;
+        let model_only = model_only(decision);
+        for example in selected {
+            // A candidate-only decision is not expected to emit a finding
+            // without a bound model; its invalid example is checked by the
+            // catalog's candidate-shape tests instead.
+            if model_only && example.kind == ExampleKind::Invalid {
+                continue;
+            }
+            if absent(decision, example).is_some() {
+                continue;
+            }
+            match self.run(decision, example) {
+                Ok(known) => tested.conflicts.extend(
+                    known
+                        .into_iter()
+                        .map(|line| format!("{} {}: {line}", decision.id(), example.name)),
+                ),
+                Err(failure) => {
+                    tested
+                        .failures
+                        .push(format!("{} {}: {failure}", decision.id(), example.name))
                 }
-                if absent(decision, example).is_some() {
-                    return None;
-                }
-                let failure = self.run(decision, example).err()?;
-                Some(format!("{} {}: {failure}", decision.id(), example.name))
-            })
-            .collect()
+            }
+        }
+        tested
     }
 
     /// The examples of `decision` that cannot run here because the program of
@@ -158,9 +171,21 @@ impl<'a> RuleTester<'a> {
             .is_none_or(|language| *language == example.language || example.language == NEUTRAL)
     }
 
-    fn run(&self, decision: &Decision, example: &Example) -> Result<(), String> {
+    /// Runs `example` of `decision`; the conflicts it declares and still has.
+    fn run(&self, decision: &Decision, example: &Example) -> Result<Vec<String>, String> {
+        let fixing = decision.fix.as_ref().is_some_and(Fix::deterministic)
+            && example.kind == ExampleKind::Invalid
+            && !example.fixed.is_empty();
+        // A fix is judged by every rule of its engine, so the other decisions
+        // have an engine of their own there.
+        let others = if example.kind == ExampleKind::Valid || fixing {
+            self.others(decision, example)
+        } else {
+            Vec::new()
+        };
         let registry = (self.registry)();
-        let config = config(&registry, decision, example, &self.sources)?;
+        let shared: &[&Decision] = if fixing { &[] } else { &others };
+        let config = config(&registry, decision, example, shared, &self.sources)?;
         let (outcome, engine, dir) = ExampleRun {
             registry,
             config,
@@ -174,16 +199,20 @@ impl<'a> RuleTester<'a> {
         }
         let found = found(&outcome);
         match example.kind {
-            ExampleKind::Valid if found.is_empty() => Ok(()),
+            ExampleKind::Valid if found.is_empty() => {
+                judge(example, &cross(&engine, &others, example)?)
+            }
             ExampleKind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
             ExampleKind::Invalid => {
                 compare(example, &found)?;
-                if decision.fix.as_ref().is_some_and(Fix::deterministic)
-                    && !example.fixed.is_empty()
-                {
-                    self.check_fix(&engine, decision, example, dir.path())?;
+                if !fixing {
+                    return judge(example, &[]);
                 }
-                Ok(())
+                let crossing = self.crossing(&others, dir.path())?;
+                let before = cross(&crossing, &others, example)?;
+                self.check_fix(&engine, decision, example, dir.path())?;
+                let after = cross(&crossing, &others, example)?;
+                judge(example, &introduced(example, dir.path(), &before, after))
             }
         }
     }
@@ -246,6 +275,16 @@ impl<'a> RuleTester<'a> {
     }
 }
 
+/// What the examples of a decision came to.
+#[derive(Debug, Default)]
+pub struct Tested {
+    /// One line for each example that does not hold.
+    pub failures: Vec<String>,
+    /// One line for each conflict with another decision that an example
+    /// declares and still has.
+    pub conflicts: Vec<String>,
+}
+
 /// What an example is run with: the project's own configuration and plugins,
 /// so that a rule bound to a model asks it.
 pub struct ExampleRun<'a> {
@@ -303,30 +342,45 @@ fn config(
     registry: &Registry,
     decision: &Decision,
     example: &Example,
+    others: &[&Decision],
     sources: &[SourceRuleSpec],
 ) -> Result<Config, String> {
-    let level = decision
-        .severity
-        .ok_or_else(|| "a decision without severity has no rule".to_owned())?;
-    let mut rule = toml::Table::new();
-    rule.insert("level".to_owned(), level.to_string().into());
-    if !example.options.is_empty() {
-        let mut options = toml::Table::new();
-        for (key, value) in &example.options {
-            options.insert(key.clone(), toml_value(value)?);
+    let mut rules: Vec<(&Decision, Option<&Example>)> = vec![(decision, Some(example))];
+    rules.extend(others.iter().map(|d| (*d, None)));
+    rules_config(registry, &rules, sources)
+}
+
+/// A configuration that enables each of `rules` at its decision's severity,
+/// with the options of the example it is given, else the decision's own.
+fn rules_config(
+    registry: &Registry,
+    rules: &[(&Decision, Option<&Example>)],
+    sources: &[SourceRuleSpec],
+) -> Result<Config, String> {
+    let mut table = toml::Table::new();
+    for (decision, example) in rules {
+        let level = decision
+            .severity
+            .ok_or_else(|| "a decision without severity has no rule".to_owned())?;
+        let mut rule = toml::Table::new();
+        rule.insert("level".to_owned(), level.to_string().into());
+        if let Some(example) = example.filter(|e| !e.options.is_empty()) {
+            let mut options = toml::Table::new();
+            for (key, value) in &example.options {
+                options.insert(key.clone(), toml_value(value)?);
+            }
+            rule.insert("options".to_owned(), options.into());
         }
-        rule.insert("options".to_owned(), options.into());
+        table.insert(decision.id().to_owned(), rule.into());
     }
     let plugins: Vec<toml::Value> = registry
         .manifests()
         .iter()
         .map(|plugin| toml::Value::String(plugin.id.clone()))
         .collect();
-    let mut rules = toml::Table::new();
-    rules.insert(decision.id().to_owned(), rule.into());
     let mut root = toml::Table::new();
     root.insert("plugins".to_owned(), plugins.into());
-    root.insert("rules".to_owned(), rules.into());
+    root.insert("rules".to_owned(), table.into());
     let sources: Vec<toml::Value> = sources
         .iter()
         .map(|source| toml::Value::try_from(source).map_err(|e| e.to_string()))

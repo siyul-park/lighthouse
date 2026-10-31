@@ -213,6 +213,7 @@ fn commit(
             runs: 0,
             failures: Vec::new(),
             skipped: Vec::new(),
+            conflicts: Vec::new(),
         }
     };
     if !test.failures.is_empty() {

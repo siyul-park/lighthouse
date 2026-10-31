@@ -48,6 +48,12 @@ pub struct Example {
     /// the fix again must change nothing, and the rule must no longer fire.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fixed: Vec<ExampleFile>,
+    /// Decisions this example is known to break besides its own: a `valid`
+    /// example, or the `fixed` form of an `invalid` one, that another decision
+    /// reports on, or an `invalid` one whose fix introduces such a finding. A
+    /// finding of any other decision that is not listed fails the test.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conflicts: Vec<String>,
 }
 
 /// An expected diagnostic of an invalid example.

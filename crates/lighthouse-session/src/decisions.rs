@@ -65,6 +65,9 @@ pub struct DecisionTest {
     /// One line per example that was not run because the program its command
     /// check names is not installed; they are not failures.
     pub skipped: Vec<String>,
+    /// One line per conflict with another decision that an example declares
+    /// and still has: a candidate for a contradiction, not a failure.
+    pub conflicts: Vec<String>,
 }
 
 /// The decisions the registry has a rule for, with their catalog titles; with
@@ -232,6 +235,7 @@ pub(crate) fn test_catalog(
     };
     let mut failures = unregistered(&decisions, &registered);
     let mut skipped = Vec::new();
+    let mut conflicts = Vec::new();
     let mut runs = 0;
     let restart_error = RefCell::new(None);
     for language in &languages {
@@ -262,11 +266,18 @@ pub(crate) fn test_catalog(
                     .into_iter()
                     .map(|f| format!("[{language}] {f}")),
             );
+            let tested = tester.tested(decision);
             failures.extend(
-                tester
-                    .check(decision)
+                tested
+                    .failures
                     .into_iter()
                     .map(|f| format!("[{language}] {f}")),
+            );
+            conflicts.extend(
+                tested
+                    .conflicts
+                    .into_iter()
+                    .map(|c| format!("[{language}] {c}")),
             );
         }
     }
@@ -279,6 +290,7 @@ pub(crate) fn test_catalog(
         runs,
         failures,
         skipped,
+        conflicts,
     })
 }
 

@@ -375,6 +375,19 @@ fn example(decision: &Decision, example: &Example) -> Result<(), Error> {
     if example.kind == ExampleKind::Valid && !example.expect.is_empty() {
         return Err(fail("a valid example expects no diagnostics".to_owned()));
     }
+    let mut conflicts = BTreeSet::new();
+    for other in &example.conflicts {
+        if other == id
+            || !other
+                .split_once('/')
+                .is_some_and(|(p, n)| kebab(p).is_ok() && kebab(n).is_ok())
+            || !conflicts.insert(other)
+        {
+            return Err(fail(format!(
+                "conflict `{other}` is not the id of another decision, or is repeated"
+            )));
+        }
+    }
     decision
         .resolve_options(&example.options, Some(&example.language))
         .map(drop)
