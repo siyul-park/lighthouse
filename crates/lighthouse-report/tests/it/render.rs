@@ -140,7 +140,7 @@ fn sarif_describes_a_rule_by_the_decision_it_cites_and_links_its_docs() {
         rules[0]["shortDescription"]["text"],
         "Files stay small and cohesive"
     );
-    assert_eq!(rules[0]["defaultConfiguration"]["level"], "warning");
+    assert_eq!(rules[0]["defaultConfiguration"]["level"], "note");
     assert_eq!(rules[0]["properties"]["status"], "accepted");
     assert_eq!(
         rules[0]["helpUri"],
