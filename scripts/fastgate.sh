@@ -233,6 +233,18 @@ def gate(spec, scratch):
                 failed = True
 
     body_file = medium_file(path, kind, avoid=called(path, kind)[1])
+    # Medians for the body edit, before the edit cases leave their marks (an
+    # unformatted file, a probe type) on the tree, so that they compare with
+    # the cold runs of the same tree: the edit is applied afresh for each run.
+    timed = []
+    for n in range(1, RUNS + 1):
+        body_edit(path, body_file, kind, 100 + n)
+        expected = run(path, cfg, False)
+        got = run(path, cfg, True)
+        if (got[0], got[1]) != (expected[0], expected[1]):
+            say(f"{label}: body edit {n}: differs from cold")
+            failed = True
+        timed.append(got[2])
     steps = script(path, cfg, kind, probe, body_file)
     for step, apply in steps:
         apply()
@@ -244,16 +256,6 @@ def gate(spec, scratch):
                 say(f"{label}: {step}: {what} differs from cold")
                 failed = True
         say(f"{label}: {step}: identical={(got[0], got[1]) == (expected[0], expected[1])} total cold {expected[2]['total']}ms warm {got[2]['total']}ms")
-    # Medians for the body edit: the edit is applied afresh for each run.
-    timed = []
-    for n in range(1, RUNS + 1):
-        body_edit(path, body_file, kind, 100 + n)
-        expected = run(path, cfg, False)
-        got = run(path, cfg, True)
-        if (got[0], got[1]) != (expected[0], expected[1]):
-            say(f"{label}: body edit {n}: differs from cold")
-            failed = True
-        timed.append(got[2])
     cold_t, first_t, warm_t, edit_t = (median([r[2] for r in cold]), median([r[2] for r in first]), median([r[2] for r in warm]), median(timed))
     say(f"\n{label} ({kind}), median of {RUNS}, ms")
     say("| run | " + " | ".join(PHASES) + " |")
