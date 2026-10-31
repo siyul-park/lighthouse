@@ -559,7 +559,9 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
                 entry.push_str(&body(block));
             }
             Some(_) => {
-                entry.push_str(&eol.repeat(2));
+                // The anchor's last line has no end of line: the first
+                // declaration put there ends it and leaves a blank line.
+                entry.push_str(&eol.repeat(if entry.is_empty() { 2 } else { 1 }));
                 entry.push_str(&body(block));
             }
             None => {

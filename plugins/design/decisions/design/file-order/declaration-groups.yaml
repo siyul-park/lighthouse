@@ -692,20 +692,20 @@ spec:
       kind: invalid
       fixed:
         - path: store_test.go
-          body: |-
+          body: |
             package store
 
             import "testing"
 
-            type sample struct{}
+            type one struct{}
 
-            type other struct{}
+            type two struct{}
 
-            const size = 1
+            type three struct{}
 
             var limit = 3
 
-            func TestSample(t *testing.T) { _ = sample{}; _ = other{}; _ = size; _ = limit }
+            func TestSample(t *testing.T) { _ = one{}; _ = two{}; _ = three{}; _ = limit }
       files:
         - path: go.mod
           body: |-
@@ -720,12 +720,12 @@ spec:
 
             var limit = 3
 
-            const size = 1
+            func TestSample(t *testing.T) { _ = one{}; _ = two{}; _ = three{}; _ = limit }
 
-            func TestSample(t *testing.T) { _ = sample{}; _ = other{}; _ = size; _ = limit }
+            type one struct{}
 
-            type sample struct{}
+            type two struct{}
 
-            type other struct{}
+            type three struct{}
       expect:
         - line: 5

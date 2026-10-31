@@ -160,3 +160,24 @@ fn reorder_carries_the_free_comment_above_a_declaration_it_moves() {
         "fn a() {}\n\nfn c() {}\n\n// free\n\nfn b() {}\n"
     );
 }
+
+#[test]
+fn reorder_puts_several_blocks_after_a_last_line_without_an_end_of_line() {
+    let text = "fn a() {}\n\nfn b() {}\n\nfn c() {}\n\nfn d() {}\n\nfn e() {}";
+    let symbols = [
+        ("a", 1, 1),
+        ("b", 3, 3),
+        ("c", 5, 5),
+        ("d", 7, 7),
+        ("e", 9, 9),
+    ];
+    let op = EditOp::Reorder {
+        owner: Owner::File(FILE.into()),
+        order: ["c", "d", "e", "a", "b"].map(id).to_vec(),
+    };
+
+    assert_eq!(
+        case(text, &symbols, vec![]).run(&[op]).unwrap(),
+        "fn c() {}\n\nfn d() {}\n\nfn e() {}\n\nfn a() {}\n\nfn b() {}\n"
+    );
+}
