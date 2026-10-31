@@ -78,13 +78,13 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (48)
+## Active decisions (50)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|unsafe` marks a decision with a fixer and the safety of its fix.
 
 ### core
 
-- `core/max-lines` (warn) Files stay small and cohesive
+- `core/max-lines` (info) Files stay small and cohesive
 - `core/allow-reason` (error) Allow a finding in source, with a reason
 - `core/no-unused-allow` (warn, fixable: unsafe) Allow annotations suppress something
 - `core/decision-naming` (warn) Decision names follow the ESLint convention
@@ -97,7 +97,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/no-conjoined-modules` (info) Modules do not share private implementation
 - `design/module-layout` (warn) A module groups code at one abstraction level
 - `design/layers` (error) Dependencies point down the layers
-- `design/complexity` (warn) Functions stay within their complexity limits
+- `design/complexity` (info) Functions stay within their complexity limits
 - `design/coupling` (warn) Functions are not dependency hubs
 - `design/signature-size` (warn, fixable: unsafe) Signatures stay within their size limits
 - `design/no-private-types` (warn) Public signatures expose public types
@@ -140,4 +140,6 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `testing/max-case-depth` (warn) Test cases have at most two levels
 - `testing/no-hidden-target` (warn) Tests expose the behavior they exercise
 - `testing/file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers
+- `testing/owner-file` (info) The tests of a symbol live in the test file of its file
+- `testing/file-pair` (info) A test file is named after a source file
 - `testing/public-boundary` (error) Contract tests live outside the target

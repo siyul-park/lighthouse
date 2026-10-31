@@ -38,6 +38,7 @@ mod gap;
 mod homonyms;
 mod imports;
 mod ownership;
+mod pair;
 mod parent;
 mod role;
 mod stability;
@@ -329,6 +330,9 @@ impl<'a> Builder<'a> {
                     .map(|comment| self.comment(comment, text))
                     .collect(),
             );
+        }
+        if self.needs.field("pair") {
+            value["pair"] = self.pair(file);
         }
         if self.needs.field("line_widths") {
             value["line_widths"] = widths::line_widths(text);

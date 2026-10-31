@@ -436,7 +436,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/complexity`](#functions-stay-within-their-complexity-limits) | Functions stay within their complexity limits | warn · cel |  |  |
+| [`design/complexity`](#functions-stay-within-their-complexity-limits) | Functions stay within their complexity limits | info · cel |  |  |
 | [`design/coupling`](#functions-are-not-dependency-hubs) | Functions are not dependency hubs | warn · cel |  |  |
 | [`design/abstraction-level`](#a-function-reads-at-one-level-of-abstraction) | A function reads at one level of abstraction | warn · model |  |  |
 | [`design/signature-size`](#signatures-stay-within-their-size-limits) | Signatures stay within their size limits | warn · cel | unsafe |  |
@@ -450,11 +450,11 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 ### Functions stay within their complexity limits
 
-`design/complexity` · symbol · warn · cel · cel, go, python, rust, typescript
+`design/complexity` · symbol · info · cel · cel, go, python, rust, typescript
 
-*Function size and control-flow metrics are signals for simplifying the function, not for moving the same complexity into another file or a helper used only once; the remedy simplifies the behavior rather than relocating it. A role-specific limit may replace the default for lines, statements, decision paths, cognitive complexity, and nesting.*
+*Function size and control-flow metrics are signals for simplifying the function, not for moving the same complexity into another file or a helper used only once; the remedy simplifies the behavior rather than relocating it. The single-use helpers of a function (functions only it calls, and theirs) count toward it, and the sum is reported at the function that calls them, never at its helpers. A role-specific limit may replace the default for lines, statements, decision paths, cognitive complexity, and nesting.*
 
-A function SHOULD stay within the configured limits for lines, statements, decision paths, cognitive complexity, and nesting.
+A function, with the helpers that only it calls, SHOULD stay within the configured limits for lines, statements, decision paths, cognitive complexity, and nesting.
 
 Derived from: Lighthouse catalog: the CEL limits are the largest values among the expressions of the bundled decisions when CEL was first measured; lower them as those expressions are simplified; funlen lines 60: https://golangci-lint.run/usage/linters/#funlen; clippy too_many_lines 100: https://doc.rust-lang.org/clippy/lint_configuration.html; ESLint max-lines-per-function: https://eslint.org/docs/latest/rules/max-lines-per-function; funlen statements 40: https://golangci-lint.run/usage/linters/#funlen; ESLint max-statements: https://eslint.org/docs/latest/rules/max-statements; McCabe 1976, A Complexity Measure; gocyclo min-complexity 30: https://golangci-lint.run/usage/linters/#gocyclo; ESLint complexity: https://eslint.org/docs/latest/rules/complexity; Sonar S1541, cyclop; Campbell 2018, Cognitive Complexity (SonarSource); gocognit min-complexity 30: https://golangci-lint.run/usage/linters/#gocognit; clippy cognitive_complexity 25: https://doc.rust-lang.org/clippy/lint_configuration.html; Sonar S3776; ESLint max-depth 4: https://eslint.org/docs/latest/rules/max-depth; Sonar S134; Henry and Kafura 1981, information flow; funlen: https://golangci-lint.run/usage/linters/#funlen; SonarSource, Cognitive Complexity (2017); Martin, Clean Code (2008), G6 Code at Wrong Level of Abstraction; Martin, Clean Code (2008), G16 Obscured Intent; Martin, Clean Code (2008), G30 Functions Should Do One Thing; Martin, Clean Code (2008), G34 Functions Should Descend Only One Level of Abstraction; Martin, Clean Code (2008), ch. 3 Small functions; Martin, Clean Code (2008), ch. 3 Do one thing; Martin, Clean Code (2008), ch. 3 One level of abstraction; Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9; Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
 

@@ -55,6 +55,8 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("gap", Reach::Local),
     ("func", Reach::Local),
     ("line_widths", Reach::Local),
+    // The source file a test file is named after.
+    ("pair", Reach::Global),
     ("data_only", Reach::Neighbors),
     ("receiver_affinity", Reach::Neighbors),
     ("owner_home", Reach::Neighbors),

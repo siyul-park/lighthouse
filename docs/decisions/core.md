@@ -10,12 +10,12 @@ Size limits that keep files reviewable.
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/max-lines`](#files-stay-small-and-cohesive) | Files stay small and cohesive | warn · cel |  |  |
+| [`core/max-lines`](#files-stay-small-and-cohesive) | Files stay small and cohesive | info · cel |  |  |
 | [`core/max-len`](#lines-fit-the-configured-width) | Lines fit the configured width | warn · cel |  |  |
 
 ### Files stay small and cohesive
 
-`core/max-lines` · file · warn · cel
+`core/max-lines` · file · info · cel
 
 *Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The remedy is simpler code or a concept that is reused, never the same code moved elsewhere. A file over the limit is made simpler, or split along a boundary whose halves are used apart, never by size alone or by moving code to a file that remains tied to the first. A half moved to another file that stays tied to the first through private items is not a boundary (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man).*
 

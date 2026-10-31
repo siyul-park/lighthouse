@@ -48,7 +48,6 @@ sources = [
 files = ["docs/cli.md", "docs/mcp.md", "docs/decisions/**", "skills/lighthouse/SKILL.md"]
 
 [spec.rules]
-"core/max-lines" = { level = "warn", options = { max = 1000 } }
 # Keep line width off in this repository; max-lines remains the default size check.
 "core/max-len" = "off"
 # Four words: visitor methods and field names from external formats are not ours to rename.
@@ -90,7 +89,7 @@ options.layers = [
 # project's own design.
 [[spec.overrides]]
 files = ["crates/lighthouse-rpc/tests/conformance/**"]
-rules = { "core/max-lines" = "off", "design/complexity" = { level = "warn", options = { kinds = ["lines", "statements", "cognitive", "nesting"] } }, "design/exported-doc" = "off", "design/no-unused-symbol" = "off", "design/no-redundant-symbol" = "off", "design/declaration-groups" = "off", "design/top-down-order" = "off", "design/vertical-distance" = "off", "design/no-noise-comment" = "off", "design/no-todo" = "off", "design/no-detached-comment" = "off", "design/no-redundant-qualifier" = "off", "design/max-name-words" = "off", "design/no-type-encoding" = "off", "design/no-mutable-globals" = "off", "design/context-first" = "off", "design/no-stored-context" = "off", "design/error-identity" = "off", "design/no-panic" = "off", "design/single-responsibility" = "off", "design/no-conjoined-modules" = "off", "design/coupling" = "off", "design/signature-size" = "off", "design/no-private-types" = "off", "design/prefer-method" = "off", "design/feature-envy" = "off", "testing/public-boundary" = "off", "testing/no-missing-owner" = "off", "testing/no-duplicate-owner" = "off" }
+rules = { "core/max-lines" = "off", "design/complexity" = { level = "info", options = { kinds = ["lines", "statements", "cognitive", "nesting"] } }, "design/exported-doc" = "off", "design/no-unused-symbol" = "off", "design/no-redundant-symbol" = "off", "design/declaration-groups" = "off", "design/top-down-order" = "off", "design/vertical-distance" = "off", "design/no-noise-comment" = "off", "design/no-todo" = "off", "design/no-detached-comment" = "off", "design/no-redundant-qualifier" = "off", "design/max-name-words" = "off", "design/no-type-encoding" = "off", "design/no-mutable-globals" = "off", "design/context-first" = "off", "design/no-stored-context" = "off", "design/error-identity" = "off", "design/no-panic" = "off", "design/single-responsibility" = "off", "design/no-conjoined-modules" = "off", "design/coupling" = "off", "design/signature-size" = "off", "design/no-private-types" = "off", "design/prefer-method" = "off", "design/feature-envy" = "off", "testing/public-boundary" = "off", "testing/no-missing-owner" = "off", "testing/no-duplicate-owner" = "off" }
 
 [[spec.overrides]]
 files = ["docs/cli.md", "docs/decisions/**", "schema/**", "protocol/schema/**", "crates/*/tests/it/snapshots/**"]

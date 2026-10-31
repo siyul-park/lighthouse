@@ -22,6 +22,8 @@ Test structure should provide one obvious owner for each public contract and kee
 | [`testing/simple-tables`](#test-tables-stay-simple) | Test tables stay simple | warn · model |  |  |
 | [`testing/no-hidden-target`](#tests-expose-the-behavior-they-exercise) | Tests expose the behavior they exercise | warn · cel |  |  |
 | [`testing/file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | error · cel | safe |  |
+| [`testing/owner-file`](#the-tests-of-a-symbol-live-in-the-test-file-of-its-file) | The tests of a symbol live in the test file of its file | info · cel |  |  |
+| [`testing/file-pair`](#a-test-file-is-named-after-a-source-file) | A test file is named after a source file | info · cel |  |  |
 
 ### Every public symbol has an owner test
 
@@ -466,6 +468,78 @@ Derived from: Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Marti
 ```
 
 Also: rust, typescript, python
+
+### The tests of a symbol live in the test file of its file
+
+`testing/owner-file` · symbol · info · cel · go
+
+*A source file has one test file, and the tests of its symbols are read there. This is the test-side twin of `design/owner-file`, which keeps the members of an owner together in one source file; and it is why `core/max-lines` asks for no split by size: a test file grows with its source file, not apart from it. Go: `go test` runs the files named `*_test.go`, and the standard library names each after the file it tests (`strings.go`, `strings_test.go`). The test file of `x.go` is `x_test.go` in the same directory, whether its package is `x` or `x_test`. An owner test (see `testing/no-missing-owner`) of a symbol declared in `y.go` belongs in `y_test.go`. A test file named after no source file is judged by `testing/file-pair`. Rust, TypeScript and Python are not judged yet. There is no tool precedent; the severity is `info` until precision is measured at 80% or more and the project approves a stronger level.*
+
+The owner tests of a source file's symbols MUST live in that file's test file.
+
+Derived from: Go standard library layout: tests of x.go are in x_test.go (https://pkg.go.dev/cmd/go#hdr-Test_packages); Lighthouse design/owner-file and core/max-lines
+
+```go invalid other_test.go
+package sample
+
+import "testing"
+
+func TestGet(t *testing.T) {
+	if Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+```go valid store_test.go
+package sample
+
+import "testing"
+
+func TestGet(t *testing.T) {
+	if Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+### A test file is named after a source file
+
+`testing/file-pair` · file · info · cel · go
+
+*A test file is read next to the source file it tests, so its name says which one. A test file named after no source file (a `helpers_test.go` that only holds a share of the tests of a large file) hides where the tests of a symbol are; see `testing/owner-file` for the tests themselves and `core/max-lines`, which asks for no split by size. Go: `x_test.go` pairs with `x.go` in the same directory; both `package x` and `package x_test` count. `export_test.go` (the file that exports internals to the external test package), `example_test.go` and `main_test.go` are Go conventions with no source file of that name. Rust, TypeScript and Python are not judged yet. There is no tool precedent; the severity is `info` until precision is measured at 80% or more and the project approves a stronger level.*
+
+A test file MUST be named after a source file of its package.
+
+Derived from: Go standard library layout: tests of x.go are in x_test.go (https://pkg.go.dev/cmd/go#hdr-Test_packages)
+
+| option | default | meaning |
+| --- | --- | --- |
+| `allow` | `["export","example","main"]` | Base names of test files that need no source file: Go's `export_test.go` and example-file conventions. |
+
+```go invalid helpers_test.go
+package sample
+
+import "testing"
+
+func TestGet(t *testing.T) {
+	if Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+```go valid store_test.go
+package sample
+
+import "testing"
+
+func TestGet(t *testing.T) {
+	if Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
 
 ## Public Boundary
 

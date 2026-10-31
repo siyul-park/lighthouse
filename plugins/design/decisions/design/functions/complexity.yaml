@@ -8,13 +8,14 @@ spec:
   title: Functions stay within their complexity limits
   context: Function size and control-flow metrics are signals for simplifying the
     function, not for moving the same complexity into another file or a helper used
-    only once; the remedy simplifies the behavior rather than relocating it. A role-specific limit may replace the default for lines, statements,
+    only once; the remedy simplifies the behavior rather than relocating it. The single-use helpers of a function (functions only it calls, and theirs) count toward it, and the sum is reported at the function that calls them, never at its helpers. A role-specific limit may replace the default for lines, statements,
     decision paths, cognitive complexity, and nesting.
   scope:
     subject: symbol
-  requirement: A function SHOULD stay within the configured limits for lines, statements,
-    decision paths, cognitive complexity, and nesting.
-  severity: warn
+  requirement: A function, with the helpers that only it calls, SHOULD stay within
+    the configured limits for lines, statements, decision paths, cognitive complexity,
+    and nesting.
+  severity: info
   options:
     properties:
       kinds:
@@ -96,28 +97,34 @@ spec:
          {'kind': 'cognitive', 'what': 'cognitive complexity points', 'own': m.cognitive, 'all': u.cognitive,
           'max': caps.cognitive, 'skip': options.ignoreDispatch && m.dispatcher,
           'hint': 'flatten the control flow'}]
+    - name: folds
+      expression: 'm.measured && u.caller == null && size(u.helpers) > 0'
+    - name: helper_names
+      expression: "u.helpers.map(h, h.name).join(', ')"
     - name: judged
       expression: 'm.measured ? rows.filter(r, r.max >= 0 && !r.skip) : []'
     - name: found
       expression: |-
-        judged.filter(r, r.kind in options.kinds && r.own > r.max)
+        judged.filter(r, r.kind in options.kinds && (r.own > r.max || (folds && r.all > r.max)))
           .map(r, {'kind': r.kind, 'what': r.what, 'own': r.own, 'max': r.max,
-                   'hint': r.hint, 'value': r.own})
+                   'hint': r.hint, 'folded': r.own <= r.max, 'value': r.own > r.max ? r.own : r.all})
         + (m.measured && 'nesting' in options.kinds && caps.nesting >= 0 && m.depth > caps.nesting
            ? [{'kind': 'nesting', 'what': 'levels of nesting', 'own': m.depth, 'max': caps.nesting,
-               'hint': 'extract nested blocks or return early', 'value': m.depth}] : [])
+               'hint': 'extract nested blocks or return early', 'folded': false, 'value': m.depth}] : [])
     - name: first
-      expression: 'size(found) > 0 ? found[0] : {''kind'': '''', ''what'': '''', ''own'':
-        0, ''max'': 0, ''hint'': '''', ''value'': 0}'
+      expression: |-
+        size(found) > 0 ? found[0] : {'kind': '', 'what': '', 'own': 0, 'max': 0, 'hint': '', 'folded': false, 'value': 0}
     where: size(found) > 0
     message: "{{ size(found) == 0 ? '' : subject + ' ' + string(first.value) + ' '
-      + first.what + ' (max ' + string(first.max) + '): ' + first.hint }}"
+      + first.what + (first.folded ? ' with its single-use helpers ' + helper_names : '')
+      + ' (max ' + string(first.max) + '): ' + first.hint }}"
     evidence:
       kind: first.kind
       kinds: found.map(f, f.kind)
       value: first.value
       max: first.max
       role: func.role
+      helpers: u.helpers.map(h, h.name)
     identity:
       subject: func.id
   languages:
@@ -242,6 +249,64 @@ spec:
         }
     expect:
     - line: 1
+  - name: lines-single-use-helper-counts
+    language: go
+    kind: invalid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func run() int {
+            return help() + 1
+        }
+
+        func help() int {
+            x := 1
+            return x
+        }
+    expect:
+    - line: 3
+    options:
+      kinds:
+      - lines
+      limits:
+        lines: 5
+        statements: 40
+        cyclomatic: 30
+        cognitive: 30
+        nesting: 4
+
+  - name: lines-shared-helper-is-not-folded
+    language: go
+    kind: valid
+    files:
+    - path: sample.go
+      body: |-
+        package sample
+
+        func run() int {
+            return help() + 1
+        }
+
+        func other() int {
+            return help() + 2
+        }
+
+        func help() int {
+            x := 1
+            return x
+        }
+    options:
+      kinds:
+      - lines
+      limits:
+        lines: 5
+        statements: 40
+        cyclomatic: 30
+        cognitive: 30
+        nesting: 4
+
   - name: statements-many-statements
     language: go
     kind: invalid

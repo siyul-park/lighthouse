@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/owner-file
+  uid: 6a1f0c52-8d3e-4f7b-9b0a-2c5e7d4a91b3
+spec:
+  title: The tests of a symbol live in the test file of its file
+  context: >-
+    A source file has one test file, and the tests of its symbols are read
+    there. This is the test-side twin of `design/owner-file`, which keeps the
+    members of an owner together in one source file; and it is why
+    `core/max-lines` asks for no split by size: a test file grows with its
+    source file, not apart from it.
+
+    Go: `go test` runs the files named `*_test.go`, and the standard library
+    names each after the file it tests (`strings.go`, `strings_test.go`). The
+    test file of `x.go` is `x_test.go` in the same directory, whether its
+    package is `x` or `x_test`. An owner test (see `testing/no-missing-owner`)
+    of a symbol declared in `y.go` belongs in `y_test.go`. A test file named
+    after no source file is judged by `testing/file-pair`.
+
+    Rust, TypeScript and Python are not judged yet.
+
+    There is no tool precedent; the severity is `info` until precision is
+    measured at 80% or more and the project approves a stronger level.
+  scope:
+    subject: symbol
+    examples: exclude
+  languages:
+    go: {}
+  requirement: >-
+    The owner tests of a source file's symbols MUST live in that file's test
+    file.
+  severity: info
+  check:
+    type: cel
+    select: symbol
+    variables:
+      - name: parts
+        expression: "symbol.file.split('/')"
+      - name: home
+        expression: "parts[size(parts) - 1].substring(0, size(parts[size(parts) - 1]) - 3) + '_test.go'"
+      - name: misplaced
+        expression: >-
+          symbol.kind != 'test' && symbol.file.endsWith('.go')
+          ? symbol.tests.filter(t, t.file_test && t.file.endsWith('_test.go')
+              && t.file.split('/').slice(0, size(t.file.split('/')) - 1) == parts.slice(0, size(parts) - 1)
+              && t.file.split('/')[size(t.file.split('/')) - 1] != home)
+          : []
+    where: size(misplaced) > 0
+    message: >-
+      {{ misplaced[0].name + ' tests ' + symbol.name + ' of ' + parts[size(parts) - 1]
+         + '; it belongs in ' + home }}
+    evidence:
+      symbol: symbol.id
+      test: misplaced[0].id
+      home: home
+    at:
+      symbol: misplaced[0].id
+    identity:
+      subject: misplaced[0].id
+  provenance:
+    wasDerivedFrom:
+      - "Go standard library layout: tests of x.go are in x_test.go (https://pkg.go.dev/cmd/go#hdr-Test_packages)"
+      - "Lighthouse design/owner-file and core/max-lines"
+  examples:
+    - name: valid-pair
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: store.go
+          body: |-
+            package sample
+
+            func Get() int { return 1 }
+        - path: store_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestGet(t *testing.T) {
+            	if Get() != 1 {
+            		t.Fatal("get")
+            	}
+            }
+    - name: misplaced-test
+      language: go
+      kind: invalid
+      files:
+        - path: store.go
+          body: |-
+            package sample
+
+            func Get() int { return 1 }
+        - path: other_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestGet(t *testing.T) {
+            	if Get() != 1 {
+            		t.Fatal("get")
+            	}
+            }
+      expect:
+        - line: 5

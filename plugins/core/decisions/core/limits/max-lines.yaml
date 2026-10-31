@@ -22,7 +22,7 @@ spec:
     examples: exclude
   requirement: >-
     A file SHOULD stay at or below the configured line limit (option `max`).
-  severity: warn
+  severity: info
   options:
     properties:
       max:
