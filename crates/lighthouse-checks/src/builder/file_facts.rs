@@ -22,9 +22,10 @@ impl Builder<'_> {
             .unwrap_or_else(|| json!([]))
     }
 
-    /// `{ base, expected, found }` for a test file named `<base>_test.<ext>`:
+    /// `{ base, expected, found, sourced }` for a test file named `<base>_test.<ext>`:
     /// the base name, the path of the source file the name asks for and the
-    /// path of that file when the project has it (else empty); null for any
+    /// path of that file when the project has it (else empty), and whether the
+    /// directory has any source file; null for any
     /// other file.
     pub(super) fn pair(&self, file: &File) -> Value {
         let Some(base) = file
@@ -47,7 +48,12 @@ impl Builder<'_> {
             .file(&expected)
             .filter(|f| !f.test)
             .map_or_else(String::new, |f| path(&f.path));
-        json!({ "base": base, "expected": path(&expected), "found": found })
+        let sourced = self.project.files.iter().any(|f| {
+            !f.test
+                && f.path.parent() == file.path.parent()
+                && f.path.extension() == file.path.extension()
+        });
+        json!({ "base": base, "expected": path(&expected), "found": found, "sourced": sourced })
     }
 }
 

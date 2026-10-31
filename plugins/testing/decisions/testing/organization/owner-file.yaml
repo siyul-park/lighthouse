@@ -5,61 +5,89 @@ metadata:
   name: testing/owner-file
   uid: 6a1f0c52-8d3e-4f7b-9b0a-2c5e7d4a91b3
 spec:
-  title: The tests of a symbol live in the test file of its file
+  title: The tests of a source file live in its test file
   context: >-
-    A source file has one test file, and the tests of its symbols are read
-    there. This is the test-side twin of `design/owner-file`, which keeps the
-    members of an owner together in one source file; and it is why
-    `core/max-lines` asks for no split by size: a test file grows with its
+    A source file has one test file, named after it, and the tests of its
+    symbols are read there. This is the test-side twin of `design/owner-file`,
+    which keeps the members of an owner together in one source file; and it is
+    why `core/max-lines` asks for no split by size: a test file grows with its
     source file, not apart from it.
 
     Go: `go test` runs the files named `*_test.go`, and the standard library
     names each after the file it tests (`strings.go`, `strings_test.go`). The
     test file of `x.go` is `x_test.go` in the same directory, whether its
-    package is `x` or `x_test`. An owner test (see `testing/no-missing-owner`)
-    of a symbol declared in `y.go` belongs in `y_test.go`. A test file named
-    after no source file is judged by `testing/file-pair`.
+    package is `x` or `x_test`. Two findings, told apart by the evidence
+    `kind`. `unpaired`: a test file named after no source file of its
+    directory (`helpers_test.go` beside no `helpers.go`), reported at its first
+    declaration; `export_test.go`, `example_test.go` and `main_test.go` are Go
+    conventions that need no source file (option `allow`), and a directory with
+    no source file at all (`examples/`, a conformance suite) has nothing to be
+    named after. `misplaced`: an owner test (see `testing/no-missing-owner`) of
+    a symbol declared in `y.go` that sits in a test file other than
+    `y_test.go`.
 
     Rust, TypeScript and Python are not judged yet.
 
-    There is no tool precedent; the severity is `info` until precision is
-    measured at 80% or more and the project approves a stronger level.
+    No tool has this precedent. The severity follows the measured precision of
+    the findings. Measured on cel, qlbridge and lighthouse's own Go before its
+    tests were moved (minivm, which was being edited, left out): 45 of 47
+    findings are right (96%), 27 of 27 `misplaced` and 18 of 20 `unpaired`; the
+    two others are a Go example file (`cel_example_test.go`) and a benchmark
+    file (`vm_bench_test.go`), which the convention names after neither a
+    source file nor `example_test.go`. At 95% or more the project approved
+    `error` (user decision, outside the precedent gate).
   scope:
     subject: symbol
+    tests: only
     examples: exclude
   languages:
     go: {}
   requirement: >-
-    The owner tests of a source file's symbols MUST live in that file's test
-    file.
-  severity: info
+    The tests of a source file's symbols MUST live in that file's test file, and
+    a test file MUST be named after a source file of its package.
+  severity: error
+  options:
+    properties:
+      allow:
+        type: array
+        items:
+          type: string
+        default: [export, example, main]
+        description: >-
+          Base names of test files that need no source file: Go's
+          `export_test.go` and example-file conventions.
+    additionalProperties: false
   check:
     type: cel
     select: symbol
     variables:
       - name: parts
         expression: "symbol.file.split('/')"
-      - name: home
-        expression: "parts[size(parts) - 1].substring(0, size(parts[size(parts) - 1]) - 3) + '_test.go'"
+      - name: stem
+        expression: "parts[size(parts) - 1].substring(0, size(parts[size(parts) - 1]) - 3)"
+      - name: unpaired
+        expression: >-
+          symbol.file.endsWith('_test.go') && size(file.symbols) > 0 && file.symbols[0].id == symbol.id
+          && file.pair != null && file.pair.sourced && file.pair.found == ''
+          && !(file.pair.base in options.allow)
+      - name: owned
+        expression: "symbol.kind == 'test' && has(symbol.owned) && symbol.owned != null ? symbol.owned : {}"
       - name: misplaced
         expression: >-
-          symbol.kind != 'test' && symbol.file.endsWith('.go')
-          ? symbol.tests.filter(t, t.file_test && t.file.endsWith('_test.go')
-              && t.file.split('/').slice(0, size(t.file.split('/')) - 1) == parts.slice(0, size(parts) - 1)
-              && t.file.split('/')[size(t.file.split('/')) - 1] != home)
-          : []
-    where: size(misplaced) > 0
+          size(owned) > 0 && symbol.file.endsWith('_test.go')
+          && owned.file.split('/').slice(0, size(owned.file.split('/')) - 1) == parts.slice(0, size(parts) - 1)
+          && stem != owned.file.split('/')[size(owned.file.split('/')) - 1].substring(0, size(owned.file.split('/')[size(owned.file.split('/')) - 1]) - 3) + '_test'
+    where: unpaired || misplaced
     message: >-
-      {{ misplaced[0].name + ' tests ' + symbol.name + ' of ' + parts[size(parts) - 1]
-         + '; it belongs in ' + home }}
+      {{ unpaired
+         ? 'test file ' + symbol.file + ' has no source file ' + file.pair.base + '.go'
+         : symbol.name + ' tests ' + owned.name + ' of ' + owned.file.split('/')[size(owned.file.split('/')) - 1]
+           + '; it belongs in ' + owned.file.split('/')[size(owned.file.split('/')) - 1].substring(0, size(owned.file.split('/')[size(owned.file.split('/')) - 1]) - 3) + '_test.go' }}
     evidence:
-      symbol: symbol.id
-      test: misplaced[0].id
-      home: home
-    at:
-      symbol: misplaced[0].id
+      kind: "unpaired ? 'unpaired' : 'misplaced'"
+      symbol: "unpaired ? '' : owned.id"
     identity:
-      subject: misplaced[0].id
+      subject: symbol.id
   provenance:
     wasDerivedFrom:
       - "Go standard library layout: tests of x.go are in x_test.go (https://pkg.go.dev/cmd/go#hdr-Test_packages)"
@@ -86,7 +114,7 @@ spec:
             		t.Fatal("get")
             	}
             }
-    - name: misplaced-test
+    - name: unpaired-helpers
       language: go
       kind: invalid
       files:
@@ -95,7 +123,7 @@ spec:
             package sample
 
             func Get() int { return 1 }
-        - path: other_test.go
+        - path: helpers_test.go
           body: |-
             package sample
 
@@ -108,3 +136,50 @@ spec:
             }
       expect:
         - line: 5
+    - name: misplaced-test
+      language: go
+      kind: invalid
+      files:
+        - path: store.go
+          body: |-
+            package sample
+
+            func Get() int { return 1 }
+
+            func Set() int { return 2 }
+        - path: set.go
+          body: |-
+            package sample
+
+            func Put() int { return 3 }
+        - path: store_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestGet(t *testing.T) {
+            	if Get() != 1 {
+            		t.Fatal("get")
+            	}
+            }
+
+            func TestPut(t *testing.T) {
+            	if Put() != 3 {
+            		t.Fatal("put")
+            	}
+            }
+        - path: set_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestSet(t *testing.T) {
+            	if Set() != 2 {
+            		t.Fatal("set")
+            	}
+            }
+      expect:
+        - line: 5
+        - line: 11

@@ -19,7 +19,7 @@ spec:
       intro: >-
         Test structure should provide one obvious owner for each public contract
         and keep case structure shallow, direct and readable.
-      decisions: [no-missing-owner, no-duplicate-owner, standard-assertions, behavior-cases, case-assertions, consistent-case-style, max-case-depth, prefer-table, scenario-cases, simple-tables, no-hidden-target, file-layout, owner-file, file-pair]
+      decisions: [no-missing-owner, no-duplicate-owner, standard-assertions, behavior-cases, case-assertions, consistent-case-style, max-case-depth, prefer-table, scenario-cases, simple-tables, no-hidden-target, file-layout, owner-file]
     - name: public-boundary
       title: Public Boundary
       intro: >-

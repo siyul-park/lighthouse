@@ -38,6 +38,7 @@ mod forward;
 mod gap;
 mod homonyms;
 mod imports;
+mod owned;
 mod ownership;
 mod parent;
 mod role;
@@ -412,6 +413,9 @@ impl<'a> Builder<'a> {
                 json!(target.map_or("", |t| t.as_str())),
             );
         }
+        if needs.field("owned") && symbol.kind == SymbolKind::Test {
+            map.insert("owned".to_owned(), self.owned(symbol));
+        }
         if needs.field("receiver_affinity") {
             map.insert(
                 "receiver_affinity".to_owned(),
@@ -740,6 +744,7 @@ pub(crate) struct Indexes {
     imports: OnceLock<BTreeMap<String, Vec<String>>>,
     cycles: OnceLock<BTreeMap<String, Vec<String>>>,
     types: OnceLock<BTreeMap<String, Vec<Value>>>,
+    owned: OnceLock<BTreeMap<SymbolId, Vec<SymbolId>>>,
     names: OnceLock<BTreeMap<String, Vec<SymbolId>>>,
     parents: OnceLock<parent::Uses>,
     modules: OnceLock<System>,

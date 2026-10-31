@@ -46,6 +46,8 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("owner", Reach::Neighbors),
     ("uses", Reach::Neighbors),
     ("tests", Reach::Global),
+    // The symbol a test is the owner test of.
+    ("owned", Reach::Global),
     // A function with the single-use helpers it calls, transitively; how far a
     // symbol reaches the others through what the symbols use.
     ("unit", Reach::Global),
