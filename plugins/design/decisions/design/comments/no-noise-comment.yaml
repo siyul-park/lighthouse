@@ -235,12 +235,15 @@ spec:
     kind: invalid
     fixed:
     - path: src/lib.rs
-      body: pub struct Store;
+      body: |-
+        /// Part of the example.
+        pub struct Store;
     files:
     - path: src/lib.rs
       body: |-
         // ===== Types =====
 
+        /// Part of the example.
         pub struct Store;
     expect:
     - line: 1
@@ -290,7 +293,6 @@ spec:
         package sample
 
         // The total is computed once: compute(a, b) is costly.
-
         func run() {}
     canonical: false
   - name: code-rust-invalid
@@ -301,12 +303,15 @@ spec:
       - commented-code
     fixed:
     - path: src/lib.rs
-      body: pub struct Store;
+      body: |-
+        /// Part of the example.
+        pub struct Store;
     files:
     - path: src/lib.rs
       body: |-
         // let total = compute(a, b);
 
+        /// Part of the example.
         pub struct Store;
     expect:
     - line: 1
@@ -321,6 +326,7 @@ spec:
       body: |-
         // The total is computed once because compute is costly.
 
+        /// Part of the example.
         pub struct Store;
     canonical: false
   - name: history-go-invalid
@@ -351,7 +357,6 @@ spec:
         package sample
 
         // The format changed in version 2; readers accept both.
-
         func run() {}
     canonical: false
   - name: history-rust-invalid
@@ -379,6 +384,7 @@ spec:
       body: |-
         // The author field is optional on the wire.
 
+        /// Part of the example.
         pub struct Store;
     canonical: false
   - name: closing-go-invalid
@@ -430,6 +436,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn run(x: i32) -> i32 {
             if x > 0 {
                 return x;
@@ -443,6 +450,7 @@ spec:
     fixed:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function helper(): number {
           return 1;
         }
@@ -451,6 +459,7 @@ spec:
       body: |-
         // ---- Helpers ----
 
+        /** Part of the example. */
         export function helper(): number {
           return 1;
         }
@@ -462,6 +471,7 @@ spec:
     fixed:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function helper(): number {
           return 1;
         }
@@ -470,6 +480,7 @@ spec:
       body: |-
         // #region Helpers
 
+        /** Part of the example. */
         export function helper(): number {
           return 1;
         }
@@ -491,6 +502,7 @@ spec:
           return 1;
         }
 
+        /** Part of the example. */
         export const x = 1; // --- not a banner: it trails code
   - name: code-typescript-invalid
     language: typescript
@@ -501,6 +513,7 @@ spec:
     fixed:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function run(): void {}
     files:
     - path: sample.ts
@@ -508,6 +521,7 @@ spec:
         // const total = compute(a, b);
         // console.log("total", total);
 
+        /** Part of the example. */
         export function run(): void {}
     expect:
     - line: 1
@@ -522,6 +536,7 @@ spec:
       body: |-
         // The total is computed once: compute(a, b) is costly.
 
+        /** Part of the example. */
         export function run(): void {}
     canonical: false
   - name: code-typescript-prose-valid
@@ -533,6 +548,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function run(x: number): number {
           // let the frame paint once (scale-up), then lift it
           // alpha = rgba(0,0,0,0), so inverted keeps no alpha
@@ -564,6 +580,7 @@ spec:
       body: |-
         // The format changed in version 2; readers accept both.
 
+        /** Part of the example. */
         export function run(): void {}
     canonical: false
   - name: closing-typescript-invalid
@@ -592,6 +609,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function run(x: number): number {
           if (x > 0) {
             return x;
@@ -605,6 +623,7 @@ spec:
     fixed:
     - path: sample.js
       body: |-
+        /** Part of the example. */
         function helper() {
           return 1;
         }
@@ -615,6 +634,7 @@ spec:
       body: |-
         // ---- Helpers ----
 
+        /** Part of the example. */
         function helper() {
           return 1;
         }
@@ -654,6 +674,7 @@ spec:
       body: |-
         # Retry once: the first call warms the cache.
         def load() -> str:
+            """Part of the example."""
             return "x"
   - name: python-prose-with-operators-valid
     language: python
@@ -665,4 +686,5 @@ spec:
         # PYTHON_GIL=0 crashes the interpreter on free-threaded builds.
         # show_traceback = True, using_user_site = False
         def load() -> str:
+            """Part of the example."""
             return "x"

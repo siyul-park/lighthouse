@@ -162,8 +162,10 @@ spec:
       body: |-
         package provider
 
+        // Config is part of the example.
         type Config struct{}
 
+        // Providence is part of the example.
         type Providence struct{}
 
         type providerState struct{}
@@ -177,6 +179,7 @@ spec:
       body: |-
         package provider
 
+        // Provider is part of the example.
         type Provider struct{}
   - name: rust-invalid
     language: rust
@@ -202,7 +205,9 @@ spec:
     - path: src/lib.rs
       body: pub mod store;
     - path: src/store.rs
-      body: pub struct Handle;
+      body: |-
+        /// Part of the example.
+        pub struct Handle;
   - name: rust-primary-concept
     language: rust
     kind: valid
@@ -213,7 +218,9 @@ spec:
     - path: src/lib.rs
       body: pub mod store;
     - path: src/store.rs
-      body: pub struct Store;
+      body: |-
+        /// Part of the example.
+        pub struct Store;
     canonical: false
   - name: affix-go
     language: go
@@ -237,8 +244,15 @@ spec:
       affix: true
     files:
     - path: sample.go
-      body: "package sample\n\ntype Options struct {\n\tname string\n\tpath string\n\tmode
-        int\n}\n"
+      body: |
+        package sample
+
+        // Options is part of the example.
+        type Options struct {
+        	name string
+        	path string
+        	mode int
+        }
   - name: affix-rust
     language: rust
     kind: invalid
@@ -266,6 +280,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub enum Kind {
             File,
             Dir,
@@ -340,8 +355,10 @@ spec:
     files:
     - path: provider.ts
       body: |-
+        /** Part of the example. */
         export class ProviderOptions {}
 
+        /** Part of the example. */
         export function providerFor(): ProviderOptions {
           return new ProviderOptions();
         }
@@ -351,6 +368,7 @@ spec:
     files:
     - path: provider.ts
       body: |-
+        /** Part of the example. */
         export enum Kind {
           Local,
           Remote,
@@ -382,6 +400,7 @@ spec:
 
 
         class Color(Enum):
+            """Part of the example."""
             RED = 1
             BLUE = 2
   fix:

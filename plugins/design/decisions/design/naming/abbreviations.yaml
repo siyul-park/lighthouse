@@ -123,8 +123,10 @@ spec:
       body: |
         package sample
 
+        // Config is part of the example.
         type Config struct{ httpURL string }
 
+        // Identity is part of the example.
         func Identity() string { return "" }
   - name: acronym-as-word-rust
     language: rust
@@ -133,6 +135,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub struct Config {
             pub http_url: String,
             pub uuid: String,
@@ -212,10 +215,12 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export class Config {
           httpUrl = "";
         }
 
+        /** Part of the example. */
         export function userId(): string {
           return "";
         }
@@ -237,6 +242,7 @@ spec:
     - path: web/client.py
       body: |-
         class HTTPClient:
+            """Part of the example."""
             pass
   - name: python-function-snake-case
     language: python
@@ -245,4 +251,5 @@ spec:
     - path: web/fetch.py
       body: |-
         def fetch_url(address: str) -> str:
+            """Part of the example."""
             return address

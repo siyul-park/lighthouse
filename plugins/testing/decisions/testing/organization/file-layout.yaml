@@ -136,8 +136,10 @@ spec:
           body: |-
             package sample
 
+            // Get is part of the example.
             func Get() int { return 1 }
 
+            // Set is part of the example.
             func Set() int { return 2 }
         - path: store_test.go
           body: |-
@@ -170,8 +172,10 @@ spec:
           body: |-
             package sample
 
+            // Get is part of the example.
             func Get() int { return 1 }
 
+            // Set is part of the example.
             func Set() int { return 2 }
         - path: store_test.go
           body: |-
@@ -195,8 +199,10 @@ spec:
           body: |-
             package sample
 
+            // Get is part of the example.
             func Get() int { return 1 }
 
+            // Set is part of the example.
             func Set() int { return 2 }
         - path: store_test.go
           body: |-
@@ -222,7 +228,22 @@ spec:
       kind: invalid
       fixed:
         - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nconst want = 1\n\nfunc TestGet(t *testing.T) {\n\tif store.Get() != want {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            const want = 1
+
+            func TestGet(t *testing.T) {
+            	if store.Get() != want {
+            		t.Fatal("get")
+            	}
+            }
       files:
         - path: go.mod
           body: |-
@@ -233,9 +254,25 @@ spec:
           body: |-
             package store
 
+            // Get is part of the example.
             func Get() int { return 1 }
         - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tif store.Get() != want {\n\t\tt.Fatal(\"get\")\n\t}\n}\n\nconst want = 1"
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            func TestGet(t *testing.T) {
+            	if store.Get() != want {
+            		t.Fatal("get")
+            	}
+            }
+
+            const want = 1
       expect:
         - line: 15
     - name: helper-above-its-test
@@ -243,7 +280,21 @@ spec:
       kind: invalid
       fixed:
         - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) { checkGet(t) }\n\nfunc checkGet(t *testing.T) {\n\tt.Helper()\n\t_ = store.Get()\n}"
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            func TestGet(t *testing.T) { checkGet(t) }
+
+            func checkGet(t *testing.T) {
+            	t.Helper()
+            	_ = store.Get()
+            }
       files:
         - path: go.mod
           body: |-
@@ -254,9 +305,24 @@ spec:
           body: |-
             package store
 
+            // Get is part of the example.
             func Get() int { return 1 }
         - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc checkGet(t *testing.T) {\n\tt.Helper()\n\t_ = store.Get()\n}\n\nfunc TestGet(t *testing.T) { checkGet(t) }"
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            func checkGet(t *testing.T) {
+            	t.Helper()
+            	_ = store.Get()
+            }
+
+            func TestGet(t *testing.T) { checkGet(t) }
       expect:
         - line: 9
     - name: fixtures-tests-helpers
@@ -273,9 +339,26 @@ spec:
           body: |-
             package store
 
+            // Get is part of the example.
             func Get() int { return 1 }
         - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nconst want = 1\n\nfunc TestGet(t *testing.T) { checkGet(t, want) }\n\nfunc checkGet(t *testing.T, want int) {\n\tt.Helper()\n\t_ = store.Get() + want\n}"
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            const want = 1
+
+            func TestGet(t *testing.T) { checkGet(t, want) }
+
+            func checkGet(t *testing.T, want int) {
+            	t.Helper()
+            	_ = store.Get() + want
+            }
     - name: rust-fixtures-tests-helpers
       language: rust
       kind: valid
@@ -283,6 +366,7 @@ spec:
       files:
         - path: src/lib.rs
           body: |-
+            /// Part of the example.
             pub fn get() -> i32 {
                 1
             }
@@ -331,6 +415,7 @@ spec:
       files:
       - path: store.ts
         body: |-
+          /** Part of the example. */
           export function get(): number {
             return 1;
           }

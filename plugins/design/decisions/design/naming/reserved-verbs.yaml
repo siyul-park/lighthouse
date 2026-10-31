@@ -76,10 +76,13 @@ spec:
       body: |
         package sample
 
+        // User is part of the example.
         type User struct{ id string }
 
+        // HasUser is part of the example.
         func HasUser(id string) bool { return id != "" }
 
+        // BuildUser is part of the example.
         func BuildUser(id string) User { return User{id: id} }
   - name: invalid-rust
     language: rust
@@ -97,6 +100,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub fn is_cache_enabled() -> bool { true }
   - name: cel-action-verb-returns-bool
     language: cel
@@ -165,14 +169,18 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export class User {
+          /** Part of the example. */
           constructor(readonly id: string) {}
         }
 
+        /** Part of the example. */
         export function hasUser(id: string): boolean {
           return id !== "";
         }
 
+        /** Part of the example. */
         export function buildUser(id: string): User {
           return new User(id);
         }
@@ -194,13 +202,16 @@ spec:
     - path: users/users.py
       body: |-
         class User:
+            """Part of the example."""
             def __init__(self, user_id: str) -> None:
                 self.user_id = user_id
 
 
         def has_user(user_id: str) -> bool:
+            """Part of the example."""
             return user_id != ""
 
 
         def build_user(user_id: str) -> User:
+            """Part of the example."""
             return User(user_id)

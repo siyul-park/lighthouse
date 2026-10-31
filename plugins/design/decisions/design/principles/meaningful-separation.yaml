@@ -96,6 +96,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn run() -> i32 { 1 }
   - name: single-user-typescript-invalid
     language: typescript
@@ -121,6 +122,7 @@ spec:
     files:
     - path: src/main.ts
       body: |-
+        /** Part of the example. */
         export function run(): number {
           return 1;
         }
@@ -147,6 +149,7 @@ spec:
     - path: src/main.py
       body: |-
         def run() -> int:
+            """Part of the example."""
             return 1
   options:
     properties: {}

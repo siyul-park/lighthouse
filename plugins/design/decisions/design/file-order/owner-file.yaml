@@ -61,8 +61,10 @@ spec:
       body: |-
         package sample
 
+        // Store is part of the example.
         type Store struct{}
 
+        // Total is part of the example.
         func (s *Store) Total() int { return 1 }
     canonical: true
   - name: rust-invalid-owner-file
@@ -86,9 +88,11 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store;
 
         impl Store {
+            /// Part of the example.
             pub fn total(&self) -> u8 { 1 }
         }
     canonical: true

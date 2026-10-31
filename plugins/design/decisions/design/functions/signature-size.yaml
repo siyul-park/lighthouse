@@ -217,8 +217,10 @@ spec:
       body: |-
         package sample
 
+        // Server is part of the example.
         type Server struct{}
 
+        // NewServer is part of the example.
         func NewServer(a, b, c, d, e, f, g, h, i int) *Server {
             return &Server{}
         }
@@ -252,6 +254,7 @@ spec:
       body: |-
         package sample
 
+        // Writer is part of the example.
         type Writer interface {
             Write(a, b, c, d, e, f, g, h, i int)
         }
@@ -289,6 +292,7 @@ spec:
       body: |-
         package sample
 
+        // Request is part of the example.
         type Request struct{ A, B, C int }
 
         func build(a, b, c, d, e, f int, r Request) int {
@@ -371,6 +375,7 @@ spec:
       body: |-
         package sample
 
+        // BuildOptions is part of the example.
         type BuildOptions struct{ A, B, C *int }
 
         func build(a, b, c, d, e, f, g int, o BuildOptions) int {
@@ -387,6 +392,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) -> i32 {
             a
         }
@@ -431,9 +437,11 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Server;
 
         impl Server {
+            /// Part of the example.
             pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}
         }
     options:
@@ -482,16 +490,19 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Request {
             pub a: i32,
             pub b: i32,
             pub c: i32,
         }
 
+        /// Part of the example.
         pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, r: Request) -> i32 {
             a + r.a
         }
 
+        /// Part of the example.
         pub fn other(r: Request) -> i32 {
             r.b
         }
@@ -525,12 +536,14 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct BuildOptions {
             pub a: Option<i32>,
             pub b: Vec<i32>,
             pub c: Option<String>,
         }
 
+        /// Part of the example.
         pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, o: BuildOptions) -> i32 {
             a + o.b.len() as i32
         }
@@ -544,6 +557,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         #[serde(default)]
         pub struct BuildOptions {
             pub a: i32,
@@ -551,6 +565,7 @@ spec:
             pub c: i32,
         }
 
+        /// Part of the example.
         pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, o: BuildOptions) -> i32 {
             a + o.b
         }
@@ -603,8 +618,10 @@ spec:
       body: |-
         package sample
 
+        // Parser is part of the example.
         type Parser struct{}
 
+        // NewParser is part of the example.
         func NewParser() (*Parser, int, int, error) {
             return &Parser{}, 0, 0, nil
         }
@@ -620,6 +637,7 @@ spec:
       body: |-
         package sample
 
+        // Reader is part of the example.
         type Reader interface {
             Read() (int, int, int, error)
         }
@@ -641,6 +659,7 @@ spec:
       body: |-
         package sample
 
+        // Pair is part of the example.
         type Pair struct{ A, B, C, D int }
 
         func split() Pair {
@@ -684,6 +703,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Pair {
             pub a: i32,
             pub b: i32,
@@ -691,6 +711,7 @@ spec:
             pub d: i32,
         }
 
+        /// Part of the example.
         pub fn split() -> Pair {
             Pair { a: 0, b: 0, c: 0, d: 0 }
         }
@@ -718,6 +739,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function build(a: number, b: number, c: number): number {
           return a + b + c;
         }
@@ -766,10 +788,12 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export interface Writer {
           write(a: number, b: number, c: number, d: number): void;
         }
 
+        /** Part of the example. */
         export class File implements Writer {
           write(a: number, b: number, c: number, d: number): void {
             void [a, b, c, d];
@@ -784,12 +808,14 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export interface BuildOptions {
           a?: number;
           b?: number;
           c?: number;
         }
 
+        /** Part of the example. */
         export function build(a: number, b: number, c: number, options: BuildOptions): number {
           return a + b + c + (options.a ?? 0);
         }
@@ -828,6 +854,7 @@ spec:
     - path: net/connect.py
       body: |-
         def connect(host: str, port: int, tls: bool, retries: int, timeout: float) -> None:
+            """Part of the example."""
             ...
   fix:
     safety: unsafe

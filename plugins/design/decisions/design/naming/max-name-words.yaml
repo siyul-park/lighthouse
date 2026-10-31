@@ -182,6 +182,7 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export function parseHttpRequest(): void {}
   - name: words-typescript-higher-limit
     language: typescript
@@ -192,6 +193,7 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export function parseHttpRequestBodyBytes(): void {}
   - name: python-long-name
     language: python
@@ -215,6 +217,7 @@ spec:
     - path: http/parse.py
       body: |-
         def parse_http_request() -> None:
+            """Part of the example."""
             ...
   - name: python-higher-limit
     language: python
@@ -226,4 +229,5 @@ spec:
     - path: http/parse.py
       body: |-
         def parse_http_request_body_bytes() -> None:
+            """Part of the example."""
             ...

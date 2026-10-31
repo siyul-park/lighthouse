@@ -109,13 +109,32 @@ spec:
       body: |-
         package store
 
+        // Store is part of the example.
         type Store struct{}
 
+        // Get is part of the example.
         func (s *Store) Get() int { return 1 }
     - path: store_test.go
-      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
-        TestStore(t *testing.T) {\n\ts := &store.Store{}\n\t_ = s\n}\n\nfunc TestStore_Get(t
-        *testing.T) {\n\ts := &store.Store{}\n\tif s.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+      body: |-
+        package store_test
+
+        import (
+        	"testing"
+
+        	"example.com/store"
+        )
+
+        func TestStore(t *testing.T) {
+        	s := &store.Store{}
+        	_ = s
+        }
+
+        func TestStore_Get(t *testing.T) {
+        	s := &store.Store{}
+        	if s.Get() != 1 {
+        		t.Fatal("get")
+        	}
+        }
   - name: duplicate-rust-invalid
     language: rust
     kind: invalid
@@ -146,6 +165,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn get() -> u8 {
             1
         }
@@ -197,7 +217,9 @@ spec:
     files:
     - path: store.ts
       body: |-
+        /** Part of the example. */
         export class Store {
+          /** Part of the example. */
           get(): number {
             return 1;
           }
@@ -250,7 +272,9 @@ spec:
     - path: store.py
       body: |-
         class Store:
+            """Part of the example."""
             def get(self) -> int:
+                """Part of the example."""
                 return 1
     - path: test_store.py
       body: |-

@@ -55,6 +55,7 @@ spec:
       body: |-
         package sample
 
+        // Load is part of the example.
         func Load() string { return "x" }
   - name: one-letter-rust-name
     language: rust
@@ -88,6 +89,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function load(): string {
           return "x";
         }
@@ -109,4 +111,5 @@ spec:
     - path: sample.py
       body: |-
         def load() -> str:
+            """Part of the example."""
             return "x"

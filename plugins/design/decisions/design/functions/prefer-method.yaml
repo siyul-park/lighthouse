@@ -82,19 +82,47 @@ spec:
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store)
-        Total() int { return sum(s) }\n\nfunc Sum(s *Store) int { return sum(s) }\n\nfunc
-        sum(s *Store) int {\n\ttotal := 0\n\tfor _, i := range s.items {\n\t\ttotal
-        += i\n\t}\n\treturn total\n}"
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct{ items []int }
+
+        // Total is part of the example.
+        func (s *Store) Total() int { return sum(s) }
+
+        // Sum is part of the example.
+        func Sum(s *Store) int { return sum(s) }
+
+        func sum(s *Store) int {
+        	total := 0
+        	for _, i := range s.items {
+        		total += i
+        	}
+        	return total
+        }
     canonical: true
   - name: helper-unrelated-to-the-owner
     language: go
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store)
-        Total() int { return sum(s.items) }\n\nfunc sum(items []int) int {\n\ttotal
-        := 0\n\tfor _, i := range items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct{ items []int }
+
+        // Total is part of the example.
+        func (s *Store) Total() int { return sum(s.items) }
+
+        func sum(items []int) int {
+        	total := 0
+        	for _, i := range items {
+        		total += i
+        	}
+        	return total
+        }
     canonical: false
   - name: constructor-called-by-method
     language: go
@@ -104,8 +132,10 @@ spec:
       body: |-
         package sample
 
+        // Store is part of the example.
         type Store struct{ items []int }
 
+        // Reset is part of the example.
         func (s *Store) Reset() *Store { return newStore() }
 
         func newStore() *Store { return &Store{items: []int{}} }
@@ -145,16 +175,19 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             items: Vec<i32>,
         }
 
         impl Store {
+            /// Part of the example.
             pub fn total(&self) -> i32 {
                 sum(self)
             }
         }
 
+        /// Part of the example.
         pub fn total_of(store: &Store) -> i32 {
             sum(store)
         }
@@ -200,14 +233,17 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
           items: number[] = [];
 
+          /** Part of the example. */
           total(): number {
             return sum(this);
           }
         }
 
+        /** Part of the example. */
         export function totalOf(store: Store): number {
           return sum(store);
         }
@@ -225,9 +261,11 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
           items: number[] = [];
 
+          /** Part of the example. */
           total(): number {
             return sum(this.items);
           }
@@ -269,14 +307,17 @@ spec:
     - path: stock/store.py
       body: |-
         class Store:
+            """Part of the example."""
             def __init__(self) -> None:
                 self.items: list[int] = []
 
             def total(self) -> int:
+                """Part of the example."""
                 return _sum_store(self)
 
 
         def total_of(store: Store) -> int:
+            """Part of the example."""
             return _sum_store(store)
 
 

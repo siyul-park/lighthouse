@@ -328,8 +328,10 @@ spec:
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
+            // Run is part of the example.
             func (s *Service) Run() int { return helper() }
 
             func helper() int { return 1 }
@@ -340,8 +342,10 @@ spec:
 
             func helper() int { return 1 }
 
+            // Service is part of the example.
             type Service struct{}
 
+            // Run is part of the example.
             func (s *Service) Run() int { return helper() }
       expect:
         - line: 3
@@ -354,8 +358,10 @@ spec:
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
+            // Run is part of the example.
             func (s *Service) Run() int { return helper() }
 
             func helper() int { return 1 }
@@ -367,8 +373,10 @@ spec:
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
+            // Run is part of the example.
             func (s *Service) Run() int { return s.run() }
 
             func (s *Service) run() int { return 1 }
@@ -377,13 +385,15 @@ spec:
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
             func (s *Service) run() int { return 1 }
 
+            // Run is part of the example.
             func (s *Service) Run() int { return s.run() }
       expect:
-        - line: 7
+        - line: 9
     - name: init-after-functions
       language: go
       kind: invalid
@@ -396,6 +406,7 @@ spec:
 
             func init() { ready = true }
 
+            // Run is part of the example.
             func Run() bool { return ready }
       files:
         - path: example.go
@@ -404,11 +415,12 @@ spec:
 
             var ready bool
 
+            // Run is part of the example.
             func Run() bool { return ready }
 
             func init() { ready = true }
       expect:
-        - line: 7
+        - line: 8
     - name: groups-in-order
       language: go
       kind: valid
@@ -417,10 +429,12 @@ spec:
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{ ok bool }
 
             type state int
 
+            // Limit is part of the example.
             const Limit = 3
 
             const floor = 1
@@ -429,14 +443,17 @@ spec:
 
             func init() { ready = true }
 
+            // NewService is part of the example.
             func NewService() *Service { return &Service{ok: true} }
 
+            // Run is part of the example.
             func (s *Service) Run() int { return floor + int(state(Limit)) }
 
             func (s *Service) String() string { return "service" }
 
             func (s *Service) check() bool { return s.ok }
 
+            // Open is part of the example.
             func Open() *Service { return NewService() }
     - name: owner-blocks
       language: go
@@ -446,27 +463,35 @@ spec:
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
+            // Client is part of the example.
             type Client struct{}
 
+            // Run is part of the example.
             func (s *Service) Run() int { return 1 }
 
+            // Do is part of the example.
             func (c *Client) Do() int { return 1 }
       files:
         - path: example.go
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
+            // Run is part of the example.
             func (s *Service) Run() int { return 1 }
 
+            // Client is part of the example.
             type Client struct{}
 
+            // Do is part of the example.
             func (c *Client) Do() int { return 1 }
       expect:
-        - line: 7
+        - line: 10
     - name: constructor-after-methods
       language: go
       kind: invalid
@@ -475,23 +500,29 @@ spec:
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
+            // NewService is part of the example.
             func NewService() *Service { return &Service{} }
 
+            // Run is part of the example.
             func (s *Service) Run() int { return 1 }
       files:
         - path: example.go
           body: |-
             package sample
 
+            // Service is part of the example.
             type Service struct{}
 
+            // Run is part of the example.
             func (s *Service) Run() int { return 1 }
 
+            // NewService is part of the example.
             func NewService() *Service { return &Service{} }
       expect:
-        - line: 7
+        - line: 10
     - name: private-constructor-after-methods
       language: go
       kind: invalid
@@ -523,21 +554,25 @@ spec:
       fixed:
         - path: src/lib.rs
           body: |-
+            /// Part of the example.
             pub struct Store;
 
+            /// Part of the example.
             pub fn run() -> u8 {
                 1
             }
       files:
         - path: src/lib.rs
           body: |-
+            /// Part of the example.
             pub fn run() -> u8 {
                 1
             }
 
+            /// Part of the example.
             pub struct Store;
       expect:
-        - line: 5
+        - line: 7
     - name: rust-valid
       language: rust
       kind: valid
@@ -547,18 +582,22 @@ spec:
           body: |-
             const LIMIT: u8 = 3;
 
+            /// Part of the example.
             pub struct Store;
 
             impl Store {
+                /// Part of the example.
                 pub fn new() -> Self {
                     Store
                 }
 
+                /// Part of the example.
                 pub fn get(&self) -> u8 {
                     LIMIT
                 }
             }
 
+            /// Part of the example.
             pub fn run() -> u8 {
                 helper()
             }
@@ -572,13 +611,16 @@ spec:
       fixed:
         - path: src/lib.rs
           body: |-
+            /// Part of the example.
             pub struct Store;
 
             impl Store {
+                /// Part of the example.
                 pub fn new() -> Self {
                     Store
                 }
 
+                /// Part of the example.
                 pub fn get(&self) -> u8 {
                     1
                 }
@@ -586,19 +628,22 @@ spec:
       files:
         - path: src/lib.rs
           body: |-
+            /// Part of the example.
             pub struct Store;
 
             impl Store {
+                /// Part of the example.
                 pub fn get(&self) -> u8 {
                     1
                 }
 
+                /// Part of the example.
                 pub fn new() -> Self {
                     Store
                 }
             }
       expect:
-        - line: 8
+        - line: 11
     - name: test-fixtures-out-of-order
       language: go
       kind: invalid

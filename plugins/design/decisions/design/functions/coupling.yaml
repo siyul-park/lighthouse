@@ -160,17 +160,19 @@ spec:
       body: |-
         mod service {
             pub fn serve() {
-                super::left();
-                super::right();
+                left();
+                right();
             }
+
+            fn left() {}
+            fn right() {}
         }
 
-        fn left() {}
-        fn right() {}
-
+        /// Part of the example.
         pub fn a() {
             service::serve();
         }
+        /// Part of the example.
         pub fn b() {
             service::serve();
         }
@@ -268,9 +270,11 @@ spec:
         function left(): void {}
         function right(): void {}
 
+        /** Part of the example. */
         export function a(): void {
           hub();
         }
+        /** Part of the example. */
         export function b(): void {
           hub();
         }
@@ -349,21 +353,26 @@ spec:
     - path: hub/hub.py
       body: |-
         def hub() -> None:
+            """Part of the example."""
             left()
             right()
 
 
         def left() -> None:
+            """Part of the example."""
             pass
 
 
         def right() -> None:
+            """Part of the example."""
             pass
 
 
         def a() -> None:
+            """Part of the example."""
             hub()
 
 
         def b() -> None:
+            """Part of the example."""
             hub()

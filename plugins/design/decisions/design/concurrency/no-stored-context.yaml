@@ -60,8 +60,10 @@ spec:
 
         import "context"
 
+        // Worker is part of the example.
         type Worker struct{ name string }
 
+        // Run is part of the example.
         func (w *Worker) Run(ctx context.Context) error { return ctx.Err() }
     canonical: true
   - name: stored-context-a-cancel-function
@@ -74,5 +76,6 @@ spec:
 
         import "context"
 
+        // Holder is part of the example.
         type Holder struct{ cancel context.CancelFunc }
     canonical: false

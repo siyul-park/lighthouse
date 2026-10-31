@@ -111,6 +111,7 @@ spec:
           body: |-
             package sample
 
+            // Get is part of the example.
             func Get() int { return 1 }
         - path: store_test.go
           body: |-
@@ -131,6 +132,7 @@ spec:
           body: |-
             package sample
 
+            // Get is part of the example.
             func Get() int { return 1 }
         - path: store_example_test.go
           body: |-

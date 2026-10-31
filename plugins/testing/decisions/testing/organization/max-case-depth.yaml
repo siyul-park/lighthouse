@@ -67,6 +67,7 @@ spec:
       body: |-
         package sample
 
+        // Get is part of the example.
         func Get() int { return 1 }
     - path: sample_test.go
       body: |
@@ -104,6 +105,7 @@ spec:
     files:
     - path: store.ts
       body: |-
+        /** Part of the example. */
         export function get(): number {
           return 1;
         }
@@ -144,6 +146,7 @@ spec:
     - path: store.py
       body: |-
         def get() -> int:
+            """Part of the example."""
             return 1
     - path: test_store.py
       body: |-

@@ -171,11 +171,13 @@ spec:
 
         import "example.com/app/infra"
 
+        // Load is part of the example.
         func Load() string { return infra.Read() }
     - path: infra/infra.go
       body: |
         package infra
 
+        // Read is part of the example.
         func Read() string { return "" }
     canonical: true
   - name: go-peers
@@ -225,11 +227,13 @@ spec:
 
         import "example.com/app/grpc"
 
+        // Serve is part of the example.
         func Serve() string { return grpc.Serve() }
     - path: grpc/grpc.go
       body: |
         package grpc
 
+        // Serve is part of the example.
         func Serve() string { return "" }
   - name: go-submodules-of-one-glob
     language: go
@@ -246,11 +250,13 @@ spec:
 
         import "example.com/app/http/wire"
 
+        // Serve is part of the example.
         func Serve() string { return wire.Encode() }
     - path: http/wire/wire.go
       body: |
         package wire
 
+        // Encode is part of the example.
         func Encode() string { return "" }
   - name: go-forbidden
     language: go
@@ -294,11 +300,13 @@ spec:
 
         import "example.com/app/infra"
 
+        // Load is part of the example.
         func Load() string { return infra.Read() }
     - path: infra/infra.go
       body: |
         package infra
 
+        // Read is part of the example.
         func Read() string { return "" }
   - name: rust-mod-points-up
     language: rust
@@ -354,11 +362,13 @@ spec:
       body: |-
         use crate::infra::read;
 
+        /// Part of the example.
         pub fn load() -> String {
             read()
         }
     - path: src/infra.rs
       body: |-
+        /// Part of the example.
         pub fn read() -> String {
             String::new()
         }
@@ -397,11 +407,13 @@ spec:
       body: |-
         import { read } from "../infra/infra";
 
+        /** Part of the example. */
         export function load(): string {
           return read();
         }
     - path: infra/infra.ts
       body: |-
+        /** Part of the example. */
         export function read(): string {
           return "";
         }
@@ -485,8 +497,10 @@ spec:
 
 
         def load() -> str:
+            """Part of the example."""
             return read()
     - path: infra/infra.py
       body: |-
         def read() -> str:
+            """Part of the example."""
             return ""

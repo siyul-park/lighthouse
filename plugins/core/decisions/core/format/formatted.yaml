@@ -118,6 +118,7 @@ spec:
       body: |
         package sample
 
+        // Run is part of the example.
         func  Run( ) int {return 1}
     expect:
     - line: 1
@@ -126,6 +127,7 @@ spec:
       body: |
         package sample
 
+        // Run is part of the example.
         func Run() int { return 1 }
   - name: go-formatted
     language: go
@@ -135,6 +137,7 @@ spec:
       body: |
         package sample
 
+        // Run is part of the example.
         func Run() int { return 1 }
     canonical: true
   - name: rust-unformatted
@@ -143,12 +146,14 @@ spec:
     files:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub fn run()->i32{1}
     expect:
     - line: 1
     fixed:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub fn run() -> i32 {
             1
         }
@@ -185,6 +190,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub fn run() -> i32 {
             1
         }
@@ -195,12 +201,14 @@ spec:
     files:
     - path: example.ts
       body: |
+        /** Part of the example. */
         export function run( ){return 1}
     expect:
     - line: 1
     fixed:
     - path: example.ts
       body: |
+        /** Part of the example. */
         export function run() {
           return 1;
         }
@@ -210,6 +218,7 @@ spec:
     files:
     - path: example.ts
       body: |
+        /** Part of the example. */
         export function run() {
           return 1;
         }
@@ -220,6 +229,7 @@ spec:
     files:
     - path: example.js
       body: |
+        /** Part of the example. */
         function  run( ){return 1}
         module.exports={run}
     expect:
@@ -227,6 +237,7 @@ spec:
     fixed:
     - path: example.js
       body: |
+        /** Part of the example. */
         function run() {
           return 1;
         }
@@ -238,6 +249,7 @@ spec:
     - path: example.py
       body: |
         def run( ) ->int:
+            """Part of the example."""
             return  1
     expect:
     - line: 1
@@ -245,6 +257,7 @@ spec:
     - path: example.py
       body: |
         def run() -> int:
+            """Part of the example."""
             return 1
   - name: python-formatted
     language: python
@@ -253,5 +266,6 @@ spec:
     - path: example.py
       body: |
         def run() -> int:
+            """Part of the example."""
             return 1
     canonical: true

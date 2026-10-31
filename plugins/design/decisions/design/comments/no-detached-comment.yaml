@@ -109,6 +109,7 @@ spec:
 
         //go:noinline
 
+        // Load is part of the example.
         func Load() {}
   - name: detached-rust-invalid
     language: rust
@@ -116,16 +117,18 @@ spec:
     files:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub fn before() {}
 
         /// Opens the store.
 
         pub fn open() {}
     expect:
-    - line: 3
+    - line: 4
     fixed:
     - path: src/lib.rs
       body: |
+        /// Part of the example.
         pub fn before() {}
 
         /// Opens the store.
@@ -147,16 +150,18 @@ spec:
     files:
     - path: sample.ts
       body: |
+        /** Part of the example. */
         export const before = 1;
 
         /** Opens the store. */
 
         export function open(): void {}
     expect:
-    - line: 3
+    - line: 4
     fixed:
     - path: sample.ts
       body: |
+        /** Part of the example. */
         export const before = 1;
 
         /** Opens the store. */
@@ -180,6 +185,7 @@ spec:
 
         import { open } from "./store";
 
+        /** Part of the example. */
         export const run = open;
   - name: detached-javascript-invalid
     language: typescript
@@ -202,8 +208,10 @@ spec:
     files:
     - path: sample.ts
       body: |
+        /** Part of the example. */
         export const before = 1;
 
         // Opens the store.
 
+        /** Part of the example. */
         export function open(): void {}

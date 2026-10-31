@@ -87,6 +87,7 @@ spec:
       body: |
         package sample
 
+        // Get is part of the example.
         func Get(s string) int { return len(s) }
     - path: sample_test.go
       body: |
@@ -142,6 +143,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function get(input: string): number {
           return input.length;
         }
@@ -188,6 +190,7 @@ spec:
     - path: sample.py
       body: |-
         def get(text: str) -> int:
+            """Part of the example."""
             return len(text)
     - path: test_sample.py
       body: |-

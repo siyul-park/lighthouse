@@ -61,10 +61,12 @@ spec:
 
         import "errors"
 
+        // ErrMissing is part of the example.
         var ErrMissing = errors.New("missing")
 
         var defaults = map[string]string{}
 
+        // Limit is part of the example.
         const Limit = 3
   - name: global-typescript-invalid
     language: typescript
@@ -81,10 +83,12 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export const limit = 3;
 
         let cache: Record<string, string> = {};
 
+        /** Part of the example. */
         export function reset(): void {
           cache = {};
         }

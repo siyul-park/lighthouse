@@ -111,6 +111,7 @@ spec:
       body: |-
         package sample
 
+        // Run is part of the example.
         func Run() int { return helper() }
 
         func helper() int { return 1 }
@@ -121,6 +122,7 @@ spec:
 
         func helper() int { return 1 }
 
+        // Run is part of the example.
         func Run() int { return helper() }
     expect:
     - line: 3
@@ -133,6 +135,7 @@ spec:
       body: |-
         package sample
 
+        // Run is part of the example.
         func Run() int { return helper() }
 
         func helper() int { return 1 }
@@ -144,8 +147,10 @@ spec:
       body: |-
         package sample
 
+        // First is part of the example.
         func First() int { return leaf() }
 
+        // Second is part of the example.
         func Second() int { return leaf() + 1 }
 
         func leaf() int { return 1 }
@@ -156,13 +161,15 @@ spec:
       body: |-
         package sample
 
+        // First is part of the example.
         func First() int { return leaf() }
 
         func leaf() int { return 1 }
 
+        // Second is part of the example.
         func Second() int { return leaf() + 1 }
     expect:
-    - line: 5
+    - line: 6
   - name: used-elsewhere
     language: go
     kind: valid
@@ -173,11 +180,13 @@ spec:
 
         func helper() int { return 1 }
 
+        // Run is part of the example.
         func Run() int { return helper() }
     - path: b.go
       body: |-
         package sample
 
+        // Other is part of the example.
         func Other() int { return helper() }
     canonical: false
   - name: mutual-recursion
@@ -185,10 +194,25 @@ spec:
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\nfunc even(n int) bool {\n\tif n == 0 {\n\t\treturn
-        true\n\t}\n\treturn odd(n - 1)\n}\n\nfunc odd(n int) bool {\n\tif n == 0 {\n\t\treturn
-        false\n\t}\n\treturn even(n - 1)\n}\n\nfunc Run(n int) bool { return even(n)
-        }"
+      body: |-
+        package sample
+
+        func even(n int) bool {
+        	if n == 0 {
+        		return true
+        	}
+        	return odd(n - 1)
+        }
+
+        func odd(n int) bool {
+        	if n == 0 {
+        		return false
+        	}
+        	return even(n - 1)
+        }
+
+        // Run is part of the example.
+        func Run(n int) bool { return even(n) }
     canonical: false
   - name: type-before-its-holder
     language: go
@@ -198,19 +222,23 @@ spec:
       body: |-
         package sample
 
+        // Order is part of the example.
         type Order struct{ Lines []Line }
 
+        // Line is part of the example.
         type Line struct{}
     files:
     - path: example.go
       body: |-
         package sample
 
+        // Line is part of the example.
         type Line struct{}
 
+        // Order is part of the example.
         type Order struct{ Lines []Line }
     expect:
-    - line: 3
+    - line: 4
   - name: type-after-its-holder
     language: go
     kind: valid
@@ -219,8 +247,10 @@ spec:
       body: |-
         package sample
 
+        // Order is part of the example.
         type Order struct{ Lines map[string]*Line }
 
+        // Line is part of the example.
         type Line struct{}
   - name: types-that-hold-each-other
     language: go
@@ -230,8 +260,10 @@ spec:
       body: |-
         package sample
 
+        // Node is part of the example.
         type Node struct{ Edges []*Edge }
 
+        // Edge is part of the example.
         type Edge struct{ To *Node }
   - name: public-type-before-the-private-type-that-holds-it
     language: go
@@ -241,6 +273,7 @@ spec:
       body: |-
         package sample
 
+        // Line is part of the example.
         type Line struct{}
 
         type order struct{ lines []Line }
@@ -269,6 +302,7 @@ spec:
     fixed:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn run() -> u8 {
             helper()
         }
@@ -283,6 +317,7 @@ spec:
             1
         }
 
+        /// Part of the example.
         pub fn run() -> u8 {
             helper()
         }
@@ -295,6 +330,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn run() -> u8 {
             helper()
         }

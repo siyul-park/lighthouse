@@ -138,10 +138,25 @@ spec:
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
-        int\n}\n\ntype Cache struct{ hits int }\n\nfunc summary(s *Store, c *Cache)
-        int {\n\tn := len(s.items)\n\tn += s.total + s.extra\n\tn += c.hits\n\treturn
-        n\n}"
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct {
+        	items []int
+        	total int
+        	extra int
+        }
+
+        // Cache is part of the example.
+        type Cache struct{ hits int }
+
+        func summary(s *Store, c *Cache) int {
+        	n := len(s.items)
+        	n += s.total + s.extra
+        	n += c.hits
+        	return n
+        }
     options:
       kinds:
       - type
@@ -151,10 +166,25 @@ spec:
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n}\n\nfunc
-        (s *Store) Total() int { return s.total }\n\nfunc report(s *Store) int {\n\tn
-        := s.total\n\tn += len(s.items)\n\treturn n + format(s)\n}\n\nfunc format(s
-        *Store) int { return len(s.items) }"
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct {
+        	items []int
+        	total int
+        }
+
+        // Total is part of the example.
+        func (s *Store) Total() int { return s.total }
+
+        func report(s *Store) int {
+        	n := s.total
+        	n += len(s.items)
+        	return n + format(s)
+        }
+
+        func format(s *Store) int { return len(s.items) }
     options:
       kinds:
       - type
@@ -193,6 +223,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub enum Level {
             Error,
             Warn,
@@ -200,6 +231,7 @@ spec:
         }
 
         impl Level {
+            /// Part of the example.
             pub fn name(&self) -> &'static str {
                 "level"
             }
@@ -222,10 +254,26 @@ spec:
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
-        int\n}\n\nfunc (s *Store) Reset() { s.items = nil }\n\nfunc snapshot(items
-        []int) int {\n\ts := Store{items: items}\n\tn := len(s.items)\n\tn += s.total\n\tn
-        += s.extra\n\treturn n\n}"
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct {
+        	items []int
+        	total int
+        	extra int
+        }
+
+        // Reset is part of the example.
+        func (s *Store) Reset() { s.items = nil }
+
+        func snapshot(items []int) int {
+        	s := Store{items: items}
+        	n := len(s.items)
+        	n += s.total
+        	n += s.extra
+        	return n
+        }
     options:
       kinds:
       - type
@@ -236,6 +284,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             items: Vec<i32>,
             total: i32,
@@ -243,6 +292,7 @@ spec:
         }
 
         impl Store {
+            /// Part of the example.
             pub fn reset(&mut self) {
                 self.items.clear();
             }
@@ -264,6 +314,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             items: Vec<i32>,
             total: i32,
@@ -271,6 +322,7 @@ spec:
         }
 
         impl Store {
+            /// Part of the example.
             pub fn reset(&mut self) {
                 self.items.clear();
             }
@@ -323,17 +375,32 @@ spec:
 
         go 1.26
     - path: app/app.go
-      body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return
-        load() }\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count() +
-        store.Scan()\n\treturn a + b + local()\n}\n\nfunc local() int { return 0 }\n"
+      body: |
+        package app
+
+        import "example.com/app/store"
+
+        // Run is part of the example.
+        func Run() int { return load() }
+
+        func load() int {
+        	a := store.Read()
+        	b := store.Count() + store.Scan()
+        	return a + b + local()
+        }
+
+        func local() int { return 0 }
     - path: store/store.go
       body: |
         package store
 
+        // Read is part of the example.
         func Read() int { return 1 }
 
+        // Count is part of the example.
         func Count() int { return 2 }
 
+        // Scan is part of the example.
         func Scan() int { return 3 }
     options:
       kinds:
@@ -349,17 +416,30 @@ spec:
 
         go 1.26
     - path: app/app.go
-      body: "package app\n\nimport \"example.com/app/store\"\n\nvar total = load()\n\nfunc
-        load() int {\n\ta := store.Read()\n\tb := store.Count()\n\tc := store.Scan()\n\treturn
-        a + b + c\n}\n"
+      body: |
+        package app
+
+        import "example.com/app/store"
+
+        var total = load()
+
+        func load() int {
+        	a := store.Read()
+        	b := store.Count()
+        	c := store.Scan()
+        	return a + b + c
+        }
     - path: store/store.go
       body: |
         package store
 
+        // Read is part of the example.
         func Read() int { return 1 }
 
+        // Count is part of the example.
         func Count() int { return 2 }
 
+        // Scan is part of the example.
         func Scan() int { return 3 }
     options:
       kinds:
@@ -412,6 +492,7 @@ spec:
 
         use crate::store::read;
 
+        /// Part of the example.
         pub fn run() -> i32 {
             load()
         }
@@ -464,19 +545,20 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
           items: number[] = [];
           total = 0;
-          extra = 0;
         }
 
+        /** Part of the example. */
         export class Cache {
           hits = 0;
         }
 
         function summary(store: Store, cache: Cache): number {
           let n = store.items.length;
-          n += store.total + store.extra;
+          n += store.total;
           n += cache.hits;
           return n;
         }
@@ -489,6 +571,7 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
           items: number[] = [];
           total = 0;
@@ -535,6 +618,7 @@ spec:
     - path: stats/summary.py
       body: |-
         class Store:
+            """Part of the example."""
             def __init__(self) -> None:
                 self.items: list[int] = []
                 self.total = 0
@@ -542,11 +626,13 @@ spec:
 
 
         class Cache:
+            """Part of the example."""
             def __init__(self) -> None:
                 self.hits = 0
 
 
         def summary(store: Store, cache: Cache) -> int:
+            """Part of the example."""
             n = len(store.items)
             n += store.total + store.extra
             n += cache.hits

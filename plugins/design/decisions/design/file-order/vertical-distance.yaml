@@ -57,31 +57,41 @@ spec:
       body: |-
         package sample
 
+        // A is part of the example.
         type A struct{}
 
+        // B is part of the example.
         type B struct{}
 
+        // One is part of the example.
         func (a A) One() int { return 1 }
 
+        // Two is part of the example.
         func (a A) Two() int { return 2 }
 
+        // One is part of the example.
         func (b B) One() int { return 1 }
     files:
     - path: example.go
       body: |-
         package sample
 
+        // A is part of the example.
         type A struct{}
 
+        // B is part of the example.
         type B struct{}
 
+        // One is part of the example.
         func (a A) One() int { return 1 }
 
+        // One is part of the example.
         func (b B) One() int { return 1 }
 
+        // Two is part of the example.
         func (a A) Two() int { return 2 }
     expect:
-    - line: 11
+    - line: 16
   - name: gap-free-function-between
     language: go
     kind: invalid
@@ -90,27 +100,35 @@ spec:
       body: |-
         package sample
 
+        // A is part of the example.
         type A struct{}
 
+        // One is part of the example.
         func (a A) One() int { return 1 }
 
+        // Two is part of the example.
         func (a A) Two() int { return 2 }
 
+        // Other is part of the example.
         func Other() int { return 0 }
     files:
     - path: example.go
       body: |-
         package sample
 
+        // A is part of the example.
         type A struct{}
 
+        // One is part of the example.
         func (a A) One() int { return 1 }
 
+        // Other is part of the example.
         func Other() int { return 0 }
 
+        // Two is part of the example.
         func (a A) Two() int { return 2 }
     expect:
-    - line: 9
+    - line: 13
   - name: gap-valid
     language: go
     kind: valid
@@ -119,16 +137,21 @@ spec:
       body: |-
         package sample
 
+        // A is part of the example.
         type A struct{}
 
+        // B is part of the example.
         type B struct{}
 
+        // One is part of the example.
         func (a A) One() int { return 1 }
 
+        // Two is part of the example.
         func (a A) Two() int { return 2 }
 
         func (a A) hidden() int { return 3 }
 
+        // One is part of the example.
         func (b B) One() int { return 1 }
     canonical: true
   - name: gap-rust-invalid
@@ -166,23 +189,28 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct A;
 
+        /// Part of the example.
         pub struct B;
 
         impl A {
+            /// Part of the example.
             pub fn one(&self) -> u8 {
                 1
             }
         }
 
         impl A {
+            /// Part of the example.
             pub fn two(&self) -> u8 {
                 2
             }
         }
 
         impl B {
+            /// Part of the example.
             pub fn one(&self) -> u8 {
                 1
             }

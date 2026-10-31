@@ -104,12 +104,16 @@ spec:
       body: |-
         package sample
 
+        // Store is part of the example.
         type Store struct{}
 
+        // Get is part of the example.
         func (s *Store) Get() int { return 1 }
 
+        // Put is part of the example.
         func (s *Store) Put() int { return 2 }
 
+        // Drop is part of the example.
         func (s *Store) Drop() int { return 3 }
     options:
       maxMembers: 3
@@ -137,11 +141,15 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store;
 
         impl Store {
+            /// Part of the example.
             pub fn get(&self) -> i32 { 1 }
+            /// Part of the example.
             pub fn put(&self) -> i32 { 2 }
+            /// Part of the example.
             pub fn drop_all(&self) -> i32 { 3 }
         }
     options:
@@ -174,13 +182,18 @@ spec:
       body: |-
         package sample
 
+        // Store is part of the example.
         type Store struct {
         	items []int
         }
 
+        // Add is part of the example.
         func (s *Store) Add(x int)   { s.items = append(s.items, x) }
+        // Count is part of the example.
         func (s *Store) Count() int  { return len(s.items) }
+        // First is part of the example.
         func (s *Store) First() int  { return s.items[0] }
+        // Last is part of the example.
         func (s *Store) Last() int   { return s.items[len(s.items)-1] }
   - name: cohesion-rust-invalid
     language: rust
@@ -207,6 +220,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             items: Vec<i32>,
         }
@@ -248,15 +262,19 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
+          /** Part of the example. */
           get(): number {
             return 1;
           }
 
+          /** Part of the example. */
           put(): number {
             return 2;
           }
 
+          /** Part of the example. */
           drop(): number {
             return 3;
           }
@@ -295,21 +313,26 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
           private items: number[] = [];
 
+          /** Part of the example. */
           add(item: number): void {
             this.items.push(item);
           }
 
+          /** Part of the example. */
           count(): number {
             return this.items.length;
           }
 
+          /** Part of the example. */
           first(): number | undefined {
             return this.items[0];
           }
 
+          /** Part of the example. */
           last(): number | undefined {
             return this.items[this.items.length - 1];
           }
@@ -342,13 +365,17 @@ spec:
     - path: store.py
       body: |-
         class Store:
+            """Part of the example."""
             def get(self) -> int:
+                """Part of the example."""
                 return 1
 
             def put(self) -> int:
+                """Part of the example."""
                 return 2
 
             def drop(self) -> int:
+                """Part of the example."""
                 return 3
   - name: cohesion-python-invalid
     language: python
@@ -384,19 +411,24 @@ spec:
     - path: store.py
       body: |-
         class Store:
+            """Part of the example."""
             def __init__(self) -> None:
                 self._items: list[int] = []
 
             def add(self, item: int) -> None:
+                """Part of the example."""
                 self._items.append(item)
 
             def count(self) -> int:
+                """Part of the example."""
                 return len(self._items)
 
             def first(self) -> int:
+                """Part of the example."""
                 return self._items[0]
 
             def last(self) -> int:
+                """Part of the example."""
                 return self._items[-1]
   - name: cohesion-python-contract-valid
     language: python
@@ -405,13 +437,16 @@ spec:
     - path: store.py
       body: |-
         class Store:
+            """Part of the example."""
             def __init__(self) -> None:
                 self._items: list[int] = []
 
             def add(self, item: int) -> None:
+                """Part of the example."""
                 self._items.append(item)
 
             def count(self) -> int:
+                """Part of the example."""
                 return len(self._items)
 
             def __repr__(self) -> str:
@@ -419,4 +454,5 @@ spec:
 
             @staticmethod
             def version() -> int:
+                """Part of the example."""
                 return 1

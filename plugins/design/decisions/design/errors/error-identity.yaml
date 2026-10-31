@@ -99,6 +99,7 @@ spec:
 
         import "fmt"
 
+        // Load is part of the example.
         func Load(name string, err error) error {
             return fmt.Errorf("load %s: %w", name, err)
         }
@@ -161,8 +162,10 @@ spec:
 
         import "errors"
 
+        // ErrNotFound is part of the example.
         var ErrNotFound = errors.New("not found")
 
+        // Missing is part of the example.
         func Missing(err error) bool {
             return errors.Is(err, ErrNotFound)
         }
@@ -183,10 +186,13 @@ spec:
             "io"
         )
 
+        // Done is part of the example.
         func Done(err error) bool { return err == io.EOF }
 
+        // Empty is part of the example.
         func Empty(err error) bool { return err == sql.ErrNoRows }
 
+        // Failed is part of the example.
         func Failed(err error) bool { return err != nil }
     options:
       kinds:
@@ -249,10 +255,12 @@ spec:
 
         import "errors"
 
+        // Timeout is part of the example.
         type Timeout struct{}
 
         func (*Timeout) Error() string { return "timeout" }
 
+        // IsTimeout is part of the example.
         func IsTimeout(err error) bool {
             var t *Timeout
             return errors.As(err, &t)
@@ -271,12 +279,15 @@ spec:
 
         import "errors"
 
+        // ErrNotFound is part of the example.
         var ErrNotFound = errors.New("not found")
 
+        // Missing is part of the example.
         type Missing struct{}
 
         func (*Missing) Error() string { return "missing" }
 
+        // Is is part of the example.
         func (*Missing) Is(target error) bool { return target == ErrNotFound }
     options:
       kinds:
@@ -296,8 +307,10 @@ spec:
 
         import "errors"
 
+        // ErrNotFound is part of the example.
         var ErrNotFound = errors.New("not found")
 
+        // Missing is part of the example.
         func Missing(err error) bool {
             return err == ErrNotFound
         }

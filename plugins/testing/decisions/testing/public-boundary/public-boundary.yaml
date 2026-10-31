@@ -95,10 +95,23 @@ spec:
 
         func get() int { return 1 }
 
+        // Get is part of the example.
         func Get() int { return get() }
     - path: store_test.go
-      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
-        TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+      body: |-
+        package store_test
+
+        import (
+        	"testing"
+
+        	"example.com/store"
+        )
+
+        func TestGet(t *testing.T) {
+        	if store.Get() != 1 {
+        		t.Fatal("get")
+        	}
+        }
   - name: internal-test-of-the-public-api
     language: go
     kind: valid
@@ -115,10 +128,19 @@ spec:
 
         func get() int { return 1 }
 
+        // Get is part of the example.
         func Get() int { return get() }
     - path: store_test.go
-      body: "package store\n\nimport \"testing\"\n\nfunc TestGet(t *testing.T) {\n\tif
-        Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+      body: |-
+        package store
+
+        import "testing"
+
+        func TestGet(t *testing.T) {
+        	if Get() != 1 {
+        		t.Fatal("get")
+        	}
+        }
   - name: rust-valid
     language: rust
     kind: valid
@@ -130,6 +152,7 @@ spec:
             1
         }
 
+        /// Part of the example.
         pub fn get() -> u8 {
             hidden()
         }

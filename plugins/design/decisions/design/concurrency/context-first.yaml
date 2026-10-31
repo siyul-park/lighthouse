@@ -74,6 +74,7 @@ spec:
 
         import "context"
 
+        // Fetch is part of the example.
         func Fetch(ctx context.Context, url string) ([]byte, error) { return nil, ctx.Err() }
   - name: context-first-allowed-type-before
     language: go
@@ -91,6 +92,7 @@ spec:
           "testing"
         )
 
+        // Setup is part of the example.
         func Setup(t *testing.T, ctx context.Context) { _ = ctx.Err() }
     canonical: false
   - name: context-first-type-not-allowed

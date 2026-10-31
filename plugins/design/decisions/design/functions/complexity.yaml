@@ -452,6 +452,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub enum Node {
             If { has_else: bool },
             For,
@@ -459,6 +460,7 @@ spec:
             Other,
         }
 
+        /// Part of the example.
         #[derive(Default)]
         pub struct Counts {
             ifs: u32,
@@ -468,6 +470,7 @@ spec:
         }
 
         impl Counts {
+            /// Part of the example.
             pub fn visit(&mut self, node: &Node) {
                 match node {
                     Node::If { has_else } => {
@@ -701,6 +704,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function total(a: number, b: number): number {
           let sum = a;
 
@@ -751,6 +755,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function classify(n: number): string {
           if (n < 0) return "negative";
           if (n === 0) return "zero";
@@ -800,6 +805,7 @@ spec:
     files:
     - path: sample.ts
       body: |-
+        /** Part of the example. */
         export function name(kind: number): string {
           switch (kind) {
             case 0:
@@ -907,6 +913,7 @@ spec:
     - path: codes/classify.py
       body: |-
         def classify(code: int) -> int:
+            """Part of the example."""
             if code == 1:
                 return 10
             if code == 2:

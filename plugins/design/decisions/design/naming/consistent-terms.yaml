@@ -69,11 +69,13 @@ spec:
       body: |
         package first
 
+        // Account is part of the example.
         type Account struct{}
     - path: second/second.go
       body: |
         package second
 
+        // Ledger is part of the example.
         type Ledger struct{}
   - name: distinct-names-rust
     language: rust
@@ -83,9 +85,11 @@ spec:
     - path: src/lib.rs
       body: |
         pub mod first {
+            /// Part of the example.
             pub struct Account;
         }
         pub mod second {
+            /// Part of the example.
             pub struct Ledger;
         }
 
@@ -104,8 +108,11 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Customer { pub id: u64 }
+        /// Part of the example.
         pub fn find_customer(id: u64) -> Option<Customer> { None }
+        /// Part of the example.
         pub fn save_customer(value: Customer) { let _ = value; }
   - name: homonym-typescript
     language: typescript
@@ -123,9 +130,11 @@ spec:
     files:
     - path: first/first.ts
       body: |-
+        /** Part of the example. */
         export class Account {}
     - path: second/second.ts
       body: |-
+        /** Part of the example. */
         export class Ledger {}
   - name: python-homonym-classes
     language: python
@@ -147,8 +156,10 @@ spec:
     - path: first/first.py
       body: |-
         class Account:
+            """Part of the example."""
             pass
     - path: second/second.py
       body: |-
         class Ledger:
+            """Part of the example."""
             pass

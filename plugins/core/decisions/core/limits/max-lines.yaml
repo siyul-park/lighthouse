@@ -107,11 +107,13 @@ spec:
     language: rust
     kind: valid
     canonical: true
-    options: { max: 2 }
+    options: { max: 4 }
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn one() {}
+        /// Part of the example.
         pub fn two() {}
   - name: yaml-over-limit
     language: yaml

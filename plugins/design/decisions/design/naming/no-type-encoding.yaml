@@ -96,8 +96,10 @@ spec:
       body: |-
         package sample
 
+        // Reader is part of the example.
         type Reader interface{ Read() }
 
+        // Item is part of the example.
         type Item struct{}
     canonical: true
   - name: encoding-rust-invalid
@@ -117,7 +119,9 @@ spec:
       enabled: true
     files:
     - path: src/lib.rs
-      body: pub fn total() {}
+      body: |-
+        /// Part of the example.
+        pub fn total() {}
     canonical: true
   - name: cel-type-prefix
     language: cel
@@ -195,10 +199,12 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export interface Reader {
           read(): string;
         }
 
+        /** Part of the example. */
         export class Item {}
   - name: python-interface-prefix
     language: python
@@ -224,4 +230,5 @@ spec:
 
 
         class Store(Protocol):
+            """Part of the example."""
             def read(self) -> str: ...

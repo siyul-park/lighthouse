@@ -106,6 +106,7 @@ spec:
 
         import "errors"
 
+        // Read is part of the example.
         func Read(n int) (int, error) {
             if n < 0 {
                 return 0, errors.New("negative")
@@ -124,6 +125,7 @@ spec:
       body: |-
         package sample
 
+        // MustRead is part of the example.
         func MustRead(n int) int {
             if n < 0 {
                 panic("negative")
@@ -224,6 +226,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> {
             text.parse()
         }
@@ -251,6 +254,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn double(n: u32) -> u32 {
             n * 2
         }
@@ -274,6 +278,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn must_parse(text: &str) -> u32 {
             text.parse().unwrap()
         }
@@ -287,6 +292,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn double(n: u32) -> u32 {
             n * 2
         }

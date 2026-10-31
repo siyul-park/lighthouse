@@ -180,13 +180,32 @@ spec:
       body: |-
         package store
 
+        // Get is part of the example.
         func Get() int { return 1 }
 
+        // Put is part of the example.
         func Put() int { return 2 }
     - path: store_test.go
-      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
-        TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}\n\nfunc
-        TestPutFlow(t *testing.T) {\n\tif store.Put() != 2 {\n\t\tt.Fatal(\"put\")\n\t}\n}"
+      body: |-
+        package store_test
+
+        import (
+        	"testing"
+
+        	"example.com/store"
+        )
+
+        func TestGet(t *testing.T) {
+        	if store.Get() != 1 {
+        		t.Fatal("get")
+        	}
+        }
+
+        func TestPutFlow(t *testing.T) {
+        	if store.Put() != 2 {
+        		t.Fatal("put")
+        	}
+        }
   - name: missing-no-tests-at-all
     language: go
     kind: valid
@@ -196,6 +215,7 @@ spec:
       body: |-
         package store
 
+        // Get is part of the example.
         func Get() int { return 1 }
   - name: missing-rust-invalid
     language: rust
@@ -225,6 +245,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn get() -> u8 {
             1
         }
@@ -271,6 +292,7 @@ spec:
         pub use shapes::area;
     - path: src/shapes.rs
       body: |-
+        /// Part of the example.
         pub fn area() -> u8 {
             1
         }
@@ -286,12 +308,15 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Registry;
 
         impl Registry {
+            /// Part of the example.
             pub fn register(&self) {}
         }
 
+        /// Part of the example.
         pub fn get() -> u8 {
             1
         }
@@ -318,12 +343,25 @@ spec:
 
         type getter interface{ Get() int }
 
+        // Store is part of the example.
         type Store struct{}
 
         func (Store) Get() int { return 1 }
     - path: store_test.go
-      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
-        TestStore(t *testing.T) {\n\tif (store.Store{}) != (store.Store{}) {\n\t\tt.Fatal(\"store\")\n\t}\n}"
+      body: |-
+        package store_test
+
+        import (
+        	"testing"
+
+        	"example.com/store"
+        )
+
+        func TestStore(t *testing.T) {
+        	if (store.Store{}) != (store.Store{}) {
+        		t.Fatal("store")
+        	}
+        }
   - name: missing-typescript-invalid
     language: typescript
     kind: invalid
@@ -355,10 +393,12 @@ spec:
     files:
     - path: store.ts
       body: |-
+        /** Part of the example. */
         export function get(): number {
           return 1;
         }
 
+        /** Part of the example. */
         export function put(): number {
           return 2;
         }
@@ -384,6 +424,7 @@ spec:
     files:
     - path: store.ts
       body: |-
+        /** Part of the example. */
         export function get(): number {
           return 1;
         }
@@ -438,6 +479,7 @@ spec:
     - path: sample.py
       body: |-
         def get() -> int:
+            """Part of the example."""
             return 1
     - path: test_sample.py
       body: |-

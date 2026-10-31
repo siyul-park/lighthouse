@@ -125,11 +125,23 @@ spec:
       body: |-
         package store
 
+        // Get is part of the example.
         func Get() int { return 1 }
     - path: store_test.go
-      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
-        TestGet(t *testing.T) {\n\tif got := store.Get(); got != 1 {\n\t\tt.Fatalf(\"got
-        %d\", got)\n\t}\n}"
+      body: |-
+        package store_test
+
+        import (
+        	"testing"
+
+        	"example.com/store"
+        )
+
+        func TestGet(t *testing.T) {
+        	if got := store.Get(); got != 1 {
+        		t.Fatalf("got %d", got)
+        	}
+        }
     canonical: true
   - name: rust-native-assertion
     language: rust
@@ -173,6 +185,7 @@ spec:
     files:
     - path: store.ts
       body: |-
+        /** Part of the example. */
         export function get(): number {
           return 1;
         }
@@ -221,6 +234,7 @@ spec:
     - path: sample.py
       body: |-
         def get(text: str) -> int:
+            """Part of the example."""
             return len(text)
     - path: test_sample.py
       body: |-

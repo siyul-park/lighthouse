@@ -62,8 +62,10 @@ spec:
       body: |-
         package sample
 
+        // Config is part of the example.
         type Config struct{}
 
+        // New is part of the example.
         func New() Config { return Config{} }
     canonical: true
   - name: unexported-parameter
@@ -89,8 +91,10 @@ spec:
 
         type option struct{}
 
+        // Option is part of the example.
         type Option = option
 
+        // New is part of the example.
         func New() Option { return option{} }
     canonical: false
   - name: unexported-private-function
@@ -155,10 +159,12 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export interface Config {
           verbose: boolean;
         }
 
+        /** Part of the example. */
         export function load(): Config {
           return { verbose: true };
         }

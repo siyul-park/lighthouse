@@ -210,6 +210,7 @@ spec:
     - path: sample.ts
       body: |
         // Load reads the configured record.
+        /** Part of the example. */
         export function load(): void {}
   - name: todo-javascript-invalid
     language: typescript
@@ -247,4 +248,5 @@ spec:
       body: |-
         # The cache is warm after the first call.
         def load() -> str:
+            """Part of the example."""
             return "x"

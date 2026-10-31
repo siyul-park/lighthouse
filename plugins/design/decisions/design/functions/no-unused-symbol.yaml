@@ -98,6 +98,7 @@ spec:
       body: |-
         package sample
 
+        // Run is part of the example.
         func Run() int { return helper() }
 
         func helper() int { return 1 }
@@ -110,7 +111,8 @@ spec:
       body: |-
         package sample
 
-        type marker interface {
+        // Marker is part of the example.
+        type Marker interface {
             isMarker()
         }
 
@@ -118,7 +120,8 @@ spec:
 
         func (node) isMarker() {}
 
-        func Mark(m marker) bool { return m != nil }
+        // Mark is part of the example.
+        func Mark(m Marker) bool { return m != nil }
   - name: go-used-private-helper
     language: go
     kind: valid
@@ -129,6 +132,7 @@ spec:
 
         func exit() {}
 
+        // Run is part of the example.
         func Run() int {
             exit()
             return 1
@@ -139,6 +143,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn run() -> i32 {
             helper()
         }
@@ -220,6 +225,7 @@ spec:
     - path: src/lib.rs
       body: |-
         fn helper() {}
+        /// Part of the example.
         pub fn used() { helper(); }
     canonical: false
   - name: dead-typescript-invalid
@@ -247,6 +253,7 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export function run(): number {
           return helper();
         }
@@ -281,6 +288,7 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export function run(items: number[]): number[] {
           return items.map(double);
         }
@@ -335,4 +343,5 @@ spec:
 
 
         def trim(text: str) -> str:
+            """Part of the example."""
             return _collapse(text.strip())

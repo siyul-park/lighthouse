@@ -96,6 +96,7 @@ spec:
       body: |-
         package language
 
+        // Analyze is part of the example.
         func Analyze() int { return parse() }
         func parse() int { return 1 }
   - name: mixed-level-implementation
@@ -129,6 +130,7 @@ spec:
         pub mod language;
     - path: src/language/mod.rs
       body: |-
+        /// Part of the example.
         pub fn analyze() -> usize { parse() }
         fn parse() -> usize { 1 }
   - name: mixed-level-typescript-module
@@ -163,6 +165,7 @@ spec:
     files:
     - path: src/engine/language.ts
       body: |-
+        /** Part of the example. */
         export function analyze(): number {
           return 1;
         }
@@ -205,6 +208,7 @@ spec:
     - path: src/engine/language.py
       body: |-
         def analyze() -> int:
+            """Part of the example."""
             return 1
   provenance:
     wasDerivedFrom:

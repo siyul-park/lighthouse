@@ -141,12 +141,15 @@ spec:
           body: |-
             package sample
 
+            // Value is part of the example.
             type Value interface{ V() }
 
+            // A is part of the example.
             type A struct{}
 
             func (A) V() {}
 
+            // B is part of the example.
             type B struct{}
 
             func (B) V() {}

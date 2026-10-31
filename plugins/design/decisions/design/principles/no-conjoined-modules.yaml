@@ -66,8 +66,10 @@ spec:
       body: |
         mod part;
 
+        /// Part of the example.
         pub fn api() -> i32 { 1 }
 
+        /// Part of the example.
         pub fn run() -> i32 { part::work() }
     - path: src/part.rs
       body: |
@@ -86,6 +88,7 @@ spec:
       body: |-
         package sample
 
+        // API is part of the example.
         func API() int { return 1 }
     - path: part/part.go
       body: |-
@@ -93,6 +96,7 @@ spec:
 
         import "example.com/sample"
 
+        // Work is part of the example.
         func Work() int { return sample.API() }
 
   - name: go-unrelated-responsibilities-share-package
@@ -116,6 +120,7 @@ spec:
     files:
     - path: src/sample.ts
       body: |-
+        /** Part of the example. */
         export function api(): number {
           return 1;
         }
@@ -123,6 +128,7 @@ spec:
       body: |-
         import { api } from "../sample";
 
+        /** Part of the example. */
         export function work(): number {
           return api() + 1;
         }
@@ -137,10 +143,12 @@ spec:
 
 
         def api() -> int:
+            """Part of the example."""
             return 1
 
 
         def run() -> int:
+            """Part of the example."""
             return work()
     - path: src/sample/part.py
       body: |-
@@ -148,6 +156,7 @@ spec:
 
 
         def work() -> int:
+            """Part of the example."""
             return api() + 1
   - name: python-modules-share-a-private-helper
     language: python

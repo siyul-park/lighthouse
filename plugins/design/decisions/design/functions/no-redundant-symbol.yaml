@@ -164,11 +164,29 @@ spec:
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\ntype Store struct {\n\tclosed bool\n\tdata   map[string][]byte\n}\n\nvar ErrClosed error\n\nfunc
-        (s *Store) load(k string) ([]byte, error) {\n\tif s.closed {\n\t\treturn nil,
-        ErrClosed\n\t}\n\treturn s.read(k)\n}\n\nfunc (s *Store) read(k string) ([]byte,
-        error) { return s.data[k], nil }\n\nfunc (s *Store) Get(k string) ([]byte,
-        error) { return s.load(k) }"
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct {
+        	closed bool
+        	data   map[string][]byte
+        }
+
+        // ErrClosed is part of the example.
+        var ErrClosed error
+
+        func (s *Store) load(k string) ([]byte, error) {
+        	if s.closed {
+        		return nil, ErrClosed
+        	}
+        	return s.read(k)
+        }
+
+        func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+        // Get is part of the example.
+        func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
     canonical: true
   - name: used-as-value
     language: go
@@ -178,14 +196,17 @@ spec:
       body: |-
         package sample
 
+        // Store is part of the example.
         type Store struct{ data map[string][]byte }
 
         func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
 
         func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
 
+        // Get is part of the example.
         func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
 
+        // Loader is part of the example.
         func (s *Store) Loader() func(string) ([]byte, error) { return s.load }
   - name: adds-an-argument
     language: go
@@ -195,12 +216,14 @@ spec:
       body: |-
         package sample
 
+        // Store is part of the example.
         type Store struct{ data map[string][]byte }
 
         func (s *Store) load(k string) ([]byte, error) { return s.read(k, true) }
 
         func (s *Store) read(k string, fresh bool) ([]byte, error) { return s.data[k], nil }
 
+        // Get is part of the example.
         func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
   - name: called-from-a-test
     language: go
@@ -210,16 +233,25 @@ spec:
       body: |-
         package sample
 
+        // Store is part of the example.
         type Store struct{ data map[string][]byte }
 
         func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
 
         func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
 
+        // Get is part of the example.
         func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
     - path: example_test.go
-      body: "package sample\n\nimport \"testing\"\n\nfunc TestLoad(t *testing.T) {\n\ts
-        := &Store{}\n\ts.load(\"k\")\n}"
+      body: |-
+        package sample
+
+        import "testing"
+
+        func TestLoad(t *testing.T) {
+        	s := &Store{}
+        	s.load("k")
+        }
   - name: rust-invalid
     language: rust
     kind: invalid
@@ -251,6 +283,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             closed: bool,
             data: Vec<u8>,
@@ -268,6 +301,7 @@ spec:
                 self.data[k]
             }
 
+            /// Part of the example.
             pub fn get(&self, k: usize) -> u8 {
                 self.load(k)
             }
@@ -279,6 +313,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             data: Vec<u8>,
         }
@@ -292,10 +327,12 @@ spec:
                 self.data[k]
             }
 
+            /// Part of the example.
             pub fn get(&self, k: usize) -> u8 {
                 self.load(k)
             }
 
+            /// Part of the example.
             pub fn loader(&self) -> fn(&Store, usize) -> u8 {
                 Store::load
             }
@@ -306,6 +343,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             data: Vec<u8>,
         }
@@ -319,6 +357,7 @@ spec:
                 if fresh { self.data[k] } else { 0 }
             }
 
+            /// Part of the example.
             pub fn get(&self, k: usize) -> u8 {
                 self.load(k)
             }
@@ -329,6 +368,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub struct Store {
             data: Vec<u8>,
         }
@@ -342,6 +382,7 @@ spec:
                 self.data[k]
             }
 
+            /// Part of the example.
             pub fn get(&self, k: usize) -> u8 {
                 self.load(k)
             }
@@ -363,10 +404,12 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub trait Reader {
             fn read_one(&self, k: usize) -> u8;
         }
 
+        /// Part of the example.
         pub struct Store {
             data: Vec<u8>,
         }
@@ -383,6 +426,7 @@ spec:
             }
         }
 
+        /// Part of the example.
         pub fn use_it(r: &dyn Reader) -> u8 {
             r.read_one(0)
         }
@@ -402,11 +446,30 @@ spec:
     kind: valid
     files:
     - path: example.go
-      body: "package sample\n\ntype store interface {\n\tGet() int\n\tPut(x int)\n}\n\ntype
-        memory struct{ n int }\n\nfunc (m *memory) Get() int  { return m.n }\nfunc
-        (m *memory) Put(x int) { m.n = x }\n\nfunc Use() int {\n\tm := &memory{}\n\tm.Put(1)\n\treturn
-        m.Get()\n}\n\ntype disk struct{ n int }\n\nfunc (d *disk) Get() int  { return
-        d.n }\nfunc (d *disk) Put(x int) { d.n = x }"
+      body: |-
+        package sample
+
+        type store interface {
+        	Get() int
+        	Put(x int)
+        }
+
+        type memory struct{ n int }
+
+        func (m *memory) Get() int  { return m.n }
+        func (m *memory) Put(x int) { m.n = x }
+
+        // Use is part of the example.
+        func Use() int {
+        	m := &memory{}
+        	m.Put(1)
+        	return m.Get()
+        }
+
+        type disk struct{ n int }
+
+        func (d *disk) Get() int  { return d.n }
+        func (d *disk) Put(x int) { d.n = x }
   - name: interface-rust-invalid
     language: rust
     kind: invalid
@@ -464,6 +527,7 @@ spec:
             }
         }
 
+        /// Part of the example.
         pub fn run() -> i32 {
             let mut m = Memory { n: 0 };
             m.put(1);
@@ -533,6 +597,7 @@ spec:
     files:
     - path: src/lib.rs
       body: |-
+        /// Part of the example.
         pub fn total(a: i32, b: i32) -> i32 {
             scale(add(a, b))
         }
@@ -573,6 +638,7 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
           private closed = false;
           private data = new Map<string, number>();
@@ -588,6 +654,7 @@ spec:
             return this.data.get(key);
           }
 
+          /** Part of the example. */
           get(key: string): number | undefined {
             return this.load(key);
           }
@@ -598,6 +665,7 @@ spec:
     files:
     - path: example.ts
       body: |-
+        /** Part of the example. */
         export class Store {
           private data = new Map<string, number>();
 
@@ -609,6 +677,7 @@ spec:
             return fresh ? this.data.get(key) : undefined;
           }
 
+          /** Part of the example. */
           get(key: string): number | undefined {
             return this.load(key);
           }
@@ -649,7 +718,8 @@ spec:
     files:
     - path: example.ts
       body: |-
-        interface Store {
+        /** Part of the example. */
+        export interface Store {
           get(): number;
           put(value: number): void;
         }
@@ -678,6 +748,7 @@ spec:
           }
         }
 
+        /** Part of the example. */
         export function use(store: Store): number {
           store.put(new Memory().get() + new Disk().get());
           return store.get();
@@ -748,4 +819,5 @@ spec:
 
 
         def get(key: str) -> int | None:
+            """Part of the example."""
             return _load(key)

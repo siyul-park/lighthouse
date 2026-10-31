@@ -66,8 +66,10 @@ spec:
           body: |-
             package sample
 
+            // Iterator is part of the example.
             type Iterator struct{}
 
+            // Kind is part of the example.
             func (it *Iterator) Kind() int {
             	return 1
             }
@@ -76,11 +78,13 @@ spec:
           body: |-
             package sample
 
+            // Iterator is part of the example.
             type Iterator struct{}
 
+            // Kind is part of the example.
             func (it *Iterator) Kind() int { return 1 }
       expect:
-        - line: 5
+        - line: 7
     - name: several-statements
       language: go
       kind: invalid
@@ -110,12 +114,15 @@ spec:
           body: |-
             package sample
 
+            // Iterator is part of the example.
             type Iterator struct{}
 
+            // Kind is part of the example.
             func (it *Iterator) Kind() int {
             	return 1
             }
 
+            // Reset is part of the example.
             func (it *Iterator) Reset() {}
 
             var _ = func() int { return 1 }
