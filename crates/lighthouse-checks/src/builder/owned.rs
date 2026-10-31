@@ -40,7 +40,7 @@ impl Builder<'_> {
             .map_or(Value::Null, |s| self.node(s))
     }
 
-    /// Per test, the symbols it is credited to, in the order of the symbols.
+    /// Per test, the symbols it is credited to, in the order of their ids.
     fn owned_index(&self) -> BTreeMap<SymbolId, Vec<SymbolId>> {
         let mut index: BTreeMap<SymbolId, Vec<SymbolId>> = BTreeMap::new();
         let owners = self.project.symbols.iter().filter(|s| {
@@ -66,6 +66,10 @@ impl Builder<'_> {
                     .push(symbol.id.clone());
             }
         }
+        // The symbols come in the order the providers answered in, which is
+        // not the same from run to run; a test that is credited to several
+        // takes the same one every time.
+        index.values_mut().for_each(|owners| owners.sort());
         index
     }
 
