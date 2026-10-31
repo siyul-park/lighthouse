@@ -14,6 +14,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestReadMessage(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		input   string
+		wantEOF bool
+		wantErr bool
+		want    string
+	}{
+		{name: "reads a framed message", input: "Content-Length: 45\r\n\r\n" + `{"jsonrpc":"2.0","id":7,"result":"日本語"}`, want: `"日本語"`},
+		{name: "ends cleanly at empty input", input: "", wantEOF: true},
+		{name: "rejects a missing length", input: "Content-Type: x\r\n\r\n{}", wantErr: true},
+		{name: "rejects a malformed length", input: "Content-Length: nope\r\n\r\n", wantErr: true},
+		{name: "rejects a short body", input: "Content-Length: 9\r\n\r\n{}", wantErr: true},
+		{name: "rejects a malformed body", input: "Content-Length: 2\r\n\r\n{]", wantErr: true},
+		{name: "rejects a header block without end", input: "Content-Length: 2\r\n", wantErr: true},
+		{name: "rejects an oversized body", input: "Content-Length: 999999999999\r\n\r\n", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := sdk.ReadMessage(bufio.NewReader(strings.NewReader(tc.input)))
+
+			require.Equal(t, tc.wantEOF, errors.Is(err, io.EOF), "got %v", err)
+			require.Equal(t, tc.wantErr, err != nil && !tc.wantEOF, "got %v", err)
+			if err == nil {
+				require.Equal(t, tc.want, string(got.Result))
+			}
+		})
+	}
+}
+
 func TestWriteMessage(t *testing.T) {
 	id := json.RawMessage("7")
 	var out bytes.Buffer
@@ -70,33 +99,4 @@ func TestWriteMessage(t *testing.T) {
 			})
 		}
 	})
-}
-
-func TestReadMessage(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		input   string
-		wantEOF bool
-		wantErr bool
-		want    string
-	}{
-		{name: "reads a framed message", input: "Content-Length: 45\r\n\r\n" + `{"jsonrpc":"2.0","id":7,"result":"日本語"}`, want: `"日本語"`},
-		{name: "ends cleanly at empty input", input: "", wantEOF: true},
-		{name: "rejects a missing length", input: "Content-Type: x\r\n\r\n{}", wantErr: true},
-		{name: "rejects a malformed length", input: "Content-Length: nope\r\n\r\n", wantErr: true},
-		{name: "rejects a short body", input: "Content-Length: 9\r\n\r\n{}", wantErr: true},
-		{name: "rejects a malformed body", input: "Content-Length: 2\r\n\r\n{]", wantErr: true},
-		{name: "rejects a header block without end", input: "Content-Length: 2\r\n", wantErr: true},
-		{name: "rejects an oversized body", input: "Content-Length: 999999999999\r\n\r\n", wantErr: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := sdk.ReadMessage(bufio.NewReader(strings.NewReader(tc.input)))
-
-			require.Equal(t, tc.wantEOF, errors.Is(err, io.EOF), "got %v", err)
-			require.Equal(t, tc.wantErr, err != nil && !tc.wantEOF, "got %v", err)
-			if err == nil {
-				require.Equal(t, tc.want, string(got.Result))
-			}
-		})
-	}
 }
