@@ -342,7 +342,9 @@ func run(schemaPath, out string, check bool) error {
 	return os.WriteFile(out, text, 0o644)
 }
 
-func refName(ref string) string { return ref[strings.LastIndex(ref, "/")+1:] }
+func refName(ref string) string {
+	return ref[strings.LastIndex(ref, "/")+1:]
+}
 
 // isStruct tells a definition that is an object from one that is a name for a
 // scalar or a list: an object has properties, or is a choice between objects.

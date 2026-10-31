@@ -170,4 +170,6 @@ func unitName(unit, key string) string {
 	return unitPrefix + unitStem(unit) + "-" + key + ".json"
 }
 
-func unitStem(unit string) string { return digest(unit)[:16] }
+func unitStem(unit string) string {
+	return digest(unit)[:16]
+}

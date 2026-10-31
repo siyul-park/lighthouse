@@ -233,7 +233,9 @@ func isJump(n *ast.BranchStmt) bool {
 	return n.Tok == token.GOTO || (n.Label != nil && (n.Tok == token.BREAK || n.Tok == token.CONTINUE))
 }
 
-func isLogical(n *ast.BinaryExpr) bool { return n.Op == token.LAND || n.Op == token.LOR }
+func isLogical(n *ast.BinaryExpr) bool {
+	return n.Op == token.LAND || n.Op == token.LOR
+}
 
 func unparen(e ast.Expr) ast.Expr {
 	for {

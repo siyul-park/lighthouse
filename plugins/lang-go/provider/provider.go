@@ -15,10 +15,14 @@ type Provider struct {
 const language = "go"
 
 // Name is the plugin id.
-func (p *Provider) Name() string { return p.id }
+func (p *Provider) Name() string {
+	return p.id
+}
 
 // Version is the plugin version.
-func (p *Provider) Version() string { return p.version }
+func (p *Provider) Version() string {
+	return p.version
+}
 
 // Manifest describes the Go language.
 func (p *Provider) Manifest() []sdk.LanguageManifest {
@@ -78,7 +82,11 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 // Stats says which units the last index request read from the cache and which
 // it analyzed; both are empty when the request ran without the cache. Tests
 // use it to assert what an edit re-indexes.
-func (p *Provider) Stats() RunStats { return p.last }
+func (p *Provider) Stats() RunStats {
+	return p.last
+}
 
 // New returns a Go provider that identifies itself as id and version.
-func New(id, version string) *Provider { return &Provider{id: id, version: version} }
+func New(id, version string) *Provider {
+	return &Provider{id: id, version: version}
+}

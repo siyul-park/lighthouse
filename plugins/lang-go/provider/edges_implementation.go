@@ -100,7 +100,9 @@ func declaredIn(t types.Type, pkg *types.Package) bool {
 	return ok && named.Obj().Pkg() == pkg
 }
 
-func isError(t types.Type) bool { return t != nil && types.Identical(t, errorType) }
+func isError(t types.Type) bool {
+	return t != nil && types.Identical(t, errorType)
+}
 
 // receiverNamed is the named type behind an optional pointer.
 func receiverNamed(t types.Type) (*types.Named, bool) {

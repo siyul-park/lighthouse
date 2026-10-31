@@ -67,4 +67,6 @@ func writtenName(t types.Type, declared *types.TypeName) *types.TypeName {
 }
 
 // fullPath qualifies a type by the import path of its package.
-func fullPath(p *types.Package) string { return p.Path() }
+func fullPath(p *types.Package) string {
+	return p.Path()
+}
