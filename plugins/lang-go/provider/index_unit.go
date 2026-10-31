@@ -45,6 +45,31 @@ type edgeKey struct {
 	sited    bool
 }
 
+func newUnit(rel string, file *ast.File, pkg *packages.Package, src []byte, res *resolver) *unit {
+	dir := path.Dir(rel)
+	u := &unit{
+		rel:      rel,
+		file:     file,
+		pkg:      pkg,
+		fset:     pkg.Fset,
+		src:      src,
+		res:      res,
+		frag:     emptyFragment(sdk.FileInfo{Path: rel, Generated: isGenerated(file)}),
+		module:   dir,
+		main:     file.Name.Name == "main",
+		internal: hasComponent(dir, "internal"),
+		test:     strings.HasSuffix(rel, "_test.go"),
+		edges:    map[edgeKey]bool{},
+		cmap:     ast.NewCommentMap(pkg.Fset, file, file.Comments),
+	}
+	if u.test && strings.HasSuffix(file.Name.Name, "_test") {
+		u.module = dir + moduleSuffixTest
+		u.testOf = dir
+	}
+	u.frag.Modules = []sdk.Module{{Path: u.module, Name: file.Name.Name, TestOf: u.testOf}}
+	return u
+}
+
 // fragment collects the symbols, edges, function summaries and test cases of
 // the file, plus its comment groups.
 func (u *unit) fragment() *sdk.Fragment {
@@ -393,31 +418,6 @@ func (u *unit) visibility(name string) string {
 }
 
 func (u *unit) info() *types.Info { return u.pkg.TypesInfo }
-
-func newUnit(rel string, file *ast.File, pkg *packages.Package, src []byte, res *resolver) *unit {
-	dir := path.Dir(rel)
-	u := &unit{
-		rel:      rel,
-		file:     file,
-		pkg:      pkg,
-		fset:     pkg.Fset,
-		src:      src,
-		res:      res,
-		frag:     emptyFragment(sdk.FileInfo{Path: rel, Generated: isGenerated(file)}),
-		module:   dir,
-		main:     file.Name.Name == "main",
-		internal: hasComponent(dir, "internal"),
-		test:     strings.HasSuffix(rel, "_test.go"),
-		edges:    map[edgeKey]bool{},
-		cmap:     ast.NewCommentMap(pkg.Fset, file, file.Comments),
-	}
-	if u.test && strings.HasSuffix(file.Name.Name, "_test") {
-		u.module = dir + moduleSuffixTest
-		u.testOf = dir
-	}
-	u.frag.Modules = []sdk.Module{{Path: u.module, Name: file.Name.Name, TestOf: u.testOf}}
-	return u
-}
 
 // baseName is the identifier a type expression names, behind pointers,
 // parentheses, type arguments and package qualifiers.

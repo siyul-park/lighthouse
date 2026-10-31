@@ -30,6 +30,31 @@ type options struct {
 	bin string
 }
 
+// newOptions decodes the options of the Go language, rejecting unknown keys,
+// and resolves the go binary.
+func newOptions(raw map[string]json.RawMessage) (options, error) {
+	var o options
+	if data, ok := raw[language]; ok {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&o); err != nil {
+			return options{}, fmt.Errorf("invalid [languages.%s] options: %w", language, err)
+		}
+	}
+	name := o.Go
+	if name == "" {
+		name = "go"
+	}
+	bin, err := exec.LookPath(name)
+	if err != nil {
+		return options{}, fmt.Errorf("go command not found: %w", err)
+	}
+	if o.bin, err = filepath.Abs(bin); err != nil {
+		return options{}, err
+	}
+	return o, nil
+}
+
 // environ is the environment of the go command: this process's with the
 // configured additions, GOTOOLCHAIN=local unless configured, and the chosen
 // binary's directory first on PATH when `go` is set.
@@ -65,29 +90,4 @@ func (o options) load(fn func()) {
 	_ = os.Setenv("PATH", filepath.Dir(o.bin)+string(os.PathListSeparator)+path)
 	defer func() { _ = os.Setenv("PATH", path) }()
 	fn()
-}
-
-// newOptions decodes the options of the Go language, rejecting unknown keys,
-// and resolves the go binary.
-func newOptions(raw map[string]json.RawMessage) (options, error) {
-	var o options
-	if data, ok := raw[language]; ok {
-		dec := json.NewDecoder(bytes.NewReader(data))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&o); err != nil {
-			return options{}, fmt.Errorf("invalid [languages.%s] options: %w", language, err)
-		}
-	}
-	name := o.Go
-	if name == "" {
-		name = "go"
-	}
-	bin, err := exec.LookPath(name)
-	if err != nil {
-		return options{}, fmt.Errorf("go command not found: %w", err)
-	}
-	if o.bin, err = filepath.Abs(bin); err != nil {
-		return options{}, err
-	}
-	return o, nil
 }

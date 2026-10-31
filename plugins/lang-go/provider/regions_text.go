@@ -30,6 +30,36 @@ type remap struct {
 // lines that wrap the fence.
 const unmapped = -1
 
+// newRegionText is the fence as it is written, each byte at its place in the
+// host: its own bytes where the text is copied as is, the whole segment where
+// it was changed on the way (a tab, a line ending), the whole fence without a
+// map.
+func newRegionText(source *sdk.EmbeddedSource) regionText {
+	from, to := int(source.SourceRange[0]), int(source.SourceRange[1])
+	host := make([][2]int, len(source.Text))
+	for i := range host {
+		host[i] = [2]int{from, to}
+	}
+	if source.TextMap == nil && to-from == len(source.Text) {
+		for i := range host {
+			host[i] = [2]int{from + i, from + i + 1}
+		}
+	}
+	for _, segment := range source.TextMap {
+		textFrom, textTo := int(segment.TextRange[0]), int(segment.TextRange[1])
+		hostFrom, hostTo := int(segment.SourceRange[0]), int(segment.SourceRange[1])
+		linear := textTo-textFrom == hostTo-hostFrom
+		for i := textFrom; i < textTo && i < len(host); i++ {
+			if linear {
+				host[i] = [2]int{hostFrom + i - textFrom, hostFrom + i - textFrom + 1}
+			} else {
+				host[i] = [2]int{hostFrom, hostTo}
+			}
+		}
+	}
+	return regionText{text: []byte(source.Text), host: host}
+}
+
 // around is the text between head and tail, which the host does not show.
 func (t regionText) around(head, tail string) regionText {
 	text := append([]byte(head), t.text...)
@@ -194,36 +224,6 @@ func (m remap) offset(p sdk.Position) (int, bool) {
 		return 0, false
 	}
 	return m.lines[p.Line-1] + p.Col - 1, true
-}
-
-// newRegionText is the fence as it is written, each byte at its place in the
-// host: its own bytes where the text is copied as is, the whole segment where
-// it was changed on the way (a tab, a line ending), the whole fence without a
-// map.
-func newRegionText(source *sdk.EmbeddedSource) regionText {
-	from, to := int(source.SourceRange[0]), int(source.SourceRange[1])
-	host := make([][2]int, len(source.Text))
-	for i := range host {
-		host[i] = [2]int{from, to}
-	}
-	if source.TextMap == nil && to-from == len(source.Text) {
-		for i := range host {
-			host[i] = [2]int{from + i, from + i + 1}
-		}
-	}
-	for _, segment := range source.TextMap {
-		textFrom, textTo := int(segment.TextRange[0]), int(segment.TextRange[1])
-		hostFrom, hostTo := int(segment.SourceRange[0]), int(segment.SourceRange[1])
-		linear := textTo-textFrom == hostTo-hostFrom
-		for i := textFrom; i < textTo && i < len(host); i++ {
-			if linear {
-				host[i] = [2]int{hostFrom + i - textFrom, hostFrom + i - textFrom + 1}
-			} else {
-				host[i] = [2]int{hostFrom, hostTo}
-			}
-		}
-	}
-	return regionText{text: []byte(source.Text), host: host}
 }
 
 // lineStarts are the offsets at which the lines of text begin.

@@ -37,6 +37,24 @@ type goModule struct {
 // moduleSuffixTest marks the module of an external test package.
 const moduleSuffixTest = "[test]"
 
+// newResolver maps every package reachable from roots. Packages inside the
+// project root get their directory, relative to it, as module path; all
+// others (the standard library, dependencies, vendored code) keep their
+// import path.
+func newResolver(root string, roots []*packages.Package, local *goModule) *resolver {
+	r := &resolver{modules: map[string]string{}, project: map[string]bool{}, local: local}
+	packages.Visit(roots, nil, func(p *packages.Package) {
+		if module, inside := moduleOf(root, p); module != "" && r.modules[p.PkgPath] == "" {
+			r.modules[p.PkgPath] = module
+			r.project[p.PkgPath] = inside
+			if inside {
+				r.declared = append(r.declared, p)
+			}
+		}
+	})
+	return r
+}
+
 // object is the target of a package-level function, variable, constant or
 // type, or of a method. Fields need their holder and go through field.
 func (r *resolver) object(obj types.Object) (string, bool) {
@@ -133,24 +151,6 @@ func (m *goModule) locate(importPath string) (string, bool) {
 	default:
 		return m.dir + "/" + rest, true
 	}
-}
-
-// newResolver maps every package reachable from roots. Packages inside the
-// project root get their directory, relative to it, as module path; all
-// others (the standard library, dependencies, vendored code) keep their
-// import path.
-func newResolver(root string, roots []*packages.Package, local *goModule) *resolver {
-	r := &resolver{modules: map[string]string{}, project: map[string]bool{}, local: local}
-	packages.Visit(roots, nil, func(p *packages.Package) {
-		if module, inside := moduleOf(root, p); module != "" && r.modules[p.PkgPath] == "" {
-			r.modules[p.PkgPath] = module
-			r.project[p.PkgPath] = inside
-			if inside {
-				r.declared = append(r.declared, p)
-			}
-		}
-	})
-	return r
 }
 
 // moduleOf is the module path of a package and whether it lives inside the

@@ -85,6 +85,37 @@ const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledG
 // syntheticModule names the module assumed for Go files with no go.mod.
 const syntheticModule = "lighthouse.invalid/workspace"
 
+func newRun(params sdk.IndexParams, opts options) *run {
+	r := &run{
+		root:          params.Project.Root,
+		opts:          opts,
+		overlays:      map[string][]byte{},
+		requested:     map[string]sdk.FileRef{},
+		astRequested:  map[string]bool{},
+		fragments:     map[string]*sdk.Fragment{},
+		claimed:       map[string]bool{},
+		problems:      map[string]string{},
+		excludedFiles: map[string]bool{},
+		failed:        map[string]int{},
+		encoded:       map[string]json.RawMessage{},
+		regionModules: map[string]string{},
+		fenceFiles:    map[string]bool{},
+		result:        emptyResult(),
+	}
+	for _, f := range params.FileInputs() {
+		r.requested[f.Path] = f
+	}
+	for _, input := range params.Inputs {
+		if input.Kind == "file" && input.File != nil && input.SourceAST {
+			r.astRequested[input.File.Path] = true
+		}
+	}
+	for _, o := range params.Context.Overlays {
+		r.overlays[filepath.Join(r.root, filepath.FromSlash(o.Path))] = []byte(o.Text)
+	}
+	return r
+}
+
 func (r *run) index() {
 	var candidates []string
 	for rel := range r.requested {
@@ -503,37 +534,6 @@ func (l *loader) next() loaded {
 	default: // loaded up front, no slot was taken
 	}
 	return got
-}
-
-func newRun(params sdk.IndexParams, opts options) *run {
-	r := &run{
-		root:          params.Project.Root,
-		opts:          opts,
-		overlays:      map[string][]byte{},
-		requested:     map[string]sdk.FileRef{},
-		astRequested:  map[string]bool{},
-		fragments:     map[string]*sdk.Fragment{},
-		claimed:       map[string]bool{},
-		problems:      map[string]string{},
-		excludedFiles: map[string]bool{},
-		failed:        map[string]int{},
-		encoded:       map[string]json.RawMessage{},
-		regionModules: map[string]string{},
-		fenceFiles:    map[string]bool{},
-		result:        emptyResult(),
-	}
-	for _, f := range params.FileInputs() {
-		r.requested[f.Path] = f
-	}
-	for _, input := range params.Inputs {
-		if input.Kind == "file" && input.File != nil && input.SourceAST {
-			r.astRequested[input.File.Path] = true
-		}
-	}
-	for _, o := range params.Context.Overlays {
-		r.overlays[filepath.Join(r.root, filepath.FromSlash(o.Path))] = []byte(o.Text)
-	}
-	return r
 }
 
 func nearestModule(dir string, cache map[string]string) (string, bool) {
