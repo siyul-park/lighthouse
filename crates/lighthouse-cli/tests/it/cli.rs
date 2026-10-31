@@ -253,8 +253,8 @@ fn decision_list_and_explain() {
         .unwrap();
     let list = String::from_utf8(list.stdout).unwrap();
     for line in [
-        "core/max-lines\twarn\tFiles stay small and cohesive",
-        "design/complexity\twarn\tFunctions stay within their complexity limits",
+        "core/max-lines\tinfo\tFiles stay small and cohesive",
+        "design/complexity\tinfo\tFunctions stay within their complexity limits",
         "design/declaration-groups\terror\t",
         "design/no-mutable-globals\twarn\t",
         "design/error-identity\twarn\t",
@@ -291,7 +291,7 @@ fn decision_list_all_shows_status_of_every_decision() {
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
     for line in [
-        "core/max-lines\timplemented\twarn\tFiles stay small and cohesive",
+        "core/max-lines\timplemented\tinfo\tFiles stay small and cohesive",
         "design/no-duplication\tjudged\tinfo\tBehavior has one implementation",
     ] {
         assert!(text.lines().any(|l| l == line), "{line}");

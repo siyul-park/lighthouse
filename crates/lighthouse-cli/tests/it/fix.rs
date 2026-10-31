@@ -105,8 +105,8 @@ fn rust_project_in(source: &str, extra: &str, pack: &str) -> TempDir {
     dir
 }
 
-const MISORDERED: &str = "package demo\n\nfunc helper() int { return 1 }\n\ntype Service struct{}\n\nfunc (s *Service) Run() int { return helper() }\n";
-const ORDERED: &str = "package demo\n\ntype Service struct{}\n\nfunc (s *Service) Run() int { return helper() }\n\nfunc helper() int { return 1 }\n";
+const MISORDERED: &str = "package demo\n\nfunc helper() int {\n\treturn 1\n}\n\ntype Service struct{}\n\nfunc (s *Service) Run() int {\n\treturn helper()\n}\n";
+const ORDERED: &str = "package demo\n\ntype Service struct{}\n\nfunc (s *Service) Run() int {\n\treturn helper()\n}\n\nfunc helper() int {\n\treturn 1\n}\n";
 
 #[test]
 fn dry_run_prints_the_diff_and_changes_nothing() {
@@ -119,7 +119,7 @@ fn dry_run_prints_the_diff_and_changes_nothing() {
         .assert()
         .success()
         .stdout(predicate::str::contains("--- a/a.go\n+++ b/a.go\n"))
-        .stdout(predicate::str::contains("+func helper() int { return 1 }"))
+        .stdout(predicate::str::contains("+func helper() int {"))
         .stderr(predicate::str::contains(
             "would fix design/declaration-groups [safe]",
         ))
@@ -153,7 +153,7 @@ fn fix_applies_safe_fixes_and_reports_what_is_left() {
 
 #[test]
 fn unsafe_fixes_are_previewed_until_asked_for() {
-    let banner = "package demo\n\nfunc main() { _ = helper() }\n\n// ---- Helpers ----\nfunc helper() int { return 1 }\n";
+    let banner = "package demo\n\nfunc main() {\n\t_ = helper()\n}\n\n// ---- Helpers ----\nfunc helper() int {\n\treturn 1\n}\n";
     let Some(dir) = go_project(&[("a.go", banner)], "") else {
         return;
     };
@@ -181,7 +181,7 @@ fn unsafe_fixes_are_previewed_until_asked_for() {
         ));
     assert_eq!(
         read(&dir, "a.go"),
-        "package demo\n\nfunc main() { _ = helper() }\n\nfunc helper() int { return 1 }\n"
+        "package demo\n\nfunc main() {\n\t_ = helper()\n}\n\nfunc helper() int {\n\treturn 1\n}\n"
     );
 }
 
@@ -649,7 +649,7 @@ fn a_replace_inserts_a_doc_line_in_go() {
 
     assert_eq!(
         read(&dir, "a.go"),
-        "package demo\n\n// Run is documented.\nfunc Run() int { return 1 }\n"
+        "package demo\n\n// Run is documented.\nfunc Run() int {\n\treturn 1\n}\n"
     );
 }
 
@@ -678,7 +678,7 @@ fn a_replace_inserts_a_doc_line_in_rust() {
 
 #[test]
 fn a_run_without_the_store_still_honors_the_committed_decisions() {
-    let banner = "package demo\n\nfunc main() { _ = helper() }\n\n// ---- Helpers ----\nfunc helper() int { return 1 }\n";
+    let banner = "package demo\n\nfunc main() {\n\t_ = helper()\n}\n\n// ---- Helpers ----\nfunc helper() int {\n\treturn 1\n}\n";
     let Some(dir) = go_project(&[("a.go", banner)], "") else {
         return;
     };
