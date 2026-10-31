@@ -81,8 +81,19 @@ impl Orchestrator<'_> {
                 }
                 None => {}
             }
-            self.notes
-                .push(format!("rolled back {}: {reason}", file.display()));
+            let mut by: Vec<&str> = kept
+                .iter()
+                .chain(merged.iter().map(|(p, _)| p))
+                .filter(|p| p.files.contains(file))
+                .map(|p| p.rule_id.as_str())
+                .collect();
+            by.sort_unstable();
+            by.dedup();
+            self.notes.push(format!(
+                "rolled back {}: {reason} (after the fixes of {})",
+                file.display(),
+                by.join(", ")
+            ));
         }
         self.keep_previews(&kept, &merged, &rolled, &candidates.bases);
         for file in changed.iter().filter(|f| !rolled.contains_key(*f)) {
@@ -376,7 +387,7 @@ pub(super) fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<
 
 /// `failed` plus every file that shares a proposal with a failed one: a fix
 /// that spans files is undone as a whole.
-fn close_over(
+pub(super) fn close_over(
     kept: &[Proposal],
     mut failed: BTreeMap<PathBuf, String>,
 ) -> BTreeMap<PathBuf, String> {

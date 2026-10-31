@@ -30,7 +30,7 @@ use super::{
     super::propose::{Phase, Proposal, Taking},
     super::{AppliedFix, FixedBy},
     Orchestrator,
-    rollback::{kept_proposals, worse},
+    rollback::{close_over, kept_proposals, worse},
 };
 use crate::{Error, Overlays, Run};
 
@@ -178,8 +178,39 @@ impl Orchestrator<'_> {
                 .into_iter()
                 .map(|(file, text)| (file.clone(), self.texts.insert(file, text)))
                 .collect();
-            let next = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
-            if seen.insert(self.state_hash()) && worse(&after, &next, changed).is_empty() {
+            let mut next = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
+            let mut made = made;
+            let mut prior = prior;
+            let mut bad = worse(&after, &next, changed);
+            if !bad.is_empty() && !seen.contains(&self.state_hash()) {
+                // The follow-ups of the files that got worse are undone, those of
+                // the others stay: a file that cannot be improved does not undo
+                // the formatting of another.
+                let undone = close_over(&kept, bad);
+                for (file, text) in std::mem::take(&mut prior) {
+                    if !undone.contains_key(&file) {
+                        prior.push((file, text));
+                        continue;
+                    }
+                    match text {
+                        Some(text) => self.texts.insert(file, text),
+                        None => self.texts.remove(&file),
+                    };
+                }
+                made.retain(|f| {
+                    !f.proposal
+                        .files
+                        .iter()
+                        .any(|file| undone.contains_key(file))
+                });
+                if !prior.is_empty() {
+                    next = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
+                    bad = worse(&after, &next, changed);
+                } else {
+                    bad = undone;
+                }
+            }
+            if bad.is_empty() && seen.insert(self.state_hash()) {
                 after = next;
                 followed.extend(made);
                 continue;
