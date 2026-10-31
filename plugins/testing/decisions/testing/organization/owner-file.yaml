@@ -31,13 +31,18 @@ spec:
     Rust, TypeScript and Python are not judged yet.
 
     No tool has this precedent. The severity follows the measured precision of
-    the findings. Measured on cel, qlbridge and lighthouse's own Go before its
-    tests were moved (minivm, which was being edited, left out): 45 of 45
-    findings are right, 27 of 27 `misplaced` and 18 of 18 `unpaired`, once the
-    Go example and benchmark file conventions are in `allow` (without them
-    `cel_example_test.go` and `vm_bench_test.go` were wrong: 18 of 20). At 95%
-    or more for each kind the project approved `error` (user decision, outside
-    the precedent gate).
+    the findings. Measured on cel and qlbridge with the strict Go baseline
+    configuration (minivm, which was being edited, left out): `misplaced` 11 of
+    11 right and `unpaired` 14 of 14 right, so 100% and 100%. An owner test
+    counts only when it also reaches its target (it uses the symbol, or a
+    member of a type), a target in generated code is never judged, and a test
+    that uses something its own file's source declares stays where it is; each
+    rule removed false findings that the name alone produced (a parser test
+    named after the statement types it asserts, a test named after a generated
+    protobuf type), at the price of fewer findings (17 became 11 on cel). The
+    Go example and benchmark file conventions are in `allow`. At 95% or more
+    for each kind the project approved `error` (user decision, outside the
+    precedent gate).
   scope:
     subject: symbol
     tests: only
