@@ -1,5 +1,10 @@
-# The gate builds the plugins once (a stamp file) and the release lighthouse
-# binary once; every check below runs that binary.
+# Two tiers.
+#   make fast  the agent's gate after every step: what changed against BASE
+#              (default main) and what depends on it (scripts/fast.sh).
+#   make ci    the full gate, run before a merge: every test, every lint, every
+#              decision example, the generated docs.
+# Both build the plugins once (a stamp file) and the release lighthouse binary
+# once; every check runs that binary.
 
 PLUGINS := target/plugins
 LIGHTHOUSE := target/release/lighthouse
@@ -11,7 +16,7 @@ SOURCES := $(shell find crates plugins protocol Cargo.toml Cargo.lock -type f ! 
 GO_TOOLCHAIN := $(shell cd plugins/lang-go && go env GOROOT 2>/dev/null)
 export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
 
-.PHONY: plugins cli test lint decisions docs ci
+.PHONY: plugins cli test lint decisions docs ci fast
 
 # Builds the out-of-process plugins; each directory holds the binary, its
 # lighthouse-plugin.toml and, for a plugin that provides packs, its `decisions/`:
@@ -83,3 +88,7 @@ docs: cli
 
 # The full gate.
 ci: test lint decisions docs
+
+# The agent's gate; BASE is the ref the change is measured against.
+fast:
+	BASE=$(or $(BASE),main) sh scripts/fast.sh
