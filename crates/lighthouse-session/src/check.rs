@@ -54,16 +54,6 @@ pub struct CheckRequest {
     pub detached: bool,
 }
 
-/// How a run ended. `Incomplete` wins over everything: "not checked" is never
-/// "passed".
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum RunStatus {
-    Clean,
-    Findings,
-    Incomplete,
-}
-
 /// The counts of a run, shared by every frontend that reports on one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Summary {
@@ -79,6 +69,16 @@ pub struct Summary {
     pub suppressed: usize,
     /// Findings that directives in the code suppress.
     pub allowed: usize,
+}
+
+/// How a run ended. `Incomplete` wins over everything: "not checked" is never
+/// "passed".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum RunStatus {
+    Clean,
+    Findings,
+    Incomplete,
 }
 
 /// The `CheckReport` kind: the findings of a run for a program, with the gaps,

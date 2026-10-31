@@ -12,43 +12,6 @@ use serde::Serialize;
 /// The equal-width bins of P(fail) the expected calibration error uses.
 const BINS: usize = 10;
 
-/// A proportion with its Wilson 95% interval.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
-pub struct Rate {
-    pub hits: usize,
-    pub of: usize,
-    pub value: f64,
-    pub low: f64,
-    pub high: f64,
-}
-
-impl Rate {
-    /// `hits` out of `of`; `None` when `of` is zero.
-    pub fn new(hits: usize, of: usize) -> Option<Self> {
-        if of == 0 {
-            return None;
-        }
-        let (low, high) = wilson(hits as f64, of as f64);
-        Some(Self {
-            hits,
-            of,
-            value: hits as f64 / of as f64,
-            low,
-            high,
-        })
-    }
-}
-
-impl fmt::Display for Rate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:.3} [{:.3}, {:.3}] ({}/{})",
-            self.value, self.low, self.high, self.hits, self.of
-        )
-    }
-}
-
 /// How a check came out for one labelled subject.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -155,6 +118,43 @@ impl Metrics {
             )),
             None => Some(format!("recall unknown < {target:.2}")),
         }
+    }
+}
+
+/// A proportion with its Wilson 95% interval.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+pub struct Rate {
+    pub hits: usize,
+    pub of: usize,
+    pub value: f64,
+    pub low: f64,
+    pub high: f64,
+}
+
+impl Rate {
+    /// `hits` out of `of`; `None` when `of` is zero.
+    pub fn new(hits: usize, of: usize) -> Option<Self> {
+        if of == 0 {
+            return None;
+        }
+        let (low, high) = wilson(hits as f64, of as f64);
+        Some(Self {
+            hits,
+            of,
+            value: hits as f64 / of as f64,
+            low,
+            high,
+        })
+    }
+}
+
+impl fmt::Display for Rate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:.3} [{:.3}, {:.3}] ({}/{})",
+            self.value, self.low, self.high, self.hits, self.of
+        )
     }
 }
 

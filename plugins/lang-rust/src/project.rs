@@ -19,97 +19,6 @@ use self::cargo::TargetKind;
 
 pub(crate) mod cargo;
 
-pub struct SourceFile {
-    pub rel: String,
-    pub text: String,
-    pub ast: syn::File,
-    pub generated: bool,
-    pub(crate) line_starts: Vec<usize>,
-}
-
-impl SourceFile {
-    /// 1-based line and byte column of a proc-macro2 position (0-based
-    /// character column).
-    pub fn position(&self, line: usize, col: usize) -> (u32, u32) {
-        let line_number = u32::try_from(line).unwrap_or(u32::MAX);
-        let (Some(offset), Some(&start)) = (
-            self.offset(line, col),
-            self.line_starts.get(line.wrapping_sub(1)),
-        ) else {
-            return (line_number, 1);
-        };
-        (
-            line_number,
-            u32::try_from(offset - start + 1).unwrap_or(u32::MAX),
-        )
-    }
-}
-
-impl SourceFile {
-    /// The first line, with its 1-based byte column, of the plain `//`
-    /// comment lines that lead the item starting on `line` with no blank line
-    /// between; `None` when no such line sits directly above it. Doc comments
-    /// are part of the item's tokens, and `//!` belongs to the module.
-    pub fn leading_comments(&self, line: usize) -> Option<(u32, u32)> {
-        let mut first = None;
-        let mut at = line.checked_sub(1)?;
-        while at > 0 {
-            let start = *self.line_starts.get(at - 1)?;
-            let text = self.text.get(start..)?.split('\n').next()?;
-            let trimmed = text.trim_start();
-            let plain = (trimmed.starts_with("//")
-                && !trimmed.starts_with("//!")
-                && !trimmed.starts_with("///"))
-                || trimmed.starts_with("////");
-            if !plain {
-                break;
-            }
-            let col = text.len() - trimmed.len() + 1;
-            first = Some((u32::try_from(at).ok()?, u32::try_from(col).ok()?));
-            at -= 1;
-        }
-        first
-    }
-
-    /// Byte offset of a proc-macro2 position (1-based line, 0-based
-    /// character column).
-    pub fn offset(&self, line: usize, col: usize) -> Option<usize> {
-        let start = *self.line_starts.get(line.checked_sub(1)?)?;
-        let rest = self.text.get(start..)?;
-        let line_text = rest.split('\n').next()?;
-        let at = line_text
-            .char_indices()
-            .nth(col)
-            .map_or(line_text.len(), |(at, _)| at);
-        Some(start + at)
-    }
-}
-
-pub struct Crate {
-    pub package: usize,
-    pub kind: TargetKind,
-    pub root: usize,
-    /// Whether code outside the project can depend on the package.
-    pub exported: bool,
-    /// Label of the library crate an integration test crate exercises.
-    pub test_of: Option<String>,
-}
-
-pub struct Mod {
-    pub path: String,
-    pub name: String,
-    pub parent: Option<usize>,
-    pub krate: usize,
-    pub file: usize,
-    /// Indexes of the nested inline `mod` items leading from the file's items
-    /// to this module's items.
-    pub inline: Vec<usize>,
-    pub vis: Visibility,
-    pub cfg_test: bool,
-    dir: PathBuf,
-    nested: bool,
-}
-
 #[derive(Default)]
 pub struct Tree {
     pub files: Vec<SourceFile>,
@@ -430,6 +339,97 @@ impl Tree {
         let rel = &self.files[self.mods[m].file].rel;
         let abs = self.root.join(rel);
         abs.parent().map(Path::to_owned).unwrap_or_default()
+    }
+}
+
+pub struct Mod {
+    pub path: String,
+    pub name: String,
+    pub parent: Option<usize>,
+    pub krate: usize,
+    pub file: usize,
+    /// Indexes of the nested inline `mod` items leading from the file's items
+    /// to this module's items.
+    pub inline: Vec<usize>,
+    pub vis: Visibility,
+    pub cfg_test: bool,
+    dir: PathBuf,
+    nested: bool,
+}
+
+pub struct Crate {
+    pub package: usize,
+    pub kind: TargetKind,
+    pub root: usize,
+    /// Whether code outside the project can depend on the package.
+    pub exported: bool,
+    /// Label of the library crate an integration test crate exercises.
+    pub test_of: Option<String>,
+}
+
+pub struct SourceFile {
+    pub rel: String,
+    pub text: String,
+    pub ast: syn::File,
+    pub generated: bool,
+    pub(crate) line_starts: Vec<usize>,
+}
+
+impl SourceFile {
+    /// 1-based line and byte column of a proc-macro2 position (0-based
+    /// character column).
+    pub fn position(&self, line: usize, col: usize) -> (u32, u32) {
+        let line_number = u32::try_from(line).unwrap_or(u32::MAX);
+        let (Some(offset), Some(&start)) = (
+            self.offset(line, col),
+            self.line_starts.get(line.wrapping_sub(1)),
+        ) else {
+            return (line_number, 1);
+        };
+        (
+            line_number,
+            u32::try_from(offset - start + 1).unwrap_or(u32::MAX),
+        )
+    }
+}
+
+impl SourceFile {
+    /// The first line, with its 1-based byte column, of the plain `//`
+    /// comment lines that lead the item starting on `line` with no blank line
+    /// between; `None` when no such line sits directly above it. Doc comments
+    /// are part of the item's tokens, and `//!` belongs to the module.
+    pub fn leading_comments(&self, line: usize) -> Option<(u32, u32)> {
+        let mut first = None;
+        let mut at = line.checked_sub(1)?;
+        while at > 0 {
+            let start = *self.line_starts.get(at - 1)?;
+            let text = self.text.get(start..)?.split('\n').next()?;
+            let trimmed = text.trim_start();
+            let plain = (trimmed.starts_with("//")
+                && !trimmed.starts_with("//!")
+                && !trimmed.starts_with("///"))
+                || trimmed.starts_with("////");
+            if !plain {
+                break;
+            }
+            let col = text.len() - trimmed.len() + 1;
+            first = Some((u32::try_from(at).ok()?, u32::try_from(col).ok()?));
+            at -= 1;
+        }
+        first
+    }
+
+    /// Byte offset of a proc-macro2 position (1-based line, 0-based
+    /// character column).
+    pub fn offset(&self, line: usize, col: usize) -> Option<usize> {
+        let start = *self.line_starts.get(line.checked_sub(1)?)?;
+        let rest = self.text.get(start..)?;
+        let line_text = rest.split('\n').next()?;
+        let at = line_text
+            .char_indices()
+            .nth(col)
+            .map_or(line_text.len(), |(at, _)| at);
+        Some(start + at)
     }
 }
 

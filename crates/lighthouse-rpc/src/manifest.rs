@@ -20,52 +20,13 @@ const FILE_NAMES: [&str; 3] = [
     "lighthouse-plugin.json",
 ];
 
-/// The spec of the `Plugin` kind: how to start a plugin process, and what the
-/// plugin provides.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PluginSpec {
-    pub version: String,
-    /// How to start the plugin's process; a bundled plugin, which the binary
-    /// compiles in, has none.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub runtime: Option<Runtime>,
-    /// Directory of the plugin's decision catalog, relative to the manifest
-    /// directory: the packs the plugin provides, read without starting the
-    /// process.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub catalog: Option<PathBuf>,
-    #[serde(default, skip_serializing_if = "provides_nothing")]
-    pub provides: Provides,
-}
-
-impl Spec for PluginSpec {
-    const KIND: &'static str = "Plugin";
-}
-
-/// How a plugin process is started.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Runtime {
-    /// Executable. A relative path with a separator is resolved against the
-    /// manifest directory; a bare name is looked up on `PATH`.
-    pub command: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub args: Vec<String>,
-}
-
-/// What a plugin contributes, declared so that tools can list it without
-/// starting the process. Each list is checked against what the process
-/// reports when it starts.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Provides {
-    /// Language ids.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub languages: Vec<String>,
-    /// Model ids.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub models: Vec<String>,
+/// What a search found: usable manifests, and manifests that did not parse.
+/// A broken manifest only matters to a plugin that is listed, so discovery
+/// does not fail on it.
+#[derive(Debug, Default)]
+pub struct Discovered {
+    pub found: Vec<Found>,
+    pub broken: Vec<Error>,
 }
 
 /// A `Plugin` document and the directory it was found in.
@@ -124,13 +85,52 @@ impl Found {
     }
 }
 
-/// What a search found: usable manifests, and manifests that did not parse.
-/// A broken manifest only matters to a plugin that is listed, so discovery
-/// does not fail on it.
-#[derive(Debug, Default)]
-pub struct Discovered {
-    pub found: Vec<Found>,
-    pub broken: Vec<Error>,
+/// The spec of the `Plugin` kind: how to start a plugin process, and what the
+/// plugin provides.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PluginSpec {
+    pub version: String,
+    /// How to start the plugin's process; a bundled plugin, which the binary
+    /// compiles in, has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<Runtime>,
+    /// Directory of the plugin's decision catalog, relative to the manifest
+    /// directory: the packs the plugin provides, read without starting the
+    /// process.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catalog: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "provides_nothing")]
+    pub provides: Provides,
+}
+
+impl Spec for PluginSpec {
+    const KIND: &'static str = "Plugin";
+}
+
+/// How a plugin process is started.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Runtime {
+    /// Executable. A relative path with a separator is resolved against the
+    /// manifest directory; a bare name is looked up on `PATH`.
+    pub command: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+}
+
+/// What a plugin contributes, declared so that tools can list it without
+/// starting the process. Each list is checked against what the process
+/// reports when it starts.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Provides {
+    /// Language ids.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub languages: Vec<String>,
+    /// Model ids.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<String>,
 }
 
 /// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,

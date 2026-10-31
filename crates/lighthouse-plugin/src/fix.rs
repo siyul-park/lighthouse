@@ -21,14 +21,6 @@ pub struct FixerManifest {
     pub requires: Vec<Capability>,
 }
 
-/// The decision behind a finding, as far as a fixer may use it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FixDecision {
-    pub id: String,
-    pub requirement: String,
-    pub context: String,
-}
-
 /// Everything a fixer may read to answer for one finding. The project is the
 /// analysis the finding came from, read-only.
 pub struct FixRequest<'a> {
@@ -45,6 +37,14 @@ pub struct FixRequest<'a> {
     /// Whether the project is trusted to run commands (`lighthouse trust`, or
     /// `LIGHTHOUSE_TRUST=1`); the repository cannot grant it itself.
     pub trusted: bool,
+}
+
+/// The decision behind a finding, as far as a fixer may use it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixDecision {
+    pub id: String,
+    pub requirement: String,
+    pub context: String,
 }
 
 /// Proposes the edits that make a finding go away, as [`FixOutcome`]. `fix`

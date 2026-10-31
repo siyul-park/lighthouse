@@ -50,6 +50,118 @@ vocabulary!(Capability, "capability" {
     Overlays => "overlays",
 });
 
+vocabulary!(SymbolKind, "symbol kind" {
+    Function => "function",
+    Method => "method",
+    Type => "type",
+    Field => "field",
+    Variant => "variant",
+    Const => "const",
+    Var => "var",
+    Interface => "interface",
+    Test => "test",
+});
+
+vocabulary!(EdgeKind, "edge kind" {
+    Calls => "calls",
+    References => "references",
+    Imports => "imports",
+    Contains => "contains",
+    Implements => "implements",
+    AccessesPrivate => "accesses-private",
+});
+
+/// A construct and the number of enclosing nesting constructs (including
+/// nested functions) around it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Flow {
+    pub kind: FlowKind,
+    pub nesting: u32,
+    /// `Switch`: arms other than the default arm.
+    #[serde(default)]
+    pub arms: u32,
+    /// `Logic`: operators in the run.
+    #[serde(default)]
+    pub operators: u32,
+    /// `Switch`: every arm, default included, is a single return.
+    #[serde(default)]
+    pub returning: bool,
+}
+
+impl Flow {
+    /// A construct with no arms, operators or returning arms; set those directly.
+    pub fn new(kind: FlowKind, nesting: u32) -> Self {
+        Self {
+            kind,
+            nesting,
+            arms: 0,
+            operators: 0,
+            returning: false,
+        }
+    }
+}
+
+/// Normalized control-flow construct, shared by every language. Providers map
+/// their syntax onto these kinds; analyzers never see language syntax.
+///
+/// Mapping guidance for providers:
+/// - conditional expression (`?:`, `x if c else y`): `If`; `elif`/`else if`:
+///   `ElseIf`; `else`, also `for ... else` and `while ... else`: `Else`.
+/// - `switch`, `match`, `select`: one `Switch` whose `arms` counts the arms
+///   that are not the default or wildcard arm.
+/// - every loop form, comprehension generators included: `Loop`; a
+///   comprehension filter `if`: `If`.
+/// - `catch`/`except`/`rescue` handler: one `Catch` each; `try` and `finally`
+///   emit nothing.
+/// - `goto` and labeled `break`/`continue`: `Jump`.
+/// - a run of like `&&`/`||`/`and`/`or` operators: one `Logic` whose
+///   `operators` counts the operators in the run; `??` and `?.` emit nothing.
+/// - a direct call to the enclosing function: `Recursion`.
+/// - nested functions, lambdas and closures emit nothing but raise the
+///   nesting of what they contain.
+///
+/// Cyclomatic complexity is `1 + ifs + else-ifs + loops + catches + switch
+/// arms + logic operators`; cognitive complexity follows Campbell 2018.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FlowKind {
+    If,
+    ElseIf,
+    Else,
+    Switch,
+    Loop,
+    Catch,
+    Jump,
+    Logic,
+    Recursion,
+}
+
+/// All fragments merged: sorted, deduplicated, edge targets resolved.
+///
+/// A symbol id declared in several files (build variants, for instance) keeps
+/// the first declaration in file order; the rest are dropped and reported by
+/// [`Project::notices`], as are targets that stayed ambiguous.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Project {
+    all: Fragment,
+    index: Index,
+    notices: Vec<String>,
+    documents: Vec<Document>,
+}
+
+/// UCM contribution of one indexed file; ids are project-stable.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Fragment {
+    pub files: Vec<File>,
+    pub modules: Vec<Module>,
+    pub symbols: Vec<Symbol>,
+    pub edges: Vec<Edge>,
+    pub functions: Vec<FunctionSummary>,
+    pub tests: Vec<TestCase>,
+    #[serde(default)]
+    pub comments: Vec<Comment>,
+}
+
 /// A project file; `path` is its project-relative identity and `hash` its content hash.
 /// `generated` and `test` are the provider's classification, never inferred here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,95 +228,6 @@ pub struct Module {
     pub example: bool,
 }
 
-/// Project-stable identity: `module::owner::name#kind`.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct SymbolId(pub(crate) String);
-
-impl SymbolId {
-    /// Builds `module::owner::...::name#kind`; the result always satisfies [`SymbolId::parse`].
-    pub fn new(module: &str, owners: &[&str], name: &str, kind: SymbolKind) -> Self {
-        let mut id = module.to_owned();
-        for part in owners.iter().chain([&name]) {
-            id.push_str("::");
-            id.push_str(part);
-        }
-        id.push('#');
-        id.push_str(kind.as_str());
-        Self(id)
-    }
-
-    /// The id text, `module::owner::name#kind`.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Accepts an id built elsewhere, such as by a plugin: `module::name`
-    /// parts ending in `#kind` with a known kind.
-    pub fn parse(id: &str) -> Option<Self> {
-        let (head, kind) = id.rsplit_once('#')?;
-        let kind = SymbolKind::ALL.iter().any(|k| k.as_str() == kind);
-        (kind && head.contains("::")).then(|| Self(id.to_owned()))
-    }
-
-    /// Path of the module that declares the symbol.
-    pub fn module(&self) -> &str {
-        self.0
-            .split_once("::")
-            .map_or(&self.0, |(module, _)| module)
-    }
-}
-
-/// What a symbol declares; the lowercase name is the `#kind` suffix of its id.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum SymbolKind {
-    Function,
-    Method,
-    Type,
-    Field,
-    /// A variant of an enum or a union.
-    Variant,
-    Const,
-    Var,
-    Interface,
-    Test,
-}
-
-vocabulary!(SymbolKind, "symbol kind" {
-    Function => "function",
-    Method => "method",
-    Type => "type",
-    Field => "field",
-    Variant => "variant",
-    Const => "const",
-    Var => "var",
-    Interface => "interface",
-    Test => "test",
-});
-
-/// Who may use a symbol, as the language defines it; `Internal` is
-/// visible within a bounded unit such as a crate, but not outside it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Visibility {
-    Public,
-    Private,
-    Internal,
-}
-
-/// What a declaration of a test file is for, when its language can tell.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum SymbolRole {
-    /// Test code that checks on behalf of tests, such as a function that takes
-    /// the test framework's handle.
-    TestHelper,
-    /// Test data and code that builds it: types, constants, variables and
-    /// functions that need no handle.
-    Fixture,
-}
-
 /// A named declaration. `id` is project-unique; `owner` is the declaring type
 /// or interface of a member, `None` at module level.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -260,22 +283,110 @@ impl Symbol {
     }
 }
 
-/// A vertex of the dependency graph: a whole module or one symbol.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// What a declaration of a test file is for, when its language can tell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Node {
-    Module(String),
-    Symbol(SymbolId),
+pub enum SymbolRole {
+    /// Test code that checks on behalf of tests, such as a function that takes
+    /// the test framework's handle.
+    TestHelper,
+    /// Test data and code that builds it: types, constants, variables and
+    /// functions that need no handle.
+    Fixture,
 }
 
-/// Edge target. `Path` is resolved by [`Project::merge`]: a module path, a full
-/// symbol id (`module::owner::name#kind`), or a kind-less id
-/// (`module::owner::name`) that names exactly one symbol.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Who may use a symbol, as the language defines it; `Internal` is
+/// visible within a bounded unit such as a crate, but not outside it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Target {
-    Resolved(Node),
-    Path(String),
+pub enum Visibility {
+    Public,
+    Private,
+    Internal,
+}
+
+/// What a symbol declares; the lowercase name is the `#kind` suffix of its id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SymbolKind {
+    Function,
+    Method,
+    Type,
+    Field,
+    /// A variant of an enum or a union.
+    Variant,
+    Const,
+    Var,
+    Interface,
+    Test,
+}
+
+/// Project-stable identity: `module::owner::name#kind`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SymbolId(pub(crate) String);
+
+impl SymbolId {
+    /// Builds `module::owner::...::name#kind`; the result always satisfies [`SymbolId::parse`].
+    pub fn new(module: &str, owners: &[&str], name: &str, kind: SymbolKind) -> Self {
+        let mut id = module.to_owned();
+        for part in owners.iter().chain([&name]) {
+            id.push_str("::");
+            id.push_str(part);
+        }
+        id.push('#');
+        id.push_str(kind.as_str());
+        Self(id)
+    }
+
+    /// The id text, `module::owner::name#kind`.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Accepts an id built elsewhere, such as by a plugin: `module::name`
+    /// parts ending in `#kind` with a known kind.
+    pub fn parse(id: &str) -> Option<Self> {
+        let (head, kind) = id.rsplit_once('#')?;
+        let kind = SymbolKind::ALL.iter().any(|k| k.as_str() == kind);
+        (kind && head.contains("::")).then(|| Self(id.to_owned()))
+    }
+
+    /// Path of the module that declares the symbol.
+    pub fn module(&self) -> &str {
+        self.0
+            .split_once("::")
+            .map_or(&self.0, |(module, _)| module)
+    }
+}
+
+/// A directed relation from `from` to `to`; unresolved targets stay
+/// [`Target::Path`] after [`Project::merge`] when they are unknown or ambiguous.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Edge {
+    pub kind: EdgeKind,
+    pub from: Node,
+    pub to: Target,
+    pub resolution: Resolution,
+    /// Where the reference occurs, when the provider reports it (capability
+    /// `reference-sites`). The same relation used at several places is one
+    /// edge per place.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site: Option<Span>,
+}
+
+/// How reliable an [`Edge`]'s target is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Resolution {
+    /// The target comes from type information.
+    Semantic,
+    /// The target comes from names alone.
+    Syntactic,
+    /// A guess: the source may use the target. Callers, callees and other
+    /// counting analyses ignore such edges; [`Project::references`] keeps them
+    /// so a rule asking "might this be used" fails safe.
+    Heuristic,
 }
 
 /// The relation an [`Edge`] states between its endpoints.
@@ -295,107 +406,22 @@ pub enum EdgeKind {
     AccessesPrivate,
 }
 
-vocabulary!(EdgeKind, "edge kind" {
-    Calls => "calls",
-    References => "references",
-    Imports => "imports",
-    Contains => "contains",
-    Implements => "implements",
-    AccessesPrivate => "accesses-private",
-});
-
-/// How reliable an [`Edge`]'s target is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Resolution {
-    /// The target comes from type information.
-    Semantic,
-    /// The target comes from names alone.
-    Syntactic,
-    /// A guess: the source may use the target. Callers, callees and other
-    /// counting analyses ignore such edges; [`Project::references`] keeps them
-    /// so a rule asking "might this be used" fails safe.
-    Heuristic,
-}
-
-/// A directed relation from `from` to `to`; unresolved targets stay
-/// [`Target::Path`] after [`Project::merge`] when they are unknown or ambiguous.
+/// A vertex of the dependency graph: a whole module or one symbol.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Edge {
-    pub kind: EdgeKind,
-    pub from: Node,
-    pub to: Target,
-    pub resolution: Resolution,
-    /// Where the reference occurs, when the provider reports it (capability
-    /// `reference-sites`). The same relation used at several places is one
-    /// edge per place.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub site: Option<Span>,
-}
-
-/// Normalized control-flow construct, shared by every language. Providers map
-/// their syntax onto these kinds; analyzers never see language syntax.
-///
-/// Mapping guidance for providers:
-/// - conditional expression (`?:`, `x if c else y`): `If`; `elif`/`else if`:
-///   `ElseIf`; `else`, also `for ... else` and `while ... else`: `Else`.
-/// - `switch`, `match`, `select`: one `Switch` whose `arms` counts the arms
-///   that are not the default or wildcard arm.
-/// - every loop form, comprehension generators included: `Loop`; a
-///   comprehension filter `if`: `If`.
-/// - `catch`/`except`/`rescue` handler: one `Catch` each; `try` and `finally`
-///   emit nothing.
-/// - `goto` and labeled `break`/`continue`: `Jump`.
-/// - a run of like `&&`/`||`/`and`/`or` operators: one `Logic` whose
-///   `operators` counts the operators in the run; `??` and `?.` emit nothing.
-/// - a direct call to the enclosing function: `Recursion`.
-/// - nested functions, lambdas and closures emit nothing but raise the
-///   nesting of what they contain.
-///
-/// Cyclomatic complexity is `1 + ifs + else-ifs + loops + catches + switch
-/// arms + logic operators`; cognitive complexity follows Campbell 2018.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum FlowKind {
-    If,
-    ElseIf,
-    Else,
-    Switch,
-    Loop,
-    Catch,
-    Jump,
-    Logic,
-    Recursion,
+pub enum Node {
+    Module(String),
+    Symbol(SymbolId),
 }
 
-/// A construct and the number of enclosing nesting constructs (including
-/// nested functions) around it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Flow {
-    pub kind: FlowKind,
-    pub nesting: u32,
-    /// `Switch`: arms other than the default arm.
-    #[serde(default)]
-    pub arms: u32,
-    /// `Logic`: operators in the run.
-    #[serde(default)]
-    pub operators: u32,
-    /// `Switch`: every arm, default included, is a single return.
-    #[serde(default)]
-    pub returning: bool,
-}
-
-impl Flow {
-    /// A construct with no arms, operators or returning arms; set those directly.
-    pub fn new(kind: FlowKind, nesting: u32) -> Self {
-        Self {
-            kind,
-            nesting,
-            arms: 0,
-            operators: 0,
-            returning: false,
-        }
-    }
+/// Edge target. `Path` is resolved by [`Project::merge`]: a module path, a full
+/// symbol id (`module::owner::name#kind`), or a kind-less id
+/// (`module::owner::name`) that names exactly one symbol.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Target {
+    Resolved(Node),
+    Path(String),
 }
 
 /// A test symbol and the symbols it exercises (`targets`); `nesting` is its
@@ -422,32 +448,6 @@ pub struct Comment {
     /// knows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attached_to: Option<SymbolId>,
-}
-
-/// UCM contribution of one indexed file; ids are project-stable.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Fragment {
-    pub files: Vec<File>,
-    pub modules: Vec<Module>,
-    pub symbols: Vec<Symbol>,
-    pub edges: Vec<Edge>,
-    pub functions: Vec<FunctionSummary>,
-    pub tests: Vec<TestCase>,
-    #[serde(default)]
-    pub comments: Vec<Comment>,
-}
-
-/// All fragments merged: sorted, deduplicated, edge targets resolved.
-///
-/// A symbol id declared in several files (build variants, for instance) keeps
-/// the first declaration in file order; the rest are dropped and reported by
-/// [`Project::notices`], as are targets that stayed ambiguous.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Project {
-    all: Fragment,
-    index: Index,
-    notices: Vec<String>,
-    documents: Vec<Document>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

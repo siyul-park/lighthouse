@@ -171,17 +171,6 @@ impl From<bool> for FailOn {
 /// Replacement texts by project-relative path; see [`Engine::check_overlaid`].
 pub type Overlays = BTreeMap<PathBuf, String>;
 
-struct Language {
-    files: GlobSet,
-    tests: GlobSet,
-}
-
-pub(crate) struct Input {
-    pub(crate) file: File,
-    pub(crate) text: String,
-    language: usize,
-}
-
 /// What the rules of a run read: the selected rules and everything they may
 /// look at.
 struct Scene<'a> {
@@ -199,8 +188,11 @@ struct Scene<'a> {
     models: &'a dyn lighthouse_plugin::Models,
 }
 
-/// The rules that did not finish, by file (`None` for the project).
-pub(crate) type Unsettled = BTreeSet<(String, Option<PathBuf>)>;
+pub(crate) struct Input {
+    pub(crate) file: File,
+    pub(crate) text: String,
+    language: usize,
+}
 
 /// The findings of the rules, and the rules that did not finish.
 type Collected = (Vec<Diagnostic>, Unsettled);
@@ -232,11 +224,8 @@ impl Gathered {
     }
 }
 
-/// Where the engine keeps the findings of its runs, and how much.
-struct CacheSettings {
-    dir: PathBuf,
-    limit: u64,
-}
+/// The rules that did not finish, by file (`None` for the project).
+pub(crate) type Unsettled = BTreeSet<(String, Option<PathBuf>)>;
 
 /// A configured set of plugins that analyzes one project root. Running it does
 /// not modify the project or the engine.
@@ -277,6 +266,17 @@ pub struct Engine {
     cache: Option<CacheSettings>,
     /// What the run may do with models.
     models: ModelOptions,
+}
+
+/// Where the engine keeps the findings of its runs, and how much.
+struct CacheSettings {
+    dir: PathBuf,
+    limit: u64,
+}
+
+struct Language {
+    files: GlobSet,
+    tests: GlobSet,
 }
 
 /// Whether and how a run asks models.

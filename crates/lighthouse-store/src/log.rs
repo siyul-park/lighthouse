@@ -42,6 +42,67 @@ pub(crate) const FILE: &str = "decisions.jsonl";
 /// Length of a record id: the hash of its spec.
 const ID_BYTES: usize = 16;
 
+/// A revision as the log holds it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RevisionEvent {
+    pub id: String,
+    pub spec: RevisionSpec,
+}
+
+/// The spec of the `Revision` record: a change to how a decision is judged,
+/// approved by whoever it is attributed to. One that carries a `model` binds
+/// that model to the decision before every other binding; one that carries
+/// none unbinds it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RevisionSpec {
+    /// The uid of the decision, else its name.
+    pub decision: String,
+    /// The id of the revision this one follows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meaning_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_revision: Option<String>,
+    pub change: Change,
+    /// The evaluation that justified it: metrics, labelled-set size and hash.
+    #[serde(default)]
+    pub evaluation: Value,
+    /// `prov:wasAttributedTo`: who approved it.
+    pub approval: Attribution,
+    /// The model it binds, `<provider>/<model>` (a learned one is
+    /// `local/learned@<artifact hash>`). A revision is a full snapshot: absent
+    /// means unbound, so a writer that does not change the model copies its
+    /// parent's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// `prov:generatedAtTime`.
+    pub generated_at_time: String,
+}
+
+impl Spec for RevisionSpec {
+    const KIND: &'static str = "Revision";
+}
+
+/// How far a revision moves a decision. Binding or retraining a model is
+/// `minor`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Change {
+    Major,
+    Minor,
+    Patch,
+}
+
+/// A judgment as the log holds it, with the suppressions that go with it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JudgmentEvent {
+    pub id: String,
+    pub spec: JudgmentSpec,
+    pub suppressions: Vec<SuppressionEvent>,
+}
+
 /// The spec of the `Judgment` record: a label on one subject (here a finding),
 /// with the finding frozen as it was seen. It is a recorded label, not ground
 /// truth, and it belongs to the decision's `meaningVersion`: it expires when
@@ -98,57 +159,11 @@ impl Spec for JudgmentSpec {
     const KIND: &'static str = "Judgment";
 }
 
-/// How far a revision moves a decision. Binding or retraining a model is
-/// `minor`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Change {
-    Major,
-    Minor,
-    Patch,
-}
-
-/// The spec of the `Revision` record: a change to how a decision is judged,
-/// approved by whoever it is attributed to. One that carries a `model` binds
-/// that model to the decision before every other binding; one that carries
-/// none unbinds it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct RevisionSpec {
-    /// The uid of the decision, else its name.
-    pub decision: String,
-    /// The id of the revision this one follows.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub meaning_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub check_revision: Option<String>,
-    pub change: Change,
-    /// The evaluation that justified it: metrics, labelled-set size and hash.
-    #[serde(default)]
-    pub evaluation: Value,
-    /// `prov:wasAttributedTo`: who approved it.
-    pub approval: Attribution,
-    /// The model it binds, `<provider>/<model>` (a learned one is
-    /// `local/learned@<artifact hash>`). A revision is a full snapshot: absent
-    /// means unbound, so a writer that does not change the model copies its
-    /// parent's.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    /// `prov:generatedAtTime`.
-    pub generated_at_time: String,
-}
-
-impl Spec for RevisionSpec {
-    const KIND: &'static str = "Revision";
-}
-
-/// A revision as the log holds it.
+/// A suppression as the log holds it.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RevisionEvent {
+pub struct SuppressionEvent {
     pub id: String,
-    pub spec: RevisionSpec,
+    pub spec: SuppressionSpec,
 }
 
 /// The spec of the `Suppression` record: the `fail` judgment `judgment` is
@@ -171,21 +186,6 @@ pub struct SuppressionSpec {
 
 impl Spec for SuppressionSpec {
     const KIND: &'static str = "Suppression";
-}
-
-/// A judgment as the log holds it, with the suppressions that go with it.
-#[derive(Debug, Clone, PartialEq)]
-pub struct JudgmentEvent {
-    pub id: String,
-    pub spec: JudgmentSpec,
-    pub suppressions: Vec<SuppressionEvent>,
-}
-
-/// A suppression as the log holds it.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SuppressionEvent {
-    pub id: String,
-    pub spec: SuppressionSpec,
 }
 
 impl JudgmentEvent {

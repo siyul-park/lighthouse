@@ -7,6 +7,16 @@ use std::collections::BTreeMap;
 use lighthouse_protocol::{Question, State, TrainingLine};
 use serde_json::Value;
 
+/// What a training file holds.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Dataset {
+    pub decision: String,
+    pub lines: Vec<Line>,
+    /// The code of the examples of what fails, and of what passes.
+    pub invalid: Vec<String>,
+    pub valid: Vec<String>,
+}
+
 /// One subject: the labelled line of a training file, then embedded for the
 /// learners, or the subject a model is asked about.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -24,16 +34,6 @@ pub struct Line {
     pub group: String,
     /// Who gave the label: `person`, `agent` or `model`.
     pub source: String,
-}
-
-/// What a training file holds.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Dataset {
-    pub decision: String,
-    pub lines: Vec<Line>,
-    /// The code of the examples of what fails, and of what passes.
-    pub invalid: Vec<String>,
-    pub valid: Vec<String>,
 }
 
 /// Reads a JSON Lines training file.

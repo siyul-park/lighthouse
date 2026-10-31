@@ -32,110 +32,6 @@ pub(crate) const FIELDS: [&str; 8] = [
     "command", "env", "timeout", "stdin", "output", "success", "sarif", "sandbox",
 ];
 
-/// What a program is given on stdin.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Stdin {
-    #[default]
-    None,
-    /// The text of `{file}`.
-    File,
-}
-
-impl Stdin {
-    fn is_none(&self) -> bool {
-        *self == Self::None
-    }
-}
-
-/// What a program prints, which decides what its result is. A program has one
-/// of two results: findings (`lines`, `sarif`, `status`) or changes (`files`,
-/// `stdout`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Output {
-    /// One finding per line of stdout; a leading `path:line[:col]: ` places it,
-    /// and a line that is only a path of the project places it at line 1 of
-    /// that file, with the decision's title as the message.
-    Lines,
-    /// A SARIF 2.1.0 log: one finding per result.
-    Sarif,
-    /// One finding when the exit code is not in `success`, with the tail of
-    /// stderr or stdout as its message.
-    Status,
-    /// The files the program changed in its scratch copy of the project.
-    Files,
-    /// The new text of `{file}`, on stdout.
-    Stdout,
-}
-
-impl Output {
-    /// The word a file writes it as.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Lines => "lines",
-            Self::Sarif => "sarif",
-            Self::Status => "status",
-            Self::Files => "files",
-            Self::Stdout => "stdout",
-        }
-    }
-
-    /// Whether the result is findings, as opposed to changes.
-    pub fn finds(self) -> bool {
-        matches!(self, Self::Lines | Self::Sarif | Self::Status)
-    }
-}
-
-/// The unit a SARIF log counts columns in (`columnKind`, plus the bytes that
-/// tools such as golangci-lint count without saying so).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum SarifColumns {
-    /// UTF-16 code units.
-    Utf16CodeUnits,
-    /// Unicode code points.
-    UnicodeCodePoints,
-    /// Bytes.
-    Bytes,
-}
-
-/// How a SARIF log is read, under SARIF's own names. A result must pass both
-/// lists.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Sarif {
-    /// Globs over the result's `ruleId`, such as `errcheck` or `govet:*`: `*`
-    /// is any run of characters inside one segment, segments being separated
-    /// by `/` or `::`, and `**` is any number of segments, as in module path
-    /// globs. Default: every rule.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub rules: Vec<String>,
-    /// SARIF `level`s to keep: `error`, `warning`, `note` or `none`; a result
-    /// without a level is a `warning`. Default: every level.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub levels: Vec<String>,
-    /// The unit the program counts columns in, when its log does not say or
-    /// says wrongly. Default: the log's `columnKind`, else `utf16CodeUnits`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub columns: Option<SarifColumns>,
-}
-
-/// What a program may reach besides what the project's `[sandbox]` lets every
-/// program reach: its lists are added to the project's.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Sandbox {
-    /// Hosts the program may reach, through the proxy of the run: a name, or
-    /// `*.suffix` for every host below it, either with `:port`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub network: Vec<String>,
-    /// Places besides its own that it may write: paths below the project, or
-    /// below the home directory with `~/` in front. Never a secret.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub write: Vec<String>,
-}
-
 /// The places a program is bound at, which decide the placeholders it accepts
 /// and the outputs it may have.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -162,6 +58,50 @@ pub enum Batching {
     File,
     /// Neither: one run over the project.
     Once,
+}
+
+/// The programs a decision binds at one point: its own, and the ones of the
+/// languages that give their own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Programs {
+    own: Program,
+    languages: BTreeMap<String, Program>,
+}
+
+impl Programs {
+    pub(crate) fn new(own: &Program, languages: BTreeMap<String, Program>) -> Self {
+        Self {
+            own: own.clone(),
+            languages,
+        }
+    }
+
+    /// The program for the files of `language`: the one the language gives,
+    /// else the decision's own; `None` where neither has a command.
+    pub fn of(&self, language: &str) -> Option<&Program> {
+        self.languages
+            .get(language)
+            .or_else(|| (!self.own.command.is_empty()).then_some(&self.own))
+    }
+
+    /// Whether `language` gives a program of its own.
+    pub fn is_language(&self, language: &str) -> bool {
+        self.languages.contains_key(language)
+    }
+
+    /// The decision's own program, which has no command when every language
+    /// gives its own.
+    pub fn own(&self) -> &Program {
+        &self.own
+    }
+
+    /// Every program, the decision's own first when it has a command.
+    pub fn all(&self) -> impl Iterator<Item = &Program> {
+        (!self.own.command.is_empty())
+            .then_some(&self.own)
+            .into_iter()
+            .chain(self.languages.values())
+    }
 }
 
 /// A program as the files write it. Where a program is a table of its own
@@ -387,48 +327,108 @@ impl From<ProgramSpec> for Program {
     }
 }
 
-/// The programs a decision binds at one point: its own, and the ones of the
-/// languages that give their own.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Programs {
-    own: Program,
-    languages: BTreeMap<String, Program>,
+/// What a program is given on stdin.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Stdin {
+    #[default]
+    None,
+    /// The text of `{file}`.
+    File,
 }
 
-impl Programs {
-    pub(crate) fn new(own: &Program, languages: BTreeMap<String, Program>) -> Self {
-        Self {
-            own: own.clone(),
-            languages,
+impl Stdin {
+    fn is_none(&self) -> bool {
+        *self == Self::None
+    }
+}
+
+/// What a program prints, which decides what its result is. A program has one
+/// of two results: findings (`lines`, `sarif`, `status`) or changes (`files`,
+/// `stdout`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Output {
+    /// One finding per line of stdout; a leading `path:line[:col]: ` places it,
+    /// and a line that is only a path of the project places it at line 1 of
+    /// that file, with the decision's title as the message.
+    Lines,
+    /// A SARIF 2.1.0 log: one finding per result.
+    Sarif,
+    /// One finding when the exit code is not in `success`, with the tail of
+    /// stderr or stdout as its message.
+    Status,
+    /// The files the program changed in its scratch copy of the project.
+    Files,
+    /// The new text of `{file}`, on stdout.
+    Stdout,
+}
+
+impl Output {
+    /// The word a file writes it as.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Lines => "lines",
+            Self::Sarif => "sarif",
+            Self::Status => "status",
+            Self::Files => "files",
+            Self::Stdout => "stdout",
         }
     }
 
-    /// The program for the files of `language`: the one the language gives,
-    /// else the decision's own; `None` where neither has a command.
-    pub fn of(&self, language: &str) -> Option<&Program> {
-        self.languages
-            .get(language)
-            .or_else(|| (!self.own.command.is_empty()).then_some(&self.own))
+    /// Whether the result is findings, as opposed to changes.
+    pub fn finds(self) -> bool {
+        matches!(self, Self::Lines | Self::Sarif | Self::Status)
     }
+}
 
-    /// Whether `language` gives a program of its own.
-    pub fn is_language(&self, language: &str) -> bool {
-        self.languages.contains_key(language)
-    }
+/// How a SARIF log is read, under SARIF's own names. A result must pass both
+/// lists.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Sarif {
+    /// Globs over the result's `ruleId`, such as `errcheck` or `govet:*`: `*`
+    /// is any run of characters inside one segment, segments being separated
+    /// by `/` or `::`, and `**` is any number of segments, as in module path
+    /// globs. Default: every rule.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rules: Vec<String>,
+    /// SARIF `level`s to keep: `error`, `warning`, `note` or `none`; a result
+    /// without a level is a `warning`. Default: every level.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub levels: Vec<String>,
+    /// The unit the program counts columns in, when its log does not say or
+    /// says wrongly. Default: the log's `columnKind`, else `utf16CodeUnits`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub columns: Option<SarifColumns>,
+}
 
-    /// The decision's own program, which has no command when every language
-    /// gives its own.
-    pub fn own(&self) -> &Program {
-        &self.own
-    }
+/// The unit a SARIF log counts columns in (`columnKind`, plus the bytes that
+/// tools such as golangci-lint count without saying so).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum SarifColumns {
+    /// UTF-16 code units.
+    Utf16CodeUnits,
+    /// Unicode code points.
+    UnicodeCodePoints,
+    /// Bytes.
+    Bytes,
+}
 
-    /// Every program, the decision's own first when it has a command.
-    pub fn all(&self) -> impl Iterator<Item = &Program> {
-        (!self.own.command.is_empty())
-            .then_some(&self.own)
-            .into_iter()
-            .chain(self.languages.values())
-    }
+/// What a program may reach besides what the project's `[sandbox]` lets every
+/// program reach: its lists are added to the project's.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Sandbox {
+    /// Hosts the program may reach, through the proxy of the run: a name, or
+    /// `*.suffix` for every host below it, either with `:port`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub network: Vec<String>,
+    /// Places besides its own that it may write: paths below the project, or
+    /// below the home directory with `~/` in front. Never a secret.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub write: Vec<String>,
 }
 
 impl Point {

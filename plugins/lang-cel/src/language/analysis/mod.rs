@@ -48,10 +48,6 @@ const CONTEXT_VARIABLES: [&str; 16] = [
 const PACK: &str = "Pack";
 const DECISION: &str = "Decision";
 
-/// The shared variables of the packs by name: the document that declares each,
-/// its symbol and whether it takes parameters.
-pub(super) type PackVariables = BTreeMap<String, Vec<(String, SymbolId, bool)>>;
-
 /// What the expressions of one file resolve their names against, and the
 /// symbols of functions outside the project they found on the way.
 pub(super) struct Analysis<'a> {
@@ -60,6 +56,10 @@ pub(super) struct Analysis<'a> {
     libraries: &'a [CelLibraryManifest],
     external: &'a mut BTreeMap<SymbolId, Symbol>,
 }
+
+/// The shared variables of the packs by name: the document that declares each,
+/// its symbol and whether it takes parameters.
+pub(super) type PackVariables = BTreeMap<String, Vec<(String, SymbolId, bool)>>;
 
 /// One expression to analyze: its program and text, the symbol that holds it,
 /// the document it belongs to and the parameters it may name.

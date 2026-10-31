@@ -40,47 +40,6 @@ use crate::{Needs, Run};
 /// How many apply-and-recheck rounds a run takes before it stops.
 pub const MAX_ROUNDS: usize = 5;
 
-/// What makes a fix: a registered fixer, derived from the rule, or the
-/// project's agent that edits, which guesses and is held to the checks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FixedBy {
-    /// The registered fixer with this id.
-    Fixer(String),
-    /// The agent `[models] agent` binds.
-    Model,
-}
-
-/// How one rule's findings are fixed, as the catalog says.
-#[derive(Debug, Clone)]
-pub struct FixBinding {
-    /// What serves the rule.
-    pub fixer: FixedBy,
-    /// The effective safety of the fix at best, [`DecisionSpec::fix_safety`]: what
-    /// the fixer claims can only be as safe as this, unless the project gives
-    /// the rule a safety of its own (see [`FixPlan::with_safety`]).
-    pub cap: Safety,
-    /// The languages of the examples of the decision: where its fix is known
-    /// to apply.
-    pub languages: Vec<String>,
-    /// What the fix needs to run: when [`Availability`] says it cannot, the
-    /// rule's findings are declined with the reason.
-    pub needs: Needs,
-    pub decision: FixDecision,
-}
-
-/// The fix by a command of a rule: the program the fix run itself runs for a
-/// finding, through the rewrite path it shares with an agent.
-#[derive(Debug, Clone)]
-pub(super) struct CommandFix {
-    programs: Programs,
-    /// How far its change may go.
-    scope: FixScope,
-    /// What the language of the file must provide for the fix to be made.
-    requires: Vec<Capability>,
-    /// What the fix does, in the words of the decision's title.
-    description: String,
-}
-
 /// The fixer of each rule, by rule id. Built from the catalog by the caller:
 /// the engine knows no decisions.
 #[derive(Debug, Clone, Default)]
@@ -263,6 +222,47 @@ impl FixPlan {
     }
 }
 
+/// The fix by a command of a rule: the program the fix run itself runs for a
+/// finding, through the rewrite path it shares with an agent.
+#[derive(Debug, Clone)]
+pub(super) struct CommandFix {
+    programs: Programs,
+    /// How far its change may go.
+    scope: FixScope,
+    /// What the language of the file must provide for the fix to be made.
+    requires: Vec<Capability>,
+    /// What the fix does, in the words of the decision's title.
+    description: String,
+}
+
+/// How one rule's findings are fixed, as the catalog says.
+#[derive(Debug, Clone)]
+pub struct FixBinding {
+    /// What serves the rule.
+    pub fixer: FixedBy,
+    /// The effective safety of the fix at best, [`DecisionSpec::fix_safety`]: what
+    /// the fixer claims can only be as safe as this, unless the project gives
+    /// the rule a safety of its own (see [`FixPlan::with_safety`]).
+    pub cap: Safety,
+    /// The languages of the examples of the decision: where its fix is known
+    /// to apply.
+    pub languages: Vec<String>,
+    /// What the fix needs to run: when [`Availability`] says it cannot, the
+    /// rule's findings are declined with the reason.
+    pub needs: Needs,
+    pub decision: FixDecision,
+}
+
+/// What makes a fix: a registered fixer, derived from the rule, or the
+/// project's agent that edits, which guesses and is held to the checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FixedBy {
+    /// The registered fixer with this id.
+    Fixer(String),
+    /// The agent `[models] agent` binds.
+    Model,
+}
+
 /// What a fix run is asked to do.
 #[derive(Debug, Clone, Default)]
 pub struct FixRun {
@@ -284,74 +284,6 @@ pub struct FixRun {
     /// catalog's; needs `rules` or `fingerprints`. Its proposals are
     /// `unsafe`.
     pub fixer: Option<String>,
-}
-
-/// A fix that was applied.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AppliedFix {
-    pub fingerprint: Fingerprint,
-    pub rule_id: String,
-    pub fixer: FixedBy,
-    pub description: String,
-    pub safety: Safety,
-    /// Every file the fix changed.
-    pub files: Vec<PathBuf>,
-    pub round: usize,
-    /// What the fix changes, kept only in a dry run, where no fix is written:
-    /// `None` when it could not be shown.
-    pub preview: Option<Preview>,
-    /// Whether it is a safe fix of what the change of others introduced, in a
-    /// file several of them edited: what it writes belongs to no one of them.
-    /// In a file one fix edited it is part of that fix.
-    pub follow_up: bool,
-}
-
-/// A finding that was left as it was, and why.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct DeclinedFix {
-    #[schemars(with = "String")]
-    pub fingerprint: Fingerprint,
-    #[serde(rename = "decision")]
-    pub rule_id: String,
-    #[serde(rename = "path", serialize_with = "slashed_path")]
-    #[schemars(with = "String")]
-    pub file: PathBuf,
-    pub line: u32,
-    pub reason: String,
-}
-
-/// A file's text before and after the run.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FileChange {
-    pub path: PathBuf,
-    pub before: String,
-    pub after: String,
-}
-
-/// An `unsafe` fix that the checks accepted and the run was not permitted to
-/// write, kept for a hand to apply: only if the files are still as it was
-/// verified over.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PreviewedFix {
-    pub rule_id: String,
-    pub fixer: FixedBy,
-    pub preview: Preview,
-    /// The digest of each file the fix changes, as it was verified over.
-    pub bases: BTreeMap<PathBuf, String>,
-    /// The findings the fix was made for, this one among them: a run of a
-    /// model is made for all the findings of a file, and applied for them
-    /// all.
-    pub batch: Vec<Fingerprint>,
-}
-
-/// What the runs of an agent that edits took, and did.
-#[derive(Debug, Clone, PartialEq)]
-pub struct EditUsage {
-    /// Runs of the agent; answers kept from earlier runs are not counted.
-    pub runs: usize,
-    pub seconds: f64,
-    /// What each run did, when its harness reported it.
-    pub batches: Vec<BatchTrace>,
 }
 
 /// What a fix run did.
@@ -383,6 +315,74 @@ pub struct FixReport {
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
     pub finished: Run,
+}
+
+/// What the runs of an agent that edits took, and did.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditUsage {
+    /// Runs of the agent; answers kept from earlier runs are not counted.
+    pub runs: usize,
+    pub seconds: f64,
+    /// What each run did, when its harness reported it.
+    pub batches: Vec<BatchTrace>,
+}
+
+/// An `unsafe` fix that the checks accepted and the run was not permitted to
+/// write, kept for a hand to apply: only if the files are still as it was
+/// verified over.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewedFix {
+    pub rule_id: String,
+    pub fixer: FixedBy,
+    pub preview: Preview,
+    /// The digest of each file the fix changes, as it was verified over.
+    pub bases: BTreeMap<PathBuf, String>,
+    /// The findings the fix was made for, this one among them: a run of a
+    /// model is made for all the findings of a file, and applied for them
+    /// all.
+    pub batch: Vec<Fingerprint>,
+}
+
+/// A file's text before and after the run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileChange {
+    pub path: PathBuf,
+    pub before: String,
+    pub after: String,
+}
+
+/// A finding that was left as it was, and why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct DeclinedFix {
+    #[schemars(with = "String")]
+    pub fingerprint: Fingerprint,
+    #[serde(rename = "decision")]
+    pub rule_id: String,
+    #[serde(rename = "path", serialize_with = "slashed_path")]
+    #[schemars(with = "String")]
+    pub file: PathBuf,
+    pub line: u32,
+    pub reason: String,
+}
+
+/// A fix that was applied.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppliedFix {
+    pub fingerprint: Fingerprint,
+    pub rule_id: String,
+    pub fixer: FixedBy,
+    pub description: String,
+    pub safety: Safety,
+    /// Every file the fix changed.
+    pub files: Vec<PathBuf>,
+    pub round: usize,
+    /// What the fix changes, kept only in a dry run, where no fix is written:
+    /// `None` when it could not be shown.
+    pub preview: Option<Preview>,
+    /// Whether it is a safe fix of what the change of others introduced, in a
+    /// file several of them edited: what it writes belongs to no one of them.
+    /// In a file one fix edited it is part of that fix.
+    pub follow_up: bool,
 }
 
 /// The languages of the examples of `decision`, sorted.

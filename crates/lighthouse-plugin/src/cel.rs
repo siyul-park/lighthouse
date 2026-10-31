@@ -10,45 +10,13 @@ use cel::Env;
 
 use crate::Error;
 
-/// Where a function comes from, in the order a decision's author prefers them
-/// (`rules/cel-everywhere.md` section 2.4). A library never holds step 1: the
-/// `cel` crate already provides it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Precedence {
-    /// The CEL spec or an official extension (cel-go `ext`, Kubernetes CEL
-    /// libraries) defines it: official name, overloads and meaning.
-    Official,
-    /// Nothing official has it: designed after the nearest official precedent.
-    Designed,
-}
-
-impl Precedence {
-    /// The step of the precedence rule: 2 for an official extension, 3 for a
-    /// design of ours.
-    pub fn step(self) -> u8 {
-        match self {
-            Self::Official => 2,
-            Self::Designed => 3,
-        }
-    }
-}
-
-/// One overload of a function: the types of its arguments (not counting the
-/// receiver of a member function) and of its result, as CEL spells them.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Overload {
-    pub params: Vec<String>,
-    pub result: String,
-}
-
-impl Overload {
-    /// An overload of `params` giving `result`.
-    pub fn new(params: &[&str], result: &str) -> Self {
-        Self {
-            params: params.iter().map(|p| (*p).to_owned()).collect(),
-            result: result.to_owned(),
-        }
-    }
+/// What a library declares about itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CelLibraryManifest {
+    /// Fully qualified `plugin/name`.
+    pub id: String,
+    pub version: String,
+    pub functions: Vec<Function>,
 }
 
 /// A function a library provides.
@@ -102,13 +70,45 @@ impl fmt::Display for Function {
     }
 }
 
-/// What a library declares about itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CelLibraryManifest {
-    /// Fully qualified `plugin/name`.
-    pub id: String,
-    pub version: String,
-    pub functions: Vec<Function>,
+/// Where a function comes from, in the order a decision's author prefers them
+/// (`rules/cel-everywhere.md` section 2.4). A library never holds step 1: the
+/// `cel` crate already provides it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Precedence {
+    /// The CEL spec or an official extension (cel-go `ext`, Kubernetes CEL
+    /// libraries) defines it: official name, overloads and meaning.
+    Official,
+    /// Nothing official has it: designed after the nearest official precedent.
+    Designed,
+}
+
+impl Precedence {
+    /// The step of the precedence rule: 2 for an official extension, 3 for a
+    /// design of ours.
+    pub fn step(self) -> u8 {
+        match self {
+            Self::Official => 2,
+            Self::Designed => 3,
+        }
+    }
+}
+
+/// One overload of a function: the types of its arguments (not counting the
+/// receiver of a member function) and of its result, as CEL spells them.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Overload {
+    pub params: Vec<String>,
+    pub result: String,
+}
+
+impl Overload {
+    /// An overload of `params` giving `result`.
+    pub fn new(params: &[&str], result: &str) -> Self {
+        Self {
+            params: params.iter().map(|p| (*p).to_owned()).collect(),
+            result: result.to_owned(),
+        }
+    }
 }
 
 /// Registers the functions of its manifest into an environment. cel-go's

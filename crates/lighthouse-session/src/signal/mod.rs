@@ -50,22 +50,6 @@ pub enum Change {
     Resolved,
 }
 
-/// How many signals fall in each bucket.
-#[derive(Debug, Default, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Counts {
-    pub total: usize,
-    /// By class: `directive`, `correction`, `preference`, `none`, `abstain`
-    /// and `finding`.
-    pub by_class: BTreeMap<String, usize>,
-    /// By the classifier rule that fired, or the decision of a finding.
-    pub by_rule: BTreeMap<String, usize>,
-    /// By status: `open`, `recorded`, `linked` and `dismissed`.
-    pub by_status: BTreeMap<String, usize>,
-    /// Prompts no rule decided, which a bound model could.
-    pub abstained: usize,
-}
-
 impl Change {
     fn name(self) -> &'static str {
         match self {
@@ -73,6 +57,18 @@ impl Change {
             Self::Resolved => "resolved",
         }
     }
+}
+
+/// The `DecisionSignals` kind.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SignalReport {
+    /// The open signals that state a decision, or every signal with `all`.
+    pub signals: Vec<Signal>,
+    /// How many `limit` left out.
+    pub omitted: usize,
+    pub counts: Counts,
+    pub measures: Measures,
 }
 
 /// The measures of the loop, counted from signal statuses and proposals, never
@@ -92,16 +88,20 @@ pub struct Measures {
     pub ratification: Option<Rate>,
 }
 
-/// The `DecisionSignals` kind.
-#[derive(Debug, Serialize, JsonSchema)]
+/// How many signals fall in each bucket.
+#[derive(Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SignalReport {
-    /// The open signals that state a decision, or every signal with `all`.
-    pub signals: Vec<Signal>,
-    /// How many `limit` left out.
-    pub omitted: usize,
-    pub counts: Counts,
-    pub measures: Measures,
+pub struct Counts {
+    pub total: usize,
+    /// By class: `directive`, `correction`, `preference`, `none`, `abstain`
+    /// and `finding`.
+    pub by_class: BTreeMap<String, usize>,
+    /// By the classifier rule that fired, or the decision of a finding.
+    pub by_rule: BTreeMap<String, usize>,
+    /// By status: `open`, `recorded`, `linked` and `dismissed`.
+    pub by_status: BTreeMap<String, usize>,
+    /// Prompts no rule decided, which a bound model could.
+    pub abstained: usize,
 }
 
 /// Records what a person's prompt says, whatever it says: a class a rule

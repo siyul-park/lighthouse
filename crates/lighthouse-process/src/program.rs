@@ -32,74 +32,6 @@ pub enum Home<'a> {
     Own(&'a Path),
 }
 
-/// The environment of one run of a program, and the secrets in it.
-#[derive(Debug, Clone, Default)]
-pub struct Environment {
-    vars: Vec<(String, String)>,
-    /// The variables `${NAME}` was expanded from, with their values.
-    secrets: Vec<(String, String)>,
-}
-
-impl Environment {
-    /// The one environment of every program: `PATH`, `USER`, `LOGNAME` and
-    /// `LANG`, the user's `HOME` and `TMPDIR` or a home of the run's own, the
-    /// declared variables (a `${NAME}` in a value is the user's variable
-    /// `NAME`) and the `context` Lighthouse passes. A variable that is not set
-    /// fails, naming the variable and never a value.
-    pub fn new(
-        declared: &BTreeMap<String, String>,
-        context: Vec<(String, String)>,
-        home: Home<'_>,
-    ) -> Result<Self, String> {
-        Self::new_in(declared, context, home, |name| env::var(name).ok())
-    }
-
-    /// [`Environment::new`] reading the user's variables through `lookup`.
-    pub fn new_in(
-        declared: &BTreeMap<String, String>,
-        context: Vec<(String, String)>,
-        home: Home<'_>,
-        lookup: impl Fn(&str) -> Option<String>,
-    ) -> Result<Self, String> {
-        let user = |names: &[&str]| -> Vec<(String, String)> {
-            names
-                .iter()
-                .filter_map(|k| lookup(k).map(|v| ((*k).to_owned(), v)))
-                .collect()
-        };
-        let mut vars = user(&INHERITED);
-        match home {
-            Home::User => vars.extend(user(&PERSONAL)),
-            Home::Own(dir) => vars.extend(isolated(dir)),
-        }
-        let mut secrets = Vec::new();
-        for (key, value) in declared {
-            let (expanded, used) = substitute(value, &lookup)?;
-            secrets.extend(used);
-            vars.push((key.clone(), expanded));
-        }
-        vars.extend(context);
-        Ok(Self { vars, secrets })
-    }
-
-    /// The variables, in the order they were set; a later one wins.
-    pub fn vars(&self) -> &[(String, String)] {
-        &self.vars
-    }
-
-    /// `text` with the value of every expanded variable written as `${NAME}`,
-    /// so that nothing a program echoes leaks a secret into a note or a log.
-    pub fn scrub(&self, text: &str) -> String {
-        let mut shown = text.to_owned();
-        let mut secrets: Vec<&(String, String)> = self.secrets.iter().collect();
-        secrets.sort_by_key(|(_, value)| std::cmp::Reverse(value.len()));
-        for (name, value) in secrets.into_iter().filter(|(_, value)| !value.is_empty()) {
-            shown = shown.replace(value, &format!("${{{name}}}"));
-        }
-        shown
-    }
-}
-
 /// One run of a program: the command line with its placeholders filled, where
 /// it runs, what it reads, and the limits and the sandbox it lives under.
 pub struct Job<'a> {
@@ -166,6 +98,74 @@ impl Job<'_> {
         } else {
             clean.into_bytes()
         }
+    }
+}
+
+/// The environment of one run of a program, and the secrets in it.
+#[derive(Debug, Clone, Default)]
+pub struct Environment {
+    vars: Vec<(String, String)>,
+    /// The variables `${NAME}` was expanded from, with their values.
+    secrets: Vec<(String, String)>,
+}
+
+impl Environment {
+    /// The one environment of every program: `PATH`, `USER`, `LOGNAME` and
+    /// `LANG`, the user's `HOME` and `TMPDIR` or a home of the run's own, the
+    /// declared variables (a `${NAME}` in a value is the user's variable
+    /// `NAME`) and the `context` Lighthouse passes. A variable that is not set
+    /// fails, naming the variable and never a value.
+    pub fn new(
+        declared: &BTreeMap<String, String>,
+        context: Vec<(String, String)>,
+        home: Home<'_>,
+    ) -> Result<Self, String> {
+        Self::new_in(declared, context, home, |name| env::var(name).ok())
+    }
+
+    /// [`Environment::new`] reading the user's variables through `lookup`.
+    pub fn new_in(
+        declared: &BTreeMap<String, String>,
+        context: Vec<(String, String)>,
+        home: Home<'_>,
+        lookup: impl Fn(&str) -> Option<String>,
+    ) -> Result<Self, String> {
+        let user = |names: &[&str]| -> Vec<(String, String)> {
+            names
+                .iter()
+                .filter_map(|k| lookup(k).map(|v| ((*k).to_owned(), v)))
+                .collect()
+        };
+        let mut vars = user(&INHERITED);
+        match home {
+            Home::User => vars.extend(user(&PERSONAL)),
+            Home::Own(dir) => vars.extend(isolated(dir)),
+        }
+        let mut secrets = Vec::new();
+        for (key, value) in declared {
+            let (expanded, used) = substitute(value, &lookup)?;
+            secrets.extend(used);
+            vars.push((key.clone(), expanded));
+        }
+        vars.extend(context);
+        Ok(Self { vars, secrets })
+    }
+
+    /// The variables, in the order they were set; a later one wins.
+    pub fn vars(&self) -> &[(String, String)] {
+        &self.vars
+    }
+
+    /// `text` with the value of every expanded variable written as `${NAME}`,
+    /// so that nothing a program echoes leaks a secret into a note or a log.
+    pub fn scrub(&self, text: &str) -> String {
+        let mut shown = text.to_owned();
+        let mut secrets: Vec<&(String, String)> = self.secrets.iter().collect();
+        secrets.sort_by_key(|(_, value)| std::cmp::Reverse(value.len()));
+        for (name, value) in secrets.into_iter().filter(|(_, value)| !value.is_empty()) {
+            shown = shown.replace(value, &format!("${{{name}}}"));
+        }
+        shown
     }
 }
 

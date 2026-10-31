@@ -15,22 +15,6 @@ const MARKERS: [(&str, Form); 4] = [
     ("lighthouse-enable", Form::Enable),
 ];
 
-/// What a directive does, in the ESLint forms.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Form {
-    /// `lighthouse-disable <id>[, <id>] -- <reason>`: from this comment to a
-    /// matching `lighthouse-enable`, or to the end of the file; at the top of
-    /// a file, the whole file.
-    Disable,
-    /// `lighthouse-enable <id>[, <id>]`: ends a range.
-    Enable,
-    /// `lighthouse-disable-next-line <id>[, <id>] -- <reason>`: the next line
-    /// and the symbol declared there.
-    NextLine,
-    /// `lighthouse-disable-line <id>[, <id>] -- <reason>`: this line.
-    Line,
-}
-
 vocabulary!(Form, "directive form" {
     Disable => "disable",
     Enable => "enable",
@@ -57,6 +41,22 @@ pub struct Directive {
     /// Why the finding is acceptable here; a directive that disables without
     /// one does not suppress anything.
     pub reason: Option<String>,
+}
+
+/// What a directive does, in the ESLint forms.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Form {
+    /// `lighthouse-disable <id>[, <id>] -- <reason>`: from this comment to a
+    /// matching `lighthouse-enable`, or to the end of the file; at the top of
+    /// a file, the whole file.
+    Disable,
+    /// `lighthouse-enable <id>[, <id>]`: ends a range.
+    Enable,
+    /// `lighthouse-disable-next-line <id>[, <id>] -- <reason>`: the next line
+    /// and the symbol declared there.
+    NextLine,
+    /// `lighthouse-disable-line <id>[, <id>] -- <reason>`: this line.
+    Line,
 }
 
 /// Every directive of a comment's text with the index of its line in the text:

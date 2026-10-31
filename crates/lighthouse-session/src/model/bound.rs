@@ -9,6 +9,19 @@ use serde::Serialize;
 
 use crate::{Result, Selector, Session};
 
+/// One model and what it is bound to.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct BoundModel {
+    /// `<provider>/<model>`.
+    pub model: String,
+    /// The decision it judges; none for the classification and agent
+    /// models.
+    pub decision: Option<String>,
+    pub binding: Binding,
+    /// Whether asking it reaches a service outside the machine.
+    pub remote: bool,
+}
+
 /// Where a binding comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -25,19 +38,6 @@ pub enum Binding {
     RuleAgent,
     /// A trained model attached by an approved revision.
     Attached,
-}
-
-/// One model and what it is bound to.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
-pub struct BoundModel {
-    /// `<provider>/<model>`.
-    pub model: String,
-    /// The decision it judges; none for the classification and agent
-    /// models.
-    pub decision: Option<String>,
-    pub binding: Binding,
-    /// Whether asking it reaches a service outside the machine.
-    pub remote: bool,
 }
 
 /// The models of the project bound to decisions matching `decisions` (ids and

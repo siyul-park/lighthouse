@@ -42,15 +42,6 @@ pub struct SectionSpec {
     pub decisions: Vec<String>,
 }
 
-/// An ordered group of decisions within a pack.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct Section {
-    pub id: String,
-    pub title: String,
-    pub intro: String,
-    pub decisions: Vec<Decision>,
-}
-
 /// An ordered set of sections; the pack id is the prefix of its decision ids.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Pack {
@@ -60,4 +51,13 @@ pub struct Pack {
     /// The CEL values the decisions of the pack share; see [`PackSpec::variables`].
     pub variables: Vec<Variable>,
     pub sections: Vec<Section>,
+}
+
+/// An ordered group of decisions within a pack.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Section {
+    pub id: String,
+    pub title: String,
+    pub intro: String,
+    pub decisions: Vec<Decision>,
 }

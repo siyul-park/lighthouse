@@ -54,17 +54,6 @@ pub struct Target<'a> {
     pub place: String,
 }
 
-/// The code of one extent a finding is in, as the agent is given it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Code {
-    pub path: String,
-    pub language: String,
-    /// The first line of `text`, from 1.
-    pub first: u32,
-    /// The lines of the extent.
-    pub text: String,
-}
-
 /// What the engine knows from the code model that the fix needs, so that the
 /// agent does not have to look for it: the code of the findings and, as far as
 /// a budget allows, what surrounds it.
@@ -88,6 +77,17 @@ pub struct Localized {
     /// it uses and of the places that fit the budget, and the files it lists.
     /// What an agent opens besides these is what it went looking for.
     pub briefed: BTreeSet<String>,
+}
+
+/// The code of one extent a finding is in, as the agent is given it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Code {
+    pub path: String,
+    pub language: String,
+    /// The first line of `text`, from 1.
+    pub first: u32,
+    /// The lines of the extent.
+    pub text: String,
 }
 
 /// The decisions whose safe fixes the project applies to what an agent

@@ -15,150 +15,6 @@ use lighthouse_spec::Decision;
 
 use crate::metrics::Outcome;
 
-/// Who gave a label, strongest first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Source {
-    /// A person, by a judgment.
-    Person,
-    /// A table of hand-reviewed findings.
-    Tsv,
-    /// A coding agent, by a judgment.
-    Agent,
-    /// A model, by a judgment.
-    Model,
-    /// An example the decision carries.
-    Example,
-}
-
-impl Source {
-    /// How much a label of this source is trusted.
-    pub fn weight(self) -> f64 {
-        match self {
-            Self::Person | Self::Tsv | Self::Example => 1.0,
-            Self::Agent => 0.7,
-            Self::Model => 0.5,
-        }
-    }
-
-    /// Lower is stronger; an example is never in competition.
-    fn rank(self) -> u8 {
-        match self {
-            Self::Person | Self::Example => 0,
-            Self::Tsv => 1,
-            Self::Agent => 2,
-            Self::Model => 3,
-        }
-    }
-
-    /// The name a dataset line carries for the source.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Person => "person",
-            Self::Tsv => "tsv",
-            Self::Agent => "agent",
-            Self::Model => "model",
-            Self::Example => "example",
-        }
-    }
-}
-
-/// The source a judgment's attribution stands for: a person, else a software
-/// agent by the role it had, a coding agent unless it was a model.
-impl From<&Attribution> for Source {
-    fn from(attribution: &Attribution) -> Self {
-        match (attribution.kind, attribution.role) {
-            (AgentKind::Person, _) => Self::Person,
-            (AgentKind::SoftwareAgent, Some(Role::Model)) => Self::Model,
-            (AgentKind::SoftwareAgent, _) => Self::Agent,
-        }
-    }
-}
-
-/// What is known about one subject.
-#[derive(Debug, Clone)]
-pub struct Sample {
-    /// The subject's fingerprint; for an example, its own key.
-    pub key: String,
-    /// What the label says; `NotApplicable` is about the selector.
-    pub judgment: Judgment,
-    pub source: Source,
-    /// PROV `wasAttributedTo` of the label.
-    pub attribution: Attribution,
-    /// An example subject: how the check came out on it.
-    pub observed: Option<Outcome>,
-    /// An example subject: what a model is asked about it.
-    pub subject: Option<Subject>,
-}
-
-impl Sample {
-    /// A subject an example of `decision` shows: its key is
-    /// `example:<decision>:<example>:<line>` for a `fail` and
-    /// `example:<decision>:<example>:<fingerprint>` for a `pass`. `outcome` is
-    /// how the check came out on it and `subject` what a model is asked, when
-    /// a rule put it to one.
-    pub fn example(
-        decision: &str,
-        key: String,
-        judgment: Judgment,
-        outcome: Outcome,
-        subject: Option<Subject>,
-    ) -> Self {
-        Self {
-            key,
-            judgment,
-            source: Source::Example,
-            attribution: Attribution::new(AgentKind::Person, Some(format!("example:{decision}"))),
-            observed: Some(outcome),
-            subject,
-        }
-    }
-}
-
-/// A table of reviewed findings: `TP` is a `fail`, `FP` a `pass`, anything
-/// else (`unclear`) says nothing. Rows without a fingerprint (`-`) cannot be
-/// found again and are left out. A hand review is a person's.
-pub struct Table<'a> {
-    pub file: &'a Path,
-    /// Only the rows of this repository; every row when `None`.
-    pub repo: Option<&'a str>,
-}
-
-impl Table<'_> {
-    fn rows(&self) -> Result<Vec<Sample>> {
-        let text =
-            fs::read_to_string(self.file).map_err(|e| format!("{}: {e}", self.file.display()))?;
-        let attribution =
-            Attribution::new(AgentKind::Person, Some(self.file.display().to_string()));
-        let mut rows = Vec::new();
-        for line in text.lines().filter(|l| !l.starts_with('#')) {
-            let cells: Vec<&str> = line.split('\t').collect();
-            let [fingerprint, repo, _, verdict, ..] = cells[..] else {
-                continue;
-            };
-            let judgment = match verdict {
-                "TP" => Judgment::Fail,
-                "FP" => Judgment::Pass,
-                _ => continue,
-            };
-            if fingerprint == "-"
-                || fingerprint == "fingerprint"
-                || self.repo.is_some_and(|wanted| wanted != repo)
-            {
-                continue;
-            }
-            rows.push(Sample {
-                key: fingerprint.to_owned(),
-                judgment,
-                source: Source::Tsv,
-                attribution: attribution.clone(),
-                observed: None,
-                subject: None,
-            });
-        }
-        Ok(rows)
-    }
-}
-
 /// What to collect the labels of.
 pub struct Labels<'a> {
     /// The judgments given on the decision's subjects.
@@ -215,5 +71,149 @@ impl Labels<'_> {
             });
         }
         Ok(labels)
+    }
+}
+
+/// A table of reviewed findings: `TP` is a `fail`, `FP` a `pass`, anything
+/// else (`unclear`) says nothing. Rows without a fingerprint (`-`) cannot be
+/// found again and are left out. A hand review is a person's.
+pub struct Table<'a> {
+    pub file: &'a Path,
+    /// Only the rows of this repository; every row when `None`.
+    pub repo: Option<&'a str>,
+}
+
+impl Table<'_> {
+    fn rows(&self) -> Result<Vec<Sample>> {
+        let text =
+            fs::read_to_string(self.file).map_err(|e| format!("{}: {e}", self.file.display()))?;
+        let attribution =
+            Attribution::new(AgentKind::Person, Some(self.file.display().to_string()));
+        let mut rows = Vec::new();
+        for line in text.lines().filter(|l| !l.starts_with('#')) {
+            let cells: Vec<&str> = line.split('\t').collect();
+            let [fingerprint, repo, _, verdict, ..] = cells[..] else {
+                continue;
+            };
+            let judgment = match verdict {
+                "TP" => Judgment::Fail,
+                "FP" => Judgment::Pass,
+                _ => continue,
+            };
+            if fingerprint == "-"
+                || fingerprint == "fingerprint"
+                || self.repo.is_some_and(|wanted| wanted != repo)
+            {
+                continue;
+            }
+            rows.push(Sample {
+                key: fingerprint.to_owned(),
+                judgment,
+                source: Source::Tsv,
+                attribution: attribution.clone(),
+                observed: None,
+                subject: None,
+            });
+        }
+        Ok(rows)
+    }
+}
+
+/// What is known about one subject.
+#[derive(Debug, Clone)]
+pub struct Sample {
+    /// The subject's fingerprint; for an example, its own key.
+    pub key: String,
+    /// What the label says; `NotApplicable` is about the selector.
+    pub judgment: Judgment,
+    pub source: Source,
+    /// PROV `wasAttributedTo` of the label.
+    pub attribution: Attribution,
+    /// An example subject: how the check came out on it.
+    pub observed: Option<Outcome>,
+    /// An example subject: what a model is asked about it.
+    pub subject: Option<Subject>,
+}
+
+impl Sample {
+    /// A subject an example of `decision` shows: its key is
+    /// `example:<decision>:<example>:<line>` for a `fail` and
+    /// `example:<decision>:<example>:<fingerprint>` for a `pass`. `outcome` is
+    /// how the check came out on it and `subject` what a model is asked, when
+    /// a rule put it to one.
+    pub fn example(
+        decision: &str,
+        key: String,
+        judgment: Judgment,
+        outcome: Outcome,
+        subject: Option<Subject>,
+    ) -> Self {
+        Self {
+            key,
+            judgment,
+            source: Source::Example,
+            attribution: Attribution::new(AgentKind::Person, Some(format!("example:{decision}"))),
+            observed: Some(outcome),
+            subject,
+        }
+    }
+}
+
+/// Who gave a label, strongest first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    /// A person, by a judgment.
+    Person,
+    /// A table of hand-reviewed findings.
+    Tsv,
+    /// A coding agent, by a judgment.
+    Agent,
+    /// A model, by a judgment.
+    Model,
+    /// An example the decision carries.
+    Example,
+}
+
+impl Source {
+    /// How much a label of this source is trusted.
+    pub fn weight(self) -> f64 {
+        match self {
+            Self::Person | Self::Tsv | Self::Example => 1.0,
+            Self::Agent => 0.7,
+            Self::Model => 0.5,
+        }
+    }
+
+    /// Lower is stronger; an example is never in competition.
+    fn rank(self) -> u8 {
+        match self {
+            Self::Person | Self::Example => 0,
+            Self::Tsv => 1,
+            Self::Agent => 2,
+            Self::Model => 3,
+        }
+    }
+
+    /// The name a dataset line carries for the source.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Person => "person",
+            Self::Tsv => "tsv",
+            Self::Agent => "agent",
+            Self::Model => "model",
+            Self::Example => "example",
+        }
+    }
+}
+
+/// The source a judgment's attribution stands for: a person, else a software
+/// agent by the role it had, a coding agent unless it was a model.
+impl From<&Attribution> for Source {
+    fn from(attribution: &Attribution) -> Self {
+        match (attribution.kind, attribution.role) {
+            (AgentKind::Person, _) => Self::Person,
+            (AgentKind::SoftwareAgent, Some(Role::Model)) => Self::Model,
+            (AgentKind::SoftwareAgent, _) => Self::Agent,
+        }
     }
 }

@@ -22,9 +22,6 @@ use serde_json::{Value, json};
 
 use crate::events::{Events, NOTES_BYTES, Reading, Scrubber, tail};
 
-/// Where the variables of the user are read: by name.
-type Lookup = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
-
 /// A program run as a model.
 pub struct CommandModel {
     manifest: Model,
@@ -305,6 +302,9 @@ impl ModelClient for CommandModel {
         }
     }
 }
+
+/// Where the variables of the user are read: by name.
+type Lookup = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 
 /// The content hash of the program a command runs, so that a changed program
 /// is a changed model; empty when it cannot be read (a program found on the

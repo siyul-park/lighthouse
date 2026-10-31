@@ -4,6 +4,52 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Params of `lighthouse/edit`: the agent changes the files of `dir` as the
+/// prompt says.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EditParams {
+    /// The agent asked: the part of the reference after the provider.
+    pub model: String,
+    /// What the agent is asked to do, as plain text.
+    pub prompt: String,
+    /// The directory it runs in and may change.
+    pub dir: String,
+}
+
+/// Result of `lighthouse/edit`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EditResult {
+    /// What the agent said about it.
+    #[serde(default)]
+    pub said: String,
+    /// What the agent read, searched, listed, edited and ran, when the plugin
+    /// can tell.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<ToolEvent>,
+}
+
+/// One thing an agent did, as its harness reported it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ToolEvent {
+    pub tool: Tool,
+    /// The file or directory it was about, relative to the directory the
+    /// agent ran in, as the host normalizes it. A plugin may send it absolute
+    /// or relative to that directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// It was about a path outside the directory the agent ran in. The host
+    /// sets this and drops the path, so that no path of the machine reaches a
+    /// report; a plugin leaves it out.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub outside: bool,
+    /// What a `search` looked for, or the glob of a `list`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+    /// The command line of a `run`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+}
+
 /// What an agent did with a tool: the kinds of its work that a fix report
 /// tells apart.
 #[derive(
@@ -35,50 +81,4 @@ impl Tool {
             _ => return None,
         })
     }
-}
-
-/// One thing an agent did, as its harness reported it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ToolEvent {
-    pub tool: Tool,
-    /// The file or directory it was about, relative to the directory the
-    /// agent ran in, as the host normalizes it. A plugin may send it absolute
-    /// or relative to that directory.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
-    /// It was about a path outside the directory the agent ran in. The host
-    /// sets this and drops the path, so that no path of the machine reaches a
-    /// report; a plugin leaves it out.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub outside: bool,
-    /// What a `search` looked for, or the glob of a `list`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pattern: Option<String>,
-    /// The command line of a `run`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub command: Option<String>,
-}
-
-/// Params of `lighthouse/edit`: the agent changes the files of `dir` as the
-/// prompt says.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct EditParams {
-    /// The agent asked: the part of the reference after the provider.
-    pub model: String,
-    /// What the agent is asked to do, as plain text.
-    pub prompt: String,
-    /// The directory it runs in and may change.
-    pub dir: String,
-}
-
-/// Result of `lighthouse/edit`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct EditResult {
-    /// What the agent said about it.
-    #[serde(default)]
-    pub said: String,
-    /// What the agent read, searched, listed, edited and ran, when the plugin
-    /// can tell.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub events: Vec<ToolEvent>,
 }

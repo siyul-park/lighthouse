@@ -22,18 +22,18 @@ const NAMESPACES: [&str; 7] = [
 /// An extension of the `cel` crate, as it installs itself.
 type Extension = fn(&mut cel::Env) -> Result<(), DeclarationError>;
 
-type Compiled = HashMap<String, Result<Arc<Program>, String>>;
+struct Inner {
+    env: Arc<cel::Env>,
+    namespaces: BTreeSet<String>,
+    compiled: Mutex<Compiled>,
+}
 
 /// One CEL environment, with what is derived from it: the namespaces of its
 /// functions and the programs compiled in it. Clones share all of it.
 #[derive(Clone)]
 pub struct Env(Arc<Inner>);
 
-struct Inner {
-    env: Arc<cel::Env>,
-    namespaces: BTreeSet<String>,
-    compiled: Mutex<Compiled>,
-}
+type Compiled = HashMap<String, Result<Arc<Program>, String>>;
 
 impl Env {
     /// The environment `env`, whose libraries added the functions of

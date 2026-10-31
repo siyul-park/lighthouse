@@ -68,55 +68,6 @@ Examples:
   lighthouse config show --origin
   lighthouse config show --origin --format json";
 
-/// A command of the agent loop, with its arguments.
-#[derive(Debug, Subcommand)]
-pub enum Action {
-    /// Check the project and print findings.
-    ///
-    /// PATHS select which findings are reported, not what is analyzed: the
-    /// whole project is always analyzed, because decisions and language
-    /// providers need more than the reported files (callers, packages, build
-    /// context).
-    ///
-    /// Exit codes: 0 clean, 1 an error was found (or warnings fail the run:
-    /// --strict, --max-warnings; info never does), 2 usage or runtime error,
-    /// 3 the analysis was incomplete (a file could not be read or loaded, a
-    /// plugin crashed or timed out). "Not checked" is never "passed";
-    /// --allow-incomplete reports it but does not fail on it.
-    ///
-    /// Plugins named by the config are started and run with your privileges,
-    /// like build scripts: only check projects whose config you trust. A
-    /// plugin that cannot start, or that is not the protocol version or
-    /// identity its entry names, is an error (exit 2); one that starts but
-    /// crashes, times out or answers badly is reported as incomplete (exit 3).
-    #[command(after_long_help = CHECK_EXAMPLES)]
-    Check(Box<CheckCommand>),
-    /// Inspect, author, test and evaluate decisions.
-    Decision {
-        #[command(subcommand)]
-        command: DecisionCommand,
-    },
-    /// Review the findings `check` remembers and record judgments on them.
-    ///
-    /// Exit codes of every subcommand: 0 on success, 2 on a usage or runtime
-    /// error (unknown or ambiguous fingerprint, a suppression that does not
-    /// fit the judgment, a finding seen again since --seen, an unusable store).
-    Review {
-        #[command(subcommand)]
-        command: ReviewCommand,
-    },
-    /// List, train, attach and detach the models that judge decisions.
-    Model {
-        #[command(subcommand)]
-        command: ModelCommand,
-    },
-    /// Show the configuration of this machine.
-    Config {
-        #[command(subcommand)]
-        command: ConfigCommand,
-    },
-}
-
 /// `check`.
 #[derive(Debug, Default, Args)]
 pub struct CheckCommand {
@@ -428,6 +379,55 @@ pub enum ConfigCommand {
 struct Tree {
     #[command(subcommand)]
     action: Action,
+}
+
+/// A command of the agent loop, with its arguments.
+#[derive(Debug, Subcommand)]
+pub enum Action {
+    /// Check the project and print findings.
+    ///
+    /// PATHS select which findings are reported, not what is analyzed: the
+    /// whole project is always analyzed, because decisions and language
+    /// providers need more than the reported files (callers, packages, build
+    /// context).
+    ///
+    /// Exit codes: 0 clean, 1 an error was found (or warnings fail the run:
+    /// --strict, --max-warnings; info never does), 2 usage or runtime error,
+    /// 3 the analysis was incomplete (a file could not be read or loaded, a
+    /// plugin crashed or timed out). "Not checked" is never "passed";
+    /// --allow-incomplete reports it but does not fail on it.
+    ///
+    /// Plugins named by the config are started and run with your privileges,
+    /// like build scripts: only check projects whose config you trust. A
+    /// plugin that cannot start, or that is not the protocol version or
+    /// identity its entry names, is an error (exit 2); one that starts but
+    /// crashes, times out or answers badly is reported as incomplete (exit 3).
+    #[command(after_long_help = CHECK_EXAMPLES)]
+    Check(Box<CheckCommand>),
+    /// Inspect, author, test and evaluate decisions.
+    Decision {
+        #[command(subcommand)]
+        command: DecisionCommand,
+    },
+    /// Review the findings `check` remembers and record judgments on them.
+    ///
+    /// Exit codes of every subcommand: 0 on success, 2 on a usage or runtime
+    /// error (unknown or ambiguous fingerprint, a suppression that does not
+    /// fit the judgment, a finding seen again since --seen, an unusable store).
+    Review {
+        #[command(subcommand)]
+        command: ReviewCommand,
+    },
+    /// List, train, attach and detach the models that judge decisions.
+    Model {
+        #[command(subcommand)]
+        command: ModelCommand,
+    },
+    /// Show the configuration of this machine.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
 }
 
 /// Runs the command.

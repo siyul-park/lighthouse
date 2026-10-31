@@ -23,25 +23,6 @@ use crate::{
     tests,
 };
 
-/// What macros kept from the analysis in one file.
-#[derive(Default)]
-pub struct MacroStats {
-    /// The file defines `macro_rules!` macros.
-    pub defines: bool,
-    /// Invocations that were not read: item position, or arguments that are
-    /// not expressions.
-    pub unread: u32,
-}
-
-/// An edge already reported: relation, resolution and site.
-type SeenEdge = (
-    EdgeKind,
-    String,
-    String,
-    Resolution,
-    Option<(u32, u32, u32, u32)>,
-);
-
 mod types;
 
 struct Extractor<'a> {
@@ -621,6 +602,25 @@ impl Extractor<'_> {
             self.stats.unread += 1;
         }
     }
+}
+
+/// An edge already reported: relation, resolution and site.
+type SeenEdge = (
+    EdgeKind,
+    String,
+    String,
+    Resolution,
+    Option<(u32, u32, u32, u32)>,
+);
+
+/// What macros kept from the analysis in one file.
+#[derive(Default)]
+pub struct MacroStats {
+    /// The file defines `macro_rules!` macros.
+    pub defines: bool,
+    /// Invocations that were not read: item position, or arguments that are
+    /// not expressions.
+    pub unread: u32,
 }
 
 /// What a function is for, as far as the language says: a method of a trait

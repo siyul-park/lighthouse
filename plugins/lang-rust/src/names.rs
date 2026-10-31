@@ -38,28 +38,10 @@ pub const TEST_ATTRIBUTES: [&str; 12] = [
     "test_case::test_case",
 ];
 
-pub type ModId = usize;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Ns {
     Type,
     Value,
-}
-
-/// A declared, nameable item of the project.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Sym {
-    pub id: String,
-    pub name: String,
-    pub kind: SymbolKind,
-    pub module: ModId,
-    pub vis: Visibility,
-}
-
-#[derive(Debug, Clone)]
-pub enum Def {
-    Module(ModId, Visibility),
-    Sym(Sym),
 }
 
 /// What a path denotes.
@@ -71,59 +53,6 @@ pub enum Res {
     Assoc(Sym, String),
     /// A crate or item outside the project.
     External,
-}
-
-#[derive(Debug, Clone)]
-pub struct UseEntry {
-    pub vis: Visibility,
-    pub path: Vec<String>,
-    /// The bound name, `*` for a glob and `_` for an anonymous import.
-    pub name: String,
-    pub module: ModId,
-    /// The `use` item the entry comes from, as written.
-    pub span: Span,
-}
-
-#[derive(Default)]
-pub struct ModNames {
-    pub types: BTreeMap<String, Def>,
-    pub values: BTreeMap<String, Def>,
-    pub uses: Vec<UseEntry>,
-}
-
-/// Generic parameters in scope with the first trait bound of each.
-pub type Generics = Rc<BTreeMap<String, Option<syn::Path>>>;
-
-/// Where a type written in source is read: its module, the type `Self` stands
-/// for and the generic parameters in scope.
-#[derive(Clone)]
-pub struct TyCx {
-    pub module: ModId,
-    pub self_ty: Option<Sym>,
-    pub generics: Generics,
-}
-
-pub struct Sig {
-    pub ret: Option<syn::Type>,
-    pub cx: TyCx,
-}
-
-pub struct Assoc {
-    pub id: String,
-    pub kind: SymbolKind,
-    pub via_trait: Option<ViaTrait>,
-}
-
-#[derive(Clone)]
-pub enum ViaTrait {
-    Project(Sym),
-    Foreign,
-}
-
-pub struct Field {
-    pub ty: syn::Type,
-    pub cx: TyCx,
-    pub id: String,
 }
 
 pub struct Index<'t> {
@@ -184,6 +113,77 @@ impl<'t> Index<'t> {
         index.settle_exports();
         index
     }
+}
+
+pub type ModId = usize;
+
+/// A declared, nameable item of the project.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sym {
+    pub id: String,
+    pub name: String,
+    pub kind: SymbolKind,
+    pub module: ModId,
+    pub vis: Visibility,
+}
+
+/// Where a type written in source is read: its module, the type `Self` stands
+/// for and the generic parameters in scope.
+#[derive(Clone)]
+pub struct TyCx {
+    pub module: ModId,
+    pub self_ty: Option<Sym>,
+    pub generics: Generics,
+}
+
+/// Generic parameters in scope with the first trait bound of each.
+pub type Generics = Rc<BTreeMap<String, Option<syn::Path>>>;
+
+pub struct Field {
+    pub ty: syn::Type,
+    pub cx: TyCx,
+    pub id: String,
+}
+
+pub struct Assoc {
+    pub id: String,
+    pub kind: SymbolKind,
+    pub via_trait: Option<ViaTrait>,
+}
+
+#[derive(Clone)]
+pub enum ViaTrait {
+    Project(Sym),
+    Foreign,
+}
+
+pub struct Sig {
+    pub ret: Option<syn::Type>,
+    pub cx: TyCx,
+}
+
+#[derive(Default)]
+pub struct ModNames {
+    pub types: BTreeMap<String, Def>,
+    pub values: BTreeMap<String, Def>,
+    pub uses: Vec<UseEntry>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Def {
+    Module(ModId, Visibility),
+    Sym(Sym),
+}
+
+#[derive(Debug, Clone)]
+pub struct UseEntry {
+    pub vis: Visibility,
+    pub path: Vec<String>,
+    /// The bound name, `*` for a glob and `_` for an anonymous import.
+    pub name: String,
+    pub module: ModId,
+    /// The `use` item the entry comes from, as written.
+    pub span: Span,
 }
 
 pub fn symbol_id(module: &str, parts: &[&str], kind: SymbolKind) -> String {

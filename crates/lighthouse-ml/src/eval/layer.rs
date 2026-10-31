@@ -33,17 +33,6 @@ use crate::{
     train::fine_tune,
 };
 
-/// The layer to grade.
-pub struct Overlay<'a> {
-    /// The model: `<provider>/<model>@sha256:<hex>` for a learned one.
-    pub model: &'a str,
-    pub decision: &'a DecisionRef,
-    /// The root of the store, where datasets and models are kept.
-    pub root: &'a Path,
-    /// The classifier of a reference (`<provider>/<model>`).
-    pub models: &'a dyn Fn(&str) -> Result<Box<dyn ModelClient + 'a>>,
-}
-
 /// The labels and the run with a layer's answers laid over them.
 pub struct Overlaid {
     pub found: Found,
@@ -107,49 +96,6 @@ impl<'a> Overlay<'a> {
         });
         drop(scratch);
         Ok(Overlaid { found, labels })
-    }
-}
-
-/// The dataset a learned model was fitted on, and the fold each line is in.
-struct CrossFit<'a> {
-    learned: Learned<'a>,
-    /// The dataset (`sha256:<hex>`).
-    dataset: String,
-    lines: Vec<Line>,
-    folds: Vec<usize>,
-    /// The fold of the first line with a key.
-    fold_of: BTreeMap<String, usize>,
-}
-
-impl<'a> CrossFit<'a> {
-    /// The dataset `overlay`'s model learned from, when it is a learned one
-    /// whose card names a dataset.
-    fn of(overlay: &Overlay<'a>) -> Result<Option<Self>> {
-        let Some(learned) = Learned::parse(overlay.model) else {
-            return Ok(None);
-        };
-        let Some(dataset) = learned.dataset(overlay.root)? else {
-            return Ok(None);
-        };
-        let lines = dataset::read(overlay.root, &dataset)?.ok_or_else(|| {
-            format!(
-                "the labels `{}` learned from (dataset {dataset}) are not in {DATASETS_DIR}; train it again",
-                overlay.model
-            )
-        })?;
-        let groups: Vec<&str> = lines.iter().map(|line| line.group.as_str()).collect();
-        let folds = assign(&groups);
-        let mut fold_of = BTreeMap::new();
-        for (line, fold) in lines.iter().zip(&folds) {
-            fold_of.entry(line.key.clone()).or_insert(*fold);
-        }
-        Ok(Some(Self {
-            learned,
-            dataset,
-            lines,
-            folds,
-            fold_of,
-        }))
     }
 }
 
@@ -228,6 +174,60 @@ impl<'a, 'l> Refits<'a, 'l> {
         self.served.insert(served);
         Ok(refit)
     }
+}
+
+/// The dataset a learned model was fitted on, and the fold each line is in.
+struct CrossFit<'a> {
+    learned: Learned<'a>,
+    /// The dataset (`sha256:<hex>`).
+    dataset: String,
+    lines: Vec<Line>,
+    folds: Vec<usize>,
+    /// The fold of the first line with a key.
+    fold_of: BTreeMap<String, usize>,
+}
+
+impl<'a> CrossFit<'a> {
+    /// The dataset `overlay`'s model learned from, when it is a learned one
+    /// whose card names a dataset.
+    fn of(overlay: &Overlay<'a>) -> Result<Option<Self>> {
+        let Some(learned) = Learned::parse(overlay.model) else {
+            return Ok(None);
+        };
+        let Some(dataset) = learned.dataset(overlay.root)? else {
+            return Ok(None);
+        };
+        let lines = dataset::read(overlay.root, &dataset)?.ok_or_else(|| {
+            format!(
+                "the labels `{}` learned from (dataset {dataset}) are not in {DATASETS_DIR}; train it again",
+                overlay.model
+            )
+        })?;
+        let groups: Vec<&str> = lines.iter().map(|line| line.group.as_str()).collect();
+        let folds = assign(&groups);
+        let mut fold_of = BTreeMap::new();
+        for (line, fold) in lines.iter().zip(&folds) {
+            fold_of.entry(line.key.clone()).or_insert(*fold);
+        }
+        Ok(Some(Self {
+            learned,
+            dataset,
+            lines,
+            folds,
+            fold_of,
+        }))
+    }
+}
+
+/// The layer to grade.
+pub struct Overlay<'a> {
+    /// The model: `<provider>/<model>@sha256:<hex>` for a learned one.
+    pub model: &'a str,
+    pub decision: &'a DecisionRef,
+    /// The root of the store, where datasets and models are kept.
+    pub root: &'a Path,
+    /// The classifier of a reference (`<provider>/<model>`).
+    pub models: &'a dyn Fn(&str) -> Result<Box<dyn ModelClient + 'a>>,
 }
 
 /// The files the dataset and model stores held before grading: what grading

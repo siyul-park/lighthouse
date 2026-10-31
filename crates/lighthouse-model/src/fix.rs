@@ -3,19 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Fingerprint, Position};
 
-/// How much a proposed fix may be trusted to keep the program's meaning.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum Safety {
-    /// Mechanical and meaning-preserving: written by `--fix`.
-    Safe,
-    /// Probably right but a judgment call: written only when the project allows
-    /// it or the run asks for unsafe fixes, else previewed.
-    Unsafe,
-}
-
 vocabulary!(Safety, "safety" {
     Safe => "safe",
     Unsafe => "unsafe",
@@ -66,6 +53,19 @@ pub struct Preview {
     pub safety: Safety,
     /// The files it changes, sorted by path.
     pub files: Vec<PreviewFile>,
+}
+
+/// How much a proposed fix may be trusted to keep the program's meaning.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum Safety {
+    /// Mechanical and meaning-preserving: written by `--fix`.
+    Safe,
+    /// Probably right but a judgment call: written only when the project allows
+    /// it or the run asks for unsafe fixes, else previewed.
+    Unsafe,
 }
 
 /// One file a fix changes. The texts are not kept: the unified hunks and the

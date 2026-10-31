@@ -26,15 +26,6 @@ pub struct ModelMethods {
     pub edit: Call<EditParams, EditResult>,
 }
 
-/// One valid or invalid example of a decision.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Example {
-    pub language: String,
-    pub code: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub note: String,
-}
-
 /// The decision the subjects are judged against.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct DecisionRef {
@@ -48,16 +39,13 @@ pub struct DecisionRef {
     pub invalid: Vec<Example>,
 }
 
-/// A symbol near the subject: a caller or callee.
+/// One valid or invalid example of a decision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Neighbor {
-    pub id: String,
-    pub kind: String,
-    /// `caller` or `callee`.
-    pub relation: String,
-    /// The neighbor's source when it is in the subject's file, truncated.
+pub struct Example {
+    pub language: String,
+    pub code: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub text: String,
+    pub note: String,
 }
 
 /// One thing to judge.
@@ -84,49 +72,16 @@ pub struct State {
     pub neighbors: Vec<Neighbor>,
 }
 
-/// What a criterion means, and what it looks like.
+/// A symbol near the subject: a caller or callee.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Criterion {
-    pub meaning: String,
-    pub examples: Vec<Example>,
-}
-
-/// The two sides of a yes/no question: `true` is that the subject fails the
-/// decision, `false` that it passes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Criteria {
-    #[serde(rename = "true")]
-    pub fail: Criterion,
-    #[serde(rename = "false")]
-    pub pass: Criterion,
-}
-
-/// What a question is about.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Instructions {
-    pub requirement: String,
-    /// What the model is told; the requirement unless the check says more.
-    pub prompt: String,
-}
-
-/// One yes/no question: System One's `noul`, the probability of yes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Question {
-    /// [`NOUL`].
-    #[serde(rename = "type")]
+pub struct Neighbor {
+    pub id: String,
     pub kind: String,
-    pub instructions: Instructions,
-    pub criteria: Criteria,
-}
-
-/// The answer to a question: P(fail).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct Answer {
-    /// [`NOUL`].
-    #[serde(rename = "type", default = "noul_kind")]
-    pub kind: String,
-    /// The probability that the subject fails the decision, from 0 to 1.
-    pub noul: f64,
+    /// `caller` or `callee`.
+    pub relation: String,
+    /// The neighbor's source when it is in the subject's file, truncated.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub text: String,
 }
 
 /// The body of TypeSafe's System One API (`POST /v1/systemone`), for one
@@ -142,6 +97,41 @@ pub struct SystemOneRequest {
     pub options: serde_json::Map<String, Value>,
 }
 
+/// One yes/no question: System One's `noul`, the probability of yes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Question {
+    /// [`NOUL`].
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub instructions: Instructions,
+    pub criteria: Criteria,
+}
+
+/// The two sides of a yes/no question: `true` is that the subject fails the
+/// decision, `false` that it passes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Criteria {
+    #[serde(rename = "true")]
+    pub fail: Criterion,
+    #[serde(rename = "false")]
+    pub pass: Criterion,
+}
+
+/// What a criterion means, and what it looks like.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Criterion {
+    pub meaning: String,
+    pub examples: Vec<Example>,
+}
+
+/// What a question is about.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Instructions {
+    pub requirement: String,
+    /// What the model is told; the requirement unless the check says more.
+    pub prompt: String,
+}
+
 /// Result of `lighthouse/classify`: System One's response. Every question
 /// asked is answered; a missing answer is an abstention.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -152,6 +142,16 @@ pub struct SystemOneResponse {
     pub answers: BTreeMap<String, Answer>,
     #[serde(default)]
     pub usage: Value,
+}
+
+/// The answer to a question: P(fail).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Answer {
+    /// [`NOUL`].
+    #[serde(rename = "type", default = "noul_kind")]
+    pub kind: String,
+    /// The probability that the subject fails the decision, from 0 to 1.
+    pub noul: f64,
 }
 
 impl Question {

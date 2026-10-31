@@ -28,13 +28,6 @@ use super::{
 };
 use crate::cache::{Cache, Digest};
 
-/// One model of the route, as the route asks it.
-pub(crate) struct Member<'a> {
-    /// `<provider>/<model>`, as a binding names it.
-    pub(crate) reference: String,
-    pub(crate) client: Box<dyn ModelClient + 'a>,
-}
-
 /// Why no model of the route answered.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Refusal {
@@ -42,21 +35,6 @@ pub(crate) enum Refusal {
     Budget,
     /// The models failed, or are no longer asked; the last reason.
     Failed(String),
-}
-
-/// What the route was asked and cost this run.
-#[derive(Default)]
-struct Spent {
-    usage: lighthouse_model::Usage,
-    /// Time the models took to answer.
-    time: Duration,
-}
-
-/// What a run has spent on the models of a route.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct Usage {
-    pub(crate) usage: lighthouse_model::Usage,
-    pub(crate) time: Duration,
 }
 
 /// The models of every binding of a task and what a run has spent on them.
@@ -74,6 +52,28 @@ pub(crate) struct Route<'a> {
     failures: Failures,
     spent: Mutex<Spent>,
     notes: Mutex<BTreeSet<String>>,
+}
+
+/// What the route was asked and cost this run.
+#[derive(Default)]
+struct Spent {
+    usage: lighthouse_model::Usage,
+    /// Time the models took to answer.
+    time: Duration,
+}
+
+/// What a run has spent on the models of a route.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Usage {
+    pub(crate) usage: lighthouse_model::Usage,
+    pub(crate) time: Duration,
+}
+
+/// One model of the route, as the route asks it.
+pub(crate) struct Member<'a> {
+    /// `<provider>/<model>`, as a binding names it.
+    pub(crate) reference: String,
+    pub(crate) client: Box<dyn ModelClient + 'a>,
 }
 
 impl Engine {

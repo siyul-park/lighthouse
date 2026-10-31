@@ -37,39 +37,6 @@ pub(crate) struct Applied {
     pub annotations: BTreeMap<PathBuf, Vec<Value>>,
 }
 
-/// A directive on a line of a comment of the file being read.
-struct Located<'a> {
-    comment: &'a Comment,
-    /// The index of the directive's line in the comment's text.
-    index: usize,
-    /// The directive's line in the file.
-    line: u32,
-    directive: Directive,
-}
-
-/// Which findings a claim reaches.
-#[derive(Clone, Copy)]
-enum Coverage {
-    /// The line after the directive and its own line; and the symbol the
-    /// comment documents, when the directive is the last line of the comment.
-    NextLine(u32),
-    /// The directive's own line.
-    Line(u32),
-    /// From a line to the matching `lighthouse-enable` (exclusive), or to the
-    /// end of the file.
-    Range { from: u32, to: Option<u32> },
-}
-
-/// One rule named by one directive that disables it.
-struct Claim<'a> {
-    at: &'a Located<'a>,
-    /// The decision's current id.
-    rule: String,
-    /// Its position in the directive's rule list.
-    rule_index: usize,
-    coverage: Coverage,
-}
-
 /// The directives of one file read in source order: what each disables, which
 /// ranges are open, and the findings about directives that are wrong.
 struct Reader<'a> {
@@ -152,6 +119,39 @@ impl<'a> Reader<'a> {
             }
         }
     }
+}
+
+/// One rule named by one directive that disables it.
+struct Claim<'a> {
+    at: &'a Located<'a>,
+    /// The decision's current id.
+    rule: String,
+    /// Its position in the directive's rule list.
+    rule_index: usize,
+    coverage: Coverage,
+}
+
+/// A directive on a line of a comment of the file being read.
+struct Located<'a> {
+    comment: &'a Comment,
+    /// The index of the directive's line in the comment's text.
+    index: usize,
+    /// The directive's line in the file.
+    line: u32,
+    directive: Directive,
+}
+
+/// Which findings a claim reaches.
+#[derive(Clone, Copy)]
+enum Coverage {
+    /// The line after the directive and its own line; and the symbol the
+    /// comment documents, when the directive is the last line of the comment.
+    NextLine(u32),
+    /// The directive's own line.
+    Line(u32),
+    /// From a line to the matching `lighthouse-enable` (exclusive), or to the
+    /// end of the file.
+    Range { from: u32, to: Option<u32> },
 }
 
 /// Applies the suppression directives of the project to `found`: a finding of

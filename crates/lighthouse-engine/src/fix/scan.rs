@@ -17,14 +17,6 @@ pub(crate) struct Container {
     pub group: Option<usize>,
 }
 
-struct Frame {
-    open: usize,
-    close: usize,
-    group: bool,
-    /// The pair around this one, by place in `frames`.
-    parent: Option<usize>,
-}
-
 /// The bracket structure of one text.
 pub(crate) struct Containers {
     frames: Vec<Frame>,
@@ -104,6 +96,14 @@ impl Containers {
             group: inner.filter(|f| f.group).map(|f| f.close),
         }
     }
+}
+
+struct Frame {
+    open: usize,
+    close: usize,
+    group: bool,
+    /// The pair around this one, by place in `frames`.
+    parent: Option<usize>,
 }
 
 fn closes(open: u8, close: u8) -> bool {

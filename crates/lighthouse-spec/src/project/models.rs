@@ -16,39 +16,6 @@ const DEFAULT_PRECISION: f64 = 0.9;
 /// project says.
 pub(super) const DEFAULT_EXPLORE: f64 = 0.05;
 
-/// One name or several, in the order written: the protocols a provider speaks
-/// (each operation uses the one that covers it: classification `typesafe`,
-/// else `openai`), or the models of a route.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(untagged)]
-pub enum Names {
-    One(String),
-    Many(Vec<String>),
-}
-
-impl Names {
-    /// The names, in the order written.
-    pub fn iter(&self) -> impl Iterator<Item = &str> {
-        let names = match self {
-            Self::One(name) => std::slice::from_ref(name),
-            Self::Many(names) => names.as_slice(),
-        };
-        names.iter().map(String::as_str)
-    }
-}
-
-/// Which model of a route a request goes to first.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Routing {
-    /// The first model, then the others in the order written.
-    #[default]
-    Ordered,
-    /// Each request starts at the next model, so load is spread; the others
-    /// follow in the order written, wrapping.
-    RoundRobin,
-}
-
 /// The `models` table of a project: its bindings and limits, and its own
 /// providers.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -90,6 +57,39 @@ impl ModelsSpec {
     /// Whether the project says nothing about models.
     pub fn is_empty(&self) -> bool {
         self == &Self::default()
+    }
+}
+
+/// Which model of a route a request goes to first.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Routing {
+    /// The first model, then the others in the order written.
+    #[default]
+    Ordered,
+    /// Each request starts at the next model, so load is spread; the others
+    /// follow in the order written, wrapping.
+    RoundRobin,
+}
+
+/// One name or several, in the order written: the protocols a provider speaks
+/// (each operation uses the one that covers it: classification `typesafe`,
+/// else `openai`), or the models of a route.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Names {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl Names {
+    /// The names, in the order written.
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        let names = match self {
+            Self::One(name) => std::slice::from_ref(name),
+            Self::Many(names) => names.as_slice(),
+        };
+        names.iter().map(String::as_str)
     }
 }
 

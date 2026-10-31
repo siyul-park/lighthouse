@@ -32,6 +32,12 @@ const LANGUAGE: &str = "rust";
 /// Makes the name of each temporary file unique within the process.
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+#[derive(Serialize, Deserialize)]
+struct Stored {
+    version: String,
+    files: BTreeMap<String, Entry>,
+}
+
 /// What the cache keeps of one analyzed file.
 #[derive(Clone, Serialize, Deserialize)]
 struct Entry {
@@ -39,12 +45,6 @@ struct Entry {
     fragment: Fragment,
     defines: bool,
     unread: u32,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Stored {
-    version: String,
-    files: BTreeMap<String, Entry>,
 }
 
 /// The cache of one index request.

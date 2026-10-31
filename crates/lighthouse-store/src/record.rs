@@ -7,6 +7,61 @@ use serde_json::{Value, json};
 
 use crate::JudgmentEvent;
 
+/// A finding as the current run saw it: what the judgments on its fingerprint
+/// are compared with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Subject {
+    pub fingerprint: String,
+    pub authored_severity: Severity,
+    pub meaning_version: Option<String>,
+    pub evidence_digest: String,
+}
+
+/// What one analysis run saw and what it covered. Findings absent from
+/// `observed` are resolved only inside `reported` and `ran`, and not where
+/// the run `unchecked` something.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Run {
+    /// Every finding of the report scope, suppressed ones included.
+    pub observed: Vec<Observed>,
+    /// Project-relative paths whose findings the run reports: a file or a
+    /// directory prefix; the empty path is everything.
+    pub reported: Vec<String>,
+    /// The decisions that ran.
+    pub ran: Vec<String>,
+    /// Every decision the configuration enables; remembered findings of any
+    /// other decision become inactive.
+    pub active: Vec<String>,
+    pub unchecked: Unchecked,
+    /// The commit and whether the working tree differed from it.
+    pub commit: Option<String>,
+    pub dirty: bool,
+    pub catalog_version: Option<String>,
+    pub lighthouse_version: String,
+}
+
+/// What a run could not check, and therefore cannot say was fixed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unchecked {
+    Nothing,
+    /// Directories (project-relative, `/`-separated) holding files that could
+    /// not be analyzed; findings under them are left as they are.
+    Paths(Vec<String>),
+    /// A gap that cannot be placed, such as a language provider that failed.
+    Everything,
+}
+
+impl Unchecked {
+    /// Whether the run could not check the file at `path`.
+    pub(crate) fn covers(&self, path: &str) -> bool {
+        match self {
+            Self::Nothing => false,
+            Self::Everything => true,
+            Self::Paths(dirs) => dirs.iter().any(|dir| Path::new(path).starts_with(dir)),
+        }
+    }
+}
+
 /// One finding as a run saw it. The locator and evidence are JSON so that
 /// artifacts other than source code fit the same record.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
@@ -93,61 +148,6 @@ impl Observed {
     }
 }
 
-/// A finding as the current run saw it: what the judgments on its fingerprint
-/// are compared with.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Subject {
-    pub fingerprint: String,
-    pub authored_severity: Severity,
-    pub meaning_version: Option<String>,
-    pub evidence_digest: String,
-}
-
-/// What a run could not check, and therefore cannot say was fixed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Unchecked {
-    Nothing,
-    /// Directories (project-relative, `/`-separated) holding files that could
-    /// not be analyzed; findings under them are left as they are.
-    Paths(Vec<String>),
-    /// A gap that cannot be placed, such as a language provider that failed.
-    Everything,
-}
-
-impl Unchecked {
-    /// Whether the run could not check the file at `path`.
-    pub(crate) fn covers(&self, path: &str) -> bool {
-        match self {
-            Self::Nothing => false,
-            Self::Everything => true,
-            Self::Paths(dirs) => dirs.iter().any(|dir| Path::new(path).starts_with(dir)),
-        }
-    }
-}
-
-/// What one analysis run saw and what it covered. Findings absent from
-/// `observed` are resolved only inside `reported` and `ran`, and not where
-/// the run `unchecked` something.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Run {
-    /// Every finding of the report scope, suppressed ones included.
-    pub observed: Vec<Observed>,
-    /// Project-relative paths whose findings the run reports: a file or a
-    /// directory prefix; the empty path is everything.
-    pub reported: Vec<String>,
-    /// The decisions that ran.
-    pub ran: Vec<String>,
-    /// Every decision the configuration enables; remembered findings of any
-    /// other decision become inactive.
-    pub active: Vec<String>,
-    pub unchecked: Unchecked,
-    /// The commit and whether the working tree differed from it.
-    pub commit: Option<String>,
-    pub dirty: bool,
-    pub catalog_version: Option<String>,
-    pub lighthouse_version: String,
-}
-
 /// What recording a run changed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RunSummary {
@@ -155,6 +155,13 @@ pub struct RunSummary {
     pub reopened: usize,
     pub resolved: usize,
     pub deactivated: usize,
+}
+
+/// What a listing selects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Filter {
+    pub decision: Option<String>,
+    pub status: StatusFilter,
 }
 
 /// Which findings a listing includes.
@@ -188,11 +195,13 @@ impl StatusFilter {
     }
 }
 
-/// What a listing selects.
+/// The standing of a judged finding with the judgment behind it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Filter {
-    pub decision: Option<String>,
-    pub status: StatusFilter,
+pub struct Ruling {
+    pub standing: Standing,
+    pub judgment: Judgment,
+    /// The justification of the suppression that goes with it, if any.
+    pub justification: Option<String>,
 }
 
 /// What the latest judgment does to a finding now.
@@ -232,35 +241,46 @@ impl Standing {
     }
 }
 
-/// The standing of a judged finding with the judgment behind it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Ruling {
-    pub standing: Standing,
+/// A judgment to record. `fingerprint` may be an unambiguous prefix.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NewJudgment {
+    pub fingerprint: String,
     pub judgment: Judgment,
-    /// The justification of the suppression that goes with it, if any.
-    pub justification: Option<String>,
+    /// Why, written for the next reader.
+    pub reason: Option<String>,
+    /// The justification of an external suppression recorded with a `fail`.
+    pub suppress: Option<String>,
+    pub attribution: Attribution,
+    /// The commit the judged code was at, when known.
+    pub commit: Option<String>,
+    /// Refuse the judgment unless the finding's last sighting is this one.
+    pub expect_seen: Option<String>,
+    pub lighthouse_version: String,
 }
 
-/// Where a finding is in its life; a judgment that hides it wins over the
-/// rest.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum State {
-    Open,
-    Resolved,
-    Inactive,
-    Suppressed,
+/// What a judgment records about the decision beyond the finding: the versions
+/// of the decision it judged and its scope.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Versions {
+    /// The uid of the finding's decision, when it differs from what the
+    /// finding was recorded with.
+    pub decision_uid: Option<String>,
+    /// Meaning version of the decision, which decides when the judgment expires.
+    pub meaning_version: Option<String>,
+    /// How the decision was checked; recorded, never expires the judgment.
+    pub check_revision: Option<String>,
+    /// Hash of the whole decision definition.
+    pub decision_hash: Option<String>,
+    pub catalog_version: Option<String>,
+    /// The decision's scope (`symbol`, `file`, ...).
+    pub scope: Option<String>,
 }
 
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Open => "open",
-            Self::Resolved => "resolved",
-            Self::Inactive => "inactive",
-            Self::Suppressed => "suppressed",
-        })
-    }
+/// A recorded judgment with the finding as the judgment saw it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Resolved {
+    pub event: JudgmentEvent,
+    pub finding: FindingRecord,
 }
 
 /// A finding as stored: its latest sighting, its history and its standing.
@@ -328,44 +348,24 @@ impl FindingRecord {
     }
 }
 
-/// A judgment to record. `fingerprint` may be an unambiguous prefix.
-#[derive(Debug, Clone, PartialEq)]
-pub struct NewJudgment {
-    pub fingerprint: String,
-    pub judgment: Judgment,
-    /// Why, written for the next reader.
-    pub reason: Option<String>,
-    /// The justification of an external suppression recorded with a `fail`.
-    pub suppress: Option<String>,
-    pub attribution: Attribution,
-    /// The commit the judged code was at, when known.
-    pub commit: Option<String>,
-    /// Refuse the judgment unless the finding's last sighting is this one.
-    pub expect_seen: Option<String>,
-    pub lighthouse_version: String,
+/// Where a finding is in its life; a judgment that hides it wins over the
+/// rest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum State {
+    Open,
+    Resolved,
+    Inactive,
+    Suppressed,
 }
 
-/// What a judgment records about the decision beyond the finding: the versions
-/// of the decision it judged and its scope.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Versions {
-    /// The uid of the finding's decision, when it differs from what the
-    /// finding was recorded with.
-    pub decision_uid: Option<String>,
-    /// Meaning version of the decision, which decides when the judgment expires.
-    pub meaning_version: Option<String>,
-    /// How the decision was checked; recorded, never expires the judgment.
-    pub check_revision: Option<String>,
-    /// Hash of the whole decision definition.
-    pub decision_hash: Option<String>,
-    pub catalog_version: Option<String>,
-    /// The decision's scope (`symbol`, `file`, ...).
-    pub scope: Option<String>,
-}
-
-/// A recorded judgment with the finding as the judgment saw it.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Resolved {
-    pub event: JudgmentEvent,
-    pub finding: FindingRecord,
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Open => "open",
+            Self::Resolved => "resolved",
+            Self::Inactive => "inactive",
+            Self::Suppressed => "suppressed",
+        })
+    }
 }

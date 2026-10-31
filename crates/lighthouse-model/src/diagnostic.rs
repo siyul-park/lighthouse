@@ -11,22 +11,6 @@ use lighthouse_protocol::hash::{Hasher, short_digest};
 
 use crate::{Span, squash};
 
-/// How hard a finding fails a run; serialized and parsed as the lowercase
-/// variant name. Whether a finding also asks for review is not a level: it
-/// follows from the severity its decision authored.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum Severity {
-    /// Fails the run.
-    Error,
-    /// Fails the run only under `--strict` or past `--max-warnings`.
-    Warn,
-    /// Reported, never fails the run.
-    Info,
-}
-
 vocabulary!(Severity, "severity" {
     Error => "error",
     Warn => "warn",
@@ -42,75 +26,104 @@ impl Severity {
     }
 }
 
-/// Stable identity of a finding across runs and line shifts.
+/// Part of the analysis scope that could not be analyzed: a file, or the
+/// whole run of a provider when `path` is `None`. Never silent: "not checked"
+/// is not "passed".
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Fingerprint(String);
+pub struct Incomplete {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<PathBuf>,
+    pub reason: String,
+}
 
-impl Fingerprint {
-    /// Fewest characters of a fingerprint that name a finding, as in git: the
-    /// least accepted as input and the least printed.
-    pub const MIN_PREFIX: usize = 7;
+vocabulary!(SuppressionKind, "suppression kind" {
+    InSource => "inSource",
+    External => "external",
+});
 
-    /// Hashes the rule, the symbol path (separators normalized to `/`) and the
-    /// whitespace-normalized snippet.
-    pub fn new(rule_id: &str, symbol_path: &str, snippet: &str) -> Self {
-        let symbol_path = symbol_path.replace('\\', "/");
-        let mut hash = Hasher::new();
-        for part in [rule_id, symbol_path.as_str()] {
-            hash.update(part);
-            hash.update([0]);
+vocabulary!(SuppressionStatus, "suppression status" {
+    Accepted => "accepted",
+    UnderReview => "underReview",
+    Rejected => "rejected",
+});
+
+impl SuppressionStatus {
+    fn is_default(&self) -> bool {
+        *self == Self::Accepted
+    }
+}
+
+/// A finding a suppression keeps out of the report. A run states how many
+/// there were, and SARIF keeps them with their suppression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Suppressed {
+    pub diagnostic: Diagnostic,
+    pub suppression: Suppression,
+}
+
+/// A finding that is right but is left in place on purpose: SARIF's
+/// `suppression`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Suppression {
+    pub kind: SuppressionKind,
+    /// `accepted` unless said otherwise.
+    #[serde(default, skip_serializing_if = "SuppressionStatus::is_default")]
+    pub status: SuppressionStatus,
+    /// Why the finding stays.
+    pub justification: String,
+}
+
+impl Suppression {
+    /// An accepted suppression a directive in the code declares.
+    pub fn in_source(justification: impl Into<String>) -> Self {
+        Self::new(SuppressionKind::InSource, justification)
+    }
+
+    /// An accepted suppression recorded outside the code.
+    pub fn external(justification: impl Into<String>) -> Self {
+        Self::new(SuppressionKind::External, justification)
+    }
+
+    /// An accepted suppression of the given kind.
+    fn new(kind: SuppressionKind, justification: impl Into<String>) -> Self {
+        Self {
+            kind,
+            status: SuppressionStatus::Accepted,
+            justification: justification.into(),
         }
-        hash.update(squash(snippet));
-        Self(hash.hex())
     }
 
-    /// Adopts a fingerprint computed elsewhere, such as by a plugin.
-    pub fn from_raw(value: impl Into<String>) -> Self {
-        Self(value.into())
+    /// Whether the suppression is in force.
+    pub fn in_force(&self) -> bool {
+        self.status == SuppressionStatus::Accepted
     }
+}
 
-    /// Distinguishes the `n`th (0-based) repeat of an otherwise identical finding.
-    pub fn occurrence(&self, n: usize) -> Self {
-        if n == 0 {
-            return self.clone();
-        }
-        let mut hash = Hasher::new();
-        hash.update(&self.0);
-        hash.update(n.to_le_bytes());
-        Self(hash.hex())
-    }
+/// How a suppression was declared, in the words of SARIF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum SuppressionKind {
+    /// By a directive in the code.
+    #[serde(rename = "inSource")]
+    InSource,
+    /// Outside the code: a recorded decision to leave the finding in place.
+    #[serde(rename = "external")]
+    External,
+}
 
-    /// Tells apart findings that share a fingerprint by something stable about
-    /// where they are, such as the symbol that encloses them.
-    pub fn discriminate(&self, discriminator: &str) -> Self {
-        let mut hash = Hasher::new();
-        hash.update(&self.0);
-        hash.update([0xff]);
-        hash.update(discriminator);
-        Self(hash.hex())
-    }
-
-    /// The opaque hex string; equal fingerprints identify the same finding.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// For each of `fingerprints`, how many characters tell it apart from every
-    /// other one, at least [`Self::MIN_PREFIX`]: the width to print it at.
-    pub fn prefix_widths(fingerprints: &[&str]) -> Vec<usize> {
-        let mut order: Vec<usize> = (0..fingerprints.len()).collect();
-        order.sort_by_key(|&i| fingerprints[i]);
-        let mut widths = vec![Self::MIN_PREFIX; fingerprints.len()];
-        for pair in order.windows(2) {
-            let (a, b) = (fingerprints[pair[0]], fingerprints[pair[1]]);
-            let shared = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
-            for &i in pair {
-                widths[i] = widths[i].max(shared + 1);
-            }
-        }
-        widths
-    }
+/// Whether a suppression is in force, in the words of SARIF.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum SuppressionStatus {
+    /// In force.
+    #[default]
+    #[serde(rename = "accepted")]
+    Accepted,
+    /// Proposed, not yet in force.
+    #[serde(rename = "underReview")]
+    UnderReview,
+    /// Refused.
+    #[serde(rename = "rejected")]
+    Rejected,
 }
 
 /// One finding: where a rule found a violation and how to tell it apart from
@@ -219,104 +232,91 @@ impl Diagnostic {
     }
 }
 
-/// Part of the analysis scope that could not be analyzed: a file, or the
-/// whole run of a provider when `path` is `None`. Never silent: "not checked"
-/// is not "passed".
+/// How hard a finding fails a run; serialized and parsed as the lowercase
+/// variant name. Whether a finding also asks for review is not a level: it
+/// follows from the severity its decision authored.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum Severity {
+    /// Fails the run.
+    Error,
+    /// Fails the run only under `--strict` or past `--max-warnings`.
+    Warn,
+    /// Reported, never fails the run.
+    Info,
+}
+
+/// Stable identity of a finding across runs and line shifts.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Incomplete {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path: Option<PathBuf>,
-    pub reason: String,
-}
+#[serde(transparent)]
+pub struct Fingerprint(String);
 
-/// How a suppression was declared, in the words of SARIF.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub enum SuppressionKind {
-    /// By a directive in the code.
-    #[serde(rename = "inSource")]
-    InSource,
-    /// Outside the code: a recorded decision to leave the finding in place.
-    #[serde(rename = "external")]
-    External,
-}
+impl Fingerprint {
+    /// Fewest characters of a fingerprint that name a finding, as in git: the
+    /// least accepted as input and the least printed.
+    pub const MIN_PREFIX: usize = 7;
 
-vocabulary!(SuppressionKind, "suppression kind" {
-    InSource => "inSource",
-    External => "external",
-});
-
-/// Whether a suppression is in force, in the words of SARIF.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub enum SuppressionStatus {
-    /// In force.
-    #[default]
-    #[serde(rename = "accepted")]
-    Accepted,
-    /// Proposed, not yet in force.
-    #[serde(rename = "underReview")]
-    UnderReview,
-    /// Refused.
-    #[serde(rename = "rejected")]
-    Rejected,
-}
-
-vocabulary!(SuppressionStatus, "suppression status" {
-    Accepted => "accepted",
-    UnderReview => "underReview",
-    Rejected => "rejected",
-});
-
-impl SuppressionStatus {
-    fn is_default(&self) -> bool {
-        *self == Self::Accepted
-    }
-}
-
-/// A finding that is right but is left in place on purpose: SARIF's
-/// `suppression`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Suppression {
-    pub kind: SuppressionKind,
-    /// `accepted` unless said otherwise.
-    #[serde(default, skip_serializing_if = "SuppressionStatus::is_default")]
-    pub status: SuppressionStatus,
-    /// Why the finding stays.
-    pub justification: String,
-}
-
-impl Suppression {
-    /// An accepted suppression a directive in the code declares.
-    pub fn in_source(justification: impl Into<String>) -> Self {
-        Self::new(SuppressionKind::InSource, justification)
-    }
-
-    /// An accepted suppression recorded outside the code.
-    pub fn external(justification: impl Into<String>) -> Self {
-        Self::new(SuppressionKind::External, justification)
-    }
-
-    /// An accepted suppression of the given kind.
-    fn new(kind: SuppressionKind, justification: impl Into<String>) -> Self {
-        Self {
-            kind,
-            status: SuppressionStatus::Accepted,
-            justification: justification.into(),
+    /// Hashes the rule, the symbol path (separators normalized to `/`) and the
+    /// whitespace-normalized snippet.
+    pub fn new(rule_id: &str, symbol_path: &str, snippet: &str) -> Self {
+        let symbol_path = symbol_path.replace('\\', "/");
+        let mut hash = Hasher::new();
+        for part in [rule_id, symbol_path.as_str()] {
+            hash.update(part);
+            hash.update([0]);
         }
+        hash.update(squash(snippet));
+        Self(hash.hex())
     }
 
-    /// Whether the suppression is in force.
-    pub fn in_force(&self) -> bool {
-        self.status == SuppressionStatus::Accepted
+    /// Adopts a fingerprint computed elsewhere, such as by a plugin.
+    pub fn from_raw(value: impl Into<String>) -> Self {
+        Self(value.into())
     }
-}
 
-/// A finding a suppression keeps out of the report. A run states how many
-/// there were, and SARIF keeps them with their suppression.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Suppressed {
-    pub diagnostic: Diagnostic,
-    pub suppression: Suppression,
+    /// Distinguishes the `n`th (0-based) repeat of an otherwise identical finding.
+    pub fn occurrence(&self, n: usize) -> Self {
+        if n == 0 {
+            return self.clone();
+        }
+        let mut hash = Hasher::new();
+        hash.update(&self.0);
+        hash.update(n.to_le_bytes());
+        Self(hash.hex())
+    }
+
+    /// Tells apart findings that share a fingerprint by something stable about
+    /// where they are, such as the symbol that encloses them.
+    pub fn discriminate(&self, discriminator: &str) -> Self {
+        let mut hash = Hasher::new();
+        hash.update(&self.0);
+        hash.update([0xff]);
+        hash.update(discriminator);
+        Self(hash.hex())
+    }
+
+    /// The opaque hex string; equal fingerprints identify the same finding.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// For each of `fingerprints`, how many characters tell it apart from every
+    /// other one, at least [`Self::MIN_PREFIX`]: the width to print it at.
+    pub fn prefix_widths(fingerprints: &[&str]) -> Vec<usize> {
+        let mut order: Vec<usize> = (0..fingerprints.len()).collect();
+        order.sort_by_key(|&i| fingerprints[i]);
+        let mut widths = vec![Self::MIN_PREFIX; fingerprints.len()];
+        for pair in order.windows(2) {
+            let (a, b) = (fingerprints[pair[0]], fingerprints[pair[1]]);
+            let shared = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+            for &i in pair {
+                widths[i] = widths[i].max(shared + 1);
+            }
+        }
+        widths
+    }
 }
 
 /// A hash of evidence with whitespace in its strings collapsed, so

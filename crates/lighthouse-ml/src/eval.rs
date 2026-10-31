@@ -23,6 +23,67 @@ pub use found::{Candidate, Found};
 pub use grade::{RepoResult, grade};
 pub use layer::{Overlaid, Overlay};
 
+/// The result of an evaluation.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalReport {
+    pub decision: String,
+    pub labelled: usize,
+    pub policy: Evaluation,
+    pub current: Side,
+    pub candidate: Option<Side>,
+    /// How often the candidate answers as the current check does.
+    pub agreement: Option<Rate>,
+    /// Whether the check (the candidate, when there is one) meets the
+    /// evaluation policy by the point estimates of its precision and, when the
+    /// policy sets a target, of its recall; the intervals are shown beside.
+    pub meets_policy: Option<bool>,
+    /// Labelled subjects the candidate decides that the current check leaves
+    /// for review.
+    pub decided: usize,
+    /// The examples that should pass and the candidate newly fails.
+    pub regressions: Vec<String>,
+    /// The table of unflagged subjects written for a person to label.
+    pub audit: Option<PathBuf>,
+    /// What to do about an attached model that misses the policy: detach it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<Proposal>,
+}
+
+/// One check's numbers.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Side {
+    pub check: String,
+    pub metrics: Metrics,
+    #[serde(flatten)]
+    pub usage: Usage,
+    /// The probability each labelled subject was given, by repository and
+    /// fingerprint: the raw answers the metrics are computed from, so that
+    /// reports can be pooled.
+    pub scores: Vec<Score>,
+    /// What went wrong with the models, or was worth saying: the notices of
+    /// the run, so that a failing model is not silent.
+    pub notices: Vec<String>,
+    /// The model attached by revision this side is graded with, and how.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layer: Option<Layer>,
+}
+
+/// What a model gave a labelled subject.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Score {
+    /// The label's fingerprint.
+    pub fingerprint: String,
+    pub repo: Option<String>,
+    /// Whether the label says the subject violates the requirement.
+    pub violates: bool,
+    /// P(fail) the model gave.
+    pub probability: f64,
+    /// The model that gave it: `<reference>@<version>`.
+    pub model: String,
+}
+
 /// How a layer was graded, for the report.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -62,67 +123,6 @@ impl Sum for Usage {
             },
         })
     }
-}
-
-/// One check's numbers.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Side {
-    pub check: String,
-    pub metrics: Metrics,
-    #[serde(flatten)]
-    pub usage: Usage,
-    /// The probability each labelled subject was given, by repository and
-    /// fingerprint: the raw answers the metrics are computed from, so that
-    /// reports can be pooled.
-    pub scores: Vec<Score>,
-    /// What went wrong with the models, or was worth saying: the notices of
-    /// the run, so that a failing model is not silent.
-    pub notices: Vec<String>,
-    /// The model attached by revision this side is graded with, and how.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub layer: Option<Layer>,
-}
-
-/// What a model gave a labelled subject.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
-pub struct Score {
-    /// The label's fingerprint.
-    pub fingerprint: String,
-    pub repo: Option<String>,
-    /// Whether the label says the subject violates the requirement.
-    pub violates: bool,
-    /// P(fail) the model gave.
-    pub probability: f64,
-    /// The model that gave it: `<reference>@<version>`.
-    pub model: String,
-}
-
-/// The result of an evaluation.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct EvalReport {
-    pub decision: String,
-    pub labelled: usize,
-    pub policy: Evaluation,
-    pub current: Side,
-    pub candidate: Option<Side>,
-    /// How often the candidate answers as the current check does.
-    pub agreement: Option<Rate>,
-    /// Whether the check (the candidate, when there is one) meets the
-    /// evaluation policy by the point estimates of its precision and, when the
-    /// policy sets a target, of its recall; the intervals are shown beside.
-    pub meets_policy: Option<bool>,
-    /// Labelled subjects the candidate decides that the current check leaves
-    /// for review.
-    pub decided: usize,
-    /// The examples that should pass and the candidate newly fails.
-    pub regressions: Vec<String>,
-    /// The table of unflagged subjects written for a person to label.
-    pub audit: Option<PathBuf>,
-    /// What to do about an attached model that misses the policy: detach it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proposal: Option<Proposal>,
 }
 
 /// The monitor proposes to detach a model; nothing is written until it is

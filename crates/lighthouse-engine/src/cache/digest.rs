@@ -27,17 +27,6 @@ use serde::Serialize;
 
 use super::{Error, neighbors::Ties};
 
-/// A SHA-256.
-pub type Digest = [u8; 32];
-
-/// What the keys of one file's results are built from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FileDigest {
-    pub slice: Digest,
-    pub neighbors: Digest,
-    pub neighbors_at: Digest,
-}
-
 /// The digests of a project: one per file and one for all of it.
 #[derive(Debug, Default)]
 pub struct Digests {
@@ -86,6 +75,17 @@ impl Digests {
     pub fn file(&self, path: &Path) -> Option<&FileDigest> {
         self.files.get(path)
     }
+}
+
+/// A SHA-256.
+pub type Digest = [u8; 32];
+
+/// What the keys of one file's results are built from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileDigest {
+    pub slice: Digest,
+    pub neighbors: Digest,
+    pub neighbors_at: Digest,
 }
 
 /// The digest of the documents of a project, which no file digest covers.

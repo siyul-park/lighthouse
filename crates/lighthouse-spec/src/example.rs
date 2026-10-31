@@ -4,24 +4,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// Whether an example must produce no diagnostics (`valid`) or exactly those
-/// listed in `expect` (`invalid`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum ExampleKind {
-    Valid,
-    Invalid,
-}
-
-impl fmt::Display for ExampleKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Valid => "valid",
-            Self::Invalid => "invalid",
-        })
-    }
-}
-
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct RawFile {
@@ -30,6 +12,51 @@ struct RawFile {
     body: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source: Option<String>,
+}
+
+impl From<ExampleFile> for RawFile {
+    fn from(file: ExampleFile) -> Self {
+        Self {
+            path: file.path,
+            body: file.source.is_none().then_some(file.text),
+            source: file.source,
+        }
+    }
+}
+
+/// A fixture project for one language and what a rule must report on it:
+/// nothing for `valid`, the diagnostics of `expect` for `invalid`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Example {
+    pub name: String,
+    pub language: String,
+    pub kind: ExampleKind,
+    pub files: Vec<ExampleFile>,
+    /// The example that best shows the decision in its language; at most one
+    /// per language and kind. Agent output prefers it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub canonical: bool,
+    /// Diagnostics an invalid example must produce.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub expect: Vec<Expect>,
+    /// Rule options the example runs with.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub options: Map<String, Value>,
+    /// What an invalid example's files become when the decision's fix is
+    /// applied: the files that change, each with its whole new text. Applying
+    /// the fix again must change nothing, and the rule must no longer fire.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fixed: Vec<ExampleFile>,
+}
+
+/// An expected diagnostic of an invalid example.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Expect {
+    pub line: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 /// One file of an example project, addressed by `path` inside the example.
@@ -93,47 +120,20 @@ impl TryFrom<RawFile> for ExampleFile {
     }
 }
 
-impl From<ExampleFile> for RawFile {
-    fn from(file: ExampleFile) -> Self {
-        Self {
-            path: file.path,
-            body: file.source.is_none().then_some(file.text),
-            source: file.source,
-        }
+/// Whether an example must produce no diagnostics (`valid`) or exactly those
+/// listed in `expect` (`invalid`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExampleKind {
+    Valid,
+    Invalid,
+}
+
+impl fmt::Display for ExampleKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Valid => "valid",
+            Self::Invalid => "invalid",
+        })
     }
-}
-
-/// An expected diagnostic of an invalid example.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Expect {
-    pub line: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
-
-/// A fixture project for one language and what a rule must report on it:
-/// nothing for `valid`, the diagnostics of `expect` for `invalid`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Example {
-    pub name: String,
-    pub language: String,
-    pub kind: ExampleKind,
-    pub files: Vec<ExampleFile>,
-    /// The example that best shows the decision in its language; at most one
-    /// per language and kind. Agent output prefers it.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub canonical: bool,
-    /// Diagnostics an invalid example must produce.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub expect: Vec<Expect>,
-    /// Rule options the example runs with.
-    #[serde(default, skip_serializing_if = "Map::is_empty")]
-    pub options: Map<String, Value>,
-    /// What an invalid example's files become when the decision's fix is
-    /// applied: the files that change, each with its whole new text. Applying
-    /// the fix again must change nothing, and the rule must no longer fire.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fixed: Vec<ExampleFile>,
 }

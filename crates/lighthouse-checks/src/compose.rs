@@ -15,14 +15,6 @@ use lighthouse_spec::{Catalog, Env};
 
 use crate::Error;
 
-/// A function of the catalog with the library that provides it.
-#[derive(Debug, Clone)]
-pub struct Entry {
-    pub library: String,
-    pub version: String,
-    pub function: Function,
-}
-
 /// The environment of the bundled libraries and the catalog of their
 /// functions. Clones share both.
 #[derive(Clone)]
@@ -60,6 +52,13 @@ impl Composition {
     }
 }
 
+/// A function of the catalog with the library that provides it.
+#[derive(Debug, Clone)]
+pub struct Entry {
+    pub library: String,
+    pub version: String,
+    pub function: Function,
+}
 /// The composition of the bundled libraries, which the composition root
 /// registers in `libraries`: what every entry point builds before it reads a
 /// decision.

@@ -10,82 +10,6 @@ use crate::{
 };
 use lighthouse_protocol::{DecisionRef, hash};
 
-/// Where a decision stands in its life, as an architecture decision record
-/// does. Only an accepted decision is enforced.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum DecisionStatus {
-    /// Under discussion: written down, not yet enforced.
-    Proposed,
-    #[default]
-    Accepted,
-    /// Considered and turned down; kept so the question is not asked again.
-    Rejected,
-    /// Replaced by another decision (named in that decision's `supersedes`).
-    Superseded,
-    /// No longer wanted, and nothing replaces it.
-    Deprecated,
-}
-
-impl DecisionStatus {
-    /// Whether decisions in this state are enforced.
-    pub fn enforced(self) -> bool {
-        self == Self::Accepted
-    }
-
-    /// Whether this is the default, left out of written files.
-    pub fn is_default(&self) -> bool {
-        *self == Self::Accepted
-    }
-}
-
-impl std::fmt::Display for DecisionStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Proposed => "proposed",
-            Self::Accepted => "accepted",
-            Self::Rejected => "rejected",
-            Self::Superseded => "superseded",
-            Self::Deprecated => "deprecated",
-        })
-    }
-}
-
-/// What one language changes about a decision: the values of its options and
-/// the programs that check and fix its files.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct LanguageSpec {
-    /// Values of the decision's options that replace their defaults here.
-    #[serde(default, skip_serializing_if = "Map::is_empty")]
-    pub options: Map<String, Value>,
-    /// The program that checks the files of this language, in place of the
-    /// decision's own `command` check, which it needs to be.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub check: Option<Program>,
-    /// The program that fixes the findings in files of this language, in
-    /// place of the decision's own `command` fix, which it needs to be.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fix: Option<Program>,
-}
-
-/// Where a decision comes from, in the vocabulary of W3C PROV.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Provenance {
-    /// The sources the decision was derived from: a paper, a tool's rule, the
-    /// lines of a document it covers.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub was_derived_from: Vec<String>,
-}
-
-impl Provenance {
-    /// Whether nothing is said about where the decision comes from.
-    pub fn is_empty(&self) -> bool {
-        self.was_derived_from.is_empty()
-    }
-}
-
 /// A design decision, the way an architecture decision record states one:
 /// what was decided and why, its status, and how it is enforced. The engine
 /// compiles `check` into the rule that enforces it. A decision without a
@@ -141,6 +65,82 @@ pub struct DecisionSpec {
 
 impl Spec for DecisionSpec {
     const KIND: &'static str = "Decision";
+}
+
+/// Where a decision comes from, in the vocabulary of W3C PROV.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct Provenance {
+    /// The sources the decision was derived from: a paper, a tool's rule, the
+    /// lines of a document it covers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub was_derived_from: Vec<String>,
+}
+
+impl Provenance {
+    /// Whether nothing is said about where the decision comes from.
+    pub fn is_empty(&self) -> bool {
+        self.was_derived_from.is_empty()
+    }
+}
+
+/// What one language changes about a decision: the values of its options and
+/// the programs that check and fix its files.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageSpec {
+    /// Values of the decision's options that replace their defaults here.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub options: Map<String, Value>,
+    /// The program that checks the files of this language, in place of the
+    /// decision's own `command` check, which it needs to be.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<Program>,
+    /// The program that fixes the findings in files of this language, in
+    /// place of the decision's own `command` fix, which it needs to be.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<Program>,
+}
+
+/// Where a decision stands in its life, as an architecture decision record
+/// does. Only an accepted decision is enforced.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecisionStatus {
+    /// Under discussion: written down, not yet enforced.
+    Proposed,
+    #[default]
+    Accepted,
+    /// Considered and turned down; kept so the question is not asked again.
+    Rejected,
+    /// Replaced by another decision (named in that decision's `supersedes`).
+    Superseded,
+    /// No longer wanted, and nothing replaces it.
+    Deprecated,
+}
+
+impl DecisionStatus {
+    /// Whether decisions in this state are enforced.
+    pub fn enforced(self) -> bool {
+        self == Self::Accepted
+    }
+
+    /// Whether this is the default, left out of written files.
+    pub fn is_default(&self) -> bool {
+        *self == Self::Accepted
+    }
+}
+
+impl std::fmt::Display for DecisionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Proposed => "proposed",
+            Self::Accepted => "accepted",
+            Self::Rejected => "rejected",
+            Self::Superseded => "superseded",
+            Self::Deprecated => "deprecated",
+        })
+    }
 }
 
 /// One catalog entry: a `Decision` document. `metadata.name` is its

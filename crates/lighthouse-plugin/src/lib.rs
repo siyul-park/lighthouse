@@ -55,68 +55,6 @@ pub struct PluginManifest {
     pub version: String,
 }
 
-/// Where the checked project lives and how each language is configured.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Workspace {
-    pub root: PathBuf,
-    /// Per-language options from the configuration, keyed by language id.
-    pub languages: BTreeMap<String, Options>,
-    /// File globs that require serialized ASTs from their owning provider.
-    pub source_globs: Vec<String>,
-    /// The name prefixes that make a function a constructor, by language id:
-    /// what the provider declares, or the project's `constructorPrefixes`.
-    pub constructors: BTreeMap<String, Vec<String>>,
-    /// How tests are named after the symbols they own, by language id: what
-    /// the provider declares, with the project's `testNaming` over it.
-    pub test_naming: BTreeMap<String, TestNaming>,
-    /// Text that stands in for the file of the same project-relative path:
-    /// what a provider must read instead of the disk. Empty for a normal run;
-    /// a fix run checks candidate edits this way before anything is written.
-    pub overlays: BTreeMap<PathBuf, String>,
-    /// CEL libraries registered by the host, as manifests for language providers.
-    pub cel_libraries: Vec<CelLibraryManifest>,
-    /// The directory the host keeps derived data in between runs
-    /// (`.lighthouse/cache`), exactly when its result cache is on; a provider
-    /// may keep its own under a directory named by its plugin. `None` when the
-    /// run must not use a cache.
-    pub cache_dir: Option<PathBuf>,
-    /// How the programs the project names run: the project's `[sandbox]`.
-    pub sandbox: Policy,
-}
-
-/// What the analyzers computed in one run, by analyzer id and scope key (the
-/// file path, or empty for project scope).
-#[derive(Debug, Clone, Default)]
-pub struct Facts(BTreeMap<String, BTreeMap<String, Value>>);
-
-impl Facts {
-    /// No facts yet.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Keeps `value` as the fact of `analyzer` at `key`.
-    pub fn insert(&mut self, analyzer: &str, key: String, value: Value) {
-        self.0
-            .entry(analyzer.to_owned())
-            .or_default()
-            .insert(key, value);
-    }
-
-    /// The fact of `analyzer` at `key`.
-    pub fn get(&self, analyzer: &str, key: &str) -> Option<&Value> {
-        self.0.get(analyzer)?.get(key)
-    }
-
-    /// Every fact as `(analyzer, key, value)`, sorted.
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &str, &Value)> {
-        self.0.iter().flat_map(|(analyzer, keys)| {
-            keys.iter()
-                .map(move |(key, value)| (analyzer.as_str(), key.as_str(), value))
-        })
-    }
-}
-
 impl Workspace {
     /// A workspace at `root` with no language options.
     pub fn new(root: impl Into<PathBuf>) -> Self {
@@ -193,6 +131,68 @@ impl Context<'_> {
     }
 }
 
+/// What the analyzers computed in one run, by analyzer id and scope key (the
+/// file path, or empty for project scope).
+#[derive(Debug, Clone, Default)]
+pub struct Facts(BTreeMap<String, BTreeMap<String, Value>>);
+
+impl Facts {
+    /// No facts yet.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Keeps `value` as the fact of `analyzer` at `key`.
+    pub fn insert(&mut self, analyzer: &str, key: String, value: Value) {
+        self.0
+            .entry(analyzer.to_owned())
+            .or_default()
+            .insert(key, value);
+    }
+
+    /// The fact of `analyzer` at `key`.
+    pub fn get(&self, analyzer: &str, key: &str) -> Option<&Value> {
+        self.0.get(analyzer)?.get(key)
+    }
+
+    /// Every fact as `(analyzer, key, value)`, sorted.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str, &Value)> {
+        self.0.iter().flat_map(|(analyzer, keys)| {
+            keys.iter()
+                .map(move |(key, value)| (analyzer.as_str(), key.as_str(), value))
+        })
+    }
+}
+
+/// Where the checked project lives and how each language is configured.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Workspace {
+    pub root: PathBuf,
+    /// Per-language options from the configuration, keyed by language id.
+    pub languages: BTreeMap<String, Options>,
+    /// File globs that require serialized ASTs from their owning provider.
+    pub source_globs: Vec<String>,
+    /// The name prefixes that make a function a constructor, by language id:
+    /// what the provider declares, or the project's `constructorPrefixes`.
+    pub constructors: BTreeMap<String, Vec<String>>,
+    /// How tests are named after the symbols they own, by language id: what
+    /// the provider declares, with the project's `testNaming` over it.
+    pub test_naming: BTreeMap<String, TestNaming>,
+    /// Text that stands in for the file of the same project-relative path:
+    /// what a provider must read instead of the disk. Empty for a normal run;
+    /// a fix run checks candidate edits this way before anything is written.
+    pub overlays: BTreeMap<PathBuf, String>,
+    /// CEL libraries registered by the host, as manifests for language providers.
+    pub cel_libraries: Vec<CelLibraryManifest>,
+    /// The directory the host keeps derived data in between runs
+    /// (`.lighthouse/cache`), exactly when its result cache is on; a provider
+    /// may keep its own under a directory named by its plugin. `None` when the
+    /// run must not use a cache.
+    pub cache_dir: Option<PathBuf>,
+    /// How the programs the project names run: the project's `[sandbox]`.
+    pub sandbox: Policy,
+}
+
 /// What a language provider declares about itself: which files are its own and
 /// what it guarantees about them. The `initialize` result of a plugin process
 /// carries one per language, field for field.
@@ -212,16 +212,6 @@ pub struct LanguageManifest {
     pub fallback: bool,
     /// Among regular providers the higher priority claims a file first.
     pub priority: i32,
-}
-
-/// A file handed to a provider with its text as read by the engine.
-#[derive(Debug, Clone, Copy)]
-pub struct Source<'a> {
-    pub file: &'a File,
-    pub text: &'a str,
-    /// Empty for a physical file; populated when the same index interface
-    /// analyzes source regions selected from another provider's syntax tree.
-    pub regions: &'a [EmbeddedSource],
 }
 
 impl LanguageManifest {
@@ -258,6 +248,16 @@ pub struct Indexed {
     pub notices: Vec<String>,
     /// Files or scopes that could not be analyzed.
     pub incomplete: Vec<Incomplete>,
+}
+
+/// A file handed to a provider with its text as read by the engine.
+#[derive(Debug, Clone, Copy)]
+pub struct Source<'a> {
+    pub file: &'a File,
+    pub text: &'a str,
+    /// Empty for a physical file; populated when the same index interface
+    /// analyzes source regions selected from another provider's syntax tree.
+    pub regions: &'a [EmbeddedSource],
 }
 
 /// Turns the files of one language into UCM fragments. Implementations must

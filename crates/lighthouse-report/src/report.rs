@@ -118,17 +118,16 @@ pub enum Report {
     Full(Full),
 }
 
-/// How a compact report stands.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Status {
-    Clean,
-    /// Some finding is a decision's verdict.
-    Findings,
-    /// Every finding is a subject nothing decided, left to review.
-    Review,
-    /// Part of the project was not checked.
-    Incomplete,
+/// The report with the findings grouped by decision.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct Compact {
+    pub status: Status,
+    pub counts: Counts,
+    #[serde(flatten)]
+    pub groups: Groups,
+    /// What was not checked: `[path, reason]` pairs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub incomplete: Vec<(Option<PathBuf>, String)>,
 }
 
 /// The counts of a compact report: findings by severity (a subject left to
@@ -149,16 +148,17 @@ pub struct Counts {
     pub allowed: Option<usize>,
 }
 
-/// The report with the findings grouped by decision.
-#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
-pub struct Compact {
-    pub status: Status,
-    pub counts: Counts,
-    #[serde(flatten)]
-    pub groups: Groups,
-    /// What was not checked: `[path, reason]` pairs.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub incomplete: Vec<(Option<PathBuf>, String)>,
+/// How a compact report stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    Clean,
+    /// Some finding is a decision's verdict.
+    Findings,
+    /// Every finding is a subject nothing decided, left to review.
+    Review,
+    /// Part of the project was not checked.
+    Incomplete,
 }
 
 /// The report with one record per finding.
@@ -181,21 +181,6 @@ pub struct Gap {
     pub kind: &'static str,
     pub path: Option<PathBuf>,
     pub reason: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Location {
-    path: String,
-    line: u32,
-    column: u32,
-    end_line: u32,
-}
-
-/// How a judgment is recorded on a finding.
-#[derive(Serialize)]
-struct Resolve {
-    command: String,
 }
 
 #[derive(Serialize)]
@@ -226,6 +211,21 @@ struct Finding<'a> {
     fingerprint: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     resolve: Option<Resolve>,
+}
+
+/// How a judgment is recorded on a finding.
+#[derive(Serialize)]
+struct Resolve {
+    command: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Location {
+    path: String,
+    line: u32,
+    column: u32,
+    end_line: u32,
 }
 
 /// The agent text: grouped by decision unless `briefing.detail` is full.

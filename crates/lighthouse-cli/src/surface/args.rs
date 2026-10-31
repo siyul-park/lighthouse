@@ -17,85 +17,12 @@ use serde_json::Value;
 
 use crate::surface::{Context, Result};
 
-/// How much each item of a report carries.
-#[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum Detail {
-    /// Grouped by decision, a decision's text said once.
-    #[default]
-    Compact,
-    /// One self-contained record per item.
-    Full,
-}
-
-impl From<Detail> for lighthouse_report::Detail {
-    fn from(detail: Detail) -> Self {
-        match detail {
-            Detail::Compact => Self::Compact,
-            Detail::Full => Self::Full,
-        }
-    }
-}
-
-/// A judgment, spelled as SARIF and the rule pipeline spell it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema)]
-pub enum JudgmentArg {
-    /// The code conforms: the finding is a false positive.
-    #[serde(rename = "pass")]
-    #[value(name = "pass")]
-    Pass,
-    /// The finding is right.
-    #[serde(rename = "fail")]
-    #[value(name = "fail")]
-    Fail,
-    /// The decision does not apply here; a hint to narrow it.
-    #[serde(rename = "notApplicable")]
-    #[value(name = "notApplicable")]
-    NotApplicable,
-}
-
 impl From<JudgmentArg> for Judgment {
     fn from(judgment: JudgmentArg) -> Self {
         match judgment {
             JudgmentArg::Pass => Self::Pass,
             JudgmentArg::Fail => Self::Fail,
             JudgmentArg::NotApplicable => Self::NotApplicable,
-        }
-    }
-}
-
-/// Which remembered findings a listing includes.
-#[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum StatusFilter {
-    /// Still reported and not suppressed.
-    #[default]
-    Open,
-    /// Kept out of reports by a judgment.
-    Suppressed,
-    /// Judged `notApplicable`, so the decision is too broad.
-    Narrowing,
-    /// Of a rule the configuration no longer enables.
-    Inactive,
-    /// No longer reported by a complete run.
-    Resolved,
-    /// Every remembered finding.
-    All,
-}
-
-impl From<StatusFilter> for lighthouse_session::review::StatusFilter {
-    fn from(status: StatusFilter) -> Self {
-        match status {
-            StatusFilter::Open => Self::Open,
-            StatusFilter::Suppressed => Self::Suppressed,
-            StatusFilter::Narrowing => Self::Narrowing,
-            StatusFilter::Inactive => Self::Inactive,
-            StatusFilter::Resolved => Self::Resolved,
-            StatusFilter::All => Self::All,
         }
     }
 }
@@ -161,6 +88,47 @@ pub struct CheckArgs {
     pub allow_incomplete: bool,
 }
 
+/// How much each item of a report carries.
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum Detail {
+    /// Grouped by decision, a decision's text said once.
+    #[default]
+    Compact,
+    /// One self-contained record per item.
+    Full,
+}
+
+impl From<Detail> for lighthouse_report::Detail {
+    fn from(detail: Detail) -> Self {
+        match detail {
+            Detail::Compact => Self::Compact,
+            Detail::Full => Self::Full,
+        }
+    }
+}
+
+/// `fix`, the tool of `check --fix`: which findings, and how to fix them.
+/// Name at least one of `paths`, `decision` and `fingerprints`: a fix through
+/// MCP never defaults to the whole project.
+#[derive(Debug, Default, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FixArgs {
+    /// Fix findings under these paths.
+    pub paths: Vec<PathBuf>,
+    /// Fix the findings of these decisions: ids or globs.
+    pub decision: Vec<String>,
+    /// Fix these findings: fingerprints or unique prefixes of at least 7
+    /// characters.
+    pub fingerprints: Vec<String>,
+    /// Ask no model: what they would fix is left to review.
+    pub no_models: bool,
+    #[serde(flatten)]
+    pub options: FixOptions,
+}
+
 /// How `check --fix` fixes (the `fix` tool takes the same).
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", default)]
@@ -203,25 +171,6 @@ impl FixOptions {
             self.unsafe_fixes
         }
     }
-}
-
-/// `fix`, the tool of `check --fix`: which findings, and how to fix them.
-/// Name at least one of `paths`, `decision` and `fingerprints`: a fix through
-/// MCP never defaults to the whole project.
-#[derive(Debug, Default, Clone, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", default)]
-pub struct FixArgs {
-    /// Fix findings under these paths.
-    pub paths: Vec<PathBuf>,
-    /// Fix the findings of these decisions: ids or globs.
-    pub decision: Vec<String>,
-    /// Fix these findings: fingerprints or unique prefixes of at least 7
-    /// characters.
-    pub fingerprints: Vec<String>,
-    /// Ask no model: what they would fix is left to review.
-    pub no_models: bool,
-    #[serde(flatten)]
-    pub options: FixOptions,
 }
 
 /// `decision list`.
@@ -300,6 +249,41 @@ pub struct DecisionTestArgs {
     pub language: Option<String>,
 }
 
+/// Who a record is attributed to, for the commands that write one.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Attributed {
+    /// Who this is attributed to: `person` or `agent`, with an id after a
+    /// colon (`agent:claude`). Default: the person from `git config
+    /// user.name` on the command line, the client's name through MCP.
+    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
+    pub attributed_to: Option<String>,
+}
+
+/// `decision eval`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionEvalArgs {
+    /// The decision, such as `design/prefer-method`.
+    #[arg(value_name = "ID")]
+    pub id: String,
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub labels: LabelSource,
+    /// A decision file whose check is evaluated beside the current one.
+    #[arg(long, value_name = "FILE", conflicts_with = "model")]
+    pub check: Option<PathBuf>,
+    /// A model to grade as the first layer of the decision, beside the
+    /// current check: `<provider>/<model>@sha256:<hex>`. One fitted on labels
+    /// is graded on those by refits that leave each fold out.
+    #[arg(long, value_name = "REF")]
+    pub model: Option<String>,
+    /// Write this many selected subjects the check did not flag to a table
+    /// for a person to label (`TP` or `FP`), to measure recall.
+    #[arg(long, value_name = "N")]
+    pub audit: Option<usize>,
+}
+
 /// Where the labels of a decision come from: the table of reviewed findings
 /// and the repositories it is about. Flags and tool arguments of every command
 /// that learns from labels.
@@ -347,41 +331,6 @@ impl LabelSource {
     }
 }
 
-/// Who a record is attributed to, for the commands that write one.
-#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", default)]
-pub struct Attributed {
-    /// Who this is attributed to: `person` or `agent`, with an id after a
-    /// colon (`agent:claude`). Default: the person from `git config
-    /// user.name` on the command line, the client's name through MCP.
-    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
-    pub attributed_to: Option<String>,
-}
-
-/// `decision eval`.
-#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct DecisionEvalArgs {
-    /// The decision, such as `design/prefer-method`.
-    #[arg(value_name = "ID")]
-    pub id: String,
-    #[command(flatten)]
-    #[serde(flatten)]
-    pub labels: LabelSource,
-    /// A decision file whose check is evaluated beside the current one.
-    #[arg(long, value_name = "FILE", conflicts_with = "model")]
-    pub check: Option<PathBuf>,
-    /// A model to grade as the first layer of the decision, beside the
-    /// current check: `<provider>/<model>@sha256:<hex>`. One fitted on labels
-    /// is graded on those by refits that leave each fold out.
-    #[arg(long, value_name = "REF")]
-    pub model: Option<String>,
-    /// Write this many selected subjects the check did not flag to a table
-    /// for a person to label (`TP` or `FP`), to measure recall.
-    #[arg(long, value_name = "N")]
-    pub audit: Option<usize>,
-}
-
 /// `review list`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", default)]
@@ -406,13 +355,38 @@ pub struct ReviewListArgs {
     pub detail: Detail,
 }
 
-/// `review show` and `review history`.
-#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FingerprintArgs {
-    /// A fingerprint, or the start of one (at least 7 characters).
-    #[arg(value_name = "FP")]
-    pub fingerprint: String,
+/// Which remembered findings a listing includes.
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum StatusFilter {
+    /// Still reported and not suppressed.
+    #[default]
+    Open,
+    /// Kept out of reports by a judgment.
+    Suppressed,
+    /// Judged `notApplicable`, so the decision is too broad.
+    Narrowing,
+    /// Of a rule the configuration no longer enables.
+    Inactive,
+    /// No longer reported by a complete run.
+    Resolved,
+    /// Every remembered finding.
+    All,
+}
+
+impl From<StatusFilter> for lighthouse_session::review::StatusFilter {
+    fn from(status: StatusFilter) -> Self {
+        match status {
+            StatusFilter::Open => Self::Open,
+            StatusFilter::Suppressed => Self::Suppressed,
+            StatusFilter::Narrowing => Self::Narrowing,
+            StatusFilter::Inactive => Self::Inactive,
+            StatusFilter::Resolved => Self::Resolved,
+            StatusFilter::All => Self::All,
+        }
+    }
 }
 
 /// `review resolve`.
@@ -458,6 +432,32 @@ impl ReviewResolveArgs {
             lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
         })
     }
+}
+
+/// `review show` and `review history`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FingerprintArgs {
+    /// A fingerprint, or the start of one (at least 7 characters).
+    #[arg(value_name = "FP")]
+    pub fingerprint: String,
+}
+
+/// A judgment, spelled as SARIF and the rule pipeline spell it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema)]
+pub enum JudgmentArg {
+    /// The code conforms: the finding is a false positive.
+    #[serde(rename = "pass")]
+    #[value(name = "pass")]
+    Pass,
+    /// The finding is right.
+    #[serde(rename = "fail")]
+    #[value(name = "fail")]
+    Fail,
+    /// The decision does not apply here; a hint to narrow it.
+    #[serde(rename = "notApplicable")]
+    #[value(name = "notApplicable")]
+    NotApplicable,
 }
 
 /// `model list`.

@@ -9,30 +9,6 @@ use lighthouse_protocol::{FileInfo, Fragment, Node, Position, Span};
 use super::text::Text;
 use crate::project::SourceFile;
 
-/// The lines of a host file, to turn the byte offsets of a mapping into
-/// positions.
-pub(super) struct Lines {
-    starts: Vec<usize>,
-}
-
-impl Lines {
-    pub(super) fn of(text: &str) -> Self {
-        let starts = std::iter::once(0)
-            .chain(text.match_indices('\n').map(|(at, _)| at + 1))
-            .collect();
-        Self { starts }
-    }
-
-    pub(super) fn position(&self, offset: usize) -> Position {
-        let line = self.starts.partition_point(|start| *start <= offset);
-        let start = self.starts.get(line.wrapping_sub(1)).copied().unwrap_or(0);
-        Position {
-            line: u32::try_from(line).unwrap_or(u32::MAX),
-            col: u32::try_from(offset - start + 1).unwrap_or(u32::MAX),
-        }
-    }
-}
-
 /// Where the spans of one fence's file lie in its host file.
 pub(super) struct Remap<'a> {
     pub(super) text: &'a Text,
@@ -138,5 +114,29 @@ impl Remap<'_> {
             facts: Default::default(),
         };
         fragment
+    }
+}
+
+/// The lines of a host file, to turn the byte offsets of a mapping into
+/// positions.
+pub(super) struct Lines {
+    starts: Vec<usize>,
+}
+
+impl Lines {
+    pub(super) fn of(text: &str) -> Self {
+        let starts = std::iter::once(0)
+            .chain(text.match_indices('\n').map(|(at, _)| at + 1))
+            .collect();
+        Self { starts }
+    }
+
+    pub(super) fn position(&self, offset: usize) -> Position {
+        let line = self.starts.partition_point(|start| *start <= offset);
+        let start = self.starts.get(line.wrapping_sub(1)).copied().unwrap_or(0);
+        Position {
+            line: u32::try_from(line).unwrap_or(u32::MAX),
+            col: u32::try_from(offset - start + 1).unwrap_or(u32::MAX),
+        }
     }
 }

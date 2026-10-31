@@ -55,6 +55,45 @@ impl fmt::Display for OptionType {
     }
 }
 
+/// A JSON Schema object that declares the options of a decision. Keys not
+/// declared are refused: `additionalProperties` is `false`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OptionsSchema {
+    #[serde(default)]
+    pub properties: BTreeMap<String, OptionSchema>,
+    #[serde(default)]
+    pub additional_properties: bool,
+    /// The decision whose options this one reads: the options it does not
+    /// declare are those of that decision, as the project configured them. A
+    /// project sets them there, once, and both decisions judge by them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// The options read from `from`, once the decision is built over it.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub inherited: Vec<String>,
+    /// The values the languages of that decision give those options, by
+    /// language: its own `languages` entries stay as authored, since they say
+    /// where it applies.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub inherited_languages: BTreeMap<String, Map<String, Value>>,
+}
+
+impl OptionsSchema {
+    /// A schema over `properties` that refuses any other key.
+    pub fn new(properties: BTreeMap<String, OptionSchema>) -> Self {
+        Self {
+            properties,
+            additional_properties: false,
+            from: None,
+            inherited: Vec::new(),
+            inherited_languages: BTreeMap::new(),
+        }
+    }
+}
+
 /// One tunable value: its shape, default and description. The shape's keys
 /// sit beside `default` and `description`; a key that is none of them is
 /// refused.
@@ -111,44 +150,5 @@ impl Deref for OptionSchema {
 
     fn deref(&self) -> &Shape {
         &self.shape
-    }
-}
-
-/// A JSON Schema object that declares the options of a decision. Keys not
-/// declared are refused: `additionalProperties` is `false`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct OptionsSchema {
-    #[serde(default)]
-    pub properties: BTreeMap<String, OptionSchema>,
-    #[serde(default)]
-    pub additional_properties: bool,
-    /// The decision whose options this one reads: the options it does not
-    /// declare are those of that decision, as the project configured them. A
-    /// project sets them there, once, and both decisions judge by them.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub from: Option<String>,
-    /// The options read from `from`, once the decision is built over it.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub inherited: Vec<String>,
-    /// The values the languages of that decision give those options, by
-    /// language: its own `languages` entries stay as authored, since they say
-    /// where it applies.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub inherited_languages: BTreeMap<String, Map<String, Value>>,
-}
-
-impl OptionsSchema {
-    /// A schema over `properties` that refuses any other key.
-    pub fn new(properties: BTreeMap<String, OptionSchema>) -> Self {
-        Self {
-            properties,
-            additional_properties: false,
-            from: None,
-            inherited: Vec::new(),
-            inherited_languages: BTreeMap::new(),
-        }
     }
 }

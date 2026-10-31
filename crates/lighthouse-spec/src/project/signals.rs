@@ -11,18 +11,6 @@ use serde::{Deserialize, Serialize};
 /// retention of ECC's observations.
 const DEFAULT_RETENTION: time::Duration = time::Duration::from_secs(30 * 24 * 60 * 60);
 
-/// Whether the agent hears about the signals.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Surface {
-    /// Signals are recorded and counted; the agent is told nothing.
-    #[default]
-    Shadow,
-    /// The hooks tell the agent about design decisions, open signals and the
-    /// decisions of the project.
-    On,
-}
-
 /// The `signals` table of a project.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -52,4 +40,16 @@ impl SignalsSpec {
     pub fn surface(&self) -> Surface {
         self.surface.unwrap_or_default()
     }
+}
+
+/// Whether the agent hears about the signals.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Surface {
+    /// Signals are recorded and counted; the agent is told nothing.
+    #[default]
+    Shadow,
+    /// The hooks tell the agent about design decisions, open signals and the
+    /// decisions of the project.
+    On,
 }

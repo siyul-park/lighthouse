@@ -25,19 +25,19 @@ use crate::{Result, SKIPPED_DIRS, Session, decisions::test_catalog};
 /// The decision that asks decisions to be named well.
 const DECISION_NAMING: &str = "core/decision-naming";
 
-/// One thing wrong with one file.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Problem {
-    pub path: String,
-    pub message: String,
-}
-
 /// What a validation read and found.
 #[derive(Debug, Default)]
 pub struct Validated {
     pub files: usize,
     pub documents: usize,
     pub problems: Vec<Problem>,
+}
+
+/// One thing wrong with one file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Problem {
+    pub path: String,
+    pub message: String,
 }
 
 /// The languages the project's plugins provide, or why that is not known.

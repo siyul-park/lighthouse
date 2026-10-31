@@ -93,18 +93,6 @@ impl<'a> Sources<'a> {
     }
 }
 
-/// The texts of the files an operation touches: the overlay of the round, else
-/// the disk. Every file is checked first: relative and normalized, a
-/// non-generated file of the project, and reached through no symlink.
-pub(crate) struct Sources<'a> {
-    root: PathBuf,
-    project: &'a Project,
-    overlays: &'a Overlays,
-    texts: RefCell<BTreeMap<PathBuf, Rc<String>>>,
-    containers: RefCell<BTreeMap<PathBuf, Rc<Containers>>>,
-    starts: RefCell<BTreeMap<PathBuf, Rc<Vec<usize>>>>,
-}
-
 /// A declaration located in its file: the symbol, the whole lines its extent
 /// fills, the bracket it sits in and, for one of a parenthesized group, where
 /// that closes.
@@ -459,6 +447,18 @@ pub(crate) struct Lowerer<'a> {
     sources: &'a Sources<'a>,
     /// Whether the provider of a language declares `complete-references`.
     complete: &'a dyn Fn(&str) -> bool,
+}
+
+/// The texts of the files an operation touches: the overlay of the round, else
+/// the disk. Every file is checked first: relative and normalized, a
+/// non-generated file of the project, and reached through no symlink.
+pub(crate) struct Sources<'a> {
+    root: PathBuf,
+    project: &'a Project,
+    overlays: &'a Overlays,
+    texts: RefCell<BTreeMap<PathBuf, Rc<String>>>,
+    containers: RefCell<BTreeMap<PathBuf, Rc<Containers>>>,
+    starts: RefCell<BTreeMap<PathBuf, Rc<Vec<usize>>>>,
 }
 
 /// What the specs of a `const` group after one that is removed need of it.

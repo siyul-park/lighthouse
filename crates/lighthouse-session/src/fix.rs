@@ -27,16 +27,6 @@ use crate::{
     selector::long_enough,
 };
 
-/// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
-/// narrows a run from the whole project.
-#[derive(Default)]
-pub struct Targets {
-    pub paths: Vec<PathBuf>,
-    /// Fingerprints or unambiguous prefixes.
-    pub fingerprints: Vec<String>,
-    pub rules: Vec<String>,
-}
-
 /// What to fix, and how.
 #[derive(Default)]
 pub struct Selection {
@@ -57,6 +47,16 @@ pub struct Selection {
     pub models: ModelOptions,
     /// Keep the answers of models in `.lighthouse/cache` and reuse them.
     pub cache: bool,
+}
+
+/// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
+/// narrows a run from the whole project.
+#[derive(Default)]
+pub struct Targets {
+    pub paths: Vec<PathBuf>,
+    /// Fingerprints or unambiguous prefixes.
+    pub fingerprints: Vec<String>,
+    pub rules: Vec<String>,
 }
 
 /// A finished fix run: the `FixReport` kind.

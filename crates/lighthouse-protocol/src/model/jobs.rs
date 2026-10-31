@@ -9,14 +9,6 @@ use serde_json::Value;
 
 use crate::{NOUL, Question, State};
 
-/// One message of a supervised fine-tuning line, in OpenAI's chat format.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ChatMessage {
-    /// `system`, `user` or `assistant`.
-    pub role: String,
-    pub content: String,
-}
-
 /// One line of a training file, in OpenAI's supervised fine-tuning format with
 /// the keys Lighthouse adds (mlops §2b). The `system` message is the
 /// TypeSafe question as a JSON string, the `user` message the `state`, and
@@ -70,6 +62,14 @@ impl TrainingLine {
     }
 }
 
+/// One message of a supervised fine-tuning line, in OpenAI's chat format.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ChatMessage {
+    /// `system`, `user` or `assistant`.
+    pub role: String,
+    pub content: String,
+}
+
 /// What Lighthouse adds to a training line besides the chat messages.
 pub struct LineKeys<'a> {
     pub weight: f64,
@@ -77,29 +77,6 @@ pub struct LineKeys<'a> {
     pub decision: &'a str,
     pub key: &'a str,
     pub attribution: Value,
-}
-
-/// Provider-specific supervised fine-tuning parameters.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(transparent)]
-pub struct FineTuneSupervisedHyperparameters {
-    pub extra: serde_json::Map<String, Value>,
-}
-
-/// OpenAI's supervised fine-tuning method, with optional OpenAI parameters.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct FineTuneSupervisedMethod {
-    #[serde(default)]
-    pub hyperparameters: FineTuneSupervisedHyperparameters,
-}
-
-/// The method of a fine-tuning job.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct FineTuneMethod {
-    /// `supervised`.
-    #[serde(rename = "type")]
-    pub kind: String,
-    pub supervised: FineTuneSupervisedMethod,
 }
 
 /// The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),
@@ -126,25 +103,27 @@ pub struct CreateFineTuningJobRequest {
     pub options: serde_json::Map<String, Value>,
 }
 
-/// How far a fine-tuning job is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum FineTuningJobStatus {
-    ValidatingFiles,
-    Queued,
-    Running,
-    Succeeded,
-    Failed,
-    Cancelled,
+/// The method of a fine-tuning job.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FineTuneMethod {
+    /// `supervised`.
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub supervised: FineTuneSupervisedMethod,
 }
 
-/// Why a job failed, in OpenAI's words.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct FineTuneJobError {
-    pub code: String,
-    pub message: String,
+/// OpenAI's supervised fine-tuning method, with optional OpenAI parameters.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FineTuneSupervisedMethod {
     #[serde(default)]
-    pub param: Option<String>,
+    pub hyperparameters: FineTuneSupervisedHyperparameters,
+}
+
+/// Provider-specific supervised fine-tuning parameters.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
+pub struct FineTuneSupervisedHyperparameters {
+    pub extra: serde_json::Map<String, Value>,
 }
 
 /// OpenAI's `FineTuningJob`. Over stdio `lighthouse/train` answers with the
@@ -185,10 +164,88 @@ pub struct FineTuningJob {
     pub error: Option<FineTuneJobError>,
 }
 
-/// What a model can do, as OpenAI's model object lists it.
+/// Why a job failed, in OpenAI's words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FineTuneJobError {
+    pub code: String,
+    pub message: String,
+    #[serde(default)]
+    pub param: Option<String>,
+}
+
+/// How far a fine-tuning job is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Supports {
-    pub supported: bool,
+#[serde(rename_all = "snake_case")]
+pub enum FineTuningJobStatus {
+    ValidatingFiles,
+    Queued,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+}
+
+/// OpenAI's list object of models: how a plugin says which it offers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ListModelResponse {
+    /// `list`.
+    pub object: String,
+    pub data: Vec<Model>,
+}
+
+impl ListModelResponse {
+    /// The list of `data`.
+    pub fn new(data: Vec<Model>) -> Self {
+        Self {
+            object: "list".to_owned(),
+            data,
+        }
+    }
+
+    /// Whether the list has no model.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+}
+
+impl Default for ListModelResponse {
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
+}
+
+/// One model: OpenAI's model object, with what Lighthouse adds
+/// (`version`, `cost`, `deterministic`, `abstains`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Model {
+    pub id: String,
+    /// `model`.
+    pub object: String,
+    pub created: u32,
+    pub owned_by: String,
+    pub capabilities: Capabilities,
+    pub version: String,
+    pub cost: f64,
+    pub deterministic: bool,
+    pub abstains: bool,
+}
+
+impl Model {
+    /// The model `id` of the plugin that owns it, at `version`: free, not
+    /// deterministic and never abstaining until the caller says otherwise.
+    pub fn new(id: &str, version: &str, capabilities: Capabilities) -> Self {
+        Self {
+            id: id.to_owned(),
+            object: "model".to_owned(),
+            created: 0,
+            owned_by: id.to_owned(),
+            capabilities,
+            version: version.to_owned(),
+            cost: 0.0,
+            deterministic: false,
+            abstains: false,
+        }
+    }
 }
 
 /// The capabilities of a model.
@@ -227,65 +284,8 @@ impl Capabilities {
     }
 }
 
-/// One model: OpenAI's model object, with what Lighthouse adds
-/// (`version`, `cost`, `deterministic`, `abstains`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct Model {
-    pub id: String,
-    /// `model`.
-    pub object: String,
-    pub created: u32,
-    pub owned_by: String,
-    pub capabilities: Capabilities,
-    pub version: String,
-    pub cost: f64,
-    pub deterministic: bool,
-    pub abstains: bool,
-}
-
-impl Model {
-    /// The model `id` of the plugin that owns it, at `version`: free, not
-    /// deterministic and never abstaining until the caller says otherwise.
-    pub fn new(id: &str, version: &str, capabilities: Capabilities) -> Self {
-        Self {
-            id: id.to_owned(),
-            object: "model".to_owned(),
-            created: 0,
-            owned_by: id.to_owned(),
-            capabilities,
-            version: version.to_owned(),
-            cost: 0.0,
-            deterministic: false,
-            abstains: false,
-        }
-    }
-}
-
-/// OpenAI's list object of models: how a plugin says which it offers.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct ListModelResponse {
-    /// `list`.
-    pub object: String,
-    pub data: Vec<Model>,
-}
-
-impl ListModelResponse {
-    /// The list of `data`.
-    pub fn new(data: Vec<Model>) -> Self {
-        Self {
-            object: "list".to_owned(),
-            data,
-        }
-    }
-
-    /// Whether the list has no model.
-    pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
-    }
-}
-
-impl Default for ListModelResponse {
-    fn default() -> Self {
-        Self::new(Vec::new())
-    }
+/// What a model can do, as OpenAI's model object lists it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Supports {
+    pub supported: bool,
 }

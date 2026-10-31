@@ -9,6 +9,16 @@ use lighthouse_plugin::Subject;
 use super::{Layer, Score, Usage};
 use crate::{labels::Sample, metrics::Outcome};
 
+/// A candidate check's run beside the current one.
+pub struct Candidate<'a> {
+    /// The id of the candidate decision.
+    pub id: String,
+    pub found: &'a Found,
+    /// The labels as the candidate shows them: an example carries how the
+    /// candidate checked it.
+    pub labels: &'a [Sample],
+}
+
 /// What one run of a check found, by subject.
 #[derive(Default, Clone)]
 pub struct Found {
@@ -26,16 +36,6 @@ pub struct Found {
     pub(super) subjects: Arc<BTreeMap<String, Subject>>,
     /// The layer of an attached model laid over the run, when one was.
     pub(super) layer: Option<Layer>,
-}
-
-/// A candidate check's run beside the current one.
-pub struct Candidate<'a> {
-    /// The id of the candidate decision.
-    pub id: String,
-    pub found: &'a Found,
-    /// The labels as the candidate shows them: an example carries how the
-    /// candidate checked it.
-    pub labels: &'a [Sample],
 }
 
 impl Found {

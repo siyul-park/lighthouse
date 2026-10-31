@@ -13,7 +13,13 @@ use crate::eval::Fact;
 
 const SHARDS: usize = 32;
 
-type Cell = Arc<OnceLock<Option<Fact>>>;
+/// The base facts of the symbols a run's checks select, by selected kind.
+#[derive(Default)]
+pub(crate) struct Table {
+    pub(crate) symbols: Cache,
+    pub(crate) functions: Cache,
+    pub(crate) tests: Cache,
+}
 
 /// Facts by symbol, sharded so that checks running in parallel rarely wait
 /// for each other; a fact is built by whichever check asks first.
@@ -53,10 +59,4 @@ impl Cache {
     }
 }
 
-/// The base facts of the symbols a run's checks select, by selected kind.
-#[derive(Default)]
-pub(crate) struct Table {
-    pub(crate) symbols: Cache,
-    pub(crate) functions: Cache,
-    pub(crate) tests: Cache,
-}
+type Cell = Arc<OnceLock<Option<Fact>>>;

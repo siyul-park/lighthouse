@@ -9,28 +9,6 @@ use lighthouse_store::Records;
 
 use crate::{Result, Session};
 
-/// A repository the labels are about.
-#[derive(Clone)]
-pub struct Repo {
-    /// The name the rows of the table of reviewed findings use (the `repo`
-    /// column).
-    pub name: Option<String>,
-    pub dir: PathBuf,
-}
-
-impl Repo {
-    /// The repository a `name=dir` names.
-    pub fn parse(spec: &str) -> Result<Self> {
-        let (name, dir) = spec
-            .split_once('=')
-            .ok_or_else(|| format!("`{spec}` is not name=dir"))?;
-        Ok(Self {
-            name: Some(name.to_owned()),
-            dir: PathBuf::from(dir),
-        })
-    }
-}
-
 /// What the labels of a decision are drawn from.
 #[derive(Clone, Default)]
 pub struct Labelling {
@@ -80,6 +58,28 @@ impl Labelling {
         self.table.as_deref().map(|file| Table {
             file,
             repo: repo.name.as_deref(),
+        })
+    }
+}
+
+/// A repository the labels are about.
+#[derive(Clone)]
+pub struct Repo {
+    /// The name the rows of the table of reviewed findings use (the `repo`
+    /// column).
+    pub name: Option<String>,
+    pub dir: PathBuf,
+}
+
+impl Repo {
+    /// The repository a `name=dir` names.
+    pub fn parse(spec: &str) -> Result<Self> {
+        let (name, dir) = spec
+            .split_once('=')
+            .ok_or_else(|| format!("`{spec}` is not name=dir"))?;
+        Ok(Self {
+            name: Some(name.to_owned()),
+            dir: PathBuf::from(dir),
         })
     }
 }

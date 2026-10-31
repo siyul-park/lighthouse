@@ -36,20 +36,6 @@ enum Failure {
     Broken(String),
 }
 
-enum Event {
-    Response(Message),
-    Closed(String),
-}
-
-struct Session {
-    child: Child,
-    /// Frames for the writer thread, so a plugin that stops reading cannot
-    /// block the caller past its deadline.
-    writer: Sender<Vec<u8>>,
-    events: Receiver<Event>,
-    next_id: i64,
-}
-
 #[derive(Default)]
 struct Stderr {
     lines: VecDeque<String>,
@@ -57,9 +43,6 @@ struct Stderr {
     /// The plugin closed its stderr: no line is still to come.
     ended: bool,
 }
-
-/// What a plugin wrote to stderr, and the signal that it wrote all of it.
-type Captured = (Mutex<Stderr>, Condvar);
 
 /// A running plugin process spoken to over stdio. Calls are serialized; once
 /// the process crashes, times out or sends something malformed its whole
@@ -285,6 +268,23 @@ impl Drop for Client {
         }
         lighthouse_process::reap(&mut session.child);
     }
+}
+
+/// What a plugin wrote to stderr, and the signal that it wrote all of it.
+type Captured = (Mutex<Stderr>, Condvar);
+
+struct Session {
+    child: Child,
+    /// Frames for the writer thread, so a plugin that stops reading cannot
+    /// block the caller past its deadline.
+    writer: Sender<Vec<u8>>,
+    events: Receiver<Event>,
+    next_id: i64,
+}
+
+enum Event {
+    Response(Message),
+    Closed(String),
 }
 
 /// Writes frames to the plugin on its own thread, so a plugin that stops

@@ -132,60 +132,6 @@ impl Fix {
     }
 }
 
-/// How far the change of a fix may go, which the verifier checks. Ordered
-/// from the narrowest. One model for every type of fix: a fix by CEL, by a
-/// command and by a model are held to it the same way.
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum FixScope {
-    /// Only inside the symbol of the finding (its extent): the symbol it is
-    /// about, else the innermost one around it, else a short file as a whole.
-    Symbol,
-    /// Only the file of the finding. What a fix by a command has when it
-    /// declares no scope.
-    File,
-    /// The file of the finding and the files it reaches: a file may change
-    /// when it holds a reference site (a call, a use, an import) of a symbol
-    /// changed in a file that may change, transitively. A signature changes
-    /// with its callers, and a caller whose own signature changes, with its
-    /// callers. What a fix by CEL or by a model has when it declares no scope.
-    #[default]
-    References,
-    /// Any file the analysis indexes in the run's scope, for a change that
-    /// is not about references, such as the consistency of a doc and a spec.
-    Files,
-}
-
-impl FixScope {
-    /// The scope of the fix of a decision whose `fix` is `fix`: the narrower
-    /// of the `cap` of the project and what the decision declares, which for
-    /// a command is its `scope`, else `file`, and for CEL and a model its
-    /// `scope`, else `references`. Nobody widens. The project's cap is for
-    /// fixes by a model: callers ask for the others with the widest cap.
-    pub fn of_fix(fix: Option<&Fix>, cap: Self) -> Self {
-        match fix.map(|f| &f.kind) {
-            Some(FixKind::Model { scope, .. } | FixKind::Cel { scope, .. }) => {
-                scope.unwrap_or(Self::References).min(cap)
-            }
-            Some(FixKind::Command(command)) => command.scope.unwrap_or(Self::File).min(cap),
-            _ => cap,
-        }
-    }
-}
-
-impl std::fmt::Display for FixScope {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Symbol => "symbol",
-            Self::File => "file",
-            Self::References => "references",
-            Self::Files => "files",
-        })
-    }
-}
-
 /// The type of a fix; a `fix:` block holds exactly one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
@@ -264,6 +210,60 @@ impl CommandSpec {
                     "`output: stdout` is the new text of one file: its `scope` is `file`".to_owned()
                 })
             })
+    }
+}
+
+/// How far the change of a fix may go, which the verifier checks. Ordered
+/// from the narrowest. One model for every type of fix: a fix by CEL, by a
+/// command and by a model are held to it the same way.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum FixScope {
+    /// Only inside the symbol of the finding (its extent): the symbol it is
+    /// about, else the innermost one around it, else a short file as a whole.
+    Symbol,
+    /// Only the file of the finding. What a fix by a command has when it
+    /// declares no scope.
+    File,
+    /// The file of the finding and the files it reaches: a file may change
+    /// when it holds a reference site (a call, a use, an import) of a symbol
+    /// changed in a file that may change, transitively. A signature changes
+    /// with its callers, and a caller whose own signature changes, with its
+    /// callers. What a fix by CEL or by a model has when it declares no scope.
+    #[default]
+    References,
+    /// Any file the analysis indexes in the run's scope, for a change that
+    /// is not about references, such as the consistency of a doc and a spec.
+    Files,
+}
+
+impl FixScope {
+    /// The scope of the fix of a decision whose `fix` is `fix`: the narrower
+    /// of the `cap` of the project and what the decision declares, which for
+    /// a command is its `scope`, else `file`, and for CEL and a model its
+    /// `scope`, else `references`. Nobody widens. The project's cap is for
+    /// fixes by a model: callers ask for the others with the widest cap.
+    pub fn of_fix(fix: Option<&Fix>, cap: Self) -> Self {
+        match fix.map(|f| &f.kind) {
+            Some(FixKind::Model { scope, .. } | FixKind::Cel { scope, .. }) => {
+                scope.unwrap_or(Self::References).min(cap)
+            }
+            Some(FixKind::Command(command)) => command.scope.unwrap_or(Self::File).min(cap),
+            _ => cap,
+        }
+    }
+}
+
+impl std::fmt::Display for FixScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Symbol => "symbol",
+            Self::File => "file",
+            Self::References => "references",
+            Self::Files => "files",
+        })
     }
 }
 

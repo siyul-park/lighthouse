@@ -15,16 +15,6 @@ use serde::Serialize;
 /// What stands in `reads` for every file outside the project the agent opened.
 const OUTSIDE: &str = "(outside the project)";
 
-/// The calls of each tool.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ToolCounts {
-    pub read: usize,
-    pub search: usize,
-    pub list: usize,
-    pub edit: usize,
-    pub run: usize,
-}
-
 /// What the agent did for the findings of one file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchTrace {
@@ -90,6 +80,16 @@ impl BatchTrace {
             incomplete,
         }
     }
+}
+
+/// The calls of each tool.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ToolCounts {
+    pub read: usize,
+    pub search: usize,
+    pub list: usize,
+    pub edit: usize,
+    pub run: usize,
 }
 
 #[cfg(test)]

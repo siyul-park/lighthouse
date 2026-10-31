@@ -10,49 +10,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-/// What decides the findings of a decision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum CheckBy {
-    Cel,
-    Command,
-    Model,
-}
-
-/// What makes the fix of a decision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum FixBy {
-    Cel,
-    Command,
-    Model,
-    Rpc,
-}
-
-/// How the check of a decision runs here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct CheckInfo {
-    pub by: CheckBy,
-    /// False when the check cannot run in this project, such as a command in
-    /// a project nobody trusted.
-    pub runs: bool,
-}
-
-/// A tool call: the twin of a command line.
-#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
-pub struct ToolCall {
-    pub name: &'static str,
-    pub arguments: Value,
-}
-
-/// How a fix is applied, said both ways: the command line and the tool call.
-#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
-pub struct Apply {
-    /// The command line.
-    pub apply: String,
-    pub tool: ToolCall,
-}
-
 /// What an application of a fix is aimed at.
 #[derive(Debug, Clone, Copy)]
 pub enum Aim<'a> {
@@ -99,24 +56,6 @@ impl Apply {
     }
 }
 
-/// How the fix of a decision runs here.
-#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
-pub struct FixInfo {
-    pub by: FixBy,
-    /// The effective safety of the fix at best: a provider can only lower it.
-    pub safety: Safety,
-    /// False when the fix cannot run, and `why` says why.
-    pub runs: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub why: Option<Unavailable>,
-    /// Whether an `unsafe` fix run without `--unsafe-fixes` is written
-    /// (`[fix] unsafe`) or previewed. Absent for a `safe` fix.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub written: Option<bool>,
-    #[serde(flatten)]
-    pub apply: Apply,
-}
-
 /// The check and the fix of a decision, and whether a finding of it has a
 /// brief to fix it by hand.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
@@ -161,6 +100,67 @@ impl Descriptor {
             fix.by.as_str()
         )
     }
+}
+
+/// How the fix of a decision runs here.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct FixInfo {
+    pub by: FixBy,
+    /// The effective safety of the fix at best: a provider can only lower it.
+    pub safety: Safety,
+    /// False when the fix cannot run, and `why` says why.
+    pub runs: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub why: Option<Unavailable>,
+    /// Whether an `unsafe` fix run without `--unsafe-fixes` is written
+    /// (`[fix] unsafe`) or previewed. Absent for a `safe` fix.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub written: Option<bool>,
+    #[serde(flatten)]
+    pub apply: Apply,
+}
+
+/// What makes the fix of a decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum FixBy {
+    Cel,
+    Command,
+    Model,
+    Rpc,
+}
+
+/// How a fix is applied, said both ways: the command line and the tool call.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct Apply {
+    /// The command line.
+    pub apply: String,
+    pub tool: ToolCall,
+}
+
+/// A tool call: the twin of a command line.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ToolCall {
+    pub name: &'static str,
+    pub arguments: Value,
+}
+
+/// How the check of a decision runs here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct CheckInfo {
+    pub by: CheckBy,
+    /// False when the check cannot run in this project, such as a command in
+    /// a project nobody trusted.
+    pub runs: bool,
+}
+
+/// What decides the findings of a decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum CheckBy {
+    Cel,
+    Command,
+    Model,
 }
 
 impl CheckBy {

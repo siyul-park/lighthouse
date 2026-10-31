@@ -22,6 +22,14 @@ pub const USAGE: u8 = 2;
 /// The exit code of a run whose analysis was incomplete.
 pub const INCOMPLETE: u8 = 3;
 
+/// `--format` of the commands that print data.
+#[derive(Debug, Default, Clone, Copy, Args)]
+pub struct FormatArg {
+    /// `text` for people, `json` for programs (its schema: `lighthouse schema`).
+    #[arg(long, value_enum, default_value_t)]
+    pub format: Format,
+}
+
 /// How a command encodes the data it prints.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Format {
@@ -30,14 +38,6 @@ pub enum Format {
     Text,
     /// One JSON document on one line.
     Json,
-}
-
-/// `--format` of the commands that print data.
-#[derive(Debug, Default, Clone, Copy, Args)]
-pub struct FormatArg {
-    /// `text` for people, `json` for programs (its schema: `lighthouse schema`).
-    #[arg(long, value_enum, default_value_t)]
-    pub format: Format,
 }
 
 /// `--format` of `check`.
@@ -51,14 +51,6 @@ pub enum CheckFormat {
     /// SARIF 2.1.0. With `--fix`, the fixes the run left as previews, and in
     /// a dry run every fix it would make, are the `fixes` of their findings.
     Sarif,
-}
-
-/// Who is calling: a person at a terminal, or an agent through MCP.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Caller {
-    Person,
-    /// A coding agent, named by its client.
-    Agent(String),
 }
 
 /// What an operation needs to know besides its arguments.
@@ -141,12 +133,12 @@ impl Context {
     }
 }
 
-/// What an operation prints: text, or JSON that the terminal writes on one
-/// line and MCP hands over as it is.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Body {
-    Text(String),
-    Json(Value),
+/// Who is calling: a person at a terminal, or an agent through MCP.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Caller {
+    Person,
+    /// A coding agent, named by its client.
+    Agent(String),
 }
 
 /// The result of an operation. A frontend prints the `body` to stdout and
@@ -209,4 +201,12 @@ impl Reply {
             .collect();
         Self { notes, ..self }
     }
+}
+
+/// What an operation prints: text, or JSON that the terminal writes on one
+/// line and MCP hands over as it is.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Body {
+    Text(String),
+    Json(Value),
 }

@@ -44,22 +44,6 @@ pub enum HostError {
     Tree(String),
 }
 
-/// The language of a host provider, and the plugin that serves it.
-#[derive(Debug, Clone, Copy)]
-pub struct HostLanguage {
-    /// The plugin id, which is the directory the plugin is installed in.
-    pub name: &'static str,
-    pub version: &'static str,
-    /// The language id.
-    pub id: &'static str,
-    /// The name of the language in messages.
-    pub title: &'static str,
-    /// The names the language goes by in a document, see
-    /// `LanguageManifest::aliases`.
-    pub aliases: &'static [&'static str],
-    pub globs: &'static [&'static str],
-}
-
 /// What a plugin knows of its language: which it is, and how a document becomes
 /// a tree.
 pub trait HostParser {
@@ -222,6 +206,22 @@ impl<P: HostParser> Provider for HostProvider<P> {
         }
         Ok(result)
     }
+}
+
+/// The language of a host provider, and the plugin that serves it.
+#[derive(Debug, Clone, Copy)]
+pub struct HostLanguage {
+    /// The plugin id, which is the directory the plugin is installed in.
+    pub name: &'static str,
+    pub version: &'static str,
+    /// The language id.
+    pub id: &'static str,
+    /// The name of the language in messages.
+    pub title: &'static str,
+    /// The names the language goes by in a document, see
+    /// `LanguageManifest::aliases`.
+    pub aliases: &'static [&'static str],
+    pub globs: &'static [&'static str],
 }
 
 /// The fragment of a host file: the file alone, since the provider has no code

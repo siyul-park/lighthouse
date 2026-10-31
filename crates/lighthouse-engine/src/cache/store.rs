@@ -62,12 +62,6 @@ pub struct Stats {
     pub pruned: usize,
 }
 
-/// A value waiting to be written, as serialized.
-struct Write {
-    key: Digest,
-    value: Vec<u8>,
-}
-
 /// An open cache. Lookups and stores may come from several threads.
 pub struct Cache {
     path: PathBuf,
@@ -214,6 +208,12 @@ impl Cache {
             .push(reader);
         found
     }
+}
+
+/// A value waiting to be written, as serialized.
+struct Write {
+    key: Digest,
+    value: Vec<u8>,
 }
 
 /// Opens `path` as a results database, in WAL mode, of the current schema.

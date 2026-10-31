@@ -26,26 +26,6 @@ const HIDDEN: &str = "***";
 /// Where the defaults come from, in the entries.
 pub const BUNDLED: &str = "bundled";
 
-/// One file of the personal layers, read.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Layer {
-    /// The file it was read from, as shown to the user.
-    pub origin: String,
-    pub spec: EnvironmentSpec,
-}
-
-impl Layer {
-    /// The layer written in `text`, the content of the file `origin`.
-    pub fn parse(origin: &str, text: &str) -> Result<Self, Error> {
-        let spec = EnvironmentSpec::parse(origin, text)?;
-        spec.sandbox.check(origin)?;
-        Ok(Self {
-            origin: origin.to_owned(),
-            spec,
-        })
-    }
-}
-
 /// An environment key with its effective value, and the layer it came from.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct Entry {
@@ -110,6 +90,26 @@ impl Layers {
             }
         }
         found.into_values().collect()
+    }
+}
+
+/// One file of the personal layers, read.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Layer {
+    /// The file it was read from, as shown to the user.
+    pub origin: String,
+    pub spec: EnvironmentSpec,
+}
+
+impl Layer {
+    /// The layer written in `text`, the content of the file `origin`.
+    pub fn parse(origin: &str, text: &str) -> Result<Self, Error> {
+        let spec = EnvironmentSpec::parse(origin, text)?;
+        spec.sandbox.check(origin)?;
+        Ok(Self {
+            origin: origin.to_owned(),
+            spec,
+        })
     }
 }
 

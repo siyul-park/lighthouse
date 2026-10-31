@@ -8,10 +8,18 @@ use crate::{
     ModelClient, Plugin, PluginManifest, Rule,
 };
 
-/// A language provider with the id of the plugin that registered it.
-pub struct Language {
-    pub plugin: String,
-    pub provider: Box<dyn LanguageProvider>,
+/// The analyzers of one dependency walk, dependencies first.
+struct Walk<'r> {
+    registry: &'r Registry,
+    marks: BTreeMap<String, Mark>,
+    stack: Vec<String>,
+    out: Vec<&'r dyn Analyzer>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Mark {
+    Visiting,
+    Done,
 }
 
 /// The registered plugins and everything they contribute. `register` is atomic,
@@ -25,20 +33,6 @@ pub struct Registry {
     fixers: BTreeMap<String, Box<dyn Fixer>>,
     models: BTreeMap<String, Box<dyn ModelClient>>,
     libraries: Vec<Box<dyn CelLibrary>>,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Mark {
-    Visiting,
-    Done,
-}
-
-/// The analyzers of one dependency walk, dependencies first.
-struct Walk<'r> {
-    registry: &'r Registry,
-    marks: BTreeMap<String, Mark>,
-    stack: Vec<String>,
-    out: Vec<&'r dyn Analyzer>,
 }
 
 impl Registry {
@@ -292,6 +286,12 @@ impl Registry {
         self.order(self.analyzers.keys().map(String::as_str))
             .map(drop)
     }
+}
+
+/// A language provider with the id of the plugin that registered it.
+pub struct Language {
+    pub plugin: String,
+    pub provider: Box<dyn LanguageProvider>,
 }
 
 impl<'r> Walk<'r> {

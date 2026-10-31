@@ -28,59 +28,6 @@ use crate::{
     modules::{self, Declared},
 };
 
-/// A CEL check with every expression compiled.
-pub(crate) struct CelRule {
-    select: Select,
-    variables: Vec<(String, Arc<Program>)>,
-    condition: Program,
-    message: Template,
-    evidence: Vec<(String, Program)>,
-    at: Option<At>,
-    identity: Option<Identity>,
-    abstain: Option<Abstain>,
-    needs: Needs,
-    /// Per variable: whether it reads nothing of the selected value (only the
-    /// file, the options and variables like it), so a file has one value of it.
-    file_level: Vec<bool>,
-    /// Per variable, whether an expression of the check reads it, directly or
-    /// through another: the others are not evaluated.
-    used: Vec<bool>,
-    library: cel::Context<'static, 'static>,
-    /// The libraries (id and version) whose functions the expressions call.
-    libraries: BTreeMap<String, String>,
-}
-
-struct At {
-    symbol: Option<Program>,
-    line: Option<Program>,
-    end_line: Option<Program>,
-}
-
-impl At {
-    fn compile(cel: &Env, id: &str, at: &lighthouse_spec::At) -> Result<Self, Error> {
-        let maybe = |what: &str, source: &Option<String>| optional(cel, id, what, source);
-        Ok(Self {
-            symbol: maybe("at.symbol", &at.symbol)?,
-            line: maybe("at.line", &at.line)?,
-            end_line: maybe("at.endLine", &at.end_line)?,
-        })
-    }
-}
-
-struct Identity {
-    subject: Program,
-    snippet: Option<Program>,
-}
-
-impl Identity {
-    fn compile(cel: &Env, id: &str, identity: &lighthouse_spec::Identity) -> Result<Self, Error> {
-        Ok(Self {
-            subject: compile(cel, id, "identity.subject", &identity.subject)?,
-            snippet: optional(cel, id, "identity.snippet", &identity.snippet)?,
-        })
-    }
-}
-
 /// Where a finding goes, and what it is about.
 #[derive(Clone)]
 struct Anchor {
@@ -268,6 +215,59 @@ struct Evaluation<'a> {
     candidates: RefCell<Vec<Candidate>>,
     /// What the judgments of the file read in place.
     shared: Shared<'a>,
+}
+
+/// A CEL check with every expression compiled.
+pub(crate) struct CelRule {
+    select: Select,
+    variables: Vec<(String, Arc<Program>)>,
+    condition: Program,
+    message: Template,
+    evidence: Vec<(String, Program)>,
+    at: Option<At>,
+    identity: Option<Identity>,
+    abstain: Option<Abstain>,
+    needs: Needs,
+    /// Per variable: whether it reads nothing of the selected value (only the
+    /// file, the options and variables like it), so a file has one value of it.
+    file_level: Vec<bool>,
+    /// Per variable, whether an expression of the check reads it, directly or
+    /// through another: the others are not evaluated.
+    used: Vec<bool>,
+    library: cel::Context<'static, 'static>,
+    /// The libraries (id and version) whose functions the expressions call.
+    libraries: BTreeMap<String, String>,
+}
+
+struct Identity {
+    subject: Program,
+    snippet: Option<Program>,
+}
+
+impl Identity {
+    fn compile(cel: &Env, id: &str, identity: &lighthouse_spec::Identity) -> Result<Self, Error> {
+        Ok(Self {
+            subject: compile(cel, id, "identity.subject", &identity.subject)?,
+            snippet: optional(cel, id, "identity.snippet", &identity.snippet)?,
+        })
+    }
+}
+
+struct At {
+    symbol: Option<Program>,
+    line: Option<Program>,
+    end_line: Option<Program>,
+}
+
+impl At {
+    fn compile(cel: &Env, id: &str, at: &lighthouse_spec::At) -> Result<Self, Error> {
+        let maybe = |what: &str, source: &Option<String>| optional(cel, id, what, source);
+        Ok(Self {
+            symbol: maybe("at.symbol", &at.symbol)?,
+            line: maybe("at.line", &at.line)?,
+            end_line: maybe("at.endLine", &at.end_line)?,
+        })
+    }
 }
 
 /// The values of one file that all its judgments read without holding a copy

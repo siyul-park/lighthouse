@@ -33,20 +33,6 @@ const MAX_GUESSED_CANDIDATES: usize = 3;
 /// provider cannot type.
 const MAX_GUESSED_PUBLIC_CANDIDATES: usize = 8;
 
-/// A call or reference found in a body.
-pub struct Use {
-    pub to: String,
-    pub resolution: Resolution,
-}
-
-/// A use at one place: the identifier that names the target.
-pub struct Occurrence {
-    pub kind: EdgeKind,
-    pub to: String,
-    pub resolution: Resolution,
-    pub site: Span,
-}
-
 /// What the walk of one body found.
 pub struct Facts {
     pub uses: Vec<Use>,
@@ -61,6 +47,20 @@ pub struct Facts {
     /// own.
     pub nested: Vec<syn::ItemFn>,
     pub forwards_to: Option<String>,
+}
+
+/// A use at one place: the identifier that names the target.
+pub struct Occurrence {
+    pub kind: EdgeKind,
+    pub to: String,
+    pub resolution: Resolution,
+    pub site: Span,
+}
+
+/// A call or reference found in a body.
+pub struct Use {
+    pub to: String,
+    pub resolution: Resolution,
 }
 
 /// Where a function lives: the module of its id, its owner path parts and the
@@ -78,12 +78,6 @@ enum Hit {
     Nested(String),
     Local,
     Unknown,
-}
-
-#[derive(Default)]
-struct Scope {
-    locals: HashMap<String, Option<Sym>>,
-    items: HashMap<String, String>,
 }
 
 struct Walker<'i> {
@@ -448,6 +442,12 @@ impl<'i> Walker<'i> {
             tails: HashSet::new(),
         }
     }
+}
+
+#[derive(Default)]
+struct Scope {
+    locals: HashMap<String, Option<Sym>>,
+    items: HashMap<String, String>,
 }
 
 /// Walks `block` and summarizes the calls, flow and counts of the body.

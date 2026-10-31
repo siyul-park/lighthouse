@@ -17,6 +17,28 @@ const RUNTIME_SECTIONS: [&str; 2] = ["dependencies", "build-dependencies"];
 /// The edition Cargo gives a package that sets none.
 const DEFAULT_EDITION: &str = "2015";
 
+#[derive(Debug)]
+pub struct Package {
+    pub name: String,
+    pub lib_name: String,
+    /// Whether the package can be published to a registry; one that cannot
+    /// (`publish = false`) has no consumers outside the project.
+    pub publishable: bool,
+    pub targets: Vec<Target>,
+    /// Extern crate name (as written in code) to the package that provides it.
+    pub deps: BTreeMap<String, String>,
+    /// The packages that `[dependencies]` and `[build-dependencies]` name, as
+    /// opposed to `[dev-dependencies]`.
+    pub runtime: BTreeSet<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Target {
+    pub kind: TargetKind,
+    pub name: String,
+    pub root: PathBuf,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TargetKind {
     Lib,
@@ -38,28 +60,6 @@ impl TargetKind {
             Self::Build => "build",
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Target {
-    pub kind: TargetKind,
-    pub name: String,
-    pub root: PathBuf,
-}
-
-#[derive(Debug)]
-pub struct Package {
-    pub name: String,
-    pub lib_name: String,
-    /// Whether the package can be published to a registry; one that cannot
-    /// (`publish = false`) has no consumers outside the project.
-    pub publishable: bool,
-    pub targets: Vec<Target>,
-    /// Extern crate name (as written in code) to the package that provides it.
-    pub deps: BTreeMap<String, String>,
-    /// The packages that `[dependencies]` and `[build-dependencies]` name, as
-    /// opposed to `[dev-dependencies]`.
-    pub runtime: BTreeSet<String>,
 }
 
 /// The manifests read so far, by directory, so that each is parsed once.

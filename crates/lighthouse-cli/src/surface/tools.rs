@@ -187,55 +187,6 @@ pub const TOOLS: [Tool; 19] = [
     ),
 ];
 
-/// How a tool may touch the world, in the MCP annotations' terms.
-#[derive(Debug, Clone, Copy)]
-pub struct Hints {
-    pub read_only: bool,
-    pub destructive: bool,
-    pub idempotent: bool,
-    /// Whether it may reach outside the machine: when a remote model is bound.
-    pub open_world: bool,
-}
-
-impl Hints {
-    /// Changes nothing.
-    const READ: Self = Self {
-        read_only: true,
-        destructive: false,
-        idempotent: true,
-        open_world: false,
-    };
-    /// Writes, and doing it again changes nothing more.
-    const WRITE: Self = Self {
-        read_only: false,
-        ..Self::READ
-    };
-
-    /// Also overwrites what was there.
-    const fn destructive(self) -> Self {
-        Self {
-            destructive: true,
-            ..self
-        }
-    }
-
-    /// Doing it again changes more.
-    const fn repeatable(self) -> Self {
-        Self {
-            idempotent: false,
-            ..self
-        }
-    }
-
-    /// Also reaches outside the machine when a remote model is bound.
-    const fn open(self) -> Self {
-        Self {
-            open_world: true,
-            ..self
-        }
-    }
-}
-
 /// An agent-loop command as a tool.
 #[derive(Debug, Clone, Copy)]
 pub struct Tool {
@@ -295,6 +246,55 @@ impl Tool {
     /// Whether the tool may reach outside the machine in `session`'s project.
     pub fn open_world(&self, session: &Session) -> bool {
         self.hints.open_world && remote_bound(session)
+    }
+}
+
+/// How a tool may touch the world, in the MCP annotations' terms.
+#[derive(Debug, Clone, Copy)]
+pub struct Hints {
+    pub read_only: bool,
+    pub destructive: bool,
+    pub idempotent: bool,
+    /// Whether it may reach outside the machine: when a remote model is bound.
+    pub open_world: bool,
+}
+
+impl Hints {
+    /// Changes nothing.
+    const READ: Self = Self {
+        read_only: true,
+        destructive: false,
+        idempotent: true,
+        open_world: false,
+    };
+    /// Writes, and doing it again changes nothing more.
+    const WRITE: Self = Self {
+        read_only: false,
+        ..Self::READ
+    };
+
+    /// Also overwrites what was there.
+    const fn destructive(self) -> Self {
+        Self {
+            destructive: true,
+            ..self
+        }
+    }
+
+    /// Doing it again changes more.
+    const fn repeatable(self) -> Self {
+        Self {
+            idempotent: false,
+            ..self
+        }
+    }
+
+    /// Also reaches outside the machine when a remote model is bound.
+    const fn open(self) -> Self {
+        Self {
+            open_world: true,
+            ..self
+        }
     }
 }
 

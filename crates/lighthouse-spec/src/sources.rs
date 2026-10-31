@@ -38,12 +38,6 @@ pub struct SourceLine {
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Bullet {
-    pub reference: String,
-    pub text: String,
-}
-
 /// A normative line being read: under which heading, its text so far, and
 /// whether indented lines after it continue it.
 struct Item {
@@ -79,6 +73,12 @@ impl<'a> Out<'a> {
         let reference = if *n == 1 { base } else { format!("{base}-{n}") };
         self.bullets.push(Bullet { reference, text });
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Bullet {
+    pub reference: String,
+    pub text: String,
 }
 
 /// Normative lines of a Markdown document: list items (`-`, `*`, numbered)

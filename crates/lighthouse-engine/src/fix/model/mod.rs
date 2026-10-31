@@ -34,35 +34,6 @@ pub(super) use verify::{Verdict, judge};
 /// How many findings of one file an agent is given at most.
 pub(super) const MAX_FINDINGS: usize = 20;
 
-/// What a decision tells the agent besides its requirement, and how far the
-/// agent may go.
-#[derive(Debug, Clone)]
-pub(super) struct ModelFix {
-    /// The `prompt` of the fix.
-    instruction: Option<String>,
-    /// Examples that show a fix, as the brief shows them.
-    examples: Vec<Example>,
-    /// The widest change allowed: the decision's own `scope`, narrowed by the
-    /// project's.
-    scope: FixScope,
-}
-
-impl ModelFix {
-    /// The fix by a model of a decision whose `fix` is `fix`, if any, with
-    /// `cap` the widest scope the project allows.
-    pub(super) fn of(fix: Option<&Fix>, examples: &[Example], cap: FixScope) -> Self {
-        let instruction = match fix.map(|f| &f.kind) {
-            Some(FixKind::Model { prompt, .. }) => prompt.clone(),
-            _ => None,
-        };
-        Self {
-            instruction,
-            examples: brief::examples_for(examples),
-            scope: FixScope::of_fix(fix, cap),
-        }
-    }
-}
-
 /// The fixer of the findings given to a model: asks the agent each decision
 /// is bound to (`[models] agent`, or its own `agent`) and counts what happens.
 pub(super) struct ModelFixer<'e> {
@@ -130,6 +101,35 @@ impl<'e> ModelFixer<'e> {
             .into_iter()
             .chain(said.iter().cloned())
             .collect()
+    }
+}
+
+/// What a decision tells the agent besides its requirement, and how far the
+/// agent may go.
+#[derive(Debug, Clone)]
+pub(super) struct ModelFix {
+    /// The `prompt` of the fix.
+    instruction: Option<String>,
+    /// Examples that show a fix, as the brief shows them.
+    examples: Vec<Example>,
+    /// The widest change allowed: the decision's own `scope`, narrowed by the
+    /// project's.
+    scope: FixScope,
+}
+
+impl ModelFix {
+    /// The fix by a model of a decision whose `fix` is `fix`, if any, with
+    /// `cap` the widest scope the project allows.
+    pub(super) fn of(fix: Option<&Fix>, examples: &[Example], cap: FixScope) -> Self {
+        let instruction = match fix.map(|f| &f.kind) {
+            Some(FixKind::Model { prompt, .. }) => prompt.clone(),
+            _ => None,
+        };
+        Self {
+            instruction,
+            examples: brief::examples_for(examples),
+            scope: FixScope::of_fix(fix, cap),
+        }
     }
 }
 

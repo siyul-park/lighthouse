@@ -12,12 +12,6 @@ use lighthouse_protocol::hash;
 use lighthouse_spec::ModelProvider;
 use serde_json::{Map, Value};
 
-/// Builds the client of a `command` provider: the whole reference, the
-/// model part of it and the provider. The host supplies it, so that the
-/// engine does not know how a program is run as a model.
-pub type CommandModels =
-    Arc<dyn Fn(&str, &str, &ModelProvider) -> Option<Box<dyn ModelClient>> + Send + Sync>;
-
 /// What building a client needs from the engine.
 pub(super) struct Clients<'a> {
     pub(super) registry: &'a Registry,
@@ -64,6 +58,12 @@ impl<'a> Clients<'a> {
         }
     }
 }
+
+/// Builds the client of a `command` provider: the whole reference, the
+/// model part of it and the provider. The host supplies it, so that the
+/// engine does not know how a program is run as a model.
+pub type CommandModels =
+    Arc<dyn Fn(&str, &str, &ModelProvider) -> Option<Box<dyn ModelClient>> + Send + Sync>;
 
 /// A model that cannot run, kept so that its failure is reported.
 struct Refused {

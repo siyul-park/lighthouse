@@ -30,16 +30,6 @@ const MEANINGS: [(Judgment, &str); 3] = [
     ),
 ];
 
-/// What each judgment says, by judgment.
-pub type Judgments = BTreeMap<&'static str, &'static str>;
-
-/// How many groups and findings a report left out.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct Omitted {
-    pub groups: usize,
-    pub findings: usize,
-}
-
 /// Findings grouped by decision, as a program reads them: a group says what
 /// its decision says once, and a finding is one row of `[line:col, message,
 /// fingerprint]` with a last object for what sets it apart.
@@ -57,6 +47,16 @@ pub struct Groups {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub judgments: Option<Judgments>,
 }
+
+/// How many groups and findings a report left out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct Omitted {
+    pub groups: usize,
+    pub findings: usize,
+}
+
+/// What each judgment says, by judgment.
+pub type Judgments = BTreeMap<&'static str, &'static str>;
 
 /// One finding as the compact shape sees it, wherever it comes from: a fresh
 /// diagnostic or a remembered finding.

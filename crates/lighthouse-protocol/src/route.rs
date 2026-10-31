@@ -46,17 +46,17 @@ pub const ROUTES: [Route; 7] = [
     },
 ];
 
+/// One method and, when a published HTTP API does the same, its twin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Route {
+    pub method: &'static str,
+    pub http: Option<Http>,
+}
+
 /// The HTTP request that does what a method does: the published API the
 /// method's body comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Http {
     pub verb: &'static str,
     pub path: &'static str,
-}
-
-/// One method and, when a published HTTP API does the same, its twin.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Route {
-    pub method: &'static str,
-    pub http: Option<Http>,
 }

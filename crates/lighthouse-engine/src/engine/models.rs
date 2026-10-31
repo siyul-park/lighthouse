@@ -22,29 +22,6 @@ use lighthouse_spec::{Models as BoundModels, Routing};
 
 use super::{MAX_FAILURES, Scopes, batch::Pending, client::Clients, rotation_start};
 
-/// Failures shared by every binding of the same model in one run.
-#[derive(Default)]
-pub(super) struct Failures(Mutex<BTreeMap<String, (usize, String)>>);
-
-impl Failures {
-    /// Records a failed request and whether this is the threshold failure.
-    pub(super) fn record(&self, model: &str, reason: &str) -> bool {
-        let mut failures = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = failures.entry(model.to_owned()).or_default();
-        *count += 1;
-        last.clear();
-        last.push_str(reason);
-        *count == MAX_FAILURES
-    }
-
-    /// The last failure once a model has reached the per-run limit.
-    pub(super) fn skipped(&self, model: &str) -> Option<String> {
-        let failures = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = failures.get(model)?;
-        (*count >= MAX_FAILURES).then(|| last.clone())
-    }
-}
-
 /// A binding layer: the models one binding names, tried in turn.
 pub(super) struct Layer<'a> {
     /// The references of the models, joined with `,`.
@@ -74,15 +51,6 @@ impl<'a> Layer<'a> {
     pub(super) fn models(&self) -> &[Arc<dyn ModelClient + 'a>] {
         &self.models
     }
-}
-
-/// What the models of a run were asked and cost.
-#[derive(Default)]
-struct Usage {
-    /// Requests that went through to a model, and what they cost.
-    usage: lighthouse_model::Usage,
-    /// Subjects left to review because the budget was spent.
-    over_budget: usize,
 }
 
 /// What a run needs to ask models: who is bound, how much may be spent, and
@@ -117,6 +85,38 @@ pub(super) struct RunModels<'a> {
     /// What rules asked and has not been put to the models yet, by group.
     queued: Mutex<BTreeMap<String, Vec<Pending<'a>>>>,
     usage: Mutex<Usage>,
+}
+
+/// What the models of a run were asked and cost.
+#[derive(Default)]
+struct Usage {
+    /// Requests that went through to a model, and what they cost.
+    usage: lighthouse_model::Usage,
+    /// Subjects left to review because the budget was spent.
+    over_budget: usize,
+}
+
+/// Failures shared by every binding of the same model in one run.
+#[derive(Default)]
+pub(super) struct Failures(Mutex<BTreeMap<String, (usize, String)>>);
+
+impl Failures {
+    /// Records a failed request and whether this is the threshold failure.
+    pub(super) fn record(&self, model: &str, reason: &str) -> bool {
+        let mut failures = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = failures.entry(model.to_owned()).or_default();
+        *count += 1;
+        last.clear();
+        last.push_str(reason);
+        *count == MAX_FAILURES
+    }
+
+    /// The last failure once a model has reached the per-run limit.
+    pub(super) fn skipped(&self, model: &str) -> Option<String> {
+        let failures = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = failures.get(model)?;
+        (*count >= MAX_FAILURES).then(|| last.clone())
+    }
 }
 
 impl super::Engine {

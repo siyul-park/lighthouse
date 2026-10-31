@@ -5,28 +5,66 @@ use serde::{Deserialize, Serialize};
 
 use crate::UnknownTerm;
 
-/// A recorded label on one subject, as SARIF's `result.kind` says it: not
-/// ground truth. `pass` and `fail` label the check's conformance part;
-/// `notApplicable` labels its applicability part (the decision should not
-/// apply here).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub enum Judgment {
-    /// The subject conforms: a finding about it was a false positive.
-    #[serde(rename = "pass")]
-    Pass,
-    /// The subject violates the decision: a finding about it is right.
-    #[serde(rename = "fail")]
-    Fail,
-    /// The decision does not apply to the subject.
-    #[serde(rename = "notApplicable")]
-    NotApplicable,
-}
-
 vocabulary!(Judgment, "judgment" {
     Pass => "pass",
     Fail => "fail",
     NotApplicable => "notApplicable",
 });
+
+vocabulary!(Role, "role" {
+    Agent => "agent",
+    Model => "model",
+});
+
+/// A judgment on a subject of a decision, as the store records it: what
+/// learning reads of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Judged {
+    pub fingerprint: String,
+    pub meaning_version: Option<String>,
+    pub judgment: Judgment,
+    pub by: Attribution,
+}
+
+/// `prov:wasAttributedTo`: who a record is attributed to, with the role the
+/// agent had (`prov:hadRole`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Attribution {
+    #[serde(rename = "type")]
+    pub kind: AgentKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(rename = "hadRole", default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<Role>,
+}
+
+impl Attribution {
+    /// A person, or a coding agent: a software agent is one unless it says
+    /// otherwise.
+    pub fn new(kind: AgentKind, id: Option<String>) -> Self {
+        let role = (kind == AgentKind::SoftwareAgent).then_some(Role::Agent);
+        Self { kind, id, role }
+    }
+
+    /// A model, as `<provider>/<model>@<version>`.
+    pub fn model(id: impl Into<String>) -> Self {
+        Self {
+            kind: AgentKind::SoftwareAgent,
+            id: Some(id.into()),
+            role: Some(Role::Model),
+        }
+    }
+
+    /// How much a judgment by this agent weighs against another's on the same
+    /// subject: a person over a coding agent over a model.
+    pub fn strength(&self) -> u8 {
+        match (self.kind, self.role) {
+            (AgentKind::Person, _) => 3,
+            (AgentKind::SoftwareAgent, Some(Role::Model)) => 1,
+            (AgentKind::SoftwareAgent, _) => 2,
+        }
+    }
+}
 
 /// What kind of agent a record is attributed to, a W3C PROV class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -82,59 +120,21 @@ pub enum Role {
     Model,
 }
 
-vocabulary!(Role, "role" {
-    Agent => "agent",
-    Model => "model",
-});
-
-/// `prov:wasAttributedTo`: who a record is attributed to, with the role the
-/// agent had (`prov:hadRole`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Attribution {
-    #[serde(rename = "type")]
-    pub kind: AgentKind,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(rename = "hadRole", default, skip_serializing_if = "Option::is_none")]
-    pub role: Option<Role>,
-}
-
-impl Attribution {
-    /// A person, or a coding agent: a software agent is one unless it says
-    /// otherwise.
-    pub fn new(kind: AgentKind, id: Option<String>) -> Self {
-        let role = (kind == AgentKind::SoftwareAgent).then_some(Role::Agent);
-        Self { kind, id, role }
-    }
-
-    /// A model, as `<provider>/<model>@<version>`.
-    pub fn model(id: impl Into<String>) -> Self {
-        Self {
-            kind: AgentKind::SoftwareAgent,
-            id: Some(id.into()),
-            role: Some(Role::Model),
-        }
-    }
-
-    /// How much a judgment by this agent weighs against another's on the same
-    /// subject: a person over a coding agent over a model.
-    pub fn strength(&self) -> u8 {
-        match (self.kind, self.role) {
-            (AgentKind::Person, _) => 3,
-            (AgentKind::SoftwareAgent, Some(Role::Model)) => 1,
-            (AgentKind::SoftwareAgent, _) => 2,
-        }
-    }
-}
-
-/// A judgment on a subject of a decision, as the store records it: what
-/// learning reads of it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Judged {
-    pub fingerprint: String,
-    pub meaning_version: Option<String>,
-    pub judgment: Judgment,
-    pub by: Attribution,
+/// A recorded label on one subject, as SARIF's `result.kind` says it: not
+/// ground truth. `pass` and `fail` label the check's conformance part;
+/// `notApplicable` labels its applicability part (the decision should not
+/// apply here).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum Judgment {
+    /// The subject conforms: a finding about it was a false positive.
+    #[serde(rename = "pass")]
+    Pass,
+    /// The subject violates the decision: a finding about it is right.
+    #[serde(rename = "fail")]
+    Fail,
+    /// The decision does not apply to the subject.
+    #[serde(rename = "notApplicable")]
+    NotApplicable,
 }
 
 /// What a judgment teaches a model about the decision that raised the

@@ -159,20 +159,20 @@ const ORDERS: &str = "## Orders\n\n\
      `options` and the `file` of its caller. `list.misplaced()` gives the \
      indexes of the fewest elements of a list of ints that, moved, put it in order.\n\n";
 
-/// One parameter of an edit constructor.
-pub struct Param {
-    pub name: &'static str,
-    pub ty: &'static str,
-    pub required: bool,
-    pub description: &'static str,
-}
-
 /// One edit constructor.
 pub struct Operation {
     pub name: &'static str,
     pub summary: &'static str,
     pub params: &'static [Param],
     pub example: &'static str,
+}
+
+/// One parameter of an edit constructor.
+pub struct Param {
+    pub name: &'static str,
+    pub ty: &'static str,
+    pub required: bool,
+    pub description: &'static str,
 }
 
 /// The page of the fix operations.

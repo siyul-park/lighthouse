@@ -12,19 +12,6 @@ use crate::{
     metrics::{Metrics, Outcome, Rate},
 };
 
-/// What one check gave in one repository.
-struct SideInput {
-    check: String,
-    pairs: Vec<(Judgment, Outcome)>,
-    /// The probabilities of failing models gave the labelled subjects.
-    scores: Vec<Score>,
-    /// The notices of the run of the check.
-    notices: Vec<String>,
-    usage: Usage,
-    /// The layer the check was graded with, when it had one.
-    layer: Option<Layer>,
-}
-
 /// What one repository gave.
 pub struct RepoResult {
     policy: Evaluation,
@@ -36,6 +23,19 @@ pub struct RepoResult {
     regressions: Vec<String>,
     /// The rows of the audit table for this repository.
     pub audit: Vec<String>,
+}
+
+/// What one check gave in one repository.
+struct SideInput {
+    check: String,
+    pairs: Vec<(Judgment, Outcome)>,
+    /// The probabilities of failing models gave the labelled subjects.
+    scores: Vec<Score>,
+    /// The notices of the run of the check.
+    notices: Vec<String>,
+    usage: Usage,
+    /// The layer the check was graded with, when it had one.
+    layer: Option<Layer>,
 }
 
 /// What a repository gave: the labels graded by the outcome of the current

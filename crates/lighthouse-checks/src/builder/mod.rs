@@ -48,20 +48,6 @@ mod widths;
 
 use forward::{forwarded, reaches};
 
-/// The indexes over the whole project that facts read, each built by the first
-/// check of a run that asks and shared by the others.
-#[derive(Default)]
-pub(crate) struct Indexes {
-    single: OnceLock<effective::Index>,
-    imports: OnceLock<BTreeMap<String, Vec<String>>>,
-    cycles: OnceLock<BTreeMap<String, Vec<String>>>,
-    types: OnceLock<BTreeMap<String, Vec<Value>>>,
-    names: OnceLock<BTreeMap<String, Vec<SymbolId>>>,
-    parents: OnceLock<parent::Uses>,
-    modules: OnceLock<System>,
-    symbols: OnceLock<System>,
-}
-
 /// Builds the values of one run of a check over one file (or the project).
 pub(crate) struct Builder<'a> {
     project: &'a Project,
@@ -744,6 +730,19 @@ impl<'a> Builder<'a> {
     }
 }
 
+/// The indexes over the whole project that facts read, each built by the first
+/// check of a run that asks and shared by the others.
+#[derive(Default)]
+pub(crate) struct Indexes {
+    single: OnceLock<effective::Index>,
+    imports: OnceLock<BTreeMap<String, Vec<String>>>,
+    cycles: OnceLock<BTreeMap<String, Vec<String>>>,
+    types: OnceLock<BTreeMap<String, Vec<Value>>>,
+    names: OnceLock<BTreeMap<String, Vec<SymbolId>>>,
+    parents: OnceLock<parent::Uses>,
+    modules: OnceLock<System>,
+    symbols: OnceLock<System>,
+}
 /// A span as an expression sees it: where it is, in which file.
 pub(crate) fn span(file: &Path, span: Span) -> Value {
     json!({

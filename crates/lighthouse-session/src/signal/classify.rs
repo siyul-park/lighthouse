@@ -54,6 +54,14 @@ struct Rule {
     pattern: Regex,
 }
 
+/// A message read: what of it was the person's words, and what the rules
+/// made of it. `hit` is `None` when the rules abstain.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reading {
+    pub stripped: Stripped,
+    pub hit: Option<Hit>,
+}
+
 /// What a rule found in a message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hit {
@@ -62,14 +70,6 @@ pub struct Hit {
     pub rule: &'static str,
     /// The sentence it fired on, as written.
     pub sentence: String,
-}
-
-/// A message read: what of it was the person's words, and what the rules
-/// made of it. `hit` is `None` when the rules abstain.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reading {
-    pub stripped: Stripped,
-    pub hit: Option<Hit>,
 }
 
 /// Reads a prompt: cuts out code, pasted content and quoted logs, then

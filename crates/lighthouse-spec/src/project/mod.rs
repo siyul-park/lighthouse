@@ -65,33 +65,6 @@ pub const FILE_NAMES: [&str; 4] = [
     "lighthouse.json",
 ];
 
-/// A listed plugin. `path` (relative to the config directory) names the
-/// plugin directory explicitly instead of searching the plugin locations;
-/// `timeout` is the per-request limit for process plugins.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PluginRef {
-    pub id: String,
-    pub path: Option<PathBuf>,
-    timeout: Option<Duration>,
-}
-
-/// Rules for the files and languages that match.
-#[derive(Debug, Clone)]
-struct Override {
-    files: Option<GlobSet>,
-    languages: Vec<String>,
-    rules: Rules,
-}
-
-/// What a project says about one language.
-#[derive(Debug, Clone)]
-struct LanguageConfig {
-    /// Handed to the language's provider.
-    options: Options,
-    constructors: Option<Vec<String>>,
-    test_naming: Option<TestNamingSpec>,
-}
-
 impl PluginRef {
     /// A listed plugin with no explicit path and no timeout override.
     pub fn new(id: impl Into<String>) -> Self {
@@ -510,6 +483,33 @@ impl Config {
         out.push(self);
         Ok(())
     }
+}
+
+/// What a project says about one language.
+#[derive(Debug, Clone)]
+struct LanguageConfig {
+    /// Handed to the language's provider.
+    options: Options,
+    constructors: Option<Vec<String>>,
+    test_naming: Option<TestNamingSpec>,
+}
+
+/// Rules for the files and languages that match.
+#[derive(Debug, Clone)]
+struct Override {
+    files: Option<GlobSet>,
+    languages: Vec<String>,
+    rules: Rules,
+}
+
+/// A listed plugin. `path` (relative to the config directory) names the
+/// plugin directory explicitly instead of searching the plugin locations;
+/// `timeout` is the per-request limit for process plugins.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PluginRef {
+    pub id: String,
+    pub path: Option<PathBuf>,
+    timeout: Option<Duration>,
 }
 
 /// Compiles path globs. `*` and `?` never cross `/`; `**` as a whole path

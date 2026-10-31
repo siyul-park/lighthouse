@@ -1,25 +1,5 @@
 use serde_json::Value;
 
-/// A selector over a host provider's selectable tree. The host provider adds
-/// source text and maps it to the original document.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Selector {
-    parts: Vec<SelectorPart>,
-}
-
-/// One step in a selector path or a predicate applied to the current candidates.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SelectorPart {
-    /// `..`: the current value and every value below it, parents first, in
-    /// the order the tree states them.
-    Descend,
-    Key(String),
-    Index(usize),
-    Keys,
-    Indices,
-    Filter(SelectorFilter),
-}
-
 /// Disjunction of conjunctions in a filter expression.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectorFilter {
@@ -32,6 +12,13 @@ pub struct SelectorComparison {
     pub path: Selector,
     pub equal: bool,
     pub value: Value,
+}
+
+/// A selector over a host provider's selectable tree. The host provider adds
+/// source text and maps it to the original document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Selector {
+    parts: Vec<SelectorPart>,
 }
 
 impl Selector {
@@ -71,6 +58,19 @@ impl Selector {
     pub fn parts(&self) -> &[SelectorPart] {
         &self.parts
     }
+}
+
+/// One step in a selector path or a predicate applied to the current candidates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelectorPart {
+    /// `..`: the current value and every value below it, parents first, in
+    /// the order the tree states them.
+    Descend,
+    Key(String),
+    Index(usize),
+    Keys,
+    Indices,
+    Filter(SelectorFilter),
 }
 
 fn parse_key(source: &str, at: &mut usize) -> Result<SelectorPart, String> {

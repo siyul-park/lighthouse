@@ -42,6 +42,14 @@ pub struct FunctionSummary {
     pub constructs: bool,
 }
 
+/// The parameter and result types of a function, receiver excluded, one entry
+/// per occurrence in order. A Rust tuple result is one entry.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Signature {
+    pub params: Vec<TypeRef>,
+    pub results: Vec<TypeRef>,
+}
+
 /// A type as a signature or a field writes it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TypeRef {
@@ -54,25 +62,6 @@ pub struct TypeRef {
     /// Whether that named type is visible outside its module, when known.
     #[serde(default)]
     pub exported: Option<bool>,
-}
-
-/// The parameter and result types of a function, receiver excluded, one entry
-/// per occurrence in order. A Rust tuple result is one entry.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Signature {
-    pub params: Vec<TypeRef>,
-    pub results: Vec<TypeRef>,
-}
-
-/// What a function body does that a rule may flag.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum EventKind {
-    Panic,
-    Unwrap,
-    ErrorCompare,
-    ErrorAssert,
-    ErrorfUnwrapped,
 }
 
 vocabulary!(EventKind, "event kind" {
@@ -89,6 +78,17 @@ pub struct Event {
     pub kind: EventKind,
     pub span: Span,
     pub detail: Option<String>,
+}
+
+/// What a function body does that a rule may flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EventKind {
+    Panic,
+    Unwrap,
+    ErrorCompare,
+    ErrorAssert,
+    ErrorfUnwrapped,
 }
 
 /// How a test enumerates its cases: one body over a data table, or separate scenarios.

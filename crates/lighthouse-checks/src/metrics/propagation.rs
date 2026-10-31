@@ -12,25 +12,6 @@ use super::graph::Graph;
 /// The size from which the largest cycle is the core of a system.
 const CORE_MIN: u32 = 2;
 
-/// What one node reaches in its graph.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Stability {
-    /// Distinct nodes that use it directly.
-    pub ca: u32,
-    /// Distinct nodes it uses directly.
-    pub ce: u32,
-    /// Nodes that reach it, itself left out.
-    pub vfi: u32,
-    /// Nodes it reaches, itself left out.
-    pub vfo: u32,
-    /// The size of its cycle: 1 when it is on none.
-    pub cyclic: u32,
-    /// The smallest name of its cycle.
-    pub component: String,
-    /// Whether it is in the core of the system.
-    pub core: bool,
-}
-
 /// A graph of named nodes with what each one reaches.
 #[derive(Debug, Clone, PartialEq)]
 pub struct System {
@@ -55,6 +36,24 @@ impl System {
     }
 }
 
+/// What one node reaches in its graph.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Stability {
+    /// Distinct nodes that use it directly.
+    pub ca: u32,
+    /// Distinct nodes it uses directly.
+    pub ce: u32,
+    /// Nodes that reach it, itself left out.
+    pub vfi: u32,
+    /// Nodes it reaches, itself left out.
+    pub vfo: u32,
+    /// The size of its cycle: 1 when it is on none.
+    pub cyclic: u32,
+    /// The smallest name of its cycle.
+    pub component: String,
+    /// Whether it is in the core of the system.
+    pub core: bool,
+}
 /// The production modules, joined by the symbols of one that use a symbol of
 /// the other and by imports.
 pub fn modules(project: &Project) -> System {

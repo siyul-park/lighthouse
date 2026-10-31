@@ -7,22 +7,6 @@ use std::{
 
 use super::Profile;
 
-/// A path a sandboxed program may not read.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Denied {
-    pub path: PathBuf,
-    /// A directory is hidden as a whole; a file is hidden on its own.
-    pub dir: bool,
-}
-
-/// How a program in a namespace without a network reaches the proxy: the
-/// executable that forwards a local port to the proxy's socket, and the socket.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Bridge {
-    pub exe: PathBuf,
-    pub socket: PathBuf,
-}
-
 /// A [`Profile`] resolved against the disk: canonical paths, only those that
 /// exist, and the route to the proxy.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -91,6 +75,22 @@ impl Plan {
             reads,
         })
     }
+}
+
+/// How a program in a namespace without a network reaches the proxy: the
+/// executable that forwards a local port to the proxy's socket, and the socket.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bridge {
+    pub exe: PathBuf,
+    pub socket: PathBuf,
+}
+
+/// A path a sandboxed program may not read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Denied {
+    pub path: PathBuf,
+    /// A directory is hidden as a whole; a file is hidden on its own.
+    pub dir: bool,
 }
 
 /// `cwd` as a path to read again, when a mask covers it and nothing the

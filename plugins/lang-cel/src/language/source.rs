@@ -8,32 +8,6 @@ use lighthouse_plugin::Source;
 
 pub(super) const MODULE: &str = "cel";
 
-/// The text of a host file with the offsets of its lines, which every
-/// expression of the file shares.
-pub(super) struct Host {
-    text: String,
-    starts: Vec<usize>,
-}
-
-impl Host {
-    pub(super) fn new(text: &str) -> Arc<Self> {
-        Arc::new(Self {
-            text: text.to_owned(),
-            starts: LineIndex::starts_of(text),
-        })
-    }
-
-    /// The span of the byte range `start..end`, clamped to the text.
-    pub(super) fn span(&self, start: usize, end: usize) -> Span {
-        let index = LineIndex::over(&self.text, &self.starts);
-        let start = start.min(self.text.len());
-        Span {
-            start: index.position(start),
-            end: index.position(end.min(self.text.len()).max(start)),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub(super) struct FileDraft {
     pub(super) file: File,
@@ -64,6 +38,32 @@ impl FileDraft {
             host: Host::new(source.text),
             variables: Vec::new(),
             snippets: Vec::new(),
+        }
+    }
+}
+
+/// The text of a host file with the offsets of its lines, which every
+/// expression of the file shares.
+pub(super) struct Host {
+    text: String,
+    starts: Vec<usize>,
+}
+
+impl Host {
+    pub(super) fn new(text: &str) -> Arc<Self> {
+        Arc::new(Self {
+            text: text.to_owned(),
+            starts: LineIndex::starts_of(text),
+        })
+    }
+
+    /// The span of the byte range `start..end`, clamped to the text.
+    pub(super) fn span(&self, start: usize, end: usize) -> Span {
+        let index = LineIndex::over(&self.text, &self.starts);
+        let start = start.min(self.text.len());
+        Span {
+            start: index.position(start),
+            end: index.position(end.min(self.text.len()).max(start)),
         }
     }
 }

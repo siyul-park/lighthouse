@@ -68,17 +68,6 @@ impl From<RuleSetting> for RuleConfig {
     }
 }
 
-/// A level a project can set: a severity, or `off`, which only
-/// configuration has.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Level {
-    Error,
-    Warn,
-    Info,
-    Off,
-}
-
 /// How a rule is written in a spec: `warn`, `off`, or
 /// `{ level: warn, options: { max: 10 } }`.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
@@ -133,6 +122,17 @@ pub struct RuleDetail {
     /// How `lighthouse eval` judges this rule's check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evaluation: Option<Evaluation>,
+}
+
+/// A level a project can set: a severity, or `off`, which only
+/// configuration has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Level {
+    Error,
+    Warn,
+    Info,
+    Off,
 }
 
 impl From<Level> for Option<Severity> {

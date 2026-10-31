@@ -4,47 +4,6 @@ use lighthouse_model::{ExampleScope, RunScope, TestScope, ucm::Applicability};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// What a decision talks about. Mapping to the run scope of a rule is
-/// `Subject::run_scope`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Subject {
-    Symbol,
-    File,
-    Module,
-    /// A relation between two symbols or modules, such as an import.
-    Edge,
-    Project,
-    Test,
-    /// A decision document of the project.
-    Decision,
-}
-
-impl Subject {
-    /// Symbol, file and test decisions are checked once per file; module,
-    /// project and decision decisions once over the merged project.
-    pub fn run_scope(self) -> RunScope {
-        match self {
-            Self::Symbol | Self::File | Self::Test => RunScope::File,
-            Self::Module | Self::Edge | Self::Project | Self::Decision => RunScope::Project,
-        }
-    }
-}
-
-impl fmt::Display for Subject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Symbol => "symbol",
-            Self::File => "file",
-            Self::Module => "module",
-            Self::Edge => "edge",
-            Self::Project => "project",
-            Self::Test => "test",
-            Self::Decision => "decision",
-        })
-    }
-}
-
 /// Where a decision applies: what it is about, and which code its subjects
 /// may be in. Generated, test and example code are told apart by the host (the
 /// provider's marker, `.gitattributes`, the project's `generated` globs), and
@@ -92,5 +51,46 @@ impl Scope {
 impl fmt::Display for Scope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.subject.fmt(f)
+    }
+}
+
+/// What a decision talks about. Mapping to the run scope of a rule is
+/// `Subject::run_scope`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Subject {
+    Symbol,
+    File,
+    Module,
+    /// A relation between two symbols or modules, such as an import.
+    Edge,
+    Project,
+    Test,
+    /// A decision document of the project.
+    Decision,
+}
+
+impl Subject {
+    /// Symbol, file and test decisions are checked once per file; module,
+    /// project and decision decisions once over the merged project.
+    pub fn run_scope(self) -> RunScope {
+        match self {
+            Self::Symbol | Self::File | Self::Test => RunScope::File,
+            Self::Module | Self::Edge | Self::Project | Self::Decision => RunScope::Project,
+        }
+    }
+}
+
+impl fmt::Display for Subject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Symbol => "symbol",
+            Self::File => "file",
+            Self::Module => "module",
+            Self::Edge => "edge",
+            Self::Project => "project",
+            Self::Test => "test",
+            Self::Decision => "decision",
+        })
     }
 }

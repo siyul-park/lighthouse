@@ -30,55 +30,6 @@ pub enum FrameError {
     Json(#[from] serde_json::Error),
 }
 
-/// Request id chosen by the sender and echoed in the response.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Id {
-    Number(i64),
-    Text(String),
-}
-
-/// JSON-RPC error carried by a failed response, and what a handler fails
-/// with: a message turned into one is a failed request, and `data` holds the
-/// body of the error behind it when there is one (an API's own error object).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ErrorObject {
-    pub code: i64,
-    pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data: Option<Value>,
-}
-
-impl ErrorObject {
-    pub(super) fn new(code: i64, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            message: message.into(),
-            data: None,
-        }
-    }
-
-    /// A failed request with the error body of the API that caused it.
-    pub fn with_data(message: impl Into<String>, data: Value) -> Self {
-        Self {
-            data: Some(data),
-            ..Self::from(message.into())
-        }
-    }
-}
-
-impl From<String> for ErrorObject {
-    fn from(message: String) -> Self {
-        Self::new(REQUEST_FAILED, message)
-    }
-}
-
-impl From<&str> for ErrorObject {
-    fn from(message: &str) -> Self {
-        message.to_owned().into()
-    }
-}
-
 /// One JSON-RPC 2.0 message: a request or notification (`method`), or a
 /// response (`result` or `error`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -163,6 +114,55 @@ impl Message {
             error: None,
         }
     }
+}
+
+/// JSON-RPC error carried by a failed response, and what a handler fails
+/// with: a message turned into one is a failed request, and `data` holds the
+/// body of the error behind it when there is one (an API's own error object).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ErrorObject {
+    pub code: i64,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<Value>,
+}
+
+impl ErrorObject {
+    pub(super) fn new(code: i64, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            data: None,
+        }
+    }
+
+    /// A failed request with the error body of the API that caused it.
+    pub fn with_data(message: impl Into<String>, data: Value) -> Self {
+        Self {
+            data: Some(data),
+            ..Self::from(message.into())
+        }
+    }
+}
+
+impl From<String> for ErrorObject {
+    fn from(message: String) -> Self {
+        Self::new(REQUEST_FAILED, message)
+    }
+}
+
+impl From<&str> for ErrorObject {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+/// Request id chosen by the sender and echoed in the response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Id {
+    Number(i64),
+    Text(String),
 }
 
 /// Reads one `Content-Length` framed message; `None` at a clean end of input.

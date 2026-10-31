@@ -28,23 +28,6 @@ pub(crate) const MAX_EVENTS: usize = 10_000;
 /// they hold and to hear the end of what the agent said; the rest are skipped.
 const LINES_PAST_CAP: usize = 1_000;
 
-/// Rewrites what a line printed before it is read, such as hiding secrets.
-pub(crate) type Scrubber = Arc<dyn Fn(&str) -> String + Send + Sync>;
-
-/// The mapping of a provider, compiled.
-pub(crate) struct Events {
-    select: Program,
-    each: Option<Program>,
-    tool: Program,
-    path: Option<Program>,
-    pattern: Option<Program>,
-    command: Option<Program>,
-    said: Option<Program>,
-    /// The context every line is judged in: the functions and the table of
-    /// tool names.
-    base: Context<'static, 'static>,
-}
-
 /// What a run of an agent printed, as the report keeps it.
 pub(crate) struct Mapped {
     pub(crate) events: Vec<ToolEvent>,
@@ -150,6 +133,23 @@ pub(crate) struct Reading {
     scrub: Scrubber,
     found: Arc<Mutex<Found>>,
 }
+
+/// The mapping of a provider, compiled.
+pub(crate) struct Events {
+    select: Program,
+    each: Option<Program>,
+    tool: Program,
+    path: Option<Program>,
+    pattern: Option<Program>,
+    command: Option<Program>,
+    said: Option<Program>,
+    /// The context every line is judged in: the functions and the table of
+    /// tool names.
+    base: Context<'static, 'static>,
+}
+
+/// Rewrites what a line printed before it is read, such as hiding secrets.
+pub(crate) type Scrubber = Arc<dyn Fn(&str) -> String + Send + Sync>;
 
 #[derive(Default)]
 struct Found {

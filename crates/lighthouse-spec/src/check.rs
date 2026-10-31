@@ -150,6 +150,53 @@ pub enum CheckKind {
     Model(ModelCheck),
 }
 
+/// A rule written as data: a `where` expression that is true for a violation
+/// of the selected values, and a message. The expressions see the selected
+/// value (`symbol`, `func`, `edge`, `module`, `file`, `test`, `comment`, `annotation` or
+/// `event`),
+/// the decision's resolved `options`, and the standard function library over
+/// the code model: `metrics(n)`, `callers(n)`, `owner(n)`, `tests(n)`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct CelCheck {
+    /// What the check looks at. Default: what the decision's `scope.subject`
+    /// is about; a decision about the project says which it looks at.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<Select>,
+    /// Named intermediate values, evaluated in order before `where`; each
+    /// expression sees the ones before it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<Variable>,
+    /// CEL; true for a violation.
+    #[serde(rename = "where")]
+    pub condition: String,
+    /// Text with `{{ cel }}` holes.
+    pub message: String,
+    /// Evidence fields, each a CEL expression.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub evidence: BTreeMap<String, String>,
+    /// Where the finding is reported when it is not at the selected value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<At>,
+    /// What makes a finding the same finding from one run to the next, when
+    /// the default (the selected value) does not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<Identity>,
+    /// The condition under which the check is unsure and leaves the subject to
+    /// the next layer. CEL over the selected value, evaluated when `where` is
+    /// false: when it is true, or gives a kind (a string), a model is asked and
+    /// the subject is a finding, with this check's message, evidence and
+    /// identity, only if the model says `fail`. An unbound or unsure model
+    /// leaves the subject to agent review. A check that cannot be proven by
+    /// the code model but can be suspected by it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub abstain: Option<String>,
+    /// What the model is told about `abstain`'s subjects. Default: the
+    /// decision's requirement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+}
+
 /// What a CEL check looks at; each choice binds one variable of the same name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -236,53 +283,6 @@ impl Select {
             Self::Decision => "decision",
         }
     }
-}
-
-/// A rule written as data: a `where` expression that is true for a violation
-/// of the selected values, and a message. The expressions see the selected
-/// value (`symbol`, `func`, `edge`, `module`, `file`, `test`, `comment`, `annotation` or
-/// `event`),
-/// the decision's resolved `options`, and the standard function library over
-/// the code model: `metrics(n)`, `callers(n)`, `owner(n)`, `tests(n)`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct CelCheck {
-    /// What the check looks at. Default: what the decision's `scope.subject`
-    /// is about; a decision about the project says which it looks at.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub select: Option<Select>,
-    /// Named intermediate values, evaluated in order before `where`; each
-    /// expression sees the ones before it.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub variables: Vec<Variable>,
-    /// CEL; true for a violation.
-    #[serde(rename = "where")]
-    pub condition: String,
-    /// Text with `{{ cel }}` holes.
-    pub message: String,
-    /// Evidence fields, each a CEL expression.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub evidence: BTreeMap<String, String>,
-    /// Where the finding is reported when it is not at the selected value.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub at: Option<At>,
-    /// What makes a finding the same finding from one run to the next, when
-    /// the default (the selected value) does not.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub identity: Option<Identity>,
-    /// The condition under which the check is unsure and leaves the subject to
-    /// the next layer. CEL over the selected value, evaluated when `where` is
-    /// false: when it is true, or gives a kind (a string), a model is asked and
-    /// the subject is a finding, with this check's message, evidence and
-    /// identity, only if the model says `fail`. An unbound or unsure model
-    /// leaves the subject to agent review. A check that cannot be proven by
-    /// the code model but can be suspected by it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub abstain: Option<String>,
-    /// What the model is told about `abstain`'s subjects. Default: the
-    /// decision's requirement.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<String>,
 }
 
 /// A named CEL value: an intermediate result the check, its message, its

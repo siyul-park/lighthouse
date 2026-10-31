@@ -18,35 +18,6 @@ pub trait Spec {
     const KIND: &'static str;
 }
 
-/// Who a resource is. Identity is `name`; grouping is by label, never by
-/// where the document is stored.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Metadata {
-    /// Fully qualified name, such as `design/no-redundant-qualifier`.
-    pub name: String,
-    /// Identity that outlives the name: a UUID v4 assigned once, never derived
-    /// from the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub uid: Option<String>,
-    /// Selectable facts, keyed `lighthouse/<name>`.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub labels: BTreeMap<String, String>,
-    /// Free notes; never used to select.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub annotations: BTreeMap<String, String>,
-}
-
-impl Metadata {
-    /// Metadata with a name and nothing else.
-    pub fn named(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            ..Self::default()
-        }
-    }
-}
-
 /// A document: the envelope around the spec `S`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Resource<S> {
@@ -117,6 +88,35 @@ impl<S: Spec + JsonSchema> JsonSchema for Resource<S> {
             "required": ["apiVersion", "kind", "metadata", "spec"],
             "additionalProperties": false,
         })
+    }
+}
+
+/// Who a resource is. Identity is `name`; grouping is by label, never by
+/// where the document is stored.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Metadata {
+    /// Fully qualified name, such as `design/no-redundant-qualifier`.
+    pub name: String,
+    /// Identity that outlives the name: a UUID v4 assigned once, never derived
+    /// from the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+    /// Selectable facts, keyed `lighthouse/<name>`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
+    /// Free notes; never used to select.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub annotations: BTreeMap<String, String>,
+}
+
+impl Metadata {
+    /// Metadata with a name and nothing else.
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            ..Self::default()
+        }
     }
 }
 

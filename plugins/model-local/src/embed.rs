@@ -36,7 +36,30 @@ const BUCKETS: [usize; 4] = [64, 128, 256, MAX_LENGTH];
 /// Components are rounded to a multiple of 1/this.
 const SCALE: f64 = 1e5;
 
-type Run = Box<dyn FnMut(&[String]) -> Result<Vec<Vec<f32>>, String>>;
+/// The embedders opened so far: one is loaded once however often it is asked.
+pub struct Embedders {
+    open: Open,
+    loaded: BTreeMap<String, Embedder>,
+}
+
+impl Embedders {
+    pub fn new(open: Open) -> Self {
+        Self {
+            open,
+            loaded: BTreeMap::new(),
+        }
+    }
+
+    pub fn get(&mut self, name: &str) -> Result<&mut Embedder, String> {
+        match self.loaded.entry(name.to_owned()) {
+            Entry::Occupied(entry) => Ok(entry.into_mut()),
+            Entry::Vacant(entry) => Ok(entry.insert((self.open)(name)?)),
+        }
+    }
+}
+
+/// How an embedder is opened by its name.
+pub type Open = fn(&str) -> Result<Embedder, String>;
 
 /// An embedder that is loaded.
 pub struct Embedder {
@@ -96,30 +119,7 @@ impl Embedder {
     }
 }
 
-/// How an embedder is opened by its name.
-pub type Open = fn(&str) -> Result<Embedder, String>;
-
-/// The embedders opened so far: one is loaded once however often it is asked.
-pub struct Embedders {
-    open: Open,
-    loaded: BTreeMap<String, Embedder>,
-}
-
-impl Embedders {
-    pub fn new(open: Open) -> Self {
-        Self {
-            open,
-            loaded: BTreeMap::new(),
-        }
-    }
-
-    pub fn get(&mut self, name: &str) -> Result<&mut Embedder, String> {
-        match self.loaded.entry(name.to_owned()) {
-            Entry::Occupied(entry) => Ok(entry.into_mut()),
-            Entry::Vacant(entry) => Ok(entry.insert((self.open)(name)?)),
-        }
-    }
-}
+type Run = Box<dyn FnMut(&[String]) -> Result<Vec<Vec<f32>>, String>>;
 
 /// The model and its tokenizer.
 struct Gemma {
