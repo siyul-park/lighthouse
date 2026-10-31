@@ -19,8 +19,10 @@ spec:
     package is `x` or `x_test`. Two findings, told apart by the evidence
     `kind`. `unpaired`: a test file named after no source file of its
     directory (`helpers_test.go` beside no `helpers.go`), reported at its first
-    declaration; `export_test.go`, `example_test.go` and `main_test.go` are Go
-    conventions that need no source file (option `allow`), and a directory with
+    declaration; `export_test.go`, `main_test.go`, example files and benchmark
+    files (`example_test.go`, `example_*_test.go`, `*_example_test.go`,
+    `bench_test.go`, `*_bench_test.go`) are Go conventions that need no source
+    file (option `allow`, globs of the base name), and a directory with
     no source file at all (`examples/`, a conformance suite) has nothing to be
     named after. `misplaced`: an owner test (see `testing/no-missing-owner`) of
     a symbol declared in `y.go` that sits in a test file other than
@@ -30,12 +32,12 @@ spec:
 
     No tool has this precedent. The severity follows the measured precision of
     the findings. Measured on cel, qlbridge and lighthouse's own Go before its
-    tests were moved (minivm, which was being edited, left out): 45 of 47
-    findings are right (96%), 27 of 27 `misplaced` and 18 of 20 `unpaired`; the
-    two others are a Go example file (`cel_example_test.go`) and a benchmark
-    file (`vm_bench_test.go`), which the convention names after neither a
-    source file nor `example_test.go`. At 95% or more the project approved
-    `error` (user decision, outside the precedent gate).
+    tests were moved (minivm, which was being edited, left out): 45 of 45
+    findings are right, 27 of 27 `misplaced` and 18 of 18 `unpaired`, once the
+    Go example and benchmark file conventions are in `allow` (without them
+    `cel_example_test.go` and `vm_bench_test.go` were wrong: 18 of 20). At 95%
+    or more for each kind the project approved `error` (user decision, outside
+    the precedent gate).
   scope:
     subject: symbol
     tests: only
@@ -52,10 +54,12 @@ spec:
         type: array
         items:
           type: string
-        default: [export, example, main]
+        default: [export, example, 'example_*', '*_example', bench, '*_bench', main]
         description: >-
-          Base names of test files that need no source file: Go's
-          `export_test.go` and example-file conventions.
+          Globs of the base names of test files that need no source file: Go's
+          `export_test.go`, its example files (`example_test.go`,
+          `example_*_test.go`, `*_example_test.go`) and benchmark files
+          (`bench_test.go`, `*_bench_test.go`).
     additionalProperties: false
   check:
     type: cel
@@ -69,7 +73,7 @@ spec:
         expression: >-
           symbol.file.endsWith('_test.go') && size(file.symbols) > 0 && file.symbols[0].id == symbol.id
           && file.pair != null && file.pair.sourced && file.pair.found == ''
-          && !(file.pair.base in options.allow)
+          && !options.allow.exists(g, glob.matches(file.pair.base, g))
       - name: owned
         expression: "symbol.kind == 'test' && has(symbol.owned) && symbol.owned != null ? symbol.owned : {}"
       - name: misplaced
@@ -114,6 +118,31 @@ spec:
             		t.Fatal("get")
             	}
             }
+    - name: example-and-benchmark-files
+      language: go
+      kind: valid
+      files:
+        - path: store.go
+          body: |-
+            package sample
+
+            func Get() int { return 1 }
+        - path: store_example_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func ExampleGet() {}
+
+            func TestExampleOnly(t *testing.T) {}
+        - path: store_bench_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func BenchmarkGet(b *testing.B) {}
     - name: unpaired-helpers
       language: go
       kind: invalid
