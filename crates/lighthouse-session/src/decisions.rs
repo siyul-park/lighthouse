@@ -1,8 +1,14 @@
 //! Looking at decisions and running their examples.
 
-use std::{cell::RefCell, collections::BTreeSet, fmt::Write, fs};
+use std::{
+    cell::RefCell,
+    collections::BTreeSet,
+    fmt::Write,
+    fs,
+    time::{Duration, Instant},
+};
 
-use lighthouse_engine::RuleTester;
+use lighthouse_engine::{RuleTester, Spent};
 use lighthouse_plugin::Registry;
 use lighthouse_report::docs::{Density, decision_markdown};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
@@ -20,6 +26,9 @@ const ENTRY: Density<'static> = Density::Entry {
 
 /// The language examples without a provider run in.
 const NEUTRAL: &str = "text";
+
+/// How many of the slowest decisions the timings name.
+const SLOWEST: usize = 10;
 
 /// One line of a decision listing.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -68,6 +77,56 @@ pub struct DecisionTest {
     /// One line per conflict with another decision that an example declares
     /// and still has: a candidate for a contradiction, not a failure.
     pub conflicts: Vec<String>,
+    /// Where the time went; reported on request.
+    #[serde(skip)]
+    pub timings: TestTimings,
+}
+
+/// Where the time of a decision test went, in seconds. The phases are summed
+/// over all examples (and, when examples run side by side, over all workers).
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestTimings {
+    /// Starting the plugins.
+    pub plugin_start: f64,
+    /// Building each example's engine and checking it.
+    pub check: f64,
+    /// Applying the fixes and judging them.
+    pub fix: f64,
+    /// Checking the examples against the other decisions.
+    pub crossing: f64,
+    /// The decisions that took longest, with the language they ran in.
+    pub slowest: Vec<SlowDecision>,
+}
+
+/// A decision and the time its examples took in one language.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct SlowDecision {
+    pub decision: String,
+    pub language: String,
+    pub seconds: f64,
+}
+
+impl TestTimings {
+    /// The lines of the breakdown.
+    pub fn lines(&self) -> Vec<String> {
+        let mut out = vec![
+            format!("timings: plugin start {:.1}s", self.plugin_start),
+            format!("timings: check {:.1}s (summed over examples)", self.check),
+            format!("timings: fix {:.1}s (summed over examples)", self.fix),
+            format!(
+                "timings: crossing {:.1}s (summed over examples)",
+                self.crossing
+            ),
+        ];
+        out.extend(self.slowest.iter().map(|slow| {
+            format!(
+                "timings: slowest {} [{}] {:.1}s",
+                slow.decision, slow.language, slow.seconds
+            )
+        }));
+        out
+    }
 }
 
 /// The decisions the registry has a rule for, with their catalog titles; with
@@ -213,7 +272,9 @@ pub(crate) fn test_catalog(
 ) -> Result<DecisionTest> {
     let decisions = selected(catalog, ids)?;
     let shipped = &session.base;
+    let started = Instant::now();
     let (probe, registered) = session.registry()?;
+    let start = started.elapsed();
     if let Some(gap) = registered.incomplete.first() {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());
     }
@@ -238,6 +299,8 @@ pub(crate) fn test_catalog(
     let mut conflicts = Vec::new();
     let mut runs = 0;
     let restart_error = RefCell::new(None);
+    let mut spent = Spent::default();
+    let mut per_decision = Vec::new();
     for language in &languages {
         // Each example needs a fresh registry; if plugins cannot be started
         // again, the example still runs (on the in-process rules) and the
@@ -267,6 +330,12 @@ pub(crate) fn test_catalog(
                     .map(|f| format!("[{language}] {f}")),
             );
             let tested = tester.tested(decision);
+            spent += tested.spent;
+            per_decision.push((
+                decision.id().to_owned(),
+                language.clone(),
+                tested.spent.total(),
+            ));
             failures.extend(
                 tested
                     .failures
@@ -291,7 +360,28 @@ pub(crate) fn test_catalog(
         failures,
         skipped,
         conflicts,
+        timings: TestTimings {
+            plugin_start: start.as_secs_f64(),
+            check: spent.check.as_secs_f64(),
+            fix: spent.fix.as_secs_f64(),
+            crossing: spent.crossing.as_secs_f64(),
+            slowest: slowest(per_decision),
+        },
     })
+}
+
+/// The slowest of `spent`, longest first, ties by decision and language.
+fn slowest(mut spent: Vec<(String, String, Duration)>) -> Vec<SlowDecision> {
+    spent.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| (&a.0, &a.1).cmp(&(&b.0, &b.1))));
+    spent.truncate(SLOWEST);
+    spent
+        .into_iter()
+        .map(|(decision, language, spent)| SlowDecision {
+            decision,
+            language,
+            seconds: spent.as_secs_f64(),
+        })
+        .collect()
 }
 
 /// One failure for each decision whose languages name no registered provider:

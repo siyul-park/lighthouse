@@ -28,8 +28,8 @@ pub mod signal;
 pub use authoring::{Authored, create_decision, replace_decision};
 pub use check::{CheckReport, CheckRequest, Checked, RunStatus, Summary, check};
 pub use decisions::{
-    DecisionRow, DecisionTest, active_decisions, catalog_index, config_summary, decision_rows,
-    decision_text, explain, test_decisions,
+    DecisionRow, DecisionTest, TestTimings, active_decisions, catalog_index, config_summary,
+    decision_rows, decision_text, explain, test_decisions,
 };
 pub use descriptor::Fixing;
 pub use findings::Remembered;

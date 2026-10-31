@@ -8,6 +8,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::PathBuf,
+    time::Instant,
 };
 
 use lighthouse_model::Fingerprint;
@@ -85,6 +86,19 @@ impl Orchestrator<'_> {
     /// Undoes the newest link of the chain among the fixes by a model that
     /// stand, and declines its findings with `why`. False when none stands.
     pub(super) fn roll_back_newest(
+        &mut self,
+        outcome: &Run,
+        links: &Links,
+        marks: &BTreeMap<usize, Mark>,
+        why: &str,
+    ) -> bool {
+        let started = Instant::now();
+        let undone = self.undo_newest(outcome, links, marks, why);
+        self.timings.rollback += started.elapsed();
+        undone
+    }
+
+    fn undo_newest(
         &mut self,
         outcome: &Run,
         links: &Links,

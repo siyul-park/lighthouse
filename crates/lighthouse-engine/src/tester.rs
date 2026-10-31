@@ -1,4 +1,10 @@
-use std::{fmt::Write as _, fs, path::Path};
+use std::{
+    fmt::Write as _,
+    fs,
+    ops::{Add, AddAssign},
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use tempfile::TempDir;
 
@@ -119,7 +125,7 @@ impl<'a> RuleTester<'a> {
             if absent(decision, example).is_some() {
                 continue;
             }
-            match self.run(decision, example) {
+            match self.run(decision, example, &mut tested.spent) {
                 Ok(known) => tested.conflicts.extend(
                     known
                         .into_iter()
@@ -172,7 +178,12 @@ impl<'a> RuleTester<'a> {
     }
 
     /// Runs `example` of `decision`; the conflicts it declares and still has.
-    fn run(&self, decision: &Decision, example: &Example) -> Result<Vec<String>, String> {
+    fn run(
+        &self,
+        decision: &Decision,
+        example: &Example,
+        spent: &mut Spent,
+    ) -> Result<Vec<String>, String> {
         let fixing = decision.fix.as_ref().is_some_and(Fix::deterministic)
             && example.kind == ExampleKind::Invalid
             && !example.fixed.is_empty();
@@ -183,6 +194,7 @@ impl<'a> RuleTester<'a> {
         } else {
             Vec::new()
         };
+        let started = Instant::now();
         let registry = (self.registry)();
         let shared: &[&Decision] = if fixing { &[] } else { &others };
         let config = config(&registry, decision, example, shared, &self.sources)?;
@@ -194,13 +206,17 @@ impl<'a> RuleTester<'a> {
             models: ModelOptions::default(),
         }
         .run_in(decision.id(), example)?;
+        spent.check += started.elapsed();
         if !outcome.incomplete.is_empty() {
             return Err(format!("analysis incomplete: {:?}", outcome.incomplete));
         }
         let found = found(&outcome);
         match example.kind {
             ExampleKind::Valid if found.is_empty() => {
-                judge(example, &cross(&engine, &others, example)?)
+                let started = Instant::now();
+                let hits = cross(&engine, &others, example);
+                spent.crossing += started.elapsed();
+                judge(example, &hits?)
             }
             ExampleKind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
             ExampleKind::Invalid => {
@@ -208,10 +224,17 @@ impl<'a> RuleTester<'a> {
                 if !fixing {
                     return judge(example, &[]);
                 }
+                let started = Instant::now();
                 let crossing = self.crossing(&others, dir.path())?;
                 let before = cross(&crossing, &others, example)?;
-                self.check_fix(&engine, decision, example, dir.path())?;
+                spent.crossing += started.elapsed();
+                let started = Instant::now();
+                let fixed = self.check_fix(&engine, decision, example, dir.path());
+                spent.fix += started.elapsed();
+                fixed?;
+                let started = Instant::now();
                 let after = cross(&crossing, &others, example)?;
+                spent.crossing += started.elapsed();
                 judge(example, &introduced(example, dir.path(), &before, after))
             }
         }
@@ -283,6 +306,44 @@ pub struct Tested {
     /// One line for each conflict with another decision that an example
     /// declares and still has.
     pub conflicts: Vec<String>,
+    /// Where the time of its examples went.
+    pub spent: Spent,
+}
+
+/// Where the time of running examples went, summed over them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Spent {
+    /// Building the registry and engine of the example and checking it.
+    pub check: Duration,
+    /// Applying the decision's fix and judging the result.
+    pub fix: Duration,
+    /// Checking the example against the other decisions.
+    pub crossing: Duration,
+}
+
+impl Spent {
+    /// Everything together.
+    pub fn total(&self) -> Duration {
+        self.check + self.fix + self.crossing
+    }
+}
+
+impl Add for Spent {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            check: self.check + other.check,
+            fix: self.fix + other.fix,
+            crossing: self.crossing + other.crossing,
+        }
+    }
+}
+
+impl AddAssign for Spent {
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
 }
 
 /// What an example is run with: the project's own configuration and plugins,

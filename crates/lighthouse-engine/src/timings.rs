@@ -91,6 +91,67 @@ impl Timings {
     }
 }
 
+/// Where the time of a fix run went. `apply` and `settle` contain the checks
+/// they make; `checks` lists every check on its own, by round.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FixTimings {
+    /// One entry per check of the project over the texts of the run: the round
+    /// it belonged to (0 before the first) and how long it took.
+    pub checks: Vec<(usize, Duration)>,
+    /// Asking the fixers for proposals, lowering their edits included.
+    pub propose: Duration,
+    /// Applying the proposals of rounds (collision, candidate texts, check,
+    /// settling and judging), the checks included.
+    pub apply: Duration,
+    /// The safe follow-up fixes of what a round introduced, the checks included.
+    pub settle: Duration,
+    /// Undoing the newest link of a chain that a `[fix] verify` program refused.
+    pub rollback: Duration,
+    /// Running the programs of command fixes, formatters among them.
+    pub command: Duration,
+    /// Verifying the hashes and writing the files.
+    pub write: Duration,
+}
+
+impl FixTimings {
+    /// The lines of the breakdown, after those of the check.
+    pub fn lines(&self, rounds: usize) -> Vec<String> {
+        let mut out = vec![format!("timings: fix rounds {rounds}")];
+        let last = self.checks.iter().map(|(at, _)| *at).max().unwrap_or(0);
+        for round in 0..=last {
+            let (count, spent) = self.round(round);
+            if count > 0 {
+                out.push(format!(
+                    "{} ({count} check(s))",
+                    line(&format!("fix round {round} checks"), spent)
+                ));
+            }
+        }
+        let (count, spent) = (0..=last).fold((0, Duration::ZERO), |(n, sum), r| {
+            let (c, s) = self.round(r);
+            (n + c, sum + s)
+        });
+        out.push(format!("{} ({count} check(s))", line("fix checks", spent)));
+        out.push(line("fix propose", self.propose));
+        out.push(line("fix apply (with its checks)", self.apply));
+        out.push(line("fix settle (with its checks)", self.settle));
+        out.push(line("fix rollback", self.rollback));
+        out.push(line("fix command", self.command));
+        out.push(line("fix write", self.write));
+        out
+    }
+
+    /// The checks of `round`: how many and how long together.
+    fn round(&self, round: usize) -> (usize, Duration) {
+        self.checks
+            .iter()
+            .filter(|(at, _)| *at == round)
+            .fold((0, Duration::ZERO), |(n, sum), (_, spent)| {
+                (n + 1, sum + *spent)
+            })
+    }
+}
+
 fn line(phase: &str, spent: Duration) -> String {
     format!("timings: {phase} {:.1}ms", spent.as_secs_f64() * 1000.0)
 }

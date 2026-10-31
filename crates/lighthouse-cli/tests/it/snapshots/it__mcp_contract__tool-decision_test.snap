@@ -78,6 +78,67 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           "type": "string"
         },
         "type": "array"
+      },
+      "timings": {
+        "description": "Where the time went; present only with `timings`.",
+        "properties": {
+          "check": {
+            "description": "Building each example's engine and checking it.",
+            "format": "double",
+            "type": "number"
+          },
+          "crossing": {
+            "description": "Checking the examples against the other decisions.",
+            "format": "double",
+            "type": "number"
+          },
+          "fix": {
+            "description": "Applying the fixes and judging them.",
+            "format": "double",
+            "type": "number"
+          },
+          "pluginStart": {
+            "description": "Starting the plugins.",
+            "format": "double",
+            "type": "number"
+          },
+          "slowest": {
+            "description": "The decisions that took longest, with the language they ran in.",
+            "items": {
+              "description": "A decision and the time its examples took in one language.",
+              "properties": {
+                "decision": {
+                  "type": "string"
+                },
+                "language": {
+                  "type": "string"
+                },
+                "seconds": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "decision",
+                "language",
+                "seconds"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "pluginStart",
+          "check",
+          "fix",
+          "crossing",
+          "slowest"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
       }
     },
     "required": [

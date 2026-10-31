@@ -9,8 +9,8 @@ use std::{
 use lighthouse_model::Attribution;
 use lighthouse_report::{Aim, CheckInfo, Descriptor, FixInfo};
 use lighthouse_session::{
-    Authored, DecisionRow, DecisionTest, Fixing, Session, active_decisions, create_decision,
-    decision_rows, explain,
+    Authored, DecisionRow, DecisionTest, Fixing, Session, TestTimings, active_decisions,
+    create_decision, decision_rows, explain,
     model::{self, EvalReport, EvalRequest, Side},
     replace_decision,
     signal::{self, Support},
@@ -75,6 +75,9 @@ pub(super) struct DecisionTested {
     ok: bool,
     #[serde(flatten)]
     ran: DecisionTest,
+    /// Where the time went; present only with `timings`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timings: Option<TestTimings>,
 }
 
 /// `decision list`.
@@ -234,6 +237,7 @@ pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Re
     let ran = test_decisions(&session, &args.decision, args.language.as_deref())?;
     let report = DecisionTested {
         ok: ran.failures.is_empty(),
+        timings: args.timings.then(|| ran.timings.clone()),
         ran,
     };
     let code = if report.ok { 0 } else { FOUND };
@@ -260,7 +264,11 @@ pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Re
         );
         out
     })?;
-    Ok(reply.with_code(code))
+    let mut reply = reply.with_code(code);
+    if let (Some(timings), Format::Text) = (&report.timings, format) {
+        reply.notes.extend(timings.lines());
+    }
+    Ok(reply)
 }
 
 /// `decision eval`.

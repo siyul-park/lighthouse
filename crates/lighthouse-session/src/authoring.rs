@@ -214,6 +214,7 @@ fn commit(
             failures: Vec::new(),
             skipped: Vec::new(),
             conflicts: Vec::new(),
+            timings: crate::TestTimings::default(),
         }
     };
     if !test.failures.is_empty() {

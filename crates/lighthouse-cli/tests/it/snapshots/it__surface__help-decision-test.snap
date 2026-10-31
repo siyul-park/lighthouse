@@ -28,6 +28,9 @@ Options:
           [default: auto]
           [possible values: auto, always, never]
 
+      --timings
+          Print where the time went: starting the plugins, checking, fixing and crossing summed over the examples, and the ten slowest decisions. Text: to stderr; JSON: under `timings`. Results do not change
+
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
 

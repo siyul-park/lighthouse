@@ -1,4 +1,6 @@
-use lighthouse_engine::{ExampleRun, ModelOptions, RuleTester};
+use std::time::Duration;
+
+use lighthouse_engine::{ExampleRun, ModelOptions, RuleTester, Spent};
 use lighthouse_model::{
     Diagnostic, Fingerprint, Options, Position, Safety, Severity, Span,
     ucm::{Capability, EditOp, FixOutcome, Fragment},
@@ -725,4 +727,16 @@ fn a_finding_the_example_had_before_its_fix_is_not_introduced_by_it() {
         failures[0].contains("todo: it also breaks fake/wip"),
         "{failures:?}"
     );
+}
+
+#[test]
+fn spent_sums_by_phase() {
+    let one = Spent {
+        check: Duration::from_millis(3),
+        fix: Duration::from_millis(2),
+        crossing: Duration::from_millis(1),
+    };
+    let two = one + one;
+    assert_eq!(two.check, Duration::from_millis(6));
+    assert_eq!(two.total(), Duration::from_millis(12));
 }

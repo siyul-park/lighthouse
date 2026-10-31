@@ -2,8 +2,10 @@
 //! given to, and what the fixer proposes, lowered to text edits.
 
 use std::{
+    cell::Cell,
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
+    time::Duration,
 };
 
 use lighthouse_model::{
@@ -100,6 +102,8 @@ pub(super) struct Proposer<'e> {
     pub(super) models: Option<ModelFixer<'e>>,
     /// Where the fixes a run withholds are kept; `None` keeps nothing.
     pub(super) kept: Option<Cache>,
+    /// The time the programs of command fixes ran.
+    pub(super) command_time: Cell<Duration>,
 }
 
 impl<'e> Proposer<'e> {
@@ -111,6 +115,7 @@ impl<'e> Proposer<'e> {
             run,
             models: None,
             kept: None,
+            command_time: Cell::new(Duration::ZERO),
         }
     }
 

@@ -5,6 +5,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::PathBuf,
+    time::Instant,
 };
 
 use lighthouse_model::{Fingerprint, write_atomic, write_atomic_guarded};
@@ -52,6 +53,7 @@ impl Orchestrator<'_> {
     /// applied. A dry run writes nothing.
     pub(super) fn write(mut self, outcome: Result<Run, Error>) -> Result<FixReport, Error> {
         let outcome = outcome?;
+        let started = Instant::now();
         let changed: Vec<PathBuf> = self
             .texts
             .iter()
@@ -131,6 +133,8 @@ impl Orchestrator<'_> {
         }
         let (models, usage, model_edits) = self.model_counts(&kept);
         self.notes.extend(self.proposer.finish_kept());
+        self.timings.write = started.elapsed();
+        self.timings.command = self.proposer.command_time.get();
         Ok(FixReport {
             applied: kept,
             declined: self.declined.into_values().collect(),
@@ -142,6 +146,7 @@ impl Orchestrator<'_> {
             usage,
             model_edits,
             finished: outcome,
+            timings: self.timings,
         })
     }
 

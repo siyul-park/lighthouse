@@ -144,9 +144,7 @@ impl Orchestrator<'_> {
                 files: changed,
                 findings: &introduced,
             };
-            let (found, _) = self
-                .proposer
-                .propose(&after, &self.texts, Phase::Rules, taking)?;
+            let (found, _) = self.proposals(&after, Phase::Rules, taking)?;
             let mut safe: Vec<Proposal> = found
                 .into_iter()
                 .filter(|p| p.safety == Safety::Safe && p.files.iter().all(|f| changed.contains(f)))
@@ -178,7 +176,7 @@ impl Orchestrator<'_> {
                 .into_iter()
                 .map(|(file, text)| (file.clone(), self.texts.insert(file, text)))
                 .collect();
-            let mut next = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
+            let mut next = self.recheck()?;
             let mut made = made;
             let mut prior = prior;
             let mut bad = worse(&after, &next, changed);
@@ -192,7 +190,7 @@ impl Orchestrator<'_> {
                 });
                 bad = undone;
                 if !prior.is_empty() {
-                    next = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
+                    next = self.recheck()?;
                     bad = worse(&after, &next, changed);
                 }
             }

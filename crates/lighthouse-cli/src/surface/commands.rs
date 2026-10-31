@@ -78,7 +78,10 @@ pub struct CheckCommand {
     pub format: CheckFormat,
     /// Print where the time went to stderr, phase by phase: reading, each
     /// language provider, merging, analyzers, the slowest rules, identity,
-    /// the store and the report. Findings and exit code do not change.
+    /// the store and the report. With --fix it also reports the fix loop first:
+    /// rounds, the checks of each round, proposing, applying, settling,
+    /// rolling back, command fixes and writing. Findings and exit code do not
+    /// change.
     #[arg(long)]
     pub timings: bool,
     /// Fix what the catalog's fixers can fix, then report what is left. Only

@@ -6,7 +6,7 @@
 //! within the scope of the fix is the proposal; a run that changed nothing
 //! declines the finding, with what the program said as the reason.
 
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, path::Path, time::Instant};
 
 use lighthouse_model::{Diagnostic, Safety};
 use lighthouse_process::{Environment, Home, Job, Ran, context, expand};
@@ -172,6 +172,14 @@ impl Proposer<'_> {
 
     /// Runs the program for the finding and gathers what it changed.
     fn rewrite(&self, launch: &Launch<'_>, world: &World<'_>) -> Result<Changes, Failure> {
+        let started = Instant::now();
+        let changes = self.run_program(launch, world);
+        self.command_time
+            .set(self.command_time.get() + started.elapsed());
+        changes
+    }
+
+    fn run_program(&self, launch: &Launch<'_>, world: &World<'_>) -> Result<Changes, Failure> {
         let program = launch.program;
         let filter = program.stdin == Stdin::File && program.output(Point::Fix) == Output::Stdout;
         if filter {

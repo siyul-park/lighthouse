@@ -28,6 +28,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
     let mut messages = Vec::new();
     let mut shown = BTreeMap::new();
     let mut properties = serde_json::Map::new();
+    let mut fix_timings = Vec::new();
     if command.fix {
         let selection = FixArgs {
             paths: args.paths.clone(),
@@ -37,6 +38,9 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
             options: command.options.clone(),
         };
         let done = apply(ctx, &selection, !args.no_store, !args.no_cache)?;
+        if command.timings {
+            fix_timings = done.timings.lines(done.rounds);
+        }
         messages = done.lines();
         shown = done.shown.clone();
         properties = done.properties();
@@ -57,6 +61,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
     }
     .with_messages(&checked.messages);
     if command.timings {
+        reply.notes.extend(fix_timings);
         reply.notes.extend(
             checked
                 .run

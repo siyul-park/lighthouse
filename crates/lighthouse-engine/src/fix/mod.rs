@@ -35,7 +35,7 @@ pub use edits::unified_diff;
 use model::ModelFix;
 pub use model::{BatchTrace, ModelCounts, ToolCounts};
 
-use crate::{Needs, Run};
+use crate::{FixTimings, Needs, Run};
 
 /// How many apply-and-recheck rounds a run takes before it stops.
 pub const MAX_ROUNDS: usize = 5;
@@ -315,6 +315,8 @@ pub struct FixReport {
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
     pub finished: Run,
+    /// Where the time of the run went.
+    pub timings: FixTimings,
 }
 
 /// What the runs of an agent that edits took, and did.

@@ -6,6 +6,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use lighthouse_model::Fingerprint;
@@ -31,6 +32,19 @@ impl Orchestrator<'_> {
     pub(super) fn apply_round(
         &mut self,
         before: &Run,
+        proposals: Vec<Proposal>,
+        round: usize,
+    ) -> Result<Option<Run>, Error> {
+        self.round = round;
+        let started = Instant::now();
+        let applied = self.apply_proposals(before, proposals, round);
+        self.timings.apply += started.elapsed();
+        applied
+    }
+
+    fn apply_proposals(
+        &mut self,
+        before: &Run,
         mut proposals: Vec<Proposal>,
         round: usize,
     ) -> Result<Option<Run>, Error> {
@@ -52,13 +66,16 @@ impl Orchestrator<'_> {
         let after = if failed.len() == kept.len() && changed.is_empty() {
             None
         } else {
-            Some(self.proposer.engine.check_overlaid(&[], &[], &self.texts)?)
+            Some(self.recheck()?)
         };
         let mut followed = Vec::new();
         let after = match after {
             Some(run) => {
                 let settled;
-                (settled, followed) = self.settle(before, run, &changed, &kept)?;
+                let started = Instant::now();
+                let outcome = self.settle(before, run, &changed, &kept);
+                self.timings.settle += started.elapsed();
+                (settled, followed) = outcome?;
                 fold(&mut kept, &mut merged, &self.texts, &candidates.bases);
                 Some(settled)
             }

@@ -122,7 +122,7 @@ Options:
           [default: text]
 
       --timings
-          Print where the time went to stderr, phase by phase: reading, each language provider, merging, analyzers, the slowest rules, identity, the store and the report. Findings and exit code do not change
+          Print where the time went to stderr, phase by phase: reading, each language provider, merging, analyzers, the slowest rules, identity, the store and the report. With --fix it also reports the fix loop first: rounds, the checks of each round, proposing, applying, settling, rolling back, command fixes and writing. Findings and exit code do not change
 
       --fix
           Fix what the catalog's fixers can fix, then report what is left. Only safe fixes are written, whatever makes them (a rule, a command, a plugin); unsafe ones, which every fix by a model is, are shown as previews with how to apply them. Each fix is verified (re-checked, with the safe fixes of what it introduced) and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed
@@ -387,6 +387,9 @@ Arguments:
 Options:
       --language <LANGUAGE>
           Run the examples in this language only
+
+      --timings
+          Print where the time went: starting the plugins, checking, fixing and crossing summed over the examples, and the ten slowest decisions. Text: to stderr; JSON: under `timings`. Results do not change
 
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)

@@ -59,7 +59,7 @@ impl Orchestrator<'_> {
                 (file, rules)
             })
             .collect();
-        let outcome = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
+        let outcome = self.recheck()?;
         for (file, rules) in cycles {
             self.decline_cycle(&outcome, &file, &rules);
         }

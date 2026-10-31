@@ -92,6 +92,9 @@ pub struct Fixed {
     /// made last for a fingerprint stands for all of them.
     #[serde(skip)]
     pub shown: BTreeMap<String, Preview>,
+    /// Where the time of the run went, for `--timings`.
+    #[serde(skip)]
+    pub timings: lighthouse_engine::FixTimings,
 }
 
 /// An `unsafe` fix that was left for a hand to apply.
@@ -422,6 +425,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         }),
         messages,
         shown,
+        timings: report.timings,
     })
 }
 

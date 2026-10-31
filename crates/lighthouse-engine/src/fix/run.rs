@@ -4,7 +4,7 @@ mod rollback;
 mod settle;
 mod write;
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf, time::Instant};
 
 use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_protocol::hash::Hasher;
@@ -18,7 +18,7 @@ use chain::{Links, Mark};
 use cycle::Trail;
 use rollback::apart;
 
-use crate::{Engine, Error, Overlays, Run};
+use crate::{Engine, Error, FixTimings, Overlays, Run};
 
 /// The state of one fix run.
 pub(super) struct Orchestrator<'e> {
@@ -40,6 +40,10 @@ pub(super) struct Orchestrator<'e> {
     previewable: BTreeMap<Fingerprint, Standing>,
     /// `unsafe` fixes that were accepted and are left for a hand.
     previews: Vec<PreviewedFix>,
+    /// Where the time went.
+    timings: FixTimings,
+    /// The round the checks being made belong to.
+    round: usize,
 }
 
 /// A fix that stands applied in the texts of the run.
@@ -81,6 +85,8 @@ impl Engine {
             rounds: 0,
             previewable: BTreeMap::new(),
             previews: Vec::new(),
+            timings: FixTimings::default(),
+            round: 0,
         };
         let outcome = orchestrator
             .rounds()
@@ -90,6 +96,27 @@ impl Engine {
 }
 
 impl Orchestrator<'_> {
+    /// A check of the project over the texts of the run, timed.
+    pub(super) fn recheck(&mut self) -> Result<Run, Error> {
+        let started = Instant::now();
+        let run = self.proposer.engine.check_overlaid(&[], &[], &self.texts);
+        self.timings.checks.push((self.round, started.elapsed()));
+        run
+    }
+
+    /// The proposals of the fixers over the texts of the run, timed.
+    pub(super) fn proposals(
+        &mut self,
+        outcome: &Run,
+        phase: Phase,
+        taking: Taking<'_>,
+    ) -> Result<(Vec<Proposal>, BTreeMap<Fingerprint, DeclinedFix>), Error> {
+        let started = Instant::now();
+        let proposed = self.proposer.propose(outcome, &self.texts, phase, taking);
+        self.timings.propose += started.elapsed();
+        proposed
+    }
+
     /// The rounds that apply what the run may write, then the verification
     /// of what it may not, over the state the rounds left: the run of the last
     /// check. Candidates live in memory only, so an error leaves the disk as it
@@ -108,12 +135,12 @@ impl Orchestrator<'_> {
     /// check and, when it ended because nothing was left to apply, the
     /// proposals the run may not write over that state.
     fn apply_rules(&mut self) -> Result<(Run, Option<Vec<Proposal>>), Error> {
-        let engine = self.proposer.engine;
         let mut checked: Option<Run> = None;
         for round in 1..=MAX_ROUNDS {
+            self.round = round;
             let outcome = match checked.take() {
                 Some(outcome) => outcome,
-                None => engine.check_overlaid(&[], &[], &self.texts)?,
+                None => self.recheck()?,
             };
             let outcome = self.watch(outcome, round)?;
             if round == 1 && !outcome.incomplete.is_empty() {
@@ -127,9 +154,7 @@ impl Orchestrator<'_> {
                     first.reason
                 )));
             }
-            let (proposals, declined) =
-                self.proposer
-                    .propose(&outcome, &self.texts, Phase::Rules, Taking::Selected)?;
+            let (proposals, declined) = self.proposals(&outcome, Phase::Rules, Taking::Selected)?;
             self.declined.extend(declined);
             let proposals = self.unfrozen(proposals);
             let (proposals, withheld): (Vec<_>, Vec<_>) =
@@ -140,7 +165,7 @@ impl Orchestrator<'_> {
             checked = self.apply_round(&outcome, proposals, round)?;
             if checked.is_none() && self.rounds == round - 1 {
                 // Everything this round was rolled back: stop rather than repeat it.
-                return Ok((engine.check_overlaid(&[], &[], &self.texts)?, None));
+                return Ok((self.recheck()?, None));
             }
             if round == MAX_ROUNDS {
                 self.notes.push(format!(
@@ -148,9 +173,10 @@ impl Orchestrator<'_> {
                 ));
             }
         }
+        self.round = MAX_ROUNDS + 1;
         let outcome = match checked {
             Some(outcome) => outcome,
-            None => engine.check_overlaid(&[], &[], &self.texts)?,
+            None => self.recheck()?,
         };
         Ok((self.watch(outcome, MAX_ROUNDS + 1)?, None))
     }
@@ -158,9 +184,7 @@ impl Orchestrator<'_> {
     /// The proposals over the state the rounds left that the run may not
     /// write.
     fn withheld(&mut self, outcome: &Run) -> Result<Vec<Proposal>, Error> {
-        let (proposals, declined) =
-            self.proposer
-                .propose(outcome, &self.texts, Phase::Rules, Taking::Selected)?;
+        let (proposals, declined) = self.proposals(outcome, Phase::Rules, Taking::Selected)?;
         self.declined.extend(declined);
         Ok(self
             .unfrozen(proposals)
@@ -191,9 +215,7 @@ impl Orchestrator<'_> {
     /// their findings are declined. The others are verified over what is
     /// written and withdrawn to previews. The run of the last check.
     fn model_round(&mut self, outcome: Run) -> Result<Run, Error> {
-        let (proposals, declined) =
-            self.proposer
-                .propose(&outcome, &self.texts, Phase::Models, Taking::Selected)?;
+        let (proposals, declined) = self.proposals(&outcome, Phase::Models, Taking::Selected)?;
         self.declined.extend(declined);
         let (written, withheld): (Vec<_>, Vec<_>) = self
             .unfrozen(proposals)
@@ -237,7 +259,7 @@ impl Orchestrator<'_> {
         }
         match current {
             Some(checked) if !rolled => Ok(checked),
-            _ => self.proposer.engine.check_overlaid(&[], &[], &self.texts),
+            _ => self.recheck(),
         }
     }
 
@@ -269,7 +291,7 @@ impl Orchestrator<'_> {
             if changed {
                 current = Some(match checked {
                     Some(checked) => checked,
-                    None => self.proposer.engine.check_overlaid(&[], &[], &self.texts)?,
+                    None => self.recheck()?,
                 });
             }
         }

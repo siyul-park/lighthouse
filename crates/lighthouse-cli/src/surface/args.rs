@@ -247,6 +247,12 @@ pub struct DecisionTestArgs {
     /// Run the examples in this language only.
     #[arg(long)]
     pub language: Option<String>,
+    /// Print where the time went: starting the plugins, checking, fixing and
+    /// crossing summed over the examples, and the ten slowest decisions. Text:
+    /// to stderr; JSON: under `timings`. Results do not change.
+    #[arg(long)]
+    #[serde(skip)]
+    pub timings: bool,
 }
 
 /// Who a record is attributed to, for the commands that write one.
