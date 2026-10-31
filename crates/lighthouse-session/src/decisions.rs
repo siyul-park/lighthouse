@@ -11,7 +11,7 @@ use std::{
 
 use lighthouse_plugin::Registry;
 use lighthouse_report::docs::{Density, decision_markdown};
-use lighthouse_rpc::Started;
+use lighthouse_rpc::{StartOptions, Started};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -282,8 +282,13 @@ pub(crate) fn test_catalog(
     let decisions = selected(catalog, ids)?;
     let jobs = jobs.unwrap_or_else(available).max(1);
     let started = Instant::now();
+    let env = hermetic_go();
+    let options = StartOptions {
+        cache: None,
+        env: &env,
+    };
     let plugins = (0..jobs.min(MAX_STARTS))
-        .map(|_| session.start_plugins(None))
+        .map(|_| session.start_plugins(&options))
         .collect::<Result<Vec<_>>>()?;
     if let Some(gap) = plugins.iter().find_map(|p| p.registered.incomplete.first()) {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());
@@ -317,6 +322,17 @@ pub(crate) fn test_catalog(
             slowest: slowest(found.per_unit),
         },
     })
+}
+
+/// What the Go tool is told in every plugin process of a decision test, so
+/// that an example is judged the same on any machine: modules are read as the
+/// example's `go.mod` says, and nothing is fetched. The build cache is the
+/// user's own, which is shared by every example and keyed by content.
+fn hermetic_go() -> Vec<(String, String)> {
+    vec![
+        ("GOFLAGS".to_owned(), "-mod=mod".to_owned()),
+        ("GOPROXY".to_owned(), "off".to_owned()),
+    ]
 }
 
 /// The languages the registry of the started plugins provides.

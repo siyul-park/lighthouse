@@ -27,7 +27,7 @@ use thiserror::Error;
 pub use command::CommandModel;
 pub use error::Error;
 pub use manifest::{FILE_NAME, Found, PluginSpec, Provides, discover, load, search_dirs};
-pub use plugin::RpcPlugin;
+pub use plugin::{RpcPlugin, StartOptions};
 
 /// Per-request limit unless the plugin entry sets `timeout`; generous because
 /// a first index may build a cold cache.
@@ -120,7 +120,14 @@ pub fn register(
     store: &Path,
     search: &[PathBuf],
 ) -> Result<Registered, Error> {
-    let started = start(registry, config, root, store, search, None)?;
+    let started = start(
+        registry,
+        config,
+        root,
+        store,
+        search,
+        &StartOptions::default(),
+    )?;
     started.register(registry)?;
     Ok(started.registered)
 }
@@ -137,17 +144,18 @@ pub fn register(
 /// the datasets and models, which is `root` unless a run spans several
 /// projects; any other plugin is started in `root`.
 ///
-/// With a `cache` directory, what a plugin answered to `initialize` is kept
-/// there by build of the plugin, and a plugin with a kept answer is not
-/// started here: its process starts when its first request is made, so a run
-/// that never needs a plugin never starts it.
+/// With a cache directory in `options`, what a plugin answered to
+/// `initialize` is kept there by build of the plugin, and a plugin with a kept
+/// answer is not started here: its process starts when its first request is
+/// made, so a run that never needs a plugin never starts it. The environment
+/// in `options` is added to that of every plugin process.
 pub fn start(
     registry: &Registry,
     config: &Config,
     root: &Path,
     store: &Path,
     search: &[PathBuf],
-    cache: Option<&Path>,
+    options: &StartOptions<'_>,
 ) -> Result<Started, Error> {
     let discovered = discover(search)?;
     let mut registered = Registered::default();
@@ -163,7 +171,7 @@ pub fn start(
         } else {
             store
         };
-        match RpcPlugin::connect_cached(one, at, timeout, cache) {
+        match RpcPlugin::connect_with(one, at, timeout, options) {
             Ok(plugin) => entries.push(Entry::Running(Box::new(
                 plugin.confined(config.sandbox(), root),
             ))),

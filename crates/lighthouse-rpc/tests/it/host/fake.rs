@@ -5,7 +5,7 @@ use std::{fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
 use lighthouse_engine::Engine;
 use lighthouse_model::{Incomplete, ucm::File};
 use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Registry, Source, Workspace};
-use lighthouse_rpc::{Error, RpcPlugin};
+use lighthouse_rpc::{Error, RpcPlugin, StartOptions};
 use lighthouse_spec::Config;
 use tempfile::TempDir;
 
@@ -109,7 +109,11 @@ impl Fake {
     /// Like [`connect`](Self::connect), keeping the answer in `cache`.
     pub(super) fn connect_kept(&self, cache: &Path) -> Result<RpcPlugin, Error> {
         let found = lighthouse_rpc::load(self.path()).unwrap();
-        RpcPlugin::connect_cached(&found, self.path(), T, Some(cache))
+        let options = StartOptions {
+            cache: Some(cache),
+            ..StartOptions::default()
+        };
+        RpcPlugin::connect_with(&found, self.path(), T, &options)
     }
 
     pub(super) fn provider(&self, timeout: Duration) -> Box<dyn LanguageProvider> {

@@ -40,8 +40,15 @@ pub fn registry() -> Registry {
 /// process each, as the registries of a `decision test` do. Starting a plugin
 /// per registry instead is what makes example tests slow.
 pub fn pooled(base: impl Fn() -> Registry, config: &Config) -> impl Fn() -> Registry {
-    let started = lighthouse_rpc::start(&base(), config, Path::new("."), Path::new("."), &[], None)
-        .expect("the listed plugins start");
+    let started = lighthouse_rpc::start(
+        &base(),
+        config,
+        Path::new("."),
+        Path::new("."),
+        &[],
+        &Default::default(),
+    )
+    .expect("the listed plugins start");
     move || {
         let mut registry = base();
         started

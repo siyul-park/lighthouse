@@ -75,7 +75,7 @@ fn session_registry() {
 fn session_registry_from_started_plugins() {
     let dir = project("error");
     let session = session(dir.path());
-    let started = session.start_plugins(None).unwrap();
+    let started = session.start_plugins(&Default::default()).unwrap();
     assert!(started.registered.incomplete.is_empty());
 
     // Registries made from one start are alike and need no process of their own.

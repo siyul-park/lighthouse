@@ -23,6 +23,16 @@ use crate::{agent::Agent, client::Client, convert, kept::Kept, manifest::Found, 
 /// Characters of the binary digest that name a plugin's cache directory.
 const DIGEST_CHARS: usize = 16;
 
+/// How plugins are started beyond what the configuration says.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct StartOptions<'a> {
+    /// The cache directory the answer to `initialize` is kept in; with it a
+    /// plugin is started when a request first needs it.
+    pub cache: Option<&'a Path>,
+    /// Variables added to the environment of every plugin process.
+    pub env: &'a [(String, String)],
+}
+
 /// A plugin running as a separate process: the languages and models it
 /// declared in the handshake, sharing one connection.
 pub struct RpcPlugin {
@@ -40,18 +50,19 @@ pub struct RpcPlugin {
 impl RpcPlugin {
     /// Starts the process and performs the `initialize` handshake.
     pub fn connect(found: &Found, root: &Path, timeout: Duration) -> Result<Self, crate::Error> {
-        Self::connect_cached(found, root, timeout, None)
+        Self::connect_with(found, root, timeout, &StartOptions::default())
     }
 
-    /// Like [`connect`](Self::connect), keeping what the plugin answered to
-    /// `initialize` in `cache`, by a key of the plugin build. While the kept
-    /// answer is there for this build, no process starts here: it starts when
-    /// the first request is made, and has to answer as it did.
-    pub fn connect_cached(
+    /// Like [`connect`](Self::connect), as `options` say: what the plugin
+    /// answered to `initialize` is kept in the cache directory, by a key of
+    /// the plugin build, and while the kept answer is there for this build no
+    /// process starts here: it starts when the first request is made, and has
+    /// to answer as it did. The process gets the environment `options` add.
+    pub fn connect_with(
         found: &Found,
         root: &Path,
         timeout: Duration,
-        cache: Option<&Path>,
+        options: &StartOptions<'_>,
     ) -> Result<Self, crate::Error> {
         let id = found.id();
         let failed = |reason: String| crate::Error::Plugin {
@@ -66,12 +77,12 @@ impl RpcPlugin {
             },
             workspace_folders: vec![folder(root).map_err(failed)?],
         };
-        let kept = cache.and_then(|base| Kept::of(base, found));
+        let kept = options.cache.and_then(|base| Kept::of(base, found));
         if let Some(result) = kept.as_ref().and_then(Kept::read) {
-            let client = Client::lazy(found, root, timeout, params, result.clone());
+            let client = Client::lazy(found, root, timeout, options.env, params, result.clone());
             return Self::from_result(found, root, timeout, client, result);
         }
-        let client = Client::spawn(found, root, timeout).map_err(failed)?;
+        let client = Client::spawn(found, root, timeout, options.env).map_err(failed)?;
         let result: wire::InitializeResult =
             client
                 .call(wire::INITIALIZE, params)

@@ -69,15 +69,21 @@ enum Slot {
 struct Idle {
     found: Found,
     cwd: PathBuf,
+    env: Vec<(String, String)>,
     params: wire::InitializeParams,
     /// The answer the host already holds, from an earlier start.
     expected: wire::InitializeResult,
 }
 
 impl Client {
-    pub(crate) fn spawn(found: &Found, cwd: &Path, timeout: Duration) -> Result<Self, String> {
+    pub(crate) fn spawn(
+        found: &Found,
+        cwd: &Path,
+        timeout: Duration,
+        env: &[(String, String)],
+    ) -> Result<Self, String> {
         let stderr = Arc::new(Captured::default());
-        let session = launch(found, cwd, &stderr)?;
+        let session = launch(found, cwd, env, &stderr)?;
         Ok(Self {
             plugin: found.id().to_owned(),
             timeout,
@@ -92,6 +98,7 @@ impl Client {
         found: &Found,
         cwd: &Path,
         timeout: Duration,
+        env: &[(String, String)],
         params: wire::InitializeParams,
         expected: wire::InitializeResult,
     ) -> Self {
@@ -101,6 +108,7 @@ impl Client {
             session: Mutex::new(Slot::Idle(Box::new(Idle {
                 found: found.clone(),
                 cwd: cwd.to_owned(),
+                env: env.to_vec(),
                 params,
                 expected,
             }))),
@@ -156,7 +164,7 @@ impl Client {
 
     /// Starts the process of an idle client and has it answer `initialize`.
     fn bring_up(&self, idle: &Idle) -> Result<Session, String> {
-        let mut session = launch(&idle.found, &idle.cwd, &self.stderr)?;
+        let mut session = launch(&idle.found, &idle.cwd, &idle.env, &self.stderr)?;
         let answered = self.exchange::<_, wire::InitializeResult>(
             &mut session,
             wire::INITIALIZE,
@@ -330,7 +338,12 @@ enum Event {
 
 /// Starts the process of the plugin `found` in `cwd`, with threads that feed
 /// its stdin, read its stdout and collect its stderr into `stderr`.
-fn launch(found: &Found, cwd: &Path, stderr: &Arc<Captured>) -> Result<Session, String> {
+fn launch(
+    found: &Found,
+    cwd: &Path,
+    env: &[(String, String)],
+    stderr: &Arc<Captured>,
+) -> Result<Session, String> {
     let command = found
         .command_path()
         .ok_or("a bundled plugin has no process to start")?;
@@ -338,6 +351,7 @@ fn launch(found: &Found, cwd: &Path, stderr: &Arc<Captured>) -> Result<Session, 
     process
         .args(found.args())
         .current_dir(cwd)
+        .envs(env.iter().map(|(name, value)| (name, value)))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

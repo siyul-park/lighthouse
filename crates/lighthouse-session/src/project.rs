@@ -13,7 +13,7 @@ use lighthouse_checks::{Checks, Composition};
 use lighthouse_engine::{CommandModels, Engine};
 use lighthouse_model::Format;
 use lighthouse_plugin::{ModelClient, Registry};
-use lighthouse_rpc::{CommandModel, PluginCatalog, Registered, Started};
+use lighthouse_rpc::{CommandModel, PluginCatalog, Registered, StartOptions, Started};
 use lighthouse_spec::{Catalog, CheckKind, Files, FixKind, load_local, local_files};
 use lighthouse_spec::{Config, FILE_NAME, Layers};
 
@@ -208,7 +208,7 @@ impl Session {
     /// language plugins the config lists, which are started here. A plugin that serves models is started
     /// in the store.
     pub fn registry(&self) -> Result<(Registry, Registered)> {
-        let started = self.start_plugins(None)?;
+        let started = self.start_plugins(&StartOptions::default())?;
         let registry = self.registry_from(&started)?;
         Ok((registry, started.registered))
     }
@@ -217,9 +217,9 @@ impl Session {
     /// registries can be built from them with [`registry_from`](Self::registry_from);
     /// they share the processes, which end with the returned value.
     ///
-    /// With a `cache` directory a plugin it holds the answer of is not started
-    /// until a request needs it.
-    pub fn start_plugins(&self, cache: Option<&Path>) -> Result<Started> {
+    /// With a cache directory in `options` a plugin it holds the answer of is
+    /// not started until a request needs it.
+    pub fn start_plugins(&self, options: &StartOptions<'_>) -> Result<Started> {
         let search = lighthouse_rpc::search_dirs(&self.root);
         if let Some(why) = self.untrusted_plugin(&search) {
             return Err(why.into());
@@ -231,7 +231,7 @@ impl Session {
             &self.root,
             &self.store,
             &search,
-            cache,
+            options,
         )?)
     }
 
@@ -280,7 +280,11 @@ impl Session {
         if !sandbox.enabled && !self.trusted() {
             return Err(NO_SANDBOX_UNTRUSTED.into());
         }
-        let started = self.start_plugins(cache)?;
+        let options = StartOptions {
+            cache,
+            ..StartOptions::default()
+        };
+        let started = self.start_plugins(&options)?;
         let registry = self.registry_from(&started)?;
         let plugins = started.registered;
         self.require_packs(true, |pack| registry.has_plugin(pack))?;
