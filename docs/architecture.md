@@ -331,6 +331,29 @@ hit returns the stored findings and notices; failed or incomplete rule runs are
 never stored. Fingerprints, suppression and reporting run afterwards on the full set,
 so a warm run prints what a cold one does, byte for byte.
 
+What forces a decision to global reach, by the fact its expressions read (a
+command check is global too, and a rule that reports at another symbol):
+
+| Fact | Decisions |
+| --- | --- |
+| `unit` | `design/complexity` |
+| `homonyms` | `design/consistent-terms` |
+| `parent` | `design/no-conjoined-modules` |
+| `forwards_only`, `forward_target`, `implementers` | `design/no-redundant-symbol` |
+| `param_structs` | `design/signature-size` |
+| `types` | `design/single-responsibility` |
+| `local_callers` | `design/top-down-order` |
+| `owned` | `testing/file-layout`, `testing/owner-file` |
+| `pair` | `testing/owner-file` |
+| `tests` | `testing/no-duplicate-owner`, `testing/no-missing-owner` |
+| `touched_by_tests`, `module_tested` | `testing/no-missing-owner` |
+| `module_imports` | `testing/standard-assertions` |
+
+Each of these reads an index or a walk over the project, so a file's edit can
+change the findings in any other file; none is narrowed, because a narrower key
+would have to be a digest of exactly what the index reads, and none of them
+has one yet.
+
 ## Memory: findings, judgments and the feedback loop
 
 Memory has two parts with different owners. **Sightings** (what `check` saw, when, with
@@ -700,8 +723,10 @@ at most five:
    gap in the analysis; so is every file of a fix that spans files.
    Dropped fixes are reported as declined.
 
-It stops when a round applies nothing, after five rounds, or when a round reaches a state
-an earlier one had (fixes that undo each other; the note names their rules).
+It stops when a round applies nothing (the fixpoint), when a round reaches a state
+an earlier one had (fixes that undo each other; the note names their rules), or when two
+rounds in a row leave no fewer findings than the one before. A run that does none of these
+stops at 50 rounds and says so.
 **Nothing touches the disk until the last round passed.** Then the write has two phases.
 First every changed file's hash is checked against the text the run analyzed (recorded when
 it was read), and a fix that spans a file that changed is skipped as a whole, all its files,
