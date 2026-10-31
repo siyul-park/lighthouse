@@ -40,18 +40,6 @@ impl Builder<'_> {
             .map_or(Value::Null, |s| self.node(s))
     }
 
-    /// Whether the test uses the symbol, or a member of it when it is a type:
-    /// a name that matches is not enough to own it.
-    fn reaches(&self, test: &SymbolId, target: &Symbol) -> bool {
-        let uses = self.project.uses(test);
-        uses.contains(&target.id)
-            || self
-                .project
-                .members(&target.id)
-                .iter()
-                .any(|member| uses.contains(member))
-    }
-
     /// Per test, the symbols it is credited to, in the order of the symbols.
     fn owned_index(&self) -> BTreeMap<SymbolId, Vec<SymbolId>> {
         let mut index: BTreeMap<SymbolId, Vec<SymbolId>> = BTreeMap::new();
@@ -79,5 +67,17 @@ impl Builder<'_> {
             }
         }
         index
+    }
+
+    /// Whether the test uses the symbol, or a member of it when it is a type:
+    /// a name that matches is not enough to own it.
+    fn reaches(&self, test: &SymbolId, target: &Symbol) -> bool {
+        let uses = self.project.uses(test);
+        uses.contains(&target.id)
+            || self
+                .project
+                .members(&target.id)
+                .iter()
+                .any(|member| uses.contains(member))
     }
 }
