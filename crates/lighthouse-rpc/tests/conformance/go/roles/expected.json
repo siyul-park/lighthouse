@@ -419,6 +419,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "blocks": "[{\"keyword\":\"const\",\"line\":7,\"specs\":[{\"names\":[\"want\"],\"line\":7,\"public\":false,\"keys\":[]}]},{\"keyword\":\"var\",\"line\":9,\"specs\":[{\"names\":[\"names\"],\"line\":9,\"public\":false,\"keys\":[]}]}]"
+        },
         "path": "roles_test.go"
       },
       "functions": [

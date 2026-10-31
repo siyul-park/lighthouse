@@ -468,6 +468,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "blocks": "[{\"keyword\":\"var\",\"line\":10,\"specs\":[{\"names\":[\"ErrNotFound\"],\"line\":10,\"public\":true,\"keys\":[\"error\"]}]},{\"keyword\":\"const\",\"line\":77,\"specs\":[{\"names\":[\"format\"],\"line\":77,\"public\":false,\"keys\":[]}]}]"
+        },
         "path": "events.go"
       },
       "functions": [

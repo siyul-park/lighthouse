@@ -76,6 +76,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "blocks": "[{\"keyword\":\"var\",\"line\":13,\"specs\":[{\"names\":[\"Block\"],\"line\":13,\"public\":true,\"keys\":[]}]}]"
+        },
         "path": "c.go"
       },
       "functions": [

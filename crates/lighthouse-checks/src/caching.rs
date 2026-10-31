@@ -55,6 +55,8 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("gap", Reach::Local),
     ("func", Reach::Local),
     ("line_widths", Reach::Local),
+    // The declarations a provider groups into blocks.
+    ("blocks", Reach::Local),
     // The source file a test file is named after.
     ("pair", Reach::Global),
     ("data_only", Reach::Neighbors),

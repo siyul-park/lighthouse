@@ -1,0 +1,159 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/declaration-blocks
+  uid: 0e5b7c34-9a1d-4c62-b8f3-5d2a6e9c1f70
+spec:
+  title: Related constants and variables share a block
+  context: >-
+    Constants and variables that share a type are one concept, and one block
+    shows it: `const ( ... )` for the values of a type, `var ( ... )` for the
+    sentinel errors or the compile-time interface assertions that belong
+    together.
+
+    Go: a declaration's keys are the named types behind its declared type and
+    its value (`Kind`, `error`, `*Array` is `Array`, `TypedArray[bool]` is
+    `TypedArray`). An interface assertion `var _ I = T` has two keys, the
+    interface and the concrete type. Basic types and untyped constants give no
+    key. Declarations of one keyword that share a key belong in one block,
+    whether they share the interface or the concrete type of an assertion. A
+    block may hold other declarations of its keyword. The keys are compared
+    within one group of `design/declaration-groups` (public constants, private
+    constants, variables), and never across groups. A finding is reported once
+    per file, at the first declaration outside the block of the first
+    declaration that shares its key, and names how many more there are.
+
+    Other languages: not applicable. Rust checks an interface with `impl`.
+
+    Uber Go Style Guide, "Group Similar Declarations": "Only group related
+    declarations. Do not group declarations that are unrelated." and "Verify
+    Interface Compliance" (`var _ http.Handler = (*Handler)(nil)`); Effective
+    Go, "Interface checks". golangci-lint `grouper` and `decorder` group every
+    declaration of a file, which is wider than this rule, and neither is in the
+    linters golangci-lint runs by default. The severity `warn` is the project's
+    choice, outside the precedent gate.
+  scope:
+    subject: file
+    examples: exclude
+  languages:
+    go: {}
+  requirement: >-
+    Top-level `const` and `var` declarations that share a type MUST be declared
+    in one block of their keyword (`const ( ... )`, `var ( ... )`).
+  severity: warn
+  check:
+    type: cel
+    select: file
+    variables:
+      - name: specs
+        expression: >-
+          file.blocks.map(b, b.specs.map(s, {
+            'keyword': b.keyword, 'block': b.line, 'name': s.names[0], 'line': s.line, 'keys': s.keys,
+            'group': b.keyword == 'var' ? 'var' : (s.public ? 'public-const' : 'private-const')})).flatten()
+      - name: lead
+        params: [x, k]
+        expression: "specs.filter(y, y.group == x.group && k in y.keys)[0]"
+      - name: outside
+        expression: >-
+          specs.filter(x, x.keys.exists(k, lead(x, k).block != x.block))
+      - name: head
+        expression: "size(outside) > 0 ? outside[0] : {}"
+      - name: key
+        expression: "size(outside) > 0 ? head.keys.filter(k, lead(head, k).block != head.block)[0] : ''"
+      - name: shown
+        expression: "key.split('.')[size(key.split('.')) - 1]"
+    where: size(outside) > 0
+    message: >-
+      {{ head.keyword + ' ' + head.name + ' (' + shown + ') belongs in the `' + head.keyword
+         + '` block at line ' + string(lead(head, key).block) + ' with the other ' + shown
+         + ' declarations' + (size(outside) > 1 ? ' (and ' + string(size(outside) - 1) + ' more in this file)' : '') }}
+    evidence:
+      name: head.name
+      key: key
+      block: string(lead(head, key).block)
+      count: string(size(outside))
+    at:
+      line: head.line
+    identity:
+      subject: file.path
+  provenance:
+    wasDerivedFrom:
+      - "Uber Go Style Guide, Group Similar Declarations: https://github.com/uber-go/guide/blob/master/style.md#group-similar-declarations"
+      - "Uber Go Style Guide, Verify Interface Compliance: https://github.com/uber-go/guide/blob/master/style.md#verify-interface-compliance"
+      - "Effective Go, Interface checks: https://go.dev/doc/effective_go#blank_implements"
+      - "golangci-lint grouper and decorder: https://golangci-lint.run/usage/linters/"
+  examples:
+    - name: assertions-by-interface
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Value interface{ V() }
+
+            type A struct{}
+
+            func (A) V() {}
+
+            type B struct{}
+
+            func (B) V() {}
+
+            var _ Value = A{}
+
+            var x = 1
+
+            var _ Value = B{}
+      expect:
+        - line: 17
+    - name: assertions-by-type
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type X interface{ X() }
+
+            type Y interface{ Y() }
+
+            type T struct{}
+
+            func (*T) X() {}
+
+            func (*T) Y() {}
+
+            var _ X = (*T)(nil)
+
+            var _ Y = (*T)(nil)
+      expect:
+        - line: 15
+    - name: one-block-per-component
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Value interface{ V() }
+
+            type A struct{}
+
+            func (A) V() {}
+
+            type B struct{}
+
+            func (B) V() {}
+
+            var (
+            	_ Value = A{}
+            	_ Value = B{}
+            )
+
+            var count = 1

@@ -1728,6 +1728,7 @@ Declaration order should let a reader follow ownership and behavior from public 
 | [`design/vertical-distance`](#related-declarations-stay-close) | Related declarations stay close | warn · cel | unsafe |  |
 | [`design/owner-file`](#one-owner-has-one-cohesive-file) | One owner has one cohesive file | warn · cel |  |  |
 | [`design/declaration-groups`](#declarations-follow-ownership-groups) | Declarations follow ownership groups | error · cel | safe |  |
+| [`design/declaration-blocks`](#related-constants-and-variables-share-a-block) | Related constants and variables share a block | warn · cel |  |  |
 
 ### Callers precede private callees
 
@@ -1838,6 +1839,57 @@ Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; Martin
 ```
 
 Also: rust
+
+### Related constants and variables share a block
+
+`design/declaration-blocks` · file · warn · cel · go
+
+*Constants and variables that share a type are one concept, and one block shows it: `const ( ... )` for the values of a type, `var ( ... )` for the sentinel errors or the compile-time interface assertions that belong together. Go: a declaration's keys are the named types behind its declared type and its value (`Kind`, `error`, `*Array` is `Array`, `TypedArray[bool]` is `TypedArray`). An interface assertion `var _ I = T` has two keys, the interface and the concrete type. Basic types and untyped constants give no key. Declarations of one keyword that share a key belong in one block, whether they share the interface or the concrete type of an assertion. A block may hold other declarations of its keyword. The keys are compared within one group of `design/declaration-groups` (public constants, private constants, variables), and never across groups. A finding is reported once per file, at the first declaration outside the block of the first declaration that shares its key, and names how many more there are. Other languages: not applicable. Rust checks an interface with `impl`. Uber Go Style Guide, "Group Similar Declarations": "Only group related declarations. Do not group declarations that are unrelated." and "Verify Interface Compliance" (`var _ http.Handler = (*Handler)(nil)`); Effective Go, "Interface checks". golangci-lint `grouper` and `decorder` group every declaration of a file, which is wider than this rule, and neither is in the linters golangci-lint runs by default. The severity `warn` is the project's choice, outside the precedent gate.*
+
+Top-level `const` and `var` declarations that share a type MUST be declared in one block of their keyword (`const ( ... )`, `var ( ... )`).
+
+Derived from: Uber Go Style Guide, Group Similar Declarations: https://github.com/uber-go/guide/blob/master/style.md#group-similar-declarations; Uber Go Style Guide, Verify Interface Compliance: https://github.com/uber-go/guide/blob/master/style.md#verify-interface-compliance; Effective Go, Interface checks: https://go.dev/doc/effective_go#blank_implements; golangci-lint grouper and decorder: https://golangci-lint.run/usage/linters/
+
+```go invalid
+package sample
+
+type Value interface{ V() }
+
+type A struct{}
+
+func (A) V() {}
+
+type B struct{}
+
+func (B) V() {}
+
+var _ Value = A{}
+
+var x = 1
+
+var _ Value = B{}
+```
+
+```go valid
+package sample
+
+type Value interface{ V() }
+
+type A struct{}
+
+func (A) V() {}
+
+type B struct{}
+
+func (B) V() {}
+
+var (
+	_ Value = A{}
+	_ Value = B{}
+)
+
+var count = 1
+```
 
 ## Comments
 

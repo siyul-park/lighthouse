@@ -172,6 +172,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "blocks": "[{\"keyword\":\"const\",\"line\":21,\"specs\":[{\"names\":[\"Limit\"],\"line\":21,\"public\":true,\"keys\":[]}]},{\"keyword\":\"const\",\"line\":23,\"specs\":[{\"names\":[\"limit\"],\"line\":23,\"public\":false,\"keys\":[]}]}]"
+        },
         "path": "visibility.go"
       },
       "functions": [

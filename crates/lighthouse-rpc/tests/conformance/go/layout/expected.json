@@ -130,6 +130,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "blocks": "[{\"keyword\":\"var\",\"line\":10,\"specs\":[{\"names\":[\"Version\"],\"line\":10,\"public\":true,\"keys\":[]}]}]"
+        },
         "path": "cmd/app/main.go"
       },
       "functions": [

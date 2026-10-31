@@ -137,7 +137,7 @@ spec:
       intro: >-
         Declaration order should let a reader follow ownership and behavior from
         public concepts to implementation mechanics.
-      decisions: [top-down-order, vertical-distance, owner-file, declaration-groups]
+      decisions: [top-down-order, vertical-distance, owner-file, declaration-groups, declaration-blocks]
     - name: comments
       title: Comments
       intro: >-

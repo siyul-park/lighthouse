@@ -33,12 +33,12 @@ mod api;
 mod cohesion;
 mod cycle;
 mod effective;
+mod file_facts;
 mod forward;
 mod gap;
 mod homonyms;
 mod imports;
 mod ownership;
-mod pair;
 mod parent;
 mod role;
 mod stability;
@@ -330,6 +330,9 @@ impl<'a> Builder<'a> {
                     .map(|comment| self.comment(comment, text))
                     .collect(),
             );
+        }
+        if self.needs.field("blocks") {
+            value["blocks"] = self.blocks(file);
         }
         if self.needs.field("pair") {
             value["pair"] = self.pair(file);

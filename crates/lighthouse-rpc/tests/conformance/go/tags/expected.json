@@ -144,6 +144,9 @@
         }
       ],
       "file": {
+        "facts": {
+          "blocks": "[{\"keyword\":\"const\",\"line\":5,\"specs\":[{\"names\":[\"flavor\"],\"line\":5,\"public\":false,\"keys\":[]}]}]"
+        },
         "path": "slow.go"
       },
       "functions": [],
