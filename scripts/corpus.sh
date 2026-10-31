@@ -3,13 +3,18 @@
 # same repositories, or the difference is shown.
 #
 # usage: LIGHTHOUSE_TRUST=1 scripts/corpus.sh [--base BINARY] [--tip BINARY] [--plugins DIR]
-#                                             [--no-build] [name=]repo-dir...
+#                                             [--base-plugins DIR] [--no-build] [name=]repo-dir...
 #
 #   --base     the binary to compare against (a release build of main). Without
 #              it the run only checks the tip and prints its findings.
 #   --tip      default target/release/lighthouse, built (with the plugins) by
 #              `make plugins cli` unless --no-build.
-#   --plugins  the plugin directory both binaries use, default target/plugins.
+#   --plugins  the plugin directory the tip binary uses, default target/plugins.
+#   --base-plugins  the plugin directory the base binary uses, default --plugins.
+#              The base runs with the plugins built from its own commit, so a
+#              lang-* change is compared honestly. The usual call: a release
+#              build of main, its `target/plugins` copied to a temp directory,
+#              `--base main/lighthouse --base-plugins main/plugins`.
 #   repo-dir   default: cel, qlbridge (under $CORPUS_HOME, default ~/Projects)
 #              and this repository's HEAD. Each is copied out with
 #              `git archive HEAD`, never touched; the codelab/ directory of cel
@@ -31,12 +36,13 @@ cd "$root"
 absolute() {
     case $1 in /*) echo "$1" ;; *) echo "$here/$1" ;; esac
 }
-base="" tip="$root/target/release/lighthouse" plugins="$root/target/plugins" build=1
+base="" base_plugins="" tip="$root/target/release/lighthouse" plugins="$root/target/plugins" build=1
 while [ $# -gt 0 ]; do
     case "$1" in
     --base) base=$2; shift 2 ;;
     --tip) tip=$2; shift 2 ;;
     --plugins) plugins=$2; shift 2 ;;
+    --base-plugins) base_plugins=$2; shift 2 ;;
     --no-build) build=0; shift ;;
     --) shift; break ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
@@ -46,6 +52,8 @@ done
 [ -z "$base" ] || base=$(absolute "$base")
 tip=$(absolute "$tip")
 plugins=$(absolute "$plugins")
+[ -n "$base_plugins" ] || base_plugins=$plugins
+base_plugins=$(absolute "$base_plugins")
 if [ "$build" = 1 ]; then
     make -s plugins cli
 fi
@@ -62,8 +70,8 @@ export XDG_DATA_HOME="$scratch/xdg"
 # Checks one corpus with one binary: findings in $dir/<tag>.json, the exit code
 # in $dir/<tag>.rc.
 check() {
-    dir=$1 tag=$2 binary=$3
-    (cd "$dir/tree" && "$binary" check . --format json --detail full --limit 1000000 --no-cache --no-store --config "$dir/config.toml" >"$dir/$tag.json" 2>"$dir/$tag.err" && echo 0 >"$dir/$tag.rc") ||
+    dir=$1 tag=$2 binary=$3 config=$4
+    (cd "$dir/tree" && "$binary" check . --format json --detail full --limit 1000000 --no-cache --no-store --config "$dir/$config" >"$dir/$tag.json" 2>"$dir/$tag.err" && echo 0 >"$dir/$tag.rc") ||
         echo "$?" >"$dir/$tag.rc"
 }
 
@@ -79,8 +87,9 @@ corpus() {
     preset=strict-go
     [ ! -f "$dir/tree/Cargo.toml" ] || preset=strict-root
     sed "s|@PLUGINS@|$plugins|g" "scripts/baseline/$preset.toml" >"$dir/config.toml"
-    [ -z "$base" ] || check "$dir" base "$base"
-    check "$dir" tip "$tip"
+    sed "s|@PLUGINS@|$base_plugins|g" "scripts/baseline/$preset.toml" >"$dir/base-config.toml"
+    [ -z "$base" ] || check "$dir" base "$base" base-config.toml
+    check "$dir" tip "$tip" config.toml
     python3 -I scripts/corpus-diff.py "$label" "$dir" "$([ -n "$base" ] && echo 1)" >"$dir/summary.txt" || echo 1 >"$dir/differs"
 }
 
