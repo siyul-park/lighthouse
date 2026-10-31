@@ -172,6 +172,7 @@ Result: [DecisionTest](../schema/decision-test.schema.json).
 | Argument | Type | Default | Description |
 | --- | --- | --- | --- |
 | `decision` | string[] | `[]` | Decisions to test: ids and globs. Default: every checked decision. |
+| `jobs` | integer \| null | `null` | How many examples run at once. Default: as many as the machine runs at once; 1 runs them in turn. What is reported does not depend on it. |
 | `language` | string \| null | `null` | Run the examples in this language only. |
 
 ## decision_eval

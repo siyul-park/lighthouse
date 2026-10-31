@@ -150,7 +150,7 @@ impl Sets {
         }
         if examples && problems.is_empty() {
             for (catalog, own) in layered.iter().filter(|(_, own)| !own.is_empty()) {
-                let report = test_catalog(session, catalog, own, None)?;
+                let report = test_catalog(session, catalog, own, None, None)?;
                 problems.extend(report.failures.iter().map(|f| problem("examples", f)));
             }
         }

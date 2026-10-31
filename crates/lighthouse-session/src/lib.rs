@@ -8,6 +8,7 @@ mod authoring;
 mod check;
 mod decisions;
 mod descriptor;
+mod examples;
 mod findings;
 mod generated;
 mod git;

@@ -27,7 +27,7 @@ const NEUTRAL: &str = "text";
 /// `lighthouse check` would see them. The registry is built per example
 /// because an engine owns its registry.
 pub struct RuleTester<'a> {
-    registry: Box<dyn Fn() -> Registry + 'a>,
+    registry: Box<dyn Fn() -> Registry + Send + Sync + 'a>,
     catalog: &'a Catalog,
     shipped: &'a Catalog,
     language: Option<String>,
@@ -39,7 +39,7 @@ impl<'a> RuleTester<'a> {
     /// A tester over `catalog` that builds a fresh registry from `registry` for
     /// every example; `shipped` is the bundled catalog.
     pub fn new(
-        registry: impl Fn() -> Registry + 'a,
+        registry: impl Fn() -> Registry + Send + Sync + 'a,
         catalog: &'a Catalog,
         shipped: &'a Catalog,
     ) -> Self {

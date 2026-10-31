@@ -2022,6 +2022,7 @@ dependencies = [
  "lighthouse-spec",
  "lighthouse-store",
  "lighthouse-test-support",
+ "rayon",
  "regex",
  "schemars",
  "serde",

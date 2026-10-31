@@ -247,6 +247,10 @@ pub struct DecisionTestArgs {
     /// Run the examples in this language only.
     #[arg(long)]
     pub language: Option<String>,
+    /// How many examples run at once. Default: as many as the machine runs at
+    /// once; 1 runs them in turn. What is reported does not depend on it.
+    #[arg(long, short = 'j', value_name = "N")]
+    pub jobs: Option<usize>,
     /// Print where the time went: starting the plugins, checking, fixing and
     /// crossing summed over the examples, and the ten slowest decisions. Text:
     /// to stderr; JSON: under `timings`. Results do not change.

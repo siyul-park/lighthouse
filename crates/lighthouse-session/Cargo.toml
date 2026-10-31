@@ -21,6 +21,7 @@ lighthouse-report.workspace = true
 lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
 lighthouse-store.workspace = true
+rayon.workspace = true
 regex.workspace = true
 schemars.workspace = true
 serde.workspace = true

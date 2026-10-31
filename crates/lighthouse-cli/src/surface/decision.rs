@@ -234,7 +234,12 @@ pub fn read_document(source: &str) -> Result<String> {
 /// `decision test`.
 pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Reply> {
     let session = ctx.session()?;
-    let ran = test_decisions(&session, &args.decision, args.language.as_deref())?;
+    let ran = test_decisions(
+        &session,
+        &args.decision,
+        args.language.as_deref(),
+        args.jobs,
+    )?;
     let report = DecisionTested {
         ok: ran.failures.is_empty(),
         timings: args.timings.then(|| ran.timings.clone()),

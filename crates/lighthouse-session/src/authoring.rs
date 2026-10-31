@@ -205,7 +205,7 @@ fn commit(
         .decision(id)
         .is_some_and(|d| d.automated());
     let test = if testable {
-        test_decisions(&candidate, &[id.to_owned()], None)?
+        test_decisions(&candidate, &[id.to_owned()], None, None)?
     } else {
         DecisionTest {
             decisions: 0,

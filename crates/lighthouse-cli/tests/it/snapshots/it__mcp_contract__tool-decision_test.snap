@@ -22,6 +22,16 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         },
         "type": "array"
       },
+      "jobs": {
+        "default": null,
+        "description": "How many examples run at once. Default: as many as the machine runs at\nonce; 1 runs them in turn. What is reported does not depend on it.",
+        "format": "uint",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
       "language": {
         "default": null,
         "description": "Run the examples in this language only.",

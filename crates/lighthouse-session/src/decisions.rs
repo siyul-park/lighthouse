@@ -1,22 +1,23 @@
 //! Looking at decisions and running their examples.
 
 use std::{
-    cell::RefCell,
     collections::BTreeSet,
     fmt::Write,
     fs,
+    num::NonZeroUsize,
+    thread,
     time::{Duration, Instant},
 };
 
-use lighthouse_engine::{RuleTester, Spent};
 use lighthouse_plugin::Registry;
 use lighthouse_report::docs::{Density, decision_markdown};
+use lighthouse_rpc::Started;
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use crate::{Result, Selector, Session, config_file};
+use crate::{Result, Selector, Session, config_file, examples};
 
 /// A decision shown on its own: titled at heading 1, examples named without links.
 const ENTRY: Density<'static> = Density::Entry {
@@ -29,6 +30,10 @@ const NEUTRAL: &str = "text";
 
 /// How many of the slowest decisions the timings name.
 const SLOWEST: usize = 10;
+
+/// Most starts of the plugins a run makes, one for each worker up to this
+/// many: a started plugin answers one request at a time.
+const MAX_STARTS: usize = 4;
 
 /// One line of a decision listing.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -254,13 +259,16 @@ pub fn explain(catalog: &Catalog, registry: &Registry, id: &str) -> Result<Strin
 }
 
 /// Runs the examples of the checked decisions named by `ids` (all when
-/// empty) in every language the project's plugins provide, or in `language`.
+/// empty) in every language the project's plugins provide, or in `language`,
+/// on `jobs` workers (the available parallelism when `None`, one meaning in
+/// turn). What is reported does not depend on `jobs`.
 pub fn test_decisions(
     session: &Session,
     ids: &[String],
     language: Option<&str>,
+    jobs: Option<usize>,
 ) -> Result<DecisionTest> {
-    test_catalog(session, &session.catalog, ids, language)
+    test_catalog(session, &session.catalog, ids, language, jobs)
 }
 
 /// Like [`test_decisions`], over `catalog` instead of the project's own.
@@ -269,23 +277,19 @@ pub(crate) fn test_catalog(
     catalog: &Catalog,
     ids: &[String],
     language: Option<&str>,
+    jobs: Option<usize>,
 ) -> Result<DecisionTest> {
     let decisions = selected(catalog, ids)?;
-    let shipped = &session.base;
+    let jobs = jobs.unwrap_or_else(available).max(1);
     let started = Instant::now();
-    let plugins = session.start_plugins(None)?;
-    let probe = session.registry_from(&plugins)?;
-    let start = started.elapsed();
-    if let Some(gap) = plugins.registered.incomplete.first() {
+    let plugins = (0..jobs.min(MAX_STARTS))
+        .map(|_| session.start_plugins(None))
+        .collect::<Result<Vec<_>>>()?;
+    if let Some(gap) = plugins.iter().find_map(|p| p.registered.incomplete.first()) {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());
     }
-    let registered: BTreeSet<String> = probe
-        .languages()
-        .iter()
-        .map(|l| l.provider.manifest().id.clone())
-        .filter(|l| l != NEUTRAL)
-        .collect();
-    drop(probe);
+    let registered = registered_languages(session, &plugins)?;
+    let start = started.elapsed();
     let languages = match language {
         Some(language) => BTreeSet::from([language.to_owned()]),
         None => registered.clone(),
@@ -295,78 +299,43 @@ pub(crate) fn test_catalog(
     } else {
         languages
     };
+    let mut found = examples::run(session, catalog, &plugins, &languages, &decisions, jobs)?;
     let mut failures = unregistered(&decisions, &registered);
-    let mut skipped = Vec::new();
-    let mut conflicts = Vec::new();
-    let mut runs = 0;
-    let restart_error = RefCell::new(None);
-    let mut spent = Spent::default();
-    let mut per_decision = Vec::new();
-    for language in &languages {
-        // Each example needs a registry of its own, over the processes the
-        // plugins were started in once; if one cannot be built, the example
-        // still runs (on the in-process rules) and the whole test is reported
-        // as an error below.
-        let fresh = || {
-            session.registry_from(&plugins).unwrap_or_else(|e| {
-                restart_error.borrow_mut().get_or_insert(e.to_string());
-                session.in_process_registry().unwrap_or_else(|e| {
-                    restart_error.borrow_mut().get_or_insert(e.to_string());
-                    Registry::default()
-                })
-            })
-        };
-        let tester = RuleTester::new(fresh, catalog, shipped)
-            .sources(session.config.sources())
-            .language(language)
-            .trusted(session.trusted());
-        for decision in decisions.iter().filter(|d| tester.applies(d)) {
-            runs += 1;
-            skipped.extend(
-                tester
-                    .skipped(decision)
-                    .into_iter()
-                    .map(|f| format!("[{language}] {f}")),
-            );
-            let tested = tester.tested(decision);
-            spent += tested.spent;
-            per_decision.push((
-                decision.id().to_owned(),
-                language.clone(),
-                tested.spent.total(),
-            ));
-            failures.extend(
-                tested
-                    .failures
-                    .into_iter()
-                    .map(|f| format!("[{language}] {f}")),
-            );
-            conflicts.extend(
-                tested
-                    .conflicts
-                    .into_iter()
-                    .map(|c| format!("[{language}] {c}")),
-            );
-        }
-    }
-    if let Some(e) = restart_error.into_inner() {
-        return Err(format!("plugins could not be started for every example: {e}").into());
-    }
+    failures.append(&mut found.failures);
     Ok(DecisionTest {
         decisions: decisions.len(),
         languages: languages.len(),
-        runs,
+        runs: found.runs,
         failures,
-        skipped,
-        conflicts,
+        skipped: found.skipped,
+        conflicts: found.conflicts,
         timings: TestTimings {
             plugin_start: start.as_secs_f64(),
-            check: spent.check.as_secs_f64(),
-            fix: spent.fix.as_secs_f64(),
-            crossing: spent.crossing.as_secs_f64(),
-            slowest: slowest(per_decision),
+            check: found.spent.check.as_secs_f64(),
+            fix: found.spent.fix.as_secs_f64(),
+            crossing: found.spent.crossing.as_secs_f64(),
+            slowest: slowest(found.per_unit),
         },
     })
+}
+
+/// The languages the registry of the started plugins provides.
+fn registered_languages(session: &Session, plugins: &[Started]) -> Result<BTreeSet<String>> {
+    let Some(first) = plugins.first() else {
+        return Ok(BTreeSet::new());
+    };
+    let probe = session.registry_from(first)?;
+    Ok(probe
+        .languages()
+        .iter()
+        .map(|l| l.provider.manifest().id.clone())
+        .filter(|l| l != NEUTRAL)
+        .collect())
+}
+
+/// The workers of a run unless it says: as many as the machine runs at once.
+fn available() -> usize {
+    thread::available_parallelism().map_or(1, NonZeroUsize::get)
 }
 
 /// The slowest of `spent`, longest first, ties by decision and language.

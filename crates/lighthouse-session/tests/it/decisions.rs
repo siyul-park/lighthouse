@@ -118,7 +118,7 @@ fn test_decisions() {
     let session = trusted(dir.path());
 
     let ids = ["local/short".to_owned()];
-    let tested = lighthouse_session::test_decisions(&session, &ids, Some("text")).unwrap();
+    let tested = lighthouse_session::test_decisions(&session, &ids, Some("text"), None).unwrap();
     assert_eq!(tested.decisions, 1);
     assert_eq!(tested.languages, 1);
     assert_eq!(tested.runs, 1);
@@ -132,7 +132,7 @@ fn test_decisions() {
         &text.replace("file.lines > 2", "file.lines > 5"),
     );
     let failing =
-        lighthouse_session::test_decisions(&trusted(dir.path()), &ids, Some("text")).unwrap();
+        lighthouse_session::test_decisions(&trusted(dir.path()), &ids, Some("text"), None).unwrap();
     assert!(!failing.failures.is_empty());
     assert!(
         failing.failures[0].starts_with("[text]"),
@@ -140,6 +140,29 @@ fn test_decisions() {
         failing.failures
     );
 
-    let unknown = lighthouse_session::test_decisions(&session, &["local/none".to_owned()], None);
+    let unknown =
+        lighthouse_session::test_decisions(&session, &["local/none".to_owned()], None, None);
     assert!(unknown.is_err());
+}
+
+#[test]
+fn the_number_of_workers_does_not_change_what_is_reported() {
+    let dir = project("error");
+    let text = crate::fixture::read(dir.path(), ".lighthouse/decisions/short.yaml");
+    write(
+        dir.path(),
+        ".lighthouse/decisions/short.yaml",
+        &text.replace("file.lines > 2", "file.lines > 5"),
+    );
+    let session = trusted(dir.path());
+    let run = |jobs| {
+        let tested =
+            lighthouse_session::test_decisions(&session, &[], Some("text"), Some(jobs)).unwrap();
+        serde_json::to_value(&tested).unwrap()
+    };
+
+    let alone = run(1);
+    assert!(alone["runs"].as_u64().unwrap() > 1, "{alone}");
+    assert!(!alone["failures"].as_array().unwrap().is_empty(), "{alone}");
+    assert_eq!(run(4), alone);
 }
