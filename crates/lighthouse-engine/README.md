@@ -19,7 +19,7 @@ Runs the decisions over an indexed project: reads and indexes the files, runs th
 
 - The core knows no language and no rule: it takes the registry and the catalog it runs over.
 - Cache: any doubt is a miss. The key holds everything a finding depends on (build, rule and revision, applicability and options, the digests the rule's reach asks for); changing it wrongly serves stale results. The cache is local and never committed.
-- Fix: this is the only writer. It refuses to start on an incomplete analysis, verifies every round by a check over in-memory texts, rolls back any file that got worse (a multi-file fix whole), stops after `MAX_ROUNDS`, and writes only if each file still has the hash it was read with.
+- Fix: this is the only writer. It refuses to start on an incomplete analysis, verifies every round by a check over in-memory texts, rolls back any file that got worse (a multi-file fix whole), stops at a fixpoint, when fixes undo each other, when two rounds in a row leave no fewer findings, or at the cap `MAX_ROUNDS`, and writes only if each file still has the hash it was read with.
 - Source annotations (`lighthouse-disable...`) are applied after the rules; a directive that matches nothing is itself reported.
 - Models are asked in as few batched requests as possible, most specific binding first.
 

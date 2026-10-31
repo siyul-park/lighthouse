@@ -37,8 +37,15 @@ pub use model::{BatchTrace, ModelCounts, ToolCounts};
 
 use crate::{FixTimings, Needs, Run};
 
-/// How many apply-and-recheck rounds a run takes before it stops.
-pub const MAX_ROUNDS: usize = 5;
+/// The most apply-and-recheck rounds a run takes. A run ends sooner: at a
+/// fixpoint, where no fix is left to apply; when files come back to a text
+/// they had (fixes that undo each other); or when a round leaves no fewer
+/// findings than the one before. The cap only keeps a run that does none of
+/// these from going on for ever, and says so when it ends a run.
+pub const MAX_ROUNDS: usize = 50;
+
+/// How many rounds in a row may leave no fewer findings than the one before.
+const MAX_STALLED: usize = 2;
 
 /// The fixer of each rule, by rule id. Built from the catalog by the caller:
 /// the engine knows no decisions.

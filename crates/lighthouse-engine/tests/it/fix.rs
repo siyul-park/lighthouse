@@ -19,6 +19,102 @@ use lighthouse_spec::{FixScope, Task};
 
 use crate::support::*;
 
+/// A project of `text` fixed by a plugin whose only fixer turns `TODO` into
+/// what `replace` makes of the first `TODO` of the file: the report of the run.
+fn fixed_by_growing(text: &str, replace: fn(&str) -> String) -> lighthouse_engine::FixReport {
+    let dir = project(text);
+    struct Grow(FixerManifest, fn(&str) -> String);
+    impl Fixer for Grow {
+        fn manifest(&self) -> &FixerManifest {
+            &self.0
+        }
+        fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
+            let first = request
+                .text
+                .lines()
+                .position(|l| l.contains("TODO"))
+                .unwrap_or(0);
+            let col = request
+                .text
+                .lines()
+                .nth(first)
+                .and_then(|l| l.find("TODO"))
+                .unwrap_or(0);
+            let at = |col: usize| lighthouse_model::Position {
+                line: u32::try_from(first + 1).unwrap(),
+                col: u32::try_from(col + 1).unwrap(),
+            };
+            Ok(FixOutcome::Proposed {
+                description: "grow".to_owned(),
+                ops: vec![EditOp::Replace {
+                    file: request.finding.file.clone(),
+                    span: lighthouse_model::Span {
+                        start: at(col),
+                        end: at(col + "TODO".len()),
+                    },
+                    text: (self.1)(request.text),
+                }],
+                safety: Safety::Safe,
+            })
+        }
+    }
+    struct Growing(PluginManifest, FixerManifest, fn(&str) -> String);
+    impl Plugin for Growing {
+        fn manifest(&self) -> &PluginManifest {
+            &self.0
+        }
+        fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+            vec![Box::new(Toy(toy()))]
+        }
+        fn rules(&self) -> Vec<Box<dyn Rule>> {
+            vec![Box::new(Word::new("grow/todo", "TODO"))]
+        }
+        fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+            vec![Box::new(Grow(self.1.clone(), self.2))]
+        }
+    }
+    let mut registry = Registry::default();
+    let fixer = FixerManifest {
+        id: "grow/grow".to_owned(),
+        requires: Vec::new(),
+    };
+    registry
+        .register(&Growing(
+            PluginManifest {
+                id: "grow".to_owned(),
+                version: "0".to_owned(),
+            },
+            fixer,
+            replace,
+        ))
+        .unwrap();
+    let config =
+        Config::parse_inline("plugins = [\"grow\"]\n[rules]\n\"grow/todo\" = \"warn\"\n").unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
+    let mut plan = FixPlan::default();
+    plan.insert(
+        "grow/todo",
+        FixBinding {
+            fixer: FixedBy::Fixer("grow/grow".to_owned()),
+            cap: Safety::Safe,
+            languages: Vec::new(),
+            decision: FixDecision {
+                id: "grow/todo".to_owned(),
+                requirement: String::new(),
+                context: String::new(),
+            },
+            needs: Needs::Nothing,
+        },
+    );
+    engine.fix(&plan, &FixRun::default()).unwrap()
+}
+
 #[test]
 fn a_fix_that_holds_is_applied_and_reported() {
     let dir = project("fn a\nTODO here\n");
@@ -317,85 +413,37 @@ fn findings_a_run_skips_are_left_alone() {
 }
 
 #[test]
-fn fixes_stop_after_a_bounded_number_of_rounds() {
-    // A fixer that turns TODO into TODO TODO would never finish; the rounds
-    // are bounded and the run says so.
-    let dir = project("TODO\n");
-    let mut registry = Registry::default();
-    struct Grow(FixerManifest);
-    impl Fixer for Grow {
-        fn manifest(&self) -> &FixerManifest {
-            &self.0
-        }
-        fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
-            Ok(FixOutcome::Proposed {
-                description: "grow".to_owned(),
-                ops: vec![EditOp::Replace {
-                    file: request.finding.file.clone(),
-                    span: request.finding.span,
-                    text: "x\nTODO".to_owned(),
-                }],
-                safety: Safety::Safe,
-            })
-        }
-    }
-    struct Growing(PluginManifest, FixerManifest);
-    impl Plugin for Growing {
-        fn manifest(&self) -> &PluginManifest {
-            &self.0
-        }
-        fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-            vec![Box::new(Toy(toy()))]
-        }
-        fn rules(&self) -> Vec<Box<dyn Rule>> {
-            vec![Box::new(Word::new("grow/todo", "TODO"))]
-        }
-        fn fixers(&self) -> Vec<Box<dyn Fixer>> {
-            vec![Box::new(Grow(self.1.clone()))]
-        }
-    }
-    let fixer = FixerManifest {
-        id: "grow/grow".to_owned(),
-        requires: Vec::new(),
-    };
-    registry
-        .register(&Growing(
-            PluginManifest {
-                id: "grow".to_owned(),
-                version: "0".to_owned(),
-            },
-            fixer,
-        ))
-        .unwrap();
-    let config =
-        Config::parse_inline("plugins = [\"grow\"]\n[rules]\n\"grow/todo\" = \"warn\"\n").unwrap();
-    let engine = Engine::new(
-        registry,
-        config,
-        lighthouse_test_support::bundled(),
-        dir.path(),
-    )
-    .unwrap();
-    let mut plan = FixPlan::default();
-    plan.insert(
-        "grow/todo",
-        FixBinding {
-            fixer: FixedBy::Fixer("grow/grow".to_owned()),
-            cap: Safety::Safe,
-            languages: Vec::new(),
-            decision: FixDecision {
-                id: "grow/todo".to_owned(),
-                requirement: String::new(),
-                context: String::new(),
-            },
-            needs: Needs::Nothing,
-        },
-    );
+fn rounds_that_leave_no_fewer_findings_end_the_run() {
+    // A fixer that turns TODO into TODO TODO would never finish.
+    let report = fixed_by_growing("TODO\n", |_| "x\nTODO".to_owned());
 
-    let report = engine.fix(&plan, &FixRun::default()).unwrap();
+    assert_eq!(report.rounds, 2);
+    assert!(
+        report
+            .notes
+            .iter()
+            .any(|n| n.contains("the last 2 left 1 findings, no fewer than the round before")),
+        "{:?}",
+        report.notes
+    );
+}
+
+#[test]
+fn a_run_that_keeps_gaining_ground_stops_at_the_cap_and_says_so() {
+    // Each round clears one of more TODOs than the cap has rounds.
+    let many = "TODO\n".repeat(lighthouse_engine::MAX_ROUNDS + 10);
+
+    let report = fixed_by_growing(&many, |_| "x".to_owned());
 
     assert_eq!(report.rounds, lighthouse_engine::MAX_ROUNDS);
-    assert!(report.notes.iter().any(|n| n.contains("stopped after")));
+    assert!(
+        report
+            .notes
+            .iter()
+            .any(|n| n.contains("stopped at the cap of")),
+        "{:?}",
+        report.notes
+    );
 }
 
 #[test]
