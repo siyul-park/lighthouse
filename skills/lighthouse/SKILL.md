@@ -117,7 +117,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/no-stored-context` (warn) Types do not store request contexts
 - `design/error-identity` (warn) Error identity survives wrapping
 - `design/no-panic` (warn, fixable: unsafe) Production errors do not panic
-- `design/top-down-order` (warn, fixable: unsafe) Callers precede private callees
+- `design/top-down-order` (warn, fixable: unsafe) Users precede what they use
 - `design/vertical-distance` (warn, fixable: unsafe) Related declarations stay close
 - `design/owner-file` (warn) One owner has one cohesive file
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups

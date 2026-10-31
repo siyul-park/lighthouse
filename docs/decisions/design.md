@@ -1724,19 +1724,19 @@ Declaration order should let a reader follow ownership and behavior from public 
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/top-down-order`](#callers-precede-private-callees) | Callers precede private callees | warn · cel | unsafe |  |
+| [`design/top-down-order`](#users-precede-what-they-use) | Users precede what they use | warn · cel | unsafe |  |
 | [`design/vertical-distance`](#related-declarations-stay-close) | Related declarations stay close | warn · cel | unsafe |  |
 | [`design/owner-file`](#one-owner-has-one-cohesive-file) | One owner has one cohesive file | warn · cel |  |  |
 | [`design/declaration-groups`](#declarations-follow-ownership-groups) | Declarations follow ownership groups | error · cel | safe |  |
 | [`design/declaration-blocks`](#related-constants-and-variables-share-a-block) | Related constants and variables share a block | warn · cel |  |  |
 
-### Callers precede private callees
+### Users precede what they use
 
 `design/top-down-order` · symbol · warn · cel · fix: unsafe · go, rust
 
-*Readers follow a public operation into its private implementation. A callee placed first forces readers to understand a helper before the behavior that uses it. TypeScript and JavaScript are not covered, since ESLint `no-use-before-define`, whose default warns on every reference to a function before its declaration, asks for the opposite order, and neither the Google TypeScript Style Guide nor the TypeScript Handbook orders functions by their callers.*
+*Readers follow a public operation into its private implementation. A callee placed first forces readers to understand a helper before the behavior that uses it. The step-down rule applies to types alike (Martin, Clean Code, ch. 5, vertical ordering, dependent declarations below), so a type that is held as a field, directly or inside a pointer, slice, map or generic type, follows the type that holds it; no tool orders types this way, and the severity is the decision's. A group order of `design/declaration-groups` wins (a public type before the private type that holds it is fine), and types that hold each other are not ordered. TypeScript and JavaScript are not covered, since ESLint `no-use-before-define`, whose default warns on every reference to a function before its declaration, asks for the opposite order, and neither the Google TypeScript Style Guide nor the TypeScript Handbook orders functions by their callers.*
 
-A private function SHOULD be declared after the production callers that explain why it exists; public entry points and wiring remain in their appropriate declaration groups.
+A private function SHOULD be declared after the production callers that explain why it exists, and a type SHOULD be declared after the types of the same file that hold it as a field or embed it; public entry points and wiring remain in their appropriate declaration groups.
 
 Derived from: Martin, Clean Code (2008), G10 Vertical Separation; Martin, Clean Code (2008), G11 Inconsistency; Martin, Clean Code (2008), G32 Don't Be Arbitrary; Martin, Clean Code (2008), ch. 5 Vertical distance; Martin, Clean Code (2008), ch. 5 Vertical size and ordering; ESLint, no-use-before-define (TypeScript is unlisted, the default asks for callees first): https://eslint.org/docs/latest/rules/no-use-before-define
 
