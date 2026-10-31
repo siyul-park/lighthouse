@@ -672,6 +672,10 @@ fn a_declared_conflict_that_no_longer_fires_is_a_failure() {
 }
 
 fn fixing_pair(before: &str, after: &str) -> Catalog {
+    let (before, after) = (
+        before.replace('\n', "\n          "),
+        after.replace('\n', "\n          "),
+    );
     let fix_example = format!(
         "  - name: todo
     language: notes
@@ -686,6 +690,12 @@ fn fixing_pair(before: &str, after: &str) -> Catalog {
       - path: a.txt
         body: |-
           {after}
+  - name: clean
+    language: notes
+    kind: valid
+    files:
+      - path: a.txt
+        body: fine
 "
     );
     pair(&fix_example, &(WIP_CLEAN.to_owned() + WIP_INVALID), FIX)

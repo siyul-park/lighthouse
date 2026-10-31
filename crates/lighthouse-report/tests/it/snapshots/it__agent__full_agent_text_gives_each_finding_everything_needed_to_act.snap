@@ -30,6 +30,7 @@ design/no-redundant-symbol  info (authored warn)  src/lib.rs:7:1
   requirement: A symbol SHOULD earn its existence by naming reusable behavior, a contract, an invariant, or a real abstraction; a forwarding wrapper or one-implementation private interface SHOULD be consolidated when it adds no distinct responsibility.
   context:     One-use helpers are reviewed semantically: extract them only when they name a concept, remove duplication, isolate an abstraction level, serve as a function value, or provide a test seam. A private forwarding wrapper that adds no policy is inlined; a private interface with one implementation is replaced with the concrete type until another implementation exists.
   expected:    valid rust example `rust-valid` (src/lib.rs), canonical
+                 /// Part of the example.
                  pub struct Store {
                      closed: bool,
                      data: Vec<u8>,
@@ -41,7 +42,6 @@ design/no-redundant-symbol  info (authored warn)  src/lib.rs:7:1
                              return 0;
                          }
                          self.read(k)
-                     }
                  ...
   fingerprint: 2e996a5
   resolve:     lighthouse review resolve 2e996a5 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>

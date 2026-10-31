@@ -29,6 +29,7 @@ design/coupling warn [review] — A function SHOULD NOT be a high fan-in/fan-out
   internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package 5da1c26
 design/no-redundant-symbol info (authored warn) [review] — A symbol SHOULD earn its existence by naming reusable behavior, a contract, an invariant, or a real abstraction; a forwarding wrapper or one-implementation private interface SHOULD be consolidated when it adds no distinct responsibility.
   expected:
+    /// Part of the example.
     pub struct Store {
         closed: bool,
         data: Vec<u8>,
@@ -40,7 +41,6 @@ design/no-redundant-symbol info (authored warn) [review] — A symbol SHOULD ear
                 return 0;
             }
             self.read(k)
-        }
     ...
   src/lib.rs:7:1 private helper has one caller 2e996a5
 broken.go: incomplete: type error
