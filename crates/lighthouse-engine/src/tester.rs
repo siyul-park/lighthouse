@@ -6,6 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use rayon::prelude::*;
 use tempfile::TempDir;
 
 use lighthouse_plugin::Registry;
@@ -19,6 +20,10 @@ use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
 mod cross;
 
 use cross::{cross, hits_in, introduced, judge, model_only};
+
+/// Stack of a worker that checks decisions: the engine under an example
+/// recurses deeply.
+const WORKER_STACK: usize = 8 << 20;
 
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
@@ -72,13 +77,21 @@ impl<'a> RuleTester<'a> {
         self
     }
 
-    /// Failures of every checked decision; empty when all examples hold.
+    /// Failures of every checked decision; empty when all examples hold. The
+    /// decisions are checked side by side and their failures put in catalog
+    /// order.
     pub fn check_all(&self) -> Vec<String> {
-        self.catalog
-            .decisions()
-            .filter(|d| d.automated())
-            .flat_map(|p| self.check(p))
-            .collect()
+        let decisions: Vec<&Decision> =
+            self.catalog.decisions().filter(|d| d.automated()).collect();
+        let pool = rayon::ThreadPoolBuilder::new()
+            .stack_size(WORKER_STACK)
+            .thread_name(|n| format!("lighthouse-check-{n}"))
+            .build();
+        let failures: Vec<Vec<String>> = match pool {
+            Ok(pool) => pool.install(|| decisions.par_iter().map(|d| self.check(d)).collect()),
+            Err(_) => decisions.iter().map(|d| self.check(d)).collect(),
+        };
+        failures.into_iter().flatten().collect()
     }
 
     /// Failures of one decision's examples, each prefixed `<id> <example>:`.

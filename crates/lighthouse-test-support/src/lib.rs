@@ -35,23 +35,36 @@ pub fn registry() -> Registry {
     lighthouse_checks::registry(shared(), libraries()).expect("the bundled plugins build")
 }
 
-/// A factory of registries over one start of the plugins `config` lists: every
-/// registry it makes is `base` with those plugins, and all share their one
-/// process each, as the registries of a `decision test` do. Starting a plugin
-/// per registry instead is what makes example tests slow.
-pub fn pooled(base: impl Fn() -> Registry, config: &Config) -> impl Fn() -> Registry {
-    let started = lighthouse_rpc::start(
-        &base(),
-        config,
-        Path::new("."),
-        Path::new("."),
-        &[],
-        &Default::default(),
-    )
-    .expect("the listed plugins start");
+/// How many times [`pooled`] starts the plugins, so that workers need not
+/// wait for one another: a started plugin answers one request at a time.
+const STARTS: usize = 4;
+
+/// A factory of registries over a few starts of the plugins `config` lists:
+/// every registry it makes is `base` with those plugins, and those made on one
+/// worker share its process of each, as the registries of a `decision test`
+/// do. Starting a plugin per registry instead is what makes example tests
+/// slow.
+pub fn pooled(
+    base: impl Fn() -> Registry + Send + Sync,
+    config: &Config,
+) -> impl Fn() -> Registry + Send + Sync {
+    let starts: Vec<Started> = (0..STARTS)
+        .map(|_| {
+            lighthouse_rpc::start(
+                &base(),
+                config,
+                Path::new("."),
+                Path::new("."),
+                &[],
+                &Default::default(),
+            )
+            .expect("the listed plugins start")
+        })
+        .collect();
     move || {
+        let lane = rayon::current_thread_index().unwrap_or(0) % starts.len();
         let mut registry = base();
-        started
+        starts[lane]
             .register(&mut registry)
             .expect("the started plugins register");
         registry
@@ -98,6 +111,7 @@ use std::{
 use lighthouse_checks::Composition;
 use lighthouse_model::API_VERSION;
 use lighthouse_plugin::Registry;
+use lighthouse_rpc::Started;
 use lighthouse_spec::{Catalog, Config, Env};
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();

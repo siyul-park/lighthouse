@@ -15,4 +15,5 @@ lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
+rayon.workspace = true
 toml.workspace = true

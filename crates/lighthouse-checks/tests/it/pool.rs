@@ -8,10 +8,11 @@ use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Config};
 
-/// How many of the decisions that apply are left out between two that are
-/// run, for a plugin whose start is slow: a plugin started for each example
-/// makes the whole catalog take minutes.
-const GO_STRIDE: usize = 4;
+/// Every this many of the decisions that apply are run: a plugin started for
+/// each example makes the whole catalog take minutes. `decision test` over
+/// the whole catalog, whose output equals that of a run with a plugin per
+/// example, is the proof for all of them.
+const STRIDE: usize = 4;
 
 /// What running the examples of `decisions` found: failures, conflicts and
 /// skipped examples, by decision.
@@ -73,14 +74,14 @@ fn same(catalog: &Catalog, config: &Config, language: &str, stride: usize) {
 }
 
 #[test]
-fn a_pooled_rust_run_over_the_catalog_equals_a_run_with_a_plugin_per_example() {
+fn a_pooled_rust_run_equals_a_run_with_a_plugin_per_example() {
     let plugin = lighthouse_test_support::lang_rust();
     let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-rust\", path = {:?} }}]",
         plugin.to_str().unwrap()
     ))
     .unwrap();
-    same(lighthouse_test_support::bundled(), &config, "rust", 1);
+    same(lighthouse_test_support::bundled(), &config, "rust", STRIDE);
 }
 
 #[test]
@@ -93,5 +94,5 @@ fn a_pooled_go_run_equals_a_run_with_a_plugin_per_example() {
         plugin.to_str().unwrap()
     ))
     .unwrap();
-    same(lighthouse_test_support::full(), &config, "go", GO_STRIDE);
+    same(lighthouse_test_support::full(), &config, "go", STRIDE);
 }

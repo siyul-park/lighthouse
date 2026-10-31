@@ -2077,6 +2077,7 @@ dependencies = [
  "lighthouse-plugin",
  "lighthouse-rpc",
  "lighthouse-spec",
+ "rayon",
  "toml",
 ]
 
