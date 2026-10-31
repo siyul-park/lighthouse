@@ -84,7 +84,7 @@ decisions: plugins cli
 	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) decision test
 
 docs: cli
-	$(LIGHTHOUSE) docs check
+	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) docs check
 
 # The full gate.
 ci: test lint decisions docs
