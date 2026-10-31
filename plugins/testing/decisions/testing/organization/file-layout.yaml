@@ -99,7 +99,7 @@ spec:
       - name: misplaced_order
         expression: "symbol.kind == 'test' && at_index >= 0 && at_index in out_of_order"
       - name: mine
-        expression: "misplaced_order ? comparable[at_index] : {}"
+        expression: "misplaced_order ? comparable.filter(u, u.id == symbol.id)[0] : {}"
       - name: above
         expression: "misplaced_order ? comparable.filter(u, u.pos < mine.pos && u.owned.pos > mine.owned.pos) : []"
       - name: below
