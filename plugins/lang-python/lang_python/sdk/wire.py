@@ -366,6 +366,7 @@ Signature = TypedDict(
 FunctionSummary = TypedDict(
     "FunctionSummary",
     {
+        "configures": str | None,
         "constructs": bool,
         "events": list[Event],
         "flow": Required[list[Flow]],

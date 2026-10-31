@@ -40,9 +40,11 @@ spec:
     # `design/declaration-groups`, a number to compare: the index in `groups`
     # of the first of the declaration's candidate groups that the order names,
     # times a million, plus, in the group `method`, the rank of the declaration
-    # in the block of its owner: 4 per owner block, and in the block its
-    # constructors (of any visibility, as Uber's `newXYZ()` may follow the
-    # type), its exported methods, its hooks, its unexported methods.
+    # in the block of its owner: 5 per owner block, and in the block its
+    # option builders (functional options: a function that returns a func
+    # taking the owner, Pike 2014), its constructors (of any visibility, as
+    # Uber's `newXYZ()` may follow the type), its exported methods, its hooks,
+    # its unexported methods.
     # -1 when no group names the declaration.
     - name: place
       params: [s]
@@ -50,13 +52,16 @@ spec:
         cel.bind(open, s.visibility != 'private',
         cel.bind(owner, s.kind == 'method' ? s.owner_key
             : s.kind == 'type' || s.kind == 'interface' ? s.id
+            : s.kind == 'function' && s.configures != ''
+            ? (owner_types.filter(t, t.name == s.configures && t.module == s.module).map(t, t.id) + [''])[0]
             : s.kind == 'function' && s.constructor_named
             ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id) + [''])[0]
             : '',
         cel.bind(inner,
-            s.kind == 'function' && s.constructor_named ? 0
-            : open && s.kind == 'method' && s.name in hooks ? 2
-            : open ? 1 : 3,
+            s.kind == 'function' && s.configures != '' ? 0
+            : s.kind == 'function' && s.constructor_named ? 1
+            : open && s.kind == 'method' && s.name in hooks ? 3
+            : open ? 2 : 4,
         cel.bind(chosen, (
             s.kind == 'type' || s.kind == 'interface'
             ? [open ? 'public-type' : 'private-type', 'type']
@@ -73,7 +78,7 @@ spec:
           size(chosen) == 0 ? -1
           : groups.indexOf(chosen[0]) * 1000000
             + (chosen[0] == 'method'
-               ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 4 + inner
+               ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 5 + inner
                : 0)))))
     # Per placed declaration, [module, place, id, name].
     - name: slots

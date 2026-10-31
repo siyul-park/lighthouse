@@ -29,6 +29,7 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("fan_out", Reach::Neighbors),
     ("constructor_named", Reach::Local),
     ("built", Reach::Local),
+    ("configures", Reach::Local),
     ("role", Reach::Local),
     ("symbols", Reach::Local),
     // What the directives of the file suppressed: judged after every rule.

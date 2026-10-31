@@ -77,6 +77,7 @@ fn summary(of: &Symbol) -> FunctionSummary {
         manual_assertions: 0,
         implementation: false,
         constructs: false,
+        configures: None,
     }
 }
 

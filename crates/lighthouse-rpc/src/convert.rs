@@ -315,6 +315,7 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         manual_assertions: f.manual_assertions,
         implementation: f.implementation,
         constructs: f.constructs,
+        configures: f.configures,
     })
 }
 

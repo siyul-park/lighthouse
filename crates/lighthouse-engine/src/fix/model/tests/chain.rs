@@ -54,6 +54,7 @@ fn function(name: &str, file: &str, result: &str) -> (Symbol, FunctionSummary) {
         manual_assertions: 0,
         implementation: false,
         constructs: false,
+        configures: None,
     };
     (symbol, summary)
 }

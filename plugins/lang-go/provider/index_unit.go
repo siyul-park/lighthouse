@@ -174,6 +174,7 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		Events:           u.events(d),
 		Implementation:   u.implementation(d),
 		Constructs:       u.constructs(d),
+		Configures:       u.configures(d),
 		ManualAssertions: manual,
 	})
 	if isTestCase {

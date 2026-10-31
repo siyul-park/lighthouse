@@ -173,6 +173,7 @@ impl World {
             manual_assertions: 0,
             implementation: false,
             constructs: false,
+            configures: None,
         });
     }
 

@@ -350,6 +350,11 @@ type Signature struct {
 
 // FunctionSummary: Size and shape measures of one function or method, keyed by its symbol id.
 type FunctionSummary struct {
+	// The type a functional-option builder configures, as a symbol id: a
+	// function without a receiver whose only result is a function that takes
+	// that type or a pointer to it as its only parameter, or a named type of
+	// the package whose underlying type is one (Go `func WithX() func(*T)`).
+	Configures string `json:"configures,omitempty"`
 	// The function builds a value of its owner type without taking one: an
 	// associated function without a receiver that returns `Self` or the
 	// owner. Added in 0.1 before 1.0.

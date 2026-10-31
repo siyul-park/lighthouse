@@ -423,7 +423,10 @@ single value, 0 for `()`), looking inside a `Result<T, E>` at `T`.
 interface declares elsewhere: a method of a trait impl in Rust, a method of a type
 that satisfies an interface its package names in Go. `constructs` (optional) marks an
 associated function without a receiver that returns `Self` or its owner type, bare
-or in a `Result` or `Option`.
+or in a `Result` or `Option`. `configures` (optional) is the symbol id of the type a
+functional-option builder configures: a function without a receiver whose only result
+is a function that takes that type, or a pointer to it, as its only parameter (written
+out or a named type of the package); Go only.
 
 `signature` (optional) is `{ params, results }`, the types of the parameters
 (receiver excluded) and results, one `TypeRef` per occurrence in order (a Rust

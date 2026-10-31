@@ -40,6 +40,9 @@ pub struct FunctionSummary {
     /// An associated function without a receiver that returns its owner.
     #[serde(default)]
     pub constructs: bool,
+    /// The type a functional-option builder configures (`module::name`).
+    #[serde(default)]
+    pub configures: Option<String>,
 }
 
 /// The parameter and result types of a function, receiver excluded, one entry

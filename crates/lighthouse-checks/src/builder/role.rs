@@ -17,7 +17,7 @@ pub(super) struct Flags {
 }
 
 impl Builder<'_> {
-    /// `constructor_named`, `role` and `built`, for the expressions that
+    /// `constructor_named`, `configures`, `role` and `built`, for the expressions that
     /// mention them.
     pub(super) fn role_facts(
         &self,
@@ -37,6 +37,13 @@ impl Builder<'_> {
                 "param_structs".to_owned(),
                 self.param_structs(symbol, summary),
             );
+        }
+        if needs.field("configures") {
+            let named = summary
+                .and_then(|s| s.configures.as_deref())
+                .and_then(|id| id.rsplit_once("::"))
+                .map_or("", |(_, name)| name);
+            map.insert("configures".to_owned(), json!(named));
         }
         if needs.field("role") || needs.field("built") {
             map.insert("role".to_owned(), json!(self.role(symbol, summary)));

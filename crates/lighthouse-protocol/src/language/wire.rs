@@ -582,6 +582,12 @@ pub struct FunctionSummary {
     /// owner. Added in 0.1 before 1.0.
     #[serde(default, skip_serializing_if = "is_false")]
     pub constructs: bool,
+    /// The type a functional-option builder configures, as a symbol id: a
+    /// function without a receiver whose only result is a function that takes
+    /// that type or a pointer to it as its only parameter, or a named type of
+    /// the package whose underlying type is one (Go `func WithX() func(*T)`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configures: Option<String>,
     /// Target of the call the body consists of when it passes the receiver and
     /// every parameter on, in order.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -18,7 +18,12 @@ spec:
     handle) follow the same order; tests and test helpers are placed by
     `testing/file-layout`. Order: public types; private types; public
     constants; private constants; variables; all `init` functions; one block
-    per type, in the order the types are declared, each with the constructors
+    per type, in the order the types are declared, each with the functional
+    option builders of the type first (a function that returns a func taking
+    the type or a pointer to it, or a named type of that kind, such as
+    `func WithHandlers(...) func(*Program)`: Pike, "Self-referential functions
+    and the design of options", and Cheney, "Functional options for friendly
+    APIs"; the interface form of an option, `apply(*T)`, is not recognized) and then the constructors
     of the type (a function named `NewType` or `newType`, of any visibility,
     where `Type` or `type` is a type declared in the same file: Uber, "newXYZ()/NewXYZ()
     may appear after the type is defined, but before the rest of the methods on
@@ -53,7 +58,8 @@ spec:
   requirement: >-
     Top-level declarations in a file MUST follow the language's ownership-group
     order, from public contract to private mechanics. Initializers MUST stay
-    together and MUST precede non-initializer functions and methods. A
+    together and MUST precede non-initializer functions and methods. An
+    option builder MUST precede the constructors of its type; a
     constructor MUST precede the other methods of its type; where methods are
     grouped by owner, exported methods MUST precede unexported ones.
   severity: error
@@ -93,7 +99,7 @@ spec:
           written), `public-const`,
           `private-const`, `const`, `var`, `init`, `method` (the members of the
           types, one block per type, in the order the types are declared, each
-          with the constructors of the type (`NewType` or `newType`, any visibility) first, then its exported
+          with the option builders of the type first, then the constructors of the type (`NewType` or `newType`, any visibility), then its exported
           methods, its hooks and its unexported methods),
           `public-function`, `private-function`.
       hooks:
@@ -210,8 +216,71 @@ spec:
       - "Martin, Clean Code (2008), ch. 10 Class organization"
       - "Uber Go Style Guide, Function Grouping and Ordering"
       - "golangci-lint, funcorder"
+      - "Rob Pike, Self-referential functions and the design of options (2014): https://commandcenter.blogspot.com/2014/01/self-referential-functions-and-design.html"
+      - "Dave Cheney, Functional options for friendly APIs (2014): https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis"
       - "typescript-eslint, member-ordering (TypeScript is unlisted: its default order, fields before constructors before methods and static before instance, is not a group order): https://typescript-eslint.io/rules/member-ordering/"
   examples:
+    - name: option-after-constructor
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Program is a compiled program.
+            type Program struct{ name string }
+
+            // WithName names the program.
+            func WithName(name string) func(*Program) {
+            	return func(p *Program) {
+            		p.name = name
+            	}
+            }
+
+            // New returns a program with the options applied.
+            func New(options ...func(*Program)) *Program {
+            	p := &Program{}
+            	for _, option := range options {
+            		option(p)
+            	}
+            	return p
+            }
+
+            // Name returns the name of the program.
+            func (p *Program) Name() string {
+            	return p.name
+            }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Program is a compiled program.
+            type Program struct{ name string }
+
+            // New returns a program with the options applied.
+            func New(options ...func(*Program)) *Program {
+            	p := &Program{}
+            	for _, option := range options {
+            		option(p)
+            	}
+            	return p
+            }
+
+            // WithName names the program.
+            func WithName(name string) func(*Program) {
+            	return func(p *Program) {
+            		p.name = name
+            	}
+            }
+
+            // Name returns the name of the program.
+            func (p *Program) Name() string {
+            	return p.name
+            }
+      expect:
+        - line: 16
     - name: bare-new-constructor
       language: go
       kind: invalid

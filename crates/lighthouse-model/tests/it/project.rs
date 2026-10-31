@@ -124,6 +124,7 @@ fn summary(symbol: &Symbol, forwards_to: Option<Target>) -> FunctionSummary {
         manual_assertions: 0,
         implementation: false,
         constructs: false,
+        configures: None,
     }
 }
 

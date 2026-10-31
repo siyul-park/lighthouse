@@ -95,6 +95,37 @@ func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
 	return set
 }
 
+// configures names the type a functional-option builder configures: the
+// function has no receiver and its only result is a func type, written out or
+// named in the package, that takes T or *T, for a type T of the package, as its
+// only parameter and returns nothing. It is empty for any other function.
+func (u *unit) configures(d *ast.FuncDecl) string {
+	if d.Recv != nil {
+		return ""
+	}
+	fn, ok := u.info().Defs[d.Name].(*types.Func)
+	if !ok {
+		return ""
+	}
+	results := fn.Type().(*types.Signature).Results()
+	if results.Len() != 1 {
+		return ""
+	}
+	result := types.Unalias(results.At(0).Type())
+	if named, ok := result.(*types.Named); ok && named.Obj().Pkg() != u.pkg.Types {
+		return ""
+	}
+	option, ok := result.Underlying().(*types.Signature)
+	if !ok || option.Params().Len() != 1 || option.Results().Len() != 0 {
+		return ""
+	}
+	owner, ok := namedType(option.Params().At(0).Type())
+	if !ok || owner.Pkg() != u.pkg.Types {
+		return ""
+	}
+	return target(u.res.module(owner.Pkg()), owner.Name())
+}
+
 func declaredIn(t types.Type, pkg *types.Package) bool {
 	named, ok := receiverNamed(t)
 	return ok && named.Obj().Pkg() == pkg

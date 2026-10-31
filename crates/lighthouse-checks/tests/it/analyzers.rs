@@ -49,6 +49,7 @@ fn summary(symbol: &Symbol, nesting: u32, statements: u32, flow: &[Flow]) -> Fun
         manual_assertions: 0,
         implementation: false,
         constructs: false,
+        configures: None,
     }
 }
 

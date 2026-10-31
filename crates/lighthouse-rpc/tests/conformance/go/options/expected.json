@@ -1,0 +1,429 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Program#type",
+          "span": {
+            "end": {
+              "col": 39,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Program is configured with options."
+        },
+        {
+          "attached_to": ".::Option#type",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "text": "// Option configures a Program."
+        },
+        {
+          "attached_to": ".::WithName#function",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "text": "// WithName names the program."
+        },
+        {
+          "attached_to": ".::WithAlias#function",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "text": "// WithAlias is an option of the named type."
+        },
+        {
+          "attached_to": ".::Apply#function",
+          "span": {
+            "end": {
+              "col": 51,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "text": "// Apply is not an option: it takes two arguments."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Program#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Program#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Program::name#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Option#type"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::WithName#function"
+        },
+        {
+          "from": {
+            "symbol": ".::WithName#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 11
+            },
+            "start": {
+              "col": 30,
+              "line": 11
+            }
+          },
+          "to": ".::Program::name"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::WithAlias#function"
+        },
+        {
+          "from": {
+            "symbol": ".::WithAlias#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 16
+            },
+            "start": {
+              "col": 30,
+              "line": 16
+            }
+          },
+          "to": ".::Program::name"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Apply#function"
+        }
+      ],
+      "file": {
+        "path": "options.go"
+      },
+      "functions": [
+        {
+          "configures": ".::Program",
+          "flow": [],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "func(*example.com/options.Program)"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": ".::WithName#function",
+          "tokens": 16,
+          "top_level": 1
+        },
+        {
+          "configures": ".::Program",
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": ".::Option",
+                "text": "example.com/options.Option"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": ".::WithAlias#function",
+          "tokens": 16,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": ".::Program",
+                "text": "*example.com/options.Program"
+              },
+              {
+                "exported": true,
+                "symbol": ".::Option",
+                "text": "example.com/options.Option"
+              }
+            ],
+            "results": [
+              {
+                "text": "func(*example.com/options.Program, *example.com/options.Program)"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": ".::Apply#function",
+          "tokens": 8,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "name": "options",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Program is configured with options.",
+          "extent": {
+            "end": {
+              "col": 35,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "options.go",
+          "id": ".::Program#type",
+          "kind": "type",
+          "name": "Program",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 4
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 4
+            },
+            "start": {
+              "col": 22,
+              "line": 4
+            }
+          },
+          "file": "options.go",
+          "id": ".::Program::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": ".::Program#type",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 4
+            },
+            "start": {
+              "col": 22,
+              "line": 4
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Option configures a Program.",
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "options.go",
+          "id": ".::Option#type",
+          "kind": "type",
+          "name": "Option",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 7
+            },
+            "start": {
+              "col": 6,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "WithName names the program.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "options.go",
+          "id": ".::WithName#function",
+          "kind": "function",
+          "name": "WithName",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "WithAlias is an option of the named type.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "file": "options.go",
+          "id": ".::WithAlias#function",
+          "kind": "function",
+          "name": "WithAlias",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Apply is not an option: it takes two arguments.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "file": "options.go",
+          "id": ".::Apply#function",
+          "kind": "function",
+          "name": "Apply",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

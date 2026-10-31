@@ -919,6 +919,13 @@
     "FunctionSummary": {
       "description": "Size and shape measures of one function or method, keyed by its symbol id.",
       "properties": {
+        "configures": {
+          "description": "The type a functional-option builder configures, as a symbol id: a\nfunction without a receiver whose only result is a function that takes\nthat type or a pointer to it as its only parameter, or a named type of\nthe package whose underlying type is one (Go `func WithX() func(*T)`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "constructs": {
           "description": "The function builds a value of its owner type without taking one: an\nassociated function without a receiver that returns `Self` or the\nowner. Added in 0.1 before 1.0.",
           "type": "boolean"

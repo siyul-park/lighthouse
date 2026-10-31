@@ -23,7 +23,7 @@ The Go language provider: loads packages with `go/packages`, type-checks with `g
 | `modules` | one per package, with `test_of` for external test packages |
 | `symbols` | functions, methods, types, struct fields, interface methods, constants, variables, tests; `extent`, `doc`, `optional`, `type_ref` of fields |
 | `edges` | `calls`, `references`, `imports`, `implements`, `accesses-private` from `go/types`, with sites; `syntactic` for names the prose of a fence defines |
-| `functions` | flow, nesting, statements, tokens, signature, `events` (`panic`, error comparisons and assertions, `fmt.Errorf` without `%w`), `forwards_to`, `implementation`, `constructs`, `manual_assertions` |
+| `functions` | flow, nesting, statements, tokens, signature, `events` (`panic`, error comparisons and assertions, `fmt.Errorf` without `%w`), `forwards_to`, `implementation`, `constructs`, `configures`, `manual_assertions` |
 | `tests` | `Test*` functions and their `t.Run` subtests, with table or scenario style |
 | `comments`, `generated` | comment groups; the `Code generated ... DO NOT EDIT.` marker |
 

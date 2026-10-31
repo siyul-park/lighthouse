@@ -268,6 +268,7 @@ impl Extractor<'_> {
             manual_assertions: 0,
             implementation: role.implementation,
             constructs: role.constructs,
+            configures: None,
         });
         if let Some(attrs) = test {
             self.frag.tests.push(TestCase {
