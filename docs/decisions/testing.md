@@ -22,8 +22,7 @@ Test structure should provide one obvious owner for each public contract and kee
 | [`testing/simple-tables`](#test-tables-stay-simple) | Test tables stay simple | warn · model |  |  |
 | [`testing/no-hidden-target`](#tests-expose-the-behavior-they-exercise) | Tests expose the behavior they exercise | warn · cel |  |  |
 | [`testing/file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | error · cel | safe |  |
-| [`testing/owner-file`](#the-tests-of-a-symbol-live-in-the-test-file-of-its-file) | The tests of a symbol live in the test file of its file | info · cel |  |  |
-| [`testing/file-pair`](#a-test-file-is-named-after-a-source-file) | A test file is named after a source file | info · cel |  |  |
+| [`testing/owner-file`](#the-tests-of-a-source-file-live-in-its-test-file) | The tests of a source file live in its test file | error · cel |  |  |
 
 ### Every public symbol has an owner test
 
@@ -450,68 +449,46 @@ Also: rust, typescript, python
 
 `testing/file-layout` · test · error · cel · fix: safe · go, python, rust, typescript
 
-*A test file reads top-down: what the tests use, then the specification, then how it checks. Go: A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration- groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures. Rust: The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers. Scope: the decision is about test code (`tests: only`), which is a symbol of a test file or of a module that exists to test another, such as a `#[cfg(test)]` module in a production file; the Rust example below has one.*
+*A test file reads top-down: what the tests use, then the specification, then how it checks. Go: A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration- groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures. The owner tests of a file (`TestGet` for `Get`, as in `testing/no-missing-owner`) follow the order in which their targets are declared in the source file, as `design/declaration-groups` orders the methods inside its groups: `compile_test.go` orders its tests the way `compile.go` declares the symbols they test. The source file is the one most of the owner tests of the file test (see `testing/owner-file`); tests that own nothing, or whose target is in another file, are not ordered, and tests of one target keep their order. No tool orders tests this way; it is the project's decision, which Uber's "Function Grouping and Ordering" gives for the source side. Rust: The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers. Scope: the decision is about test code (`tests: only`), which is a symbol of a test file or of a module that exists to test another, such as a `#[cfg(test)]` module in a production file; the Rust example below has one.*
 
-A test file MUST declare its fixtures (test types, constants, variables and the functions that build them without the test framework's handle) above its tests, and its test helpers (functions that take the test framework's handle and are called from tests) below the tests that use them. Fixtures keep the declaration-group order among themselves and sit next to the fixtures they compose.
+A test file MUST declare its fixtures (test types, constants, variables and the functions that build them without the test framework's handle) above its tests, and its test helpers (functions that take the test framework's handle and are called from tests) below the tests that use them. Fixtures keep the declaration-group order among themselves and sit next to the fixtures they compose. Its owner tests SHOULD follow the declaration order of their targets in the source file.
 
 Derived from: Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Martin, Clean Code (2008), G24 Follow Standard Conventions
 
 ```diff
+
+```
+
+```diff
 --- a/store_test.go
 +++ b/store_test.go
-@@ -8,0 +9,2 @@
-+const want = 1
+@@ -4,0 +5,6 @@
++func TestGet(t *testing.T) {
++	if Get() != 1 {
++		t.Fatal("get")
++	}
++}
 +
-@@ -14,2 +15,0 @@
+@@ -8,6 +13,0 @@
+-	}
+-}
 -
--const want = 1
+-func TestGet(t *testing.T) {
+-	if Get() != 1 {
+-		t.Fatal("get")
 ```
 
 Also: rust, typescript, python
 
-### The tests of a symbol live in the test file of its file
+### The tests of a source file live in its test file
 
-`testing/owner-file` · symbol · info · cel · go
+`testing/owner-file` · symbol · error · cel · go
 
-*A source file has one test file, and the tests of its symbols are read there. This is the test-side twin of `design/owner-file`, which keeps the members of an owner together in one source file; and it is why `core/max-lines` asks for no split by size: a test file grows with its source file, not apart from it. Go: `go test` runs the files named `*_test.go`, and the standard library names each after the file it tests (`strings.go`, `strings_test.go`). The test file of `x.go` is `x_test.go` in the same directory, whether its package is `x` or `x_test`. An owner test (see `testing/no-missing-owner`) of a symbol declared in `y.go` belongs in `y_test.go`. A test file named after no source file is judged by `testing/file-pair`. Rust, TypeScript and Python are not judged yet. There is no tool precedent; the severity is `info` until precision is measured at 80% or more and the project approves a stronger level.*
+*A source file has one test file, named after it, and the tests of its symbols are read there. This is the test-side twin of `design/owner-file`, which keeps the members of an owner together in one source file; and it is why `core/max-lines` asks for no split by size: a test file grows with its source file, not apart from it. Go: `go test` runs the files named `*_test.go`, and the standard library names each after the file it tests (`strings.go`, `strings_test.go`). The test file of `x.go` is `x_test.go` in the same directory, whether its package is `x` or `x_test`. Two findings, told apart by the evidence `kind`. `unpaired`: a test file named after no source file of its directory (`helpers_test.go` beside no `helpers.go`), reported at its first declaration; `export_test.go`, `example_test.go` and `main_test.go` are Go conventions that need no source file (option `allow`), and a directory with no source file at all (`examples/`, a conformance suite) has nothing to be named after. `misplaced`: an owner test (see `testing/no-missing-owner`) of a symbol declared in `y.go` that sits in a test file other than `y_test.go`. Rust, TypeScript and Python are not judged yet. No tool has this precedent. The severity follows the measured precision of the findings. Measured on cel, qlbridge and lighthouse's own Go before its tests were moved (minivm, which was being edited, left out): 45 of 47 findings are right (96%), 27 of 27 `misplaced` and 18 of 20 `unpaired`; the two others are a Go example file (`cel_example_test.go`) and a benchmark file (`vm_bench_test.go`), which the convention names after neither a source file nor `example_test.go`. At 95% or more the project approved `error` (user decision, outside the precedent gate).*
 
-The owner tests of a source file's symbols MUST live in that file's test file.
+The tests of a source file's symbols MUST live in that file's test file, and a test file MUST be named after a source file of its package.
 
 Derived from: Go standard library layout: tests of x.go are in x_test.go (https://pkg.go.dev/cmd/go#hdr-Test_packages); Lighthouse design/owner-file and core/max-lines
-
-```go invalid other_test.go
-package sample
-
-import "testing"
-
-func TestGet(t *testing.T) {
-	if Get() != 1 {
-		t.Fatal("get")
-	}
-}
-```
-
-```go valid store_test.go
-package sample
-
-import "testing"
-
-func TestGet(t *testing.T) {
-	if Get() != 1 {
-		t.Fatal("get")
-	}
-}
-```
-
-### A test file is named after a source file
-
-`testing/file-pair` · file · info · cel · go
-
-*A test file is read next to the source file it tests, so its name says which one. A test file named after no source file (a `helpers_test.go` that only holds a share of the tests of a large file) hides where the tests of a symbol are; see `testing/owner-file` for the tests themselves and `core/max-lines`, which asks for no split by size. Go: `x_test.go` pairs with `x.go` in the same directory; both `package x` and `package x_test` count. `export_test.go` (the file that exports internals to the external test package), `example_test.go` and `main_test.go` are Go conventions with no source file of that name. Rust, TypeScript and Python are not judged yet. There is no tool precedent; the severity is `info` until precision is measured at 80% or more and the project approves a stronger level.*
-
-A test file MUST be named after a source file of its package.
-
-Derived from: Go standard library layout: tests of x.go are in x_test.go (https://pkg.go.dev/cmd/go#hdr-Test_packages)
 
 | option | default | meaning |
 | --- | --- | --- |

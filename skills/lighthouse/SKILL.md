@@ -78,7 +78,7 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (52)
+## Active decisions (51)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|unsafe` marks a decision with a fixer and the safety of its fix.
 
@@ -142,6 +142,5 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `testing/max-case-depth` (warn) Test cases have at most two levels
 - `testing/no-hidden-target` (warn) Tests expose the behavior they exercise
 - `testing/file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers
-- `testing/owner-file` (info) The tests of a symbol live in the test file of its file
-- `testing/file-pair` (info) A test file is named after a source file
+- `testing/owner-file` (error) The tests of a source file live in its test file
 - `testing/public-boundary` (error) Contract tests live outside the target

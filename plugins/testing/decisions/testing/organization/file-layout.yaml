@@ -18,6 +18,17 @@ spec:
     test or helper of the same file uses may sit anywhere below the
     fixtures.
 
+    The owner tests of a file (`TestGet` for `Get`, as in
+    `testing/no-missing-owner`) follow the order in which their targets are
+    declared in the source file, as `design/declaration-groups` orders the
+    methods inside its groups: `compile_test.go` orders its tests the way
+    `compile.go` declares the symbols they test. The source file is the one
+    most of the owner tests of the file test (see `testing/owner-file`); tests
+    that own nothing, or whose target is in another file, are not ordered, and
+    tests of one target keep their order. No tool orders tests this way; it is
+    the project's decision, which Uber's "Function Grouping and Ordering" gives
+    for the source side.
+
     Rust: The same reading order applies to a `#[cfg(test)]` module and to
     files of `tests/`: fixtures and builders first, then the `#[test]`
     functions, then the helpers that check. It is not enforced for Rust,
@@ -42,7 +53,8 @@ spec:
     tests, and its test helpers (functions that take the test framework's handle
     and are called from tests) below the tests that use them. Fixtures keep the
     declaration-group order among themselves and sit next to the fixtures they
-    compose.
+    compose. Its owner tests SHOULD follow the declaration order of their
+    targets in the source file.
   severity: error
   check:
     type: cel
@@ -60,17 +72,47 @@ spec:
         expression: symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
       - name: misplaced_helper
         expression: symbol.test_role == 'test-helper' && size(user) > 0
+      - name: owner_tests
+        expression: "tests.filter(t, has(t.owned) && t.owned != null && t.owned.file != '')"
+      - name: homes
+        expression: "owner_tests.map(t, t.owned.file)"
+      - name: home
+        expression: "size(homes) > 0 ? homes.distinct().sortBy(f, -size(homes.filter(x, x == f)))[0] : ''"
+      - name: comparable
+        expression: "owner_tests.filter(t, t.owned.file == home)"
+      - name: targets
+        expression: "comparable.map(t, t.owned.pos)"
+      - name: out_of_order
+        expression: "targets.misplaced()"
+      - name: at_index
+        expression: "comparable.map(t, t.id).indexOf(symbol.id)"
+      - name: misplaced_order
+        expression: "symbol.kind == 'test' && at_index >= 0 && at_index in out_of_order"
+      - name: mine
+        expression: "misplaced_order ? comparable[at_index] : {}"
+      - name: above
+        expression: "misplaced_order ? comparable.filter(u, u.pos < mine.pos && u.owned.pos > mine.owned.pos) : []"
+      - name: below
+        expression: "misplaced_order ? comparable.filter(u, u.pos > mine.pos && u.owned.pos < mine.owned.pos) : []"
+      - name: sorted_tests
+        expression: "comparable.sortBy(t, t.owned.pos).map(t, t.id)"
     where: >-
-      (misplaced_fixture || misplaced_helper)
+      (misplaced_fixture || misplaced_helper || misplaced_order)
     message: >-
       {{ misplaced_fixture
          ? 'fixture ' + symbol.name + ' must be declared above the tests, before ' + first.name
-         : 'test helper ' + symbol.name + ' must be declared below ' + user.name + ', which uses it' }}
+         : misplaced_helper
+         ? 'test helper ' + symbol.name + ' must be declared below ' + user.name + ', which uses it'
+         : size(above) > 0
+         ? symbol.name + ' tests ' + mine.owned.name + ', declared before ' + above[0].owned.name
+           + '; it belongs above ' + above[0].name
+         : symbol.name + ' tests ' + mine.owned.name + ', declared after ' + below[0].owned.name
+           + '; it belongs below ' + below[0].name }}
     evidence:
       symbol: symbol.id
       role: symbol.test_role
-      before: "misplaced_fixture ? first.id : ''"
-      after: "misplaced_helper ? user.id : ''"
+      before: "misplaced_fixture ? first.id : misplaced_order && size(above) > 0 ? above[0].id : ''"
+      after: "misplaced_helper ? user.id : misplaced_order && size(below) > 0 ? below[0].id : ''"
     identity:
       subject: symbol.id
   fix:
@@ -79,12 +121,102 @@ spec:
     edits: >-
       misplaced_fixture ? [move(symbol, before(first))]
       : misplaced_helper ? [move(symbol, after(user))]
+      : misplaced_order ? [reorder(sorted_tests)]
       : []
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), ch. 5 Vertical size and ordering"
       - "Martin, Clean Code (2008), G24 Follow Standard Conventions"
   examples:
+    - name: tests-in-target-order
+      language: go
+      kind: valid
+      files:
+        - path: store.go
+          body: |-
+            package sample
+
+            func Get() int { return 1 }
+
+            func Set() int { return 2 }
+        - path: store_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestGet(t *testing.T) {
+            	if Get() != 1 {
+            		t.Fatal("get")
+            	}
+            }
+
+            func TestScenario(t *testing.T) {
+            	if Set() != 2 {
+            		t.Fatal("set")
+            	}
+            }
+
+            func TestSet(t *testing.T) {
+            	if Set() != 2 {
+            		t.Fatal("set")
+            	}
+            }
+    - name: tests-out-of-target-order
+      language: go
+      kind: invalid
+      fixed:
+        - path: store.go
+          body: |-
+            package sample
+
+            func Get() int { return 1 }
+
+            func Set() int { return 2 }
+        - path: store_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestGet(t *testing.T) {
+            	if Get() != 1 {
+            		t.Fatal("get")
+            	}
+            }
+
+            func TestSet(t *testing.T) {
+            	if Set() != 2 {
+            		t.Fatal("set")
+            	}
+            }
+      files:
+        - path: store.go
+          body: |-
+            package sample
+
+            func Get() int { return 1 }
+
+            func Set() int { return 2 }
+        - path: store_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestSet(t *testing.T) {
+            	if Set() != 2 {
+            		t.Fatal("set")
+            	}
+            }
+
+            func TestGet(t *testing.T) {
+            	if Get() != 1 {
+            		t.Fatal("get")
+            	}
+            }
+      expect:
+        - line: 11
     - name: fixture-after-test
       language: go
       kind: invalid
