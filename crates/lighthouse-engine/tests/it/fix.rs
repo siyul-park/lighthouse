@@ -413,16 +413,17 @@ fn findings_a_run_skips_are_left_alone() {
 }
 
 #[test]
-fn rounds_that_leave_no_fewer_findings_end_the_run() {
-    // A fixer that turns TODO into TODO TODO would never finish.
+fn rounds_that_leave_as_many_findings_go_on_while_they_apply_fixes() {
+    // Each round turns a TODO into one other TODO: no fewer findings, but every
+    // round changes the text, so the run goes on to the cap.
     let report = fixed_by_growing("TODO\n", |_| "x\nTODO".to_owned());
 
-    assert_eq!(report.rounds, 2);
+    assert_eq!(report.rounds, lighthouse_engine::MAX_ROUNDS);
     assert!(
         report
             .notes
             .iter()
-            .any(|n| n.contains("the last 2 left 1 findings, no fewer than the round before")),
+            .any(|n| n.contains("stopped at the cap of")),
         "{:?}",
         report.notes
     );

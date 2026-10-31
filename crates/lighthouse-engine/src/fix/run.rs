@@ -4,14 +4,17 @@ mod rollback;
 mod settle;
 mod write;
 
-use std::{collections::BTreeMap, path::PathBuf, time::Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+    time::Instant,
+};
 
 use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_protocol::hash::Hasher;
 
 use super::{
-    AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, FixedBy, MAX_ROUNDS, MAX_STALLED,
-    PreviewedFix,
+    AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, FixedBy, MAX_ROUNDS, PreviewedFix,
     propose::{Phase, Proposal, Proposer, Taking},
     rewrite::run_verify,
 };
@@ -137,10 +140,9 @@ impl Orchestrator<'_> {
     /// proposals the run may not write over that state.
     fn apply_rules(&mut self) -> Result<(Run, Option<Vec<Proposal>>), Error> {
         let mut checked: Option<Run> = None;
-        // The findings the checks of the rounds so far found, and for how many
-        // rounds in a row they were no fewer.
-        let mut before: Option<usize> = None;
-        let mut stalled = 0;
+        // The states of the texts the rounds began from: one that comes again
+        // means the rounds go round.
+        let mut seen = BTreeSet::new();
         for round in 1..=MAX_ROUNDS {
             self.round = round;
             let outcome = match checked.take() {
@@ -159,22 +161,13 @@ impl Orchestrator<'_> {
                     first.reason
                 )));
             }
-            let found = outcome.diagnostics.len();
-            stalled = if before.is_some_and(|last| found >= last) {
-                stalled + 1
-            } else {
-                0
-            };
-            // Two rounds in a row, so that fixes which undo each other are
-            // caught by `watch` (the third state is the first) and named.
-            if stalled >= MAX_STALLED {
+            if !seen.insert(self.state_hash()) {
                 self.notes.push(format!(
-                    "stopped after {} rounds: the last {stalled} left {found} findings, no fewer than the round before",
+                    "stopped after {} rounds: the texts are as they were at the start of an earlier round",
                     round - 1
                 ));
                 return Ok((outcome, None));
             }
-            before = Some(found);
             let (proposals, declined) = self.proposals(&outcome, Phase::Rules, Taking::Selected)?;
             self.declined.extend(declined);
             let proposals = self.unfrozen(proposals);

@@ -724,9 +724,8 @@ at most five:
    Dropped fixes are reported as declined.
 
 It stops when a round applies nothing (the fixpoint), when a round reaches a state
-an earlier one had (fixes that undo each other; the note names their rules), or when two
-rounds in a row leave no fewer findings than the one before. A run that does none of these
-stops at 50 rounds and says so.
+an earlier one had, or the texts of all files are those of an earlier round (fixes that undo
+each other; the note names their rules). A run that does neither stops at 50 rounds and says so.
 **Nothing touches the disk until the last round passed.** Then the write has two phases.
 First every changed file's hash is checked against the text the run analyzed (recorded when
 it was read), and a fix that spans a file that changed is skipped as a whole, all its files,
