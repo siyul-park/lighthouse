@@ -12,6 +12,19 @@ use super::Builder;
 const TEST_SUFFIX: &str = "_test";
 
 impl Builder<'_> {
+    /// The facts of a file that a provider states or that name another file:
+    /// `blocks`, `inline_bodies` and `pair`, each when a check reads it.
+    pub(super) fn file_facts(&self, value: &mut Value, file: &File) {
+        for name in ["blocks", "inline_bodies"] {
+            if self.needs.field(name) {
+                value[name] = self.provider_list(file, name);
+            }
+        }
+        if self.needs.field("pair") {
+            value["pair"] = self.pair(file);
+        }
+    }
+
     /// A list a provider states in the file fact `name` as JSON (the
     /// `const` and `var` declarations as `blocks`, the functions with a body
     /// on one line as `inline_bodies`); empty when it states none.

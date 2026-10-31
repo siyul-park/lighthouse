@@ -318,14 +318,7 @@ impl<'a> Builder<'a> {
                     .collect(),
             );
         }
-        for name in ["blocks", "inline_bodies"] {
-            if self.needs.field(name) {
-                value[name] = self.provider_list(file, name);
-            }
-        }
-        if self.needs.field("pair") {
-            value["pair"] = self.pair(file);
-        }
+        self.file_facts(&mut value, file);
         if self.needs.field("line_widths") {
             value["line_widths"] = widths::line_widths(text);
         }
