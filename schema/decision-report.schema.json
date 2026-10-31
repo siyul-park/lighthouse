@@ -57,6 +57,13 @@
     "tested": {
       "description": "What the gate ran before the decision was written.",
       "properties": {
+        "conflicts": {
+          "description": "One line per conflict with another decision that an example declares\nand still has: a candidate for a contradiction, not a failure.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "decisions": {
           "format": "uint",
           "minimum": 0,
@@ -92,7 +99,8 @@
         "languages",
         "runs",
         "failures",
-        "skipped"
+        "skipped",
+        "conflicts"
       ],
       "type": "object"
     },

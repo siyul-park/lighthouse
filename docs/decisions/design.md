@@ -48,12 +48,16 @@ func (s *Store) Drop() int { return 3 }
 ```go valid
 package sample
 
+// Store is part of the example.
 type Store struct{}
 
+// Get is part of the example.
 func (s *Store) Get() int { return 1 }
 
+// Put is part of the example.
 func (s *Store) Put() int { return 2 }
 
+// Drop is part of the example.
 func (s *Store) Drop() int { return 3 }
 ```
 
@@ -116,8 +120,10 @@ pub fn work() -> i32 { super::secret() + 1 }
 ```rust valid src/lib.rs
 mod part;
 
+/// Part of the example.
 pub fn api() -> i32 { 1 }
 
+/// Part of the example.
 pub fn run() -> i32 { part::work() }
 ```
 
@@ -243,14 +249,17 @@ var Defaults = map[string]string{}
 func Run() int { return language.Analyze() }
 ```
 
-```gomod valid go.mod
-module example.com/sample
-go 1.26
+```go invalid language/language.go
+package language
+
+func Analyze() int { return parse() }
+func parse() int { return 1 }
 ```
 
 ```go valid language/language.go
 package language
 
+// Analyze is part of the example.
 func Analyze() int { return parse() }
 func parse() int { return 1 }
 ```
@@ -284,12 +293,6 @@ Derived from: import-linter, layers, independence and forbidden contracts; ArchU
 | `independent` | `true` | Modules of one layer that match different globs do not import each other. |
 | `layers` | `[]` | The layers from the top down, each a list of module globs, such as `[["app/cli"], ["app/**"], ["app/model"]]`. A module imports only modules of its own layer or below. |
 
-```gomod invalid go.mod
-module example.com/app
-
-go 1.26
-```
-
 ```go invalid domain/domain.go
 package domain
 
@@ -304,23 +307,19 @@ package infra
 func Read() string { return "" }
 ```
 
-```gomod valid go.mod
-module example.com/app
-
-go 1.26
-```
-
 ```go valid domain/domain.go
 package domain
 
 import "example.com/app/infra"
 
+// Load is part of the example.
 func Load() string { return infra.Read() }
 ```
 
 ```go valid infra/infra.go
 package infra
 
+// Read is part of the example.
 func Read() string { return "" }
 ```
 
@@ -504,7 +503,7 @@ Derived from: rustfmt fn_single_line, default false: https://github.com/rust-lan
 ```diff
 --- a/example.go
 +++ b/example.go
-@@ -5 +5,3 @@
+@@ -7 +7,3 @@
 -func (it *Iterator) Kind() int { return 1 }
 +func (it *Iterator) Kind() int {
 +	return 1
@@ -652,8 +651,10 @@ func New() config { return config{} }
 ```go valid
 package sample
 
+// Config is part of the example.
 type Config struct{}
 
+// New is part of the example.
 func New() Config { return Config{} }
 ```
 
@@ -720,10 +721,13 @@ func sum(s *Store) int {
 ```go valid
 package sample
 
+// Store is part of the example.
 type Store struct{ items []int }
 
+// Total is part of the example.
 func (s *Store) Total() int { return sum(s) }
 
+// Sum is part of the example.
 func Sum(s *Store) int { return sum(s) }
 
 func sum(s *Store) int {
@@ -775,12 +779,14 @@ func summary(s *Store) int {
 ```go valid
 package sample
 
+// Store is part of the example.
 type Store struct {
 	items []int
 	total int
 	extra int
 }
 
+// Cache is part of the example.
 type Cache struct{ hits int }
 
 func summary(s *Store, c *Cache) int {
@@ -820,6 +826,7 @@ func unused() int { return 2 }
 ```go valid
 package sample
 
+// Run is part of the example.
 func Run() int { return helper() }
 
 func helper() int { return 1 }
@@ -957,8 +964,10 @@ type ProviderOptions struct{}
 ```go valid
 package provider
 
+// Config is part of the example.
 type Config struct{}
 
+// Providence is part of the example.
 type Providence struct{}
 
 type providerState struct{}
@@ -1019,8 +1028,10 @@ type IReader interface{ Read() }
 ```go valid
 package sample
 
+// Reader is part of the example.
 type Reader interface{ Read() }
 
+// Item is part of the example.
 type Item struct{}
 ```
 
@@ -1099,10 +1110,13 @@ func BuildUser(id string) bool { return id != "" }
 ```go valid
 package sample
 
+// User is part of the example.
 type User struct{ id string }
 
+// HasUser is part of the example.
 func HasUser(id string) bool { return id != "" }
 
+// BuildUser is part of the example.
 func BuildUser(id string) User { return User{id: id} }
 ```
 
@@ -1127,6 +1141,7 @@ func x() string { return "x" }
 ```go valid
 package sample
 
+// Load is part of the example.
 func Load() string { return "x" }
 ```
 
@@ -1136,7 +1151,7 @@ Also: rust, typescript, python
 
 `design/abbreviations` · symbol · warn · cel · cel, go, python, rust, typescript
 
-*Nonstandard abbreviations increase the number of terms readers must learn and make the same concept appear under multiple spellings. Go writes common initialisms in capitals (golint `commonInitialisms`, revive `var-naming`); Rust writes an acronym as one word (Rust API Guidelines, C-CASE), so its list is empty; TypeScript does the same (Google TypeScript Style Guide, treat acronyms as words, so `loadHttpUrl` and not `loadHTTPURL`).*
+*Nonstandard abbreviations increase the number of terms readers must learn and make the same concept appear under multiple spellings. Go writes common initialisms in capitals (golint `commonInitialisms`, revive `var-naming`); Rust writes an acronym as one word (Rust API Guidelines, C-CASE), so its list is empty; TypeScript does the same (Google TypeScript Style Guide, treat acronyms as words, so `loadHttpUrl` and not `loadHTTPURL`). A method whose name a language protocol dictates (`toJSON` for `JSON.stringify`, Go's `String`) keeps it, as the methods `design/exported-doc` exempts, taken from it, so the list is stated once.*
 
 Names SHOULD use standard abbreviations and initialisms in their conventional form, such as `HTTP`, `URL`, `ID`, and `JSON`.
 
@@ -1156,12 +1171,14 @@ type Config struct{ httpUrl string }
 ```go valid
 package sample
 
+// Config is part of the example.
 type Config struct{ httpURL string }
 
+// Identity is part of the example.
 func Identity() string { return "" }
 ```
 
-Also: rust, cel, typescript, python
+Also: typescript, rust, cel, python
 
 ### One concept has one term
 
@@ -1173,15 +1190,29 @@ One term SHOULD represent one concept across packages, and one concept SHOULD ha
 
 Derived from: Lighthouse, coding-patterns#naming-1fc2961d; Martin, Clean Code (2008), N3 Use Standard Nomenclature Where Possible; Martin, Clean Code (2008), N4 Unambiguous Names; Martin, Clean Code (2008), G11 Inconsistency
 
+```go invalid first/first.go
+package first
+
+type Account struct{}
+```
+
 ```go invalid second/second.go
 package second
 
 type Account struct{}
 ```
 
+```go valid first/first.go
+package first
+
+// Account is part of the example.
+type Account struct{}
+```
+
 ```go valid second/second.go
 package second
 
+// Ledger is part of the example.
 type Ledger struct{}
 ```
 
@@ -1277,10 +1308,12 @@ package config
 
 import "errors"
 
+// ErrMissing is part of the example.
 var ErrMissing = errors.New("missing")
 
 var defaults = map[string]string{}
 
+// Limit is part of the example.
 const Limit = 3
 ```
 
@@ -1526,6 +1559,7 @@ package sample
 
 import "context"
 
+// Fetch is part of the example.
 func Fetch(ctx context.Context, url string) ([]byte, error) { return nil, ctx.Err() }
 ```
 
@@ -1555,8 +1589,10 @@ package sample
 
 import "context"
 
+// Worker is part of the example.
 type Worker struct{ name string }
 
+// Run is part of the example.
 func (w *Worker) Run(ctx context.Context) error { return ctx.Err() }
 ```
 
@@ -1621,6 +1657,7 @@ package sample
 
 import "fmt"
 
+// Load is part of the example.
 func Load(name string, err error) error {
     return fmt.Errorf("load %s: %w", name, err)
 }
@@ -1657,6 +1694,7 @@ package sample
 
 import "errors"
 
+// Read is part of the example.
 func Read(n int) (int, error) {
     if n < 0 {
         return 0, errors.New("negative")
@@ -1768,12 +1806,12 @@ Derived from: Martin, Clean Code (2008), G10 Vertical Separation; Martin, Clean 
 ```diff
 --- a/example.go
 +++ b/example.go
-@@ -2,0 +3,2 @@
-+func Run() int { return helper() }
-+
-@@ -4,2 +5,0 @@
+@@ -3,2 +2,0 @@
+-func helper() int { return 1 }
 -
--func Run() int { return helper() }
+@@ -6,0 +5,2 @@
++
++func helper() int { return 1 }
 ```
 
 Also: rust
@@ -1791,11 +1829,13 @@ Derived from: Martin, Clean Code (2008), G10 Vertical Separation; Martin, Clean 
 ```diff
 --- a/example.go
 +++ b/example.go
-@@ -8,0 +9,2 @@
+@@ -11,0 +12,3 @@
++// Two is part of the example.
 +func (a A) Two() int { return 2 }
 +
-@@ -10,2 +11,0 @@
+@@ -14,3 +16,0 @@
 -
+-// Two is part of the example.
 -func (a A) Two() int { return 2 }
 ```
 
@@ -1826,8 +1866,10 @@ func (s *Store) Total() int { return 1 }
 ```go valid
 package sample
 
+// Store is part of the example.
 type Store struct{}
 
+// Total is part of the example.
 func (s *Store) Total() int { return 1 }
 ```
 
@@ -1904,12 +1946,15 @@ var _ Value = B{}
 ```go valid
 package sample
 
+// Value is part of the example.
 type Value interface{ V() }
 
+// A is part of the example.
 type A struct{}
 
 func (A) V() {}
 
+// B is part of the example.
 type B struct{}
 
 func (B) V() {}

@@ -39,6 +39,13 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "description": "The `DecisionTest` kind: the examples of the checked decisions, run.",
     "properties": {
+      "conflicts": {
+        "description": "One line per conflict with another decision that an example declares\nand still has: a candidate for a contradiction, not a failure.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
       "decisions": {
         "format": "uint",
         "minimum": 0,
@@ -79,7 +86,8 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "languages",
       "runs",
       "failures",
-      "skipped"
+      "skipped",
+      "conflicts"
     ],
     "title": "DecisionTest",
     "type": "object"

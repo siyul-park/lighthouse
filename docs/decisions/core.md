@@ -182,7 +182,7 @@ Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; gofmt:
 ```diff
 --- a/example.go
 +++ b/example.go
-@@ -3 +3 @@
+@@ -4 +4 @@
 -func  Run( ) int {return 1}
 +func Run() int { return 1 }
 ```

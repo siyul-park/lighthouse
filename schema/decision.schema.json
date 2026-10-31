@@ -566,6 +566,13 @@
           "description": "The example that best shows the decision in its language; at most one\nper language and kind. Agent output prefers it.",
           "type": "boolean"
         },
+        "conflicts": {
+          "description": "Decisions this example is known to break besides its own: a `valid`\nexample, or the `fixed` form of an `invalid` one, that another decision\nreports on, or an `invalid` one whose fix introduces such a finding. A\nfinding of any other decision that is not listed fails the test.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "expect": {
           "description": "Diagnostics an invalid example must produce.",
           "items": {

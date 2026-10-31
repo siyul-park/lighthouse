@@ -74,6 +74,7 @@ func TestGet(t *testing.T) {
 ```go valid
 package store
 
+// Get is part of the example.
 func Get() int { return 1 }
 ```
 
@@ -124,8 +125,10 @@ func TestGet_Missing(t *testing.T) {
 ```go valid store.go
 package store
 
+// Store is part of the example.
 type Store struct{}
 
+// Get is part of the example.
 func (s *Store) Get() int { return 1 }
 ```
 
@@ -173,6 +176,12 @@ package assertions
 func Equal(got, want int) bool { return got == want }
 ```
 
+```go invalid store.go
+package store
+
+func Get() int { return 1 }
+```
+
 ```go invalid store_test.go
 package store_test
 
@@ -189,6 +198,13 @@ func TestGet(t *testing.T) {
         t.Fatalf("got %d", got)
     }
 }
+```
+
+```go valid store.go
+package store
+
+// Get is part of the example.
+func Get() int { return 1 }
 ```
 
 ```go valid store_test.go
@@ -264,6 +280,12 @@ A test level SHOULD use either data-driven table cases or individually named sce
 
 Derived from: Lighthouse, testing#organization-17ab163b
 
+```go invalid sample.go
+package sample
+
+func Get(s string) int { return len(s) }
+```
+
 ```go invalid sample_test.go
 package sample
 
@@ -289,6 +311,13 @@ func TestGetCases(t *testing.T) {
 		})
 	}
 }
+```
+
+```go valid sample.go
+package sample
+
+// Get is part of the example.
+func Get(s string) int { return len(s) }
 ```
 
 ```go valid sample_test.go
@@ -324,10 +353,23 @@ Nested test cases SHOULD be limited to two levels: a test function and its direc
 
 Derived from: Lighthouse, testing#organization-c3e1ee9a
 
+```go invalid sample.go
+package sample
+
+func Get() int { return 1 }
+```
+
 ```go invalid sample_test.go
 package sample
 import "testing"
 func TestGet(t *testing.T) { t.Run("a", func(t *testing.T) { t.Run("b", func(t *testing.T) { t.Run("c", func(t *testing.T) {}) }) }) }
+```
+
+```go valid sample.go
+package sample
+
+// Get is part of the example.
+func Get() int { return 1 }
 ```
 
 ```go valid sample_test.go
@@ -416,6 +458,12 @@ A test SHOULD make the production call and its asserted result visible; helpers 
 
 Derived from: Lighthouse, testing#readability-668c9a46; Lighthouse, testing#contract-31731df3; Meszaros, xUnit Test Patterns, Obscure Test
 
+```go invalid sample.go
+package sample
+
+func Get() int { return 1 }
+```
+
 ```go invalid sample_test.go
 package sample
 
@@ -429,6 +477,13 @@ func assertGetIsOne(t *testing.T) {
 }
 
 func TestGet(t *testing.T) { assertGetIsOne(t) }
+```
+
+```go valid sample.go
+package sample
+
+// Get is part of the example.
+func Get() int { return 1 }
 ```
 
 ```go valid sample_test.go
@@ -494,6 +549,12 @@ Derived from: Go standard library layout: tests of x.go are in x_test.go (https:
 | --- | --- | --- |
 | `allow` | `["export","example","example_*","*_example","bench","*_bench","main"]` | Globs of the base names of test files that need no source file: Go's `export_test.go`, its example files (`example_test.go`, `example_*_test.go`, `*_example_test.go`) and benchmark files (`bench_test.go`, `*_bench_test.go`). |
 
+```go invalid store.go
+package sample
+
+func Get() int { return 1 }
+```
+
 ```go invalid helpers_test.go
 package sample
 
@@ -504,6 +565,13 @@ func TestGet(t *testing.T) {
 		t.Fatal("get")
 	}
 }
+```
+
+```go valid store.go
+package sample
+
+// Get is part of the example.
+func Get() int { return 1 }
 ```
 
 ```go valid store_test.go
@@ -536,6 +604,14 @@ Contract tests MUST live outside the target's private scope and MUST NOT referen
 
 Derived from: Martin, Clean Code (2008), ch. 9 Clean tests
 
+```go invalid store.go
+package store
+
+func get() int { return 1 }
+
+func Get() int { return get() }
+```
+
 ```go invalid store_test.go
 package store
 
@@ -546,6 +622,15 @@ func TestGet(t *testing.T) {
 		t.Fatal("get")
 	}
 }
+```
+
+```go valid store.go
+package store
+
+func get() int { return 1 }
+
+// Get is part of the example.
+func Get() int { return get() }
 ```
 
 ```go valid store_test.go
