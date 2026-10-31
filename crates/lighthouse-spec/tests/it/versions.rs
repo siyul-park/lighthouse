@@ -187,7 +187,7 @@ fn meaning_version_follows_what_the_decision_demands() {
     };
     let base = decision.meaning_version();
     assert_ne!(changed(|s| s.requirement.push_str(" Always.")), base);
-    assert_ne!(changed(|s| s.severity = Some(Severity::Info)), base);
+    assert_ne!(changed(|s| s.severity = Some(Severity::Error)), base);
     assert_ne!(changed(|s| s.scope.subject = Subject::Module), base);
     assert_ne!(
         changed(|s| {

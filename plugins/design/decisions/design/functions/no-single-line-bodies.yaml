@@ -56,7 +56,7 @@ spec:
     wasDerivedFrom:
       - "rustfmt fn_single_line, default false: https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#fn_single_line"
       - "pycodestyle E704, ignored by default: https://pycodestyle.pycqa.org/en/latest/intro.html#error-codes"
-      - "Martin, Clean Code (2008), ch. 5 Vertical formatting"
+      - "Martin, Clean Code (2008), ch. 5 Vertical size and ordering"
   examples:
     - name: single-line-method
       language: go

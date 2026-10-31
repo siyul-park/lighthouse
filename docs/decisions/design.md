@@ -499,7 +499,7 @@ Also: rust, cel, typescript, python
 
 A function or method declaration MUST NOT put a non-empty body on the line of its opening brace and closing brace; the statements go on their own indented lines.
 
-Derived from: rustfmt fn_single_line, default false: https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#fn_single_line; pycodestyle E704, ignored by default: https://pycodestyle.pycqa.org/en/latest/intro.html#error-codes; Martin, Clean Code (2008), ch. 5 Vertical formatting
+Derived from: rustfmt fn_single_line, default false: https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#fn_single_line; pycodestyle E704, ignored by default: https://pycodestyle.pycqa.org/en/latest/intro.html#error-codes; Martin, Clean Code (2008), ch. 5 Vertical size and ordering
 
 ```diff
 --- a/example.go
