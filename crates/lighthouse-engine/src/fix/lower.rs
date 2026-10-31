@@ -259,8 +259,10 @@ impl<'a> Lowerer<'a> {
         ])
     }
 
-    /// Puts the listed declarations in order within the places they occupy,
-    /// one container at a time.
+    /// Puts the listed declarations in order, one container at a time, by
+    /// moving the fewest of them: those that are out of order against the
+    /// longest run that is already in order. What stays keeps its place, with
+    /// the comments and blank lines around it.
     fn reorder(&self, owner: &Owner, order: &[Node]) -> Result<Vec<TextEdit>, String> {
         let blocks: Vec<Block> = order
             .iter()
@@ -285,25 +287,15 @@ impl<'a> Lowerer<'a> {
         }
         let mut edits = Vec::new();
         for group in containers.values() {
-            let mut slots: Vec<&Block> = group.clone();
-            slots.sort_by_key(|b| b.lines.start);
-            if slots.windows(2).any(|w| w[0].lines.end > w[1].lines.start) {
+            let mut current: Vec<&Block> = group.clone();
+            current.sort_by_key(|b| b.lines.start);
+            if current
+                .windows(2)
+                .any(|w| w[0].lines.end > w[1].lines.start)
+            {
                 return Err("declarations to reorder overlap".to_owned());
             }
-            for (slot, wanted) in slots.iter().zip(group.iter()) {
-                if slot.symbol.id == wanted.symbol.id {
-                    continue;
-                }
-                let mut body = text[wanted.lines.clone()].to_owned();
-                if !body.ends_with('\n') {
-                    body.push_str(eol_of(&text));
-                }
-                edits.push(TextEdit {
-                    file: file.clone(),
-                    range: slot.lines.clone(),
-                    text: body,
-                });
-            }
+            edits.extend(moves(&text, &current, group));
         }
         Ok(edits)
     }
@@ -518,6 +510,118 @@ fn code_follows(rest: &str) -> bool {
         return false;
     }
     !(rest.starts_with("/*") && rest.find("*/") == rest.len().checked_sub(2))
+}
+
+/// The edits that move the blocks of `current` (in file order) that are not in
+/// the longest run already in the order of `wanted`: each is removed and put
+/// after the block that precedes it in `wanted`, or before the first block
+/// that stays when none does.
+fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
+    let rank: BTreeMap<&SymbolId, usize> = wanted
+        .iter()
+        .enumerate()
+        .map(|(n, b)| (&b.symbol.id, n))
+        .collect();
+    let ranks: Vec<usize> = current.iter().map(|b| rank[&b.symbol.id]).collect();
+    let stays = longest_run(&ranks);
+    if stays.len() == current.len() {
+        return Vec::new();
+    }
+    let eol = eol_of(text);
+    let kept: BTreeSet<&SymbolId> = stays.iter().map(|&n| &current[n].symbol.id).collect();
+    let body = |block: &Block| {
+        let mut body = text[carried(text, block)].to_owned();
+        if !body.ends_with('\n') {
+            body.push_str(eol);
+        }
+        body
+    };
+    let mut edits = Vec::new();
+    for block in current.iter().filter(|b| !kept.contains(&b.symbol.id)) {
+        let file = block.symbol.file.clone();
+        edits.push(TextEdit::delete(
+            file,
+            with_blank(text, carried(text, block)),
+        ));
+    }
+    let first_kept = current.iter().find(|b| kept.contains(&b.symbol.id));
+    let mut after: Option<&Block> = None;
+    let mut put: BTreeMap<Option<&SymbolId>, String> = BTreeMap::new();
+    for block in wanted {
+        if kept.contains(&block.symbol.id) {
+            after = Some(block);
+            continue;
+        }
+        let entry = put.entry(after.map(|a| &a.symbol.id)).or_default();
+        match after {
+            Some(beside) if text[..beside.lines.end].ends_with('\n') => {
+                entry.push_str(eol);
+                entry.push_str(&body(block));
+            }
+            Some(_) => {
+                entry.push_str(&eol.repeat(2));
+                entry.push_str(&body(block));
+            }
+            None => {
+                entry.push_str(&body(block));
+                entry.push_str(eol);
+            }
+        }
+    }
+    for (anchor, inserted) in put {
+        let beside = match anchor {
+            Some(id) => current.iter().find(|b| &b.symbol.id == id),
+            None => first_kept,
+        };
+        let Some(beside) = beside else { continue };
+        let at = if anchor.is_some() {
+            beside.lines.end
+        } else {
+            beside.lines.start
+        };
+        edits.push(TextEdit::insert(beside.symbol.file.clone(), at, inserted));
+    }
+    edits
+}
+
+/// The lines of a block that moves, with the comments that stand free above it:
+/// they lead the declaration, and left behind they would lead whatever follows.
+fn carried(text: &str, block: &Block) -> Range<usize> {
+    let mut start = with_leading_comments(text, block.lines.start);
+    loop {
+        let blanks = text[..start]
+            .trim_end_matches(['\n', ' ', '\t', '\r'])
+            .len();
+        let above = text[..blanks].rfind('\n').map_or(0, |n| n + 1);
+        let line = text[above..blanks].trim();
+        if blanks == start || blanks == 0 || !(line.starts_with("//") || line.ends_with("*/")) {
+            return start..block.lines.end;
+        }
+        let line_end = text[blanks..]
+            .find('\n')
+            .map_or(text.len(), |n| blanks + n + 1);
+        let opened = with_leading_comments(text, line_end);
+        if opened >= start {
+            return start..block.lines.end;
+        }
+        start = opened;
+    }
+}
+
+/// The indices of a longest strictly increasing subsequence of `ranks`.
+fn longest_run(ranks: &[usize]) -> Vec<usize> {
+    let mut best: Vec<Vec<usize>> = Vec::with_capacity(ranks.len());
+    for (n, rank) in ranks.iter().enumerate() {
+        let run = (0..n)
+            .filter(|&m| ranks[m] < *rank)
+            .map(|m| &best[m])
+            .max_by_key(|run| run.len())
+            .map_or_else(Vec::new, Clone::clone);
+        let mut run = run;
+        run.push(n);
+        best.push(run);
+    }
+    best.into_iter().max_by_key(Vec::len).unwrap_or_default()
 }
 
 #[cfg(test)]

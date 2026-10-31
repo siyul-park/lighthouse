@@ -1,9 +1,9 @@
-//! Lowering a reorder: blocks permute within the places they occupy.
+//! Lowering a reorder: the blocks out of order are moved, the others stay.
 
 use super::*;
 
 #[test]
-fn reorder_permutes_the_blocks_within_the_places_they_occupy() {
+fn reorder_moves_the_blocks_out_of_order() {
     let case = case(THREE, &[("a", 1, 1), ("b", 3, 3), ("c", 5, 5)], vec![]);
     let op = EditOp::Reorder {
         owner: Owner::File(FILE.into()),
@@ -17,7 +17,7 @@ fn reorder_permutes_the_blocks_within_the_places_they_occupy() {
 }
 
 #[test]
-fn reorder_leaves_declarations_it_does_not_list_in_their_places() {
+fn reorder_leaves_declarations_it_does_not_list_where_they_are() {
     let case = case(THREE, &[("a", 1, 1), ("b", 3, 3), ("c", 5, 5)], vec![]);
     let op = EditOp::Reorder {
         owner: Owner::File(FILE.into()),
@@ -26,7 +26,7 @@ fn reorder_leaves_declarations_it_does_not_list_in_their_places() {
 
     assert_eq!(
         case.run(&[op]).unwrap(),
-        "fn c() {}\n\nfn b() {}\n\nfn a() {}\n"
+        "fn b() {}\n\nfn c() {}\n\nfn a() {}\n"
     );
 }
 
@@ -127,6 +127,36 @@ fn reorder_sorts_each_block_on_its_own() {
 
     assert_eq!(
         sorted,
-        "fn a() {}\n\nimpl X {\n    fn c() {}\n\n    fn d() {}\n}\n\nfn b() {}\n"
+        "impl X {\n    fn c() {}\n\n    fn d() {}\n}\n\nfn a() {}\n\nfn b() {}\n"
+    );
+}
+
+#[test]
+fn reorder_keeps_a_section_comment_with_the_declaration_it_stays_before() {
+    let text = "fn a() {}\n\n// DML\n\nfn b() {}\n\nfn c() {}\n";
+    let case = case(text, &[("a", 1, 1), ("b", 5, 5), ("c", 7, 7)], vec![]);
+    let op = EditOp::Reorder {
+        owner: Owner::File(FILE.into()),
+        order: vec![id("b"), id("c"), id("a")],
+    };
+
+    assert_eq!(
+        case.run(&[op]).unwrap(),
+        "// DML\n\nfn b() {}\n\nfn c() {}\n\nfn a() {}\n"
+    );
+}
+
+#[test]
+fn reorder_carries_the_free_comment_above_a_declaration_it_moves() {
+    let text = "fn a() {}\n\n// free\n\nfn b() {}\n\nfn c() {}\n";
+    let case = case(text, &[("a", 1, 1), ("b", 5, 5), ("c", 7, 7)], vec![]);
+    let op = EditOp::Reorder {
+        owner: Owner::File(FILE.into()),
+        order: vec![id("a"), id("c"), id("b")],
+    };
+
+    assert_eq!(
+        case.run(&[op]).unwrap(),
+        "fn a() {}\n\nfn c() {}\n\n// free\n\nfn b() {}\n"
     );
 }
