@@ -35,6 +35,22 @@ pub fn registry() -> Registry {
     lighthouse_checks::registry(shared(), libraries()).expect("the bundled plugins build")
 }
 
+/// A factory of registries over one start of the plugins `config` lists: every
+/// registry it makes is `base` with those plugins, and all share their one
+/// process each, as the registries of a `decision test` do. Starting a plugin
+/// per registry instead is what makes example tests slow.
+pub fn pooled(base: impl Fn() -> Registry, config: &Config) -> impl Fn() -> Registry {
+    let started = lighthouse_rpc::start(&base(), config, Path::new("."), Path::new("."), &[], None)
+        .expect("the listed plugins start");
+    move || {
+        let mut registry = base();
+        started
+            .register(&mut registry)
+            .expect("the started plugins register");
+        registry
+    }
+}
+
 /// The language plugins of this repository that provide a pack.
 const PACK_PLUGINS: [&str; 3] = ["lang-go", "lang-markdown", "lang-rust"];
 
@@ -75,7 +91,7 @@ use std::{
 use lighthouse_checks::Composition;
 use lighthouse_model::API_VERSION;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Env};
+use lighthouse_spec::{Catalog, Config, Env};
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
 static LANG_TYPESCRIPT: OnceLock<Option<PathBuf>> = OnceLock::new();

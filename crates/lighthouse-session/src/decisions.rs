@@ -273,9 +273,10 @@ pub(crate) fn test_catalog(
     let decisions = selected(catalog, ids)?;
     let shipped = &session.base;
     let started = Instant::now();
-    let (probe, registered) = session.registry()?;
+    let plugins = session.start_plugins(None)?;
+    let probe = session.registry_from(&plugins)?;
     let start = started.elapsed();
-    if let Some(gap) = registered.incomplete.first() {
+    if let Some(gap) = plugins.registered.incomplete.first() {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());
     }
     let registered: BTreeSet<String> = probe
@@ -302,20 +303,18 @@ pub(crate) fn test_catalog(
     let mut spent = Spent::default();
     let mut per_decision = Vec::new();
     for language in &languages {
-        // Each example needs a fresh registry; if plugins cannot be started
-        // again, the example still runs (on the in-process rules) and the
-        // whole test is reported as an error below.
+        // Each example needs a registry of its own, over the processes the
+        // plugins were started in once; if one cannot be built, the example
+        // still runs (on the in-process rules) and the whole test is reported
+        // as an error below.
         let fresh = || {
-            session
-                .registry()
-                .map(|(registry, _)| registry)
-                .unwrap_or_else(|e| {
+            session.registry_from(&plugins).unwrap_or_else(|e| {
+                restart_error.borrow_mut().get_or_insert(e.to_string());
+                session.in_process_registry().unwrap_or_else(|e| {
                     restart_error.borrow_mut().get_or_insert(e.to_string());
-                    session.in_process_registry().unwrap_or_else(|e| {
-                        restart_error.borrow_mut().get_or_insert(e.to_string());
-                        Registry::default()
-                    })
+                    Registry::default()
                 })
+            })
         };
         let tester = RuleTester::new(fresh, catalog, shipped)
             .sources(session.config.sources())

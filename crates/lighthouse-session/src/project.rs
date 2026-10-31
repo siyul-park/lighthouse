@@ -13,7 +13,7 @@ use lighthouse_checks::{Checks, Composition};
 use lighthouse_engine::{CommandModels, Engine};
 use lighthouse_model::Format;
 use lighthouse_plugin::{ModelClient, Registry};
-use lighthouse_rpc::{CommandModel, PluginCatalog, Registered};
+use lighthouse_rpc::{CommandModel, PluginCatalog, Registered, Started};
 use lighthouse_spec::{Catalog, CheckKind, Files, FixKind, load_local, local_files};
 use lighthouse_spec::{Config, FILE_NAME, Layers};
 
@@ -208,19 +208,39 @@ impl Session {
     /// language plugins the config lists, which are started here. A plugin that serves models is started
     /// in the store.
     pub fn registry(&self) -> Result<(Registry, Registered)> {
-        let mut registry = self.in_process_registry()?;
+        let started = self.start_plugins(None)?;
+        let registry = self.registry_from(&started)?;
+        Ok((registry, started.registered))
+    }
+
+    /// The language plugins the config lists, started once. Any number of
+    /// registries can be built from them with [`registry_from`](Self::registry_from);
+    /// they share the processes, which end with the returned value.
+    ///
+    /// With a `cache` directory a plugin it holds the answer of is not started
+    /// until a request needs it.
+    pub fn start_plugins(&self, cache: Option<&Path>) -> Result<Started> {
         let search = lighthouse_rpc::search_dirs(&self.root);
         if let Some(why) = self.untrusted_plugin(&search) {
             return Err(why.into());
         }
-        let registered = lighthouse_rpc::register(
-            &mut registry,
+        let in_process = self.in_process_registry()?;
+        Ok(lighthouse_rpc::start(
+            &in_process,
             &self.config,
             &self.root,
             &self.store,
             &search,
-        )?;
-        Ok((registry, registered))
+            cache,
+        )?)
+    }
+
+    /// A registry of the bundled and local plugins and the `started` ones; no
+    /// process starts.
+    pub fn registry_from(&self, started: &Started) -> Result<Registry> {
+        let mut registry = self.in_process_registry()?;
+        started.register(&mut registry)?;
+        Ok(registry)
     }
 
     /// An engine over `root` with `registry`, `config` and `catalog`, that
@@ -249,11 +269,20 @@ impl Session {
     /// them had to say. It trusts what the user trusts and runs the models the
     /// project's providers name.
     pub fn engine(&self) -> Result<(Engine, Vec<String>)> {
+        self.engine_kept(None)
+    }
+
+    /// Like [`engine`](Self::engine), keeping what the plugins answered to
+    /// `initialize` in `cache` (see [`start_plugins`](Self::start_plugins)): a
+    /// plugin that no file of the run needs is not started.
+    pub fn engine_kept(&self, cache: Option<&Path>) -> Result<(Engine, Vec<String>)> {
         let sandbox = self.config.sandbox().clone();
         if !sandbox.enabled && !self.trusted() {
             return Err(NO_SANDBOX_UNTRUSTED.into());
         }
-        let (registry, plugins) = self.registry()?;
+        let started = self.start_plugins(cache)?;
+        let registry = self.registry_from(&started)?;
+        let plugins = started.registered;
         self.require_packs(true, |pack| registry.has_plugin(pack))?;
         let config = self.enabled_in(&registry);
         let engine = self

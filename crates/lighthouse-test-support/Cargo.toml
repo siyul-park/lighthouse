@@ -13,5 +13,6 @@ lang-cel.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
+lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
 toml.workspace = true

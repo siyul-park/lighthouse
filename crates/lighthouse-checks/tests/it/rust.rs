@@ -8,14 +8,18 @@ use lighthouse_model::Fingerprint;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::Config;
 
-fn registry() -> Registry {
+fn config() -> Config {
     let plugin = lighthouse_test_support::lang_rust();
-    let mut registry = lighthouse_test_support::registry();
-    let config = Config::parse_inline(&format!(
+    Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-rust\", path = {:?} }}]",
         plugin.to_str().unwrap()
     ))
-    .unwrap();
+    .unwrap()
+}
+
+fn registry() -> Registry {
+    let mut registry = lighthouse_test_support::registry();
+    let config = config();
     lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
     registry
 }
@@ -23,7 +27,7 @@ fn registry() -> Registry {
 #[test]
 fn every_checked_decision_passes_its_rust_examples() {
     let failures = lighthouse_engine::RuleTester::new(
-        registry,
+        lighthouse_test_support::pooled(lighthouse_test_support::registry, &config()),
         lighthouse_test_support::bundled(),
         lighthouse_test_support::bundled(),
     )

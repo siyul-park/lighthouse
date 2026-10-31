@@ -1,7 +1,7 @@
 use std::{
     collections::VecDeque,
     io::{BufRead, BufReader, Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         Arc, Condvar, Mutex,
@@ -11,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use lighthouse_protocol as wire;
 use lighthouse_protocol::{Id, Message, read_message, write_message};
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -44,61 +45,67 @@ struct Stderr {
     ended: bool,
 }
 
-/// A running plugin process spoken to over stdio. Calls are serialized; once
-/// the process crashes, times out or sends something malformed its whole
-/// process group is killed and every later call fails with the original reason.
+/// A plugin process spoken to over stdio. Calls are serialized; once the
+/// process crashes, times out or sends something malformed its whole process
+/// group is killed and every later call fails with the original reason. The
+/// process of a client made by [`lazy`](Self::lazy) starts at its first call.
 pub(crate) struct Client {
     plugin: String,
     timeout: Duration,
-    session: Mutex<Result<Session, String>>,
+    session: Mutex<Slot>,
     stderr: Arc<Captured>,
+}
+
+/// Where the process of a client stands.
+enum Slot {
+    /// Not started yet: what starting it needs.
+    Idle(Box<Idle>),
+    Up(Session),
+    /// Gone, or never came up, and why.
+    Down(String),
+}
+
+/// What starts a process that was put off, and what it must answer.
+struct Idle {
+    found: Found,
+    cwd: PathBuf,
+    params: wire::InitializeParams,
+    /// The answer the host already holds, from an earlier start.
+    expected: wire::InitializeResult,
 }
 
 impl Client {
     pub(crate) fn spawn(found: &Found, cwd: &Path, timeout: Duration) -> Result<Self, String> {
-        let command = found
-            .command_path()
-            .ok_or("a bundled plugin has no process to start")?;
-        let mut process = Command::new(&command);
-        process
-            .args(found.args())
-            .current_dir(cwd)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        #[cfg(unix)]
-        std::os::unix::process::CommandExt::process_group(&mut process, 0);
-        let mut child = process
-            .spawn()
-            .map_err(|e| format!("cannot start `{}`: {e}", command.display()))?;
-        let stdin = child.stdin.take().ok_or("no stdin")?;
-        let stdout = child.stdout.take().ok_or("no stdout")?;
-        let stderr_pipe = child.stderr.take().ok_or("no stderr")?;
-
-        let writer = spawn_writer(stdin);
-        let events = spawn_reader(stdout);
-
         let stderr = Arc::new(Captured::default());
-        let sink = Arc::clone(&stderr);
-        thread::spawn(move || {
-            collect_stderr(BufReader::new(stderr_pipe), &sink.0);
-            if let Ok(mut state) = sink.0.lock() {
-                state.ended = true;
-            }
-            sink.1.notify_all();
-        });
-
+        let session = launch(found, cwd, &stderr)?;
         Ok(Self {
             plugin: found.id().to_owned(),
             timeout,
-            session: Mutex::new(Ok(Session {
-                child,
-                writer,
-                events,
-                next_id: 1,
-            })),
+            session: Mutex::new(Slot::Up(session)),
             stderr,
         })
+    }
+
+    /// A client whose process starts at the first call, and answers
+    /// `initialize` as `expected` says it did when the host last asked.
+    pub(crate) fn lazy(
+        found: &Found,
+        cwd: &Path,
+        timeout: Duration,
+        params: wire::InitializeParams,
+        expected: wire::InitializeResult,
+    ) -> Self {
+        Self {
+            plugin: found.id().to_owned(),
+            timeout,
+            session: Mutex::new(Slot::Idle(Box::new(Idle {
+                found: found.clone(),
+                cwd: cwd.to_owned(),
+                params,
+                expected,
+            }))),
+            stderr: Arc::new(Captured::default()),
+        }
     }
 
     /// The id of the plugin this client speaks to.
@@ -117,12 +124,26 @@ impl Client {
             .session
             .lock()
             .map_err(|_| "client poisoned".to_owned())?;
-        let session = guard.as_mut().map_err(|reason| reason.clone())?;
+        if matches!(*guard, Slot::Idle(_))
+            && let Slot::Idle(idle) = std::mem::replace(&mut *guard, Slot::Down(String::new()))
+        {
+            *guard = match self.bring_up(&idle) {
+                Ok(session) => Slot::Up(session),
+                Err(reason) => Slot::Down(reason),
+            };
+        }
+        let session = match &mut *guard {
+            Slot::Up(session) => session,
+            Slot::Down(reason) => return Err(reason.clone()),
+            Slot::Idle(_) => return Err(self.say("did not start")),
+        };
         match self.exchange(session, method, params) {
             Ok(result) => Ok(result),
             Err(Failure::Rejected(reason)) => Err(reason),
             Err(Failure::Broken(reason)) => {
-                if let Ok(mut dead) = std::mem::replace(&mut *guard, Err(reason.clone())) {
+                if let Slot::Up(mut dead) =
+                    std::mem::replace(&mut *guard, Slot::Down(reason.clone()))
+                {
                     lighthouse_process::reap(&mut dead.child);
                 }
                 // The session guard is held while it waits: the plugin is gone
@@ -131,6 +152,26 @@ impl Client {
                 Err(reason)
             }
         }
+    }
+
+    /// Starts the process of an idle client and has it answer `initialize`.
+    fn bring_up(&self, idle: &Idle) -> Result<Session, String> {
+        let mut session = launch(&idle.found, &idle.cwd, &self.stderr)?;
+        let answered = self.exchange::<_, wire::InitializeResult>(
+            &mut session,
+            wire::INITIALIZE,
+            idle.params.clone(),
+        );
+        let reason = match answered {
+            Ok(answer) if answer == idle.expected => return Ok(session),
+            Ok(_) => self.say(
+                "answers `initialize` differently than when it was cached; delete the cache \
+                 directory and run again",
+            ),
+            Err(Failure::Rejected(reason) | Failure::Broken(reason)) => reason,
+        };
+        lighthouse_process::reap(&mut session.child);
+        Err(reason)
     }
 
     fn exchange<P: Serialize, R: DeserializeOwned>(
@@ -249,7 +290,7 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        let Ok(Ok(session)) = self.session.get_mut() else {
+        let Ok(Slot::Up(session)) = self.session.get_mut() else {
             return;
         };
         let shutdown = Message::request(session.next_id, lighthouse_protocol::SHUTDOWN, ());
@@ -285,6 +326,48 @@ struct Session {
 enum Event {
     Response(Message),
     Closed(String),
+}
+
+/// Starts the process of the plugin `found` in `cwd`, with threads that feed
+/// its stdin, read its stdout and collect its stderr into `stderr`.
+fn launch(found: &Found, cwd: &Path, stderr: &Arc<Captured>) -> Result<Session, String> {
+    let command = found
+        .command_path()
+        .ok_or("a bundled plugin has no process to start")?;
+    let mut process = Command::new(&command);
+    process
+        .args(found.args())
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut process, 0);
+    let mut child = process
+        .spawn()
+        .map_err(|e| format!("cannot start `{}`: {e}", command.display()))?;
+    let stdin = child.stdin.take().ok_or("no stdin")?;
+    let stdout = child.stdout.take().ok_or("no stdout")?;
+    let stderr_pipe = child.stderr.take().ok_or("no stderr")?;
+
+    let writer = spawn_writer(stdin);
+    let events = spawn_reader(stdout);
+
+    let sink = Arc::clone(stderr);
+    thread::spawn(move || {
+        collect_stderr(BufReader::new(stderr_pipe), &sink.0);
+        if let Ok(mut state) = sink.0.lock() {
+            state.ended = true;
+        }
+        sink.1.notify_all();
+    });
+
+    Ok(Session {
+        child,
+        writer,
+        events,
+        next_id: 1,
+    })
 }
 
 /// Writes frames to the plugin on its own thread, so a plugin that stops

@@ -17,13 +17,17 @@ fn go_plugin() -> Option<PathBuf> {
     lighthouse_test_support::lang_go()
 }
 
-fn registry(plugin: &Path) -> Registry {
-    let mut registry = lighthouse_test_support::registry();
-    let config = Config::parse_inline(&format!(
+fn listed(plugin: &Path) -> Config {
+    Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-go\", path = {:?} }}]",
         plugin.to_str().unwrap()
     ))
-    .unwrap();
+    .unwrap()
+}
+
+fn registry(plugin: &Path) -> Registry {
+    let mut registry = lighthouse_test_support::registry();
+    let config = listed(plugin);
     lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
     registry
 }
@@ -468,7 +472,8 @@ fn every_checked_decision_passes_its_catalog_examples() {
     if go_plugin().is_none() {
         return;
     }
-    let registry = || registry(&go_plugin().expect("checked above"));
+    let config = listed(&go_plugin().expect("checked above"));
+    let registry = lighthouse_test_support::pooled(lighthouse_test_support::registry, &config);
     let failures = lighthouse_engine::RuleTester::new(
         registry,
         lighthouse_test_support::full(),

@@ -72,6 +72,20 @@ fn session_registry() {
 }
 
 #[test]
+fn session_registry_from_started_plugins() {
+    let dir = project("error");
+    let session = session(dir.path());
+    let started = session.start_plugins(None).unwrap();
+    assert!(started.registered.incomplete.is_empty());
+
+    // Registries made from one start are alike and need no process of their own.
+    let first = session.registry_from(&started).unwrap();
+    let second = session.registry_from(&started).unwrap();
+    assert!(first.rule("local/short").is_some());
+    assert_eq!(first.manifests(), second.manifests());
+}
+
+#[test]
 fn session_engine_with() {
     let dir = project("error");
     let session = session(dir.path());
@@ -109,6 +123,15 @@ fn session_engine() {
         notices.iter().any(|n| n.contains("sandbox off")),
         "{notices:?}"
     );
+}
+
+#[test]
+fn session_engine_kept() {
+    let dir = project("error");
+    let cache = dir.path().join(".lighthouse/cache");
+    let (engine, notices) = session(dir.path()).engine_kept(Some(&cache)).unwrap();
+    assert!(engine.active("local/short"));
+    assert!(notices.is_empty(), "{notices:?}");
 }
 
 #[test]

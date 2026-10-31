@@ -67,6 +67,7 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
     "#;
 
 pub(super) struct Fake {
+    logs: TempDir,
     dir: TempDir,
 }
 
@@ -76,7 +77,8 @@ impl Fake {
         let script = dir.path().join("plugin.sh");
         fs::write(&script, SCRIPT).unwrap();
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
-        let log = dir.path().join("log");
+        let logs = tempfile::tempdir().unwrap();
+        let log = logs.path().join("log");
         fs::write(
             dir.path().join("lighthouse-plugin.toml"),
             super::plugin_document(
@@ -86,11 +88,17 @@ impl Fake {
             ),
         )
         .unwrap();
-        Self { dir }
+        Self { dir, logs }
     }
 
     pub(super) fn path(&self) -> &Path {
         self.dir.path()
+    }
+
+    /// Where the script writes its log and the requests it gets: beside the
+    /// plugin, so that running it does not change the plugin's directory.
+    pub(super) fn logs(&self) -> &Path {
+        self.logs.path()
     }
 
     pub(super) fn connect(&self, timeout: Duration) -> Result<RpcPlugin, Error> {
@@ -98,12 +106,18 @@ impl Fake {
         RpcPlugin::connect(&found, self.path(), timeout)
     }
 
+    /// Like [`connect`](Self::connect), keeping the answer in `cache`.
+    pub(super) fn connect_kept(&self, cache: &Path) -> Result<RpcPlugin, Error> {
+        let found = lighthouse_rpc::load(self.path()).unwrap();
+        RpcPlugin::connect_cached(&found, self.path(), T, Some(cache))
+    }
+
     pub(super) fn provider(&self, timeout: Duration) -> Box<dyn LanguageProvider> {
         self.connect(timeout).unwrap().languages().remove(0)
     }
 
     pub(super) fn log(&self) -> String {
-        fs::read_to_string(self.path().join("log")).unwrap_or_default()
+        fs::read_to_string(self.logs().join("log")).unwrap_or_default()
     }
 }
 

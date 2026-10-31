@@ -1,8 +1,6 @@
 //! The `types` of a module (methods, cohesion groups) and the `implementers`
 //! of an interface, read by checks over real Go and Rust sources.
 
-use std::path::Path;
-
 use lighthouse_checks::Checks;
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
@@ -143,8 +141,7 @@ fn catalog() -> Catalog {
     Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap()
 }
 
-fn registry() -> Registry {
-    let mut registry = lighthouse_test_support::registry();
+fn config() -> Config {
     let plugins: Vec<_> = [
         ("lang-go", lighthouse_test_support::lang_go()),
         ("lang-rust", Some(lighthouse_test_support::lang_rust())),
@@ -152,8 +149,11 @@ fn registry() -> Registry {
     .into_iter()
     .filter_map(|(id, path)| Some(format!("{{ id = \"{id}\", path = {:?} }}", path?.to_str()?)))
     .collect();
-    let config = Config::parse_inline(&format!("plugins = [{}]", plugins.join(", "))).unwrap();
-    lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
+    Config::parse_inline(&format!("plugins = [{}]", plugins.join(", "))).unwrap()
+}
+
+fn base() -> Registry {
+    let mut registry = lighthouse_test_support::registry();
     registry
         .register(
             &Checks::new(&lighthouse_test_support::composition(), "demo", &catalog()).unwrap(),
@@ -164,7 +164,11 @@ fn registry() -> Registry {
 
 #[test]
 fn module_types_count_methods_and_find_the_groups_that_share_nothing() {
-    let failures =
-        RuleTester::new(registry, &catalog(), lighthouse_test_support::bundled()).check_all();
+    let failures = RuleTester::new(
+        lighthouse_test_support::pooled(base, &config()),
+        &catalog(),
+        lighthouse_test_support::bundled(),
+    )
+    .check_all();
     assert!(failures.is_empty(), "{failures:?}");
 }

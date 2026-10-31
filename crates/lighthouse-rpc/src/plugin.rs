@@ -18,7 +18,7 @@ use lighthouse_protocol as wire;
 use lighthouse_protocol::hash;
 use serde_json::Value;
 
-use crate::{agent::Agent, client::Client, convert, manifest::Found, model::Remote};
+use crate::{agent::Agent, client::Client, convert, kept::Kept, manifest::Found, model::Remote};
 
 /// Characters of the binary digest that name a plugin's cache directory.
 const DIGEST_CHARS: usize = 16;
@@ -40,16 +40,23 @@ pub struct RpcPlugin {
 impl RpcPlugin {
     /// Starts the process and performs the `initialize` handshake.
     pub fn connect(found: &Found, root: &Path, timeout: Duration) -> Result<Self, crate::Error> {
+        Self::connect_cached(found, root, timeout, None)
+    }
+
+    /// Like [`connect`](Self::connect), keeping what the plugin answered to
+    /// `initialize` in `cache`, by a key of the plugin build. While the kept
+    /// answer is there for this build, no process starts here: it starts when
+    /// the first request is made, and has to answer as it did.
+    pub fn connect_cached(
+        found: &Found,
+        root: &Path,
+        timeout: Duration,
+        cache: Option<&Path>,
+    ) -> Result<Self, crate::Error> {
         let id = found.id();
         let failed = |reason: String| crate::Error::Plugin {
             id: id.to_owned(),
             reason,
-        };
-        let client = Client::spawn(found, root, timeout).map_err(failed)?;
-        let unavailable = |client: &Client, reason: String| crate::Error::Unavailable {
-            id: id.to_owned(),
-            reason,
-            notices: client.drain_stderr(),
         };
         let params = wire::InitializeParams {
             protocol_version: wire::VERSION.to_owned(),
@@ -59,9 +66,41 @@ impl RpcPlugin {
             },
             workspace_folders: vec![folder(root).map_err(failed)?],
         };
-        let result: wire::InitializeResult = client
-            .call(wire::INITIALIZE, params)
-            .map_err(|reason| unavailable(&client, reason))?;
+        let kept = cache.and_then(|base| Kept::of(base, found));
+        if let Some(result) = kept.as_ref().and_then(Kept::read) {
+            let client = Client::lazy(found, root, timeout, params, result.clone());
+            return Self::from_result(found, root, timeout, client, result);
+        }
+        let client = Client::spawn(found, root, timeout).map_err(failed)?;
+        let result: wire::InitializeResult =
+            client
+                .call(wire::INITIALIZE, params)
+                .map_err(|reason| crate::Error::Unavailable {
+                    id: id.to_owned(),
+                    reason,
+                    notices: client.drain_stderr(),
+                })?;
+        let plugin = Self::from_result(found, root, timeout, client, result.clone())?;
+        if let Some(kept) = &kept {
+            kept.write(&result);
+        }
+        Ok(plugin)
+    }
+
+    /// The plugin that `client` speaks to, if `result` is what its manifest
+    /// promised.
+    fn from_result(
+        found: &Found,
+        root: &Path,
+        timeout: Duration,
+        client: Client,
+        result: wire::InitializeResult,
+    ) -> Result<Self, crate::Error> {
+        let id = found.id();
+        let failed = |reason: String| crate::Error::Plugin {
+            id: id.to_owned(),
+            reason,
+        };
         if result.protocol_version != wire::VERSION {
             return Err(failed(format!(
                 "speaks protocol {}, lighthouse speaks {}",

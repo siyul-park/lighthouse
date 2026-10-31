@@ -8,6 +8,7 @@ mod command;
 mod convert;
 mod error;
 mod events;
+mod kept;
 mod manifest;
 mod model;
 mod plugin;
@@ -31,16 +32,6 @@ pub use plugin::RpcPlugin;
 /// Per-request limit unless the plugin entry sets `timeout`; generous because
 /// a first index may build a cold cache.
 const PLUGIN_TIMEOUT: Duration = Duration::from_secs(600);
-
-/// What registering external plugins left for the run to report.
-#[derive(Debug, Default)]
-pub struct Registered {
-    /// Ignored broken manifests and what unavailable plugins wrote to stderr.
-    pub notices: Vec<String>,
-    /// One entry per listed plugin that started but failed its handshake; pass
-    /// to the engine so the run is reported incomplete.
-    pub incomplete: Vec<Incomplete>,
-}
 
 /// A listed plugin that is part of the project, and the program it runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,22 +61,58 @@ impl Plugin for Unavailable {
     }
 }
 
+/// The listed plugins as [`start`] left them: running processes and the ones
+/// that did not come up. Any number of registries can be built from it
+/// ([`Started::register`]); they all share the one process of each plugin, and
+/// the processes end when this does.
+pub struct Started {
+    entries: Vec<Entry>,
+    /// What starting them left for the run to report.
+    pub registered: Registered,
+}
+
+enum Entry {
+    Running(Box<RpcPlugin>),
+    Gone(Unavailable),
+}
+
+impl Started {
+    /// Puts the started plugins into `registry`. No process starts. A plugin
+    /// whose id `registry` already holds is an error.
+    pub fn register(&self, registry: &mut Registry) -> Result<(), Error> {
+        for entry in &self.entries {
+            let plugin: &dyn Plugin = match entry {
+                Entry::Running(plugin) => plugin.as_ref(),
+                Entry::Gone(gone) => gone,
+            };
+            registry.register(plugin).map_err(|e| Error::Plugin {
+                id: plugin.manifest().id.clone(),
+                reason: e.to_string(),
+            })?;
+        }
+        Ok(())
+    }
+}
+
+/// What registering external plugins left for the run to report.
+#[derive(Debug, Default)]
+pub struct Registered {
+    /// Ignored broken manifests and what unavailable plugins wrote to stderr.
+    pub notices: Vec<String>,
+    /// One entry per listed plugin that started but failed its handshake; pass
+    /// to the engine so the run is reported incomplete.
+    pub incomplete: Vec<Incomplete>,
+}
+
 /// The JSON Schema of the kinds this crate defines.
 pub fn descriptors() -> Vec<lighthouse_model::Schema> {
     vec![lighthouse_model::Schema::new::<PluginSpec>()]
 }
 
 /// Starts every plugin listed in `config` that is not already registered and
-/// registers it. An entry with `path` uses that directory (relative to
-/// `root`); other ids are looked up in `search`. An id provided by more than
-/// one place, a registered in-process plugin included, is an error, as are a
-/// protocol version or identity mismatch and a missing binary. A process that
-/// starts but crashes, times out or answers badly during `initialize` is
-/// reported as incomplete instead. Ids found nowhere are left for the engine
-/// to report as unknown. Manifests of unlisted plugins are never started and,
-/// when broken, ignored. A plugin that provides models is started in `store`,
-/// the root of the datasets and models, which is `root` unless a run spans
-/// several projects; any other plugin is started in `root`.
+/// registers it: [`start`] and [`Started::register`] in one step, for a run
+/// that needs one registry. See [`start`] for what is started and what is an
+/// error.
 pub fn register(
     registry: &mut Registry,
     config: &Config,
@@ -93,9 +120,39 @@ pub fn register(
     store: &Path,
     search: &[PathBuf],
 ) -> Result<Registered, Error> {
+    let started = start(registry, config, root, store, search, None)?;
+    started.register(registry)?;
+    Ok(started.registered)
+}
+
+/// Starts every plugin listed in `config` that `registry` does not already
+/// hold, once. An entry with `path` uses that directory (relative to `root`);
+/// other ids are looked up in `search`. An id provided by more than one place,
+/// a registered in-process plugin included, is an error, as are a protocol
+/// version or identity mismatch and a missing binary. A process that starts
+/// but crashes, times out or answers badly during `initialize` is reported as
+/// incomplete instead. Ids found nowhere are left for the engine to report as
+/// unknown. Manifests of unlisted plugins are never started and, when broken,
+/// ignored. A plugin that provides models is started in `store`, the root of
+/// the datasets and models, which is `root` unless a run spans several
+/// projects; any other plugin is started in `root`.
+///
+/// With a `cache` directory, what a plugin answered to `initialize` is kept
+/// there by build of the plugin, and a plugin with a kept answer is not
+/// started here: its process starts when its first request is made, so a run
+/// that never needs a plugin never starts it.
+pub fn start(
+    registry: &Registry,
+    config: &Config,
+    root: &Path,
+    store: &Path,
+    search: &[PathBuf],
+    cache: Option<&Path>,
+) -> Result<Started, Error> {
     let discovered = discover(search)?;
     let mut registered = Registered::default();
     note_broken(discovered.broken, config, &mut registered)?;
+    let mut entries = Vec::new();
     for listed in config.plugins() {
         let id = listed.id.as_str();
         let chosen = choose(listed, registry.has_plugin(id), &discovered.found, root)?;
@@ -106,8 +163,10 @@ pub fn register(
         } else {
             store
         };
-        let registration = match RpcPlugin::connect(one, at, timeout) {
-            Ok(plugin) => registry.register(&plugin.confined(config.sandbox(), root)),
+        match RpcPlugin::connect_cached(one, at, timeout, cache) {
+            Ok(plugin) => entries.push(Entry::Running(Box::new(
+                plugin.confined(config.sandbox(), root),
+            ))),
             Err(Error::Unavailable {
                 id,
                 reason,
@@ -120,19 +179,20 @@ pub fn register(
                         "plugin `{id}` is unavailable, its files fall back to plain text: {reason}"
                     ),
                 });
-                registry.register(&Unavailable(lighthouse_plugin::PluginManifest {
-                    id: one.id().to_owned(),
-                    version: one.resource.spec.version.clone(),
-                }))
+                entries.push(Entry::Gone(Unavailable(
+                    lighthouse_plugin::PluginManifest {
+                        id: one.id().to_owned(),
+                        version: one.resource.spec.version.clone(),
+                    },
+                )));
             }
             Err(e) => return Err(e),
-        };
-        registration.map_err(|e| Error::Plugin {
-            id: id.to_owned(),
-            reason: e.to_string(),
-        })?;
+        }
     }
-    Ok(registered)
+    Ok(Started {
+        entries,
+        registered,
+    })
 }
 
 /// The listed plugins the project brings: those in its `.lighthouse/plugins`

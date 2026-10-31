@@ -306,8 +306,9 @@ impl Checked {
 /// records the run and drops the findings that judgments keep out.
 pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
     let started = Instant::now();
-    let (engine, notices) = session.engine()?;
     let root = session.root.clone();
+    let kept = request.cache.then(|| cache::dir(&root));
+    let (engine, notices) = session.engine_kept(kept.as_deref())?;
     let catalog = Arc::clone(&session.catalog);
     let attached = if request.detached {
         BTreeMap::new()

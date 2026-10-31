@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 use super::{
     config,
-    fake::{Fake, T, index},
+    fake::{Fake, T, index, ws},
     manifest,
 };
 
@@ -91,7 +91,7 @@ fn handshake_declares_languages_and_index_converts_the_result() {
     );
 
     let request: Value =
-        serde_json::from_str(&fs::read_to_string(fake.path().join("log.request")).unwrap())
+        serde_json::from_str(&fs::read_to_string(fake.logs().join("log.request")).unwrap())
             .unwrap();
     let params = &request["params"];
     assert_eq!(params["language"], "fake");
@@ -162,7 +162,7 @@ fn the_cache_directory_is_named_by_the_plugin_binary_and_absent_with_overlays() 
     let mut ws = Workspace::new(fake.path());
     ws.cache_dir = Some(cache.path().to_owned());
     let sent = || -> Value {
-        let text = fs::read_to_string(fake.path().join("log.request")).unwrap();
+        let text = fs::read_to_string(fake.logs().join("log.request")).unwrap();
         serde_json::from_str::<Value>(&text).unwrap()["params"]["context"].clone()
     };
 
@@ -179,4 +179,46 @@ fn the_cache_directory_is_named_by_the_plugin_binary_and_absent_with_overlays() 
 
     assert!(sent().get("cache").is_none(), "{}", sent());
     assert_eq!(sent()["overlays"][0]["path"], "a.fake");
+}
+
+#[test]
+fn a_kept_answer_puts_the_start_of_the_process_off_to_its_first_request() {
+    let fake = Fake::new("ok");
+    let cache = tempfile::tempdir().unwrap();
+    // The first start has to ask, and keeps the answer.
+    drop(fake.connect_kept(cache.path()).unwrap());
+    let asked = fake.log();
+    assert!(asked.contains("shutdown"), "{asked}");
+
+    // With the answer kept, the plugin is known without a process.
+    let plugin = fake.connect_kept(cache.path()).unwrap();
+    let provider = plugin.languages().remove(0);
+    assert_eq!(provider.manifest().globs, ["**/*.fake"]);
+    assert_eq!(plugin.manifest().version, "1.2");
+    drop(provider);
+    drop(plugin);
+    assert_eq!(fake.log(), asked, "no process was started");
+    assert!(!fake.logs().join("log.request").exists());
+
+    // The first request starts it.
+    let plugin = fake.connect_kept(cache.path()).unwrap();
+    let provider = plugin.languages().remove(0);
+    let indexed = index(provider.as_ref(), &ws(&fake), &["a.fake"]);
+    assert_eq!(indexed.fragments.len(), 1, "{:?}", indexed.incomplete);
+    assert!(fake.logs().join("log.request").exists());
+}
+
+#[test]
+fn a_kept_answer_is_not_taken_for_a_plugin_that_was_rebuilt() {
+    let fake = Fake::new("ok");
+    let cache = tempfile::tempdir().unwrap();
+    drop(fake.connect_kept(cache.path()).unwrap());
+    let asked = fake.log();
+
+    let script = fake.path().join("plugin.sh");
+    let text = fs::read_to_string(&script).unwrap();
+    fs::write(&script, format!("{text}\n# rebuilt\n")).unwrap();
+    drop(fake.connect_kept(cache.path()).unwrap());
+
+    assert_ne!(fake.log(), asked, "the rebuilt plugin was asked again");
 }

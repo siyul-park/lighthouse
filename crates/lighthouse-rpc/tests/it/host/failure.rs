@@ -203,7 +203,7 @@ fn a_timeout_kills_the_whole_process_group() {
     let provider = fake.provider(Duration::from_secs(6));
     let indexed = index(provider.as_ref(), &ws(&fake), &["a.fake"]);
     assert!(only_gap(&indexed).reason.contains("timed out"));
-    let pid = fs::read_to_string(fake.path().join("log.pid")).unwrap();
+    let pid = fs::read_to_string(fake.logs().join("log.pid")).unwrap();
     let alive = || {
         std::process::Command::new("kill")
             .args(["-0", pid.trim()])
