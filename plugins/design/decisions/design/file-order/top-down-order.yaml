@@ -47,14 +47,20 @@ spec:
     - name: fields
       expression: "symbol.kind == 'type' ? file.symbols.filter(f, f.kind == 'field') : []"
     - name: mentions
-      params: [f, name]
-      expression: "f.type != null && f.type.text.matches('(^|[^A-Za-z0-9_])' + name + '($|[^A-Za-z0-9_])')"
+      params: [f, b]
+      expression: |-
+        f.type != null && (f.type.symbol == b.id.split('#')[0]
+          || (f.type.symbol == '' && f.type.text.matches(
+                b.lang == 'go'
+                ? (b.module == '.' ? '\\.' : '/' + b.module.replace('.', '\\.') + '\\.')
+                  + b.name + '($|[^A-Za-z0-9_])'
+                : '(^|[^A-Za-z0-9_])' + b.name + '($|[^A-Za-z0-9_])')))
     - name: holders
       expression: |-
         symbol.kind == 'type'
           ? file.symbols.filter(a, a.kind == 'type' && a.id != symbol.id
-              && fields.exists(f, f.owner_key == a.id && mentions(f, symbol.name))
-              && !fields.exists(f, f.owner_key == symbol.id && mentions(f, a.name)))
+              && fields.exists(f, f.owner_key == a.id && mentions(f, symbol))
+              && !fields.exists(f, f.owner_key == symbol.id && mentions(f, a)))
           : []
     - name: users
       expression: "symbol.func != null ? local : holders.sortBy(a, a.pos)"
