@@ -336,6 +336,10 @@ pub struct Caching {
     /// severity and option defaults, as the decision wrote them), so that
     /// stored findings of the old way are not used.
     pub revision: String,
+    /// The programs the findings come from, by name: the stored findings are
+    /// used again only while the host finds them (and the files that choose
+    /// their version and configuration) as they were.
+    pub tools: Vec<String>,
 }
 
 /// A check that turns facts into diagnostics. `validate` rejects bad options

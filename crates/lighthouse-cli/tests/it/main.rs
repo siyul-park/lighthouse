@@ -17,6 +17,7 @@ mod fix_events;
 mod fix_groups;
 mod fix_scope;
 mod fix_trust;
+mod formatted_batches;
 mod fx;
 mod fx_apply;
 mod fx_describe;

@@ -38,6 +38,7 @@ spec:
         - gofmt
         - "-l"
         - "{files}"
+        independent: true
       fix:
         command:
         - gofmt
@@ -73,6 +74,7 @@ spec:
         - "--output-format"
         - concise
         - "{files}"
+        independent: true
       fix:
         command:
         - ruff
@@ -91,6 +93,7 @@ spec:
         - prettier
         - "--list-different"
         - "{files}"
+        independent: true
       fix:
         command:
         - prettier

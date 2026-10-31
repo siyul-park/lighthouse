@@ -111,19 +111,28 @@ impl Check {
         // those of a command, which reads whatever the program reads, and of
         // a rule that reads the directives, which depend on what every other
         // rule found, are not. A bundled command that judges a file by its
-        // text alone is.
+        // text alone is, and so is one that formats files in batches, which
+        // reads the project's files and its configuration but no secret.
         meta.caching = match &kind {
             Kind::Cel(rule) if rule.after_suppression() => None,
             Kind::Command(rule) if rule.local(meta.scope) => Some(Caching {
                 reach: Reach::Local,
                 positions: false,
                 revision,
+                tools: rule.tools(),
+            }),
+            Kind::Command(rule) if rule.batched(meta.scope) => Some(Caching {
+                reach: Reach::Global,
+                positions: false,
+                revision,
+                tools: rule.tools(),
             }),
             Kind::Command(_) => None,
             _ => Some(Caching {
                 reach,
                 positions,
                 revision,
+                tools: Vec::new(),
             }),
         };
         Ok(Some(Self {

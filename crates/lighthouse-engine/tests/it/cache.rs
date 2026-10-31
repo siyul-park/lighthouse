@@ -118,6 +118,7 @@ impl Plugin for CountingPlugin {
                 reach,
                 positions: false,
                 revision: "1".to_owned(),
+                tools: Vec::new(),
             }),
         };
         vec![

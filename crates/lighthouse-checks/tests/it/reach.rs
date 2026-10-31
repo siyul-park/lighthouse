@@ -63,7 +63,7 @@ fn every_fact_the_builder_derives_declares_its_reach() {
 const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("core/allow-reason", None),
     ("core/decision-naming", Some((Reach::Global, false))),
-    ("core/formatted", None),
+    ("core/formatted", Some((Reach::Global, false))),
     ("core/max-len", Some((Reach::Local, false))),
     ("core/max-lines", Some((Reach::Local, false))),
     ("core/no-unused-allow", None),

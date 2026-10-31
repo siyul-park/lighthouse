@@ -28,8 +28,16 @@ const RETIRED: [&str; 3] = ["rule", "path", "root"];
 
 /// The keys a program table may have, for the loaders that read it beside
 /// others.
-pub(crate) const FIELDS: [&str; 8] = [
-    "command", "env", "timeout", "stdin", "output", "success", "sarif", "sandbox",
+pub(crate) const FIELDS: [&str; 9] = [
+    "command",
+    "env",
+    "timeout",
+    "stdin",
+    "output",
+    "success",
+    "independent",
+    "sarif",
+    "sandbox",
 ];
 
 /// The places a program is bound at, which decide the placeholders it accepts
@@ -139,6 +147,12 @@ pub struct Program {
     /// (linters exit 1 with findings), `[0]` otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub success: Option<Vec<i32>>,
+    /// A run over several files finds in each file what a run over that file
+    /// alone finds, as `gofmt -l` does; not so for a program that follows
+    /// what a file names, as `rustfmt` follows `mod`. Lets a check run one
+    /// program for the files of a batch and tell each file its findings.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub independent: bool,
     /// How a SARIF log is read; only with `output: sarif`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sarif: Option<Sarif>,
@@ -157,6 +171,7 @@ impl Program {
             stdin: Stdin::None,
             output: None,
             success: None,
+            independent: false,
             sarif: None,
             sandbox: None,
         }
@@ -258,6 +273,9 @@ impl Program {
         }
         if self.stdin == Stdin::File && self.batching() == Batching::Files {
             return Some("`stdin: file` needs one file: use `{file}`, not `{files}`".to_owned());
+        }
+        if self.independent && self.batching() != Batching::Files {
+            return Some("`independent` is for a program run over `{files}`".to_owned());
         }
         if self.sarif.is_some() && output != Output::Sarif {
             return Some("`sarif` needs `output: sarif`".to_owned());

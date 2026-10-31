@@ -13,7 +13,7 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use crate::cache::{Cache, Digest, Digests, KeyBuilder, Stored};
+use crate::cache::{Cache, Digest, Digests, KeyBuilder, Stored, tools};
 use lighthouse_model::{ExampleScope, Reach, TestScope};
 use lighthouse_plugin::Models;
 use serde::{Deserialize, Serialize};
@@ -96,7 +96,7 @@ impl Engine {
                 cache,
                 digests,
                 documents_digest: documents,
-                prefixes: self.prefixes(selected, models),
+                prefixes: self.prefixes(selected, models, (cache, project)),
             }),
             Err(e) => {
                 notices.insert(format!("the result cache is not used: {e}"));
@@ -107,7 +107,12 @@ impl Engine {
 
     /// The prefix of the keys of each selected rule that may be cached: not one
     /// whose `abstain` route the models are asked about this run.
-    fn prefixes(&self, selected: &[&dyn Rule], models: &dyn Models) -> HashMap<String, Prefix> {
+    fn prefixes(
+        &self,
+        selected: &[&dyn Rule],
+        models: &dyn Models,
+        (cache, project): (&Cache, &Project),
+    ) -> HashMap<String, Prefix> {
         let base = self.cache_base();
         selected
             .iter()
@@ -121,6 +126,14 @@ impl Engine {
                 key.part(&meta.id)
                     .part(&caching.revision)
                     .part([caching.reach as u8, u8::from(caching.positions)]);
+                if !caching.tools.is_empty() {
+                    key.part(tools::identity(
+                        &caching.tools,
+                        &self.ws.root,
+                        project,
+                        cache,
+                    ));
+                }
                 let prefix = Prefix {
                     key,
                     reach: caching.reach,

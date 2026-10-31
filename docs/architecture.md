@@ -318,8 +318,11 @@ describes; a test fails for a fact or function without one): `local` (the
 subject's own symbol, file and summary), `neighbors` (one edge, owner or member
 away) or `global` (indexes and walks over the project). A rule's reach is the
 greatest of what its expressions mention; project-scope rules and rules
-that report at another symbol are global; command, annotation and plugin rules
-are not cached. A key holds the build, plugins and language conventions, the rule
+that report at another symbol are global; annotation and plugin rules are not
+cached, nor is a command, except a bundled one that judges a file by its text
+(local), or that formats files (`{files}`, no environment): it reads the project
+and is keyed on all of it, on the programs it runs (their file, their version,
+the files that choose or configure them), and runs once for the files of a run. A key holds the build, plugins and language conventions, the rule
 id, its check revision (a hash of the decision), the resolved options and
 applicability, then by reach the file path and its slice digest (local), plus its
 neighbor digest (neighbors), or the digest of the whole merged project (global).

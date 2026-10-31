@@ -7,6 +7,7 @@
 //! the analysis incomplete, never clean; stderr is for people and only ever
 //! explains an error.
 
+mod batch;
 pub mod sarif;
 
 use std::{
@@ -86,6 +87,9 @@ impl CommandRule {
             };
             if !self.selects(&file.path) {
                 return Ok(Vec::new());
+            }
+            if let Some(found) = self.answered((meta, ctx, options), &file.path) {
+                return Ok(found);
             }
             return run(program)?.one(&file.path, Some(text));
         }

@@ -19,6 +19,7 @@ mod digest;
 mod key;
 mod neighbors;
 mod store;
+pub(crate) mod tools;
 
 pub(crate) use digest::digest_of;
 pub use digest::{Digest, Digests, FileDigest, documents};

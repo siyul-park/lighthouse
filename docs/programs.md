@@ -25,6 +25,7 @@ sandbox = { network = ["proxy.golang.org"], write = ["~/.cache/golangci-lint"] }
 | `stdin` | `none`, or `file`: the text of `{file}`. | `none` |
 | `output` | What it prints, which decides the result ([results](#results)). | `lines` for a check, `files` for a fix, `status` for a verify program, `stdout` for a provider |
 | `success` | The exit codes that mean the program ran. Any other code, a signal or a timeout is an error, never a clean result. | `[0, 1]` for `lines` and `sarif` (linters exit 1 with findings), `[0]` otherwise |
+| `independent` | A run over several files finds in each what a run over it alone finds (`gofmt -l`), not so for a program that follows what a file names (`rustfmt` and `mod`). Only with `{files}`. A bundled check that is `independent` runs once for the files of a run and tells each file its findings. | `false` |
 | `sarif` | How a SARIF log is read, under SARIF's names: `rules` (globs over `ruleId`), `levels`, `columns` (`utf16CodeUnits`, `unicodeCodePoints`, `bytes`). Only with `output: sarif`. | every result |
 | `sandbox` | What the program may reach besides the project's `[sandbox]`: `network` (hosts) and `write` (places). Its lists are added to the project's. | none |
 
