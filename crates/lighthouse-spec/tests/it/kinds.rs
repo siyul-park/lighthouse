@@ -167,25 +167,6 @@ fn option_schema_holds_its_shape() {
 }
 
 #[test]
-fn shape_check() {
-    let limit = lighthouse_spec::limit().clone();
-    assert!(limit.check(&json!(3), "x").is_ok());
-    assert!(
-        limit
-            .check(&json!(-2), "x")
-            .unwrap_err()
-            .contains("at least -1")
-    );
-}
-
-#[test]
-fn option_schema_check() {
-    let option = OptionSchema::new(OptionType::Integer, json!(3), "Limit.");
-    assert!(option.check(&json!(4), "x").is_ok());
-    assert!(option.check(&json!("4"), "x").is_err());
-}
-
-#[test]
 fn shape_target() {
     let by_ref = lighthouse_spec::Shape {
         reference: Some("#/$defs/limit".to_owned()),
@@ -201,6 +182,25 @@ fn shape_target() {
         lighthouse_spec::Shape::of(OptionType::Boolean)
             .target()
             .is_none()
+    );
+}
+
+#[test]
+fn option_schema_check() {
+    let option = OptionSchema::new(OptionType::Integer, json!(3), "Limit.");
+    assert!(option.check(&json!(4), "x").is_ok());
+    assert!(option.check(&json!("4"), "x").is_err());
+}
+
+#[test]
+fn shape_check() {
+    let limit = lighthouse_spec::limit().clone();
+    assert!(limit.check(&json!(3), "x").is_ok());
+    assert!(
+        limit
+            .check(&json!(-2), "x")
+            .unwrap_err()
+            .contains("at least -1")
     );
 }
 

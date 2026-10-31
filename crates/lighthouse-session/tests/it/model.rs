@@ -212,12 +212,18 @@ fn remote_bound() {
 }
 
 #[test]
-fn repo_parse() {
-    let repo = Repo::parse("lh=/work/lighthouse").unwrap();
-    assert_eq!(repo.name.as_deref(), Some("lh"));
-    assert_eq!(repo.dir, Path::new("/work/lighthouse"));
-    let refused = Repo::parse("/work/lighthouse").err().unwrap();
-    assert!(refused.to_string().contains("is not name=dir"), "{refused}");
+fn labelling() {
+    let dir = bound();
+    labelled(dir.path());
+    let mut asked = request(dir.path(), None);
+    // Without a table the decision has only its examples to be graded on.
+    asked.labelling.table = None;
+    let report = in_dir(dir.path(), || lighthouse_session::model::eval(&asked)).unwrap();
+    assert_eq!(report.labelled, 1, "the invalid example's subject");
+    // A repository that is not there is an error that names it.
+    asked.labelling.repos = vec![Repo::parse("gone=/no/such/dir").unwrap()];
+    let missing = in_dir(dir.path(), || lighthouse_session::model::eval(&asked));
+    assert!(missing.err().unwrap().to_string().contains("/no/such/dir"));
 }
 
 #[test]
@@ -244,18 +250,12 @@ fn repo() {
 }
 
 #[test]
-fn labelling() {
-    let dir = bound();
-    labelled(dir.path());
-    let mut asked = request(dir.path(), None);
-    // Without a table the decision has only its examples to be graded on.
-    asked.labelling.table = None;
-    let report = in_dir(dir.path(), || lighthouse_session::model::eval(&asked)).unwrap();
-    assert_eq!(report.labelled, 1, "the invalid example's subject");
-    // A repository that is not there is an error that names it.
-    asked.labelling.repos = vec![Repo::parse("gone=/no/such/dir").unwrap()];
-    let missing = in_dir(dir.path(), || lighthouse_session::model::eval(&asked));
-    assert!(missing.err().unwrap().to_string().contains("/no/such/dir"));
+fn repo_parse() {
+    let repo = Repo::parse("lh=/work/lighthouse").unwrap();
+    assert_eq!(repo.name.as_deref(), Some("lh"));
+    assert_eq!(repo.dir, Path::new("/work/lighthouse"));
+    let refused = Repo::parse("/work/lighthouse").err().unwrap();
+    assert!(refused.to_string().contains("is not name=dir"), "{refused}");
 }
 
 #[test]

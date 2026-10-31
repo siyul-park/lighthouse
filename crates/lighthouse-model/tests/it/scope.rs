@@ -109,6 +109,32 @@ fn applicability_excludes_files_without_subjects() {
 }
 
 #[test]
+fn applicability_excludes() {
+    let plain = symbol("a.go", "Plain");
+    let inline = symbol("lib.go", "InlineTest");
+    let project = Project::merge([Fragment {
+        files: vec![file("a.go", false, false), file("lib.go", false, false)],
+        modules: vec![Module {
+            path: "m".to_owned(),
+            name: None,
+            test_of: Some("n".to_owned()),
+            language: None,
+            example: false,
+        }],
+        symbols: vec![plain.clone(), inline.clone()],
+        ..Fragment::default()
+    }]);
+    let only = by(false, TestScope::Only);
+    let production = by(false, TestScope::Exclude);
+    let silent = file("quiet.go", false, false);
+
+    assert!(only.excludes(&project, &silent), "no test code in it");
+    assert!(!only.excludes(&project, &file("a_test.go", false, true)));
+    assert!(!production.excludes(&project, &silent));
+    assert!(production.excludes(&project, &file("a_test.go", false, true)));
+}
+
+#[test]
 fn applicability_admits_file() {
     let production = file("a.go", false, false);
     let generated = file("g.go", true, false);
@@ -139,6 +165,29 @@ fn applicability_admits_comment() {
 }
 
 #[test]
+fn applicability_admits_module() {
+    let module = |test_of: Option<&str>| Module {
+        path: "m".to_owned(),
+        name: None,
+        test_of: test_of.map(str::to_owned),
+        language: None,
+        example: false,
+    };
+    let prod = file("a.go", false, false);
+    let generated = file("g.go", true, false);
+    let tests = file("a_test.go", false, true);
+
+    let standard = Applicability::default();
+    assert!(standard.admits_module(&module(None), &[&prod]));
+    assert!(!standard.admits_module(&module(Some("n")), &[&prod]));
+    assert!(!standard.admits_module(&module(None), &[&tests]));
+    assert!(!standard.admits_module(&module(None), &[&generated]));
+    assert!(standard.admits_module(&module(None), &[&generated, &prod]));
+    assert!(by(false, TestScope::Only).admits_module(&module(Some("n")), &[&prod]));
+    assert!(by(true, TestScope::Include).admits_module(&module(None), &[&generated]));
+}
+
+#[test]
 fn applicability_admits_symbol() {
     let plain = symbol("a.go", "Plain");
     let in_test = symbol("a_test.go", "Helper");
@@ -161,55 +210,6 @@ fn applicability_admits_symbol() {
     assert!(tests.admits_symbol(&project, &in_test));
     assert!(!tests.admits_symbol(&project, &plain));
     assert!(by(true, TestScope::Include).admits_symbol(&project, &in_generated));
-}
-
-#[test]
-fn applicability_excludes() {
-    let plain = symbol("a.go", "Plain");
-    let inline = symbol("lib.go", "InlineTest");
-    let project = Project::merge([Fragment {
-        files: vec![file("a.go", false, false), file("lib.go", false, false)],
-        modules: vec![Module {
-            path: "m".to_owned(),
-            name: None,
-            test_of: Some("n".to_owned()),
-            language: None,
-            example: false,
-        }],
-        symbols: vec![plain.clone(), inline.clone()],
-        ..Fragment::default()
-    }]);
-    let only = by(false, TestScope::Only);
-    let production = by(false, TestScope::Exclude);
-    let silent = file("quiet.go", false, false);
-
-    assert!(only.excludes(&project, &silent), "no test code in it");
-    assert!(!only.excludes(&project, &file("a_test.go", false, true)));
-    assert!(!production.excludes(&project, &silent));
-    assert!(production.excludes(&project, &file("a_test.go", false, true)));
-}
-
-#[test]
-fn applicability_admits_module() {
-    let module = |test_of: Option<&str>| Module {
-        path: "m".to_owned(),
-        name: None,
-        test_of: test_of.map(str::to_owned),
-        language: None,
-        example: false,
-    };
-    let prod = file("a.go", false, false);
-    let generated = file("g.go", true, false);
-    let tests = file("a_test.go", false, true);
-
-    let standard = Applicability::default();
-    assert!(standard.admits_module(&module(None), &[&prod]));
-    assert!(!standard.admits_module(&module(Some("n")), &[&prod]));
-    assert!(!standard.admits_module(&module(None), &[&tests]));
-    assert!(!standard.admits_module(&module(None), &[&generated]));
-    assert!(standard.admits_module(&module(None), &[&generated, &prod]));
-    assert!(by(false, TestScope::Only).admits_module(&module(Some("n")), &[&prod]));
-    assert!(by(true, TestScope::Include).admits_module(&module(None), &[&generated]));
 }
 
 #[test]

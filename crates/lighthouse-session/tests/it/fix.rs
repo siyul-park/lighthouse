@@ -24,40 +24,40 @@ fn fixed(dry_run: bool) -> (tempfile::TempDir, Fixed) {
 }
 
 #[test]
-fn fixed_lines() {
-    let (dir, dry) = fixed(true);
-    let lines = dry.lines();
+fn previewed() {
+    // `[fix] unsafe` is off: the verified fix is shown, not written.
+    let (dir, _scripts, done) = agent_run(CUT, false);
+    assert!(done.applied.is_empty());
+    assert_eq!(done.previews.len(), 1, "{:?}", done.lines());
+    let preview = &done.previews[0];
+    assert_eq!(preview.decision, "local/long-note");
+    assert_eq!(preview.safety, "unsafe");
+    assert_eq!(preview.files, ["a.txt"]);
+    assert!(preview.diff.contains("-c"), "{}", preview.diff);
     assert!(
-        lines
-            .iter()
-            .any(|l| l.starts_with("would fix local/short [safe] a.txt")),
-        "{lines:?}"
+        preview.apply.apply.contains("--fingerprint"),
+        "{}",
+        preview.apply.apply
     );
-    assert_eq!(read(dir.path(), "a.txt"), LONG, "a dry run changes nothing");
-
-    let (dir, done) = fixed(false);
-    let lines = done.lines();
-    assert_eq!(done.applied.len(), 2);
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.starts_with("fixed local/short [safe] b.txt"))
-    );
-    assert_eq!(read(dir.path(), "a.txt"), "a\nb\n");
-    assert_eq!(read(dir.path(), "b.txt"), "a\nb\n");
+    assert_eq!(read(dir.path(), "a.txt"), LONG, "a preview changes nothing");
+    assert!(done.shown.contains_key(&preview.fingerprint));
 }
 
 #[test]
-fn fixed_properties() {
-    let (_, done) = fixed(true);
-    // No agent ran, so there is nothing to put in a property bag.
-    assert!(done.properties().is_empty());
-    assert!(done.usage.is_none() && done.models.is_empty());
-
+fn batch() {
     let (_dir, _scripts, done) = agent_run(CUT, true);
-    let bag = done.properties();
-    assert_eq!(bag["agent"]["runs"], 1, "{bag:?}");
-    assert_eq!(bag["agent"]["batches"][0]["file"], "a.txt");
+    let usage = done.usage.as_ref().unwrap();
+    assert_eq!(usage.usage.calls, 1);
+    let runs = usage.agent.as_ref().unwrap();
+    assert_eq!(runs.runs, 1);
+    let batch = &runs.batches[0];
+    assert_eq!(batch.file, "a.txt");
+    // It opened the file of the finding, which the brief includes, and
+    // another one, which it does not.
+    assert_eq!(batch.reads, ["other.txt"]);
+    assert_eq!(batch.counts.read, 2);
+    assert!(!batch.incomplete);
+    assert!(batch.note.is_none());
 }
 
 /// A decision whose fix is made by a model: the note is cut to two lines.
@@ -161,23 +161,16 @@ fn applied() {
 }
 
 #[test]
-fn previewed() {
-    // `[fix] unsafe` is off: the verified fix is shown, not written.
-    let (dir, _scripts, done) = agent_run(CUT, false);
-    assert!(done.applied.is_empty());
-    assert_eq!(done.previews.len(), 1, "{:?}", done.lines());
-    let preview = &done.previews[0];
-    assert_eq!(preview.decision, "local/long-note");
-    assert_eq!(preview.safety, "unsafe");
-    assert_eq!(preview.files, ["a.txt"]);
-    assert!(preview.diff.contains("-c"), "{}", preview.diff);
-    assert!(
-        preview.apply.apply.contains("--fingerprint"),
-        "{}",
-        preview.apply.apply
-    );
-    assert_eq!(read(dir.path(), "a.txt"), LONG, "a preview changes nothing");
-    assert!(done.shown.contains_key(&preview.fingerprint));
+fn fixed_properties() {
+    let (_, done) = fixed(true);
+    // No agent ran, so there is nothing to put in a property bag.
+    assert!(done.properties().is_empty());
+    assert!(done.usage.is_none() && done.models.is_empty());
+
+    let (_dir, _scripts, done) = agent_run(CUT, true);
+    let bag = done.properties();
+    assert_eq!(bag["agent"]["runs"], 1, "{bag:?}");
+    assert_eq!(bag["agent"]["batches"][0]["file"], "a.txt");
 }
 
 #[test]
@@ -226,18 +219,25 @@ fn models() {
 }
 
 #[test]
-fn batch() {
-    let (_dir, _scripts, done) = agent_run(CUT, true);
-    let usage = done.usage.as_ref().unwrap();
-    assert_eq!(usage.usage.calls, 1);
-    let runs = usage.agent.as_ref().unwrap();
-    assert_eq!(runs.runs, 1);
-    let batch = &runs.batches[0];
-    assert_eq!(batch.file, "a.txt");
-    // It opened the file of the finding, which the brief includes, and
-    // another one, which it does not.
-    assert_eq!(batch.reads, ["other.txt"]);
-    assert_eq!(batch.counts.read, 2);
-    assert!(!batch.incomplete);
-    assert!(batch.note.is_none());
+fn fixed_lines() {
+    let (dir, dry) = fixed(true);
+    let lines = dry.lines();
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("would fix local/short [safe] a.txt")),
+        "{lines:?}"
+    );
+    assert_eq!(read(dir.path(), "a.txt"), LONG, "a dry run changes nothing");
+
+    let (dir, done) = fixed(false);
+    let lines = done.lines();
+    assert_eq!(done.applied.len(), 2);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("fixed local/short [safe] b.txt"))
+    );
+    assert_eq!(read(dir.path(), "a.txt"), "a\nb\n");
+    assert_eq!(read(dir.path(), "b.txt"), "a\nb\n");
 }

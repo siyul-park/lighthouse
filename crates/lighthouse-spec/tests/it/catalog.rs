@@ -74,42 +74,12 @@ fn subject_run_scope() {
 }
 
 #[test]
-fn decision_resolve_options() {
-    let decision = bundled("core/max-lines").clone().map_spec(|mut spec| {
-        spec.languages
-            .entry("go".to_owned())
-            .or_default()
-            .options
-            .insert("max".to_owned(), json!(500));
-        spec
-    });
-    let none = Map::new();
-    assert_eq!(decision.resolve_options(&none, None).unwrap()["max"], 1000);
+fn decision_options_from() {
     assert_eq!(
-        decision.resolve_options(&none, Some("go")).unwrap()["max"],
-        500
+        bundled("design/top-down-order").options_from(),
+        Some("design/declaration-groups")
     );
-    assert_eq!(
-        decision.resolve_options(&none, Some("rust")).unwrap()["max"],
-        1000
-    );
-
-    let set = |v| Map::from_iter([("max".to_owned(), v)]);
-    assert_eq!(
-        decision
-            .resolve_options(&set(json!(7)), Some("go"))
-            .unwrap()["max"],
-        7
-    );
-    let unknown = Map::from_iter([("mx".to_owned(), json!(1))]);
-    assert!(
-        decision
-            .resolve_options(&unknown, None)
-            .unwrap_err()
-            .to_string()
-            .contains("unknown option")
-    );
-    assert!(decision.resolve_options(&set(json!("big")), None).is_err());
+    assert_eq!(bundled("design/declaration-groups").options_from(), None);
 }
 
 #[test]
@@ -512,15 +482,6 @@ fn an_option_schema_refuses_keys_it_does_not_know() {
 }
 
 #[test]
-fn decision_options_from() {
-    assert_eq!(
-        bundled("design/top-down-order").options_from(),
-        Some("design/declaration-groups")
-    );
-    assert_eq!(bundled("design/declaration-groups").options_from(), None);
-}
-
-#[test]
 fn decision_inheriting() {
     let layout = bundled("design/top-down-order");
     let source = bundled("design/declaration-groups");
@@ -547,6 +508,45 @@ fn decision_inheriting() {
         over.options.as_ref().unwrap().inherited,
         ["groups", "hooks"]
     );
+}
+
+#[test]
+fn decision_resolve_options() {
+    let decision = bundled("core/max-lines").clone().map_spec(|mut spec| {
+        spec.languages
+            .entry("go".to_owned())
+            .or_default()
+            .options
+            .insert("max".to_owned(), json!(500));
+        spec
+    });
+    let none = Map::new();
+    assert_eq!(decision.resolve_options(&none, None).unwrap()["max"], 1000);
+    assert_eq!(
+        decision.resolve_options(&none, Some("go")).unwrap()["max"],
+        500
+    );
+    assert_eq!(
+        decision.resolve_options(&none, Some("rust")).unwrap()["max"],
+        1000
+    );
+
+    let set = |v| Map::from_iter([("max".to_owned(), v)]);
+    assert_eq!(
+        decision
+            .resolve_options(&set(json!(7)), Some("go"))
+            .unwrap()["max"],
+        7
+    );
+    let unknown = Map::from_iter([("mx".to_owned(), json!(1))]);
+    assert!(
+        decision
+            .resolve_options(&unknown, None)
+            .unwrap_err()
+            .to_string()
+            .contains("unknown option")
+    );
+    assert!(decision.resolve_options(&set(json!("big")), None).is_err());
 }
 
 #[test]

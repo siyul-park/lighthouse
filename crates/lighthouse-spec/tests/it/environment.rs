@@ -140,20 +140,6 @@ fn program_identifiers() {
 }
 
 #[test]
-fn free_variables() {
-    let cel = cel();
-    let free = |source: &str| {
-        let program = cel.compile(source).unwrap();
-        lighthouse_spec::free_variables(&cel, &program)
-            .into_iter()
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(free("x.exists(e, e > y)"), ["x", "y"]);
-    assert_eq!(free("cel.bind(a, b, a + c)"), ["b", "c"]);
-    assert_eq!(free("glob.matches(m, g)"), ["g", "m"]);
-}
-
-#[test]
 fn program_calls() {
     let cel = cel();
     let program = cel
@@ -175,6 +161,20 @@ fn program_calls() {
             ("startsWith".to_owned(), None, true, 1),
         ]
     );
+}
+
+#[test]
+fn free_variables() {
+    let cel = cel();
+    let free = |source: &str| {
+        let program = cel.compile(source).unwrap();
+        lighthouse_spec::free_variables(&cel, &program)
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(free("x.exists(e, e > y)"), ["x", "y"]);
+    assert_eq!(free("cel.bind(a, b, a + c)"), ["b", "c"]);
+    assert_eq!(free("glob.matches(m, g)"), ["g", "m"]);
 }
 
 #[test]

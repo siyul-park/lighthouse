@@ -3,6 +3,24 @@
 use crate::fixture::{grant, project, read, session, withdraw, write};
 
 #[test]
+fn basis_trusted() {
+    let dir = project("error");
+    let before = session(dir.path());
+    assert!(!before.basis.trusted(&before.root));
+    assert!(
+        before
+            .basis
+            .commands
+            .iter()
+            .any(|c| c.contains("fixer of local/short")),
+        "{:?}",
+        before.basis.commands
+    );
+    grant(&before);
+    assert!(before.basis.trusted(&before.root));
+}
+
+#[test]
 fn trust() {
     let dir = project("error");
     let before = session(dir.path());
@@ -32,22 +50,4 @@ fn revoke() {
     assert!(session(dir.path()).trusted());
     assert!(withdraw(&before.root));
     assert!(!session(dir.path()).trusted());
-}
-
-#[test]
-fn basis_trusted() {
-    let dir = project("error");
-    let before = session(dir.path());
-    assert!(!before.basis.trusted(&before.root));
-    assert!(
-        before
-            .basis
-            .commands
-            .iter()
-            .any(|c| c.contains("fixer of local/short")),
-        "{:?}",
-        before.basis.commands
-    );
-    grant(&before);
-    assert!(before.basis.trusted(&before.root));
 }

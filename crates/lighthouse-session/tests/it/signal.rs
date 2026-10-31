@@ -80,6 +80,40 @@ fn session_surfaces() {
 }
 
 #[test]
+fn change() {
+    let dir = project("error");
+    let session = session(dir.path());
+    let found = findings(&session);
+    signal::capture_findings(
+        &session,
+        "s1",
+        "Stop",
+        &found,
+        &["0123456789abcdef".to_owned()],
+        &hook(),
+    )
+    .unwrap();
+    // What an edit did to a finding is the first word of its signal.
+    let mut starts: Vec<String> = counted(&session, true)
+        .signals
+        .iter()
+        .map(|s| s.excerpt.split(' ').next().unwrap().to_owned())
+        .collect();
+    starts.sort();
+    assert_eq!(starts, ["introduced", "resolved"]);
+}
+
+#[test]
+fn a_signal_older_than_the_retention_is_purged_by_the_next_one() {
+    let dir = project_with("error", "[signals]\nretention = \"1s\"\n");
+    let session = session(dir.path());
+    said(&session, DIRECTIVE);
+    thread::sleep(Duration::from_millis(2100));
+    said(&session, SECOND);
+    assert_eq!(counted(&session, true).counts.total, 1);
+}
+
+#[test]
 fn capture_prompt() {
     let dir = project("error");
     let session = session(dir.path());
@@ -101,16 +135,6 @@ fn capture_prompt() {
     let key = format!("ghp_{}", "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8");
     let leaked = said(&session, &format!("Never commit {key} to the repository."));
     assert!(!leaked.excerpt.contains("ghp_"), "{}", leaked.excerpt);
-}
-
-#[test]
-fn a_signal_older_than_the_retention_is_purged_by_the_next_one() {
-    let dir = project_with("error", "[signals]\nretention = \"1s\"\n");
-    let session = session(dir.path());
-    said(&session, DIRECTIVE);
-    thread::sleep(Duration::from_millis(2100));
-    said(&session, SECOND);
-    assert_eq!(counted(&session, true).counts.total, 1);
 }
 
 #[test]
@@ -140,30 +164,6 @@ fn capture_findings() {
             .iter()
             .any(|s| s.excerpt.contains("local/short") && s.rule == "local/short")
     );
-}
-
-#[test]
-fn change() {
-    let dir = project("error");
-    let session = session(dir.path());
-    let found = findings(&session);
-    signal::capture_findings(
-        &session,
-        "s1",
-        "Stop",
-        &found,
-        &["0123456789abcdef".to_owned()],
-        &hook(),
-    )
-    .unwrap();
-    // What an edit did to a finding is the first word of its signal.
-    let mut starts: Vec<String> = counted(&session, true)
-        .signals
-        .iter()
-        .map(|s| s.excerpt.split(' ').next().unwrap().to_owned())
-        .collect();
-    starts.sort();
-    assert_eq!(starts, ["introduced", "resolved"]);
 }
 
 #[test]

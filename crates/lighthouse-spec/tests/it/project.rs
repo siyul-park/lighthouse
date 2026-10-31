@@ -89,87 +89,6 @@ rules = { "core/a" = "error" }
 "#;
 
 #[test]
-fn config_resolve() {
-    let got = resolve(
-        r#"
-extends = ["core/recommended"]
-[rules]
-"core/a" = { level = "error", options = { max = 9 } }
-"core/c" = "info"
-"#,
-        "x.rs",
-        "rust",
-    );
-    assert_eq!(got["core/a"], rule(Some(Severity::Error), &[("max", 9)]));
-    assert_eq!(got["core/b"], rule(Some(Severity::Info), &[]));
-    assert_eq!(got["core/c"], rule(Some(Severity::Info), &[]));
-
-    let got = resolve(
-        "extends = [\"core/recommended\"]\n[rules]\n\"core/a\" = \"error\"\n",
-        "x.rs",
-        "rust",
-    );
-    assert_eq!(got["core/a"], rule(Some(Severity::Error), &[("max", 5)]));
-
-    let single = Projects::new([shared(
-        "p/x",
-        &[],
-        Rules::from([(
-            "core/a".to_owned(),
-            rule(Some(Severity::Warn), &[("max", 5), ("depth", 1)]),
-        )]),
-    )])
-    .unwrap();
-    let config = Config::parse_inline(
-        r#"
-extends = ["p/x"]
-[rules]
-"core/a" = { level = "warn", options = { max = 9, extra = 2 } }
-[[overrides]]
-files = ["src/**"]
-rules = { "core/a" = { level = "error", options = { depth = 7 } } }
-"#,
-    )
-    .unwrap();
-    let got = config
-        .resolve(Path::new("src/x.rs"), "rust", &single)
-        .unwrap();
-    assert_eq!(
-        got["core/a"],
-        rule(
-            Some(Severity::Error),
-            &[("max", 9), ("depth", 7), ("extra", 2)]
-        )
-    );
-
-    let got = resolve("[rules]\n\"core/a\" = \"off\"\n", "x.rs", "rust");
-    assert_eq!(got["core/a"].level, None);
-
-    let level = |path, lang| resolve(LAYERED, path, lang)["core/a"].level;
-    assert_eq!(level("pkg/x.rs", "rust"), Some(Severity::Warn));
-    assert_eq!(level("internal/x.rs", "rust"), Some(Severity::Error));
-    assert_eq!(level("pkg/x.go", "go"), Some(Severity::Info));
-    assert_eq!(level("internal/x.go", "go"), Some(Severity::Error));
-
-    let config = Config::parse_inline("extends = [\"nope/x\"]").unwrap();
-    let err = config
-        .resolve(Path::new("x"), "text", &projects())
-        .unwrap_err();
-    assert!(matches!(err, Error::UnknownProject(id) if id == "nope/x"));
-}
-
-#[test]
-fn glob_set_star_stays_within_a_directory_and_double_star_crosses_them() {
-    let set = glob_set(["*.rs"]).unwrap();
-    assert!(set.is_match("a.rs"));
-    assert!(!set.is_match("src/a.rs"));
-    let set = glob_set(["**/*.rs"]).unwrap();
-    assert!(set.is_match("src/deep/a.rs"));
-    assert!(glob_set(["**"]).unwrap().is_match("src/deep/a.rs"));
-    assert!(!glob_set(["src/*"]).unwrap().is_match("src/a/b"));
-}
-
-#[test]
 fn config_parse() {
     let msg = |text: &str| Config::parse_inline(text).unwrap_err().to_string();
     assert!(msg("[rules]\n\"a/b\" = \"loud\"").contains("unknown level `loud`"));
@@ -185,13 +104,41 @@ fn config_parse() {
 }
 
 #[test]
-fn config_configured() {
-    let config = Config::parse_inline(
-        "[rules]\n\"a/x\" = \"warn\"\n[[overrides]]\nrules = { \"b/y\" = \"off\" }\n",
+fn glob_set_star_stays_within_a_directory_and_double_star_crosses_them() {
+    let set = glob_set(["*.rs"]).unwrap();
+    assert!(set.is_match("a.rs"));
+    assert!(!set.is_match("src/a.rs"));
+    let set = glob_set(["**/*.rs"]).unwrap();
+    assert!(set.is_match("src/deep/a.rs"));
+    assert!(glob_set(["**"]).unwrap().is_match("src/deep/a.rs"));
+    assert!(!glob_set(["src/*"]).unwrap().is_match("src/a/b"));
+}
+
+#[test]
+fn config_load() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("lighthouse.toml");
+    assert!(matches!(Config::load(&path), Err(Error::Io { .. })));
+    std::fs::write(&path, "[spec]\nextends = [\"core/recommended\"]").unwrap();
+    assert!(matches!(Config::load(&path), Err(Error::Document(_))));
+    std::fs::write(
+        &path,
+        ENVELOPE.replace("plugins = [\"core\"]", "extends = [\"core/recommended\"]"),
     )
     .unwrap();
-    let ids: Vec<_> = config.configured().map(|(id, _)| id).collect();
-    assert_eq!(ids, ["a/x", "b/y"]);
+    assert_eq!(Config::load(&path).unwrap().extends(), ["core/recommended"]);
+}
+
+#[test]
+fn config_plugins() {
+    let config = Config::parse_inline(
+        "plugins = [\"core\", { id = \"lang-go\", path = \"tools/go\", timeout = \"30s\" }]",
+    )
+    .unwrap();
+    let plugins = config.plugins();
+    assert_eq!(plugins[0], PluginRef::new("core"));
+    assert_eq!(plugins[1].id, "lang-go");
+    assert_eq!(plugins[1].path.as_deref(), Some(Path::new("tools/go")));
 }
 
 const ENVELOPE: &str = r#"
@@ -216,18 +163,9 @@ fn config_discover_walks_up_to_the_nearest_file() {
 }
 
 #[test]
-fn config_load() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("lighthouse.toml");
-    assert!(matches!(Config::load(&path), Err(Error::Io { .. })));
-    std::fs::write(&path, "[spec]\nextends = [\"core/recommended\"]").unwrap();
-    assert!(matches!(Config::load(&path), Err(Error::Document(_))));
-    std::fs::write(
-        &path,
-        ENVELOPE.replace("plugins = [\"core\"]", "extends = [\"core/recommended\"]"),
-    )
-    .unwrap();
-    assert_eq!(Config::load(&path).unwrap().extends(), ["core/recommended"]);
+fn config_lists() {
+    let config = Config::parse_inline("plugins = [\"lang-go\"]").unwrap();
+    assert!(config.lists("lang-go") && !config.lists("design"));
 }
 
 #[test]
@@ -257,15 +195,9 @@ fn the_same_project_reads_from_yaml_toml_and_json() {
 }
 
 #[test]
-fn config_plugins() {
-    let config = Config::parse_inline(
-        "plugins = [\"core\", { id = \"lang-go\", path = \"tools/go\", timeout = \"30s\" }]",
-    )
-    .unwrap();
-    let plugins = config.plugins();
-    assert_eq!(plugins[0], PluginRef::new("core"));
-    assert_eq!(plugins[1].id, "lang-go");
-    assert_eq!(plugins[1].path.as_deref(), Some(Path::new("tools/go")));
+fn config_languages() {
+    let config = Config::parse_inline("[languages.go]\ntags = [\"integration\"]\n").unwrap();
+    assert_eq!(options(&config, "go")["tags"][0], "integration");
 }
 
 #[test]
@@ -294,15 +226,31 @@ fn plugin_ref_timeout_is_a_duration_string() {
 }
 
 #[test]
-fn config_lists() {
-    let config = Config::parse_inline("plugins = [\"lang-go\"]").unwrap();
-    assert!(config.lists("lang-go") && !config.lists("design"));
+fn config_constructor_prefixes() {
+    let config = Config::parse_inline(
+        "[languages.go]\nconstructorPrefixes = [\"Make\"]\n[languages.rust]\ntags = 1\n",
+    )
+    .unwrap();
+    let prefixes: Vec<_> = config.constructor_prefixes().collect();
+    assert_eq!(prefixes, [("go", &["Make".to_owned()][..])]);
+    assert!(!options(&config, "go").contains_key("constructorPrefixes"));
 }
 
 #[test]
-fn config_languages() {
-    let config = Config::parse_inline("[languages.go]\ntags = [\"integration\"]\n").unwrap();
-    assert_eq!(options(&config, "go")["tags"][0], "integration");
+fn config_test_naming() {
+    let config = Config::parse_inline(
+        "[languages.rust]\ntestNaming = { prefix = \"t_\", snakeCase = true }\n[languages.go]\ntags = 1\n",
+    )
+    .unwrap();
+
+    let naming: Vec<_> = config.test_naming().collect();
+
+    assert_eq!(naming.len(), 1);
+    assert_eq!(naming[0].0, "rust");
+    assert_eq!(naming[0].1.prefix.as_deref(), Some("t_"));
+    assert_eq!(naming[0].1.snake_case, Some(true));
+    assert_eq!(naming[0].1.variants, None);
+    assert!(!options(&config, "rust").contains_key("testNaming"));
 }
 
 #[test]
@@ -412,9 +360,16 @@ language = {{ provider = "cel", context = {context} }}
 }
 
 #[test]
-fn config_extends() {
-    let config = Config::parse_inline("extends = [\"a/x\", \"b/y\"]").unwrap();
-    assert_eq!(config.extends(), ["a/x", "b/y"]);
+fn config_is_generated() {
+    let config = Config::parse_inline(GENERATED).unwrap();
+
+    assert!(config.is_generated(Path::new("api/x.pb.go")));
+    assert!(!config.is_generated(Path::new("api/x.go")));
+    assert!(
+        !Config::parse_inline("")
+            .unwrap()
+            .is_generated(Path::new("x.pb.go"))
+    );
 }
 
 #[test]
@@ -599,19 +554,6 @@ fn the_entries_of_a_project_are_those_of_what_it_extends_and_its_own() {
 const GENERATED: &str = "[generated]\nfiles = [\"**/*.pb.go\"]\ncheck = \"skip\"\n";
 
 #[test]
-fn config_is_generated() {
-    let config = Config::parse_inline(GENERATED).unwrap();
-
-    assert!(config.is_generated(Path::new("api/x.pb.go")));
-    assert!(!config.is_generated(Path::new("api/x.go")));
-    assert!(
-        !Config::parse_inline("")
-            .unwrap()
-            .is_generated(Path::new("x.pb.go"))
-    );
-}
-
-#[test]
 fn config_generated_check() {
     use lighthouse_spec::GeneratedCheck;
 
@@ -620,6 +562,12 @@ fn config_generated_check() {
     let include = Config::parse_inline("[generated]\ncheck = \"include\"").unwrap();
     assert_eq!(include.generated_check(), Some(GeneratedCheck::Include));
     assert_eq!(Config::parse_inline("").unwrap().generated_check(), None);
+}
+
+#[test]
+fn config_extends() {
+    let config = Config::parse_inline("extends = [\"a/x\", \"b/y\"]").unwrap();
+    assert_eq!(config.extends(), ["a/x", "b/y"]);
 }
 
 #[test]
@@ -636,31 +584,83 @@ fn a_rule_can_say_whether_it_checks_generated_code() {
 }
 
 #[test]
-fn config_constructor_prefixes() {
+fn config_configured() {
     let config = Config::parse_inline(
-        "[languages.go]\nconstructorPrefixes = [\"Make\"]\n[languages.rust]\ntags = 1\n",
+        "[rules]\n\"a/x\" = \"warn\"\n[[overrides]]\nrules = { \"b/y\" = \"off\" }\n",
     )
     .unwrap();
-    let prefixes: Vec<_> = config.constructor_prefixes().collect();
-    assert_eq!(prefixes, [("go", &["Make".to_owned()][..])]);
-    assert!(!options(&config, "go").contains_key("constructorPrefixes"));
+    let ids: Vec<_> = config.configured().map(|(id, _)| id).collect();
+    assert_eq!(ids, ["a/x", "b/y"]);
 }
 
 #[test]
-fn config_test_naming() {
+fn config_resolve() {
+    let got = resolve(
+        r#"
+extends = ["core/recommended"]
+[rules]
+"core/a" = { level = "error", options = { max = 9 } }
+"core/c" = "info"
+"#,
+        "x.rs",
+        "rust",
+    );
+    assert_eq!(got["core/a"], rule(Some(Severity::Error), &[("max", 9)]));
+    assert_eq!(got["core/b"], rule(Some(Severity::Info), &[]));
+    assert_eq!(got["core/c"], rule(Some(Severity::Info), &[]));
+
+    let got = resolve(
+        "extends = [\"core/recommended\"]\n[rules]\n\"core/a\" = \"error\"\n",
+        "x.rs",
+        "rust",
+    );
+    assert_eq!(got["core/a"], rule(Some(Severity::Error), &[("max", 5)]));
+
+    let single = Projects::new([shared(
+        "p/x",
+        &[],
+        Rules::from([(
+            "core/a".to_owned(),
+            rule(Some(Severity::Warn), &[("max", 5), ("depth", 1)]),
+        )]),
+    )])
+    .unwrap();
     let config = Config::parse_inline(
-        "[languages.rust]\ntestNaming = { prefix = \"t_\", snakeCase = true }\n[languages.go]\ntags = 1\n",
+        r#"
+extends = ["p/x"]
+[rules]
+"core/a" = { level = "warn", options = { max = 9, extra = 2 } }
+[[overrides]]
+files = ["src/**"]
+rules = { "core/a" = { level = "error", options = { depth = 7 } } }
+"#,
     )
     .unwrap();
+    let got = config
+        .resolve(Path::new("src/x.rs"), "rust", &single)
+        .unwrap();
+    assert_eq!(
+        got["core/a"],
+        rule(
+            Some(Severity::Error),
+            &[("max", 9), ("depth", 7), ("extra", 2)]
+        )
+    );
 
-    let naming: Vec<_> = config.test_naming().collect();
+    let got = resolve("[rules]\n\"core/a\" = \"off\"\n", "x.rs", "rust");
+    assert_eq!(got["core/a"].level, None);
 
-    assert_eq!(naming.len(), 1);
-    assert_eq!(naming[0].0, "rust");
-    assert_eq!(naming[0].1.prefix.as_deref(), Some("t_"));
-    assert_eq!(naming[0].1.snake_case, Some(true));
-    assert_eq!(naming[0].1.variants, None);
-    assert!(!options(&config, "rust").contains_key("testNaming"));
+    let level = |path, lang| resolve(LAYERED, path, lang)["core/a"].level;
+    assert_eq!(level("pkg/x.rs", "rust"), Some(Severity::Warn));
+    assert_eq!(level("internal/x.rs", "rust"), Some(Severity::Error));
+    assert_eq!(level("pkg/x.go", "go"), Some(Severity::Info));
+    assert_eq!(level("internal/x.go", "go"), Some(Severity::Error));
+
+    let config = Config::parse_inline("extends = [\"nope/x\"]").unwrap();
+    let err = config
+        .resolve(Path::new("x"), "text", &projects())
+        .unwrap_err();
+    assert!(matches!(err, Error::UnknownProject(id) if id == "nope/x"));
 }
 
 #[test]

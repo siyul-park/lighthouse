@@ -35,7 +35,7 @@ func (u *unit) block(d *ast.GenDecl) {
 	if d.Tok != token.CONST && d.Tok != token.VAR {
 		return
 	}
-	block := declBlock{Keyword: d.Tok.String(), Line: position(u.fset, d.Pos()).Line}
+	block := declBlock{Keyword: d.Tok.String(), Line: position(u.fset, d.Pos()).Line, Specs: []declSpec{}}
 	for _, spec := range d.Specs {
 		if s, ok := spec.(*ast.ValueSpec); ok {
 			block.Specs = append(block.Specs, u.declSpec(s))

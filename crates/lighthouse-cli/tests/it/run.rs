@@ -37,6 +37,27 @@ fn run() {
 }
 
 #[test]
+fn tool_open_world() {
+    let dir = tempfile::tempdir().unwrap();
+    let session = Session::bare(PathBuf::from(dir.path())).unwrap();
+    for tool in tools() {
+        assert!(
+            !tool.open_world(&session),
+            "{}: no remote model is bound in a bare project",
+            tool.name
+        );
+    }
+}
+
+#[test]
+fn schema() {
+    let schema = input::<CheckArgs>();
+    assert_eq!(schema["type"], "object");
+    assert!(schema.get("$schema").is_none() && schema.get("title").is_none());
+    assert!(schema["properties"]["paths"].is_object());
+}
+
+#[test]
 fn call() {
     let (_dir, ctx) = core_project();
     assert!(
@@ -57,25 +78,4 @@ fn call() {
         error.to_string().contains("unknown field `nope`"),
         "{error}"
     );
-}
-
-#[test]
-fn schema() {
-    let schema = input::<CheckArgs>();
-    assert_eq!(schema["type"], "object");
-    assert!(schema.get("$schema").is_none() && schema.get("title").is_none());
-    assert!(schema["properties"]["paths"].is_object());
-}
-
-#[test]
-fn tool_open_world() {
-    let dir = tempfile::tempdir().unwrap();
-    let session = Session::bare(PathBuf::from(dir.path())).unwrap();
-    for tool in tools() {
-        assert!(
-            !tool.open_world(&session),
-            "{}: no remote model is bound in a bare project",
-            tool.name
-        );
-    }
 }

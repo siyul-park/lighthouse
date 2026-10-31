@@ -184,12 +184,6 @@ fn a_library_is_named_after_its_plugin_and_once() {
 }
 
 #[test]
-fn precedence_step() {
-    assert_eq!(Precedence::Official.step(), 2);
-    assert_eq!(Precedence::Designed.step(), 3);
-}
-
-#[test]
 fn function_namespace() {
     assert_eq!(
         function("regex.replace", None, &[]).namespace(),
@@ -203,4 +197,10 @@ fn function_accepts() {
     let f = function("f", None, &[&["int"], &["int", "int"]]);
     assert!(f.accepts(1) && f.accepts(2));
     assert!(!f.accepts(0) && !f.accepts(3));
+}
+
+#[test]
+fn precedence_step() {
+    assert_eq!(Precedence::Official.step(), 2);
+    assert_eq!(Precedence::Designed.step(), 3);
 }

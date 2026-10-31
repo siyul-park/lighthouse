@@ -7,6 +7,22 @@ use lighthouse_session::Fixing;
 use crate::fixture::{project, session, trusted};
 
 #[test]
+fn fixing() {
+    let dir = project("error");
+    let session = session(dir.path());
+    let fixing = Fixing::of(&session).unwrap();
+    // The fix that cannot run says why.
+    let decision = session.catalog.decision("local/short").unwrap();
+    let fix = fixing
+        .describe(decision, Aim::Decision("local/short"))
+        .unwrap()
+        .fix
+        .unwrap();
+    assert!(!fix.runs);
+    assert!(fix.why.unwrap().to_string().contains("trust"));
+}
+
+#[test]
 fn fixing_of() {
     let dir = project("error");
     let untrusted = Fixing::of(&session(dir.path())).unwrap();
@@ -74,20 +90,4 @@ fn fixing_describe() {
             .unwrap()
             .brief
     );
-}
-
-#[test]
-fn fixing() {
-    let dir = project("error");
-    let session = session(dir.path());
-    let fixing = Fixing::of(&session).unwrap();
-    // The fix that cannot run says why.
-    let decision = session.catalog.decision("local/short").unwrap();
-    let fix = fixing
-        .describe(decision, Aim::Decision("local/short"))
-        .unwrap()
-        .fix
-        .unwrap();
-    assert!(!fix.runs);
-    assert!(fix.why.unwrap().to_string().contains("trust"));
 }

@@ -19,60 +19,22 @@ fn everything(session: &Session) -> Checked {
 }
 
 #[test]
-fn check() {
+fn checked_summary() {
     let dir = project("error");
-    let checked = everything(&session(dir.path()));
-    let findings = checked.findings();
-    assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].rule_id, "local/short");
-    assert_eq!(findings[0].file.to_str(), Some("a.txt"));
+    let summary = everything(&session(dir.path())).summary();
+    assert_eq!(summary.status, RunStatus::Findings);
+    assert_eq!((summary.errors, summary.warnings, summary.infos), (1, 0, 0));
+    assert_eq!(summary.reviews, 0, "an error asks for no review");
 
-    // Only the decisions asked for run; one that is not active is no decision.
-    let local = run(
-        &session(dir.path()),
-        CheckRequest {
-            rules: vec!["local/*".to_owned()],
-            ..CheckRequest::default()
-        },
-    );
-    assert_eq!(local.findings().len(), 1);
-    let unknown = lighthouse_session::check(
-        &session(dir.path()),
-        &CheckRequest {
-            rules: vec!["core/*".to_owned()],
-            paths: vec![dir.path().to_owned()],
-            ..CheckRequest::default()
-        },
-    );
-    assert!(
-        unknown
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("no decision matches")
-    );
+    write(dir.path(), "a.txt", "a\n");
+    let clean = everything(&session(dir.path())).summary();
+    assert_eq!(clean.status, RunStatus::Clean);
+    assert_eq!(clean.errors, 0);
 
-    // A run that stores remembers its findings for review.
-    let remembered = run(
-        &session(dir.path()),
-        CheckRequest {
-            store: true,
-            ..CheckRequest::default()
-        },
-    );
-    assert_eq!(remembered.findings().len(), 1);
-    assert!(
-        lighthouse_session::review::list(
-            dir.path(),
-            &lighthouse_session::review::Query {
-                rules: Vec::new(),
-                status: lighthouse_session::review::StatusFilter::Open,
-                all_tiers: true,
-            }
-        )
-        .unwrap()
-        .is_some_and(|listed| listed.findings.len() == 1)
-    );
+    let warned = project("warn");
+    let summary = everything(&session(warned.path())).summary();
+    assert_eq!((summary.errors, summary.warnings), (0, 1));
+    assert_eq!(summary.reviews, 1, "a warning waits for review");
 }
 
 #[test]
@@ -119,25 +81,6 @@ fn check_reports_only_the_changed_files_of_a_working_tree() {
         .map(|d| d.file.display().to_string())
         .collect();
     assert_eq!(files, ["c.txt"]);
-}
-
-#[test]
-fn checked_summary() {
-    let dir = project("error");
-    let summary = everything(&session(dir.path())).summary();
-    assert_eq!(summary.status, RunStatus::Findings);
-    assert_eq!((summary.errors, summary.warnings, summary.infos), (1, 0, 0));
-    assert_eq!(summary.reviews, 0, "an error asks for no review");
-
-    write(dir.path(), "a.txt", "a\n");
-    let clean = everything(&session(dir.path())).summary();
-    assert_eq!(clean.status, RunStatus::Clean);
-    assert_eq!(clean.errors, 0);
-
-    let warned = project("warn");
-    let summary = everything(&session(warned.path())).summary();
-    assert_eq!((summary.errors, summary.warnings), (0, 1));
-    assert_eq!(summary.reviews, 1, "a warning waits for review");
 }
 
 #[test]
@@ -244,6 +187,63 @@ fn checked_briefing() {
     );
     let findings = checked.findings();
     assert!(briefing.needs_review(&findings[0]));
+}
+
+#[test]
+fn check() {
+    let dir = project("error");
+    let checked = everything(&session(dir.path()));
+    let findings = checked.findings();
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule_id, "local/short");
+    assert_eq!(findings[0].file.to_str(), Some("a.txt"));
+
+    // Only the decisions asked for run; one that is not active is no decision.
+    let local = run(
+        &session(dir.path()),
+        CheckRequest {
+            rules: vec!["local/*".to_owned()],
+            ..CheckRequest::default()
+        },
+    );
+    assert_eq!(local.findings().len(), 1);
+    let unknown = lighthouse_session::check(
+        &session(dir.path()),
+        &CheckRequest {
+            rules: vec!["core/*".to_owned()],
+            paths: vec![dir.path().to_owned()],
+            ..CheckRequest::default()
+        },
+    );
+    assert!(
+        unknown
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("no decision matches")
+    );
+
+    // A run that stores remembers its findings for review.
+    let remembered = run(
+        &session(dir.path()),
+        CheckRequest {
+            store: true,
+            ..CheckRequest::default()
+        },
+    );
+    assert_eq!(remembered.findings().len(), 1);
+    assert!(
+        lighthouse_session::review::list(
+            dir.path(),
+            &lighthouse_session::review::Query {
+                rules: Vec::new(),
+                status: lighthouse_session::review::StatusFilter::Open,
+                all_tiers: true,
+            }
+        )
+        .unwrap()
+        .is_some_and(|listed| listed.findings.len() == 1)
+    );
 }
 
 #[test]
