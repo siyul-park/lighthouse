@@ -15,9 +15,11 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-var astNodeType = reflect.TypeOf((*ast.Node)(nil)).Elem()
-var tokenType = reflect.TypeOf(token.Token(0))
-var tokenPosType = reflect.TypeOf(token.Pos(0))
+var (
+	astNodeType  = reflect.TypeOf((*ast.Node)(nil)).Elem()
+	tokenType    = reflect.TypeOf(token.Token(0))
+	tokenPosType = reflect.TypeOf(token.Pos(0))
+)
 
 // collectSources serializes the same parsed Go AST used by native analysis.
 func (r *run) collectSources(pkgs []*packages.Package) {

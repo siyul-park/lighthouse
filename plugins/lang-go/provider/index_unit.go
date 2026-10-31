@@ -34,6 +34,7 @@ type unit struct {
 	test     bool
 	edges    map[edgeKey]bool
 	cmap     ast.CommentMap
+	blocks   []declBlock
 }
 
 // edgeKey identifies an emitted edge: the same relation at another site is
@@ -80,8 +81,10 @@ func (u *unit) fragment() *sdk.Fragment {
 			u.function(d)
 		case *ast.GenDecl:
 			u.general(d)
+			u.block(d)
 		}
 	}
+	u.publishBlocks()
 	if u.fence {
 		u.unresolved()
 	}
