@@ -81,20 +81,6 @@ func (u *unit) constructs(d *ast.FuncDecl) bool {
 	return false
 }
 
-// interfacesOf returns the candidate interfaces of a package, computed once:
-// those it names or declares (types.Info.Uses and Defs) and those its calls take as parameters, so
-// an interface of a dependency is found when the package hands a value to it.
-func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
-	cached, _ := r.interfaces.LoadOrStore(pkg, &interfaceSet{})
-	set := cached.(*interfaceSet)
-	set.once.Do(func() {
-		set.byMethod = collectInterfaces(pkg)
-		set.wider = r.widerInterfaces(pkg)
-		set.embedders = collectEmbedders(pkg)
-	})
-	return set
-}
-
 // configures names the type a functional-option builder configures: the
 // function has no receiver and its only result is a func type, written out or
 // named in the package, that takes T or *T, for a type T of the package, as its
@@ -124,6 +110,20 @@ func (u *unit) configures(d *ast.FuncDecl) string {
 		return ""
 	}
 	return target(u.res.module(owner.Pkg()), owner.Name())
+}
+
+// interfacesOf returns the candidate interfaces of a package, computed once:
+// those it names or declares (types.Info.Uses and Defs) and those its calls take as parameters, so
+// an interface of a dependency is found when the package hands a value to it.
+func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
+	cached, _ := r.interfaces.LoadOrStore(pkg, &interfaceSet{})
+	set := cached.(*interfaceSet)
+	set.once.Do(func() {
+		set.byMethod = collectInterfaces(pkg)
+		set.wider = r.widerInterfaces(pkg)
+		set.embedders = collectEmbedders(pkg)
+	})
+	return set
 }
 
 func declaredIn(t types.Type, pkg *types.Package) bool {

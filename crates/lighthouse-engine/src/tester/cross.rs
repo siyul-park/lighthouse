@@ -119,25 +119,6 @@ pub(super) fn introduced(
     after
 }
 
-/// The 1-based lines of `after` that differ from `before`; a removal counts the
-/// lines around the place it was made.
-fn edited_lines(before: &str, after: &str) -> Vec<Range<u32>> {
-    let diff = TextDiff::from_lines(before, after);
-    diff.ops()
-        .iter()
-        .filter(|op| !matches!(op, similar::DiffOp::Equal { .. }))
-        .map(|op| {
-            let range = op.new_range();
-            let (start, end) = (range.start as u32, range.end as u32);
-            if start == end {
-                start.max(1)..start + 2
-            } else {
-                start + 1..end + 1
-            }
-        })
-        .collect()
-}
-
 /// Holds the `hits` to what `example` declares: a finding of a decision it does
 /// not list is a failure, and so is a listed decision that has none. The lines
 /// that report what is declared and still found.
@@ -188,4 +169,23 @@ pub(super) fn model_only(decision: &Decision) -> bool {
             CheckKind::Cel(cel) if cel.abstain.is_some() && cel.condition.trim() == "false"
         )
     })
+}
+
+/// The 1-based lines of `after` that differ from `before`; a removal counts the
+/// lines around the place it was made.
+fn edited_lines(before: &str, after: &str) -> Vec<Range<u32>> {
+    let diff = TextDiff::from_lines(before, after);
+    diff.ops()
+        .iter()
+        .filter(|op| !matches!(op, similar::DiffOp::Equal { .. }))
+        .map(|op| {
+            let range = op.new_range();
+            let (start, end) = (range.start as u32, range.end as u32);
+            if start == end {
+                start.max(1)..start + 2
+            } else {
+                start + 1..end + 1
+            }
+        })
+        .collect()
 }

@@ -183,31 +183,17 @@ impl Orchestrator<'_> {
             let mut prior = prior;
             let mut bad = worse(&after, &next, changed);
             if !bad.is_empty() && !seen.contains(&self.state_hash()) {
-                // The follow-ups of the files that got worse are undone, those of
-                // the others stay: a file that cannot be improved does not undo
-                // the formatting of another.
-                let undone = close_over(&kept, bad);
-                for (file, text) in std::mem::take(&mut prior) {
-                    if !undone.contains_key(&file) {
-                        prior.push((file, text));
-                        continue;
-                    }
-                    match text {
-                        Some(text) => self.texts.insert(file, text),
-                        None => self.texts.remove(&file),
-                    };
-                }
+                let undone = self.undo_files(&mut prior, close_over(&kept, bad));
                 made.retain(|f| {
                     !f.proposal
                         .files
                         .iter()
                         .any(|file| undone.contains_key(file))
                 });
+                bad = undone;
                 if !prior.is_empty() {
                     next = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
                     bad = worse(&after, &next, changed);
-                } else {
-                    bad = undone;
                 }
             }
             if bad.is_empty() && seen.insert(self.state_hash()) {
@@ -224,6 +210,28 @@ impl Orchestrator<'_> {
             break;
         }
         Ok((after, followed))
+    }
+
+    /// Puts back the texts `prior` holds of the files in `undone`, and keeps
+    /// the rest in `prior`: the follow-ups of the files that got worse are
+    /// undone, those of the others stay, so a file that cannot be improved does
+    /// not undo the formatting of another. `undone`, as it was given.
+    fn undo_files(
+        &mut self,
+        prior: &mut Vec<(PathBuf, Option<String>)>,
+        undone: BTreeMap<PathBuf, String>,
+    ) -> BTreeMap<PathBuf, String> {
+        for (file, text) in std::mem::take(prior) {
+            if !undone.contains_key(&file) {
+                prior.push((file, text));
+                continue;
+            }
+            match text {
+                Some(text) => self.texts.insert(file, text),
+                None => self.texts.remove(&file),
+            };
+        }
+        undone
     }
 
     /// The `safe` fixes that change something in each file that several of

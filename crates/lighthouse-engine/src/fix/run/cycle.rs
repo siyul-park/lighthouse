@@ -48,6 +48,27 @@ impl Orchestrator<'_> {
         if round == 1 {
             self.trail.errors = errors.clone();
         }
+        let returned = self.record(&errors, round);
+        if returned.is_empty() {
+            return Ok(outcome);
+        }
+        let cycles: Vec<(PathBuf, Vec<String>)> = returned
+            .into_iter()
+            .map(|(file, at)| {
+                let rules = self.put_back(&file, at);
+                (file, rules)
+            })
+            .collect();
+        let outcome = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
+        for (file, rules) in cycles {
+            self.decline_cycle(&outcome, &file, &rules);
+        }
+        Ok(outcome)
+    }
+
+    /// Notes the text each file has now among the texts it had; the files that
+    /// came back to one, with the visit they came back to.
+    fn record(&mut self, errors: &BTreeMap<PathBuf, usize>, round: usize) -> Returns {
         let mut returned = Returns::new();
         for (file, text) in &self.texts {
             if self.trail.frozen.contains(file) {
@@ -79,21 +100,7 @@ impl Orchestrator<'_> {
                 }),
             }
         }
-        if returned.is_empty() {
-            return Ok(outcome);
-        }
-        let cycles: Vec<(PathBuf, Vec<String>)> = returned
-            .into_iter()
-            .map(|(file, at)| {
-                let rules = self.put_back(&file, at);
-                (file, rules)
-            })
-            .collect();
-        let outcome = self.proposer.engine.check_overlaid(&[], &[], &self.texts)?;
-        for (file, rules) in cycles {
-            self.decline_cycle(&outcome, &file, &rules);
-        }
-        Ok(outcome)
+        returned
     }
 
     /// Puts `file`, whose text came back to its visit number `at`, back to the
