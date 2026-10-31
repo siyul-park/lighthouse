@@ -1,17 +1,25 @@
+# The gate builds the plugins once (a stamp file) and the release lighthouse
+# binary once; every check below runs that binary.
+
 PLUGINS := target/plugins
+LIGHTHOUSE := target/release/lighthouse
+BUILT := $(PLUGINS)/.built
+SOURCES := $(shell find crates plugins protocol Cargo.toml Cargo.lock -type f ! -path '*/node_modules/*' ! -path '*/dist/*' ! -path '*/__pycache__/*' ! -path '*/target/*')
 
 # Command-check examples run from temporary directories, where goenv cannot
 # discover plugins/lang-go/.go-version. Keep this toolchain on PATH for checks.
 GO_TOOLCHAIN := $(shell cd plugins/lang-go && go env GOROOT 2>/dev/null)
 export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
 
-.PHONY: plugins test lint ci
+.PHONY: plugins cli test lint decisions docs ci
 
 # Builds the out-of-process plugins; each directory holds the binary, its
 # lighthouse-plugin.toml and, for a plugin that provides packs, its `decisions/`:
 # the layout plugin discovery expects. Binaries are replaced by rename, never overwritten in place: macOS caches a binary's
 # code signature per file, and new bytes under the old file are killed on launch.
-plugins:
+plugins: $(BUILT)
+
+$(BUILT): $(SOURCES)
 	mkdir -p $(PLUGINS)/lang-go
 	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
 	mv -f $(PLUGINS)/lang-go/lang-go.new $(PLUGINS)/lang-go/lang-go
@@ -43,6 +51,11 @@ plugins:
 			cp -R plugins/$$plugin/decisions $(PLUGINS)/$$plugin/; \
 		fi; \
 	done
+	touch $(BUILT)
+
+# The release binary every check below runs; cargo knows when it is fresh.
+cli:
+	cargo build --release -p lighthouse-cli
 
 test: plugins
 	cargo test --workspace
@@ -52,14 +65,21 @@ test: plugins
 
 # Formatters, compilers' linters, then the dogfood gate: Lighthouse checks its
 # own sources with the rules this repository enforces (lighthouse.toml).
-lint: plugins
+lint: plugins cli
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets -- -D warnings
 	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./... && cd sdk && go run ./gen -check
 	cd plugins/lang-python && ruff format --check . && ruff check . && python3 -I scripts/wire.py --check
-	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check $(wildcard plugins/*/decisions)
-	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- check . --allow-incomplete
-	LIGHTHOUSE_TRUST=1 cargo run -q -p lighthouse-cli -- decision test 'markdown/*'
+	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) check $(wildcard plugins/*/decisions)
+	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) check . --allow-incomplete
+	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) decision test 'markdown/*'
 
-# What CI runs.
-ci: test lint
+# Every example of every checked decision, and the generated docs.
+decisions: plugins cli
+	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) decision test
+
+docs: cli
+	$(LIGHTHOUSE) docs check
+
+# The full gate.
+ci: test lint decisions docs
