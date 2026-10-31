@@ -18,7 +18,7 @@ use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
 
 mod cross;
 
-use cross::{cross, introduced, judge, model_only};
+use cross::{cross, hits_in, introduced, judge, model_only};
 
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
@@ -198,14 +198,31 @@ impl<'a> RuleTester<'a> {
         let registry = (self.registry)();
         let shared: &[&Decision] = if fixing { &[] } else { &others };
         let config = config(&registry, decision, example, shared, &self.sources)?;
-        let (outcome, engine, dir) = ExampleRun {
+        // A valid example is checked once for its own decision and the others,
+        // and the findings are told apart by their rule.
+        let mut rules = vec![decision.id().to_owned()];
+        if example.kind == ExampleKind::Valid {
+            rules.extend(others.iter().map(|d| d.id().to_owned()));
+        }
+        let (together, engine, dir) = ExampleRun {
             registry,
             config,
             catalog: self.catalog,
             trusted: self.trusted,
             models: ModelOptions::default(),
         }
-        .run_in(decision.id(), example)?;
+        .run_rules(&rules, example)?;
+        // What stops the others from running does not stop the decision: an
+        // incomplete run is asked again for the decision alone.
+        let (outcome, hits) = if together.incomplete.is_empty() {
+            let hits = hits_in(&together, example, |rule| rule != decision.id());
+            (only_rule(together, decision.id()), Some(hits))
+        } else if rules.len() > 1 {
+            let own = engine.check(&[], &rules[..1]).map_err(|e| e.to_string())?;
+            (own, None)
+        } else {
+            (together, None)
+        };
         spent.check += started.elapsed();
         if !outcome.incomplete.is_empty() {
             return Err(format!("analysis incomplete: {:?}", outcome.incomplete));
@@ -214,7 +231,10 @@ impl<'a> RuleTester<'a> {
         match example.kind {
             ExampleKind::Valid if found.is_empty() => {
                 let started = Instant::now();
-                let hits = cross(&engine, &others, example);
+                let hits = match hits {
+                    Some(hits) => Ok(hits),
+                    None => cross(&engine, &others, example),
+                };
                 spent.crossing += started.elapsed();
                 judge(example, &hits?)
             }
@@ -366,14 +386,21 @@ impl ExampleRun<'_> {
     /// Like [`run`](Self::run), keeping the engine and the directory, for a
     /// caller that goes on to fix the files.
     fn run_in(self, rule: &str, example: &Example) -> Result<(Run, Engine, TempDir), String> {
+        self.run_rules(&[rule.to_owned()], example)
+    }
+
+    /// Like [`run_in`](Self::run_in), with several rules.
+    fn run_rules(
+        self,
+        rules: &[String],
+        example: &Example,
+    ) -> Result<(Run, Engine, TempDir), String> {
         let dir = materialize(example)?;
         let engine = Engine::new(self.registry, self.config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted)
             .with_models(self.models);
-        let run = engine
-            .check(&[], &[rule.to_owned()])
-            .map_err(|e| e.to_string())?;
+        let run = engine.check(&[], rules).map_err(|e| e.to_string())?;
         Ok((run, engine, dir))
     }
 }
@@ -389,6 +416,12 @@ fn materialize(example: &Example) -> Result<TempDir, String> {
         fs::write(&path, file.text()).map_err(|e| e.to_string())?;
     }
     Ok(dir)
+}
+
+/// `run` with the findings of `rule` only.
+fn only_rule(mut run: Run, rule: &str) -> Run {
+    run.diagnostics.retain(|d| d.rule_id == rule);
+    run
 }
 
 /// The line and message of each finding of the run.

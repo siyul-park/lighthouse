@@ -17,7 +17,7 @@ use lighthouse_spec::{Decision, Example};
 use similar::TextDiff;
 
 use super::{RuleTester, absent, rules_config};
-use crate::{Engine, ModelOptions};
+use crate::{Engine, ModelOptions, Run};
 
 /// A finding of a decision other than the one the example is of.
 pub(super) struct Hit {
@@ -74,11 +74,17 @@ pub(super) fn cross(
     }
     let only: Vec<String> = others.iter().map(|d| d.id().to_owned()).collect();
     let run = engine.check(&[], &only).map_err(|e| e.to_string())?;
+    Ok(hits_in(&run, example, |_| true))
+}
+
+/// The findings in the files of `example` among those of `run` whose rule
+/// `wanted` accepts: a run that checked the decision of the example with the
+/// others has both, and each is told by its rule.
+pub(super) fn hits_in(run: &Run, example: &Example, wanted: impl Fn(&str) -> bool) -> Vec<Hit> {
     let own: BTreeSet<&Path> = example.files.iter().map(|f| Path::new(&f.path)).collect();
-    Ok(run
-        .diagnostics
+    run.diagnostics
         .iter()
-        .filter(|d| own.contains(d.file.as_path()))
+        .filter(|d| own.contains(d.file.as_path()) && wanted(&d.rule_id))
         .map(|d| Hit {
             rule: d.rule_id.clone(),
             file: d.file.clone(),
@@ -86,7 +92,7 @@ pub(super) fn cross(
             message: d.message.clone(),
             introduced: false,
         })
-        .collect())
+        .collect()
 }
 
 /// The findings of `after` that the fix of `example` introduced: those that
