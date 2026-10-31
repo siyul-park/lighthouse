@@ -290,6 +290,113 @@ spec:
             }
       expect:
         - line: 16
+    - name: private-option-after-methods
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Interpreter runs programs.
+            type Interpreter struct{ fuel uint64 }
+
+            // Option configures an interpreter.
+            type Option func(*option)
+
+            type option struct{ fuel uint64 }
+
+            // WithFuel limits the steps of a run.
+            func WithFuel(n uint64) Option {
+            	return func(o *option) {
+            		o.fuel = n
+            	}
+            }
+
+            // New returns an interpreter with the options applied.
+            func New(opts ...Option) *Interpreter {
+            	o := &option{}
+            	for _, opt := range opts {
+            		opt(o)
+            	}
+            	return &Interpreter{fuel: o.fuel}
+            }
+
+            // Fuel returns the step limit.
+            func (i *Interpreter) Fuel() uint64 {
+            	return i.fuel
+            }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Interpreter runs programs.
+            type Interpreter struct{ fuel uint64 }
+
+            // Option configures an interpreter.
+            type Option func(*option)
+
+            type option struct{ fuel uint64 }
+
+            // New returns an interpreter with the options applied.
+            func New(opts ...Option) *Interpreter {
+            	o := &option{}
+            	for _, opt := range opts {
+            		opt(o)
+            	}
+            	return &Interpreter{fuel: o.fuel}
+            }
+
+            // WithFuel limits the steps of a run.
+            func WithFuel(n uint64) Option {
+            	return func(o *option) {
+            		o.fuel = n
+            	}
+            }
+
+            // Fuel returns the step limit.
+            func (i *Interpreter) Fuel() uint64 {
+            	return i.fuel
+            }
+      expect:
+        - line: 21
+    - name: private-option-before-constructor
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Interpreter runs programs.
+            type Interpreter struct{ fuel uint64 }
+
+            // Option configures an interpreter.
+            type Option func(*option)
+
+            type option struct{ fuel uint64 }
+
+            // WithFuel limits the steps of a run.
+            func WithFuel(n uint64) Option {
+            	return func(o *option) {
+            		o.fuel = n
+            	}
+            }
+
+            // New returns an interpreter with the options applied.
+            func New(opts ...Option) *Interpreter {
+            	o := &option{}
+            	for _, opt := range opts {
+            		opt(o)
+            	}
+            	return &Interpreter{fuel: o.fuel}
+            }
+
+            // Fuel returns the step limit.
+            func (i *Interpreter) Fuel() uint64 {
+            	return i.fuel
+            }
     - name: bare-new-constructor
       language: go
       kind: invalid

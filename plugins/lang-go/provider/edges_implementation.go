@@ -84,7 +84,9 @@ func (u *unit) constructs(d *ast.FuncDecl) bool {
 // configures names the type a functional-option builder configures: the
 // function has no receiver and its only result is a func type, written out or
 // named in the package, that takes T or *T, for a type T of the package, as its
-// only parameter and returns nothing. It is empty for any other function.
+// only parameter and returns nothing. When constructors of the package take
+// that option type and build a type of the package, the builder configures
+// that one instead (see builtBy). It is empty for any other function.
 func (u *unit) configures(d *ast.FuncDecl) string {
 	if d.Recv != nil {
 		return ""
@@ -108,6 +110,9 @@ func (u *unit) configures(d *ast.FuncDecl) string {
 	owner, ok := namedType(option.Params().At(0).Type())
 	if !ok || owner.Pkg() != u.pkg.Types {
 		return ""
+	}
+	if built := u.res.constructorsOf(u.pkg).builtBy(result, u.fset.Position(d.Pos()).Filename); built != nil {
+		owner = built
 	}
 	return target(u.res.module(owner.Pkg()), owner.Name())
 }

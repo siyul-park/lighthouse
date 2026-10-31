@@ -21,6 +21,8 @@ type resolver struct {
 	local *goModule
 	// interfaces caches, per package, the interfaces its code names.
 	interfaces sync.Map
+	// constructors caches, per package, the constructors that take options.
+	constructors sync.Map
 	// declared are the packages inside the project.
 	declared []*packages.Package
 	// wider are the interfaces a package satisfies without naming them.
