@@ -12,7 +12,7 @@ mod names;
 mod project;
 mod provider;
 mod regions;
-mod source;
+mod symbols;
 mod syntax;
 mod tests;
 mod visibility;

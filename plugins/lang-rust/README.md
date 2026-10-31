@@ -13,7 +13,7 @@ The Rust language provider: reads sources with `syn`, resolves names through its
 - `main.rs`: the entry; `provider.rs`: the `Provider` (manifest, `index`) and the packages of a request.
 - `index.rs` (with `index/types.rs`): the fragment of one file; `cache.rs`: the fragment cache.
 - `project.rs`, `project/cargo.rs`: the module tree of every crate target and the packages from `Cargo.toml`.
-- `names.rs`, `names/` (declare, resolve, query): what every module declares and imports, and path resolution; `source.rs`, `source/`: the syntax tree handed to the host (`source-ast`).
+- `names.rs`, `names/` (declare, resolve, query): what every module declares and imports, and path resolution; `symbols.rs`, `symbols/`: the syntax tree handed to the host (`source-ast`).
 - `functions.rs`: one function body, with `functions/edges.rs` (calls and references), `functions/flow.rs`, `functions/events.rs` and `functions/signature.rs`.
 - `extent.rs`, `visibility.rs`, `comments.rs`, `tests.rs`, `regions.rs` (with `regions/`): the roles named after what they fill; `syntax.rs` and `macros.rs` are the syn helpers they share.
 

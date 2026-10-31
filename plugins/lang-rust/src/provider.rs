@@ -263,7 +263,7 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
         if !requested_asts.contains(&file.rel) || !seen_trees.insert(file.rel.clone()) {
             continue;
         }
-        match crate::source::from_file(file) {
+        match crate::symbols::from_file(file) {
             Ok(source_ast) => sources.push(source_ast),
             Err(reason) => {
                 incomplete.insert((
