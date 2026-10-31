@@ -210,14 +210,16 @@ impl<'a> RuleTester<'a> {
         let started = Instant::now();
         let registry = (self.registry)();
         let shared: &[&Decision] = if fixing { &[] } else { &others };
-        let config = config(&registry, decision, example, shared, &self.sources)?;
+        let mut configured: Vec<(&Decision, Option<&Example>)> = vec![(decision, Some(example))];
+        configured.extend(shared.iter().map(|other| (*other, None)));
+        let config = rules_config(&registry, &configured, &self.sources)?;
         // A valid example is checked once for its own decision and the others,
         // and the findings are told apart by their rule.
         let mut rules = vec![decision.id().to_owned()];
         if example.kind == ExampleKind::Valid {
             rules.extend(others.iter().map(|d| d.id().to_owned()));
         }
-        let (together, engine, dir) = ExampleRun {
+        let (mut together, engine, dir) = ExampleRun {
             registry,
             config,
             catalog: self.catalog,
@@ -229,7 +231,8 @@ impl<'a> RuleTester<'a> {
         // incomplete run is asked again for the decision alone.
         let (outcome, hits) = if together.incomplete.is_empty() {
             let hits = hits_in(&together, example, |rule| rule != decision.id());
-            (only_rule(together, decision.id()), Some(hits))
+            together.diagnostics.retain(|d| d.rule_id == decision.id());
+            (together, Some(hits))
         } else if rules.len() > 1 {
             let own = engine.check(&[], &rules[..1]).map_err(|e| e.to_string())?;
             (own, None)
@@ -243,12 +246,9 @@ impl<'a> RuleTester<'a> {
         let found = found(&outcome);
         match example.kind {
             ExampleKind::Valid if found.is_empty() => {
-                let started = Instant::now();
-                let hits = match hits {
-                    Some(hits) => Ok(hits),
-                    None => cross(&engine, &others, example),
-                };
-                spent.crossing += started.elapsed();
+                let hits = timed(&mut spent.crossing, || {
+                    hits.map_or_else(|| cross(&engine, &others, example), Ok)
+                });
                 judge(example, &hits?)
             }
             ExampleKind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
@@ -257,17 +257,15 @@ impl<'a> RuleTester<'a> {
                 if !fixing {
                     return judge(example, &[]);
                 }
-                let started = Instant::now();
-                let crossing = self.crossing(&others, dir.path())?;
-                let before = cross(&crossing, &others, example)?;
-                spent.crossing += started.elapsed();
-                let started = Instant::now();
-                let fixed = self.check_fix(&engine, decision, example, dir.path());
-                spent.fix += started.elapsed();
-                fixed?;
-                let started = Instant::now();
-                let after = cross(&crossing, &others, example)?;
-                spent.crossing += started.elapsed();
+                let (crossing, before) = timed(&mut spent.crossing, || {
+                    let crossing = self.crossing(&others, dir.path())?;
+                    let before = cross(&crossing, &others, example)?;
+                    Ok::<_, String>((crossing, before))
+                })?;
+                timed(&mut spent.fix, || {
+                    self.check_fix(&engine, decision, example, dir.path())
+                })?;
+                let after = timed(&mut spent.crossing, || cross(&crossing, &others, example))?;
                 judge(example, &introduced(example, dir.path(), &before, after))
             }
         }
@@ -431,10 +429,12 @@ fn materialize(example: &Example) -> Result<TempDir, String> {
     Ok(dir)
 }
 
-/// `run` with the findings of `rule` only.
-fn only_rule(mut run: Run, rule: &str) -> Run {
-    run.diagnostics.retain(|d| d.rule_id == rule);
-    run
+/// Runs `work`, adding the time it takes to `slot`.
+fn timed<R>(slot: &mut Duration, work: impl FnOnce() -> R) -> R {
+    let started = Instant::now();
+    let done = work();
+    *slot += started.elapsed();
+    done
 }
 
 /// The line and message of each finding of the run.
@@ -443,18 +443,6 @@ fn found(run: &Run) -> Vec<(u32, &str)> {
         .iter()
         .map(|d| (d.span.start.line, d.message.as_str()))
         .collect()
-}
-
-fn config(
-    registry: &Registry,
-    decision: &Decision,
-    example: &Example,
-    others: &[&Decision],
-    sources: &[SourceRuleSpec],
-) -> Result<Config, String> {
-    let mut rules: Vec<(&Decision, Option<&Example>)> = vec![(decision, Some(example))];
-    rules.extend(others.iter().map(|d| (*d, None)));
-    rules_config(registry, &rules, sources)
 }
 
 /// A configuration that enables each of `rules` at its decision's severity,

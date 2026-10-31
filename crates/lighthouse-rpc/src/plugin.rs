@@ -65,10 +65,7 @@ impl RpcPlugin {
         options: &StartOptions<'_>,
     ) -> Result<Self, crate::Error> {
         let id = found.id();
-        let failed = |reason: String| crate::Error::Plugin {
-            id: id.to_owned(),
-            reason,
-        };
+        let failed = unavailable(id);
         let params = wire::InitializeParams {
             protocol_version: wire::VERSION.to_owned(),
             client_info: wire::Implementation {
@@ -108,10 +105,7 @@ impl RpcPlugin {
         result: wire::InitializeResult,
     ) -> Result<Self, crate::Error> {
         let id = found.id();
-        let failed = |reason: String| crate::Error::Plugin {
-            id: id.to_owned(),
-            reason,
-        };
+        let failed = unavailable(id);
         if result.protocol_version != wire::VERSION {
             return Err(failed(format!(
                 "speaks protocol {}, lighthouse speaks {}",
@@ -135,10 +129,7 @@ impl RpcPlugin {
         let digest = if languages.is_empty() {
             String::new()
         } else {
-            let binary = found
-                .command_path()
-                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound))
-                .and_then(fs::read);
+            let binary = found.command_path().and_then(|path| fs::read(path).ok());
             let version = &found.resource.spec.version;
             hash::sha256(binary.as_deref().unwrap_or(version.as_bytes()))
         };
@@ -414,5 +405,13 @@ fn embedded_wire(source: &Source<'_>) -> wire::EmbeddedFile {
         test: source.file.test,
         facts: source.file.facts.clone(),
         sources: source.regions.to_vec(),
+    }
+}
+
+/// The error of the plugin `id` that does not start or answer as it promised.
+fn unavailable(id: &str) -> impl Fn(String) -> crate::Error + Copy + '_ {
+    move |reason| crate::Error::Plugin {
+        id: id.to_owned(),
+        reason,
     }
 }
