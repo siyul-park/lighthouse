@@ -38,6 +38,7 @@ fn example() -> Example {
         expect: Vec::new(),
         options: serde_json::Map::new(),
         fixed: vec![ExampleFile::inline("x.go", "good\n")],
+        conflicts: Vec::new(),
     }
 }
 

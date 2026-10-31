@@ -1,12 +1,10 @@
 mod chain;
+mod cycle;
 mod rollback;
 mod settle;
 mod write;
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_protocol::hash::Hasher;
@@ -17,6 +15,7 @@ use super::{
     rewrite::run_verify,
 };
 use chain::{Links, Mark};
+use cycle::Trail;
 use rollback::apart;
 
 use crate::{Engine, Error, Overlays, Run};
@@ -30,8 +29,8 @@ pub(super) struct Orchestrator<'e> {
     /// The first text of every file the run changed, with its hash: what the
     /// disk must still hold when the run writes.
     original: BTreeMap<PathBuf, (String, String)>,
-    /// Hashes of the states the rounds reached, to stop an oscillation.
-    states: BTreeSet<String>,
+    /// The texts each file passed through, to stop an oscillation.
+    trail: Trail,
     applied: Vec<AppliedFix>,
     declined: BTreeMap<Fingerprint, DeclinedFix>,
     notes: Vec<String>,
@@ -75,7 +74,7 @@ impl Engine {
             proposer: proposer.asking_models(),
             texts: Overlays::new(),
             original: BTreeMap::new(),
-            states: BTreeSet::new(),
+            trail: Trail::default(),
             applied: Vec::new(),
             declined: BTreeMap::new(),
             notes: kept.into_iter().collect(),
@@ -111,12 +110,12 @@ impl Orchestrator<'_> {
     fn apply_rules(&mut self) -> Result<(Run, Option<Vec<Proposal>>), Error> {
         let engine = self.proposer.engine;
         let mut checked: Option<Run> = None;
-        self.states.insert(self.state_hash());
         for round in 1..=MAX_ROUNDS {
             let outcome = match checked.take() {
                 Some(outcome) => outcome,
                 None => engine.check_overlaid(&[], &[], &self.texts)?,
             };
+            let outcome = self.watch(outcome, round)?;
             if round == 1 && !outcome.incomplete.is_empty() {
                 let first = &outcome.incomplete[0];
                 return Err(Error::Fix(format!(
@@ -132,29 +131,16 @@ impl Orchestrator<'_> {
                 self.proposer
                     .propose(&outcome, &self.texts, Phase::Rules, Taking::Selected)?;
             self.declined.extend(declined);
+            let proposals = self.unfrozen(proposals);
             let (proposals, withheld): (Vec<_>, Vec<_>) =
                 proposals.into_iter().partition(|p| self.permits(p.safety));
             if proposals.is_empty() {
                 return Ok((outcome, Some(withheld)));
             }
-            let first_applied = self.applied.len();
             checked = self.apply_round(&outcome, proposals, round)?;
             if checked.is_none() && self.rounds == round - 1 {
                 // Everything this round was rolled back: stop rather than repeat it.
                 return Ok((engine.check_overlaid(&[], &[], &self.texts)?, None));
-            }
-            if !self.states.insert(self.state_hash()) {
-                let mut rules: Vec<&str> = self.applied[first_applied..]
-                    .iter()
-                    .map(|a| a.rule_id.as_str())
-                    .collect();
-                rules.sort_unstable();
-                rules.dedup();
-                self.notes.push(format!(
-                    "stopped: the fixes of {} undo each other",
-                    rules.join(", ")
-                ));
-                break;
             }
             if round == MAX_ROUNDS {
                 self.notes.push(format!(
@@ -166,7 +152,7 @@ impl Orchestrator<'_> {
             Some(outcome) => outcome,
             None => engine.check_overlaid(&[], &[], &self.texts)?,
         };
-        Ok((outcome, None))
+        Ok((self.watch(outcome, MAX_ROUNDS + 1)?, None))
     }
 
     /// The proposals over the state the rounds left that the run may not
@@ -176,7 +162,8 @@ impl Orchestrator<'_> {
             self.proposer
                 .propose(outcome, &self.texts, Phase::Rules, Taking::Selected)?;
         self.declined.extend(declined);
-        Ok(proposals
+        Ok(self
+            .unfrozen(proposals)
             .into_iter()
             .filter(|p| !self.permits(p.safety))
             .collect())
@@ -208,8 +195,10 @@ impl Orchestrator<'_> {
             self.proposer
                 .propose(&outcome, &self.texts, Phase::Models, Taking::Selected)?;
         self.declined.extend(declined);
-        let (written, withheld): (Vec<_>, Vec<_>) =
-            proposals.into_iter().partition(|p| self.permits(p.safety));
+        let (written, withheld): (Vec<_>, Vec<_>) = self
+            .unfrozen(proposals)
+            .into_iter()
+            .partition(|p| self.permits(p.safety));
         let outcome = self.write_models(outcome, written)?;
         if !withheld.is_empty() {
             let start = self.mark();
