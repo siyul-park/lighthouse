@@ -85,7 +85,6 @@ pub(super) struct Proposal {
     pub(super) batch: Vec<Fingerprint>,
     /// The edits come from operations that only move declarations, so that the
     /// edits of a round on one file must keep its declarations together.
-    #[serde(default)]
     pub(super) moves_only: bool,
 }
 
