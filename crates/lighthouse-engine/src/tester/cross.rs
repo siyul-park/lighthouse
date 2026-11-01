@@ -55,7 +55,7 @@ impl RuleTester<'_> {
     pub(super) fn crossing(&self, others: &[&Decision], dir: &Path) -> Result<Engine, String> {
         let registry = (self.registry)();
         let rules: Vec<(&Decision, Option<&Example>)> = others.iter().map(|d| (*d, None)).collect();
-        let config = rules_config(&registry, &rules, &self.sources)?;
+        let config = rules_config(self.catalog, &registry, &rules, &self.sources)?;
         Ok(Engine::new(registry, config, self.catalog, dir)
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted)

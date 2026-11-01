@@ -138,6 +138,23 @@ spec:
       params: [id]
       expression: >-
         cel.bind(at, placed_ids.indexOf(id), at < 0 ? -1 : keys.slice(at, at + 1)[0])
+    # Whether the declaration `id` lies, in the layout of the `method` group,
+    # between the members `first` and `last` (both of the group, `first` not
+    # after `last`): under `blocks: kind` a type's members are spread over the
+    # rank segments, and what the layout puts between them belongs there.
+    # Under `blocks: type` a type's members are one block: nothing but its own
+    # lies between them.
+    - name: laid_between
+      params: [first, last, id]
+      expression: >-
+        blocks == 'kind' && groups.indexOf('method') >= 0
+          ? cel.bind(lo, declaration_group(first),
+            cel.bind(hi, declaration_group(last),
+            cel.bind(at, declaration_group(id),
+              lo >= 0 && at >= lo && at <= hi
+              && lo / 1000000 == groups.indexOf('method') && hi / 1000000 == lo / 1000000
+              && at / 1000000 == lo / 1000000)))
+          : false
     # The anchor of a declaration, by id: the first declaration above it in its
     # module whose place is greater, with its id, name, line and place; empty
     # when none is, or the declaration is not placed.

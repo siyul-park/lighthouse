@@ -18,13 +18,18 @@ spec:
   requirement: Related functions and methods SHOULD be physically close, and direct
     collaborators and symmetric siblings SHOULD be adjacent when practical.
   severity: warn
+  options:
+    from: design/declaration-groups
+    properties: {}
+    additionalProperties: false
   check:
     type: cel
     select: function
     variables:
     - name: separators
       expression: 'func.kind == ''method'' && func.gap.previous != null ? func.gap.between.filter(b,
-        b.kind != ''method'' || b.owner_key != func.owner_key) : []'
+        (b.kind != ''method'' || b.owner_key != func.owner_key)
+        && !laid_between(func.gap.previous, func.id, b.id)) : []'
     - name: separated
       expression: size(separators) > 0
     where: separated
@@ -154,6 +159,85 @@ spec:
         // One is part of the example.
         func (b B) One() int { return 1 }
     canonical: true
+  - name: gap-kind-valid
+    language: go
+    kind: valid
+    options:
+      blocks: kind
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{}
+
+        // B is part of the example.
+        type B struct{}
+
+        // NewA is part of the example.
+        func NewA() *A { return &A{} }
+
+        // NewB is part of the example.
+        func NewB() *B { return &B{} }
+
+        // One is part of the example.
+        func (a A) One() int { return 1 }
+
+        // Two is part of the example.
+        func (a A) Two() int { return 2 }
+
+        // One is part of the example.
+        func (b B) One() int { return 1 }
+
+        // String is part of the example.
+        func (a A) String() string { return "A" }
+
+        // String is part of the example.
+        func (b B) String() string { return "B" }
+
+        func (a A) hidden() int { return 3 }
+
+        func (b B) hidden() int { return 4 }
+  - name: gap-kind-free-function-between
+    language: go
+    kind: invalid
+    options:
+      blocks: kind
+    fixed:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{}
+
+        // One is part of the example.
+        func (a A) One() int { return 1 }
+
+        // Two is part of the example.
+        func (a A) Two() int { return 2 }
+
+        // Other is part of the example.
+        func Other() int { return 0 }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{}
+
+        // One is part of the example.
+        func (a A) One() int { return 1 }
+
+        // Other is part of the example.
+        func Other() int { return 0 }
+
+        // Two is part of the example.
+        func (a A) Two() int { return 2 }
+    expect:
+    - line: 13
   - name: gap-rust-invalid
     language: rust
     kind: invalid

@@ -19,7 +19,10 @@ pub(crate) fn layer(catalog: &Catalog, cel: &Env) -> Result<(), Error> {
         }
     }
     unique(catalog)?;
-    catalog.decisions().try_for_each(|d| decision(d, cel))?;
+    catalog.decisions().try_for_each(|d| {
+        let source = d.options_from().and_then(|from| catalog.decision(from));
+        decision(d, source, cel)
+    })?;
     option_sources(catalog)?;
     lifecycle(catalog, catalog.decisions())?;
     sources(catalog)
@@ -45,7 +48,13 @@ pub(crate) fn projects(catalog: &Catalog) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn decision(decision: &Decision, cel: &Env) -> Result<(), Error> {
+/// `source` is the decision this one reads the options of, whose options its
+/// examples may set too.
+pub(crate) fn decision(
+    decision: &Decision,
+    source: Option<&Decision>,
+    cel: &Env,
+) -> Result<(), Error> {
     let id = decision.id();
     let (pack, name) = id
         .split_once('/')
@@ -88,10 +97,11 @@ pub(crate) fn decision(decision: &Decision, cel: &Env) -> Result<(), Error> {
         return Err(Error::invalid(id, "`supersedes` entries are not empty"));
     }
     options(decision)?;
+    let reading = source.map(|source| decision.inheriting(source));
     decision
         .examples
         .iter()
-        .try_for_each(|e| example(decision, e))?;
+        .try_for_each(|e| example(reading.as_ref().unwrap_or(decision), e))?;
     canonical(decision)?;
     check(decision, cel)?;
     fix(decision, cel)?;

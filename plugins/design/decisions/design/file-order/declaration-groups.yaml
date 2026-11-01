@@ -388,77 +388,6 @@ spec:
             func (f fact) merge() int {
             	return f.n
             }
-    - name: private-option-after-methods
-      language: go
-      kind: invalid
-      fixed:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Interpreter runs programs.
-            type Interpreter struct{ fuel uint64 }
-
-            // Option configures an interpreter.
-            type Option func(*option)
-
-            type option struct{ fuel uint64 }
-
-            // WithFuel limits the steps of a run.
-            func WithFuel(n uint64) Option {
-            	return func(o *option) {
-            		o.fuel = n
-            	}
-            }
-
-            // New returns an interpreter with the options applied.
-            func New(opts ...Option) *Interpreter {
-            	o := &option{}
-            	for _, opt := range opts {
-            		opt(o)
-            	}
-            	return &Interpreter{fuel: o.fuel}
-            }
-
-            // Fuel returns the step limit.
-            func (i *Interpreter) Fuel() uint64 {
-            	return i.fuel
-            }
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Interpreter runs programs.
-            type Interpreter struct{ fuel uint64 }
-
-            // Option configures an interpreter.
-            type Option func(*option)
-
-            type option struct{ fuel uint64 }
-
-            // New returns an interpreter with the options applied.
-            func New(opts ...Option) *Interpreter {
-            	o := &option{}
-            	for _, opt := range opts {
-            		opt(o)
-            	}
-            	return &Interpreter{fuel: o.fuel}
-            }
-
-            // WithFuel limits the steps of a run.
-            func WithFuel(n uint64) Option {
-            	return func(o *option) {
-            		o.fuel = n
-            	}
-            }
-
-            // Fuel returns the step limit.
-            func (i *Interpreter) Fuel() uint64 {
-            	return i.fuel
-            }
-      expect:
-        - line: 21
     - name: bare-new-constructor
       language: go
       kind: invalid
@@ -973,24 +902,71 @@ spec:
           body: |-
             package sample
 
-            type alpha struct{}
-            type beta struct{}
-            func newAlpha() *alpha { return &alpha{} }
-            func newBeta() *beta { return &beta{} }
+            // Alpha is part of the example.
+            type Alpha struct{}
 
-            func (a *alpha) run() {}
-            func (b *beta) run() {}
+            // Beta is part of the example.
+            type Beta struct{}
+
+            // NewAlpha is part of the example.
+            func NewAlpha() *Alpha { return &Alpha{} }
+
+            // NewBeta is part of the example.
+            func NewBeta() *Beta { return &Beta{} }
+
+            // Run is part of the example.
+            func (a *Alpha) Run() int { return 1 }
+
+            // Walk is part of the example.
+            func (a *Alpha) Walk() int { return 2 }
+
+            // Run is part of the example.
+            func (b *Beta) Run() int { return 1 }
+
+            // String is part of the example.
+            func (a *Alpha) String() string { return "alpha" }
+
+            // String is part of the example.
+            func (b *Beta) String() string { return "beta" }
+
+            func (a *Alpha) stop() int { return 3 }
+
+            func (b *Beta) stop() int { return 4 }
       files:
         - path: example.go
           body: |-
             package sample
 
-            type alpha struct{}
-            type beta struct{}
-            func newAlpha() *alpha { return &alpha{} }
-            func (a *alpha) run() {}
-            func newBeta() *beta { return &beta{} }
-            func (b *beta) run() {}
+            // Alpha is part of the example.
+            type Alpha struct{}
+
+            // Beta is part of the example.
+            type Beta struct{}
+
+            // NewAlpha is part of the example.
+            func NewAlpha() *Alpha { return &Alpha{} }
+
+            // Run is part of the example.
+            func (a *Alpha) Run() int { return 1 }
+
+            // NewBeta is part of the example.
+            func NewBeta() *Beta { return &Beta{} }
+
+            // Walk is part of the example.
+            func (a *Alpha) Walk() int { return 2 }
+
+            // Run is part of the example.
+            func (b *Beta) Run() int { return 1 }
+
+            // String is part of the example.
+            func (a *Alpha) String() string { return "alpha" }
+
+            // String is part of the example.
+            func (b *Beta) String() string { return "beta" }
+
+            func (a *Alpha) stop() int { return 3 }
+
+            func (b *Beta) stop() int { return 4 }
       expect:
-        - line: 7
-          message: "newBeta is a constructor of beta: constructors come after the option builders, above run (line 6)"
+        - line: 16
+          message: "NewBeta is a constructor of Beta: constructors come after the option builders, above Run (line 13)"

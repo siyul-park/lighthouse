@@ -212,7 +212,7 @@ impl<'a> RuleTester<'a> {
         let shared: &[&Decision] = if fixing { &[] } else { &others };
         let mut configured: Vec<(&Decision, Option<&Example>)> = vec![(decision, Some(example))];
         configured.extend(shared.iter().map(|other| (*other, None)));
-        let config = rules_config(&registry, &configured, &self.sources)?;
+        let config = rules_config(self.catalog, &registry, &configured, &self.sources)?;
         // A valid example is checked once for its own decision and the others,
         // and the findings are told apart by their rule.
         let mut rules = vec![decision.id().to_owned()];
@@ -446,27 +446,58 @@ fn found(run: &Run) -> Vec<(u32, &str)> {
 }
 
 /// A configuration that enables each of `rules` at its decision's severity,
-/// with the options of the example it is given, else the decision's own.
+/// with the options of the example it is given, else the decision's own. The
+/// options an example sets that its decision reads from another
+/// (`options.from`) go to that decision, which is enabled with them.
 fn rules_config(
+    catalog: &Catalog,
     registry: &Registry,
     rules: &[(&Decision, Option<&Example>)],
     sources: &[SourceRuleSpec],
 ) -> Result<Config, String> {
     let mut table = toml::Table::new();
+    let mut set = |id: &str, level: String, options: toml::Table| {
+        let rule = table
+            .entry(id.to_owned())
+            .or_insert_with(|| toml::Table::new().into())
+            .as_table_mut()
+            .expect("a rule is a table");
+        rule.insert("level".to_owned(), level.into());
+        if !options.is_empty() {
+            let own = rule
+                .entry("options".to_owned())
+                .or_insert_with(|| toml::Table::new().into())
+                .as_table_mut()
+                .expect("options are a table");
+            own.extend(options);
+        }
+    };
     for (decision, example) in rules {
         let level = decision
             .severity
             .ok_or_else(|| "a decision without severity has no rule".to_owned())?;
-        let mut rule = toml::Table::new();
-        rule.insert("level".to_owned(), level.to_string().into());
-        if let Some(example) = example.filter(|e| !e.options.is_empty()) {
-            let mut options = toml::Table::new();
-            for (key, value) in &example.options {
-                options.insert(key.clone(), toml_value(value)?);
-            }
-            rule.insert("options".to_owned(), options.into());
+        let source = decision
+            .options_from()
+            .and_then(|from| catalog.decision(from));
+        let inherited = source
+            .map(|s| decision.inheriting(s))
+            .and_then(|d| d.options.as_ref().map(|options| options.inherited.clone()));
+        let (mut own, mut read) = (toml::Table::new(), toml::Table::new());
+        for (key, value) in example.iter().flat_map(|e| &e.options) {
+            let into = if inherited.as_ref().is_some_and(|keys| keys.contains(key)) {
+                &mut read
+            } else {
+                &mut own
+            };
+            into.insert(key.clone(), toml_value(value)?);
         }
-        table.insert(decision.id().to_owned(), rule.into());
+        set(decision.id(), level.to_string(), own);
+        if let Some(source) = source.filter(|_| !read.is_empty()) {
+            let level = source
+                .severity
+                .ok_or_else(|| "a decision without severity has no rule".to_owned())?;
+            set(source.id(), level.to_string(), read);
+        }
     }
     let plugins: Vec<toml::Value> = registry
         .manifests()
