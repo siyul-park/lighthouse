@@ -407,9 +407,25 @@ spec:
       expect:
         - line: 12
           message: "function WithName belongs to the public-function group, where option builders come first: move it above Run (line 9)"
-    - name: methods-of-a-public-type-declared-elsewhere-lead
+    - name: constructor-of-a-type-declared-elsewhere
       language: go
-      kind: valid
+      kind: invalid
+      fixed:
+        - path: module.go
+          body: |-
+            package sample
+
+            // Module is analyzed in fact.go.
+            type Module struct{ n int }
+        - path: fact.go
+          body: |-
+            package sample
+
+            // NewModule returns a module of n.
+            func NewModule(n int) *Module { return &Module{n: n} }
+
+            // Analyze reads the facts of the module.
+            func (m *Module) Analyze() int { return m.n }
       files:
         - path: module.go
           body: |-
@@ -421,17 +437,14 @@ spec:
           body: |-
             package sample
 
-            type fact struct{ n int }
-
             // Analyze reads the facts of the module.
-            func (m *Module) Analyze() int {
-            	f := fact{n: m.n}
-            	return f.merge()
-            }
+            func (m *Module) Analyze() int { return m.n }
 
-            func (f fact) merge() int {
-            	return f.n
-            }
+            // NewModule returns a module of n.
+            func NewModule(n int) *Module { return &Module{n: n} }
+      expect:
+        - line: 7
+          message: "NewModule is a constructor of Module: it goes in Module's block after its option builders, above Analyze (line 4)"
     - name: bare-new-constructor
       language: go
       kind: invalid

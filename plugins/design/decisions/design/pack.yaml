@@ -66,7 +66,9 @@ spec:
     - name: blocks
       expression: options.blocks
     # The owner block of a declaration: the type of its module that a method,
-    # a constructor or an option builder belongs to, else empty. A private free
+    # a constructor or an option builder belongs to (a constructor of a type
+    # declared in another file belongs to it when the file has methods of the
+    # type, as those methods do), else empty. A private free
     # function never joins an owner block: it stays in `private-function`.
     - name: owner_of
       params: [s]
@@ -76,7 +78,9 @@ spec:
           : s.kind == 'function' && s.configures != ''
           ? (owner_types.filter(t, t.name == s.configures && t.module == s.module).map(t, t.id) + [''])[0]
           : s.kind == 'function' && s.constructor_named
-          ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id) + [''])[0]
+          ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id)
+             + method_owners.filter(o, o in [s.module + '::' + s.built + '#type', s.module + '::' + s.built])
+             + [''])[0]
           : ''
     # The rank of a declaration in the block of its owner.
     - name: block_rank
