@@ -22,11 +22,13 @@ export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
 # lighthouse-plugin.toml and, for a plugin that provides packs, its `decisions/`:
 # the layout plugin discovery expects. Binaries are replaced by rename, never overwritten in place: macOS caches a binary's
 # code signature per file, and new bytes under the old file are killed on launch.
+# `-trimpath` makes the binary the same in every checkout: trust hashes it, so a
+# worktree of a trusted repository builds the plugin its trust was given for.
 plugins: $(BUILT)
 
 $(BUILT): $(SOURCES)
 	mkdir -p $(PLUGINS)/lang-go
-	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
+	cd plugins/lang-go && go build -trimpath -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
 	mv -f $(PLUGINS)/lang-go/lang-go.new $(PLUGINS)/lang-go/lang-go
 	cp plugins/lang-go/lighthouse-plugin.toml $(PLUGINS)/lang-go/
 	rm -rf $(PLUGINS)/lang-go/decisions && cp -R plugins/lang-go/decisions $(PLUGINS)/lang-go/
