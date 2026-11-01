@@ -709,7 +709,7 @@ at most five:
    candidate texts standing in for the files (protocol `context.overlays`; nothing is
    read from or written to those files), for the rules and analyzers as well as the language
    providers; a program that reads files is run in a copy of the project that holds the texts.
-5. take the **safe follow-ups**: the safe fixes of the findings the change introduced in its files
+5. take the **safe follow-ups**: the safe fixes of the findings the change introduced in its files and in the files they are charged to (below)
    (the formatter's among them, `core/formatted`), in priority order, at most
    two passes, and check again. They become part of the fix, and so of its preview, when the
    fix is the only one that edits the file; in a file that several fixes of the round edit they
@@ -720,7 +720,12 @@ at most five:
    A changed file is dropped, back to its text
    before the round, when its check got worse: more findings of error or warn severity for
    some rule in the file (counted per file and decision, as a model fix's verdict is), or a new
-   gap in the analysis; so is every file of a fix that spans files.
+   gap in the analysis; so is every file of a fix that spans files, and every file whose
+   follow-ups answered a dropped one. A finding new in a file the round did not change is
+   charged by the reach of its rule: to nobody (`local`), to the changed files that hold the
+   file's neighbours (`neighbors`), or to every changed file (`global`, or a rule that declares
+   nothing); the files it is charged to get its safe fixes as follow-ups, and are verified
+   and dropped with the change.
    Dropped fixes are reported as declined.
 
 It stops when a round applies nothing (the fixpoint), when a round reaches a state

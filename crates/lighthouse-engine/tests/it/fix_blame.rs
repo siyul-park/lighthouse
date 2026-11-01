@@ -7,10 +7,11 @@ use std::{fs, path::Path};
 use lighthouse_engine::{Engine, FixBinding, FixReport, FixRun, FixedBy, Needs};
 use lighthouse_model::{
     Diagnostic, Fingerprint, LineIndex, Options, Reach, Safety, Severity, Span,
+    ucm::{EditOp, FixOutcome},
 };
 use lighthouse_plugin::{
-    Caching, Context, Error as PluginError, FixDecision, Fixer, LanguageProvider, Plugin,
-    PluginManifest, Registry, Rule, RuleManifest,
+    Caching, Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest,
+    LanguageProvider, Plugin, PluginManifest, Registry, Rule, RuleManifest,
 };
 use lighthouse_spec::Config;
 
@@ -218,4 +219,89 @@ fn the_repair_of_a_dependent_is_undone_with_the_change_that_called_for_it() {
     assert_eq!(text(&dir), "fn a\nTODO\n", "{:?}", report.notes);
     assert_eq!(read(&dir, "ghost.toy"), "fn g\nBOO\n");
     assert!(report.applied.is_empty(), "{:?}", report.applied);
+}
+
+/// Replaces the `TODO` with `DONE`, but with `BAD` in `b.toy`.
+struct Selective(FixerManifest);
+
+impl Fixer for Selective {
+    fn manifest(&self) -> &FixerManifest {
+        &self.0
+    }
+
+    fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
+        let broken = request.finding.file == Path::new("b.toy");
+        Ok(FixOutcome::Proposed {
+            description: "replace".to_owned(),
+            ops: vec![EditOp::Replace {
+                file: request.finding.file.clone(),
+                span: request.finding.span,
+                text: if broken { "BAD" } else { "DONE" }.to_owned(),
+            }],
+            safety: Safety::Safe,
+        })
+    }
+}
+
+struct Unrelated;
+
+impl Plugin for Unrelated {
+    fn manifest(&self) -> &PluginManifest {
+        &PLUGIN
+    }
+
+    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+        vec![Box::new(Toy(toy()))]
+    }
+
+    fn rules(&self) -> Vec<Box<dyn Rule>> {
+        vec![
+            Box::new(Word::new("fake/todo", "TODO")),
+            Box::new(Word::new("fake/bad", "BAD")),
+        ]
+    }
+
+    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+        vec![Box::new(Selective(FixerManifest {
+            id: "fake/selective".to_owned(),
+            requires: Vec::new(),
+        }))]
+    }
+}
+
+#[test]
+fn of_unrelated_sources_only_the_one_whose_fix_broke_its_own_file_is_rolled_back() {
+    let dir = project("fn a\nTODO\n");
+    for file in ["b.toy", "c.toy"] {
+        fs::write(dir.path().join(file), "fn x\nTODO\n").unwrap();
+    }
+    let mut registry = Registry::default();
+    registry.register(&Unrelated).unwrap();
+    let config = Config::parse_inline(
+        "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/bad\" = \"error\"\n",
+    )
+    .unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
+
+    let report = engine
+        .fix(&plan("fake/selective", Safety::Safe), &FixRun::default())
+        .unwrap();
+
+    assert_eq!(read(&dir, "a.toy"), "fn a\nDONE\n", "{:?}", report.notes);
+    assert_eq!(read(&dir, "b.toy"), "fn x\nTODO\n");
+    assert_eq!(read(&dir, "c.toy"), "fn x\nDONE\n");
+    assert!(
+        report
+            .notes
+            .iter()
+            .all(|note| note.starts_with("rolled back b.toy")),
+        "{:?}",
+        report.notes
+    );
 }

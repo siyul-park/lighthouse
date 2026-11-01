@@ -96,13 +96,7 @@ impl Orchestrator<'_> {
             verdict = judge(&kept, &merged, before, after);
             failed.extend(verdict.files.clone());
         }
-        let mut rolled = close_over(&kept, failed);
-        for (file, causes) in &joined.causes {
-            let reason = causes.iter().find_map(|cause| rolled.get(cause)).cloned();
-            if let Some(reason) = reason {
-                rolled.entry(file.clone()).or_insert(reason);
-            }
-        }
+        let rolled = close_over(&kept, &joined.causes, failed);
         prior.extend(joined.prior.clone());
         for (file, reason) in &rolled {
             match prior.remove(file) {
@@ -436,25 +430,41 @@ pub(super) fn worse(blame: &Blame<'_>) -> BTreeMap<PathBuf, String> {
     bad
 }
 
-/// `failed` plus every file that shares a proposal with a failed one: a fix
-/// that spans files is undone as a whole.
+/// `failed` plus the files that go with them, and only those: every file that
+/// shares a proposal with a failed one (a fix that spans files is undone as a
+/// whole), and every dependent of `blamed` (a file only the safe fixes of a
+/// change reached, with the changed files it answers) one of whose causes
+/// failed. Fixes that share no file and no cause stay.
 pub(super) fn close_over(
     kept: &[Proposal],
+    blamed: &BTreeMap<PathBuf, BTreeSet<PathBuf>>,
     mut failed: BTreeMap<PathBuf, String>,
 ) -> BTreeMap<PathBuf, String> {
     loop {
         let mut grew = false;
-        for proposal in kept {
-            let files = &proposal.files;
-            let Some(reason) = files.iter().find_map(|f| failed.get(f)).cloned() else {
+        let groups = kept
+            .iter()
+            .map(|proposal| (proposal.files.as_slice(), None))
+            .chain(
+                blamed
+                    .iter()
+                    .map(|(file, causes)| (std::slice::from_ref(file), Some(causes))),
+            );
+        let mut joins: Vec<(PathBuf, String)> = Vec::new();
+        for (files, causes) in groups {
+            let reason = match causes {
+                None => files.iter().find_map(|f| failed.get(f)),
+                Some(causes) => causes.iter().find_map(|c| failed.get(c)),
+            };
+            let Some(reason) = reason else {
                 continue;
             };
-            for file in files {
-                if let std::collections::btree_map::Entry::Vacant(slot) = failed.entry(file.clone())
-                {
-                    slot.insert(reason.clone());
-                    grew = true;
-                }
+            joins.extend(files.iter().map(|f| (f.clone(), reason.clone())));
+        }
+        for (file, reason) in joins {
+            if let std::collections::btree_map::Entry::Vacant(slot) = failed.entry(file) {
+                slot.insert(reason);
+                grew = true;
             }
         }
         if !grew {

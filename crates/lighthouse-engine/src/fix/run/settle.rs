@@ -3,7 +3,8 @@
 //! mechanical: an agent places code where it reads best, a reorder moves lines
 //! a formatter would break, an order rule is fixed by a reorder and not by a
 //! rewrite. So a change is judged on itself plus the safe fixes of the
-//! findings it introduced in its files, applied in the order of their
+//! findings it introduced in its files and in the files they are charged to (see
+//! [`Blame`]), applied in the order of their
 //! priority, in at most [`PASSES`] passes. Those fixes become part of the fix:
 //! its edits say the text each of its files ends with, so that a preview shows
 //! what the run would write. In a file that several fixes edited they cannot
@@ -202,7 +203,7 @@ impl Orchestrator<'_> {
             judged.extend(prior.iter().map(|(file, _)| file.clone()));
             let mut bad = worse(&Blame::new(engine, (&after, &next), &judged));
             if !bad.is_empty() && !seen.contains(&self.state_hash()) {
-                let undone = self.undo_files(&mut prior, close_over(&kept, bad));
+                let undone = self.undo_files(&mut prior, close_over(&kept, &dependents, bad));
                 made.retain(|f| {
                     !f.proposal
                         .files
