@@ -7,7 +7,14 @@
 //! The digest is computed from the very bytes the session loaded the
 //! configuration and the rules from, so what is trusted is what runs. A program
 //! that resolves inside the project is part of the digest by content; a program
-//! outside it (`gofmt`, `sh`) is trusted by its command line only.
+//! outside it (`gofmt`, `sh`) is trusted by its command line only. A path inside
+//! the project enters the digest relative to the root, so the same inputs in
+//! another worktree of the repository give the same digest.
+//!
+//! Trust is kept per repository (the git common directory, else the root) with
+//! one entry per root: a root is trusted when its digest equals the digest of
+//! any root trusted under the same key. The `.git` files are read only to find
+//! that key; they grant nothing, because the digest must still match.
 
 use std::{
     collections::BTreeMap,
@@ -23,10 +30,24 @@ use crate::Result;
 pub const TRUST_VAR: &str = "LIGHTHOUSE_TRUST";
 const FILE: &str = "trust.toml";
 
+/// The roots trusted under one repository (or one plain directory), each with
+/// the digest it was trusted at.
+type Roots = BTreeMap<String, String>;
+
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct Table {
     #[serde(default)]
-    trusted: BTreeMap<String, String>,
+    trusted: BTreeMap<String, Entry>,
+}
+
+/// An entry of the trust file. Only the current shape (roots under a key)
+/// counts; any other, such as the one-digest-per-key shape of an earlier
+/// layout, reads as nothing trusted.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+enum Entry {
+    Roots(Roots),
+    Unknown(toml::Value),
 }
 
 /// What a project asks to be trusted for: a digest of the configuration, the
@@ -65,14 +86,19 @@ impl Basis {
             field(&mut hash, "rule-name", name.as_bytes());
             field(&mut hash, "rule", text.as_bytes());
         }
+        let prefixes = prefixes(root);
         let root = root.canonicalize().ok();
         for command in programs {
             let program = command.argv.first().map_or("", String::as_str);
-            field(&mut hash, "program", program.as_bytes());
+            field(
+                &mut hash,
+                "program",
+                relative(&prefixes, program).as_bytes(),
+            );
             // The program and every argument that names a file inside the
             // project (`sh script.sh`, `python3 x.py`) are trusted by content.
             for (at, arg) in command.argv.iter().enumerate() {
-                field(&mut hash, "argument", arg.as_bytes());
+                field(&mut hash, "argument", relative(&prefixes, arg).as_bytes());
                 let named = root.as_deref().and_then(|r| {
                     if at == 0 {
                         inside(r, arg)
@@ -105,24 +131,38 @@ impl Basis {
         let Ok(known) = read() else {
             return false;
         };
-        key(root).is_some_and(|k| known.get(&k) == Some(&self.digest))
+        key(root).is_some_and(|k| {
+            known
+                .get(&k)
+                .is_some_and(|roots| roots.values().any(|d| d == &self.digest))
+        })
     }
 }
 
 /// Records trust in `root` as `basis` describes it.
 pub fn trust(root: &Path, basis: &Basis) -> Result<PathBuf> {
     let mut known = read()?;
-    known.insert(
-        key(root).ok_or("the project root has no usable path")?,
-        basis.digest.clone(),
-    );
+    let at = key(root).ok_or("the project root has no usable path")?;
+    let name = canonical_name(root).ok_or("the project root has no usable path")?;
+    known
+        .entry(at)
+        .or_default()
+        .insert(name, basis.digest.clone());
     write(&known)
 }
 
 /// Withdraws trust in `root`; true when there was some.
 pub fn revoke(root: &Path) -> Result<bool> {
     let mut known = read()?;
-    let had = key(root).is_some_and(|k| known.remove(&k).is_some());
+    let mut had = false;
+    if let (Some(at), Some(name)) = (key(root), canonical_name(root)) {
+        if let Some(roots) = known.get_mut(&at) {
+            had = roots.remove(&name).is_some();
+            if roots.is_empty() {
+                known.remove(&at);
+            }
+        }
+    }
     write(&known)?;
     Ok(had)
 }
@@ -165,30 +205,96 @@ fn in_project(root: &Path, arg: &str) -> Option<PathBuf> {
         .filter(|p| p.starts_with(root) && p.is_file())
 }
 
-fn key(root: &Path) -> Option<String> {
+/// `text` with every spelling of the root directory replaced by a marker, so
+/// a path inside the project does not depend on where the project is.
+fn relative(prefixes: &[String], text: &str) -> String {
+    prefixes.iter().fold(text.to_owned(), |text, prefix| {
+        text.replace(prefix.as_str(), "{root}")
+    })
+}
+
+/// The spellings of `root`, as given and canonical, longest first.
+fn prefixes(root: &Path) -> Vec<String> {
+    let mut found: Vec<String> = [Some(root.to_path_buf()), root.canonicalize().ok()]
+        .into_iter()
+        .flatten()
+        .map(|p| p.to_string_lossy().trim_end_matches('/').to_owned())
+        .filter(|p| !p.is_empty())
+        .collect();
+    found.sort_by_key(|p| std::cmp::Reverse(p.len()));
+    found.dedup();
+    found
+}
+
+fn canonical_name(root: &Path) -> Option<String> {
     root.canonicalize()
         .ok()
         .map(|p| p.to_string_lossy().into_owned())
 }
 
-fn read() -> Result<BTreeMap<String, String>> {
+/// What trust is kept under: the git common directory when `root` is inside a
+/// work tree (every worktree of a repository shares it), else the root.
+fn key(root: &Path) -> Option<String> {
+    let root = root.canonicalize().ok()?;
+    match common_dir(&root) {
+        Some(dir) => Some(format!("git:{}", dir.to_string_lossy())),
+        None => Some(root.to_string_lossy().into_owned()),
+    }
+}
+
+/// The common git directory of the work tree holding `root`, read from the
+/// files git keeps: `.git` is the directory, or a file `gitdir: <dir>` naming
+/// the worktree's directory, whose `commondir` file names the shared one.
+fn common_dir(root: &Path) -> Option<PathBuf> {
+    let (base, dot_git) = root.ancestors().find_map(|dir| {
+        let dot_git = dir.join(".git");
+        dot_git.exists().then(|| (dir.to_path_buf(), dot_git))
+    })?;
+    let git_dir = if dot_git.is_dir() {
+        dot_git
+    } else {
+        let text = fs::read_to_string(&dot_git).ok()?;
+        let named = text.lines().next()?.strip_prefix("gitdir:")?.trim();
+        base.join(named).canonicalize().ok()?
+    };
+    let common = match fs::read_to_string(git_dir.join("commondir")) {
+        Ok(text) => git_dir.join(text.trim()),
+        Err(_) => git_dir,
+    };
+    common.canonicalize().ok().filter(|c| c.is_dir())
+}
+
+fn read() -> Result<BTreeMap<String, Roots>> {
     let path = path()?;
     match fs::read_to_string(&path) {
-        Ok(text) => Ok(toml::from_str::<Table>(&text)
-            .map_err(|e| format!("{}: {e}", path.display()))?
-            .trusted),
+        Ok(text) => parse(&text).map_err(|e| format!("{}: {e}", path.display()).into()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
         Err(e) => Err(format!("{}: {e}", path.display()).into()),
     }
 }
 
-fn write(known: &BTreeMap<String, String>) -> Result<PathBuf> {
+/// The roots of a trust file; an entry of any other layout is skipped.
+fn parse(text: &str) -> std::result::Result<BTreeMap<String, Roots>, toml::de::Error> {
+    Ok(toml::from_str::<Table>(text)?
+        .trusted
+        .into_iter()
+        .filter_map(|(key, entry)| match entry {
+            Entry::Roots(roots) => Some((key, roots)),
+            Entry::Unknown(_) => None,
+        })
+        .collect())
+}
+
+fn write(known: &BTreeMap<String, Roots>) -> Result<PathBuf> {
     let path = path()?;
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
     let text = toml::to_string(&Table {
-        trusted: known.clone(),
+        trusted: known
+            .iter()
+            .map(|(key, roots)| (key.clone(), Entry::Roots(roots.clone())))
+            .collect(),
     })?;
     lighthouse_model::write_atomic(&path, &text)?;
     Ok(path)
@@ -199,3 +305,6 @@ fn path() -> Result<PathBuf> {
         .ok_or("no config directory for the trust file (set XDG_CONFIG_HOME or HOME)")?;
     Ok(dir.join(FILE))
 }
+
+#[cfg(test)]
+mod tests;
