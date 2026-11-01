@@ -112,7 +112,9 @@ spec:
     # option builders (functional options: a function that returns a func
     # taking the owner, Pike 2014), its constructors (of any visibility, as
     # Uber's `newXYZ()` may follow the type), its exported methods, its hooks,
-    # its unexported methods.
+    # its unexported methods. In the group `public-function` the option builders
+    # that belong to no method block (their type has no method in the file)
+    # come first, then the other functions.
     # -1 when no group names the declaration.
     - name: place
       params: [s]
@@ -125,6 +127,7 @@ spec:
                ? cel.bind(index, owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner),
                    blocks == 'kind' ? block_rank(s) * size(owners) + index
                    : index * 5 + block_rank(s))
+               : chosen[0] == 'public-function' && s.kind == 'function' && s.configures == '' ? 1
                : 0)))
     # Per placed declaration, [module, place, id, name, line].
     - name: slots

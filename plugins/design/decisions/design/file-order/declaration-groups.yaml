@@ -31,7 +31,8 @@ spec:
     Go idiom of Effective Go, "Package names": `ring.New` — a function with no
     receiver that returns the type), then its exported methods,
     then its clone, conversion and interface hooks, then its unexported
-    methods; public functions; private functions.
+    methods; public functions, the option builders of types without methods first;
+    private functions.
 
     Rust: The same principle, from the concepts to the machinery, with a
     type kept next to its impl blocks because that is how Rust code reads.
@@ -243,6 +244,9 @@ spec:
          : symbol.kind + ' ' + symbol.name + ' belongs to the ' + options.groups[report[0][1]]
            + ' group'
            + (report[0][2] != '' ? ' and must follow ' + report[0][2]
+              : size(found) > 0 && found.place / 1000000 == report[0][1]
+              ? ', where option builders come first: move it above ' + found.name
+                + ' (line ' + string(found.line) + ')'
               : size(found) > 0
               ? ', which comes before ' + options.groups[found.place / 1000000]
                 + ': move it above ' + found.name + ' (line ' + string(found.line) + ')'
@@ -335,12 +339,12 @@ spec:
       expect:
         - line: 16
           message: "WithName is an option builder of Program: it goes in Program's block first, above New (line 7)"
-    - name: option-builders-before-consumer-in-function-group
+    - name: option-builders-lead-the-function-group
       language: go
-      kind: valid
+      kind: invalid
       options:
         groups: [public-type, private-type, public-const, private-const, var, init, public-function, method, private-function]
-      files:
+      fixed:
         - path: example.go
           body: |-
             package sample
@@ -356,13 +360,27 @@ spec:
             }
 
             // Run applies the options and returns the name.
-            func Run(opts ...Option) string {
-            	o := options{}
-            	for _, opt := range opts {
-            		opt(&o)
-            	}
-            	return o.name
+            func Run(opts ...Option) string { return string(rune('a' + len(opts))) }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Option configures Run.
+            type Option func(*options)
+
+            type options struct{ name string }
+
+            // Run applies the options and returns the name.
+            func Run(opts ...Option) string { return string(rune('a' + len(opts))) }
+
+            // WithName names the run.
+            func WithName(name string) Option {
+            	return func(o *options) { o.name = name }
             }
+      expect:
+        - line: 12
+          message: "function WithName belongs to the public-function group, where option builders come first: move it above Run (line 9)"
     - name: methods-of-a-public-type-declared-elsewhere-lead
       language: go
       kind: valid
