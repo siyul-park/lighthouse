@@ -155,12 +155,12 @@ pub fn trust(root: &Path, basis: &Basis) -> Result<PathBuf> {
 pub fn revoke(root: &Path) -> Result<bool> {
     let mut known = read()?;
     let mut had = false;
-    if let (Some(at), Some(name)) = (key(root), canonical_name(root)) {
-        if let Some(roots) = known.get_mut(&at) {
-            had = roots.remove(&name).is_some();
-            if roots.is_empty() {
-                known.remove(&at);
-            }
+    if let (Some(at), Some(name)) = (key(root), canonical_name(root))
+        && let Some(roots) = known.get_mut(&at)
+    {
+        had = roots.remove(&name).is_some();
+        if roots.is_empty() {
+            known.remove(&at);
         }
     }
     write(&known)?;
