@@ -98,6 +98,7 @@ spec:
           : s.kind == 'var' ? ['var']
           : s.kind == 'function'
           ? (s.name == 'init' ? ['init'] : [])
+            + (s.constructor_named && s.configures == '' && s.visibility == 'private' ? ['private'] : [])
             + (owner != '' && (s.configures == '' || owner in method_owners) ? ['method'] : [])
             + (s.visibility != 'private' ? ['public-function'] : ['private', 'private-function'])
           : s.kind == 'method'
@@ -108,7 +109,9 @@ spec:
     # functions and the unexported methods, which that group takes out of
     # their owner blocks. Each follows every one of the declarations of the
     # group that use it (call or reference it); the ranks are the order that
-    # keeps file order except for that (`list.usersFirst()`).
+    # keeps file order except for that (`list.usersFirst()`). An unexported
+    # constructor is a member too, and it precedes the unexported methods of the
+    # type it constructs, so that the type's block reads constructor first.
     - name: private_members
       expression: >-
         !('private' in groups) ? []
@@ -117,7 +120,11 @@ spec:
       expression: private_members.map(s, s.id)
     - name: private_ranks
       expression: >-
-        private_members.map(s, s.file_uses.map(u, private_ids.indexOf(u)).filter(i, i >= 0))
+        private_members.map(s, (s.file_uses.map(u, private_ids.indexOf(u))
+              + (s.kind == 'function' && s.constructor_named && owner_of(s) != ''
+                 ? private_members.filter(m, m.kind == 'method' && m.owner_key == owner_of(s))
+                     .map(m, private_ids.indexOf(m.id))
+                 : [])).filter(i, i >= 0))
           .usersFirst()
     # The rank of a declaration of the group `private` among its users.
     - name: private_rank

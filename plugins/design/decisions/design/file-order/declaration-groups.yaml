@@ -105,8 +105,11 @@ spec:
           methods, its hooks and its unexported methods),
           `public-function`, `private-function`, `private` (the private functions
           and the unexported methods together, each after every private declaration
-          that calls it, else in file order; it takes the unexported methods out
-          of `method` and of their type's block, and is meant for `blocks: kind`).
+          that calls it, else in file order, a cycle of them together after its
+          users; it takes the unexported methods and the unexported constructors
+          out of `method` and of their type's block, and is meant for `blocks: kind`;
+          an unexported constructor precedes the unexported methods of its type,
+          and follows the exported ones, as `private` comes after `method`).
       hooks:
         type: array
         default:
@@ -908,9 +911,11 @@ spec:
             func (c *Codec) Read() int { return complexOf(c) + c.enter() }
 
             // Decode decodes a value.
-            func Decode(c *Codec) int { return complexOf(c) }
+            func Decode(c *Codec) int { return complexOf(c) + newCodec().n }
 
             func complexOf(c *Codec) int { return c.asFloat() }
+
+            func newCodec() *Codec { return &Codec{} }
 
             func (c *Codec) asFloat() int { return c.n }
 
@@ -929,7 +934,7 @@ spec:
             func (c *Codec) Read() int { return complexOf(c) + c.enter() }
 
             // Decode decodes a value.
-            func Decode(c *Codec) int { return complexOf(c) }
+            func Decode(c *Codec) int { return complexOf(c) + newCodec().n }
 
             func (c *Codec) quiesce() int { return c.n }
 
@@ -938,10 +943,13 @@ spec:
             func complexOf(c *Codec) int { return c.asFloat() }
 
             func (c *Codec) enter() int { return c.quiesce() + c.n }
+
+            func newCodec() *Codec { return &Codec{} }
       expect:
         - line: 12
           message: "method quiesce belongs to the private group and must follow enter"
         - line: 16
+        - line: 20
     - name: private-functions-and-methods-in-caller-order
       language: go
       kind: valid
