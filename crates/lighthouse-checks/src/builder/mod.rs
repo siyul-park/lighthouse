@@ -439,9 +439,6 @@ impl<'a> Builder<'a> {
         if needs.field("gap") {
             map.insert("gap".to_owned(), self.gap(symbol));
         }
-        if needs.field("gap_helpers") {
-            map.insert("gap_helpers".to_owned(), self.gap_helpers(symbol));
-        }
     }
 
     /// The facts about where a symbol sits among the types, modules and tests

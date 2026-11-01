@@ -1,7 +1,7 @@
 //! The `gap` of a method: what separates it from the previous method of its
 //! owner in the file.
 
-use lighthouse_model::ucm::{Symbol, SymbolId, SymbolKind, Visibility};
+use lighthouse_model::ucm::{Symbol, SymbolKind};
 use serde_json::{Value, json};
 
 use super::Builder;
@@ -36,24 +36,5 @@ impl Builder<'_> {
             "previous": module[before].id.as_str(),
             "between": module[before + 1..at].iter().map(|s| self.node(s)).collect::<Vec<_>>(),
         })
-    }
-
-    /// The ids of the private free functions between a method and the previous
-    /// method of its owner that only the owner's methods call: members of the
-    /// owner's block, as `design/declaration-groups` places them, so no
-    /// separation.
-    pub(super) fn gap_helpers(&self, symbol: &Symbol) -> Value {
-        let owner = owner_key(symbol);
-        let between = self.gap(symbol)["between"].clone();
-        let helpers = between.as_array().into_iter().flatten().filter_map(|node| {
-            let id = node["id"].as_str()?;
-            let found = self.project.symbol(&SymbolId::parse(id)?)?;
-            let affinity = self.receiver_affinity(found);
-            (found.kind == SymbolKind::Function
-                && found.visibility == Visibility::Private
-                && affinity["owner"].as_str() == owner.as_deref())
-            .then(|| json!(id))
-        });
-        Value::Array(helpers.collect())
     }
 }
