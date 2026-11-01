@@ -147,9 +147,9 @@ spec:
       {{ size(matched) == 0 ? ''
          : matched[0] == 'banner'
          ? 'comment labels a section instead of stating a fact; name the code or split it instead'
-         : matched[0] == 'code'
+         : matched[0] == 'commented-code'
          ? 'comment holds code; delete it, version control keeps history'
-         : matched[0] == 'history'
+         : matched[0] == 'journal'
          ? 'comment records history or authorship; version control keeps it'
          : matched[0] == 'closing'
          ? 'comment marks a closing brace; shorten the block instead'
@@ -165,8 +165,7 @@ spec:
   fix:
     safety: unsafe
     type: cel
-    edits: 'finding.evidence.kind in [''banner'', ''commented-code''] ? [remove(finding.span)]
-      : []'
+    edits: '[remove(finding.span)]'
   provenance:
     wasDerivedFrom:
     - Martin, Clean Code (2008), C1 Inappropriate Information
@@ -343,6 +342,12 @@ spec:
         // Modified by jdoe on 2020-01-01
 
         func run() {}
+    fixed:
+    - path: example.go
+      body: |-
+        package sample
+
+        func run() {}
     expect:
     - line: 3
   - name: history-go-valid
@@ -397,6 +402,9 @@ spec:
     - path: example.go
       body: "package sample\n\nfunc run(x int) int {\n\tif x > 0 {\n\t\treturn x\n\t}
         // end if\n\treturn 0\n}"
+    fixed:
+    - path: example.go
+      body: "package sample\n\nfunc run(x int) int {\n\tif x > 0 {\n\t\treturn x\n\t}\n\treturn 0\n}"
     expect:
     - line: 6
   - name: closing-go-valid
