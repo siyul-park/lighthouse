@@ -135,6 +135,7 @@ impl Proposer<'_> {
             chain: 0,
             bases,
             batch: vec![finding.fingerprint.clone()],
+            moves_only: false,
         })
     }
 

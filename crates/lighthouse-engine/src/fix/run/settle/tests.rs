@@ -21,6 +21,7 @@ fn proposal(file: &str, edits: Vec<TextEdit>) -> Proposal {
         chain: 0,
         bases: BTreeMap::new(),
         batch: Vec::new(),
+        moves_only: false,
     }
 }
 

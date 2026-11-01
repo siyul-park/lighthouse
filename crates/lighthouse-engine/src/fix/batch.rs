@@ -224,6 +224,7 @@ fn run_proposals(plan: &FixPlan, number: usize, run: &Accepted<'_>) -> Vec<Propo
             chain: number,
             bases: bases.clone(),
             batch: batch.clone(),
+            moves_only: false,
         })
         .collect()
 }

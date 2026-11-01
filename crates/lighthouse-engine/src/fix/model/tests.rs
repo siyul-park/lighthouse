@@ -148,6 +148,7 @@ pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
         chain: 0,
         bases: BTreeMap::new(),
         batch: vec![finding.fingerprint.clone()],
+        moves_only: false,
     }
 }
 

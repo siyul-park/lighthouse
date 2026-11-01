@@ -83,6 +83,10 @@ pub(super) struct Proposal {
     /// The findings the fix was made for, this one among them: a run of an
     /// agent is for all the findings of a file.
     pub(super) batch: Vec<Fingerprint>,
+    /// The edits come from operations that only move declarations, so that the
+    /// edits of a round on one file must keep its declarations together.
+    #[serde(default)]
+    pub(super) moves_only: bool,
 }
 
 /// What a fix by a model must have achieved for the checks to keep it.
@@ -431,6 +435,7 @@ impl<'e> Proposer<'e> {
                     chain: 0,
                     bases,
                     batch: vec![finding.fingerprint.clone()],
+                    moves_only: moves_only(&ops),
                 })
             }
         }
@@ -602,10 +607,7 @@ fn lowered(
     if self_overlap(&edits) {
         return Err("the edits of the fix overlap each other".to_owned());
     }
-    if ops
-        .iter()
-        .all(|op| matches!(op, EditOp::Move { .. } | EditOp::Reorder { .. }))
-    {
+    if moves_only(ops) {
         for file in edits.iter().map(|e| &e.file).collect::<BTreeSet<_>>() {
             let of_file: Vec<&TextEdit> = edits.iter().filter(|e| &e.file == file).collect();
             keeps_declarations(&sources.text(file)?, &of_file)?;
@@ -621,6 +623,12 @@ fn lowered(
         }
     }
     Ok((edits, bases))
+}
+
+/// Whether `ops` only move declarations.
+fn moves_only(ops: &[EditOp]) -> bool {
+    ops.iter()
+        .all(|op| matches!(op, EditOp::Move { .. } | EditOp::Reorder { .. }))
 }
 
 fn op_name(op: &EditOp) -> &'static str {

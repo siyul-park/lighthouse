@@ -14,7 +14,7 @@ use lighthouse_model::Fingerprint;
 use lighthouse_protocol::hash;
 
 use super::{
-    super::edits::overlap,
+    super::edits::{TextEdit, keeps_declarations, overlap},
     super::model::{Class, Event, Verdict, judge},
     super::preview::preview_of,
     super::propose::Proposal,
@@ -53,8 +53,13 @@ impl Orchestrator<'_> {
         // breaks a tie (the sort is stable). Safety is no key: what the run
         // may not write was set apart before, and takes no span.
         proposals.sort_by_key(|p| Reverse(p.priority));
-        let (mut kept, mut merged, dropped) = kept_proposals(proposals);
+        let (kept, mut merged, dropped) = kept_proposals(proposals);
         self.decline_dropped(&dropped);
+        let (mut kept, scattered) = self.keeping_declarations(kept);
+        merged.retain(|(_, same)| kept.iter().any(|k| &k.fingerprint == same));
+        for (p, why) in &scattered {
+            self.decline_proposal(p, why.clone());
+        }
         let mut candidates = self.round(&kept, before);
         let mut failed = std::mem::take(&mut candidates.failed);
         let changed: Vec<PathBuf> = candidates.texts.keys().cloned().collect();
@@ -119,6 +124,26 @@ impl Orchestrator<'_> {
         }
         self.report_follow_ups(followed, (&kept, &joined), &rolled, round);
         Ok(if rolled.is_empty() { after } else { None })
+    }
+
+    /// `kept` without the proposals that move declarations in a file whose
+    /// edits of the round together would not keep its declarations, with why.
+    fn keeping_declarations(
+        &self,
+        kept: Vec<Proposal>,
+    ) -> (Vec<Proposal>, Vec<(Proposal, String)>) {
+        let broken = scattering(&kept, |file| self.standing_text(file));
+        let (gone, kept) = kept
+            .into_iter()
+            .partition::<Vec<_>, _>(|p| p.files.iter().any(|f| broken.contains_key(f)));
+        let gone = gone
+            .into_iter()
+            .filter_map(|p| {
+                let why = p.files.iter().find_map(|f| broken.get(f))?.clone();
+                Some((p, why))
+            })
+            .collect();
+        (kept, gone)
     }
 
     /// Says why `file` was rolled back and after the fixes of which rules: those
@@ -302,6 +327,31 @@ pub(super) fn apart(proposals: Vec<Proposal>) -> Vec<Vec<Proposal>> {
     batches
 }
 
+/// The files whose edits among `kept` are all of fixes that only move
+/// declarations, and together would repeat or drop one, with why.
+pub(super) fn scattering(
+    kept: &[Proposal],
+    text: impl Fn(&Path) -> Option<String>,
+) -> BTreeMap<PathBuf, String> {
+    let mut by_file: BTreeMap<&PathBuf, (bool, Vec<&TextEdit>)> = BTreeMap::new();
+    for p in kept {
+        for edit in &p.edits {
+            let entry = by_file.entry(&edit.file).or_insert((true, Vec::new()));
+            entry.0 &= p.moves_only;
+            entry.1.push(edit);
+        }
+    }
+    by_file
+        .into_iter()
+        .filter(|(_, (moves, _))| *moves)
+        .filter_map(|(file, (_, edits))| {
+            let before = text(file)?;
+            let why = keeps_declarations(&before, &edits).err()?;
+            Some((file.clone(), why))
+        })
+        .collect()
+}
+
 /// Proposals in order, dropping the ones that collide with an earlier one. A
 /// proposal with exactly the edits of a kept one is covered by it, and
 /// returned with the fingerprint it merged into. The ones that collide are
@@ -443,3 +493,6 @@ pub(super) fn close_over(
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
