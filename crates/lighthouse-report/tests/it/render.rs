@@ -58,10 +58,12 @@ fn gaps() -> Vec<Incomplete> {
     vec![
         Incomplete {
             path: None,
+            provider: None,
             reason: "language `go` failed, 3 file(s) not analyzed: timed out".to_owned(),
         },
         Incomplete {
             path: Some("src/b c/é#1.go".into()),
+            provider: None,
             reason: "type error".to_owned(),
         },
     ]

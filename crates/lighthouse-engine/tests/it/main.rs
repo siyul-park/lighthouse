@@ -8,6 +8,7 @@ mod cache_store;
 mod engine;
 mod fix;
 mod fix_blame;
+mod fix_incomplete;
 mod fix_judge;
 mod fix_kept;
 mod fix_safety;

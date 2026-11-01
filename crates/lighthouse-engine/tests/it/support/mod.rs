@@ -107,7 +107,15 @@ impl LanguageProvider for Toy {
             if source.text.contains("BROKEN") {
                 indexed.incomplete.push(Incomplete {
                     path: Some(source.file.path.clone()),
+                    provider: None,
                     reason: "cannot parse".to_owned(),
+                });
+            }
+            if source.text.contains("PARTIAL") {
+                indexed.incomplete.push(Incomplete {
+                    path: None,
+                    provider: None,
+                    reason: "the provider stopped".to_owned(),
                 });
             }
             indexed.fragments.push(Fragment {

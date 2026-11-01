@@ -5,7 +5,7 @@
 
 use std::{collections::BTreeSet, path::Path};
 
-use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, FixedBy, Needs, unified_diff};
+use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy, Needs, unified_diff};
 use lighthouse_model::{
     Safety,
     ucm::{EditOp, FixOutcome},
@@ -194,20 +194,6 @@ fn a_dry_run_leaves_the_files_and_still_reports_the_changes() {
     assert_eq!(text(&dir), "TODO\n");
     assert_eq!(report.applied.len(), 1);
     assert_eq!(report.changes[0].after, "DONE\n");
-}
-
-#[test]
-fn an_incomplete_analysis_blocks_fixing() {
-    let dir = project("BROKEN\nTODO\n");
-    let engine = engine(&dir, "");
-
-    let error = engine
-        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
-        .unwrap_err();
-
-    assert!(matches!(error, Error::Fix(_)), "{error}");
-    assert!(error.to_string().contains("incomplete"));
-    assert_eq!(text(&dir), "BROKEN\nTODO\n");
 }
 
 #[test]

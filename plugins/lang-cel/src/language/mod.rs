@@ -119,6 +119,7 @@ fn drafts(files: &[EmbeddedFile], output: &mut Indexed) -> Vec<FileDraft> {
                 Ok(()) => indexed = true,
                 Err(reason) => output.incomplete.push(Incomplete {
                     path: Some(file.file.path.clone()),
+                    provider: None,
                     reason: format!("source {}: {reason}", embedded.id),
                 }),
             }
@@ -426,6 +427,7 @@ fn index_snippets(
                 let at = snippet.source.span(0, snippet.source.text.len()).start;
                 output.incomplete.push(Incomplete {
                     path: Some(draft.file.path.clone()),
+                    provider: None,
                     reason: format!(
                         "CEL expression at {}:{} does not parse: {error}",
                         at.line, at.col

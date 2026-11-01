@@ -33,6 +33,9 @@ impl Severity {
 pub struct Incomplete {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
+    /// The plugin that reported it; none for a gap of the host's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
     pub reason: String,
 }
 

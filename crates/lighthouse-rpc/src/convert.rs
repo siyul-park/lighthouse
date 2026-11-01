@@ -119,6 +119,7 @@ pub(crate) fn indexed(
     for path in requested.keys().filter(|p| !accepted.contains(*p)) {
         incomplete.insert(Incomplete {
             path: Some(path.clone()),
+            provider: None,
             reason: "the plugin returned no usable fragment".to_owned(),
         });
     }
@@ -149,6 +150,7 @@ fn source_records(
                 .retain(|previous| previous.path != source_ast.path);
             incomplete.insert(Incomplete {
                 path: Some(path.clone()),
+                provider: None,
                 reason: "duplicate source AST record for one physical file".to_owned(),
             });
             continue;
@@ -157,6 +159,7 @@ fn source_records(
         if let Err(reason) = source_ast.validate(source.text) {
             incomplete.insert(Incomplete {
                 path: Some(path.clone()),
+                provider: None,
                 reason: format!("invalid source AST: {reason}"),
             });
             continue;
@@ -167,6 +170,7 @@ fn source_records(
         if by_path.contains_key(path) && !seen_paths.contains(path) {
             incomplete.insert(Incomplete {
                 path: Some(path.clone()),
+                provider: None,
                 reason: "provider did not return a requested source AST".to_owned(),
             });
         }
@@ -202,6 +206,7 @@ fn belongs(f: &wire::Fragment) -> Result<(), String> {
 fn incomplete_of(item: wire::Incomplete) -> Incomplete {
     Incomplete {
         path: item.path.map(PathBuf::from),
+        provider: None,
         reason: item.reason,
     }
 }

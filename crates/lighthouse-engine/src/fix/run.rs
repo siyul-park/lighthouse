@@ -1,6 +1,7 @@
 mod blame;
 mod chain;
 mod cycle;
+mod incomplete;
 mod rollback;
 mod settle;
 mod write;
@@ -119,7 +120,25 @@ impl Orchestrator<'_> {
         let started = Instant::now();
         let proposed = self.proposer.propose(outcome, &self.texts, phase, taking);
         self.timings.propose += started.elapsed();
-        proposed
+        let (proposals, mut declined) = proposed?;
+        let engine = self.proposer.engine;
+        let (proposals, refused): (Vec<_>, Vec<_>) = proposals
+            .into_iter()
+            .map(|p| (incomplete::refusal(engine, outcome, &p), p))
+            .partition(|(why, _)| why.is_none());
+        for (why, p) in refused {
+            declined.insert(
+                p.fingerprint.clone(),
+                DeclinedFix {
+                    fingerprint: p.fingerprint,
+                    rule_id: p.rule_id,
+                    file: p.file,
+                    line: p.line,
+                    reason: why.unwrap_or_default(),
+                },
+            );
+        }
+        Ok((proposals.into_iter().map(|(_, p)| p).collect(), declined))
     }
 
     /// The rounds that apply what the run may write, then the verification
@@ -151,17 +170,6 @@ impl Orchestrator<'_> {
                 None => self.recheck()?,
             };
             let outcome = self.watch(outcome, round)?;
-            if round == 1 && !outcome.incomplete.is_empty() {
-                let first = &outcome.incomplete[0];
-                return Err(Error::Fix(format!(
-                    "the analysis is incomplete ({}{}), so nothing was fixed",
-                    first
-                        .path
-                        .as_ref()
-                        .map_or(String::new(), |p| format!("{}: ", p.display())),
-                    first.reason
-                )));
-            }
             if !seen.insert(self.state_hash()) {
                 self.notes.push(format!(
                     "stopped after {} rounds: the texts are as they were at the start of an earlier round",

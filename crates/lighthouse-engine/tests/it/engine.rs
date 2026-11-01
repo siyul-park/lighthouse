@@ -51,6 +51,7 @@ impl LanguageProvider for Any {
             if ends(source, self.fail_on) {
                 indexed.incomplete.push(Incomplete {
                     path: Some(source.file.path.clone()),
+                    provider: None,
                     reason: "cannot index".to_owned(),
                 });
                 continue;

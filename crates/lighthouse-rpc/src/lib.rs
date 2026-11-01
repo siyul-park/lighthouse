@@ -183,6 +183,7 @@ pub fn start(
                 registered.notices.extend(notices);
                 registered.incomplete.push(Incomplete {
                     path: None,
+                    provider: None,
                     reason: format!(
                         "plugin `{id}` is unavailable, its files fall back to plain text: {reason}"
                     ),

@@ -78,6 +78,7 @@ fn engine_with_incomplete() {
     let dir = project(&[("x.txt", b"1")]);
     let gap = Incomplete {
         path: None,
+        provider: None,
         reason: "plugin failed to start".to_owned(),
     };
     let engine = engine(&dir, ALL).unwrap();

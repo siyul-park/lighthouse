@@ -88,6 +88,7 @@ pub(super) fn select(
             {
                 run.incomplete.push(Incomplete {
                     path: Some(path.to_path_buf()),
+                    provider: None,
                     reason: format!(
                         "source rule(s) {} require a source AST, but the host provider returned none",
                         matching
@@ -108,6 +109,7 @@ pub(super) fn select(
                 Ok(regions) => selected.extend(regions),
                 Err(reason) => run.incomplete.push(Incomplete {
                     path: Some(path.to_path_buf()),
+                    provider: None,
                     reason: format!("source rule {}: {reason}", rule.spec.id),
                 }),
             }
@@ -148,6 +150,7 @@ fn accepted(
             if duplicates.insert(path.clone()) {
                 run.incomplete.push(Incomplete {
                     path: Some(path.clone()),
+                    provider: None,
                     reason: "provider returned duplicate source AST records for one physical file"
                         .to_owned(),
                 });
@@ -157,6 +160,7 @@ fn accepted(
         if let Err(reason) = source_ast.validate(&input.text) {
             run.incomplete.push(Incomplete {
                 path: Some(path),
+                provider: None,
                 reason: format!("invalid source AST: {reason}"),
             });
             continue;

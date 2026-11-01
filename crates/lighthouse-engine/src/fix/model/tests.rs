@@ -208,6 +208,7 @@ fn a_fix_that_leaves_its_file_partly_analyzed_is_not_kept() {
     let before = run(vec![hit.clone()], Vec::new());
     let gap = Incomplete {
         path: Some(FILE.into()),
+        provider: None,
         reason: "syntax error".to_owned(),
     };
     let verdict = judge(&[proposal(&hit)], &[], &before, &run(Vec::new(), vec![gap]));

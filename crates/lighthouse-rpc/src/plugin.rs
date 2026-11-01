@@ -259,6 +259,7 @@ impl Provider {
         let mut indexed = response.unwrap_or_else(|reason| Indexed {
             incomplete: vec![Incomplete {
                 path: None,
+                provider: None,
                 reason: format!("{reason}; {} file(s) not analyzed", files.len()),
             }],
             ..Indexed::default()

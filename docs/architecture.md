@@ -695,8 +695,11 @@ needs `--decision` or fingerprints.
 **The orchestrator** (`lighthouse-engine`, the only component that writes) runs rounds,
 at most five:
 
-1. check the whole project with every enabled rule; the run refuses to start when the
-   analysis is incomplete, because a fix that rests on a partial analysis is a guess;
+1. check the whole project with every enabled rule; a fix is refused (and reported as
+   declined, with the gap) when a file it edits, or a file its rule reads by reach
+   (`local`, `neighbors`, `global`), lies in the incomplete scope, because a fix that
+   rests on a partial analysis is a guess; a gap with a path covers that file, one of a
+   provider without a path covers that provider's files;
 2. select the findings (paths, rules, fingerprints; never those a judgment hides),
    ask each one's fixer for a proposal, lower it, and keep the proposals that do not
    collide (the higher `fix.priority` first, then report order, and safety is no key: a fix

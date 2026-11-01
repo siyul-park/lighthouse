@@ -65,6 +65,7 @@ impl Engine {
                 Err(e) => {
                     run.incomplete.push(Incomplete {
                         path: None,
+                        provider: None,
                         reason: format!("walk: {e}"),
                     });
                     continue;
@@ -77,6 +78,7 @@ impl Engine {
                 Ok(rel) => files.push(rel.to_owned()),
                 Err(_) => run.incomplete.push(Incomplete {
                     path: Some(entry.path().to_owned()),
+                    provider: None,
                     reason: "outside the root, not checked".to_owned(),
                 }),
             }
@@ -118,6 +120,7 @@ impl Engine {
                     } else {
                         Skipped::Incomplete(Incomplete {
                             path: Some(rel.to_owned()),
+                            provider: None,
                             reason: "not valid UTF-8".to_owned(),
                         })
                     }));
@@ -125,6 +128,7 @@ impl Engine {
                 Err(e) => {
                     return Some(Err(Skipped::Incomplete(Incomplete {
                         path: Some(rel.to_owned()),
+                        provider: None,
                         reason: format!("unreadable: {e}"),
                     })));
                 }
@@ -286,11 +290,16 @@ impl Engine {
                     views.stamp(&mut indexed.fragments, &id);
                     parts.extend(indexed.fragments);
                     run.notices.extend(indexed.notices);
-                    run.incomplete.extend(indexed.incomplete);
+                    run.incomplete
+                        .extend(indexed.incomplete.into_iter().map(|gap| Incomplete {
+                            provider: Some(id.clone()),
+                            ..gap
+                        }));
                     match asts.as_deref_mut() {
                         Some(asts) => asts.extend(indexed.sources),
                         None if !indexed.sources.is_empty() => run.incomplete.push(Incomplete {
                             path: None,
+                            provider: Some(id.clone()),
                             reason: "provider unexpectedly returned source ASTs for files that host no regions"
                                 .to_owned(),
                         }),
@@ -301,6 +310,7 @@ impl Engine {
                     if !call.files.is_empty() {
                         run.incomplete.push(Incomplete {
                             path: None,
+                            provider: Some(id.clone()),
                             reason: format!(
                                 "language `{id}` had an execution error, {} file(s) not analyzed: {e}",
                                 call.files.len()
@@ -310,6 +320,7 @@ impl Engine {
                     run.incomplete
                         .extend(call.regions.iter().map(|file| Incomplete {
                             path: Some(file.file.path.clone()),
+                            provider: Some(id.clone()),
                             reason: format!("language `{id}` cannot analyze embedded sources: {e}"),
                         }));
                 }
@@ -340,6 +351,7 @@ impl Engine {
                 {
                     run.incomplete.push(Incomplete {
                         path: Some(path.clone()),
+                        provider: None,
                         reason: "empty or duplicate embedded source identity/provider".to_owned(),
                     });
                     continue;
@@ -347,6 +359,7 @@ impl Engine {
                 if let Err(reason) = source.validate(&file.text) {
                     run.incomplete.push(Incomplete {
                         path: Some(path.clone()),
+                        provider: None,
                         reason: format!("embedded source {} is invalid: {reason}", source.id),
                     });
                     continue;
@@ -354,6 +367,7 @@ impl Engine {
                 let Some(&index) = providers.get(&source.provider) else {
                     run.incomplete.push(Incomplete {
                         path: Some(path.clone()),
+                        provider: None,
                         reason: format!(
                             "source {} selects provider {}, but that provider is not enabled",
                             source.id, source.provider
@@ -368,6 +382,7 @@ impl Engine {
                 if entries.contains_key(&path) {
                     run.incomplete.push(Incomplete {
                         path: Some(path.clone()),
+                        provider: None,
                         reason: "multiple embedded selections for one host file and provider"
                             .to_owned(),
                     });
@@ -773,6 +788,7 @@ fn unfinished(
         Err(lighthouse_plugin::Error::Incomplete(reason)) => {
             incomplete.push(Incomplete {
                 path: file.map(Path::to_owned),
+                provider: None,
                 reason: format!("{rule}: {reason}"),
             });
             Ok(Vec::new())

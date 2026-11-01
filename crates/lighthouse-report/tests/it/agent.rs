@@ -140,6 +140,7 @@ fn go_facts(findings: &[Diagnostic]) -> BTreeMap<Fingerprint, Value> {
 fn gap() -> Vec<Incomplete> {
     vec![Incomplete {
         path: Some("broken.go".into()),
+        provider: None,
         reason: "type error".to_owned(),
     }]
 }
@@ -559,6 +560,7 @@ fn report_has_the_fields_the_json_prints() {
     let findings = [unknown_rule(), helper()];
     let gaps = [Incomplete {
         path: None,
+        provider: None,
         reason: "plugin crashed".to_owned(),
     }];
     let report = lighthouse_report::report(&findings, &gaps, &briefing);

@@ -23,6 +23,7 @@ impl Scopes {
                 Ok(rel) => scopes.push(rel.to_owned()),
                 Err(_) => gaps.push(Incomplete {
                     path: Some(path.clone()),
+                    provider: None,
                     reason: format!("outside {}, not checked", root.display()),
                 }),
             }
