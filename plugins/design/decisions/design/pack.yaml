@@ -152,9 +152,26 @@ spec:
                : chosen[0] == 'private' ? private_rank(s.id)
                : chosen[0] == 'public-function' && s.kind == 'function' && s.configures == '' ? 1
                : 0)))
+    # The blank package variables of the file (`var _ I = T`), each as [line,
+    # the type it declares or asserts, empty when it has none].
+    - name: blank_types
+      expression: >-
+        file.blocks.map(b, b.specs.filter(s, '_' in s.names)
+          .map(s, [s.line, size(s.keys) == 0 ? ''
+                  : s.keys[0].split('.').slice(size(s.keys[0].split('.')) - 1, size(s.keys[0].split('.')))[0]])).flatten()
+    - name: blank_ids
+      expression: placed.filter(s, s.kind == 'var' && s.name == '_').map(s, s.id)
+    # What messages call a declaration: its name, and for a blank variable what
+    # it declares or asserts, `var _ Value`, never a bare `_`.
+    - name: display
+      params: [s]
+      expression: >-
+        s.id in blank_ids
+          ? 'var _' + (blank_types.filter(b, b[0] == s.line).map(b, b[1] == '' ? '' : ' ' + b[1]) + [''])[0]
+          : s.name
     # Per placed declaration, [module, place, id, name, line].
     - name: slots
-      expression: placed.map(s, [s.module, place(s), s.id, s.name, s.line])
+      expression: placed.map(s, [s.module, place(s), s.id, display(s), s.line])
     - name: keys
       expression: slots.map(r, r[1])
     - name: placed_ids

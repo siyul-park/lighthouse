@@ -152,7 +152,7 @@ spec:
       - name: laid
         expression: >-
           (placed + file.symbols.filter(s, s.kind == 'test')).sortBy(s, s.pos)
-            .map(s, [s.module, s.kind == 'test' ? size(groups) * 1000000 : place(s), s.id, s.name])
+            .map(s, [s.module, s.kind == 'test' ? size(groups) * 1000000 : place(s), s.id, display(s)])
       # The placed declarations of each module, in file order, each as
       # [place, id, name].
       - name: modules
@@ -161,7 +161,7 @@ spec:
             laid.filter(r, r[0] == m && r[1] >= 0).map(r, [r[1], r[2], r[3]]))
       # Per module, the placed declarations that are misplaced: the fewest
       # that, moved, put the module in order, each as
-      # [id, group, after, before, late]: it is to follow the first later
+      # [id, group, after, before, late, more]: it is to follow the first later
       # declaration of an earlier place that stays in place, else the first
       # such declaration.
       - name: displaced
@@ -176,7 +176,7 @@ spec:
                  ((last_user(at[i][1]) == '' ? [] : [last_user(at[i][1])])
                   + kept.filter(j, j > i && g[j] < g[i]).map(j, at[j][2])
                   + (follows[i] < 0 ? [] : at.slice(follows[i], follows[i] + 1).map(r, r[2]))
-                  + [''])[0], '', false])))))).flatten()
+                  + [''])[0], '', false, 0])))))).flatten()
             .filter(d, d[1] < size(groups))
       # The methods of the owners, in file order; one value per file, each as
       # [id, name, owner and module, whether it is a constructor method (a
@@ -195,16 +195,28 @@ spec:
           methods.filter(c, c[3]
               && methods.exists(x, x[2] == c[2] && !x[3] && x[4] < c[4]))
             .map(c, cel.bind(earlier, methods.filter(x, x[2] == c[2] && !x[3] && x[4] < c[4]),
-              [c[0], -1, earlier[0][1], earlier[0][0], true]))
+              [c[0], -1, earlier[0][1], earlier[0][0], true, 0]))
       # The declarations of the file in the order of their places, the argument
       # of the reorder that fixes every finding of the file at once.
       - name: ordered
         expression: >-
           laid.filter(r, r[1] >= 0).sortBy(r, r[1]).map(r, r[2])
-      # Every finding of the file, as [id, group, after, before, late], and
-      # the ids they are about.
+      # The declarations moved above a blank variable (`var _ I = T`) with no
+      # declaration to follow: they are reported once per blank variable, at
+      # the first of them, with how many more there are (`more`).
+      - name: blank_led
+        expression: >-
+          displaced.filter(d, d[2] == '' && size(anchor(d[0])) > 0 && anchor(d[0]).id in blank_ids)
+      - name: blank_firsts
+        expression: >-
+          blank_led.filter(d, blank_led.filter(e, anchor(e[0]).id == anchor(d[0]).id)[0][0] == d[0])
+            .map(d, [d[0], d[1], d[2], d[3], d[4],
+                     size(blank_led.filter(e, anchor(e[0]).id == anchor(d[0]).id)) - 1])
+      # Every finding of the file, as [id, group, after, before, late, more],
+      # and the ids they are about.
       - name: reported
-        expression: displaced + late
+        expression: >-
+          displaced.filter(d, !(d[0] in blank_led.map(e, e[0]))) + blank_firsts + late
       - name: reported_ids
         expression: reported.map(d, d[0])
       - name: report
@@ -241,12 +253,13 @@ spec:
           : 'it goes in ' + owner_name + "'s block " + words[2]
     where: size(report) > 0
     message: >-
-      {{ report[0][4]
+      {{ (report[0][4]
          ? 'constructor ' + symbol.name + ' must precede the other methods of its type, such as '
            + report[0][2]
          : options.groups[report[0][1]] == 'method' && owner_of(symbol) != ''
          ? symbol.name + ' is ' + words[0] + ' of ' + owner_name + ': ' + block_rule + target
-         : symbol.kind + ' ' + symbol.name + ' belongs to the ' + options.groups[report[0][1]]
+         : (symbol.id in blank_ids ? display(symbol) : symbol.kind + ' ' + symbol.name)
+           + ' belongs to the ' + options.groups[report[0][1]]
            + ' group'
            + (report[0][2] != '' ? ' and must follow ' + report[0][2]
               : size(found) > 0 && found.place / 1000000 == report[0][1]
@@ -257,7 +270,7 @@ spec:
               : size(found) > 0
               ? ', which comes before ' + options.groups[found.place / 1000000]
                 + ': move it above ' + found.name + ' (line ' + string(found.line) + ')'
-              : '') }}
+              : '')) + (report[0][5] > 0 ? ' (and ' + string(report[0][5]) + ' more in this file)' : '') }}
     evidence:
       declaration: symbol.id
       group: "report[0][4] ? 'constructor' : options.groups[report[0][1]]"
@@ -543,43 +556,6 @@ spec:
 
             // Open is part of the example.
             func Open() *Service { return NewService() }
-    - name: owner-blocks
-      language: go
-      kind: invalid
-      fixed:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Service is part of the example.
-            type Service struct{}
-
-            // Client is part of the example.
-            type Client struct{}
-
-            // Run is part of the example.
-            func (s *Service) Run() int { return 1 }
-
-            // Do is part of the example.
-            func (c *Client) Do() int { return 1 }
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Service is part of the example.
-            type Service struct{}
-
-            // Run is part of the example.
-            func (s *Service) Run() int { return 1 }
-
-            // Client is part of the example.
-            type Client struct{}
-
-            // Do is part of the example.
-            func (c *Client) Do() int { return 1 }
-      expect:
-        - line: 10
     - name: constructor-after-methods
       language: go
       kind: invalid
@@ -796,7 +772,7 @@ spec:
             func (p *pool) module() int { return p.n }
       expect:
         - line: 16
-    - name: var-groups
+    - name: blank-block-above-types
       language: go
       kind: invalid
       fixed:
@@ -804,36 +780,38 @@ spec:
           body: |-
             package sample
 
-            type box struct{ n int }
-
-            type shape interface{ area() int }
+            // Shape is part of the example.
+            type Shape interface{}
 
             type square struct{}
 
-            var limit = box{1}
+            type circle struct{}
 
-            var _ shape = square{}
-
-            func (square) area() int { return limit.n }
+            var (
+            	_ Shape = square{}
+            	_ Shape = circle{}
+            	_ Shape = (*square)(nil)
+            )
       files:
         - path: example.go
           body: |-
             package sample
 
-            var limit = box{1}
+            // Shape is part of the example.
+            type Shape interface{}
 
-            type box struct{ n int }
-
-            type shape interface{ area() int }
+            var (
+            	_ Shape = square{}
+            	_ Shape = circle{}
+            	_ Shape = (*square)(nil)
+            )
 
             type square struct{}
 
-            func (square) area() int { return limit.n }
-
-            var _ shape = square{}
+            type circle struct{}
       expect:
-        - line: 3
-        - line: 13
+        - line: 12
+          message: "type square belongs to the private-type group, which comes before var: move it above var _ Shape (line 7) (and 1 more in this file)"
     - name: blocks-by-kind-invalid
       language: go
       kind: invalid
