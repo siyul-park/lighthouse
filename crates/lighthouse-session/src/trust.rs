@@ -89,12 +89,7 @@ impl Basis {
         let prefixes = prefixes(root);
         let root = root.canonicalize().ok();
         for command in programs {
-            let program = command.argv.first().map_or("", String::as_str);
-            field(
-                &mut hash,
-                "program",
-                relative(&prefixes, program).as_bytes(),
-            );
+            field(&mut hash, "program", &[]);
             // The program and every argument that names a file inside the
             // project (`sh script.sh`, `python3 x.py`) are trusted by content.
             for (at, arg) in command.argv.iter().enumerate() {
@@ -210,19 +205,14 @@ fn in_project(root: &Path, arg: &str) -> Option<PathBuf> {
 /// whole directory is replaced: `/a/wt-other` and `/b/a/wt` stay as they are
 /// under `/a/wt`.
 fn relative(prefixes: &[String], text: &str) -> String {
+    let path_char = |c: char| c.is_alphanumeric() || "/._-~".contains(c);
     prefixes.iter().fold(text.to_owned(), |text, prefix| {
-        let mut out = String::with_capacity(text.len());
-        let mut rest = text.as_str();
+        let (mut out, mut rest) = (String::new(), text.as_str());
         while let Some(at) = rest.find(prefix.as_str()) {
-            let end = at + prefix.len();
             out.push_str(&rest[..at]);
-            let starts = out
-                .chars()
-                .next_back()
-                .is_none_or(|c| !(c.is_alphanumeric() || "/._-~".contains(c)));
-            let whole = starts && rest[end..].chars().next().is_none_or(|c| c == '/');
+            rest = &rest[at + prefix.len()..];
+            let whole = !out.ends_with(path_char) && !rest.starts_with(|c| c != '/');
             out.push_str(if whole { "{root}" } else { prefix });
-            rest = &rest[end..];
         }
         out + rest
     })
