@@ -82,6 +82,7 @@ spec:
             - method
             - public-function
             - private-function
+            - private
         default:
           - public-type
           - private-type
@@ -102,7 +103,10 @@ spec:
           types, one block per type, in the order the types are declared, each
           with the option builders of the type first, then the constructors of the type (`NewType` or `newType`, any visibility), then its exported
           methods, its hooks and its unexported methods),
-          `public-function`, `private-function`.
+          `public-function`, `private-function`, `private` (the private functions
+          and the unexported methods together, each after every private declaration
+          that calls it, else in file order; it takes the unexported methods out
+          of `method` and of their type's block, and is meant for `blocks: kind`).
       hooks:
         type: array
         default:
@@ -128,7 +132,7 @@ spec:
         description: >-
           How the members of the `method` group are laid out. `type`: one block
           per owner type, each with its option builders, constructors, exported
-          methods, hooks and unexported methods. `kind`: by rank first, then by
+          methods, hooks and unexported methods (the last of them when `private` is not named). `kind`: by rank first, then by
           owner: all option builders, then all constructors, and so on.
     additionalProperties: false
   languages:
@@ -169,7 +173,8 @@ spec:
             cel.bind(follows, g.anchors(),
               moved.map(i,
                 [at[i][1], g[i] / 1000000,
-                 (kept.filter(j, j > i && g[j] < g[i]).map(j, at[j][2])
+                 ((last_user(at[i][1]) == '' ? [] : [last_user(at[i][1])])
+                  + kept.filter(j, j > i && g[j] < g[i]).map(j, at[j][2])
                   + (follows[i] < 0 ? [] : at.slice(follows[i], follows[i] + 1).map(r, r[2]))
                   + [''])[0], '', false])))))).flatten()
             .filter(d, d[1] < size(groups))
@@ -245,7 +250,9 @@ spec:
            + ' group'
            + (report[0][2] != '' ? ' and must follow ' + report[0][2]
               : size(found) > 0 && found.place / 1000000 == report[0][1]
-              ? ', where option builders come first: move it above ' + found.name
+              ? (options.groups[report[0][1]] == 'private'
+                 ? ', where callers come first: move it above '
+                 : ', where option builders come first: move it above ') + found.name
                 + ' (line ' + string(found.line) + ')'
               : size(found) > 0
               ? ', which comes before ' + options.groups[found.place / 1000000]
@@ -424,6 +431,10 @@ spec:
 
             // Run runs the program.
             func (p *Program) Run() int {
+            	return p.stop()
+            }
+
+            func (p *Program) stop() int {
             	return 1
             }
       files:
@@ -434,9 +445,13 @@ spec:
             // Program is a compiled program.
             type Program struct{}
 
+            func (p *Program) stop() int {
+            	return 1
+            }
+
             // Run runs the program.
             func (p *Program) Run() int {
-            	return 1
+            	return p.stop()
             }
 
             // New returns an empty program.
@@ -444,37 +459,9 @@ spec:
             	return &Program{}
             }
       expect:
-        - line: 12
-          message: "New is a constructor of Program: it goes in Program's block after its option builders, above Run (line 7)"
-    - name: invalid
-      language: go
-      kind: invalid
-      fixed:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Service is part of the example.
-            type Service struct{}
-
-            // Run is part of the example.
-            func (s *Service) Run() int { return helper() }
-
-            func helper() int { return 1 }
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            func helper() int { return 1 }
-
-            // Service is part of the example.
-            type Service struct{}
-
-            // Run is part of the example.
-            func (s *Service) Run() int { return helper() }
-      expect:
-        - line: 3
+        - line: 11
+        - line: 16
+          message: "New is a constructor of Program: it goes in Program's block after its option builders, above stop (line 6)"
     - name: valid
       language: go
       kind: valid
@@ -491,35 +478,6 @@ spec:
             func (s *Service) Run() int { return helper() }
 
             func helper() int { return 1 }
-    - name: private-method-before-public
-      language: go
-      kind: invalid
-      fixed:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Service is part of the example.
-            type Service struct{}
-
-            // Run is part of the example.
-            func (s *Service) Run() int { return s.run() }
-
-            func (s *Service) run() int { return 1 }
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Service is part of the example.
-            type Service struct{}
-
-            func (s *Service) run() int { return 1 }
-
-            // Run is part of the example.
-            func (s *Service) Run() int { return s.run() }
-      expect:
-        - line: 9
     - name: init-after-functions
       language: go
       kind: invalid
@@ -673,26 +631,46 @@ spec:
       fixed:
         - path: src/lib.rs
           body: |-
+            const LIMIT: u8 = 3;
+
             /// Part of the example.
             pub struct Store;
 
-            /// Part of the example.
-            pub fn run() -> u8 {
-                1
+            impl Store {
+                /// Part of the example.
+                pub fn new() -> Self {
+                    Store
+                }
+
+                /// Part of the example.
+                pub fn get(&self) -> u8 {
+                    LIMIT
+                }
             }
       files:
         - path: src/lib.rs
           body: |-
             /// Part of the example.
-            pub fn run() -> u8 {
-                1
-            }
-
-            /// Part of the example.
             pub struct Store;
+
+            const LIMIT: u8 = 3;
+
+            impl Store {
+                /// Part of the example.
+                pub fn get(&self) -> u8 {
+                    LIMIT
+                }
+
+                /// Part of the example.
+                pub fn new() -> Self {
+                    Store
+                }
+            }
       expect:
-        - line: 7
-          message: "type Store belongs to the type group, which comes before public-function: move it above run (line 2)"
+        - line: 4
+          message: "const LIMIT belongs to the const group, which comes before type: move it above Store (line 2)"
+        - line: 13
+          message: "constructor new must precede the other methods of its type, such as get"
     - name: rust-valid
       language: rust
       kind: valid
@@ -725,46 +703,6 @@ spec:
             fn helper() -> u8 {
                 1
             }
-    - name: rust-constructor-after-behavior
-      language: rust
-      kind: invalid
-      fixed:
-        - path: src/lib.rs
-          body: |-
-            /// Part of the example.
-            pub struct Store;
-
-            impl Store {
-                /// Part of the example.
-                pub fn new() -> Self {
-                    Store
-                }
-
-                /// Part of the example.
-                pub fn get(&self) -> u8 {
-                    1
-                }
-            }
-      files:
-        - path: src/lib.rs
-          body: |-
-            /// Part of the example.
-            pub struct Store;
-
-            impl Store {
-                /// Part of the example.
-                pub fn get(&self) -> u8 {
-                    1
-                }
-
-                /// Part of the example.
-                pub fn new() -> Self {
-                    Store
-                }
-            }
-      expect:
-        - line: 11
-          message: "constructor new must precede the other methods of its type, such as get"
     - name: test-fixture-below-a-test
       language: go
       kind: invalid
@@ -858,36 +796,7 @@ spec:
             func (p *pool) module() int { return p.n }
       expect:
         - line: 16
-    - name: assertion-after-methods
-      language: go
-      kind: invalid
-      fixed:
-        - path: example.go
-          body: |-
-            package sample
-
-            type shape interface{ area() int }
-
-            type square struct{}
-
-            var _ shape = square{}
-
-            func (square) area() int { return 1 }
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            type shape interface{ area() int }
-
-            type square struct{}
-
-            func (square) area() int { return 1 }
-
-            var _ shape = square{}
-      expect:
-        - line: 9
-    - name: private-type-after-var
+    - name: var-groups
       language: go
       kind: invalid
       fixed:
@@ -897,7 +806,15 @@ spec:
 
             type box struct{ n int }
 
+            type shape interface{ area() int }
+
+            type square struct{}
+
             var limit = box{1}
+
+            var _ shape = square{}
+
+            func (square) area() int { return limit.n }
       files:
         - path: example.go
           body: |-
@@ -906,9 +823,17 @@ spec:
             var limit = box{1}
 
             type box struct{ n int }
+
+            type shape interface{ area() int }
+
+            type square struct{}
+
+            func (square) area() int { return limit.n }
+
+            var _ shape = square{}
       expect:
-        - line: 5
-          message: "type box belongs to the private-type group, which comes before var: move it above limit (line 3)"
+        - line: 3
+        - line: 13
     - name: blocks-by-kind-invalid
       language: go
       kind: invalid
@@ -987,3 +912,80 @@ spec:
       expect:
         - line: 16
           message: "NewBeta is a constructor of Beta: constructors come after the option builders, above Run (line 13)"
+    - name: private-helpers-follow-their-callers
+      language: go
+      kind: invalid
+      options:
+        groups: [public-type, private-type, public-const, private-const, var, init, method, public-function, private]
+        blocks: kind
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Codec reads values.
+            type Codec struct{ n int }
+
+            // Read reads a value.
+            func (c *Codec) Read() int { return complexOf(c) + c.enter() }
+
+            // Decode decodes a value.
+            func Decode(c *Codec) int { return complexOf(c) }
+
+            func complexOf(c *Codec) int { return c.asFloat() }
+
+            func (c *Codec) asFloat() int { return c.n }
+
+            func (c *Codec) enter() int { return c.quiesce() + c.n }
+
+            func (c *Codec) quiesce() int { return c.n }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Codec reads values.
+            type Codec struct{ n int }
+
+            // Read reads a value.
+            func (c *Codec) Read() int { return complexOf(c) + c.enter() }
+
+            // Decode decodes a value.
+            func Decode(c *Codec) int { return complexOf(c) }
+
+            func (c *Codec) quiesce() int { return c.n }
+
+            func (c *Codec) asFloat() int { return c.n }
+
+            func complexOf(c *Codec) int { return c.asFloat() }
+
+            func (c *Codec) enter() int { return c.quiesce() + c.n }
+      expect:
+        - line: 12
+          message: "method quiesce belongs to the private group and must follow enter"
+        - line: 16
+    - name: private-functions-and-methods-in-caller-order
+      language: go
+      kind: valid
+      options:
+        groups: [public-type, private-type, public-const, private-const, var, init, method, public-function, private]
+        blocks: kind
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Codec reads values.
+            type Codec struct{ n int }
+
+            // Read reads a value.
+            func (c *Codec) Read() int { return c.asFloat() }
+
+            // Decode decodes a value.
+            func Decode(n int) int { return complexOf(n) }
+
+            func (c *Codec) asFloat() int { return scale(c.n) }
+
+            func complexOf(n int) int { return scale(n) + 1 }
+
+            func scale(n int) int { return n * 2 }

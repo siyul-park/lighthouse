@@ -97,6 +97,32 @@ fn anchors_is_the_index_of_the_first_later_element_that_sorts_before() {
     assert_eq!(found("[]"), "");
 }
 
+#[test]
+fn users_first_puts_each_declaration_after_every_user_and_keeps_file_order_otherwise() {
+    let ranked =
+        |list: &str| evaluated(&format!("{list}.usersFirst().map(i, string(i)).join(',')"));
+    assert_eq!(ranked("[[], [0]]"), "1,0");
+    assert_eq!(ranked("[[], [], []]"), "0,1,2");
+    // A helper above its user follows it; the rest keeps its place.
+    assert_eq!(ranked("[[], [], [0]]"), "2,0,1");
+    // A leaf shared by two users follows the later of them.
+    assert_eq!(ranked("[[], [0], [], [0]]"), "3,0,1,2");
+    // Users that use each other, and a self use, keep file order.
+    assert_eq!(ranked("[[1], [0], [2]]"), "0,1,2");
+    assert_eq!(ranked("[[2], [], [0, 1]]"), "0,2,1");
+    assert_eq!(ranked("[]"), "");
+}
+
+#[test]
+fn users_first_refuses_a_list_that_holds_other_than_lists_of_ints() {
+    for expression in ["[1].usersFirst().size()", "[['a']].usersFirst().size()"] {
+        assert!(
+            std::panic::catch_unwind(|| evaluated(expression)).is_err(),
+            "{expression}"
+        );
+    }
+}
+
 /// The longest run by the definition, to compare the fast one with: the
 /// first longest run, each element after its earliest best predecessor; what
 /// it leaves out is what `misplaced` says.

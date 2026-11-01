@@ -34,6 +34,7 @@ mod cohesion;
 mod cycle;
 mod effective;
 mod file_facts;
+mod file_uses;
 mod forward;
 mod gap;
 mod homonyms;
@@ -418,9 +419,7 @@ impl<'a> Builder<'a> {
         self.placement_facts(map, symbol);
         self.api_facts(map, symbol, summary);
         self.role_facts(map, symbol, summary);
-        if needs.field("local_callers") {
-            map.insert("local_callers".to_owned(), self.local_callers(symbol));
-        }
+        self.tie_facts(map, symbol, needs);
         if needs.field("touched_by_tests") {
             map.insert(
                 "touched_by_tests".to_owned(),

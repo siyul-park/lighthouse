@@ -78,6 +78,7 @@ spec:
         (symbol.kind == 'function' || symbol.kind == 'method' || symbol.kind == 'type') && size(users) > 0 && symbol.pos <= lead.pos && !cel.bind(own, declaration_group(symbol.id),
             cel.bind(later, declaration_group(lead.id),
               own >= 0 && later >= 0 && own < later))
+        && !(in_private(symbol.id) && in_private(lead.id))
         && !(symbol.lang == 'rust' && symbol.kind == 'method' && !symbol.implementation
              && lead.kind == 'method' && lead.implementation)
     - name: matched

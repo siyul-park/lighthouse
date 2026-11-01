@@ -27,7 +27,7 @@ spec:
     select: function
     variables:
     - name: separators
-      expression: 'func.kind == ''method'' && func.gap.previous != null ? func.gap.between.filter(b,
+      expression: 'func.kind == ''method'' && func.gap.previous != null && !in_private(func.id) ? func.gap.between.filter(b,
         (b.kind != ''method'' || b.owner_key != func.owner_key)
         && !laid_between(func.gap.previous, func.id, b.id)) : []'
     - name: separated

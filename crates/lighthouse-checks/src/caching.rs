@@ -49,6 +49,9 @@ pub const FACTS: &[(&str, Reach)] = &[
     // another file.
     ("owner_visibility", Reach::Neighbors),
     ("uses", Reach::Neighbors),
+    // What a symbol calls or references in its own file: the edges of the
+    // file, which the neighbors digest holds.
+    ("file_uses", Reach::Neighbors),
     ("tests", Reach::Global),
     // The symbol a test is the owner test of.
     ("owned", Reach::Global),

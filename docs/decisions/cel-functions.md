@@ -72,6 +72,16 @@ The indexes of the elements of a list of ints that must move for the list to be 
 [3, 0, 1, 2].misplaced() == [0]
 ```
 
+### `usersFirst` (step 3)
+
+For a list that holds, per declaration in file order, the indexes of the declarations it uses, the rank of each declaration in the order that keeps file order except that a declaration follows every one of its users. Declarations that use each other, and one that uses itself, keep file order.
+
+- `list.usersFirst() -> list<int>`
+
+```text
+[[], [0]].usersFirst() == [1, 0]
+```
+
 ## `lang-cel/regex` 0.1.0
 
 ### `regex.extract` (step 2)

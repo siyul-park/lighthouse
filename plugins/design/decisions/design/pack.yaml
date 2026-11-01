@@ -99,10 +99,31 @@ spec:
           : s.kind == 'function'
           ? (s.name == 'init' ? ['init'] : [])
             + (owner != '' && (s.configures == '' || owner in method_owners) ? ['method'] : [])
-            + [s.visibility != 'private' ? 'public-function' : 'private-function']
-          : s.kind == 'method' ? ['type', 'method']
+            + (s.visibility != 'private' ? ['public-function'] : ['private', 'private-function'])
+          : s.kind == 'method'
+          ? ['type'] + (s.visibility == 'private' ? ['private'] : []) + ['method']
           : []
         ).filter(c, c in groups)
+    # The declarations of the group `private`, in file order: the private free
+    # functions and the unexported methods, which that group takes out of
+    # their owner blocks. Each follows every one of the declarations of the
+    # group that use it (call or reference it); the ranks are the order that
+    # keeps file order except for that (`list.usersFirst()`).
+    - name: private_members
+      expression: >-
+        !('private' in groups) ? []
+        : placed.filter(s, (candidate_groups(s, owner_of(s)) + [''])[0] == 'private')
+    - name: private_ids
+      expression: private_members.map(s, s.id)
+    - name: private_ranks
+      expression: >-
+        private_members.map(s, s.file_uses.map(u, private_ids.indexOf(u)).filter(i, i >= 0))
+          .usersFirst()
+    # The rank of a declaration of the group `private` among its users.
+    - name: private_rank
+      params: [id]
+      expression: >-
+        cel.bind(at, private_ids.indexOf(id), private_ranks.slice(at, at + 1)[0])
     # The place of each placed declaration in the order of
     # `design/declaration-groups`, a number to compare: the index in `groups`
     # of the first of the declaration's candidate groups that the order names,
@@ -115,6 +136,7 @@ spec:
     # its unexported methods. In the group `public-function` the option builders
     # that belong to no method block (their type has no method in the file)
     # come first, then the other functions.
+    # In the group `private` it is the rank among its callers (`private_ranks`).
     # -1 when no group names the declaration.
     - name: place
       params: [s]
@@ -127,6 +149,7 @@ spec:
                ? cel.bind(index, owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner),
                    blocks == 'kind' ? block_rank(s) * size(owners) + index
                    : index * 5 + block_rank(s))
+               : chosen[0] == 'private' ? private_rank(s.id)
                : chosen[0] == 'public-function' && s.kind == 'function' && s.configures == '' ? 1
                : 0)))
     # Per placed declaration, [module, place, id, name, line].
@@ -158,6 +181,22 @@ spec:
               && lo / 1000000 == groups.indexOf('method') && hi / 1000000 == lo / 1000000
               && at / 1000000 == lo / 1000000)))
           : false
+    # The name of the caller in the group `private` that comes last in the
+    # order of its ranks, for the declaration with this id; empty when it has
+    # none: the declaration it must follow.
+    - name: last_user
+      params: [id]
+      expression: >-
+        cel.bind(at, private_ids.indexOf(id),
+          at < 0 ? ''
+          : cel.bind(callers, private_members.filter(m, id in m.file_uses)
+                .sortBy(m, private_rank(m.id)),
+            size(callers) == 0 ? '' : callers.slice(size(callers) - 1, size(callers))[0].name))
+    # Whether the declaration with this id is in the group `private`, where the
+    # callers decide the order of the members, not their owners.
+    - name: in_private
+      params: [id]
+      expression: private_ids.indexOf(id) >= 0
     # The anchor of a declaration, by id: the first declaration above it in its
     # module whose place is greater, with its id, name, line and place; empty
     # when none is, or the declaration is not placed.
