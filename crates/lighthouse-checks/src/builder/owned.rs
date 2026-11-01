@@ -7,7 +7,7 @@ use lighthouse_model::ucm::{Symbol, SymbolId, SymbolKind};
 use serde_json::Value;
 
 use super::Builder;
-use crate::naming::Tests;
+use crate::{facts, naming::Tests};
 
 impl Builder<'_> {
     /// The node of the symbol that `test` is credited to by the naming
@@ -20,14 +20,12 @@ impl Builder<'_> {
         let Some(found) = index.get(&test.id) else {
             return Value::Null;
         };
-        let stem = test.file.file_stem().and_then(|s| s.to_str());
-        let stem = stem
-            .and_then(|s| s.strip_suffix("_test"))
-            .unwrap_or_default();
+        let stem = facts::file_stem(self.project, &test.file);
+        let stem = stem.strip_suffix("_test").unwrap_or_default();
         let in_pair = |id: &SymbolId| {
             self.project
                 .symbol(id)
-                .is_some_and(|s| s.file.file_stem().and_then(|f| f.to_str()) == Some(stem))
+                .is_some_and(|s| facts::file_stem(self.project, &s.file) == stem)
         };
         let paired = found.iter().find(|id| in_pair(id));
         // A test that uses something its own file's source declares exercises

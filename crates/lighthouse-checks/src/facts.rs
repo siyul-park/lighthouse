@@ -45,6 +45,9 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
         "visibility": visibility(s.visibility),
         "owner_kind": owner.map_or("", |o| o.kind.as_str()),
         "file": path(&s.file),
+        // The stem of the declaring file: its name without the extension and
+        // what its language ignores in a name (Go's build constraint suffixes).
+        "file_stem": file_stem(project, &s.file),
         "line": s.span.start.line,
         "col": s.span.start.col,
         "pos": pos(s.span.start),
@@ -61,6 +64,20 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
         // its placement and ownership are that declaration's, as the provider says.
         "implementation": project.function(&s.id).is_some_and(|f| f.implementation),
     })
+}
+
+/// The stem of a file: what its provider states, else its name without the
+/// extension. A provider leaves out of it what the language reads as no part
+/// of the name, such as Go's build constraint suffixes.
+pub(crate) fn file_stem(project: &Project, file: &Path) -> String {
+    project
+        .file(file)
+        .and_then(|f| f.facts.get("stem").cloned())
+        .or_else(|| {
+            file.file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+        })
+        .unwrap_or_default()
 }
 
 pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {

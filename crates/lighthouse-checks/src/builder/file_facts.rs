@@ -7,6 +7,7 @@ use lighthouse_model::ucm::File;
 use serde_json::{Value, json};
 
 use super::Builder;
+use crate::facts;
 
 /// The stem suffix of a test file, after which comes the source file's stem.
 const TEST_SUFFIX: &str = "_test";
@@ -38,8 +39,9 @@ impl Builder<'_> {
     /// `{ base, expected, found, sourced }` for a test file named `<base>_test.<ext>`:
     /// the base name, the path of the source file the name asks for and the
     /// path of that file when the project has it (else empty), and whether the
-    /// directory has any source file; null for any
-    /// other file.
+    /// directory has any source file; null for any other file. A provider that
+    /// states a stem (Go's `x_arm64_test.go` is `x_test`) adds a second name to
+    /// look for, after the file's own: `x_arm64.go`, then `x.go`.
     pub(super) fn pair(&self, file: &File) -> Value {
         let Some(base) = file
             .path
@@ -56,10 +58,13 @@ impl Builder<'_> {
             .and_then(|e| e.to_str())
             .unwrap_or_default();
         let expected = file.path.with_file_name(format!("{base}.{extension}"));
-        let found = self
-            .project
-            .file(&expected)
-            .filter(|f| !f.test)
+        let stemmed = facts::file_stem(self.project, &file.path)
+            .strip_suffix(TEST_SUFFIX)
+            .map(|s| file.path.with_file_name(format!("{s}.{extension}")));
+        let found = [Some(expected.clone()), stemmed]
+            .into_iter()
+            .flatten()
+            .find_map(|p| self.project.file(&p).filter(|f| !f.test))
             .map_or_else(String::new, |f| path(&f.path));
         let sourced = self.project.files.iter().any(|f| {
             !f.test

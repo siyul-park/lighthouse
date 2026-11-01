@@ -14,7 +14,8 @@
       ],
       "file": {
         "facts": {
-          "inline_bodies": "[{\"line\":3,\"open\":{\"col\":21,\"line\":3},\"close\":{\"col\":37,\"line\":3},\"statements\":[\"return \\\"linux\\\"\"],\"plain\":true}]"
+          "inline_bodies": "[{\"line\":3,\"open\":{\"col\":21,\"line\":3},\"close\":{\"col\":37,\"line\":3},\"statements\":[\"return \\\"linux\\\"\"],\"plain\":true}]",
+          "stem": "os"
         },
         "path": "os_linux.go"
       },

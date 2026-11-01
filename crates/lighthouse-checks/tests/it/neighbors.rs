@@ -71,7 +71,7 @@ fn pair() -> World {
 type Edit = fn(&mut World);
 
 /// How each field of a node (but the positions) is changed in the callee.
-const NODE_FIELDS: [(&str, Edit); 16] = [
+const NODE_FIELDS: [(&str, Edit); 17] = [
     ("id", |w| rename(w, "b", "n", "b")),
     ("name", |w| rename(w, "b", "m", "renamed")),
     ("name_key", |w| rename(w, "b", "m", "renamed")),
@@ -85,6 +85,11 @@ const NODE_FIELDS: [(&str, Edit); 16] = [
         find(w, "T").kind = SymbolKind::Interface;
     }),
     ("file", |w| {
+        w.files.entry(F3.to_owned()).or_insert(false);
+        find(w, "b").file = F3.into();
+    }),
+    // The stem follows the path, which the digest holds.
+    ("file_stem", |w| {
         w.files.entry(F3.to_owned()).or_insert(false);
         find(w, "b").file = F3.into();
     }),
