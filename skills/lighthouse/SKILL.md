@@ -120,7 +120,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/no-panic` (warn, fixable: unsafe) Production errors do not panic
 - `design/top-down-order` (warn, fixable: unsafe) Users precede what they use
 - `design/vertical-distance` (warn, fixable: unsafe) Related declarations stay close
-- `design/owner-file` (warn) One owner has one cohesive file
+- `design/owner-file` (info) One owner has one cohesive file
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
 - `design/declaration-blocks` (warn) Related constants and variables share a block
 - `design/exported-doc` (warn, fixable: unsafe) Exported symbols are documented

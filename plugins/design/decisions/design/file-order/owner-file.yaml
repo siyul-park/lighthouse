@@ -37,8 +37,9 @@ spec:
     cases (208 methods) from cel (none: its split methods all implement
     interfaces), qlbridge, minivm, this repository and go/types was labelled by
     whether a reviewer following the requirement would move the method or make
-    the file the type's own concern. The rule flags 16 cases and 14 are right
-    (88%; 91% of the 23 methods; 93% held out by corpus), above 80%, so `warn`.
+    the file the type's own concern; a file of one concern across several types
+    (go/types iter.go) is such a concern file. The rule flags 16 cases and 10
+    are right (62%; 67% held out by corpus), below 80%, so `info`.
     Share alone flagged 21 cases at 48%; connectedness and narrow entry, which
     go/types' own concern files fail, lowered precision and are not used. No
     mainstream linter enforces this.
@@ -50,7 +51,7 @@ spec:
     rust: {}
   requirement: Symbols with one owner and a cohesive responsibility SHOULD share a
     file.
-  severity: warn
+  severity: info
   check:
     type: cel
     select: function
