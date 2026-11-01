@@ -938,7 +938,7 @@ spec:
             type three struct{}
       expect:
         - line: 5
-    - name: helper-after-public-functions
+    - name: private-function-before-public-function
       language: go
       kind: invalid
       fixed:
@@ -947,33 +947,89 @@ spec:
             package sample
 
             type counter struct{ n int }
-            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
-            func clamp(n int) int { return min(n, 100) }
 
-            func total() int { return 1 }
+            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
+
+            // Total returns one.
+            func Total() int { return 1 }
+
+            func clamp(n int) int { return min(n, 100) }
       files:
         - path: example.go
           body: |-
             package sample
 
             type counter struct{ n int }
+
             func (c *counter) add(d int) { c.n = clamp(c.n + d) }
-            func total() int { return 1 }
+
             func clamp(n int) int { return min(n, 100) }
+
+            // Total returns one.
+            func Total() int { return 1 }
       expect:
-        - line: 6
-    - name: helper-in-owner-block
+        - line: 10
+    - name: private-helper-after-every-type-block
       language: go
-      kind: valid
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Pass rewrites a program.
+            type Pass struct{ n int }
+
+            type pool struct{ n int }
+
+            // NewPass returns a pass.
+            func NewPass() *Pass { return &Pass{} }
+
+            // Run runs the pass.
+            func (p *Pass) Run() int { return p.roundtrip() }
+
+            func (p *Pass) roundtrip() int {
+            	if expressible(p.n) {
+            		return 1
+            	}
+            	return 0
+            }
+
+            func newPool() *pool { return &pool{} }
+
+            func (p *pool) module() int { return p.n }
+
+            func expressible(n int) bool { return n > 0 }
       files:
         - path: example.go
           body: |-
             package sample
 
-            type counter struct{ n int }
-            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
-            func clamp(n int) int { return min(n, 100) }
-            func total() int { return 1 }
+            // Pass rewrites a program.
+            type Pass struct{ n int }
+
+            type pool struct{ n int }
+
+            // NewPass returns a pass.
+            func NewPass() *Pass { return &Pass{} }
+
+            // Run runs the pass.
+            func (p *Pass) Run() int { return p.roundtrip() }
+
+            func (p *Pass) roundtrip() int {
+            	if expressible(p.n) {
+            		return 1
+            	}
+            	return 0
+            }
+
+            func expressible(n int) bool { return n > 0 }
+
+            func newPool() *pool { return &pool{} }
+
+            func (p *pool) module() int { return p.n }
+      expect:
+        - line: 21
     - name: private-type-after-var
       language: go
       kind: invalid
