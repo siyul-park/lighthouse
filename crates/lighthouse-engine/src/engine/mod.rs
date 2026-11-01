@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    Error, annotations,
+    Error, FixPlan, FixReport, FixRun, annotations,
     cache::{Cache, Error as CacheError},
     documents::Documents,
     facts::FindingFacts,
@@ -413,6 +413,13 @@ impl Engine {
     pub fn with_incomplete(mut self, gaps: Vec<Incomplete>) -> Self {
         self.startup.extend(gaps);
         self
+    }
+
+    /// Fixes the selected findings of the project: see the module docs. The
+    /// analysis must be complete, because a fix that rests on a partial
+    /// analysis is a guess.
+    pub fn fix(&self, plan: &FixPlan, run: &FixRun) -> Result<FixReport, Error> {
+        crate::fix::fix(self, plan, run)
     }
 
     /// Checks the whole project, then reports diagnostics under `paths`.

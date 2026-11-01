@@ -134,6 +134,40 @@ func (r *resolver) importPath(path string) string {
 	return path
 }
 
+// interfacesOf returns the candidate interfaces of a package, computed once:
+// those it names or declares (types.Info.Uses and Defs) and those its calls take as parameters, so
+// an interface of a dependency is found when the package hands a value to it.
+func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
+	cached, _ := r.interfaces.LoadOrStore(pkg, &interfaceSet{})
+	set := cached.(*interfaceSet)
+	set.once.Do(func() {
+		set.byMethod = collectInterfaces(pkg)
+		set.wider = r.widerInterfaces(pkg)
+		set.embedders = collectEmbedders(pkg)
+	})
+	return set
+}
+
+// widerInterfaces returns the interfaces a package may satisfy without naming
+// them, by method name.
+func (r *resolver) widerInterfaces(pkg *packages.Package) map[string][]*types.Interface {
+	r.wider.once.Do(func() {
+		for _, p := range r.declared {
+			r.wider.project = append(r.wider.project, interfacesIn(p.Types, false)...)
+		}
+	})
+	found := newMethodIndex()
+	found.add(r.wider.project...)
+	packages.Visit([]*packages.Package{pkg}, nil, func(p *packages.Package) {
+		cached, ok := r.wider.exported.Load(p.PkgPath)
+		if !ok {
+			cached, _ = r.wider.exported.LoadOrStore(p.PkgPath, interfacesIn(p.Types, true))
+		}
+		found.add(cached.([]*types.Interface)...)
+	})
+	return found.byName
+}
+
 func (m *goModule) locate(importPath string) (string, bool) {
 	if m == nil {
 		return "", false

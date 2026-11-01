@@ -15,7 +15,7 @@ use lighthouse_model::Format;
 use lighthouse_plugin::{ModelClient, Registry};
 use lighthouse_rpc::{CommandModel, PluginCatalog, Registered, StartOptions, Started};
 use lighthouse_spec::{Catalog, CheckKind, Files, FixKind, load_local, local_files};
-use lighthouse_spec::{Config, FILE_NAME, Layers};
+use lighthouse_spec::{Config, FILE_NAME, Layers, Surface};
 
 use crate::{
     Result,
@@ -413,6 +413,16 @@ impl Session {
             }
         }
         Ok(registry)
+    }
+
+    /// How long signals are kept, in seconds.
+    pub(crate) fn retention(&self) -> u64 {
+        self.config.signals().retention().as_secs()
+    }
+
+    /// Whether the agent hears about signals.
+    pub fn surfaces(&self) -> bool {
+        self.config.signals().surface() == Surface::On
     }
 }
 

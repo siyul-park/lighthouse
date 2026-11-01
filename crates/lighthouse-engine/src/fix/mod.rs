@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 pub use edits::unified_diff;
 use model::ModelFix;
 pub use model::{BatchTrace, ModelCounts, ToolCounts};
+pub(crate) use run::fix;
 
 use crate::{FixTimings, Needs, Run};
 

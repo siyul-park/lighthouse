@@ -15,7 +15,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_ml::metrics::Rate;
 use lighthouse_model::{AgentKind, Attribution, Diagnostic, Role, SignalClass, SignalStatus};
-use lighthouse_spec::{DecisionStatus, Surface};
+use lighthouse_spec::DecisionStatus;
 pub use lighthouse_store::Signal;
 use lighthouse_store::{NewSignal, SignalFilter, Store};
 use schemars::JsonSchema;
@@ -30,18 +30,6 @@ pub use speak::{digest, prompt_context, stop_context};
 pub use strip::{Stripped, stripped};
 
 use crate::{Result, Session};
-
-impl Session {
-    /// How long signals are kept, in seconds.
-    fn retention(&self) -> u64 {
-        self.config.signals().retention().as_secs()
-    }
-
-    /// Whether the agent hears about signals.
-    pub fn surfaces(&self) -> bool {
-        self.config.signals().surface() == Surface::On
-    }
-}
 
 /// What an edit did to one finding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

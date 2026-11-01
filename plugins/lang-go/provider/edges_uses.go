@@ -153,19 +153,6 @@ func (w *uses) add(kind, to string, at ast.Node) {
 	}
 }
 
-// usages are the distinct uses of a body in order of first use, and every
-// place a use occurs.
-func (u *unit) usages(d *ast.FuncDecl) ([]usage, []occurrence) {
-	w := &uses{
-		res:     u.res,
-		info:    u.info(),
-		handled: map[ast.Node]bool{},
-		seen:    map[usage]bool{},
-	}
-	ast.Walk(w, d.Body)
-	return w.list, w.all
-}
-
 // callee strips parentheses and explicit type arguments from a call's function.
 func callee(e ast.Expr) ast.Expr {
 	for {

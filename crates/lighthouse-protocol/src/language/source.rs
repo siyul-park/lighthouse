@@ -4,8 +4,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::wire::EmbeddedSource;
-
 /// A provider-specific AST and its independent source-map sidecar.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Source {
@@ -231,43 +229,11 @@ pub fn pointer_child(parent: &str, token: &str) -> String {
     format!("{parent}/{}", token.replace('~', "~0").replace('/', "~1"))
 }
 
-/// Whether `child` is strictly nested below `parent` in JSON Pointer space.
-fn pointer_tokens_below(child: &[String], parent: &[String]) -> bool {
-    child.len() > parent.len() && child.starts_with(parent)
-}
-
-fn decode_pointer_token(token: &str) -> Option<String> {
-    let mut decoded = String::with_capacity(token.len());
-    let mut chars = token.chars();
-    while let Some(ch) = chars.next() {
-        if ch != '~' {
-            decoded.push(ch);
-            continue;
-        }
-        match chars.next()? {
-            '0' => decoded.push('~'),
-            '1' => decoded.push('/'),
-            _ => return None,
-        }
-    }
-    let canonical = decoded.replace('~', "~0").replace('/', "~1");
-    (canonical == token).then_some(decoded)
-}
-
-impl EmbeddedSource {
-    /// Whether the original scalar range and the decoded-text map are valid
-    /// against the host text.
-    pub fn validate(&self, host: &str) -> Result<(), String> {
-        let pointer = self.source_pointer.as_str();
-        let range = validate_source_range(self.source_range, host, pointer)?;
-        match &self.text_map {
-            Some(segments) => validate_text_map(segments, &self.text, host, Some(range), pointer),
-            None => Ok(()),
-        }
-    }
-}
-
-fn validate_source_range(range: [u32; 2], host: &str, pointer: &str) -> Result<[usize; 2], String> {
+pub(super) fn validate_source_range(
+    range: [u32; 2],
+    host: &str,
+    pointer: &str,
+) -> Result<[usize; 2], String> {
     let [start, end] = range.map(|value| value as usize);
     if start > end
         || end > host.len()
@@ -281,7 +247,7 @@ fn validate_source_range(range: [u32; 2], host: &str, pointer: &str) -> Result<[
     Ok([start, end])
 }
 
-fn validate_text_map(
+pub(super) fn validate_text_map(
     segments: &[TextMapSegment],
     text: &str,
     host: &str,
@@ -325,6 +291,29 @@ fn validate_text_map(
         ));
     }
     Ok(())
+}
+
+/// Whether `child` is strictly nested below `parent` in JSON Pointer space.
+fn pointer_tokens_below(child: &[String], parent: &[String]) -> bool {
+    child.len() > parent.len() && child.starts_with(parent)
+}
+
+fn decode_pointer_token(token: &str) -> Option<String> {
+    let mut decoded = String::with_capacity(token.len());
+    let mut chars = token.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '~' {
+            decoded.push(ch);
+            continue;
+        }
+        match chars.next()? {
+            '0' => decoded.push('~'),
+            '1' => decoded.push('/'),
+            _ => return None,
+        }
+    }
+    let canonical = decoded.replace('~', "~0").replace('/', "~1");
+    (canonical == token).then_some(decoded)
 }
 
 #[cfg(test)]

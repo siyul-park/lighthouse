@@ -96,6 +96,16 @@ func (pl *planner) environment(batches []*batch) (string, []moduleRoot, bool) {
 	return digest(parts...), modules, true
 }
 
+// interfaceDigest digests the interface declarations of every unit that is
+// analyzed: a type's `implements` edges depend on all of them.
+func (pl *planner) interfaceDigest() string {
+	var parts []string
+	for _, u := range pl.requestedUnits {
+		parts = append(parts, u.rel, u.ifaces)
+	}
+	return digest(parts...)
+}
+
 // goEnv is the output of `go env -json` for goEnvVars.
 func (pl *planner) goEnv(dir string) (string, error) {
 	cmd := exec.Command(pl.r.opts.bin, append([]string{"env", "-json"}, goEnvVars...)...)

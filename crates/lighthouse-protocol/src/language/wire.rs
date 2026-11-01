@@ -8,9 +8,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use url::Url;
 
-use super::frame::{ErrorObject, INVALID_PARAMS};
 pub use super::source::{
     Mapping, Source, TextMapSegment, pointer_child, pointer_tokens, pointer_value,
+};
+use super::{
+    frame::{ErrorObject, INVALID_PARAMS},
+    source::{validate_source_range, validate_text_map},
 };
 
 /// Every method with its params and result. Exists to anchor the schema.
@@ -348,6 +351,19 @@ pub struct EmbeddedSource {
     /// Fine-grained mapping from text bytes to the physical host file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_map: Option<Vec<TextMapSegment>>,
+}
+
+impl EmbeddedSource {
+    /// Whether the original scalar range and the decoded-text map are valid
+    /// against the host text.
+    pub fn validate(&self, host: &str) -> Result<(), String> {
+        let pointer = self.source_pointer.as_str();
+        let range = validate_source_range(self.source_range, host, pointer)?;
+        match &self.text_map {
+            Some(segments) => validate_text_map(segments, &self.text, host, Some(range), pointer),
+            None => Ok(()),
+        }
+    }
 }
 
 /// Part of the request that was not analyzed; "not checked" is not "passed".

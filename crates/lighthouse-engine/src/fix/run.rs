@@ -59,48 +59,6 @@ struct Standing {
     shown: Result<Preview, DeclinedFix>,
 }
 
-impl Engine {
-    /// Fixes the selected findings of the project: see the module docs. The
-    /// analysis must be complete, because a fix that rests on a partial
-    /// analysis is a guess.
-    pub fn fix(&self, plan: &FixPlan, run: &FixRun) -> Result<FixReport, Error> {
-        if let Some(id) = &run.fixer {
-            if self.registry.fixer(id).is_none() && plan.command(id).is_none() {
-                return Err(Error::Fix(format!("unknown fixer `{id}`")));
-            }
-            if run.rules.is_empty() && run.fingerprints.is_empty() {
-                return Err(Error::Fix(
-                    "a named fixer needs the rules or fingerprints it is for".to_owned(),
-                ));
-            }
-        }
-        let (cache, kept) = match self.open_cache() {
-            Some(Ok(cache)) => (Some(cache), None),
-            Some(Err(e)) => (None, Some(format!("the previews are not kept: {e}"))),
-            None => (None, None),
-        };
-        let proposer = Proposer::new(self, plan, run).keeping(cache);
-        let mut orchestrator = Orchestrator {
-            proposer: proposer.asking_models(),
-            texts: Overlays::new(),
-            original: BTreeMap::new(),
-            trail: Trail::default(),
-            applied: Vec::new(),
-            declined: BTreeMap::new(),
-            notes: kept.into_iter().collect(),
-            rounds: 0,
-            previewable: BTreeMap::new(),
-            previews: Vec::new(),
-            timings: FixTimings::default(),
-            round: 0,
-        };
-        let outcome = orchestrator
-            .rounds()
-            .and_then(|outcome| orchestrator.model_round(outcome));
-        orchestrator.write(outcome)
-    }
-}
-
 impl Orchestrator<'_> {
     /// A check of the project over the texts of the run, timed.
     pub(super) fn recheck(&mut self) -> Result<Run, Error> {
@@ -368,4 +326,44 @@ impl Orchestrator<'_> {
         }
         hash.hex()
     }
+}
+
+/// Fixes the selected findings of the project: see the module docs. The
+/// analysis must be complete, because a fix that rests on a partial
+/// analysis is a guess.
+pub(crate) fn fix(engine: &Engine, plan: &FixPlan, run: &FixRun) -> Result<FixReport, Error> {
+    if let Some(id) = &run.fixer {
+        if engine.registry.fixer(id).is_none() && plan.command(id).is_none() {
+            return Err(Error::Fix(format!("unknown fixer `{id}`")));
+        }
+        if run.rules.is_empty() && run.fingerprints.is_empty() {
+            return Err(Error::Fix(
+                "a named fixer needs the rules or fingerprints it is for".to_owned(),
+            ));
+        }
+    }
+    let (cache, kept) = match engine.open_cache() {
+        Some(Ok(cache)) => (Some(cache), None),
+        Some(Err(e)) => (None, Some(format!("the previews are not kept: {e}"))),
+        None => (None, None),
+    };
+    let proposer = Proposer::new(engine, plan, run).keeping(cache);
+    let mut orchestrator = Orchestrator {
+        proposer: proposer.asking_models(),
+        texts: Overlays::new(),
+        original: BTreeMap::new(),
+        trail: Trail::default(),
+        applied: Vec::new(),
+        declined: BTreeMap::new(),
+        notes: kept.into_iter().collect(),
+        rounds: 0,
+        previewable: BTreeMap::new(),
+        previews: Vec::new(),
+        timings: FixTimings::default(),
+        round: 0,
+    };
+    let outcome = orchestrator
+        .rounds()
+        .and_then(|outcome| orchestrator.model_round(outcome));
+    orchestrator.write(outcome)
 }

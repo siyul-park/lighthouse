@@ -24,21 +24,6 @@ type recordFile struct {
 	Fragment json.RawMessage `json:"fragment"`
 }
 
-// record stores the units the analysis completed without a problem, and drops
-// what the cache holds of units that changed or are gone.
-func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
-	current := map[string]string{}
-	for _, u := range plan.units {
-		current[unitStem(u.rel)] = u.key
-	}
-	for _, u := range plan.misses {
-		if rec, ok := recordOf(u, sub); ok {
-			store.write(unitName(u.rel, u.key), rec)
-		}
-	}
-	store.sweep(current)
-}
-
 // implementsOf decodes the `implements` edges of each file of the record.
 func (rec unitRecord) implementsOf() map[string][]sdk.Edge {
 	out := map[string][]sdk.Edge{}
@@ -65,18 +50,6 @@ func (rec unitRecord) covers(u *cacheUnit) bool {
 		}
 	}
 	return true
-}
-
-func (plan *cachePlan) stats() RunStats {
-	var s RunStats
-	for _, u := range plan.units {
-		if _, hit := plan.hits[u]; hit {
-			s.Hits = append(s.Hits, u.rel)
-		} else {
-			s.Misses = append(s.Misses, u.rel)
-		}
-	}
-	return s
 }
 
 // reuseImplements puts the `implements` edges of the replaced records where the

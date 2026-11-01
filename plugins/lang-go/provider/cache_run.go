@@ -1,12 +1,10 @@
 package provider
 
 import (
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 )
@@ -145,47 +143,16 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 	return plan, true
 }
 
-// edits are the overlays of a request by absolute path, when each stands in
-// for the text of an existing Go file: a unit is keyed on what its files say,
-// so the text of an edit is read where the disk's would be. An overlay that
-// adds, empties or removes a file, or is not Go, changes what the directory
-// holds and so what the units are: the request is then analyzed uncached.
-func (r *run) edits(overlays []sdk.Overlay) (map[string][]byte, bool) {
-	edits := make(map[string][]byte, len(overlays))
-	for _, o := range overlays {
-		path := filepath.Join(r.root, filepath.FromSlash(o.Path))
-		info, err := os.Stat(path)
-		if !strings.HasSuffix(o.Path, ".go") || o.Text == "" || err != nil || !info.Mode().IsRegular() {
-			return nil, false
+func (plan *cachePlan) stats() RunStats {
+	var s RunStats
+	for _, u := range plan.units {
+		if _, hit := plan.hits[u]; hit {
+			s.Hits = append(s.Hits, u.rel)
+		} else {
+			s.Misses = append(s.Misses, u.rel)
 		}
-		edits[path] = []byte(o.Text)
 	}
-	return edits, true
-}
-
-// candidates are the requested files a provider analyzes, sorted, and the
-// ignored ones.
-func (r *run) candidates() (candidates, ignored []string) {
-	for rel := range r.requested {
-		if ignoredPath(rel) {
-			ignored = append(ignored, rel)
-			continue
-		}
-		candidates = append(candidates, rel)
-	}
-	sort.Strings(candidates)
-	sort.Strings(ignored)
-	return candidates, ignored
-}
-
-// interfaceDigest digests the interface declarations of every unit that is
-// analyzed: a type's `implements` edges depend on all of them.
-func (pl *planner) interfaceDigest() string {
-	var parts []string
-	for _, u := range pl.requestedUnits {
-		parts = append(parts, u.rel, u.ifaces)
-	}
-	return digest(parts...)
+	return s
 }
 
 // analyzeMisses runs the uncached analysis over the missed units, plus the

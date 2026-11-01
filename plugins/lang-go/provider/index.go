@@ -139,6 +139,39 @@ func (r *run) index() {
 	}
 }
 
+// edits are the overlays of a request by absolute path, when each stands in
+// for the text of an existing Go file: a unit is keyed on what its files say,
+// so the text of an edit is read where the disk's would be. An overlay that
+// adds, empties or removes a file, or is not Go, changes what the directory
+// holds and so what the units are: the request is then analyzed uncached.
+func (r *run) edits(overlays []sdk.Overlay) (map[string][]byte, bool) {
+	edits := make(map[string][]byte, len(overlays))
+	for _, o := range overlays {
+		path := filepath.Join(r.root, filepath.FromSlash(o.Path))
+		info, err := os.Stat(path)
+		if !strings.HasSuffix(o.Path, ".go") || o.Text == "" || err != nil || !info.Mode().IsRegular() {
+			return nil, false
+		}
+		edits[path] = []byte(o.Text)
+	}
+	return edits, true
+}
+
+// candidates are the requested files a provider analyzes, sorted, and the
+// ignored ones.
+func (r *run) candidates() (candidates, ignored []string) {
+	for rel := range r.requested {
+		if ignoredPath(rel) {
+			ignored = append(ignored, rel)
+			continue
+		}
+		candidates = append(candidates, rel)
+	}
+	sort.Strings(candidates)
+	sort.Strings(ignored)
+	return candidates, ignored
+}
+
 func (r *run) finish() sdk.IndexResult {
 	paths := make([]string, 0, len(r.fragments))
 	for path := range r.fragments {

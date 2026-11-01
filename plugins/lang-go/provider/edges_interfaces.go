@@ -3,8 +3,6 @@ package provider
 import (
 	"go/types"
 	"sync"
-
-	"golang.org/x/tools/go/packages"
 )
 
 // wider are the interfaces beyond what a package names: every interface
@@ -40,26 +38,6 @@ func (m *methodIndex) add(list ...*types.Interface) {
 			m.byName[name] = append(m.byName[name], iface)
 		}
 	}
-}
-
-// widerInterfaces returns the interfaces a package may satisfy without naming
-// them, by method name.
-func (r *resolver) widerInterfaces(pkg *packages.Package) map[string][]*types.Interface {
-	r.wider.once.Do(func() {
-		for _, p := range r.declared {
-			r.wider.project = append(r.wider.project, interfacesIn(p.Types, false)...)
-		}
-	})
-	found := newMethodIndex()
-	found.add(r.wider.project...)
-	packages.Visit([]*packages.Package{pkg}, nil, func(p *packages.Package) {
-		cached, ok := r.wider.exported.Load(p.PkgPath)
-		if !ok {
-			cached, _ = r.wider.exported.LoadOrStore(p.PkgPath, interfacesIn(p.Types, true))
-		}
-		found.add(cached.([]*types.Interface)...)
-	})
-	return found.byName
 }
 
 // interfacesIn lists the interfaces declared at the top level of a package:

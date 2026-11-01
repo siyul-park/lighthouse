@@ -90,3 +90,18 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 func (p *Provider) Stats() RunStats {
 	return p.last
 }
+
+// record stores the units the analysis completed without a problem, and drops
+// what the cache holds of units that changed or are gone.
+func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
+	current := map[string]string{}
+	for _, u := range plan.units {
+		current[unitStem(u.rel)] = u.key
+	}
+	for _, u := range plan.misses {
+		if rec, ok := recordOf(u, sub); ok {
+			store.write(unitName(u.rel, u.key), rec)
+		}
+	}
+	store.sweep(current)
+}
