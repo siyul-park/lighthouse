@@ -1918,7 +1918,7 @@ Also: rust
 
 `design/declaration-blocks` · file · warn · cel · go
 
-*Constants and variables that share a type are one concept, and one block shows it: `const ( ... )` for the values of a type, `var ( ... )` for the sentinel errors or the compile-time interface assertions that belong together. Go: a declaration's keys are the named types behind its declared type and its value (`Kind`, `error`, `*Array` is `Array`, `TypedArray[bool]` is `TypedArray`). An interface assertion `var _ I = T` has two keys, the interface and the concrete type. Basic types and untyped constants give no key. Declarations of one keyword that share a key belong in one block, whether they share the interface or the concrete type of an assertion. A block may hold other declarations of its keyword. The keys are compared within one group of `design/declaration-groups` (public constants, private constants, variables), and never across groups. A finding is reported once per file, at the first declaration outside the block of the first declaration that shares its key, and names how many more there are. Other languages: not applicable. Rust checks an interface with `impl`. Uber Go Style Guide, "Group Similar Declarations": "Only group related declarations. Do not group declarations that are unrelated." and "Verify Interface Compliance" (`var _ http.Handler = (*Handler)(nil)`); Effective Go, "Interface checks". golangci-lint `grouper` and `decorder` group every declaration of a file, which is wider than this rule, and neither is in the linters golangci-lint runs by default. The severity `warn` is the project's choice, outside the precedent gate.*
+*Constants and variables that share a type are one concept, and one block shows it: `const ( ... )` for the values of a type, `var ( ... )` for the sentinel errors that belong together. Go: a declaration's keys are the named types behind its declared type and its value (`Kind`, `error`, `*Array` is `Array`, `TypedArray[bool]` is `TypedArray`). Basic types and untyped constants give no key. Declarations of one keyword that share a key belong in one block. A block may hold other declarations of its keyword. A blank declaration, a compile-time interface assertion `var _ I = T`, declares no name: it is not asked to join a block and no declaration is asked to join its block. The keys are compared within one group of `design/declaration-groups` (public constants, private constants, variables), and never across groups. A finding is reported once per file, at the first declaration outside the block of the first declaration that shares its key, and names how many more there are. Other languages: not applicable. Rust checks an interface with `impl`. Uber Go Style Guide, "Group Similar Declarations": "Only group related declarations. Do not group declarations that are unrelated." and "Verify Interface Compliance" (`var _ http.Handler = (*Handler)(nil)`); Effective Go, "Interface checks". golangci-lint `grouper` and `decorder` group every declaration of a file, which is wider than this rule, and neither is in the linters golangci-lint runs by default. The severity `warn` is the project's choice, outside the precedent gate.*
 
 Top-level `const` and `var` declarations that share a type MUST be declared in one block of their keyword (`const ( ... )`, `var ( ... )`).
 
@@ -1937,11 +1937,11 @@ type B struct{}
 
 func (B) V() {}
 
-var _ Value = A{}
+var a Value = A{}
 
 var x = 1
 
-var _ Value = B{}
+var b Value = B{}
 ```
 
 ```go valid
@@ -1961,8 +1961,8 @@ type B struct{}
 func (B) V() {}
 
 var (
-	_ Value = A{}
-	_ Value = B{}
+	a Value = A{}
+	b Value = B{}
 )
 
 var count = 1

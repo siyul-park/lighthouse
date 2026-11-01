@@ -9,16 +9,15 @@ spec:
   context: >-
     Constants and variables that share a type are one concept, and one block
     shows it: `const ( ... )` for the values of a type, `var ( ... )` for the
-    sentinel errors or the compile-time interface assertions that belong
-    together.
+    sentinel errors that belong together.
 
     Go: a declaration's keys are the named types behind its declared type and
     its value (`Kind`, `error`, `*Array` is `Array`, `TypedArray[bool]` is
-    `TypedArray`). An interface assertion `var _ I = T` has two keys, the
-    interface and the concrete type. Basic types and untyped constants give no
-    key. Declarations of one keyword that share a key belong in one block,
-    whether they share the interface or the concrete type of an assertion. A
-    block may hold other declarations of its keyword. The keys are compared
+    `TypedArray`). Basic types and untyped constants give no key. Declarations
+    of one keyword that share a key belong in one block. A block may hold other
+    declarations of its keyword. A blank declaration, a compile-time interface
+    assertion `var _ I = T`, declares no name: it is not asked to join a block
+    and no declaration is asked to join its block. The keys are compared
     within one group of `design/declaration-groups` (public constants, private
     constants, variables), and never across groups. A finding is reported once
     per file, at the first declaration outside the block of the first
@@ -48,7 +47,7 @@ spec:
     variables:
       - name: specs
         expression: >-
-          file.blocks.map(b, b.specs.map(s, {
+          file.blocks.map(b, b.specs.filter(s, !('_' in s.names)).map(s, {
             'keyword': b.keyword, 'block': b.line, 'name': s.names[0], 'line': s.line, 'keys': s.keys,
             'group': b.keyword == 'var' ? 'var' : (s.public ? 'public-const' : 'private-const')})).flatten()
       - name: lead
@@ -84,7 +83,7 @@ spec:
       - "Effective Go, Interface checks: https://go.dev/doc/effective_go#blank_implements"
       - "golangci-lint grouper and decorder: https://golangci-lint.run/usage/linters/"
   examples:
-    - name: assertions-by-interface
+    - name: vars-by-type
       language: go
       kind: invalid
       files:
@@ -102,14 +101,14 @@ spec:
 
             func (B) V() {}
 
-            var _ Value = A{}
+            var a Value = A{}
 
             var x = 1
 
-            var _ Value = B{}
+            var b Value = B{}
       expect:
         - line: 17
-    - name: assertions-by-type
+    - name: vars-by-concrete-type
       language: go
       kind: invalid
       files:
@@ -127,9 +126,9 @@ spec:
 
             func (*T) Y() {}
 
-            var _ X = (*T)(nil)
+            var x X = (*T)(nil)
 
-            var _ Y = (*T)(nil)
+            var y Y = (*T)(nil)
       expect:
         - line: 15
     - name: one-block-per-component
@@ -155,8 +154,38 @@ spec:
             func (B) V() {}
 
             var (
-            	_ Value = A{}
-            	_ Value = B{}
+            	a Value = A{}
+            	b Value = B{}
             )
 
             var count = 1
+    - name: assertions-join-no-block
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Value is part of the example.
+            type Value interface{ V() }
+
+            // A is part of the example.
+            type A struct{}
+
+            func (A) V() {}
+
+            // B is part of the example.
+            type B struct{}
+
+            func (B) V() {}
+
+            var (
+            	first Value = A{}
+            )
+
+            var count = 1
+
+            var _ Value = B{}
+
+            var _ Value = A{}
