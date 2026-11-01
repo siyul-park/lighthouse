@@ -17,7 +17,11 @@ spec:
     file (its types, constants, variables and functions that take no testing
     handle) follow the same order; tests and test helpers are placed by
     `testing/file-layout`. Order: public types; private types; public
-    constants; private constants; variables; all `init` functions; one block
+    constants; private constants; variables; all `init` functions; public
+    functions, the option builders of types without methods first (Uber:
+    exported functions appear first in a file, after the struct, const and var
+    definitions, and plain utility functions towards the end, the private
+    functions); one block
     per type, in the order the types are declared, each with the functional
     option builders of the type first (a function that returns a func taking
     the type or a pointer to it, or a named type of that kind, such as
@@ -31,8 +35,7 @@ spec:
     Go idiom of Effective Go, "Package names": `ring.New` — a function with no
     receiver that returns the type), then its exported methods,
     then its clone, conversion and interface hooks, then its unexported
-    methods; public functions, the option builders of types without methods first;
-    private functions.
+    methods; private functions.
 
     Rust: The same principle, from the concepts to the machinery, with a
     type kept next to its impl blocks because that is how Rust code reads.
@@ -90,8 +93,8 @@ spec:
           - private-const
           - var
           - init
-          - method
           - public-function
+          - method
           - private-function
         description: >-
           The group order of a file, first to last. A declaration belongs to the
@@ -547,6 +550,9 @@ spec:
 
             func init() { ready = true }
 
+            // Open is part of the example.
+            func Open() *Service { return NewService() }
+
             // NewService is part of the example.
             func NewService() *Service { return &Service{ok: true} }
 
@@ -556,9 +562,6 @@ spec:
             func (s *Service) String() string { return "service" }
 
             func (s *Service) check() bool { return s.ok }
-
-            // Open is part of the example.
-            func Open() *Service { return NewService() }
     - name: constructor-after-methods
       language: go
       kind: invalid
