@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use lighthouse_model::ucm::{EdgeKind, Node, Project, Symbol, SymbolId, SymbolKind, Target};
 
-use super::graph::Graph;
+use lighthouse_model::graph::Graph;
 
 /// The size from which the largest cycle is the core of a system.
 const CORE_MIN: u32 = 2;

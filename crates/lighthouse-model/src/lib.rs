@@ -25,6 +25,7 @@ mod vars;
 
 pub mod annotation;
 pub mod glob;
+pub mod graph;
 pub mod ucm;
 
 pub use diagnostic::{

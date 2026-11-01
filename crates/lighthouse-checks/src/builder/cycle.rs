@@ -7,7 +7,7 @@ use lighthouse_model::ucm::{EdgeKind, Node, Project, Target};
 use serde_json::{Value, json};
 
 use super::Builder;
-use crate::metrics::graph::Graph;
+use lighthouse_model::graph::Graph;
 
 impl Builder<'_> {
     /// The paths of the modules in the strongly connected component of the

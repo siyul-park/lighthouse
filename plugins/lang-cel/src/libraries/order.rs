@@ -17,6 +17,7 @@ use cel::{
         value::{CowVal, Val},
     },
 };
+use lighthouse_model::graph::Graph;
 use lighthouse_plugin::{Overload, Precedence};
 
 use crate::{Library, function, take_args};
@@ -121,12 +122,19 @@ fn users_first<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Exec
 /// them, and keep file order among themselves.
 fn user_ranks(uses: &[Vec<usize>]) -> Vec<i64> {
     let n = uses.len();
-    let graph: Vec<Vec<usize>> = uses
+    let edges: Vec<(usize, usize)> = uses
         .iter()
-        .map(|found| found.iter().copied().filter(|&used| used < n).collect())
+        .enumerate()
+        .flat_map(|(user, found)| found.iter().map(move |&used| (user, used)))
+        .filter(|&(_, used)| used < n)
         .collect();
-    let component = components(&graph);
-    let count = component.iter().copied().max().map_or(0, |last| last + 1);
+    let node = |at: usize| u32::try_from(at).unwrap_or(u32::MAX);
+    let (component, count) = Graph::new(
+        n,
+        edges.iter().map(|&(user, used)| (node(user), node(used))),
+    )
+    .components();
+    let component: Vec<usize> = component.into_iter().map(|unit| unit as usize).collect();
     let mut first = vec![usize::MAX; count];
     let mut members: Vec<Vec<usize>> = vec![Vec::new(); count];
     for (at, &unit) in component.iter().enumerate() {
@@ -135,10 +143,8 @@ fn user_ranks(uses: &[Vec<usize>]) -> Vec<i64> {
     }
     let mut calls: Vec<Vec<usize>> = vec![Vec::new(); count];
     let mut waiting = vec![0_usize; count];
-    for (caller, callees) in graph.iter().enumerate() {
-        for &callee in callees {
-            calls[component[caller]].push(component[callee]);
-        }
+    for &(user, used) in &edges {
+        calls[component[user]].push(component[used]);
     }
     for (unit, callees) in calls.iter_mut().enumerate() {
         callees.sort_unstable();
@@ -167,60 +173,6 @@ fn user_ranks(uses: &[Vec<usize>]) -> Vec<i64> {
         }
     }
     ranks
-}
-
-/// The strongly connected component of each node of `edges` (Tarjan, iterative);
-/// components are numbered in the order they are completed.
-fn components(edges: &[Vec<usize>]) -> Vec<usize> {
-    const UNSEEN: usize = usize::MAX;
-    let n = edges.len();
-    let mut index = vec![UNSEEN; n];
-    let mut low = vec![0_usize; n];
-    let mut on_stack = vec![false; n];
-    let mut component = vec![UNSEEN; n];
-    let mut stack = Vec::new();
-    let mut counter = 0;
-    let mut found = 0;
-    for root in 0..n {
-        if index[root] != UNSEEN {
-            continue;
-        }
-        let mut work = vec![(root, 0_usize)];
-        while let Some(&(node, next)) = work.last() {
-            if next == 0 {
-                index[node] = counter;
-                low[node] = counter;
-                counter += 1;
-                stack.push(node);
-                on_stack[node] = true;
-            }
-            if let Some(&to) = edges[node].get(next) {
-                work.pop();
-                work.push((node, next + 1));
-                if index[to] == UNSEEN {
-                    work.push((to, 0));
-                } else if on_stack[to] {
-                    low[node] = low[node].min(index[to]);
-                }
-                continue;
-            }
-            work.pop();
-            if let Some(&(parent, _)) = work.last() {
-                low[parent] = low[parent].min(low[node]);
-            }
-            if low[node] == index[node] {
-                while let Some(member) = stack.pop() {
-                    on_stack[member] = false;
-                    component[member] = found;
-                    if member == node {
-                        break;
-                    }
-                }
-                found += 1;
-            }
-        }
-    }
-    component
 }
 
 fn indexes<'b, 'v>(values: impl IntoIterator<Item = i64>) -> CowVal<'b, 'v> {
