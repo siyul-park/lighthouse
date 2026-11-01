@@ -1,0 +1,661 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::I#interface",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// I is implemented by T."
+        },
+        {
+          "attached_to": ".::A#interface",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "text": "// A is part of the example."
+        },
+        {
+          "attached_to": ".::B#interface",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "text": "// B is part of the example."
+        },
+        {
+          "attached_to": ".::T#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "text": "// T implements I."
+        },
+        {
+          "attached_to": ".::T::M#method",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "text": "// M is part of the example."
+        },
+        {
+          "attached_to": ".::_:blank.go:21#var",
+          "span": {
+            "end": {
+              "col": 38,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "text": "// The assertions below need no name."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::I#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::I#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::I::M#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::A#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::A#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::A::M#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::B#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::B#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::B::M#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::T#type"
+        },
+        {
+          "from": {
+            "symbol": ".::T#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::T::M#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::x#var"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::_:blank.go:21#var"
+        },
+        {
+          "from": {
+            "symbol": ".::_:blank.go:21#var"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 21
+            },
+            "start": {
+              "col": 11,
+              "line": 21
+            }
+          },
+          "to": ".::T"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::_:blank.go:23#var"
+        },
+        {
+          "from": {
+            "symbol": ".::_:blank.go:23#var"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 23
+            },
+            "start": {
+              "col": 13,
+              "line": 23
+            }
+          },
+          "to": ".::T"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::_:blank.go:26#var"
+        },
+        {
+          "from": {
+            "symbol": ".::_:blank.go:26#var"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 9,
+              "line": 26
+            },
+            "start": {
+              "col": 8,
+              "line": 26
+            }
+          },
+          "to": ".::x"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::_:blank.go:27#var"
+        },
+        {
+          "from": {
+            "symbol": ".::_:blank.go:27#var"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 9,
+              "line": 27
+            },
+            "start": {
+              "col": 8,
+              "line": 27
+            }
+          },
+          "to": ".::x"
+        }
+      ],
+      "file": {
+        "facts": {
+          "blocks": "[{\"keyword\":\"var\",\"line\":18,\"specs\":[{\"names\":[\"x\"],\"line\":18,\"public\":false,\"keys\":[\"example.com/blank.T\"]}]},{\"keyword\":\"var\",\"line\":21,\"specs\":[{\"names\":[\"_\"],\"line\":21,\"public\":false,\"keys\":[\"example.com/blank.I\",\"example.com/blank.T\"]}]},{\"keyword\":\"var\",\"line\":23,\"specs\":[{\"names\":[\"_\"],\"line\":23,\"public\":false,\"keys\":[\"example.com/blank.I\",\"example.com/blank.T\"]}]},{\"keyword\":\"var\",\"line\":25,\"specs\":[{\"names\":[\"_\"],\"line\":26,\"public\":false,\"keys\":[\"example.com/blank.A\",\"example.com/blank.T\"]},{\"names\":[\"_\"],\"line\":27,\"public\":false,\"keys\":[\"example.com/blank.B\",\"example.com/blank.T\"]}]},{\"keyword\":\"const\",\"line\":30,\"specs\":[{\"names\":[\"_\"],\"line\":30,\"public\":false,\"keys\":[]}]}]"
+        },
+        "path": "blank.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": ".::T::M#method",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "blank",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "I is implemented by T.",
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "blank.go",
+          "id": ".::I#interface",
+          "kind": "interface",
+          "name": "I",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 4
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 4
+            },
+            "start": {
+              "col": 19,
+              "line": 4
+            }
+          },
+          "file": "blank.go",
+          "id": ".::I::M#method",
+          "kind": "method",
+          "name": "M",
+          "owner": ".::I#interface",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 4
+            },
+            "start": {
+              "col": 19,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "A is part of the example.",
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "blank.go",
+          "id": ".::A#interface",
+          "kind": "interface",
+          "name": "A",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 7
+            },
+            "start": {
+              "col": 6,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 7
+            },
+            "start": {
+              "col": 19,
+              "line": 7
+            }
+          },
+          "file": "blank.go",
+          "id": ".::A::M#method",
+          "kind": "method",
+          "name": "M",
+          "owner": ".::A#interface",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 7
+            },
+            "start": {
+              "col": 19,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "B is part of the example.",
+          "extent": {
+            "end": {
+              "col": 24,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "blank.go",
+          "id": ".::B#interface",
+          "kind": "interface",
+          "name": "B",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 10
+            },
+            "start": {
+              "col": 6,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 10
+            },
+            "start": {
+              "col": 19,
+              "line": 10
+            }
+          },
+          "file": "blank.go",
+          "id": ".::B::M#method",
+          "kind": "method",
+          "name": "M",
+          "owner": ".::B#interface",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 10
+            },
+            "start": {
+              "col": 19,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "T implements I.",
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "blank.go",
+          "id": ".::T#type",
+          "kind": "type",
+          "name": "T",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 13
+            },
+            "start": {
+              "col": 6,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "M is part of the example.",
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "file": "blank.go",
+          "id": ".::T::M#method",
+          "kind": "method",
+          "name": "M",
+          "owner": ".::T#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 8,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "blank.go",
+          "id": ".::x#var",
+          "kind": "var",
+          "name": "x",
+          "span": {
+            "end": {
+              "col": 8,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "The assertions below need no name.",
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "blank.go",
+          "id": ".::_:blank.go:21#var",
+          "kind": "var",
+          "name": "_",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 21
+            },
+            "start": {
+              "col": 5,
+              "line": 21
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
+          "file": "blank.go",
+          "id": ".::_:blank.go:23#var",
+          "kind": "var",
+          "name": "_",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 23
+            },
+            "start": {
+              "col": 5,
+              "line": 23
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 9,
+              "line": 26
+            },
+            "start": {
+              "col": 2,
+              "line": 26
+            }
+          },
+          "file": "blank.go",
+          "id": ".::_:blank.go:26#var",
+          "kind": "var",
+          "name": "_",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 26
+            },
+            "start": {
+              "col": 2,
+              "line": 26
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 9,
+              "line": 27
+            },
+            "start": {
+              "col": 2,
+              "line": 27
+            }
+          },
+          "file": "blank.go",
+          "id": ".::_:blank.go:27#var",
+          "kind": "var",
+          "name": "_",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 27
+            },
+            "start": {
+              "col": 2,
+              "line": 27
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

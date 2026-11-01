@@ -239,6 +239,10 @@ func (u *unit) general(d *ast.GenDecl) {
 			if d.Tok == token.CONST {
 				kind = kindConst
 			}
+			if kind == kindVar && named(s.Names) == 0 {
+				u.blank(s, d)
+				continue
+			}
 			// A spec that declares one name beside blanks (`v, _ = f()`) has
 			// that name's declaration to itself.
 			var extent *sdk.Span
@@ -257,6 +261,20 @@ func (u *unit) general(d *ast.GenDecl) {
 			}
 		}
 	}
+}
+
+// blank records a package variable spec that names nothing (`var _ I = T{}`).
+// It is a declaration like `init`, and a package has several of them, so its
+// id carries the file and line of the spec.
+func (u *unit) blank(s *ast.ValueSpec, d *ast.GenDecl) {
+	var extent *sdk.Span
+	if len(s.Names) == 1 {
+		extent = u.specExtent(d, s)
+	}
+	line := position(u.fset, s.Pos()).Line
+	id := symbolID(kindVar, u.module, "_:"+path.Base(u.rel)+":"+strconv.Itoa(line))
+	u.symbol(sdk.Symbol{ID: id, Kind: kindVar, Name: "_", Owner: "", Doc: docText(s.Doc, d.Doc)}, s.Names[0].Pos(), s.End(), extent)
+	u.initializer(id, s.Values)
 }
 
 // initializer records what the initializer of a package variable uses, as

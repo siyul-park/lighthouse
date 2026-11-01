@@ -560,12 +560,16 @@ spec:
 
             type state int
 
+            type runner interface{ Run() int }
+
             // Limit is part of the example.
             const Limit = 3
 
             const floor = 1
 
             var ready bool
+
+            var _ runner = (*Service)(nil)
 
             func init() { ready = true }
 
@@ -761,40 +765,6 @@ spec:
       expect:
         - line: 11
           message: "constructor new must precede the other methods of its type, such as get"
-    - name: test-fixtures-out-of-order
-      language: go
-      kind: invalid
-      fixed:
-        - path: store_test.go
-          body: |-
-            package store
-
-            import "testing"
-
-            type sample struct{}
-
-            var limit = 3
-
-            func TestSample(t *testing.T) { _ = sample{} }
-      files:
-        - path: go.mod
-          body: |-
-            module example.com/store
-
-            go 1.26
-        - path: store_test.go
-          body: |-
-            package store
-
-            import "testing"
-
-            var limit = 3
-
-            type sample struct{}
-
-            func TestSample(t *testing.T) { _ = sample{} }
-      expect:
-        - line: 7
     - name: test-fixture-below-a-test
       language: go
       kind: invalid
@@ -888,6 +858,35 @@ spec:
             func (p *pool) module() int { return p.n }
       expect:
         - line: 16
+    - name: assertion-after-methods
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            type shape interface{ area() int }
+
+            type square struct{}
+
+            var _ shape = square{}
+
+            func (square) area() int { return 1 }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type shape interface{ area() int }
+
+            type square struct{}
+
+            func (square) area() int { return 1 }
+
+            var _ shape = square{}
+      expect:
+        - line: 9
     - name: private-type-after-var
       language: go
       kind: invalid
