@@ -11,6 +11,8 @@
 #              `make plugins cli` unless --no-build.
 #   --plugins  the plugin directory the tip binary uses, default target/plugins.
 #   --base-plugins  the plugin directory the base binary uses, default --plugins.
+#   --keep     keep each corpus's findings (<DIR>/<name>/{base,tip}.json) instead
+#              of a temporary directory removed on exit.
 #              The base runs with the plugins built from its own commit, so a
 #              lang-* change is compared honestly. The usual call: a release
 #              build of main, its `target/plugins` copied to a temp directory,
@@ -36,7 +38,7 @@ cd "$root"
 absolute() {
     case $1 in /*) echo "$1" ;; *) echo "$here/$1" ;; esac
 }
-base="" base_plugins="" tip="$root/target/release/lighthouse" plugins="$root/target/plugins" build=1
+keep="" base="" base_plugins="" tip="$root/target/release/lighthouse" plugins="$root/target/plugins" build=1
 while [ $# -gt 0 ]; do
     case "$1" in
     --base) base=$2; shift 2 ;;
@@ -44,6 +46,7 @@ while [ $# -gt 0 ]; do
     --plugins) plugins=$2; shift 2 ;;
     --base-plugins) base_plugins=$2; shift 2 ;;
     --no-build) build=0; shift ;;
+    --keep) keep=$2; shift 2 ;;
     --) shift; break ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) break ;;
@@ -60,8 +63,13 @@ fi
 home=${CORPUS_HOME:-$HOME/Projects}
 [ $# -gt 0 ] || set -- "cel=$home/cel" "qlbridge=$home/qlbridge" "lighthouse=$root"
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/lighthouse-corpus.XXXXXX")
-trap 'rm -rf "$scratch"' EXIT
+if [ -n "$keep" ]; then
+    scratch=$(absolute "$keep")
+    mkdir -p "$scratch"
+else
+    scratch=$(mktemp -d "${TMPDIR:-/tmp}/lighthouse-corpus.XXXXXX")
+    trap 'rm -rf "$scratch"' EXIT
+fi
 trap 'exit 130' INT TERM
 # An installed plugin must not shadow the ones named in the configuration.
 mkdir "$scratch/xdg"
