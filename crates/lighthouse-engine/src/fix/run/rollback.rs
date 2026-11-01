@@ -60,17 +60,16 @@ impl Orchestrator<'_> {
         let changed: Vec<PathBuf> = candidates.texts.keys().cloned().collect();
         // The candidates stand in for the disk while they are checked; the
         // texts they replace are kept to put back what is rolled back.
-        let mut prior: BTreeMap<PathBuf, Option<String>> = BTreeMap::new();
-        for (file, text) in std::mem::take(&mut candidates.texts) {
-            prior.insert(file.clone(), self.texts.insert(file, text));
-        }
+        let mut prior: BTreeMap<PathBuf, Option<String>> = std::mem::take(&mut candidates.texts)
+            .into_iter()
+            .map(|(file, text)| (file.clone(), self.texts.insert(file, text)))
+            .collect();
         let after = if failed.len() == kept.len() && changed.is_empty() {
             None
         } else {
             Some(self.recheck()?)
         };
-        let mut followed = Vec::new();
-        let mut joined = Joined::default();
+        let (mut followed, mut joined) = (Vec::new(), Joined::default());
         let after = match after {
             Some(run) => {
                 let settled;
@@ -85,11 +84,7 @@ impl Orchestrator<'_> {
         };
         let mut verdict = Verdict::default();
         // The files whose fixes answer the change are verified with it.
-        let scope: Vec<PathBuf> = changed
-            .iter()
-            .cloned()
-            .chain(joined.prior.keys().cloned())
-            .collect();
+        let scope: Vec<PathBuf> = changed.iter().chain(joined.prior.keys()).cloned().collect();
         if let Some(after) = &after {
             let blame = Blame::new(self.proposer.engine, (before, after), &scope);
             failed.extend(worse(&blame));
@@ -99,61 +94,22 @@ impl Orchestrator<'_> {
         let rolled = close_over(&kept, &joined.causes, failed);
         prior.extend(joined.prior.clone());
         for (file, reason) in &rolled {
-            match prior.remove(file) {
-                Some(Some(text)) => {
-                    self.texts.insert(file.clone(), text);
-                }
-                Some(None) => {
-                    self.texts.remove(file);
-                }
-                None => {}
+            if let Some(text) = prior.remove(file) {
+                self.restore_text(file, text);
             }
-            let mut by: Vec<&str> = kept
-                .iter()
-                .chain(merged.iter().map(|(p, _)| p))
-                .filter(|p| {
-                    p.files.contains(file)
-                        || joined
-                            .causes
-                            .get(file)
-                            .is_some_and(|causes| p.files.iter().any(|f| causes.contains(f)))
-                })
-                .map(|p| p.rule_id.as_str())
-                .collect();
-            by.sort_unstable();
-            by.dedup();
-            self.notes.push(format!(
-                "rolled back {}: {reason} (after the fixes of {})",
-                file.display(),
-                by.join(", ")
-            ));
+            self.note_rolled(file, reason, (&kept, &merged), &joined);
         }
         self.keep_previews(&kept, &merged, &rolled, &candidates.bases);
-        for file in changed.iter().filter(|f| !rolled.contains_key(*f)) {
+        candidates.bases.extend(joined.bases.clone());
+        for file in scope.iter().filter(|f| !rolled.contains_key(*f)) {
             self.original.entry(file.clone()).or_insert_with(|| {
                 let base = candidates.bases.remove(file).unwrap_or_default();
                 let hash = hash::sha256(&base);
                 (base, hash)
             });
         }
-        let root = &self.proposer.engine.ws.root;
-        for (file, text) in joined
-            .prior
-            .iter()
-            .filter(|(f, _)| !rolled.contains_key(*f))
-        {
-            self.original.entry(file.clone()).or_insert_with(|| {
-                let base = text
-                    .clone()
-                    .or_else(|| fs::read_to_string(root.join(file)).ok())
-                    .unwrap_or_default();
-                let hash = hash::sha256(&base);
-                (base, hash)
-            });
-        }
         if self.account(
-            &kept,
-            &merged,
+            (&kept, &merged),
             &rolled,
             &verdict,
             &candidates.unchanged,
@@ -165,12 +121,27 @@ impl Orchestrator<'_> {
         Ok(if rolled.is_empty() { after } else { None })
     }
 
+    /// Says why `file` was rolled back and after the fixes of which rules: those
+    /// that edit it, or the changed files it answers.
+    fn note_rolled(
+        &mut self,
+        file: &Path,
+        reason: &str,
+        proposals: (&[Proposal], &[(Proposal, Fingerprint)]),
+        joined: &Joined,
+    ) {
+        let by = joined.rules_for(file, proposals);
+        let file = file.display();
+        self.notes.push(format!(
+            "rolled back {file}: {reason} (after the fixes of {by})"
+        ));
+    }
+
     /// Records what became of each kept proposal and those merged into it:
     /// applied, or declined with the reason. True when something stayed applied.
     fn account(
         &mut self,
-        kept: &[Proposal],
-        merged: &[(Proposal, Fingerprint)],
+        (kept, merged): (&[Proposal], &[(Proposal, Fingerprint)]),
         rolled: &BTreeMap<PathBuf, String>,
         verdict: &Verdict,
         unchanged: &BTreeSet<PathBuf>,

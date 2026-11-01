@@ -20,6 +20,7 @@
 use std::{
     cmp::Reverse,
     collections::{BTreeMap, BTreeSet},
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -44,10 +45,48 @@ const PASSES: usize = 2;
 /// it: dependents of the change, with the changed files each is charged to.
 #[derive(Default)]
 pub(super) struct Joined {
-    /// The text each had before the fixes: the overlay, else the disk.
+    /// The overlay each had before the fixes, if any.
     pub(super) prior: BTreeMap<PathBuf, Option<String>>,
+    /// The text each had before the fixes: the overlay, else the disk.
+    pub(super) bases: BTreeMap<PathBuf, String>,
     /// The changed files whose change each one's fixes answer.
     pub(super) causes: BTreeMap<PathBuf, BTreeSet<PathBuf>>,
+}
+
+impl Joined {
+    /// The rules of the fixes among `kept` and `merged` that edit `file` or
+    /// the changed files it answers, as a list.
+    pub(super) fn rules_for(
+        &self,
+        file: &Path,
+        (kept, merged): (&[Proposal], &[(Proposal, Fingerprint)]),
+    ) -> String {
+        let causes = self.causes.get(file);
+        let rules: BTreeSet<&str> = kept
+            .iter()
+            .chain(merged.iter().map(|(p, _)| p))
+            .filter(|p| {
+                p.files
+                    .iter()
+                    .any(|f| f == file || causes.is_some_and(|c| c.contains(f)))
+            })
+            .map(|p| p.rule_id.as_str())
+            .collect();
+        rules.into_iter().collect::<Vec<_>>().join(", ")
+    }
+
+    /// Takes `file` in with the overlay and the text it had, and the changed
+    /// files it answers.
+    fn admit(
+        &mut self,
+        file: &Path,
+        (prior, base): (Option<String>, String),
+        causes: BTreeSet<PathBuf>,
+    ) {
+        self.causes.insert(file.to_owned(), causes);
+        self.bases.insert(file.to_owned(), base);
+        self.prior.insert(file.to_owned(), prior);
+    }
 }
 
 /// A safe fix that followed a change.
@@ -175,29 +214,13 @@ impl Orchestrator<'_> {
             if round.texts.is_empty() {
                 break;
             }
-            let made: Vec<Followed> = kept
-                .iter()
-                .chain(merged.iter().map(|(p, _)| p))
-                .map(|p| Proposal {
-                    files: p
-                        .files
-                        .iter()
-                        .filter(|f| round.texts.contains_key(*f))
-                        .cloned()
-                        .collect(),
-                    ..p.clone()
-                })
-                .filter(|p| !p.files.is_empty())
-                .map(|proposal| Followed { proposal })
-                .collect();
-            let prior: Vec<(PathBuf, Option<String>)> = round
+            let mut made = followed_in((&kept, &merged), &round.texts);
+            let mut prior: Vec<(PathBuf, Option<String>)> = round
                 .texts
                 .into_iter()
                 .map(|(file, text)| (file.clone(), self.texts.insert(file, text)))
                 .collect();
             let mut next = self.recheck()?;
-            let mut made = made;
-            let mut prior = prior;
             // What this pass edited is judged like the changed files.
             let mut judged = scope.clone();
             judged.extend(prior.iter().map(|(file, _)| file.clone()));
@@ -221,9 +244,9 @@ impl Orchestrator<'_> {
                     if scope.contains(&file) {
                         continue;
                     }
+                    let base = text.clone().or_else(|| self.disk_text(&file));
                     let causes = dependents.get(&file).cloned().unwrap_or_default();
-                    joined.causes.insert(file.clone(), causes);
-                    joined.prior.insert(file.clone(), text);
+                    joined.admit(&file, (text, base.unwrap_or_default()), causes);
                     scope.push(file);
                 }
                 after = next;
@@ -231,14 +254,24 @@ impl Orchestrator<'_> {
                 continue;
             }
             for (file, text) in prior {
-                match text {
-                    Some(text) => self.texts.insert(file, text),
-                    None => self.texts.remove(&file),
-                };
+                self.restore_text(&file, text);
             }
             break;
         }
         Ok((after, followed, joined))
+    }
+
+    /// Puts back the overlay `file` had: none removes it.
+    pub(super) fn restore_text(&mut self, file: &Path, text: Option<String>) {
+        match text {
+            Some(text) => self.texts.insert(file.to_owned(), text),
+            None => self.texts.remove(file),
+        };
+    }
+
+    /// The text `file` has on disk.
+    fn disk_text(&self, file: &Path) -> Option<String> {
+        fs::read_to_string(self.proposer.engine.ws.root.join(file)).ok()
     }
 
     /// Puts back the texts `prior` holds of the files in `undone`, and keeps
@@ -255,10 +288,7 @@ impl Orchestrator<'_> {
                 prior.push((file, text));
                 continue;
             }
-            match text {
-                Some(text) => self.texts.insert(file, text),
-                None => self.texts.remove(&file),
-            };
+            self.restore_text(&file, text);
         }
         undone
     }
@@ -356,6 +386,28 @@ impl Orchestrator<'_> {
             self.original.get(file).map(|(base, _)| base.clone())
         })
     }
+}
+
+/// The fixes among `kept` and `merged`, limited to the files `texts` changed;
+/// those that changed none are left out.
+fn followed_in(
+    (kept, merged): (&[Proposal], &[(Proposal, Fingerprint)]),
+    texts: &Overlays,
+) -> Vec<Followed> {
+    kept.iter()
+        .chain(merged.iter().map(|(p, _)| p))
+        .map(|p| Proposal {
+            files: p
+                .files
+                .iter()
+                .filter(|f| texts.contains_key(*f))
+                .cloned()
+                .collect(),
+            ..p.clone()
+        })
+        .filter(|p| !p.files.is_empty())
+        .map(|proposal| Followed { proposal })
+        .collect()
 }
 
 #[cfg(test)]
