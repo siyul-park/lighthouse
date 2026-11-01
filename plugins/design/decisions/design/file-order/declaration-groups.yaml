@@ -335,6 +335,34 @@ spec:
       expect:
         - line: 16
           message: "WithName is an option builder of Program: it goes in Program's block first, above New (line 7)"
+    - name: option-builders-before-consumer-in-function-group
+      language: go
+      kind: valid
+      options:
+        groups: [public-type, private-type, public-const, private-const, var, init, public-function, method, private-function]
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Option configures Run.
+            type Option func(*options)
+
+            type options struct{ name string }
+
+            // WithName names the run.
+            func WithName(name string) Option {
+            	return func(o *options) { o.name = name }
+            }
+
+            // Run applies the options and returns the name.
+            func Run(opts ...Option) string {
+            	o := options{}
+            	for _, opt := range opts {
+            		opt(&o)
+            	}
+            	return o.name
+            }
     - name: private-option-after-methods
       language: go
       kind: invalid

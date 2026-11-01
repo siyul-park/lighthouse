@@ -29,6 +29,11 @@ spec:
       expression: >-
         (owner_types.map(t, t.id)
           + placed.filter(s, s.kind == 'method' && s.owner_key != '').map(s, s.owner_key)).distinct()
+    # The owners that have a method in the file. An option builder of an owner
+    # without one (`type options struct` that only `Option` configures) leads no
+    # method block: it is a public function.
+    - name: method_owners
+      expression: placed.filter(s, s.kind == 'method' && s.owner_key != '').map(s, s.owner_key).distinct()
     # The group order and the hook names of the file: the options `groups` and
     # `hooks` of `design/declaration-groups`, which `design/top-down-order` reads from
     # it (`options.from`), so that the project sets them once.
@@ -78,7 +83,7 @@ spec:
           : s.kind == 'var' ? ['var']
           : s.kind == 'function'
           ? (s.name == 'init' ? ['init'] : [])
-            + (owner != '' ? ['method'] : [])
+            + (owner != '' && (s.configures == '' || owner in method_owners) ? ['method'] : [])
             + [s.visibility != 'private' ? 'public-function' : 'private-function']
           : s.kind == 'method' ? ['type', 'method']
           : []
