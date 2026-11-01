@@ -406,16 +406,19 @@ fn selected<'c>(catalog: &'c Catalog, ids: &[String]) -> Result<Vec<&'c Decision
     if ids.is_empty() {
         return Ok(catalog.decisions().filter(|d| d.automated()).collect());
     }
+    let named = ids;
     let ids = Selector::new(ids)?.expand(catalog.decisions().map(Decision::id))?;
+    // A pattern (`design/*`) selects the matching decisions that have a check.
     ids.iter()
         .map(|id| {
             let decision = catalog
                 .decision(id)
                 .ok_or_else(|| format!("unknown decision `{id}`"))?;
-            if !decision.automated() {
+            if !decision.automated() && named.contains(id) {
                 return Err(format!("`{id}` has no automated check to test").into());
             }
             Ok(decision)
         })
+        .filter(|found| found.as_ref().map_or(true, |d| d.automated()))
         .collect()
 }
