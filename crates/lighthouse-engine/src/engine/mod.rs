@@ -31,7 +31,6 @@ use rayon::prelude::*;
 use serde_json::Value;
 
 mod availability;
-mod batch;
 mod cached;
 mod client;
 mod config;

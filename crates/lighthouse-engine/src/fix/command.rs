@@ -17,10 +17,9 @@ use serde_json::json;
 use super::{
     CommandFix, FixBinding,
     edits::replace_changed,
-    kept::NOT_KEPT,
     lower::Sources,
     model::{Class, choose_extent},
-    propose::{Aim, Proposal, Proposer},
+    propose::{Aim, NOT_KEPT, Proposal, Proposer},
     rewrite::{Bounds, Change, Changes, Scratch, World, accept, collect},
 };
 use crate::{Overlays, Run};
