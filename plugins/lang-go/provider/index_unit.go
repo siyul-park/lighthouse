@@ -453,10 +453,6 @@ func baseName(e ast.Expr) string {
 	}
 }
 
-func hasComponent(dir, name string) bool {
-	return slices.Contains(strings.Split(dir, "/"), name)
-}
-
 // initializersOf are the expressions that give the i-th name of a spec its
 // value: its own, or all of them when one call initializes several names.
 func initializersOf(s *ast.ValueSpec, i int) []ast.Expr {
@@ -467,4 +463,8 @@ func initializersOf(s *ast.ValueSpec, i int) []ast.Expr {
 		return s.Values
 	}
 	return nil
+}
+
+func hasComponent(dir, name string) bool {
+	return slices.Contains(strings.Split(dir, "/"), name)
 }

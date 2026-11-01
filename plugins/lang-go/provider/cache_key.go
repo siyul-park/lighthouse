@@ -239,6 +239,34 @@ func (pl *planner) importDir(path string) (string, bool) {
 	return filepath.Join(m.dir, filepath.FromSlash(strings.TrimPrefix(path, m.path))), true
 }
 
+func joinRel(dir, name string) string {
+	if dir == "" || dir == "." {
+		return name
+	}
+	return dir + "/" + name
+}
+
+func boolText(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
+}
+
+// isContentHash reports whether the host sent a real SHA-256 in lowercase hex;
+// anything else is read from the file.
+func isContentHash(h string) bool {
+	if len(h) != 64 {
+		return false
+	}
+	for _, c := range h {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 // seal sets the digests of u from what its files contributed.
 func (d *dirDigest) seal(u *cacheUnit) {
 	u.cgo = d.cgo
@@ -268,32 +296,4 @@ func closure(u *cacheUnit) []*cacheUnit {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].abs < out[j].abs })
 	return out
-}
-
-func joinRel(dir, name string) string {
-	if dir == "" || dir == "." {
-		return name
-	}
-	return dir + "/" + name
-}
-
-func boolText(b bool) string {
-	if b {
-		return "1"
-	}
-	return "0"
-}
-
-// isContentHash reports whether the host sent a real SHA-256 in lowercase hex;
-// anything else is read from the file.
-func isContentHash(h string) bool {
-	if len(h) != 64 {
-		return false
-	}
-	for _, c := range h {
-		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-			return false
-		}
-	}
-	return true
 }

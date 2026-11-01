@@ -210,11 +210,6 @@ func switchArms(body *ast.BlockStmt, comm bool) (arms int, returning bool) {
 	return arms, returning
 }
 
-func isReturn(s ast.Stmt) bool {
-	_, ok := s.(*ast.ReturnStmt)
-	return ok
-}
-
 // chain flattens a tree of && and || into its operators and operands in
 // source order, looking through parentheses.
 func chain(e ast.Expr) ([]token.Token, []ast.Expr) {
@@ -231,6 +226,11 @@ func chain(e ast.Expr) ([]token.Token, []ast.Expr) {
 // isJump reports a goto or a labeled break or continue.
 func isJump(n *ast.BranchStmt) bool {
 	return n.Tok == token.GOTO || (n.Label != nil && (n.Tok == token.BREAK || n.Tok == token.CONTINUE))
+}
+
+func isReturn(s ast.Stmt) bool {
+	_, ok := s.(*ast.ReturnStmt)
+	return ok
 }
 
 func isLogical(n *ast.BinaryExpr) bool {

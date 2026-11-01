@@ -37,7 +37,9 @@ spec:
     - name: hooks
       expression: options.hooks
     # The owner block of a declaration: the type of its module that a method,
-    # a constructor or an option builder belongs to, else empty.
+    # a constructor or an option builder belongs to, else empty. A private
+    # function that only methods of one owner call (`receiver_affinity`) joins
+    # that owner's block, with its unexported methods, when the file has it.
     - name: owner_of
       params: [s]
       expression: >-
@@ -47,6 +49,9 @@ spec:
           ? (owner_types.filter(t, t.name == s.configures && t.module == s.module).map(t, t.id) + [''])[0]
           : s.kind == 'function' && s.constructor_named
           ? (owner_types.filter(t, t.name == s.built && t.module == s.module).map(t, t.id) + [''])[0]
+          : s.kind == 'function' && s.visibility == 'private' && size(s.receiver_affinity) > 0
+            && s.receiver_affinity.owner in owners
+          ? s.receiver_affinity.owner
           : ''
     # The rank of a declaration in the block of its owner.
     - name: block_rank

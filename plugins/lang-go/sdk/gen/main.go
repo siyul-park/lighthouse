@@ -308,40 +308,6 @@ func (g *generator) mapType(n *node) (string, error) {
 	return "map[string]" + item, nil
 }
 
-func main() {
-	schemaPath := flag.String("schema", "../../../protocol/schema/lighthouse-protocol-0.4.json", "the protocol schema")
-	out := flag.String("out", "wire.go", "the generated file")
-	check := flag.Bool("check", false, "fail when the generated file is stale")
-	flag.Parse()
-	if err := run(*schemaPath, *out, *check); err != nil {
-		fmt.Fprintln(os.Stderr, "gen:", err)
-		os.Exit(1)
-	}
-}
-
-func run(schemaPath, out string, check bool) error {
-	raw, err := os.ReadFile(schemaPath)
-	if err != nil {
-		return err
-	}
-	var s schema
-	if err := json.Unmarshal(raw, &s); err != nil {
-		return err
-	}
-	text, err := (&generator{defs: s.Defs, seen: map[string]bool{}}).render()
-	if err != nil {
-		return err
-	}
-	if check {
-		current, err := os.ReadFile(out)
-		if err != nil || !bytes.Equal(current, text) {
-			return fmt.Errorf("%s is stale: run go generate ./sdk in plugins/lang-go", out)
-		}
-		return nil
-	}
-	return os.WriteFile(out, text, 0o644)
-}
-
 func refName(ref string) string {
 	return ref[strings.LastIndex(ref, "/")+1:]
 }
@@ -371,34 +337,6 @@ func enumValues(n *node) []string {
 // defaulted tells a property whose absence the protocol reads as a value.
 func defaulted(n *node) bool {
 	return len(n.Default) > 0 && string(n.Default) != "null" && !nullable(n)
-}
-
-// nullable tells a property that may be null.
-func nullable(n *node) bool {
-	for _, t := range types(n) {
-		if t == "null" {
-			return true
-		}
-	}
-	for _, a := range n.AnyOf {
-		if nullable(a) {
-			return true
-		}
-	}
-	return false
-}
-
-func types(n *node) []string {
-	if len(n.Type) == 0 {
-		return nil
-	}
-	var one string
-	if json.Unmarshal(n.Type, &one) == nil {
-		return []string{one}
-	}
-	var many []string
-	_ = json.Unmarshal(n.Type, &many)
-	return many
 }
 
 func nonNull(kinds []string) []string {
@@ -469,4 +407,66 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func main() {
+	schemaPath := flag.String("schema", "../../../protocol/schema/lighthouse-protocol-0.4.json", "the protocol schema")
+	out := flag.String("out", "wire.go", "the generated file")
+	check := flag.Bool("check", false, "fail when the generated file is stale")
+	flag.Parse()
+	if err := run(*schemaPath, *out, *check); err != nil {
+		fmt.Fprintln(os.Stderr, "gen:", err)
+		os.Exit(1)
+	}
+}
+
+func run(schemaPath, out string, check bool) error {
+	raw, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return err
+	}
+	var s schema
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return err
+	}
+	text, err := (&generator{defs: s.Defs, seen: map[string]bool{}}).render()
+	if err != nil {
+		return err
+	}
+	if check {
+		current, err := os.ReadFile(out)
+		if err != nil || !bytes.Equal(current, text) {
+			return fmt.Errorf("%s is stale: run go generate ./sdk in plugins/lang-go", out)
+		}
+		return nil
+	}
+	return os.WriteFile(out, text, 0o644)
+}
+
+// nullable tells a property that may be null.
+func nullable(n *node) bool {
+	for _, t := range types(n) {
+		if t == "null" {
+			return true
+		}
+	}
+	for _, a := range n.AnyOf {
+		if nullable(a) {
+			return true
+		}
+	}
+	return false
+}
+
+func types(n *node) []string {
+	if len(n.Type) == 0 {
+		return nil
+	}
+	var one string
+	if json.Unmarshal(n.Type, &one) == nil {
+		return []string{one}
+	}
+	var many []string
+	_ = json.Unmarshal(n.Type, &many)
+	return many
 }

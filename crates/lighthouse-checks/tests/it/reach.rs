@@ -76,7 +76,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("design/context-first", Some((Reach::Local, false))),
     ("design/coupling", Some((Reach::Neighbors, false))),
     ("design/declaration-blocks", Some((Reach::Local, false))),
-    ("design/declaration-groups", Some((Reach::Local, false))),
+    ("design/declaration-groups", Some((Reach::Neighbors, true))),
     ("design/encapsulated-platform", Some((Reach::Local, false))),
     ("design/encapsulated-state", Some((Reach::Local, false))),
     ("design/error-categories", Some((Reach::Local, false))),

@@ -340,6 +340,92 @@ func packageOf(use string) string {
 	return name
 }
 
+// declaration is the import declaration of the specs, empty for none.
+func declaration(specs []importSpec) string {
+	if len(specs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("import (\n")
+	for _, spec := range specs {
+		b.WriteString("\t")
+		if spec.name != "" {
+			b.WriteString(spec.name + " ")
+		}
+		b.WriteString(strconv.Quote(spec.path) + "\n")
+	}
+	b.WriteString(")\n\n")
+	return b.String()
+}
+
+// mergeFragment adds the fragment of a fence to the one of its host file.
+func mergeFragment(merged map[string]*sdk.Fragment, f *sdk.Fragment, host string) {
+	into := merged[host]
+	if into == nil {
+		into = emptyFragment(sdk.FileInfo{Path: host})
+		merged[host] = into
+	}
+	into.Modules = append(into.Modules, f.Modules...)
+	into.Symbols = append(into.Symbols, f.Symbols...)
+	into.Edges = append(into.Edges, f.Edges...)
+	into.Functions = append(into.Functions, f.Functions...)
+	into.Tests = append(into.Tests, f.Tests...)
+	into.Comments = append(into.Comments, f.Comments...)
+}
+
+// qualifiers are the uses of packages the file makes without importing, as
+// `name.Selected`: what is selected from an identifier no declaration binds.
+func qualifiers(file *ast.File) []string {
+	unresolved := map[*ast.Ident]bool{}
+	for _, id := range file.Unresolved {
+		unresolved[id] = true
+	}
+	found := map[string]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		if sel, ok := n.(*ast.SelectorExpr); ok {
+			if id, ok := sel.X.(*ast.Ident); ok && unresolved[id] {
+				found[id.Name+"."+sel.Sel.Name] = true
+			}
+		}
+		return true
+	})
+	uses := make([]string, 0, len(found))
+	for use := range found {
+		uses = append(uses, use)
+	}
+	sort.Strings(uses)
+	return uses
+}
+
+func parses(src string, mode parser.Mode) bool {
+	_, err := parser.ParseFile(token.NewFileSet(), "", src, mode)
+	return err == nil
+}
+
+// contextString is the string a source rule gave under key.
+func contextString(source *sdk.EmbeddedSource, key string) string {
+	var context map[string]json.RawMessage
+	if json.Unmarshal(source.Context, &context) != nil {
+		return ""
+	}
+	var value string
+	if json.Unmarshal(context[key], &value) != nil {
+		return ""
+	}
+	return value
+}
+
+// sanitize keeps the letters and digits of a name, so that it is one element of
+// a file name.
+func sanitize(name string) string {
+	return strings.Map(func(c rune) rune {
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
+			return c
+		}
+		return '_'
+	}, name)
+}
+
 // probe is a file that makes each of the uses.
 func probe(uses map[string]bool) []byte {
 	sorted := make([]string, 0, len(uses))
@@ -402,39 +488,6 @@ func isMajor(element string) bool {
 	return true
 }
 
-// declaration is the import declaration of the specs, empty for none.
-func declaration(specs []importSpec) string {
-	if len(specs) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString("import (\n")
-	for _, spec := range specs {
-		b.WriteString("\t")
-		if spec.name != "" {
-			b.WriteString(spec.name + " ")
-		}
-		b.WriteString(strconv.Quote(spec.path) + "\n")
-	}
-	b.WriteString(")\n\n")
-	return b.String()
-}
-
-// mergeFragment adds the fragment of a fence to the one of its host file.
-func mergeFragment(merged map[string]*sdk.Fragment, f *sdk.Fragment, host string) {
-	into := merged[host]
-	if into == nil {
-		into = emptyFragment(sdk.FileInfo{Path: host})
-		merged[host] = into
-	}
-	into.Modules = append(into.Modules, f.Modules...)
-	into.Symbols = append(into.Symbols, f.Symbols...)
-	into.Edges = append(into.Edges, f.Edges...)
-	into.Functions = append(into.Functions, f.Functions...)
-	into.Tests = append(into.Tests, f.Tests...)
-	into.Comments = append(into.Comments, f.Comments...)
-}
-
 // goimports asks the vendor tool which imports the text lacks, as its module
 // has them.
 func goimports(dir string, text []byte) []importSpec {
@@ -464,57 +517,4 @@ func goimports(dir string, text []byte) []importSpec {
 		specs = append(specs, next)
 	}
 	return specs
-}
-
-// qualifiers are the uses of packages the file makes without importing, as
-// `name.Selected`: what is selected from an identifier no declaration binds.
-func qualifiers(file *ast.File) []string {
-	unresolved := map[*ast.Ident]bool{}
-	for _, id := range file.Unresolved {
-		unresolved[id] = true
-	}
-	found := map[string]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		if sel, ok := n.(*ast.SelectorExpr); ok {
-			if id, ok := sel.X.(*ast.Ident); ok && unresolved[id] {
-				found[id.Name+"."+sel.Sel.Name] = true
-			}
-		}
-		return true
-	})
-	uses := make([]string, 0, len(found))
-	for use := range found {
-		uses = append(uses, use)
-	}
-	sort.Strings(uses)
-	return uses
-}
-
-func parses(src string, mode parser.Mode) bool {
-	_, err := parser.ParseFile(token.NewFileSet(), "", src, mode)
-	return err == nil
-}
-
-// contextString is the string a source rule gave under key.
-func contextString(source *sdk.EmbeddedSource, key string) string {
-	var context map[string]json.RawMessage
-	if json.Unmarshal(source.Context, &context) != nil {
-		return ""
-	}
-	var value string
-	if json.Unmarshal(context[key], &value) != nil {
-		return ""
-	}
-	return value
-}
-
-// sanitize keeps the letters and digits of a name, so that it is one element of
-// a file name.
-func sanitize(name string) string {
-	return strings.Map(func(c rune) rune {
-		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
-			return c
-		}
-		return '_'
-	}, name)
 }

@@ -67,34 +67,6 @@ func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
 	store.sweep(current)
 }
 
-func (plan *cachePlan) stats() RunStats {
-	var s RunStats
-	for _, u := range plan.units {
-		if _, hit := plan.hits[u]; hit {
-			s.Hits = append(s.Hits, u.rel)
-		} else {
-			s.Misses = append(s.Misses, u.rel)
-		}
-	}
-	return s
-}
-
-// reuseImplements puts the `implements` edges of the replaced records where the
-// analysis, which saw only the missed units, found some of its own. The
-// declarations of the unit and of everything it imports are unchanged, so
-// the old edges are the ones a full analysis would give.
-func reuseImplements(sub *run, plan *cachePlan) {
-	for _, u := range plan.misses {
-		old := plan.previous[u].implementsOf()
-		for _, rel := range u.requested {
-			if frag := sub.fragments[rel]; frag != nil {
-				edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
-				frag.Edges = append(edges, old[rel]...)
-			}
-		}
-	}
-}
-
 // install puts the cached fragments and the analysis of the misses into r.
 func install(r *run, plan *cachePlan, sub *run) {
 	if sub != nil {
@@ -144,4 +116,32 @@ func recordOf(u *cacheUnit, sub *run) (unitRecord, bool) {
 		}
 	}
 	return rec, true
+}
+
+func (plan *cachePlan) stats() RunStats {
+	var s RunStats
+	for _, u := range plan.units {
+		if _, hit := plan.hits[u]; hit {
+			s.Hits = append(s.Hits, u.rel)
+		} else {
+			s.Misses = append(s.Misses, u.rel)
+		}
+	}
+	return s
+}
+
+// reuseImplements puts the `implements` edges of the replaced records where the
+// analysis, which saw only the missed units, found some of its own. The
+// declarations of the unit and of everything it imports are unchanged, so
+// the old edges are the ones a full analysis would give.
+func reuseImplements(sub *run, plan *cachePlan) {
+	for _, u := range plan.misses {
+		old := plan.previous[u].implementsOf()
+		for _, rel := range u.requested {
+			if frag := sub.fragments[rel]; frag != nil {
+				edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
+				frag.Edges = append(edges, old[rel]...)
+			}
+		}
+	}
 }

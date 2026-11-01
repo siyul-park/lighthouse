@@ -168,25 +168,6 @@ func (w *eventWalker) text(n ast.Node) string {
 	return string(w.src[start:end])
 }
 
-// events are the places a body panics or handles an error in a way that
-// stops working once the error is wrapped, as go-errorlint reads them: an
-// error compared with == or != (or switched on), an assertion or type switch
-// on an error, and a fmt.Errorf that formats an error without %w.
-func (u *unit) events(d *ast.FuncDecl) []sdk.Event {
-	if d.Body == nil {
-		return nil
-	}
-	w := &eventWalker{unit: u, inIs: isErrorIs(d, u.info())}
-	ast.Inspect(d.Body, w.visit)
-	slices.SortStableFunc(w.found, func(a, b sdk.Event) int {
-		if a.Span.Start.Line != b.Span.Start.Line {
-			return a.Span.Start.Line - b.Span.Start.Line
-		}
-		return a.Span.Start.Col - b.Span.Start.Col
-	})
-	return w.found
-}
-
 // hasErrorMethod reports whether the type has the method `Error() string`.
 func hasErrorMethod(t types.Type) bool {
 	return t != nil && types.Implements(t, errorType.Underlying().(*types.Interface))
@@ -210,20 +191,6 @@ func allowedSentinel(e ast.Expr, info *types.Info) bool {
 	}
 	v, ok := info.Uses[sel.Sel].(*types.Var)
 	return ok && v.Pkg() != nil && allowedSentinels[v.Pkg().Path()] == v.Name()
-}
-
-// isErrorIs reports a method `Is(error) bool`.
-func isErrorIs(d *ast.FuncDecl, info *types.Info) bool {
-	if d.Recv == nil || d.Name.Name != "Is" {
-		return false
-	}
-	fn, ok := info.Defs[d.Name].(*types.Func)
-	if !ok {
-		return false
-	}
-	sig := fn.Type().(*types.Signature)
-	return sig.Params().Len() == 1 && isError(sig.Params().At(0).Type()) &&
-		sig.Results().Len() == 1 && types.Identical(sig.Results().At(0).Type(), types.Typ[types.Bool])
 }
 
 // formatVerbs are the verbs of a printf format in argument order, `*` widths
@@ -253,4 +220,37 @@ func formatVerbs(format string) ([]rune, bool) {
 		}
 	}
 	return verbs, true
+}
+
+// events are the places a body panics or handles an error in a way that
+// stops working once the error is wrapped, as go-errorlint reads them: an
+// error compared with == or != (or switched on), an assertion or type switch
+// on an error, and a fmt.Errorf that formats an error without %w.
+func (u *unit) events(d *ast.FuncDecl) []sdk.Event {
+	if d.Body == nil {
+		return nil
+	}
+	w := &eventWalker{unit: u, inIs: isErrorIs(d, u.info())}
+	ast.Inspect(d.Body, w.visit)
+	slices.SortStableFunc(w.found, func(a, b sdk.Event) int {
+		if a.Span.Start.Line != b.Span.Start.Line {
+			return a.Span.Start.Line - b.Span.Start.Line
+		}
+		return a.Span.Start.Col - b.Span.Start.Col
+	})
+	return w.found
+}
+
+// isErrorIs reports a method `Is(error) bool`.
+func isErrorIs(d *ast.FuncDecl, info *types.Info) bool {
+	if d.Recv == nil || d.Name.Name != "Is" {
+		return false
+	}
+	fn, ok := info.Defs[d.Name].(*types.Func)
+	if !ok {
+		return false
+	}
+	sig := fn.Type().(*types.Signature)
+	return sig.Params().Len() == 1 && isError(sig.Params().At(0).Type()) &&
+		sig.Results().Len() == 1 && types.Identical(sig.Results().At(0).Type(), types.Typ[types.Bool])
 }

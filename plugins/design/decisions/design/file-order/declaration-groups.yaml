@@ -836,3 +836,74 @@ spec:
             type three struct{}
       expect:
         - line: 5
+    - name: helper-after-public-functions
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Counter counts.
+            type Counter struct{ n int }
+
+            // Add adds to the count.
+            func (c *Counter) Add(d int) {
+            	c.n = clamp(c.n + d)
+            }
+
+            func clamp(n int) int {
+            	return min(n, 100)
+            }
+
+            // Total returns a constant.
+            func Total() int {
+            	return 1
+            }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Counter counts.
+            type Counter struct{ n int }
+
+            // Add adds to the count.
+            func (c *Counter) Add(d int) {
+            	c.n = clamp(c.n + d)
+            }
+
+            // Total returns a constant.
+            func Total() int {
+            	return 1
+            }
+
+            func clamp(n int) int {
+            	return min(n, 100)
+            }
+      expect:
+        - line: 16
+    - name: helper-in-owner-block
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Counter counts.
+            type Counter struct{ n int }
+
+            // Add adds to the count.
+            func (c *Counter) Add(d int) {
+            	c.n = clamp(c.n + d)
+            }
+
+            func clamp(n int) int {
+            	return min(n, 100)
+            }
+
+            // Total returns a constant.
+            func Total() int {
+            	return 1
+            }

@@ -509,38 +509,6 @@ func (r *run) isRequested(rel string) bool {
 	return ok
 }
 
-// patterns are the package directories of b's files, relative to its go.mod.
-func (b *batch) patterns(root string) []string {
-	dirs := map[string]bool{}
-	for _, rel := range b.files {
-		abs := filepath.Dir(filepath.Join(root, filepath.FromSlash(rel)))
-		if p, err := filepath.Rel(b.dir, abs); err == nil {
-			dirs[p] = true
-		}
-	}
-	out := make([]string, 0, len(dirs))
-	for d := range dirs {
-		if d == "." {
-			out = append(out, ".")
-		} else {
-			out = append(out, "./"+filepath.ToSlash(d))
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-// next waits for the load of the next batch in order and frees its slot.
-func (l *loader) next() loaded {
-	got := <-l.ready[l.read]
-	l.read++
-	select {
-	case <-l.slots:
-	default: // loaded up front, no slot was taken
-	}
-	return got
-}
-
 func nearestModule(dir string, cache map[string]string) (string, bool) {
 	var visited []string
 	found, ok := "", false
@@ -609,6 +577,65 @@ func describe(e packages.Error) string {
 	return strings.TrimPrefix(e.Pos, file+":") + ": " + msg
 }
 
+// ignoredPath applies the go tool's rule for names it skips: testdata and
+// vendor directories, and names starting with "." or "_".
+func ignoredPath(rel string) bool {
+	for _, part := range strings.Split(rel, "/") {
+		if part == snippetsDir {
+			continue
+		}
+		if part == "testdata" || part == "vendor" || strings.HasPrefix(part, ".") || strings.HasPrefix(part, "_") {
+			return true
+		}
+	}
+	return false
+}
+
+// declaredBefore orders types by where they are declared, which does not
+// depend on the order in which the go command's packages were parsed.
+func declaredBefore(a, b declaredType) bool {
+	pa, pb := a.unit.fset.PositionFor(a.obj.Pos(), false), b.unit.fset.PositionFor(b.obj.Pos(), false)
+	if pa.Filename != pb.Filename {
+		return pa.Filename < pb.Filename
+	}
+	if pa.Offset != pb.Offset {
+		return pa.Offset < pb.Offset
+	}
+	return a.obj.Id() < b.obj.Id()
+}
+
+// patterns are the package directories of b's files, relative to its go.mod.
+func (b *batch) patterns(root string) []string {
+	dirs := map[string]bool{}
+	for _, rel := range b.files {
+		abs := filepath.Dir(filepath.Join(root, filepath.FromSlash(rel)))
+		if p, err := filepath.Rel(b.dir, abs); err == nil {
+			dirs[p] = true
+		}
+	}
+	out := make([]string, 0, len(dirs))
+	for d := range dirs {
+		if d == "." {
+			out = append(out, ".")
+		} else {
+			out = append(out, "./"+filepath.ToSlash(d))
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// next waits for the load of the next batch in order and frees its slot.
+func (l *loader) next() loaded {
+	got := <-l.ready[l.read]
+	l.read++
+	select {
+	case <-l.slots:
+	default: // loaded up front, no slot was taken
+	}
+	return got
+}
+
 // positionFile strips the trailing :line:col of a position.
 func positionFile(pos string) string {
 	for i := 0; i < 2; i++ {
@@ -622,20 +649,6 @@ func positionFile(pos string) string {
 		pos = pos[:at]
 	}
 	return pos
-}
-
-// ignoredPath applies the go tool's rule for names it skips: testdata and
-// vendor directories, and names starting with "." or "_".
-func ignoredPath(rel string) bool {
-	for _, part := range strings.Split(rel, "/") {
-		if part == snippetsDir {
-			continue
-		}
-		if part == "testdata" || part == "vendor" || strings.HasPrefix(part, ".") || strings.HasPrefix(part, "_") {
-			return true
-		}
-	}
-	return false
 }
 
 func emptyResult() sdk.IndexResult {
@@ -657,17 +670,4 @@ func emptyFragment(file sdk.FileInfo) *sdk.Fragment {
 		Tests:     []sdk.TestCase{},
 		Comments:  []sdk.Comment{},
 	}
-}
-
-// declaredBefore orders types by where they are declared, which does not
-// depend on the order in which the go command's packages were parsed.
-func declaredBefore(a, b declaredType) bool {
-	pa, pb := a.unit.fset.PositionFor(a.obj.Pos(), false), b.unit.fset.PositionFor(b.obj.Pos(), false)
-	if pa.Filename != pb.Filename {
-		return pa.Filename < pb.Filename
-	}
-	if pa.Offset != pb.Offset {
-		return pa.Offset < pb.Offset
-	}
-	return a.obj.Id() < b.obj.Id()
 }

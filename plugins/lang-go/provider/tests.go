@@ -30,6 +30,23 @@ func (s *subtests) Visit(n ast.Node) ast.Visitor {
 	return nil
 }
 
+// isSubtest reports a call of testing's Run with a function literal last.
+func isSubtest(call *ast.CallExpr, info *types.Info) bool {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || len(call.Args) < 2 {
+		return false
+	}
+	if _, lit := call.Args[len(call.Args)-1].(*ast.FuncLit); !lit {
+		return false
+	}
+	s := info.Selections[sel]
+	if s == nil {
+		return false
+	}
+	fn, ok := s.Obj().(*types.Func)
+	return ok && fn.Name() == "Run" && fn.Pkg() != nil && fn.Pkg().Path() == "testing"
+}
+
 // testCaseOf describes the test entry point d, whose body references usages.
 func testCaseOf(d *ast.FuncDecl, id string, usages []usage, info *types.Info) sdk.TestCase {
 	style := styleScenario
@@ -47,23 +64,6 @@ func testCaseOf(d *ast.FuncDecl, id string, usages []usage, info *types.Info) sd
 	walker := &subtests{info: info}
 	ast.Walk(walker, d.Body)
 	return sdk.TestCase{Symbol: id, Nesting: walker.deepest, Style: style, Targets: targets}
-}
-
-// isSubtest reports a call of testing's Run with a function literal last.
-func isSubtest(call *ast.CallExpr, info *types.Info) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || len(call.Args) < 2 {
-		return false
-	}
-	if _, lit := call.Args[len(call.Args)-1].(*ast.FuncLit); !lit {
-		return false
-	}
-	s := info.Selections[sel]
-	if s == nil {
-		return false
-	}
-	fn, ok := s.Obj().(*types.Func)
-	return ok && fn.Name() == "Run" && fn.Pkg() != nil && fn.Pkg().Path() == "testing"
 }
 
 // isTable reports a range over a collection of structs written in the test
