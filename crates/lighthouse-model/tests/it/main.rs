@@ -8,6 +8,7 @@ mod fix;
 mod format;
 mod fs;
 mod glob;
+mod graph;
 mod model_ref;
 mod project;
 mod resource;

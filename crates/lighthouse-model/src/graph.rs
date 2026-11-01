@@ -27,6 +27,9 @@ pub struct Reached {
 }
 
 impl Graph {
+    /// The graph of `nodes` nodes, numbered `0..nodes`, with the given `(from, to)`
+    /// edges. Self-loops and repeated edges are dropped; an edge to a node
+    /// outside `0..nodes` is a caller error and panics.
     pub fn new(nodes: usize, edges: impl IntoIterator<Item = (u32, u32)>) -> Self {
         let mut succ = vec![Vec::new(); nodes];
         for (from, to) in edges.into_iter().filter(|(from, to)| from != to) {
@@ -39,6 +42,8 @@ impl Graph {
         Self { succ }
     }
 
+    /// What each node reaches and is reached by, with its component and the
+    /// size of every component. Computed from scratch on each call.
     pub fn reached(&self) -> Reached {
         let back = self.reversed();
         let (scc, count) = self.components();
