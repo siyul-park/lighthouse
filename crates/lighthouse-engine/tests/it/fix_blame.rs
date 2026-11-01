@@ -4,18 +4,21 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_engine::{Engine, FixReport, FixRun};
-use lighthouse_model::{Diagnostic, Fingerprint, Options, Position, Reach, Safety, Severity, Span};
+use lighthouse_engine::{Engine, FixBinding, FixReport, FixRun, FixedBy, Needs};
+use lighthouse_model::{
+    Diagnostic, Fingerprint, LineIndex, Options, Reach, Safety, Severity, Span,
+};
 use lighthouse_plugin::{
-    Caching, Context, Error as PluginError, Fixer, LanguageProvider, Plugin, PluginManifest,
-    Registry, Rule, RuleManifest,
+    Caching, Context, Error as PluginError, FixDecision, Fixer, LanguageProvider, Plugin,
+    PluginManifest, Registry, Rule, RuleManifest,
 };
 use lighthouse_spec::Config;
 
 use crate::support::*;
 
 /// Reports an error in `ghost.toy` for as long as `a.toy` declares `fn z`: a
-/// finding that appears in a file nobody edited. It declares `reach`.
+/// finding that appears in a file nobody edited, at the `BOO` it holds if it
+/// does. It declares `reach`.
 struct Ghost {
     manifest: RuleManifest,
 }
@@ -43,24 +46,27 @@ impl Rule for Ghost {
     }
 
     fn check(&self, ctx: &Context, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
-        let (file, _) = ctx
+        let (file, text) = ctx
             .file
             .ok_or_else(|| PluginError::Failed("no file".into()))?;
         let declared = ctx
             .project
             .symbols_in(Path::new("a.toy"))
             .any(|symbol| symbol.name == "z");
-        if file.path != Path::new("ghost.toy") || !declared {
+        if file.path != Path::new("ghost.toy") || !declared || !text.contains("BOO") {
             return Ok(Vec::new());
         }
+        let index = LineIndex::new(text);
+        let at = text.find("BOO").unwrap_or_default();
+        let len = 3;
         Ok(vec![Diagnostic::new(
             "fake/ghost",
             Severity::Error,
             "z is declared".to_owned(),
             &file.path,
             Span {
-                start: Position { line: 1, col: 1 },
-                end: Position { line: 1, col: 1 },
+                start: index.position(at),
+                end: index.position(at + len),
             },
             Fingerprint::new("fake/ghost", "ghost.toy", ""),
         )])
@@ -82,25 +88,34 @@ impl Plugin for Haunted {
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         vec![
             Box::new(Word::new("fake/todo", "TODO")),
+            Box::new(Word::new("fake/bad", "BAD")),
             Box::new(Ghost::new(self.0)),
         ]
     }
 
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
-        vec![Box::new(rewrite("fake/declare", "fn z", Safety::Safe, &[]))]
+        vec![
+            Box::new(rewrite("fake/declare", "fn z", Safety::Safe, &[])),
+            Box::new(rewrite("fake/declare-bad", "fn z BAD", Safety::Safe, &[])),
+            Box::new(rewrite("fake/exorcise", "", Safety::Safe, &[])),
+        ]
     }
 }
 
-/// Fixes the `TODO` of `a.toy` into the declaration of `z`; `ghost.toy` is
-/// where the finding appears, and `calls` tells whether its function calls `z`.
-fn haunted(reach: Option<Reach>, calls: bool) -> (tempfile::TempDir, FixReport) {
+/// Fixes the `TODO` of `a.toy` with `fixer`, which declares `z`; `ghost.toy` is
+/// where the finding appears, and `calls` tells whether its function calls
+/// `z`. With `repair`, the finding in `ghost.toy` has a fix.
+fn haunted_by(
+    (reach, fixer): (Option<Reach>, &str),
+    ghost: &str,
+    repair: bool,
+) -> (tempfile::TempDir, FixReport) {
     let dir = project("fn a\nTODO\n");
-    let ghost = if calls { "fn g\ncall z\n" } else { "fn g\n" };
     fs::write(dir.path().join("ghost.toy"), ghost).unwrap();
     let mut registry = Registry::default();
     registry.register(&Haunted(reach)).unwrap();
     let config = Config::parse_inline(
-        "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/ghost\" = \"error\"\n",
+        "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/bad\" = \"error\"\n\"fake/ghost\" = \"error\"\n",
     )
     .unwrap();
     let engine = Engine::new(
@@ -110,10 +125,34 @@ fn haunted(reach: Option<Reach>, calls: bool) -> (tempfile::TempDir, FixReport) 
         dir.path(),
     )
     .unwrap();
-    let report = engine
-        .fix(&plan("fake/declare", Safety::Safe), &FixRun::default())
-        .unwrap();
+    let mut plan = plan(fixer, Safety::Safe);
+    if repair {
+        plan.insert(
+            "fake/ghost",
+            FixBinding {
+                fixer: FixedBy::Fixer("fake/exorcise".to_owned()),
+                cap: Safety::Safe,
+                languages: Vec::new(),
+                decision: FixDecision {
+                    id: "fake/ghost".to_owned(),
+                    requirement: String::new(),
+                    context: String::new(),
+                },
+                needs: Needs::Nothing,
+            },
+        );
+    }
+    let report = engine.fix(&plan, &FixRun::default()).unwrap();
     (dir, report)
+}
+
+fn haunted(reach: Option<Reach>, calls: bool) -> (tempfile::TempDir, FixReport) {
+    let ghost = if calls {
+        "fn g\ncall z\nBOO\n"
+    } else {
+        "fn g\nBOO\n"
+    };
+    haunted_by((reach, "fake/declare"), ghost, false)
 }
 
 /// Whether the fix of `a.toy` stands.
@@ -155,4 +194,28 @@ fn a_neighbors_finding_is_charged_to_the_changed_files_that_hold_the_neighbours(
 
     assert!(is_kept(&far), "{:?}", unrelated.notes);
     assert!(!is_kept(&near));
+}
+
+#[test]
+fn a_dependent_that_a_fix_breaks_is_repaired_by_the_safe_fix_of_its_own_finding() {
+    let (dir, report) = haunted_by((Some(Reach::Global), "fake/declare"), "fn g\nBOO\n", true);
+
+    assert!(is_kept(&dir), "{:?}", report.notes);
+    assert_eq!(read(&dir, "ghost.toy"), "fn g\n\n");
+    assert!(report.notes.is_empty(), "{:?}", report.notes);
+    let repair = report.applied.iter().find(|a| a.rule_id == "fake/ghost");
+    assert!(repair.is_some_and(|a| a.follow_up), "{:?}", report.applied);
+}
+
+#[test]
+fn the_repair_of_a_dependent_is_undone_with_the_change_that_called_for_it() {
+    let (dir, report) = haunted_by(
+        (Some(Reach::Global), "fake/declare-bad"),
+        "fn g\nBOO\n",
+        true,
+    );
+
+    assert_eq!(text(&dir), "fn a\nTODO\n", "{:?}", report.notes);
+    assert_eq!(read(&dir, "ghost.toy"), "fn g\nBOO\n");
+    assert!(report.applied.is_empty(), "{:?}", report.applied);
 }

@@ -89,6 +89,25 @@ impl<'a> Blame<'a> {
         }
     }
 
+    /// The unchanged files with a new finding that is charged to some changed
+    /// files, with those files: the dependents of the change.
+    pub(super) fn dependents(&self) -> BTreeMap<PathBuf, BTreeSet<PathBuf>> {
+        let mut found: BTreeMap<PathBuf, BTreeSet<PathBuf>> = BTreeMap::new();
+        for (file, rule) in self.grown() {
+            if self.changed.iter().any(|c| c == file) {
+                continue;
+            }
+            let causes = self.charged(file, rule);
+            if !causes.is_empty() {
+                found
+                    .entry(file.to_path_buf())
+                    .or_default()
+                    .extend(causes.into_iter().cloned());
+            }
+        }
+        found
+    }
+
     /// How far a finding of `rule` reaches: a rule that declares nothing
     /// reads the project.
     fn reach_of(&self, rule: &str) -> Reach {

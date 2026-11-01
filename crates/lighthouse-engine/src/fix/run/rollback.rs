@@ -21,7 +21,7 @@ use super::{
     super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator, Standing,
     blame::Blame,
-    settle::fold,
+    settle::{Joined, fold},
 };
 use crate::{Error, Run};
 
@@ -70,26 +70,40 @@ impl Orchestrator<'_> {
             Some(self.recheck()?)
         };
         let mut followed = Vec::new();
+        let mut joined = Joined::default();
         let after = match after {
             Some(run) => {
                 let settled;
                 let started = Instant::now();
                 let outcome = self.settle(before, run, &changed, &kept);
                 self.timings.settle += started.elapsed();
-                (settled, followed) = outcome?;
+                (settled, followed, joined) = outcome?;
                 fold(&mut kept, &mut merged, &self.texts, &candidates.bases);
                 Some(settled)
             }
             None => None,
         };
         let mut verdict = Verdict::default();
+        // The files whose fixes answer the change are verified with it.
+        let scope: Vec<PathBuf> = changed
+            .iter()
+            .cloned()
+            .chain(joined.prior.keys().cloned())
+            .collect();
         if let Some(after) = &after {
-            let blame = Blame::new(self.proposer.engine, (before, after), &changed);
+            let blame = Blame::new(self.proposer.engine, (before, after), &scope);
             failed.extend(worse(&blame));
             verdict = judge(&kept, &merged, before, after);
             failed.extend(verdict.files.clone());
         }
-        let rolled = close_over(&kept, failed);
+        let mut rolled = close_over(&kept, failed);
+        for (file, causes) in &joined.causes {
+            let reason = causes.iter().find_map(|cause| rolled.get(cause)).cloned();
+            if let Some(reason) = reason {
+                rolled.entry(file.clone()).or_insert(reason);
+            }
+        }
+        prior.extend(joined.prior.clone());
         for (file, reason) in &rolled {
             match prior.remove(file) {
                 Some(Some(text)) => {
@@ -103,7 +117,13 @@ impl Orchestrator<'_> {
             let mut by: Vec<&str> = kept
                 .iter()
                 .chain(merged.iter().map(|(p, _)| p))
-                .filter(|p| p.files.contains(file))
+                .filter(|p| {
+                    p.files.contains(file)
+                        || joined
+                            .causes
+                            .get(file)
+                            .is_some_and(|causes| p.files.iter().any(|f| causes.contains(f)))
+                })
                 .map(|p| p.rule_id.as_str())
                 .collect();
             by.sort_unstable();
@@ -122,6 +142,21 @@ impl Orchestrator<'_> {
                 (base, hash)
             });
         }
+        let root = &self.proposer.engine.ws.root;
+        for (file, text) in joined
+            .prior
+            .iter()
+            .filter(|(f, _)| !rolled.contains_key(*f))
+        {
+            self.original.entry(file.clone()).or_insert_with(|| {
+                let base = text
+                    .clone()
+                    .or_else(|| fs::read_to_string(root.join(file)).ok())
+                    .unwrap_or_default();
+                let hash = hash::sha256(&base);
+                (base, hash)
+            });
+        }
         if self.account(
             &kept,
             &merged,
@@ -132,7 +167,7 @@ impl Orchestrator<'_> {
         ) {
             self.rounds = round;
         }
-        self.report_follow_ups(followed, &kept, &rolled, round);
+        self.report_follow_ups(followed, (&kept, &joined), &rolled, round);
         Ok(if rolled.is_empty() { after } else { None })
     }
 

@@ -39,6 +39,16 @@ use crate::{Error, Overlays, Run};
 /// applied: the findings those fixes introduce get one more.
 const PASSES: usize = 2;
 
+/// The files that joined a round only through the safe fixes that followed
+/// it: dependents of the change, with the changed files each is charged to.
+#[derive(Default)]
+pub(super) struct Joined {
+    /// The text each had before the fixes: the overlay, else the disk.
+    pub(super) prior: BTreeMap<PathBuf, Option<String>>,
+    /// The changed files whose change each one's fixes answer.
+    pub(super) causes: BTreeMap<PathBuf, BTreeSet<PathBuf>>,
+}
+
 /// A safe fix that followed a change.
 pub(super) struct Followed {
     proposal: Proposal,
@@ -123,32 +133,39 @@ impl Orchestrator<'_> {
         mut after: Run,
         changed: &[PathBuf],
         fixes: &[Proposal],
-    ) -> Result<(Run, Vec<Followed>), Error> {
+    ) -> Result<(Run, Vec<Followed>, Joined), Error> {
         let mut followed = Vec::new();
+        let mut joined = Joined::default();
         if self.proposer.run.fixer.is_some() || changed.is_empty() {
-            return Ok((after, followed));
+            return Ok((after, followed, joined));
         }
+        let engine = self.proposer.engine;
+        // The changed files, and the dependents whose fixes were kept.
+        let mut scope = changed.to_vec();
         let known: BTreeSet<&Fingerprint> =
             before.diagnostics.iter().map(|d| &d.fingerprint).collect();
         let mut seen = BTreeSet::from([self.state_hash()]);
         for _ in 0..PASSES {
+            let dependents = Blame::new(engine, (before, &after), &scope).dependents();
+            let mut taken = scope.clone();
+            taken.extend(dependents.keys().cloned());
             let introduced: BTreeSet<Fingerprint> = after
                 .diagnostics
                 .iter()
-                .filter(|d| changed.contains(&d.file) && !known.contains(&d.fingerprint))
+                .filter(|d| taken.contains(&d.file) && !known.contains(&d.fingerprint))
                 .map(|d| d.fingerprint.clone())
                 .collect();
             if introduced.is_empty() {
                 break;
             }
             let taking = Taking::Introduced {
-                files: changed,
+                files: &taken,
                 findings: &introduced,
             };
             let (found, _) = self.proposals(&after, Phase::Rules, taking)?;
             let mut safe: Vec<Proposal> = found
                 .into_iter()
-                .filter(|p| p.safety == Safety::Safe && p.files.iter().all(|f| changed.contains(f)))
+                .filter(|p| p.safety == Safety::Safe && p.files.iter().all(|f| taken.contains(f)))
                 .collect();
             safe.sort_by_key(|p| Reverse(p.priority));
             let safe = Self::reportable(safe, fixes, |file| self.standing_text(file));
@@ -180,7 +197,10 @@ impl Orchestrator<'_> {
             let mut next = self.recheck()?;
             let mut made = made;
             let mut prior = prior;
-            let mut bad = worse(&Blame::new(self.proposer.engine, (&after, &next), changed));
+            // What this pass edited is judged like the changed files.
+            let mut judged = scope.clone();
+            judged.extend(prior.iter().map(|(file, _)| file.clone()));
+            let mut bad = worse(&Blame::new(engine, (&after, &next), &judged));
             if !bad.is_empty() && !seen.contains(&self.state_hash()) {
                 let undone = self.undo_files(&mut prior, close_over(&kept, bad));
                 made.retain(|f| {
@@ -192,10 +212,19 @@ impl Orchestrator<'_> {
                 bad = undone;
                 if !prior.is_empty() {
                     next = self.recheck()?;
-                    bad = worse(&Blame::new(self.proposer.engine, (&after, &next), changed));
+                    bad = worse(&Blame::new(engine, (&after, &next), &judged));
                 }
             }
             if bad.is_empty() && seen.insert(self.state_hash()) {
+                for (file, text) in prior {
+                    if scope.contains(&file) {
+                        continue;
+                    }
+                    let causes = dependents.get(&file).cloned().unwrap_or_default();
+                    joined.causes.insert(file.clone(), causes);
+                    joined.prior.insert(file.clone(), text);
+                    scope.push(file);
+                }
                 after = next;
                 followed.extend(made);
                 continue;
@@ -208,7 +237,7 @@ impl Orchestrator<'_> {
             }
             break;
         }
-        Ok((after, followed))
+        Ok((after, followed, joined))
     }
 
     /// Puts back the texts `prior` holds of the files in `undone`, and keeps
@@ -263,13 +292,14 @@ impl Orchestrator<'_> {
     }
 
     /// Reports the safe fixes `followed` that stay applied in the files that
-    /// several of the `kept` fixes of the round edit, and are not rolled back:
+    /// several of the `kept` fixes of the round edit, or that only `joined` the
+    /// round, and are not rolled back:
     /// what they wrote there belongs to no one of those fixes, so each is an
     /// applied fix of its own decision, marked as a follow-up.
     pub(super) fn report_follow_ups(
         &mut self,
         followed: Vec<Followed>,
-        kept: &[Proposal],
+        (kept, joined): (&[Proposal], &Joined),
         rolled: &BTreeMap<PathBuf, String>,
         round: usize,
     ) {
@@ -277,7 +307,10 @@ impl Orchestrator<'_> {
             let files: Vec<PathBuf> = p
                 .files
                 .iter()
-                .filter(|f| editors(kept, f) > 1 && !rolled.contains_key(*f))
+                .filter(|f| {
+                    (editors(kept, f) > 1 || joined.prior.contains_key(*f))
+                        && !rolled.contains_key(*f)
+                })
                 .cloned()
                 .collect();
             if files.is_empty() {
