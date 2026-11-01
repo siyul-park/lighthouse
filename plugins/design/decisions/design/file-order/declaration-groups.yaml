@@ -120,6 +120,15 @@ spec:
           Exported methods that implement clone, conversion or interface hooks;
           they follow the other exported methods of their type. Names are kept
           to ones that are never ordinary behavior.
+      blocks:
+        type: string
+        enum: [type, kind]
+        default: type
+        description: >-
+          How the members of the `method` group are laid out. `type`: one block
+          per owner type, each with its option builders, constructors, exported
+          methods, hooks and unexported methods. `kind`: by rank first, then by
+          owner: all option builders, then all constructors, and so on.
     additionalProperties: false
   languages:
     go: {}
@@ -209,24 +218,28 @@ spec:
         expression: >-
           cel.bind(parts, owner_of(symbol).split('#')[0].split('::'),
             parts.slice(size(parts) - 1, size(parts))[0])
-      - name: role
+      # The role, plural and place in the block, by block rank.
+      - name: words
         expression: >-
-          ['an option builder', 'a constructor', 'an exported method', 'a hook',
-           symbol.kind == 'function' ? 'a helper' : 'an unexported method']
-          .slice(block_rank(symbol), block_rank(symbol) + 1)[0]
-      - name: place_in_block
+          cel.bind(by, options.blocks == 'kind' ? 'the ' : 'its ',
+            [['an option builder', 'option builders', 'first'],
+             ['a constructor', 'constructors', 'after ' + by + 'option builders'],
+             ['an exported method', 'exported methods', 'after ' + by + 'constructors'],
+             ['a hook', 'hooks', 'after ' + by + 'exported methods'],
+             symbol.kind == 'function' ? ['a helper', 'helpers', 'last']
+               : ['an unexported method', 'unexported methods', 'last']]
+            .slice(block_rank(symbol), block_rank(symbol) + 1)[0])
+      - name: block_rule
         expression: >-
-          ['first', 'after its option builders', 'after its constructors',
-           'after its exported methods', 'last']
-          .slice(block_rank(symbol), block_rank(symbol) + 1)[0]
+          options.blocks == 'kind' ? words[1] + ' come ' + words[2]
+          : 'it goes in ' + owner_name + "'s block " + words[2]
     where: size(report) > 0
     message: >-
       {{ report[0][4]
          ? 'constructor ' + symbol.name + ' must precede the other methods of its type, such as '
            + report[0][2]
          : options.groups[report[0][1]] == 'method' && owner_of(symbol) != ''
-         ? symbol.name + ' is ' + role + ' of ' + owner_name + ': it goes in ' + owner_name
-           + "'s block " + place_in_block + target
+         ? symbol.name + ' is ' + words[0] + ' of ' + owner_name + ': ' + block_rule + target
          : symbol.kind + ' ' + symbol.name + ' belongs to the ' + options.groups[report[0][1]]
            + ' group'
            + (report[0][2] != '' ? ' and must follow ' + report[0][2]
@@ -880,45 +893,22 @@ spec:
           body: |-
             package sample
 
-            // Counter counts.
-            type Counter struct{ n int }
+            type counter struct{ n int }
+            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
+            func clamp(n int) int { return min(n, 100) }
 
-            // Add adds to the count.
-            func (c *Counter) Add(d int) {
-            	c.n = clamp(c.n + d)
-            }
-
-            func clamp(n int) int {
-            	return min(n, 100)
-            }
-
-            // Total returns a constant.
-            func Total() int {
-            	return 1
-            }
+            func total() int { return 1 }
       files:
         - path: example.go
           body: |-
             package sample
 
-            // Counter counts.
-            type Counter struct{ n int }
-
-            // Add adds to the count.
-            func (c *Counter) Add(d int) {
-            	c.n = clamp(c.n + d)
-            }
-
-            // Total returns a constant.
-            func Total() int {
-            	return 1
-            }
-
-            func clamp(n int) int {
-            	return min(n, 100)
-            }
+            type counter struct{ n int }
+            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
+            func total() int { return 1 }
+            func clamp(n int) int { return min(n, 100) }
       expect:
-        - line: 16
+        - line: 6
     - name: helper-in-owner-block
       language: go
       kind: valid
@@ -927,24 +917,11 @@ spec:
           body: |-
             package sample
 
-            // Counter counts.
-            type Counter struct{ n int }
-
-            // Add adds to the count.
-            func (c *Counter) Add(d int) {
-            	c.n = clamp(c.n + d)
-            }
-
-            func clamp(n int) int {
-            	return min(n, 100)
-            }
-
-            // Total returns a constant.
-            func Total() int {
-            	return 1
-            }
-
-    - name: public-type-after-private
+            type counter struct{ n int }
+            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
+            func clamp(n int) int { return min(n, 100) }
+            func total() int { return 1 }
+    - name: private-type-after-var
       language: go
       kind: invalid
       fixed:
@@ -952,19 +929,64 @@ spec:
           body: |-
             package sample
 
-            // Store holds a secret.
-            type Store struct{ s secret }
+            type box struct{ n int }
 
-            type secret struct{}
+            var limit = box{1}
       files:
         - path: example.go
           body: |-
             package sample
 
-            type secret struct{}
+            var limit = box{1}
 
-            // Store holds a secret.
-            type Store struct{ s secret }
+            type box struct{ n int }
       expect:
-        - line: 6
-          message: "type Store belongs to the public-type group, which comes before private-type: move it above secret (line 3)"
+        - line: 5
+          message: "type box belongs to the private-type group, which comes before var: move it above limit (line 3)"
+    - name: blocks-by-kind-invalid
+      language: go
+      kind: invalid
+      options:
+        blocks: kind
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            type alpha struct{}
+            type beta struct{}
+            func newAlpha() *alpha { return &alpha{} }
+            func newBeta() *beta { return &beta{} }
+
+            func (a *alpha) run() {}
+            func (b *beta) run() {}
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type alpha struct{}
+            type beta struct{}
+            func newAlpha() *alpha { return &alpha{} }
+            func (a *alpha) run() {}
+            func newBeta() *beta { return &beta{} }
+            func (b *beta) run() {}
+      expect:
+        - line: 7
+          message: "newBeta is a constructor of beta: constructors come after the option builders, above run (line 6)"
+    - name: blocks-by-kind-valid
+      language: go
+      kind: valid
+      options:
+        blocks: kind
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type alpha struct{}
+            type beta struct{}
+            func newAlpha() *alpha { return &alpha{} }
+            func newBeta() *beta { return &beta{} }
+            func (a *alpha) run() {}
+            func (b *beta) run() {}

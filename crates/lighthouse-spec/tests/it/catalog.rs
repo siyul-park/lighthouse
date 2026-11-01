@@ -506,7 +506,7 @@ fn decision_inheriting() {
     );
     assert_eq!(
         over.options.as_ref().unwrap().inherited,
-        ["groups", "hooks"]
+        ["blocks", "groups", "hooks"]
     );
 }
 

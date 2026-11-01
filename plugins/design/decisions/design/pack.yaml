@@ -36,6 +36,11 @@ spec:
       expression: options.groups
     - name: hooks
       expression: options.hooks
+    # How the `method` group is laid out: one block per owner type (`type`), or
+    # by rank first and then by owner (`kind`): the option `blocks` of
+    # `design/declaration-groups`.
+    - name: blocks
+      expression: options.blocks
     # The owner block of a declaration: the type of its module that a method,
     # a constructor or an option builder belongs to, else empty. A private
     # function that only methods of one owner call (`receiver_affinity`) joins
@@ -82,7 +87,8 @@ spec:
     # `design/declaration-groups`, a number to compare: the index in `groups`
     # of the first of the declaration's candidate groups that the order names,
     # times a million, plus, in the group `method`, the rank of the declaration
-    # in the block of its owner: 5 per owner block, and in the block its
+    # in the block of its owner: 5 per owner block (or, under `blocks: kind`,
+    # one rank after another, each over the owners in turn), and in the block its
     # option builders (functional options: a function that returns a func
     # taking the owner, Pike 2014), its constructors (of any visibility, as
     # Uber's `newXYZ()` may follow the type), its exported methods, its hooks,
@@ -96,7 +102,9 @@ spec:
           size(chosen) == 0 ? -1
           : groups.indexOf(chosen[0]) * 1000000
             + (chosen[0] == 'method'
-               ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 5 + block_rank(s)
+               ? cel.bind(index, owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner),
+                   blocks == 'kind' ? block_rank(s) * size(owners) + index
+                   : index * 5 + block_rank(s))
                : 0)))
     # Per placed declaration, [module, place, id, name, line].
     - name: slots
