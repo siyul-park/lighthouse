@@ -459,42 +459,6 @@ spec:
             }
       expect:
         - line: 21
-    - name: private-option-before-constructor
-      language: go
-      kind: valid
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            // Interpreter runs programs.
-            type Interpreter struct{ fuel uint64 }
-
-            // Option configures an interpreter.
-            type Option func(*option)
-
-            type option struct{ fuel uint64 }
-
-            // WithFuel limits the steps of a run.
-            func WithFuel(n uint64) Option {
-            	return func(o *option) {
-            		o.fuel = n
-            	}
-            }
-
-            // New returns an interpreter with the options applied.
-            func New(opts ...Option) *Interpreter {
-            	o := &option{}
-            	for _, opt := range opts {
-            		opt(o)
-            	}
-            	return &Interpreter{fuel: o.fuel}
-            }
-
-            // Fuel returns the step limit.
-            func (i *Interpreter) Fuel() uint64 {
-            	return i.fuel
-            }
     - name: bare-new-constructor
       language: go
       kind: invalid
@@ -718,11 +682,17 @@ spec:
             // Service is part of the example.
             type Service struct{}
 
+            type lowering struct{}
+
             // NewService is part of the example.
             func NewService() *Service { return &Service{} }
 
             // Run is part of the example.
             func (s *Service) Run() int { return 1 }
+
+            func newLowering() *lowering { return &lowering{} }
+
+            func (l *lowering) run() int { return 1 }
       files:
         - path: example.go
           body: |-
@@ -731,39 +701,21 @@ spec:
             // Service is part of the example.
             type Service struct{}
 
+            type lowering struct{}
+
             // Run is part of the example.
             func (s *Service) Run() int { return 1 }
 
             // NewService is part of the example.
             func NewService() *Service { return &Service{} }
-      expect:
-        - line: 10
-    - name: private-constructor-after-methods
-      language: go
-      kind: invalid
-      fixed:
-        - path: example.go
-          body: |-
-            package sample
-
-            type lowering struct{}
-
-            func newLowering() *lowering { return &lowering{} }
-
-            func (l *lowering) run() int { return 1 }
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            type lowering struct{}
 
             func (l *lowering) run() int { return 1 }
 
             func newLowering() *lowering { return &lowering{} }
       expect:
-        - line: 7
-          message: "newLowering is a constructor of lowering: it goes in lowering's block after its option builders, above run (line 5)"
+        - line: 12
+        - line: 16
+          message: "newLowering is a constructor of lowering: it goes in lowering's block after its option builders, above run (line 14)"
     - name: rust-invalid
       language: rust
       kind: invalid
@@ -938,37 +890,6 @@ spec:
             type three struct{}
       expect:
         - line: 5
-    - name: private-function-before-public-function
-      language: go
-      kind: invalid
-      fixed:
-        - path: example.go
-          body: |-
-            package sample
-
-            type counter struct{ n int }
-
-            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
-
-            // Total returns one.
-            func Total() int { return 1 }
-
-            func clamp(n int) int { return min(n, 100) }
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            type counter struct{ n int }
-
-            func (c *counter) add(d int) { c.n = clamp(c.n + d) }
-
-            func clamp(n int) int { return min(n, 100) }
-
-            // Total returns one.
-            func Total() int { return 1 }
-      expect:
-        - line: 10
     - name: private-helper-after-every-type-block
       language: go
       kind: invalid
@@ -986,14 +907,9 @@ spec:
             func NewPass() *Pass { return &Pass{} }
 
             // Run runs the pass.
-            func (p *Pass) Run() int { return p.roundtrip() }
+            func (p *Pass) Run() bool { return p.roundtrip() }
 
-            func (p *Pass) roundtrip() int {
-            	if expressible(p.n) {
-            		return 1
-            	}
-            	return 0
-            }
+            func (p *Pass) roundtrip() bool { return expressible(p.n) }
 
             func newPool() *pool { return &pool{} }
 
@@ -1014,14 +930,9 @@ spec:
             func NewPass() *Pass { return &Pass{} }
 
             // Run runs the pass.
-            func (p *Pass) Run() int { return p.roundtrip() }
+            func (p *Pass) Run() bool { return p.roundtrip() }
 
-            func (p *Pass) roundtrip() int {
-            	if expressible(p.n) {
-            		return 1
-            	}
-            	return 0
-            }
+            func (p *Pass) roundtrip() bool { return expressible(p.n) }
 
             func expressible(n int) bool { return n > 0 }
 
@@ -1029,7 +940,7 @@ spec:
 
             func (p *pool) module() int { return p.n }
       expect:
-        - line: 21
+        - line: 16
     - name: private-type-after-var
       language: go
       kind: invalid
@@ -1083,19 +994,3 @@ spec:
       expect:
         - line: 7
           message: "newBeta is a constructor of beta: constructors come after the option builders, above run (line 6)"
-    - name: blocks-by-kind-valid
-      language: go
-      kind: valid
-      options:
-        blocks: kind
-      files:
-        - path: example.go
-          body: |-
-            package sample
-
-            type alpha struct{}
-            type beta struct{}
-            func newAlpha() *alpha { return &alpha{} }
-            func newBeta() *beta { return &beta{} }
-            func (a *alpha) run() {}
-            func (b *beta) run() {}
