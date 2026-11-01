@@ -33,22 +33,6 @@ func (o *optionConstructors) builtBy(option types.Type, file string) *types.Type
 	return distinct(all, func(c constructor) bool { return c.file == file })
 }
 
-// distinct is the one type that the constructors accepted by keep build, nil
-// if they build none or several.
-func distinct(all []constructor, keep func(constructor) bool) *types.TypeName {
-	var found *types.TypeName
-	for _, c := range all {
-		if !keep(c) || c.built == found {
-			continue
-		}
-		if found != nil {
-			return nil
-		}
-		found = c.built
-	}
-	return found
-}
-
 // constructorsOf returns the option-taking constructors of a package,
 // computed once.
 func (r *resolver) constructorsOf(pkg *packages.Package) *optionConstructors {
@@ -99,4 +83,20 @@ func builtType(results *types.Tuple, pkg *types.Package) (*types.TypeName, bool)
 		return nil, false
 	}
 	return named.Origin().Obj(), true
+}
+
+// distinct is the one type that the constructors accepted by keep build, nil
+// if they build none or several.
+func distinct(all []constructor, keep func(constructor) bool) *types.TypeName {
+	var found *types.TypeName
+	for _, c := range all {
+		if !keep(c) || c.built == found {
+			continue
+		}
+		if found != nil {
+			return nil
+		}
+		found = c.built
+	}
+	return found
 }

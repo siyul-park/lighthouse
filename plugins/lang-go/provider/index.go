@@ -509,6 +509,74 @@ func (r *run) isRequested(rel string) bool {
 	return ok
 }
 
+// patterns are the package directories of b's files, relative to its go.mod.
+func (b *batch) patterns(root string) []string {
+	dirs := map[string]bool{}
+	for _, rel := range b.files {
+		abs := filepath.Dir(filepath.Join(root, filepath.FromSlash(rel)))
+		if p, err := filepath.Rel(b.dir, abs); err == nil {
+			dirs[p] = true
+		}
+	}
+	out := make([]string, 0, len(dirs))
+	for d := range dirs {
+		if d == "." {
+			out = append(out, ".")
+		} else {
+			out = append(out, "./"+filepath.ToSlash(d))
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// next waits for the load of the next batch in order and frees its slot.
+func (l *loader) next() loaded {
+	got := <-l.ready[l.read]
+	l.read++
+	select {
+	case <-l.slots:
+	default: // loaded up front, no slot was taken
+	}
+	return got
+}
+
+// positionFile strips the trailing :line:col of a position.
+func positionFile(pos string) string {
+	for i := 0; i < 2; i++ {
+		at := strings.LastIndex(pos, ":")
+		if at < 0 {
+			return pos
+		}
+		if _, err := strconv.Atoi(pos[at+1:]); err != nil {
+			return pos
+		}
+		pos = pos[:at]
+	}
+	return pos
+}
+
+func emptyResult() sdk.IndexResult {
+	return sdk.IndexResult{
+		Fragments:  []sdk.Fragment{},
+		Sources:    []sdk.Source{},
+		Notices:    []string{},
+		Incomplete: []sdk.Incomplete{},
+	}
+}
+
+func emptyFragment(file sdk.FileInfo) *sdk.Fragment {
+	return &sdk.Fragment{
+		File:      file,
+		Modules:   []sdk.Module{},
+		Symbols:   []sdk.Symbol{},
+		Edges:     []sdk.Edge{},
+		Functions: []sdk.FunctionSummary{},
+		Tests:     []sdk.TestCase{},
+		Comments:  []sdk.Comment{},
+	}
+}
+
 func nearestModule(dir string, cache map[string]string) (string, bool) {
 	var visited []string
 	found, ok := "", false
@@ -602,72 +670,4 @@ func declaredBefore(a, b declaredType) bool {
 		return pa.Offset < pb.Offset
 	}
 	return a.obj.Id() < b.obj.Id()
-}
-
-// patterns are the package directories of b's files, relative to its go.mod.
-func (b *batch) patterns(root string) []string {
-	dirs := map[string]bool{}
-	for _, rel := range b.files {
-		abs := filepath.Dir(filepath.Join(root, filepath.FromSlash(rel)))
-		if p, err := filepath.Rel(b.dir, abs); err == nil {
-			dirs[p] = true
-		}
-	}
-	out := make([]string, 0, len(dirs))
-	for d := range dirs {
-		if d == "." {
-			out = append(out, ".")
-		} else {
-			out = append(out, "./"+filepath.ToSlash(d))
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-// next waits for the load of the next batch in order and frees its slot.
-func (l *loader) next() loaded {
-	got := <-l.ready[l.read]
-	l.read++
-	select {
-	case <-l.slots:
-	default: // loaded up front, no slot was taken
-	}
-	return got
-}
-
-// positionFile strips the trailing :line:col of a position.
-func positionFile(pos string) string {
-	for i := 0; i < 2; i++ {
-		at := strings.LastIndex(pos, ":")
-		if at < 0 {
-			return pos
-		}
-		if _, err := strconv.Atoi(pos[at+1:]); err != nil {
-			return pos
-		}
-		pos = pos[:at]
-	}
-	return pos
-}
-
-func emptyResult() sdk.IndexResult {
-	return sdk.IndexResult{
-		Fragments:  []sdk.Fragment{},
-		Sources:    []sdk.Source{},
-		Notices:    []string{},
-		Incomplete: []sdk.Incomplete{},
-	}
-}
-
-func emptyFragment(file sdk.FileInfo) *sdk.Fragment {
-	return &sdk.Fragment{
-		File:      file,
-		Modules:   []sdk.Module{},
-		Symbols:   []sdk.Symbol{},
-		Edges:     []sdk.Edge{},
-		Functions: []sdk.FunctionSummary{},
-		Tests:     []sdk.TestCase{},
-		Comments:  []sdk.Comment{},
-	}
 }

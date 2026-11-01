@@ -117,36 +117,6 @@ func (u *unit) configures(d *ast.FuncDecl) string {
 	return target(u.res.module(owner.Pkg()), owner.Name())
 }
 
-// satisfies reports whether the type, or a pointer to it, implements iface.
-func satisfies(named *types.Named, iface *types.Interface) bool {
-	return types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface)
-}
-
-// overridesPromoted reports whether a struct type embeds a field that has a
-// method of this name: the declaration replaces a promoted method, so the
-// embedded type's contract is what it keeps.
-func overridesPromoted(named *types.Named, pkg *types.Package, name string) bool {
-	st, ok := named.Underlying().(*types.Struct)
-	if !ok {
-		return false
-	}
-	for field := range st.Fields() {
-		if !field.Embedded() {
-			continue
-		}
-		obj, _, _ := types.LookupFieldOrMethod(field.Type(), true, pkg, name)
-		if _, isMethod := obj.(*types.Func); isMethod {
-			return true
-		}
-	}
-	return false
-}
-
-func declaredIn(t types.Type, pkg *types.Package) bool {
-	named, ok := receiverNamed(t)
-	return ok && named.Obj().Pkg() == pkg
-}
-
 // interfacesOf returns the candidate interfaces of a package, computed once:
 // those it names or declares (types.Info.Uses and Defs) and those its calls take as parameters, so
 // an interface of a dependency is found when the package hands a value to it.
@@ -250,4 +220,34 @@ func addParameters(info *types.Info, call *ast.CallExpr, add func(types.Type)) {
 		}
 		add(pt)
 	}
+}
+
+// satisfies reports whether the type, or a pointer to it, implements iface.
+func satisfies(named *types.Named, iface *types.Interface) bool {
+	return types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface)
+}
+
+// overridesPromoted reports whether a struct type embeds a field that has a
+// method of this name: the declaration replaces a promoted method, so the
+// embedded type's contract is what it keeps.
+func overridesPromoted(named *types.Named, pkg *types.Package, name string) bool {
+	st, ok := named.Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	for field := range st.Fields() {
+		if !field.Embedded() {
+			continue
+		}
+		obj, _, _ := types.LookupFieldOrMethod(field.Type(), true, pkg, name)
+		if _, isMethod := obj.(*types.Func); isMethod {
+			return true
+		}
+	}
+	return false
+}
+
+func declaredIn(t types.Type, pkg *types.Package) bool {
+	named, ok := receiverNamed(t)
+	return ok && named.Obj().Pkg() == pkg
 }

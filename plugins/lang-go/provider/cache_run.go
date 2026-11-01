@@ -145,53 +145,6 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 	return plan, true
 }
 
-// unitAPIKey is the key of u under base without the bodies of its functions:
-// its own API and the API of everything it imports.
-func unitAPIKey(base string, u *cacheUnit) string {
-	parts := []string{base, u.rel, u.api}
-	for _, d := range closure(u) {
-		parts = append(parts, d.rel, d.api)
-	}
-	return digest(parts...)
-}
-
-// analyzeMisses runs the uncached analysis over the missed units, plus the
-// units that declare interfaces so that types are matched against all of them.
-// It returns false when that run failed as a whole, which the cold run would
-// report differently.
-func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan, snippets []*snippet) (*run, bool) {
-	if len(plan.misses) == 0 && len(snippets) == 0 {
-		return nil, true
-	}
-	// The interface units are always analyzed along: a method is an
-	// implementation of any interface of the project, named or not.
-	units := slices.Concat(plan.misses, plan.interfaces)
-	wanted := map[string]bool{}
-	for _, u := range units {
-		for _, rel := range u.requested {
-			wanted[rel] = true
-		}
-	}
-	subParams := params
-	subParams.Inputs = nil
-	for _, f := range params.FileInputs() {
-		if wanted[f.Path] {
-			copy := f
-			subParams.Inputs = append(subParams.Inputs, sdk.IndexInput{Kind: "file", File: &copy})
-		}
-	}
-	sub := newRun(subParams, r.opts)
-	sub.admit(snippets)
-	sub.index()
-	if !sameFailures(r, sub) {
-		return sub, false
-	}
-	if len(plan.previous) == len(plan.misses) {
-		reuseImplements(sub, plan)
-	}
-	return sub, true
-}
-
 // edits are the overlays of a request by absolute path, when each stands in
 // for the text of an existing Go file: a unit is keyed on what its files say,
 // so the text of an edit is read where the disk's would be. An overlay that
@@ -235,6 +188,43 @@ func (pl *planner) interfaceDigest() string {
 	return digest(parts...)
 }
 
+// analyzeMisses runs the uncached analysis over the missed units, plus the
+// units that declare interfaces so that types are matched against all of them.
+// It returns false when that run failed as a whole, which the cold run would
+// report differently.
+func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan, snippets []*snippet) (*run, bool) {
+	if len(plan.misses) == 0 && len(snippets) == 0 {
+		return nil, true
+	}
+	// The interface units are always analyzed along: a method is an
+	// implementation of any interface of the project, named or not.
+	units := slices.Concat(plan.misses, plan.interfaces)
+	wanted := map[string]bool{}
+	for _, u := range units {
+		for _, rel := range u.requested {
+			wanted[rel] = true
+		}
+	}
+	subParams := params
+	subParams.Inputs = nil
+	for _, f := range params.FileInputs() {
+		if wanted[f.Path] {
+			copy := f
+			subParams.Inputs = append(subParams.Inputs, sdk.IndexInput{Kind: "file", File: &copy})
+		}
+	}
+	sub := newRun(subParams, r.opts)
+	sub.admit(snippets)
+	sub.index()
+	if !sameFailures(r, sub) {
+		return sub, false
+	}
+	if len(plan.previous) == len(plan.misses) {
+		reuseImplements(sub, plan)
+	}
+	return sub, true
+}
+
 // sameFailures reports whether the analysis of the missed units failed the way
 // a full one would have. A batch the go command cannot list is reported with
 // its number of files, so the analysis must have seen all of them; any other
@@ -250,4 +240,14 @@ func sameFailures(r, sub *run) bool {
 		}
 	}
 	return true
+}
+
+// unitAPIKey is the key of u under base without the bodies of its functions:
+// its own API and the API of everything it imports.
+func unitAPIKey(base string, u *cacheUnit) string {
+	parts := []string{base, u.rel, u.api}
+	for _, d := range closure(u) {
+		parts = append(parts, d.rel, d.api)
+	}
+	return digest(parts...)
 }
