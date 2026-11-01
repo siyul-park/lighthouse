@@ -28,6 +28,7 @@ use crate::{
 pub use account::ModelCounts;
 pub(super) use account::{Account, Class, Event};
 pub(super) use extent::choose as choose_extent;
+pub(super) use reach::reach;
 pub use trace::{BatchTrace, ToolCounts};
 pub(super) use verify::{Verdict, judge};
 

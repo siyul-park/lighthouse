@@ -30,6 +30,7 @@ use super::{
     super::propose::{Phase, Proposal, Taking},
     super::{AppliedFix, FixedBy},
     Orchestrator,
+    blame::Blame,
     rollback::{close_over, kept_proposals, worse},
 };
 use crate::{Error, Overlays, Run};
@@ -179,7 +180,7 @@ impl Orchestrator<'_> {
             let mut next = self.recheck()?;
             let mut made = made;
             let mut prior = prior;
-            let mut bad = worse(&after, &next, changed);
+            let mut bad = worse(&Blame::new(self.proposer.engine, (&after, &next), changed));
             if !bad.is_empty() && !seen.contains(&self.state_hash()) {
                 let undone = self.undo_files(&mut prior, close_over(&kept, bad));
                 made.retain(|f| {
@@ -191,7 +192,7 @@ impl Orchestrator<'_> {
                 bad = undone;
                 if !prior.is_empty() {
                     next = self.recheck()?;
-                    bad = worse(&after, &next, changed);
+                    bad = worse(&Blame::new(self.proposer.engine, (&after, &next), changed));
                 }
             }
             if bad.is_empty() && seen.insert(self.state_hash()) {

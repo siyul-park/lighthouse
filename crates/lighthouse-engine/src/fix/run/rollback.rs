@@ -20,6 +20,7 @@ use super::{
     super::propose::Proposal,
     super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator, Standing,
+    blame::Blame,
     settle::fold,
 };
 use crate::{Error, Run};
@@ -83,7 +84,8 @@ impl Orchestrator<'_> {
         };
         let mut verdict = Verdict::default();
         if let Some(after) = &after {
-            failed.extend(worse(before, after, &changed));
+            let blame = Blame::new(self.proposer.engine, (before, after), &changed);
+            failed.extend(worse(&blame));
             verdict = judge(&kept, &merged, before, after);
             failed.extend(verdict.files.clone());
         }
@@ -350,36 +352,33 @@ pub(super) fn kept_proposals(
 /// The changed files whose check got worse: more findings of error or warn
 /// severity for some rule in a file, wherever in it (a finding that moves to
 /// another symbol of the file is not new, as `model::verify`'s `introduced`
-/// counts it), or a new gap in the analysis. A change that cannot be pinned on
-/// one file (a gap with no path, a finding in an untouched file) condemns them
-/// all.
-pub(super) fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<PathBuf, String> {
-    type Key<'a> = (&'a Path, &'a str);
-    fn count(run: &Run) -> BTreeMap<Key<'_>, usize> {
-        let mut counts = BTreeMap::new();
-        for d in run.loud() {
-            *counts
-                .entry((d.file.as_path(), d.rule_id.as_str()))
-                .or_insert(0) += 1;
-        }
-        counts
-    }
-    let known = count(before);
+/// counts it), or a new gap in the analysis. A finding that is new in a file
+/// that was not changed is charged to the changed files it depends on (see
+/// [`Blame`]); a gap with no path condemns them all.
+pub(super) fn worse(blame: &Blame<'_>) -> BTreeMap<PathBuf, String> {
+    let (before, after) = blame.runs();
+    let changed = blame.changed();
     let gaps: BTreeSet<_> = before.incomplete.iter().collect();
     let mut bad: BTreeMap<PathBuf, String> = BTreeMap::new();
-    let mut everyone: Option<String> = None;
-    for (key, now) in &count(after) {
-        if known.get(key).copied().unwrap_or(0) >= *now {
-            continue;
-        }
-        let (file, rule) = key;
-        let reason = format!("it introduced a finding of {rule}");
-        if changed.iter().any(|c| c.as_path() == *file) {
-            bad.entry(file.to_path_buf()).or_insert(reason);
-        } else {
-            everyone.get_or_insert_with(|| format!("{reason} in {}", file.display()));
+    let grown = blame.grown();
+    // What a file owes to its own findings comes before what it is charged.
+    for (file, rule) in &grown {
+        if changed.iter().any(|c| c == file) {
+            bad.entry(file.to_path_buf())
+                .or_insert_with(|| format!("it introduced a finding of {rule}"));
         }
     }
+    for (file, rule) in &grown {
+        if changed.iter().any(|c| c == file) {
+            continue;
+        }
+        for cause in blame.charged(file, rule) {
+            bad.entry(cause.clone()).or_insert_with(|| {
+                format!("it introduced a finding of {rule} in {}", file.display())
+            });
+        }
+    }
+    let mut everyone: Option<String> = None;
     for gap in after.incomplete.iter().filter(|g| !gaps.contains(g)) {
         match &gap.path {
             Some(path) if changed.contains(path) => {

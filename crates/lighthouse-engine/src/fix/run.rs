@@ -1,3 +1,4 @@
+mod blame;
 mod chain;
 mod cycle;
 mod rollback;
