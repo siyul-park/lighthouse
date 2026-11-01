@@ -17,7 +17,7 @@ Size limits that keep files reviewable.
 
 `core/max-lines` · file · info · cel
 
-*Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The remedy is simpler code or a concept that is reused, never the same code moved elsewhere. A file over the limit is made simpler, or split along a boundary whose halves are used apart, never by size alone or by moving code to a file that remains tied to the first. A half moved to another file that stays tied to the first through private items is not a boundary (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man).*
+*Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The remedy is simpler code or a concept that is reused, never the same code moved elsewhere. A file over the limit is made simpler, or split along a boundary whose halves are used apart, never by size alone or by moving code to a file that remains tied to the first. A half moved to another file that stays tied to the first through private items is not a boundary (Ousterhout, A Philosophy of Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element, Middle Man). Generated files are not judged: their size follows the generator, which is the file to edit.*
 
 A file SHOULD stay at or below the configured line limit (option `max`).
 

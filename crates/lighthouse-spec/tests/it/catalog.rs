@@ -427,7 +427,7 @@ fn scope_applicability() {
         lighthouse_model::TestScope::Only
     );
     assert!(!scope.applicability().generated);
-    let all = bundled("core/max-lines").scope.applicability();
+    let all = bundled("core/max-len").scope.applicability();
     assert!(all.generated);
     assert_eq!(all.tests, lighthouse_model::TestScope::Include);
 }
