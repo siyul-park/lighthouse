@@ -72,6 +72,10 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("data_only", Reach::Neighbors),
     ("receiver_affinity", Reach::Neighbors),
     ("owner_home", Reach::Neighbors),
+    // How far the file of a method away from its type is a file of that
+    // type's own concern: the share of the file the methods and their helpers
+    // hold, read across the type's whole module.
+    ("split", Reach::Global),
     ("envy", Reach::Neighbors),
     ("private_reach", Reach::Neighbors),
     // Produced for a file only along with `private_reach`, which decides.

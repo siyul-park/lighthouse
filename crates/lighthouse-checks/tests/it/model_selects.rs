@@ -167,10 +167,18 @@ fn meaningful_separation_asks_about_a_small_module_with_one_user() {
 }
 
 #[test]
-fn owner_file_asks_about_a_method_declared_away_from_its_type() {
+fn owner_file_asks_about_a_helper_of_one_type_declared_away_from_it() {
     let mut w = World::default();
     let store = w.symbol("m", "Store", SymbolKind::Type, "m/store.ucm");
-    w.member(&store, "Near", SymbolKind::Method, "m/store.ucm");
-    w.member(&store, "Far", SymbolKind::Method, "m/total.ucm");
-    assert_eq!(selected(&w, "design/owner-file", "symbol"), ["Far"]);
+    let near = w.member(&store, "Near", SymbolKind::Method, "m/store.ucm");
+    let field = w.member(&store, "items", SymbolKind::Field, "m/store.ucm");
+    let far = w.func("m", "far", "m/total.ucm");
+    w.private(&far);
+    w.edge(EdgeKind::Calls, &near, &far);
+    w.edge(EdgeKind::References, &far, &field);
+    let home = w.func("m", "home", "m/store.ucm");
+    w.private(&home);
+    w.edge(EdgeKind::Calls, &near, &home);
+    w.edge(EdgeKind::References, &home, &field);
+    assert_eq!(selected(&w, "design/owner-file", "symbol"), ["far"]);
 }

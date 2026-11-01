@@ -43,6 +43,7 @@ mod owned;
 mod ownership;
 mod parent;
 mod role;
+mod split;
 mod stability;
 mod style;
 mod unit;
@@ -450,6 +451,9 @@ impl<'a> Builder<'a> {
         if needs.field("owner_home") {
             map.insert("owner_home".to_owned(), self.owner_home(symbol));
         }
+        if needs.field("split") {
+            map.insert("split".to_owned(), self.split(symbol));
+        }
         if needs.field("style_mix") {
             map.insert("style_mix".to_owned(), json!(self.style_mix(symbol)));
         }
@@ -738,6 +742,7 @@ pub(crate) struct Indexes {
     types: OnceLock<BTreeMap<String, Vec<Value>>>,
     owned: OnceLock<BTreeMap<SymbolId, Vec<SymbolId>>>,
     names: OnceLock<BTreeMap<String, Vec<SymbolId>>>,
+    splits: OnceLock<BTreeMap<SymbolId, Value>>,
     parents: OnceLock<parent::Uses>,
     modules: OnceLock<System>,
     symbols: OnceLock<System>,

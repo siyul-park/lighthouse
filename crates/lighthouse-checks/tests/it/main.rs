@@ -29,6 +29,7 @@ mod reach;
 mod region_options;
 mod rules;
 mod rust;
+mod split_facts;
 mod stability;
 mod support;
 mod testing_rules;

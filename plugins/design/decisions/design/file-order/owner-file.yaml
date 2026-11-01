@@ -6,10 +6,42 @@ metadata:
   uid: 829bb319-11bb-4047-8b03-0a2dc7216560
 spec:
   title: One owner has one cohesive file
-  context: Files are navigational boundaries. Splitting an owner from its closely
-    related methods adds indirection unless the split expresses a meaningful boundary;
-    physical separation corresponds to a real responsibility, ownership, or abstraction
-    boundary.
+  context: >-
+    Files are navigational boundaries. Splitting an owner from its closely
+    related methods adds indirection unless the split expresses a meaningful
+    boundary; physical separation corresponds to a real responsibility,
+    ownership, or abstraction boundary.
+
+    A method declared in a file other than its type's is a finding, unless
+    the type is split by concern or the file is dedicated to the type. Two
+    facts of the `split` fact say so. A type split by concern keeps few of its
+    methods at home: it has methods in its home file, and fewer than a fifth of
+    all its methods (go/types' `Checker` has 19 of 203 in `check.go`). A file
+    is dedicated to the type when the type's methods in it and the helpers
+    only they reach (private functions and types that only the file uses) are
+    at least half of the functions of the file (`share`). A stray file of a
+    type that keeps its methods at home (minivm's `transform/fact.go`) is
+    neither. Exempt as well: methods an interface or trait fixes
+    (`implementation`), generated code (also a type declared in generated code,
+    whose file cannot take methods), tests, a platform sibling (Go
+    `machine_arm64.go` beside `machine.go`: the stem of a file name leaves out
+    a GOOS or GOARCH suffix), and a Rust inherent impl in a submodule of the
+    module that declares the type (`fix/run/settle.rs` beside `fix/run.rs`; the
+    owner file's path without `.rs`, or its directory for `lib.rs`, `main.rs`
+    and `mod.rs`, is the submodule's prefix). A private free function used only
+    by one type's methods is a judgment: it is a review task when it lives away
+    from that type. The finding has no fix; moving methods across files changes
+    the roles of files, which a reviewer decides.
+
+    The severity follows the measured precision. A sample of 51 (type, file)
+    cases (208 methods) from cel (none: its split methods all implement
+    interfaces), qlbridge, minivm, this repository and go/types was labelled by
+    whether a reviewer following the requirement would move the method or make
+    the file the type's own concern. The rule flags 16 cases and 14 are right
+    (88%; 91% of the 23 methods; 93% held out by corpus), above 80%, so `warn`.
+    Share alone flagged 21 cases at 48%; connectedness and narrow entry, which
+    go/types' own concern files fail, lowered precision and are not used. No
+    mainstream linter enforces this.
   scope:
     subject: symbol
     examples: exclude
@@ -22,17 +54,37 @@ spec:
   check:
     type: cel
     select: function
-    where: 'false'
+    variables:
+      - name: home
+        expression: "func.kind == 'method' && size(func.owner_home) > 0 ? func.owner_home : {}"
+      - name: split
+        expression: "func.kind == 'method' && size(func.split) > 0 ? func.split : {}"
+      - name: submodule
+        expression: >-
+          size(home) > 0 && func.lang == 'rust'
+          && func.file.startsWith(regex.replace(home.owner_file, '(/(lib|main|mod))?\\.rs$', '/'))
+    where: >-
+      size(home) > 0 && !func.test && !func.generated && !func.implementation
+      && !home.owner_generated && home.owner_file != func.file
+      && func.file_stem != home.owner_stem && !submodule
+      && !(size(split) > 0
+           && (split.share >= 0.5 || (split.home_methods >= 1 && split.home_methods * 5 < split.methods)))
     abstain: >-
-      !func.test && !func.generated
-      && (func.kind == 'method' || func.kind == 'function')
-      && !func.implementation && size(func.owner_home) > 0
-      && func.owner_home.owner_file != func.file
-    message: "{{ 'review whether ' + func.name + ' should live with its owner in ' + func.owner_home.owner_file }}"
+      !func.test && !func.generated && func.kind == 'function'
+      && size(func.owner_home) > 0 && func.owner_home.owner_file != func.file
+    message: >-
+      {{ func.kind == 'method'
+         ? home.owner_name + '.' + func.name + ' is declared in ' + func.file + ', away from ' + home.owner_name
+           + ' in ' + home.owner_file + ': move it to ' + home.owner_file + ', or make ' + func.file
+           + " a file of " + home.owner_name + "'s own concern"
+         : 'review whether ' + func.name + ' should live with its owner in ' + func.owner_home.owner_file }}
     evidence:
       kind: "'owner-file'"
-      owner_file: func.owner_home.owner_file
+      owner_file: "size(home) > 0 ? home.owner_file : func.owner_home.owner_file"
       file: func.file
+      share: "size(split) > 0 ? split.share : 0.0"
+      home_methods: "size(split) > 0 ? split.home_methods : 0"
+      methods: "size(split) > 0 ? split.methods : 0"
     identity:
       subject: func.id
   provenance:
@@ -53,6 +105,12 @@ spec:
         package sample
 
         func (s *Store) Total() int { return 1 }
+
+        func one() int { return 1 }
+
+        func two() int { return 2 }
+    expect:
+    - line: 3
   - name: go-valid-owner-file
     language: go
     kind: valid
@@ -67,21 +125,70 @@ spec:
         // Total is part of the example.
         func (s *Store) Total() int { return 1 }
     canonical: true
+  - name: go-valid-concern-file
+    language: go
+    kind: valid
+    files:
+    - path: store.go
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct{}
+    - path: store_query.go
+      body: |-
+        package sample
+
+        // Total is part of the example.
+        func (s *Store) Total() int { return s.sum() }
+
+        func (s *Store) sum() int { return 1 }
+    - path: use.go
+      body: |-
+        package sample
+
+        // Use is part of the example.
+        func Use(s *Store) int { return s.Total() }
+  - name: go-valid-platform-sibling
+    language: go
+    kind: valid
+    files:
+    - path: store.go
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct{}
+    - path: store_arm64.go
+      body: |-
+        package sample
+
+        // Total is part of the example.
+        func (s *Store) Total() int { return 1 }
   - name: rust-invalid-owner-file
     language: rust
     kind: invalid
     files:
     - path: src/lib.rs
       body: |-
-        pub struct Store;
+        mod store;
         mod total;
+    - path: src/store.rs
+      body: |-
+        pub struct Store;
     - path: src/total.rs
       body: |-
-        use crate::Store;
+        use crate::store::Store;
 
         impl Store {
             pub fn total(&self) -> u8 { 1 }
         }
+
+        fn one() -> u8 { 1 }
+
+        fn two() -> u8 { 2 }
+    expect:
+    - line: 4
   - name: rust-valid-owner-file
     language: rust
     kind: valid
@@ -96,3 +203,20 @@ spec:
             pub fn total(&self) -> u8 { 1 }
         }
     canonical: true
+  - name: rust-valid-submodule-impl
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Part of the example.
+        pub struct Store;
+        mod total;
+    - path: src/total.rs
+      body: |-
+        use crate::Store;
+
+        impl Store {
+            /// Part of the example.
+            pub fn total(&self) -> u8 { 1 }
+        }

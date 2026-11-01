@@ -116,7 +116,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("design/no-type-encoding", Some((Reach::Local, false))),
     ("design/no-unused-symbol", Some((Reach::Neighbors, false))),
     ("design/optional-options", Some((Reach::Local, false))),
-    ("design/owner-file", Some((Reach::Neighbors, false))),
+    ("design/owner-file", Some((Reach::Global, false))),
     ("design/plural-collections", Some((Reach::Local, false))),
     ("design/predicate-names", Some((Reach::Local, false))),
     ("design/prefer-method", Some((Reach::Neighbors, false))),

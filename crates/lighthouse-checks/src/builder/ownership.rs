@@ -8,7 +8,7 @@ use lighthouse_model::ucm::{Project, Symbol, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
 use super::{Builder, effective::named_params};
-use crate::layout;
+use crate::{facts, layout};
 
 impl Builder<'_> {
     /// A private free function whose every production caller is a method of
@@ -36,7 +36,8 @@ impl Builder<'_> {
     }
 
     /// The type a method is declared with, or that all the methods calling a
-    /// private free function belong to, and the file that type is declared in.
+    /// private free function belong to, the file that type is declared in, its
+    /// stem and whether it is generated.
     pub(super) fn owner_home(&self, symbol: &Symbol) -> Value {
         let project = self.project;
         // A helper belongs to the type it works on, not to every type whose
@@ -56,7 +57,10 @@ impl Builder<'_> {
         };
         json!({
             "owner": owner.id.as_str(),
+            "owner_name": owner.name,
             "owner_file": owner.file.to_string_lossy(),
+            "owner_stem": facts::file_stem(project, &owner.file),
+            "owner_generated": project.file(&owner.file).is_some_and(|f| f.generated),
         })
     }
 

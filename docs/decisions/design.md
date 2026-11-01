@@ -1845,7 +1845,7 @@ Also: rust
 
 `design/owner-file` · symbol · warn · cel · go, rust
 
-*Files are navigational boundaries. Splitting an owner from its closely related methods adds indirection unless the split expresses a meaningful boundary; physical separation corresponds to a real responsibility, ownership, or abstraction boundary.*
+*Files are navigational boundaries. Splitting an owner from its closely related methods adds indirection unless the split expresses a meaningful boundary; physical separation corresponds to a real responsibility, ownership, or abstraction boundary. A method declared in a file other than its type's is a finding, unless the type is split by concern or the file is dedicated to the type. Two facts of the `split` fact say so. A type split by concern keeps few of its methods at home: it has methods in its home file, and fewer than a fifth of all its methods (go/types' `Checker` has 19 of 203 in `check.go`). A file is dedicated to the type when the type's methods in it and the helpers only they reach (private functions and types that only the file uses) are at least half of the functions of the file (`share`). A stray file of a type that keeps its methods at home (minivm's `transform/fact.go`) is neither. Exempt as well: methods an interface or trait fixes (`implementation`), generated code (also a type declared in generated code, whose file cannot take methods), tests, a platform sibling (Go `machine_arm64.go` beside `machine.go`: the stem of a file name leaves out a GOOS or GOARCH suffix), and a Rust inherent impl in a submodule of the module that declares the type (`fix/run/settle.rs` beside `fix/run.rs`; the owner file's path without `.rs`, or its directory for `lib.rs`, `main.rs` and `mod.rs`, is the submodule's prefix). A private free function used only by one type's methods is a judgment: it is a review task when it lives away from that type. The finding has no fix; moving methods across files changes the roles of files, which a reviewer decides. The severity follows the measured precision. A sample of 51 (type, file) cases (208 methods) from cel (none: its split methods all implement interfaces), qlbridge, minivm, this repository and go/types was labelled by whether a reviewer following the requirement would move the method or make the file the type's own concern. The rule flags 16 cases and 14 are right (88%; 91% of the 23 methods; 93% held out by corpus), above 80%, so `warn`. Share alone flagged 21 cases at 48%; connectedness and narrow entry, which go/types' own concern files fail, lowered precision and are not used. No mainstream linter enforces this.*
 
 Symbols with one owner and a cohesive responsibility SHOULD share a file.
 
@@ -1861,6 +1861,10 @@ type Store struct{}
 package sample
 
 func (s *Store) Total() int { return 1 }
+
+func one() int { return 1 }
+
+func two() int { return 2 }
 ```
 
 ```go valid
