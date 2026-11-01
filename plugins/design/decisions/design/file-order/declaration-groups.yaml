@@ -195,20 +195,51 @@ spec:
       - name: report
         expression: >-
           symbol.id in reported_ids ? reported.filter(d, d[0] == symbol.id) : []
+      # Where the finding sends the declaration: after the declaration it must
+      # follow, when it has one that stays in place, else above its anchor.
+      - name: found
+        expression: anchor(symbol.id)
+      - name: target
+        expression: >-
+          report[0][2] != '' ? ', after ' + report[0][2]
+            : size(found) > 0 ? ', above ' + found.name + ' (line ' + string(found.line) + ')' : ''
+      # The owner block of the declaration, its role there and where in the block
+      # it goes, by block rank.
+      - name: owner_name
+        expression: >-
+          cel.bind(parts, owner_of(symbol).split('#')[0].split('::'),
+            parts.slice(size(parts) - 1, size(parts))[0])
+      - name: role
+        expression: >-
+          ['an option builder', 'a constructor', 'an exported method', 'a hook',
+           symbol.kind == 'function' ? 'a helper' : 'an unexported method']
+          .slice(block_rank(symbol), block_rank(symbol) + 1)[0]
+      - name: place_in_block
+        expression: >-
+          ['first', 'after its option builders', 'after its constructors',
+           'after its exported methods', 'last']
+          .slice(block_rank(symbol), block_rank(symbol) + 1)[0]
     where: size(report) > 0
     message: >-
       {{ report[0][4]
          ? 'constructor ' + symbol.name + ' must precede the other methods of its type, such as '
            + report[0][2]
-         : symbol.kind + ' ' + symbol.name + ' belongs to the `' + options.groups[report[0][1]]
-           + '` group and must '
-           + (report[0][2] != '' ? 'follow ' + report[0][2]
-              : 'come before the declarations above it') }}
+         : options.groups[report[0][1]] == 'method' && owner_of(symbol) != ''
+         ? symbol.name + ' is ' + role + ' of ' + owner_name + ': it goes in ' + owner_name
+           + "'s block " + place_in_block + target
+         : symbol.kind + ' ' + symbol.name + ' belongs to the ' + options.groups[report[0][1]]
+           + ' group'
+           + (report[0][2] != '' ? ' and must follow ' + report[0][2]
+              : size(found) > 0
+              ? ', which comes before ' + options.groups[found.place / 1000000]
+                + ': move it above ' + found.name + ' (line ' + string(found.line) + ')'
+              : '') }}
     evidence:
       declaration: symbol.id
       group: "report[0][4] ? 'constructor' : options.groups[report[0][1]]"
       expected_after: "!report[0][4] && report[0][2] != '' ? report[0][2] : null"
       before: report[0][3]
+      anchor: "size(found) > 0 ? found.id : ''"
     identity:
       subject: symbol.id
       snippet: "report[0][4] ? 'clause 1' : ''"
@@ -290,6 +321,7 @@ spec:
             }
       expect:
         - line: 16
+          message: "WithName is an option builder of Program: it goes in Program's block first, above New (line 7)"
     - name: private-option-after-methods
       language: go
       kind: invalid
@@ -436,6 +468,7 @@ spec:
             }
       expect:
         - line: 12
+          message: "New is a constructor of Program: it goes in Program's block after its option builders, above Run (line 7)"
     - name: invalid
       language: go
       kind: invalid
@@ -664,6 +697,7 @@ spec:
             func newLowering() *lowering { return &lowering{} }
       expect:
         - line: 7
+          message: "newLowering is a constructor of lowering: it goes in lowering's block after its option builders, above run (line 5)"
     - name: rust-invalid
       language: rust
       kind: invalid
@@ -689,6 +723,7 @@ spec:
             pub struct Store;
       expect:
         - line: 7
+          message: "type Store belongs to the type group, which comes before public-function: move it above run (line 2)"
     - name: rust-valid
       language: rust
       kind: valid
@@ -760,6 +795,7 @@ spec:
             }
       expect:
         - line: 11
+          message: "constructor new must precede the other methods of its type, such as get"
     - name: test-fixtures-out-of-order
       language: go
       kind: invalid
@@ -907,3 +943,28 @@ spec:
             func Total() int {
             	return 1
             }
+
+    - name: public-type-after-private
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            // Store holds a secret.
+            type Store struct{ s secret }
+
+            type secret struct{}
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type secret struct{}
+
+            // Store holds a secret.
+            type Store struct{ s secret }
+      expect:
+        - line: 6
+          message: "type Store belongs to the public-type group, which comes before private-type: move it above secret (line 3)"

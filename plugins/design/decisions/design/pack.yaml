@@ -98,9 +98,9 @@ spec:
             + (chosen[0] == 'method'
                ? (owners.indexOf(owner) < 0 ? 0 : owners.indexOf(owner)) * 5 + block_rank(s)
                : 0)))
-    # Per placed declaration, [module, place, id, name].
+    # Per placed declaration, [module, place, id, name, line].
     - name: slots
-      expression: placed.map(s, [s.module, place(s), s.id, s.name])
+      expression: placed.map(s, [s.module, place(s), s.id, s.name, s.line])
     - name: keys
       expression: slots.map(r, r[1])
     - name: placed_ids
@@ -110,6 +110,17 @@ spec:
       params: [id]
       expression: >-
         cel.bind(at, placed_ids.indexOf(id), at < 0 ? -1 : keys.slice(at, at + 1)[0])
+    # The anchor of a declaration, by id: the first declaration above it in its
+    # module whose place is greater, with its id, name, line and place; empty
+    # when none is, or the declaration is not placed.
+    - name: anchor
+      params: [id]
+      expression: >-
+        cel.bind(at, placed_ids.indexOf(id),
+          at < 0 ? {}
+          : cel.bind(me, slots.slice(at, at + 1)[0],
+            (slots.slice(0, at).filter(r, r[0] == me[0] && r[1] > me[1])
+              .map(r, {'id': r[2], 'name': r[3], 'line': r[4], 'place': r[1]}) + [{}])[0]))
   sections:
     - name: principles
       title: Principles

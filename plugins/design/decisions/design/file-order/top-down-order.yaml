@@ -70,30 +70,30 @@ spec:
       expression: "size(held_by) == 0 ? [] : file.symbols.filter(a, a.kind == 'type' && a.id in held_by)"
     - name: users
       expression: "symbol.func != null ? local : holders.sortBy(a, a.pos)"
-    - name: anchor
+    - name: lead
       expression: 'size(users) == 0 ? symbol : options.sharedAfterLastCaller ? users[size(users)
         - 1] : users[0]'
     - name: used_first
       expression: |-
-        (symbol.kind == 'function' || symbol.kind == 'method' || symbol.kind == 'type') && size(users) > 0 && symbol.pos <= anchor.pos && !cel.bind(own, declaration_group(symbol.id),
-            cel.bind(later, declaration_group(anchor.id),
+        (symbol.kind == 'function' || symbol.kind == 'method' || symbol.kind == 'type') && size(users) > 0 && symbol.pos <= lead.pos && !cel.bind(own, declaration_group(symbol.id),
+            cel.bind(later, declaration_group(lead.id),
               own >= 0 && later >= 0 && own < later))
         && !(symbol.lang == 'rust' && symbol.kind == 'method' && !symbol.implementation
-             && anchor.kind == 'method' && anchor.implementation)
+             && lead.kind == 'method' && lead.implementation)
     - name: matched
       expression: 'used_first ? [''callers-first''] : []'
     where: size(matched)>0
-    message: "{{ symbol.kind == 'type' ? 'type ' + symbol.name + ' is declared before ' + anchor.name + ', which holds it; holders come first'
-      : 'private ' + symbol.kind + ' ' + symbol.name + ' is declared before its caller ' + anchor.name + '; callers come first' }}"
+    message: "{{ symbol.kind == 'type' ? 'type ' + symbol.name + ' is declared above ' + lead.name + ' (line ' + string(lead.line) + '), which holds it; holders come first'
+      : 'private ' + symbol.kind + ' ' + symbol.name + ' is declared above its ' + (options.sharedAfterLastCaller ? 'last' : 'first') + ' caller ' + lead.name + ' (line ' + string(lead.line) + '); callers come first' }}"
     evidence:
-      caller: anchor.id
+      caller: lead.id
       callee: symbol.id
     identity:
       subject: symbol.id
   fix:
     safety: unsafe
     type: cel
-    edits: "symbol.kind != 'type' || symbol.lang == 'go' ? [move(symbol, after(anchor))] : []"
+    edits: "symbol.kind != 'type' || symbol.lang == 'go' ? [move(symbol, after(lead))] : []"
   provenance:
     wasDerivedFrom:
     - Martin, Clean Code (2008), G10 Vertical Separation
@@ -126,6 +126,7 @@ spec:
         func Run() int { return helper() }
     expect:
     - line: 3
+      message: private function helper is declared above its first caller Run (line 6); callers come first
   - name: valid
     language: go
     kind: valid
