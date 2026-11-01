@@ -239,8 +239,10 @@ func (u *unit) general(d *ast.GenDecl) {
 			if d.Tok == token.CONST {
 				kind = kindConst
 			}
+			// A spec that declares one name beside blanks (`v, _ = f()`) has
+			// that name's declaration to itself.
 			var extent *sdk.Span
-			if len(s.Names) == 1 {
+			if named(s.Names) == 1 {
 				extent = u.specExtent(d, s)
 			}
 			for i, name := range s.Names {
@@ -467,4 +469,15 @@ func initializersOf(s *ast.ValueSpec, i int) []ast.Expr {
 
 func hasComponent(dir, name string) bool {
 	return slices.Contains(strings.Split(dir, "/"), name)
+}
+
+// named counts the identifiers that are not blank.
+func named(names []*ast.Ident) int {
+	count := 0
+	for _, name := range names {
+		if name.Name != "_" {
+			count++
+		}
+	}
+	return count
 }

@@ -39,6 +39,9 @@ func (s *Service) Run() int {
 	return s.size + Limit
 }
 
+// kept is the one named value of its spec.
+var kept, _ = 4, 5
+
 func helper() int { return plain }
 
 type (

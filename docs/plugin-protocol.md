@@ -374,7 +374,7 @@ The host treats failures as follows, always turning them into
   with no blank line between, and a comment that trails it on its last line, belong to
   it. A declaration that is one spec of a parenthesized group (a Go `const ( ... )`)
   has the spec's own lines, which a host never moves out of its group. A symbol whose
-  declaration it shares with another (Go `var a, b = 1, 2`) has no extent. Moving or
+  declaration it shares with another (Go `var a, b = 1, 2`; not `v, _ = f()`, which declares one name) has no extent. Moving or
   deleting a declaration takes exactly this range.
 
 ### Edges
