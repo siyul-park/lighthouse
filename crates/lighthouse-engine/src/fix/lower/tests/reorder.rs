@@ -196,3 +196,85 @@ fn a_run_of_a_hundred_thousand_ranks_is_found_at_once() {
 
     assert_eq!(longest_run(&ranks).len(), 1);
 }
+
+#[test]
+fn reorder_moves_adjacent_blocks_when_the_last_ends_the_file() {
+    let text = "fn a() {}\n\nfn b() {}\n\nfn c() {}\n\nfn d() {}\n\nfn e() {}\n";
+    let symbols = [
+        ("a", 1, 1),
+        ("b", 3, 3),
+        ("c", 5, 5),
+        ("d", 7, 7),
+        ("e", 9, 9),
+    ];
+    let op = EditOp::Reorder {
+        owner: Owner::File(FILE.into()),
+        order: ["d", "e", "a", "b", "c"].map(id).to_vec(),
+    };
+
+    let lowered = case(text, &symbols, vec![]).run(&[op]);
+
+    assert_eq!(
+        lowered.unwrap(),
+        "fn d() {}\n\nfn e() {}\n\nfn a() {}\n\nfn b() {}\n\nfn c() {}\n"
+    );
+}
+
+/// A deterministic shuffle (xorshift), so that a failure repeats.
+fn shuffled(n: usize, seed: u64) -> Vec<usize> {
+    let mut state = seed | 1;
+    let mut order: Vec<usize> = (0..n).collect();
+    for at in (1..n).rev() {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        order.swap(at, usize::try_from(state % (at as u64 + 1)).unwrap());
+    }
+    order
+}
+
+#[test]
+fn every_permutation_of_mixed_declarations_lowers_to_disjoint_edits_in_the_target_order() {
+    for count in 2..=7 {
+        for seed in 1..=150u64 {
+            // Declaration `n` is one line when `n + seed` is even, else three.
+            let mut text = String::new();
+            let mut symbols = Vec::new();
+            let mut bodies = Vec::new();
+            let mut line = 1u32;
+            for n in 0..count {
+                let body = if (n as u64 + seed).is_multiple_of(2) {
+                    format!("fn d{n}() {{}}\n")
+                } else {
+                    format!("fn d{n}() {{\n    x\n}}\n")
+                };
+                let lines = u32::try_from(body.lines().count()).unwrap();
+                symbols.push((format!("d{n}"), line, line + lines - 1));
+                line += lines + 1;
+                text.push_str(&body);
+                if n + 1 < count {
+                    text.push('\n');
+                }
+                bodies.push(body);
+            }
+            let spans: Vec<(&str, u32, u32)> = symbols
+                .iter()
+                .map(|(n, a, b)| (n.as_str(), *a, *b))
+                .collect();
+            let target = shuffled(count, seed);
+            let op = EditOp::Reorder {
+                owner: Owner::File(FILE.into()),
+                order: target.iter().map(|n| id(&format!("d{n}"))).collect(),
+            };
+            let want: Vec<&str> = target.iter().map(|&n| bodies[n].as_str()).collect();
+
+            let got = case(&text, &spans, vec![])
+                .run(&[op])
+                .unwrap_or_else(|why| {
+                    panic!("{count} declarations, seed {seed}, order {target:?}: {why}")
+                });
+
+            assert_eq!(got, want.join("\n"), "seed {seed}, order {target:?}");
+        }
+    }
+}

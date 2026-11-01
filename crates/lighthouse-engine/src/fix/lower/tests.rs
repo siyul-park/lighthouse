@@ -95,6 +95,9 @@ impl Case {
         for op in ops {
             edits.extend(lowerer.lower(op)?);
         }
+        if crate::fix::edits::self_overlap(&edits) {
+            return Err("the edits of the fix overlap each other".to_owned());
+        }
         let text = sources.text(Path::new(FILE))?;
         apply(&text, &edits.iter().collect::<Vec<_>>())
     }

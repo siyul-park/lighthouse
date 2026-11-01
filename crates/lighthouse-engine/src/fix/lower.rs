@@ -537,12 +537,14 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
         body
     };
     let mut edits = Vec::new();
-    for block in current.iter().filter(|b| !kept.contains(&b.symbol.id)) {
-        let file = block.symbol.file.clone();
-        edits.push(TextEdit::delete(
-            file,
-            with_blank(text, carried(text, block)),
-        ));
+    let file = current[0].symbol.file.clone();
+    let moved: Vec<Range<usize>> = current
+        .iter()
+        .filter(|b| !kept.contains(&b.symbol.id))
+        .map(|b| carried(text, b))
+        .collect();
+    for range in joined(text, moved) {
+        edits.push(TextEdit::delete(file.clone(), with_blank(text, range)));
     }
     let first_kept = current.iter().find(|b| kept.contains(&b.symbol.id));
     let mut after: Option<&Block> = None;
@@ -584,6 +586,19 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
         edits.push(TextEdit::insert(beside.symbol.file.clone(), at, inserted));
     }
     edits
+}
+
+/// `ranges`, in file order, with those that only blank lines separate made one:
+/// each blank line is then taken once, by the deletion of the run it belongs to.
+fn joined(text: &str, ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
+    let mut runs: Vec<Range<usize>> = Vec::new();
+    for range in ranges {
+        match runs.last_mut() {
+            Some(run) if text[run.end..range.start].trim().is_empty() => run.end = range.end,
+            _ => runs.push(range),
+        }
+    }
+    runs
 }
 
 /// The lines of a block that moves, with the comments that stand free above it:
