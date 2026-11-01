@@ -131,7 +131,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("design/stateless-layout", Some((Reach::Local, false))),
     ("design/task-shutdown", Some((Reach::Local, false))),
     ("design/top-down-order", Some((Reach::Global, false))),
-    ("design/vertical-distance", Some((Reach::Local, false))),
+    ("design/vertical-distance", Some((Reach::Neighbors, false))),
     ("markdown/gfm", None),
     ("markdown/links", None),
     ("testing/behavior-cases", Some((Reach::Local, false))),

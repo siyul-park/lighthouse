@@ -8,7 +8,9 @@ spec:
   title: Related declarations stay close
   context: Vertical distance increases the effort required to compare related behavior.
     A declaration that interrupts its owner’s method block should move back beside
-    its peers.
+    its peers. A private function that only the methods of that owner call is a
+    member of the owner's block (`design/declaration-groups` places it there), so
+    it separates nothing.
   scope:
     subject: symbol
     examples: exclude
@@ -23,8 +25,8 @@ spec:
     select: function
     variables:
     - name: separators
-      expression: 'func.kind == ''method'' && func.gap.previous != null ? func.gap.between.filter(b,
-        b.kind != ''method'' || b.owner_key != func.owner_key) : []'
+      expression: "func.kind == 'method' && func.gap.previous != null ? func.gap.between.filter(b,
+        b.id in func.gap_helpers ? false : b.kind != 'method' || b.owner_key != func.owner_key) : []"
     - name: separated
       expression: size(separators) > 0
     where: separated
@@ -216,3 +218,22 @@ spec:
             }
         }
     canonical: true
+  - name: gap-valid-exclusive-helper
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{ n int }
+
+        // One is part of the example.
+        func (a A) One() int { return helper(a.n) + 1 }
+
+        // helper is part of the example.
+        func helper(n int) int { return n }
+
+        // Two is part of the example.
+        func (a A) Two() int { return helper(a.n) + 2 }

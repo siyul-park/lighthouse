@@ -56,6 +56,8 @@ pub const FACTS: &[(&str, Reach)] = &[
     // The declarations of the subject's own file between it and the previous
     // method of its owner; and the function fact a symbol carries as `func`.
     ("gap", Reach::Local),
+    // Of those, the private helpers only the owner's methods call.
+    ("gap_helpers", Reach::Neighbors),
     ("func", Reach::Local),
     ("line_widths", Reach::Local),
     // The declarations a provider groups into blocks.

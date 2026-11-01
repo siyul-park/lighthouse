@@ -1820,7 +1820,7 @@ Also: rust
 
 `design/vertical-distance` · symbol · warn · cel · fix: unsafe · go, rust
 
-*Vertical distance increases the effort required to compare related behavior. A declaration that interrupts its owner’s method block should move back beside its peers.*
+*Vertical distance increases the effort required to compare related behavior. A declaration that interrupts its owner’s method block should move back beside its peers. A private function that only the methods of that owner call is a member of the owner's block (`design/declaration-groups` places it there), so it separates nothing.*
 
 Related functions and methods SHOULD be physically close, and direct collaborators and symmetric siblings SHOULD be adjacent when practical.
 
