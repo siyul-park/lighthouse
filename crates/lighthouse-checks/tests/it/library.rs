@@ -110,6 +110,13 @@ fn users_first_puts_each_declaration_after_every_user_and_keeps_file_order_other
     // Users that use each other, and a self use, keep file order.
     assert_eq!(ranked("[[1], [0], [2]]"), "0,1,2");
     assert_eq!(ranked("[[2], [], [0, 1]]"), "0,2,1");
+    // A cycle is one unit placed after its users: `tailPing` and `pong` call
+    // each other, `tailPingPong` calls `tailPing`.
+    assert_eq!(ranked("[[1], [0], [0]]"), "1,2,0");
+    // A self-recursive function follows its user and keeps its helper after it.
+    assert_eq!(ranked("[[], [1], [0, 1]]"), "1,2,0");
+    // Two disjoint cycles keep file order between them.
+    assert_eq!(ranked("[[1], [0], [3], [2]]"), "0,1,2,3");
     assert_eq!(ranked("[]"), "");
 }
 

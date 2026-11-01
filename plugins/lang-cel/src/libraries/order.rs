@@ -48,7 +48,7 @@ pub(crate) fn library() -> Library {
             ),
             order(
                 "usersFirst",
-                "For a list that holds, per declaration in file order, the indexes of the declarations it uses, the rank of each declaration in the order that keeps file order except that a declaration follows every one of its users. Declarations that use each other, and one that uses itself, keep file order.",
+                "For a list that holds, per declaration in file order, the indexes of the declarations it uses, the rank of each declaration in the order that keeps file order except that a declaration follows every one of its users. Declarations that use each other (a cycle) are placed together after the users of any of them, in file order; one that uses itself is a unit of its own.",
                 "[[], [0]].usersFirst() == [1, 0]",
             ),
         ],
@@ -116,54 +116,111 @@ fn users_first<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Exec
 }
 
 /// The rank of each declaration when, of those whose users are all placed,
-/// the one earliest in the file goes next. Uses that lead back to the user are
-/// left out, so that declarations that use each other keep file order.
+/// the one earliest in the file goes next. Declarations that use each other
+/// (a cycle, or a use of itself) are one unit, placed after the users of any of
+/// them, and keep file order among themselves.
 fn user_ranks(uses: &[Vec<usize>]) -> Vec<i64> {
     let n = uses.len();
-    let all: Vec<Vec<usize>> = uses
+    let graph: Vec<Vec<usize>> = uses
         .iter()
         .map(|found| found.iter().copied().filter(|&used| used < n).collect())
         .collect();
-    let mut calls = all.clone();
-    let mut waiting = vec![0_usize; n];
-    for (caller, callees) in calls.iter_mut().enumerate() {
+    let component = components(&graph);
+    let count = component.iter().copied().max().map_or(0, |last| last + 1);
+    let mut first = vec![usize::MAX; count];
+    let mut members: Vec<Vec<usize>> = vec![Vec::new(); count];
+    for (at, &unit) in component.iter().enumerate() {
+        first[unit] = first[unit].min(at);
+        members[unit].push(at);
+    }
+    let mut calls: Vec<Vec<usize>> = vec![Vec::new(); count];
+    let mut waiting = vec![0_usize; count];
+    for (caller, callees) in graph.iter().enumerate() {
+        for &callee in callees {
+            calls[component[caller]].push(component[callee]);
+        }
+    }
+    for (unit, callees) in calls.iter_mut().enumerate() {
         callees.sort_unstable();
         callees.dedup();
-        callees.retain(|&callee| !reaches(&all, callee, caller));
+        callees.retain(|&callee| callee != unit);
         for &callee in callees.iter() {
             waiting[callee] += 1;
         }
     }
-    let mut ready: BinaryHeap<Reverse<usize>> =
-        (0..n).filter(|&i| waiting[i] == 0).map(Reverse).collect();
+    let mut ready: BinaryHeap<Reverse<(usize, usize)>> = (0..count)
+        .filter(|&unit| waiting[unit] == 0)
+        .map(|unit| Reverse((first[unit], unit)))
+        .collect();
     let mut ranks = vec![0_i64; n];
     let mut next = 0_i64;
-    while let Some(Reverse(at)) = ready.pop() {
-        ranks[at] = next;
-        next += 1;
-        for &callee in &calls[at] {
+    while let Some(Reverse((_, unit))) = ready.pop() {
+        for &at in &members[unit] {
+            ranks[at] = next;
+            next += 1;
+        }
+        for &callee in &calls[unit] {
             waiting[callee] -= 1;
             if waiting[callee] == 0 {
-                ready.push(Reverse(callee));
+                ready.push(Reverse((first[callee], callee)));
             }
         }
     }
     ranks
 }
 
-/// Whether `to` can be reached from `from` along `edges`.
-fn reaches(edges: &[Vec<usize>], from: usize, to: usize) -> bool {
-    let mut seen = vec![false; edges.len()];
-    let mut stack = vec![from];
-    while let Some(node) = stack.pop() {
-        if node == to {
-            return true;
+/// The strongly connected component of each node of `edges` (Tarjan, iterative);
+/// components are numbered in the order they are completed.
+fn components(edges: &[Vec<usize>]) -> Vec<usize> {
+    const UNSEEN: usize = usize::MAX;
+    let n = edges.len();
+    let mut index = vec![UNSEEN; n];
+    let mut low = vec![0_usize; n];
+    let mut on_stack = vec![false; n];
+    let mut component = vec![UNSEEN; n];
+    let mut stack = Vec::new();
+    let mut counter = 0;
+    let mut found = 0;
+    for root in 0..n {
+        if index[root] != UNSEEN {
+            continue;
         }
-        if !std::mem::replace(&mut seen[node], true) {
-            stack.extend(&edges[node]);
+        let mut work = vec![(root, 0_usize)];
+        while let Some(&(node, next)) = work.last() {
+            if next == 0 {
+                index[node] = counter;
+                low[node] = counter;
+                counter += 1;
+                stack.push(node);
+                on_stack[node] = true;
+            }
+            if let Some(&to) = edges[node].get(next) {
+                work.pop();
+                work.push((node, next + 1));
+                if index[to] == UNSEEN {
+                    work.push((to, 0));
+                } else if on_stack[to] {
+                    low[node] = low[node].min(index[to]);
+                }
+                continue;
+            }
+            work.pop();
+            if let Some(&(parent, _)) = work.last() {
+                low[parent] = low[parent].min(low[node]);
+            }
+            if low[node] == index[node] {
+                while let Some(member) = stack.pop() {
+                    on_stack[member] = false;
+                    component[member] = found;
+                    if member == node {
+                        break;
+                    }
+                }
+                found += 1;
+            }
         }
     }
-    false
+    component
 }
 
 fn indexes<'b, 'v>(values: impl IntoIterator<Item = i64>) -> CowVal<'b, 'v> {

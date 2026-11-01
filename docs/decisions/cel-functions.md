@@ -74,7 +74,7 @@ The indexes of the elements of a list of ints that must move for the list to be 
 
 ### `usersFirst` (step 3)
 
-For a list that holds, per declaration in file order, the indexes of the declarations it uses, the rank of each declaration in the order that keeps file order except that a declaration follows every one of its users. Declarations that use each other, and one that uses itself, keep file order.
+For a list that holds, per declaration in file order, the indexes of the declarations it uses, the rank of each declaration in the order that keeps file order except that a declaration follows every one of its users. Declarations that use each other (a cycle) are placed together after the users of any of them, in file order; one that uses itself is a unit of its own.
 
 - `list.usersFirst() -> list<int>`
 
