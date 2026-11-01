@@ -89,7 +89,10 @@ pub enum Command {
     /// `~/.config/lighthouse/trust.toml`) for this root and the exact
     /// `lighthouse.toml`, `.lighthouse/decisions` and personal config files
     /// (`config.toml`, `.lighthouse/local.toml`) you have read; a change to
-    /// any of them withdraws it. `LIGHTHOUSE_TRUST=1` trusts every project, for CI.
+    /// any of them withdraws it. Trust is kept per git repository: a worktree
+    /// whose inputs are byte-identical to a trusted root of the same repository
+    /// is trusted too, and `--revoke` withdraws this root only.
+    /// `LIGHTHOUSE_TRUST=1` trusts every project, for CI.
     /// Without trust none of them runs: a command fix is declined, a command
     /// check is unavailable and `[fix] verify` fails; the bundled checks still run.
     ///
