@@ -2,8 +2,8 @@
 # The corpus gate: a base binary and the tip binary find the same things in the
 # same repositories, or the difference is shown.
 #
-# usage: LIGHTHOUSE_TRUST=1 scripts/corpus.sh [--base BINARY] [--tip BINARY] [--plugins DIR]
-#                                             [--base-plugins DIR] [--no-build] [name=]repo-dir...
+# usage: scripts/corpus.sh [--base BINARY] [--tip BINARY] [--plugins DIR]
+#                          [--base-plugins DIR] [--no-build] [name=]repo-dir...
 #
 #   --base     the binary to compare against (a release build of main). Without
 #              it the run only checks the tip and prints its findings.
@@ -68,10 +68,11 @@ mkdir "$scratch/xdg"
 export XDG_DATA_HOME="$scratch/xdg"
 
 # Checks one corpus with one binary: findings in $dir/<tag>.json, the exit code
-# in $dir/<tag>.rc.
+# in $dir/<tag>.rc. The tree is a scratch archive checked with the gate's own
+# configuration, so this run trusts it.
 check() {
     dir=$1 tag=$2 binary=$3 config=$4
-    (cd "$dir/tree" && "$binary" check . --format json --detail full --limit 1000000 --no-cache --no-store --config "$dir/$config" >"$dir/$tag.json" 2>"$dir/$tag.err" && echo 0 >"$dir/$tag.rc") ||
+    (cd "$dir/tree" && LIGHTHOUSE_TRUST=1 "$binary" check . --format json --detail full --limit 1000000 --no-cache --no-store --config "$dir/$config" >"$dir/$tag.json" 2>"$dir/$tag.err" && echo 0 >"$dir/$tag.rc") ||
         echo "$?" >"$dir/$tag.rc"
 }
 
