@@ -18,4 +18,16 @@ fn a_path_in_the_root_is_hashed_without_the_root() {
     let prefixes = prefixes(Path::new("/nonexistent/one"));
     assert_eq!(relative(&prefixes, "/nonexistent/one/x.sh"), "{root}/x.sh");
     assert_eq!(relative(&prefixes, "/usr/bin/sh"), "/usr/bin/sh");
+    assert_eq!(
+        relative(&prefixes, "/nonexistent/one-other/x.sh"),
+        "/nonexistent/one-other/x.sh"
+    );
+    assert_eq!(
+        relative(&prefixes, "--dir=/nonexistent/one"),
+        "--dir={root}"
+    );
+    assert_eq!(
+        relative(&prefixes, "/x/nonexistent/one/a"),
+        "/x/nonexistent/one/a"
+    );
 }

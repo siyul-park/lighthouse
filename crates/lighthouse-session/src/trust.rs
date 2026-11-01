@@ -206,10 +206,25 @@ fn in_project(root: &Path, arg: &str) -> Option<PathBuf> {
 }
 
 /// `text` with every spelling of the root directory replaced by a marker, so
-/// a path inside the project does not depend on where the project is.
+/// a path inside the project does not depend on where the project is. Only a
+/// whole directory is replaced: `/a/wt-other` and `/b/a/wt` stay as they are
+/// under `/a/wt`.
 fn relative(prefixes: &[String], text: &str) -> String {
     prefixes.iter().fold(text.to_owned(), |text, prefix| {
-        text.replace(prefix.as_str(), "{root}")
+        let mut out = String::with_capacity(text.len());
+        let mut rest = text.as_str();
+        while let Some(at) = rest.find(prefix.as_str()) {
+            let end = at + prefix.len();
+            out.push_str(&rest[..at]);
+            let starts = out
+                .chars()
+                .next_back()
+                .is_none_or(|c| !(c.is_alphanumeric() || "/._-~".contains(c)));
+            let whole = starts && rest[end..].chars().next().is_none_or(|c| c == '/');
+            out.push_str(if whole { "{root}" } else { prefix });
+            rest = &rest[end..];
+        }
+        out + rest
     })
 }
 
