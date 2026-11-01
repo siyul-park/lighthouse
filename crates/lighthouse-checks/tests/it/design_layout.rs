@@ -82,17 +82,16 @@ fn groups_accept_a_file_in_order_and_ignore_unlisted_groups() {
 }
 
 #[test]
-fn groups_put_the_constructor_of_a_type_in_its_block_before_the_functions() {
+fn groups_put_the_constructor_of_a_type_in_its_block_after_the_public_functions() {
     let mut w = World::default();
     w.symbol("m", "Thing", SymbolKind::Type, "m/a.ucm");
-    w.func("m", "Run", "m/a.ucm");
     w.func("m", "NewThing", "m/a.ucm");
     w.func("m", "Open", "m/a.ucm");
     let found = w.check(GROUPS, json!({}));
     assert_eq!(
         w.names(&found),
-        ["NewThing"],
-        "NewThing belongs to the block of Thing; Open follows no type"
+        ["Open"],
+        "Open follows no type and leads; NewThing belongs to the block of Thing"
     );
 }
 
