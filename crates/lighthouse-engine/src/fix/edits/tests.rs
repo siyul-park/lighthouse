@@ -54,3 +54,33 @@ fn a_preceding_blank_line_goes_when_a_bracket_follows() {
 fn a_range_that_shares_its_line_is_not_whole_lines() {
     assert_eq!(whole_lines("x := 1 // c\n", &(7..11)), None);
 }
+
+#[test]
+fn a_reorder_that_keeps_every_line_keeps_the_declarations() {
+    let text = "fn a() {}\n\nfn b() {}\n\nfn c() {}\n";
+    // `c` is taken with the blank line before it and put before `a`.
+    let delete = TextEdit::delete(PathBuf::new(), 21..32);
+    let insert = TextEdit::insert(PathBuf::new(), 0, "fn c() {}\n\n".to_owned());
+    assert_eq!(
+        apply(text, &[&delete, &insert]).unwrap(),
+        "fn c() {}\n\nfn a() {}\n\nfn b() {}\n"
+    );
+    assert_eq!(keeps_declarations(text, &[&delete, &insert]), Ok(()));
+}
+
+#[test]
+fn a_move_edit_set_that_repeats_or_drops_a_declaration_is_declined() {
+    let text = "fn a() {}\n\nfn b() {}\n\nfn c() {}\n";
+    let copy = TextEdit::insert(PathBuf::new(), 0, "fn c() {}\n\n".to_owned());
+    let why = keeps_declarations(text, &[&copy]).unwrap_err();
+    assert_eq!(
+        why,
+        "the reorder would not keep the file's declarations: it repeats `fn c() {}` 1 time(s)"
+    );
+    let lost = TextEdit::delete(PathBuf::new(), 11..21);
+    let why = keeps_declarations(text, &[&lost]).unwrap_err();
+    assert_eq!(
+        why,
+        "the reorder would not keep the file's declarations: it drops `fn b() {}` 1 time(s)"
+    );
+}

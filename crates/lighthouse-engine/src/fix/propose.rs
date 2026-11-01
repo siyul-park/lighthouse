@@ -26,7 +26,7 @@ use serde_json::Value;
 
 use super::{
     DeclinedFix, FixBinding, FixPlan, FixRun, FixedBy,
-    edits::{TextEdit, apply, self_overlap},
+    edits::{TextEdit, apply, keeps_declarations, self_overlap},
     lower::{Lowerer, Sources},
     model::{Class, Event, ModelFixer, choose_extent},
     rewrite::{Bounds, Change, Changes, World, accept},
@@ -601,6 +601,15 @@ fn lowered(
     }
     if self_overlap(&edits) {
         return Err("the edits of the fix overlap each other".to_owned());
+    }
+    if ops
+        .iter()
+        .all(|op| matches!(op, EditOp::Move { .. } | EditOp::Reorder { .. }))
+    {
+        for file in edits.iter().map(|e| &e.file).collect::<BTreeSet<_>>() {
+            let of_file: Vec<&TextEdit> = edits.iter().filter(|e| &e.file == file).collect();
+            keeps_declarations(&sources.text(file)?, &of_file)?;
+        }
     }
     let mut bases = BTreeMap::new();
     for edit in &edits {

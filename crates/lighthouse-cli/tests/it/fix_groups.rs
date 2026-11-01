@@ -371,3 +371,106 @@ fn an_override_of_the_group_order_for_a_file_changes_the_layout_at_that_file_onl
     assert_eq!(findings(&dir, "design/declaration-groups"), 0);
     assert_eq!(findings(&dir, "design/top-down-order"), 0);
 }
+
+/// Several impl blocks of one type, a trait, a `#[cfg(test)]` module and
+/// free functions, with doc comments and attributes, the free `key` first.
+const IMPLS: &str = r#"fn key(n: u8) -> u8 {
+    n
+}
+
+use std::collections::BTreeMap;
+
+/// Proposes.
+#[derive(Debug)]
+pub struct Proposer {
+    n: u8,
+}
+
+impl Proposer {
+    /// Builds one.
+    pub fn new() -> Self {
+        Self { n: 0 }
+    }
+
+    /// Runs.
+    #[must_use]
+    pub fn run(&self) -> u8 {
+        self.helper() + key(1)
+    }
+}
+
+/// A trait.
+pub trait Named {
+    fn name(&self) -> u8;
+}
+
+impl Proposer {
+    fn helper(&self) -> u8 {
+        self.n
+    }
+
+    pub fn second(&self) -> BTreeMap<u8, u8> {
+        BTreeMap::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runs() {
+        assert_eq!(Proposer::new().run(), 1);
+    }
+}
+
+impl Proposer {
+    /// Third.
+    #[allow(dead_code)]
+    pub fn third(&self) -> u8 {
+        key(2)
+    }
+}
+
+impl Named for Proposer {
+    fn name(&self) -> u8 {
+        1
+    }
+}
+
+pub fn public_free() -> u8 {
+    key(3)
+}
+
+const LIMIT: u8 = 3;
+"#;
+
+/// The lines that hold text, sorted: what a reorder must not change.
+fn declarations(text: &str) -> Vec<String> {
+    let mut lines: Vec<String> = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(str::to_owned)
+        .collect();
+    lines.sort();
+    lines
+}
+
+#[test]
+fn proposals_of_two_order_decisions_over_several_impl_blocks_keep_every_declaration() {
+    let dir = rust_project(IMPLS, "[rules]\n\"design/top-down-order\" = \"warn\"\n");
+
+    lighthouse(dir.path())
+        .args(["check", "--fix"])
+        .assert()
+        .stderr(predicate::str::contains("rolled back").not());
+    let fixed = read(&dir, "src/lib.rs");
+    assert_eq!(declarations(&fixed), declarations(IMPLS), "a permutation");
+    assert_ne!(fixed, IMPLS, "the file was reordered");
+
+    lighthouse(dir.path())
+        .args(["check", "--fix"])
+        .output()
+        .unwrap();
+    assert_eq!(read(&dir, "src/lib.rs"), fixed, "the second fix is a no-op");
+}

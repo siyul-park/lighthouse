@@ -3,6 +3,7 @@
 //! applied, and the rest are applied in one pass.
 
 use std::{
+    collections::BTreeMap,
     ops::Range,
     path::{Path, PathBuf},
 };
@@ -127,6 +128,34 @@ pub(crate) fn self_overlap(edits: &[TextEdit]) -> bool {
             .iter()
             .any(|b| a.file == b.file && overlap(&a.range, &b.range))
     })
+}
+
+/// Whether the edits of a fix that only moves declarations leave the file a
+/// permutation of what it had: the lines that hold text, counted with their
+/// repeats, are the same before and after. Blank lines are not counted, since
+/// the lowering takes or leaves one with each move to keep one where one
+/// belonged. Else what the file lost or gained.
+pub(crate) fn keeps_declarations(text: &str, edits: &[&TextEdit]) -> Result<(), String> {
+    let after = apply(text, edits)?;
+    let mut counts: BTreeMap<&str, isize> = BTreeMap::new();
+    for line in text.lines().filter(|l| !l.trim().is_empty()) {
+        *counts.entry(line).or_default() -= 1;
+    }
+    for line in after.lines().filter(|l| !l.trim().is_empty()) {
+        *counts.entry(line).or_default() += 1;
+    }
+    let Some((line, n)) = counts.iter().find(|(_, n)| **n != 0) else {
+        return Ok(());
+    };
+    let (what, n) = if *n > 0 {
+        ("repeats", *n)
+    } else {
+        ("drops", -*n)
+    };
+    Err(format!(
+        "the reorder would not keep the file's declarations: it {what} `{}` {n} time(s)",
+        line.trim()
+    ))
 }
 
 /// The byte range of whole lines that `range` fills, extended by one blank
