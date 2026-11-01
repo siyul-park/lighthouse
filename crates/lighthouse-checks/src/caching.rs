@@ -45,6 +45,9 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("prev", Reach::Local),
     ("next", Reach::Local),
     ("owner", Reach::Neighbors),
+    // The visibility of the type a method belongs to, which may be declared in
+    // another file.
+    ("owner_visibility", Reach::Neighbors),
     ("uses", Reach::Neighbors),
     ("tests", Reach::Global),
     // The symbol a test is the owner test of.

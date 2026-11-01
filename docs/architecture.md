@@ -222,7 +222,7 @@ check:
 
 `select` binds one variable of the same name (`func` for `function`, which CEL
 reserves) with the fields of that kind: symbols have `id name kind visibility
-owner owner_kind file line module lang documented test generated callers callees
+owner owner_kind owner_visibility file line module lang documented test generated callers callees
 references members`; functions add `statements top_level params returns
 max_nesting tokens branches`; edges have `kind resolution from to` (each end with
 `kind id module name`); modules `path name test_of files symbols lines dependents declares`; files `path

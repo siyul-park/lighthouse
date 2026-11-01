@@ -25,10 +25,29 @@ spec:
       expression: >-
         placed.filter(s, s.kind == 'type' || s.kind == 'interface')
           .map(s, {'id': s.id, 'name': s.name, 'module': s.module})
-    - name: owners
+    # The owners, in the order the method blocks follow each other: by the
+    # group of the owner's own visibility (`public-type` before `private-type`
+    # as `groups` orders them; declaration order when it names neither), and
+    # within a group the types in declaration order, then the owners of types
+    # declared elsewhere in the order of their methods. A type declared in
+    # another file ranks by its own visibility, as its methods report it.
+    - name: owner_ids
       expression: >-
         (owner_types.map(t, t.id)
           + placed.filter(s, s.kind == 'method' && s.owner_key != '').map(s, s.owner_key)).distinct()
+    - name: private_owner_ids
+      expression: >-
+        (placed.filter(s, (s.kind == 'type' || s.kind == 'interface') && s.visibility == 'private').map(s, s.id)
+          + placed.filter(s, s.kind == 'method' && s.owner_visibility == 'private').map(s, s.owner_key)).distinct()
+    - name: owners
+      expression: >-
+        !('public-type' in options.groups) && !('private-type' in options.groups) ? owner_ids
+        : cel.bind(private_first, 'private-type' in options.groups
+            && (!('public-type' in options.groups)
+                || options.groups.indexOf('private-type') < options.groups.indexOf('public-type')),
+          private_first
+          ? owner_ids.filter(o, o in private_owner_ids) + owner_ids.filter(o, !(o in private_owner_ids))
+          : owner_ids.filter(o, !(o in private_owner_ids)) + owner_ids.filter(o, o in private_owner_ids))
     # The owners that have a method in the file. An option builder of an owner
     # without one (`type options struct` that only `Option` configures) leads no
     # method block: it is a public function.

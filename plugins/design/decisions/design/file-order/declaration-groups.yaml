@@ -363,6 +363,31 @@ spec:
             	}
             	return o.name
             }
+    - name: methods-of-a-public-type-declared-elsewhere-lead
+      language: go
+      kind: valid
+      files:
+        - path: module.go
+          body: |-
+            package sample
+
+            // Module is analyzed in fact.go.
+            type Module struct{ n int }
+        - path: fact.go
+          body: |-
+            package sample
+
+            type fact struct{ n int }
+
+            // Analyze reads the facts of the module.
+            func (m *Module) Analyze() int {
+            	f := fact{n: m.n}
+            	return f.merge()
+            }
+
+            func (f fact) merge() int {
+            	return f.n
+            }
     - name: private-option-after-methods
       language: go
       kind: invalid

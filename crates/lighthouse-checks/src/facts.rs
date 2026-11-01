@@ -44,6 +44,7 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
         "kind": s.kind.as_str(),
         "visibility": visibility(s.visibility),
         "owner_kind": owner.map_or("", |o| o.kind.as_str()),
+        "owner_visibility": owner.map_or("", |o| visibility(o.visibility)),
         "file": path(&s.file),
         // The stem of the declaring file: its name without the extension and
         // what its language ignores in a name (Go's build constraint suffixes).
