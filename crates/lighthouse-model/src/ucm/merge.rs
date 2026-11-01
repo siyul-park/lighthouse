@@ -226,6 +226,7 @@ pub(super) fn sorted_union(
     // By file, so that the edge that stands for several, and its site, do not
     // depend on the order the providers answered in.
     let mut parts: Vec<Fragment> = parts.into_iter().collect();
+    super::qualify::qualify(&mut parts);
     let first = |f: &Fragment| f.files.first().map(|file| file.path.clone());
     parts.sort_by_cached_key(first);
     for part in parts {

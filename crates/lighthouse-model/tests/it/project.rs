@@ -348,6 +348,70 @@ fn duplicate_ids_keep_the_first_declaration_and_leave_a_notice() {
     );
 }
 
+/// A fragment of one file of `lang` that declares the module `fixtures/x` and
+/// its function `run`, called by `main`.
+fn fixture(lang: &str, extension: &str) -> Fragment {
+    let run = Symbol {
+        file: format!("fixtures/x.{extension}").into(),
+        ..symbol("fixtures/x", "run")
+    };
+    let main = Symbol {
+        file: run.file.clone(),
+        ..symbol("fixtures/x", "main")
+    };
+    Fragment {
+        files: vec![File {
+            lang: lang.to_owned(),
+            ..file_of(&run)
+        }],
+        modules: vec![Module {
+            path: "fixtures/x".to_owned(),
+            name: None,
+            test_of: None,
+            language: None,
+            example: false,
+        }],
+        edges: vec![call(&main, "fixtures/x::run")],
+        symbols: vec![run, main],
+        ..Fragment::default()
+    }
+}
+
+#[test]
+fn modules_of_two_languages_with_one_path_are_told_apart_by_language() {
+    let project = Project::merge([fixture("typescript", "js"), fixture("python", "py")]);
+
+    let ids: Vec<&str> = project.symbols.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        [
+            "fixtures/x[python]::main#function",
+            "fixtures/x[python]::run#function",
+            "fixtures/x[typescript]::main#function",
+            "fixtures/x[typescript]::run#function",
+        ]
+    );
+    assert!(project.notices().is_empty(), "{:?}", project.notices());
+    assert!(project.module("fixtures/x[python]").is_some());
+    assert!(project.module("fixtures/x").is_none());
+    let run = SymbolId::new("fixtures/x[python]", &[], "run", SymbolKind::Function);
+    assert_eq!(project.callers(&run).len(), 1);
+}
+
+#[test]
+fn a_module_path_one_language_declares_keeps_its_id() {
+    let mut other = fixture("python", "py");
+    other.modules[0].path = "fixtures/y".to_owned();
+    other.symbols.clear();
+    other.edges.clear();
+
+    let project = Project::merge([fixture("typescript", "js"), other]);
+
+    assert!(project.module("fixtures/x").is_some());
+    assert!(project.module("fixtures/y").is_some());
+    assert_eq!(project.symbols[0].id.as_str(), "fixtures/x::main#function");
+}
+
 #[test]
 fn ambiguous_call_targets_prefer_callables_and_other_kinds_stay_unresolved_with_a_notice() {
     let caller = symbol("p", "caller");

@@ -12,6 +12,7 @@ mod discriminator;
 mod edit;
 mod function;
 mod merge;
+mod qualify;
 
 pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
