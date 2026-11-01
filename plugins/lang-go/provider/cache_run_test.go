@@ -93,6 +93,42 @@ func TestProviderCache(t *testing.T) {
 		}
 	})
 
+	t.Run("a body edit re-analyzes its package alone and answers as a cold run", func(t *testing.T) {
+		// p's type implements the interface of r, which p does not import; q
+		// imports p; p's bodies are where the edits are.
+		const pHead = "package p\n\ntype T struct{}\n\nfunc (T) M() int { return 1 }\n\nfunc (T) K() {}\n\n"
+		files := map[string]string{
+			"go.mod": cacheModule,
+			"p/p.go": pHead + "func F() int { return 1 }\n",
+			"q/q.go": "package q\n\nimport \"example.com/m/p\"\n\nfunc Q() int { return p.F() }\n\nfunc Forward() int { return p.F() }\n",
+			"r/r.go": "package r\n\ntype I interface {\n\tM() int\n\tK()\n}\n\ntype J interface {\n\tM() int\n}\n",
+		}
+		root, cache := t.TempDir(), t.TempDir()
+		writeTree(t, root, files)
+		g := provider.New("lang-go", "test")
+		indexWith(t, g, root, cache, nil)
+		steps := []struct {
+			name string
+			text string
+		}{
+			{"a changed body", pHead + "func F() int { return 2 }\n"},
+			{"a type declared in a body", pHead + "func F() int {\n\ttype local struct{ T }\n\tvar _ local\n\treturn 2\n}\n"},
+			{"an interface declared in a body that a method satisfies", pHead + "func F() int {\n\ttype k interface{ K() }\n\tvar _ k = T{}\n\treturn 2\n}\n"},
+			{"the body as it was", pHead + "func F() int { return 1 }\n"},
+		}
+		for _, step := range steps {
+			writeFile(t, root, "p/p.go", step.text)
+
+			got, stats := indexWith(t, g, root, cache, nil)
+			want, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
+
+			require.JSONEq(t, want, got, step.name)
+			require.Equal(t, []string{"p"}, stats.Misses, step.name)
+			require.Contains(t, got, `"kind":"implements"`, step.name)
+			require.Contains(t, got, `"implementation":true`, step.name)
+		}
+	})
+
 	t.Run("an overlay is a text for the disk's, not a reason to analyze everything", func(t *testing.T) {
 		root, cache := t.TempDir(), t.TempDir()
 		writeTree(t, root, cacheFixture)
