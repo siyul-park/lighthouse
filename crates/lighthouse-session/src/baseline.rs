@@ -20,10 +20,9 @@ use std::{
 use lighthouse_engine::cache;
 use lighthouse_model::{Diagnostic, evidence_digest, slashed, write_atomic};
 use lighthouse_protocol::hash;
-use lighthouse_spec::ProjectFiles;
 use serde::{Deserialize, Serialize};
 
-use crate::Result;
+use crate::{Result, Session};
 
 /// Under the cache directory: one directory per session.
 const DIR: &str = "hooks";
@@ -172,11 +171,16 @@ pub fn gone(baselines: &[Baseline], findings: &[Diagnostic]) -> Vec<String> {
 /// canonical), is not in a directory Lighthouse never reads, and is text when
 /// it exists. A file the tool is about to create counts. Everything else is a
 /// cheap `None`, before any plugin starts.
-pub fn editable(path: &Path, root: &Path) -> Option<PathBuf> {
-    let absolute = resolved(path)?;
-    let relative = absolute.strip_prefix(root).ok()?;
-    let in_project = ProjectFiles::new(root, &[]).is_ok_and(|files| files.contains(relative));
-    (in_project && (!absolute.exists() || is_text(&absolute))).then(|| relative.to_owned())
+pub fn editable(path: &Path, session: &Session) -> Result<Option<PathBuf>> {
+    let root = &session.root.canonicalize()?;
+    let Some(absolute) = resolved(path) else {
+        return Ok(None);
+    };
+    let Ok(relative) = absolute.strip_prefix(root) else {
+        return Ok(None);
+    };
+    let in_project = session.project_files(root)?.contains(relative);
+    Ok((in_project && (!absolute.exists() || is_text(&absolute))).then(|| relative.to_owned()))
 }
 
 fn read(path: &Path) -> Option<Baseline> {

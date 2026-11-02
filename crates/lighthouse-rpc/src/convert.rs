@@ -39,6 +39,7 @@ pub(crate) fn language_manifest(language: &wire::LanguageManifest) -> LanguageMa
         id: language.id.clone(),
         aliases: language.aliases.clone(),
         globs: language.globs.clone(),
+        ignores: language.ignores.clone(),
         conventions: language.conventions.clone(),
         // A name this host does not know is a capability it cannot use.
         capabilities: language

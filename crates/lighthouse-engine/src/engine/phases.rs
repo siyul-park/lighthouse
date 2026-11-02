@@ -94,7 +94,7 @@ impl Engine {
         let &language = self
             .providers
             .iter()
-            .find(|&&i| self.languages[i].files.is_match(rel))?;
+            .find(|&&i| self.languages[i].claims(rel))?;
         let text = match overlays.get(rel) {
             Some(text) => text.clone(),
             None => match fs::read_to_string(self.ws.root.join(rel)) {

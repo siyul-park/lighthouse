@@ -43,6 +43,7 @@ impl language::Provider for Provider {
             id: LANGUAGE.to_owned(),
             aliases: vec!["rust".to_owned(), "rs".to_owned()],
             globs: vec!["**/*.rs".to_owned()],
+            ignores: Vec::new(),
             priority: 0,
             fallback: false,
             conventions: Conventions {

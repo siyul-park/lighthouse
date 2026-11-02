@@ -6,10 +6,12 @@ name = "lang-go"
 
 [spec]
 version = "0.1.0"
-# What the go command leaves out of `./...`: directories named `testdata` or
-# `vendor`, and those whose name starts with `.` or `_` (`go help packages`).
-# `.lighthouse` is re-included: it holds the decisions of the project.
-ignores = ["testdata/", "vendor/", "_*/", ".*/", "!/.lighthouse/"]
+# What the go command leaves out of `./...` in any language's files:
+# directories named `testdata` or `vendor` (`go help packages`). Those it
+# ignores by a leading `.` or `_` are the `ignores` of the Go language, which
+# the provider declares: `__tests__/` or `.github/` stay files of the project
+# for the other languages.
+ignores = ["testdata/", "vendor/"]
 catalog = "decisions"
 
 [spec.runtime]

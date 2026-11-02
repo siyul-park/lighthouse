@@ -14,6 +14,7 @@ use crate::{
     generated::Generated,
     timings::Timings,
 };
+use ignore::gitignore::Gitignore;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Options, Severity, Suppressed,
@@ -271,7 +272,21 @@ struct CacheSettings {
 
 struct Language {
     files: GlobSet,
+    /// What the language leaves to the others although `files` match it.
+    ignored: Gitignore,
     tests: GlobSet,
+}
+
+impl Language {
+    /// Whether the language claims the project-relative file at `rel`: its
+    /// `files` match it and its own `ignores` do not.
+    fn claims(&self, rel: &Path) -> bool {
+        self.files.is_match(rel)
+            && !self
+                .ignored
+                .matched_path_or_any_parents(rel, false)
+                .is_ignore()
+    }
 }
 
 /// Whether and how a run asks models.
@@ -309,8 +324,8 @@ impl Engine {
         let config = config.inheriting(&projects)?;
         let binding = config.models(&projects)?;
         validate_config(&registry, &config, &binding, &projects)?;
-        let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
+        let (providers, languages) = load_languages(&registry, &config, &root)?;
         let ignores = ignores(&registry, &config);
         let files = ProjectFiles::new(&root, &ignores)?;
         let generated = Generated::new(&root, &registry, &config)?;

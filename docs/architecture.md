@@ -92,7 +92,7 @@ the analysis. A file is *ignored* when, in this order:
    lines, rooted at the project, in `lighthouse.toml`, in a shareable project
    (inherited through `extends`, extended first) and in a plugin manifest (the
    listed plugins' first: a plugin declares what its toolchain ignores, such as
-   Go's `testdata/`, `vendor/`, `_*/` and `.*/`, Rust's `target/`, TypeScript's
+   Go's `testdata/` and `vendor/`, Rust's `target/`, TypeScript's
    `node_modules/`, Python's `__pycache__/`, `site-packages/` and `.venv/`).
    Later patterns win, as in a `.gitignore`, so `!` brings a file back;
 4. `.gitattributes` marks it `linguist-vendored`: third-party code is not the
@@ -103,8 +103,15 @@ the analysis. A file is *ignored* when, in this order:
    each attribute is decided on its own.
 
 Hidden directories have no special rule: `.github/` workflows are project
-files. Where a toolchain ignores them (Go), its plugin says so. Providers
-receive the list and analyze what they are given; a provider that needs files
+files. Where a toolchain ignores them (Go), its language says so.
+
+`ignores` also stands in a language's declaration (as ESLint's `ignores`
+beside `files`), and then keeps a file from that language only: Go's `_*/`
+and `.*/` leave `__tests__/` and `.github/` files to the other languages. The
+host does not send such a file to that language's provider; the commands that
+list the project's files (the check, validation, the baseline of an edit, the
+copy of a fix) all use the project-level patterns above, from the same
+sources. Providers receive the list and analyze what they are given; a provider that needs files
 outside it for type information may read them but never reports on them.
 
 ## Generated code

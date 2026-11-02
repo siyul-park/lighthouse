@@ -276,6 +276,30 @@ pub fn plugin_catalogs(
     Ok(catalogs)
 }
 
+/// The `ignores` of the listed plugins, in listing order, found the way
+/// [`plugin_catalogs`] finds them: from their manifests, with no process
+/// started. A listed plugin found nowhere has none here (the engine reports
+/// it as unknown); a broken manifest of a listed plugin is an error.
+pub fn plugin_ignores(
+    config: &Config,
+    root: &Path,
+    search: &[PathBuf],
+) -> Result<Vec<String>, Error> {
+    let discovered = discover(search)?;
+    note_broken(discovered.broken, config, &mut Registered::default())?;
+    let root = canonical(root);
+    let mut ignores = Vec::new();
+    for listed in config.plugins() {
+        if let Some(one) = choose(listed, false, &discovered.found, &root)?
+            .into_iter()
+            .next()
+        {
+            ignores.extend(one.resource.spec.ignores.iter().cloned());
+        }
+    }
+    Ok(ignores)
+}
+
 /// The plugin that provides the pack `pack`, for the message of a config that
 /// uses a pack whose plugin is not loaded: the one of `listed` or of the
 /// search locations whose catalog holds the pack, else the plugin of the

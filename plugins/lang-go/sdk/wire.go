@@ -82,6 +82,11 @@ type LanguageManifest struct {
 	// component matches any number of directories.
 	Globs []string `json:"globs"`
 	ID    string   `json:"id"`
+	// Files this language does not claim although `globs` match them: the
+	// same key, syntax and meaning as a plugin's `ignores` (gitignore
+	// patterns, rooted at the project), scoped to this language as ESLint's
+	// `ignores` is to the `files` beside it. Other languages still see them.
+	Ignores []string `json:"ignores,omitempty"`
 	// Among providers matching a file, the higher priority wins.
 	Priority int `json:"priority"`
 }

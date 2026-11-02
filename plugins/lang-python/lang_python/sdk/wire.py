@@ -66,6 +66,7 @@ LanguageManifest = TypedDict(
         "fallback": bool,
         "globs": Required[list[str]],
         "id": Required[str],
+        "ignores": list[str],
         "priority": int,
     },
     total=False,

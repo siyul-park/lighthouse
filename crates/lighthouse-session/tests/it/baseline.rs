@@ -187,7 +187,8 @@ fn editable() {
     write(&root, ".lighthouse/cache/y.txt", "x");
     fs::write(root.join("blob.bin"), [0u8, 1, 2]).unwrap();
 
-    let relative = |path: &str| baseline::editable(&root.join(path), &root);
+    let session = session(&root);
+    let relative = |path: &str| baseline::editable(&root.join(path), &session).unwrap();
     assert_eq!(relative("src/x.rs"), Some("src/x.rs".into()));
     // A file the tool is about to create counts.
     assert_eq!(relative("src/new/z.rs"), Some("src/new/z.rs".into()));
@@ -198,7 +199,10 @@ fn editable() {
     );
     assert_eq!(relative("blob.bin"), None, "binary");
     assert_eq!(relative("../escape.txt"), None, "outside the project");
-    assert_eq!(baseline::editable(Path::new("/etc/hosts"), &root), None);
+    assert_eq!(
+        baseline::editable(Path::new("/etc/hosts"), &session).unwrap(),
+        None
+    );
     assert_eq!(
         relative("target/debug/x.txt"),
         None,

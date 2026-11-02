@@ -28,7 +28,7 @@ fn kept(name: &str, tree: &[&str]) -> Vec<String> {
 }
 
 #[test]
-fn the_go_command_leaves_out_testdata_vendor_and_hidden_or_underscore_directories() {
+fn the_go_command_leaves_out_testdata_and_vendor_for_every_language() {
     let found = kept(
         "lang-go",
         &[
@@ -38,13 +38,39 @@ fn the_go_command_leaves_out_testdata_vendor_and_hidden_or_underscore_directorie
             "pkg/testdata/d.go",
             "vendor/dep/e.go",
             "_tmp/f.go",
-            ".hidden/g.go",
             ".github/ci.yaml",
             ".lighthouse/decisions/x.yaml",
-            ".lighthouse/cache/y.json",
         ],
     );
-    assert_eq!(found, [".lighthouse/decisions/x.yaml", "a.go", "pkg/b.go"]);
+    // `_*/` and `.*/` are the `ignores` of the Go language, which the provider declares.
+    assert_eq!(
+        found,
+        [
+            ".github/ci.yaml",
+            ".lighthouse/decisions/x.yaml",
+            "_tmp/f.go",
+            "a.go",
+            "pkg/b.go"
+        ]
+    );
+}
+
+#[test]
+fn a_listed_plugins_ignores_are_read_from_its_manifest_without_starting_it() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join(".lighthouse/plugins/p");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("lighthouse-plugin.toml"),
+        "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Plugin\"\n[metadata]\nname = \"p\"\n[spec]\nversion = \"0\"\nignores = [\"gen/\", \"tmp/\"]\n[spec.runtime]\ncommand = \"./does-not-exist\"\n",
+    )
+    .unwrap();
+    let config = lighthouse_spec::Config::parse_inline("plugins = [\"p\", \"unknown\"]\n").unwrap();
+    let search = lighthouse_rpc::search_dirs(root.path());
+    assert_eq!(
+        lighthouse_rpc::plugin_ignores(&config, root.path(), &search).unwrap(),
+        ["gen/", "tmp/"]
+    );
 }
 
 #[test]

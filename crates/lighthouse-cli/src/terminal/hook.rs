@@ -167,7 +167,7 @@ fn answer_event(
             Ok(signal::digest(&session)?.map(|text| context(event, text)))
         }
         Event::PreToolUse => {
-            let (Some(id), Some(file)) = (id, edited_file(payload, &root)) else {
+            let (Some(id), Some(file)) = (id, edited_file(payload, &session)?) else {
                 return Ok(None);
             };
             if baseline::exists(&root, id, &file) {
@@ -184,7 +184,8 @@ fn answer_event(
             Ok(None)
         }
         Event::PostToolUse => {
-            let Some(file) = edited_file(payload, &root).filter(|f| root.join(f).exists()) else {
+            let Some(file) = edited_file(payload, &session)?.filter(|f| root.join(f).exists())
+            else {
                 return Ok(None);
             };
             let mut checked =
@@ -372,16 +373,18 @@ fn request(paths: Vec<PathBuf>, store: bool) -> CheckRequest {
 }
 
 /// The project-relative path an editing tool touches, when it is worth
-/// checking (`root` is canonical).
-fn edited_file(payload: &Value, root: &Path) -> Option<PathBuf> {
-    let tool = payload["tool_name"].as_str()?;
+/// checking.
+fn edited_file(payload: &Value, session: &Session) -> Result<Option<PathBuf>> {
+    let (Some(tool), Some(path)) = (
+        payload["tool_name"].as_str(),
+        payload["tool_input"]["file_path"].as_str(),
+    ) else {
+        return Ok(None);
+    };
     if !EDIT_TOOLS.contains(&tool) {
-        return None;
+        return Ok(None);
     }
-    baseline::editable(
-        Path::new(payload["tool_input"]["file_path"].as_str()?),
-        root,
-    )
+    baseline::editable(Path::new(path), session)
 }
 
 /// An edit: error and warn findings go back to the agent as the reason of a

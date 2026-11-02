@@ -159,6 +159,12 @@ pub struct LanguageManifest {
     /// Project-relative path globs; `*` and `?` never cross `/`, a `**`
     /// component matches any number of directories.
     pub globs: Vec<String>,
+    /// Files this language does not claim although `globs` match them: the
+    /// same key, syntax and meaning as a plugin's `ignores` (gitignore
+    /// patterns, rooted at the project), scoped to this language as ESLint's
+    /// `ignores` is to the `files` beside it. Other languages still see them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignores: Vec<String>,
     /// Among providers matching a file, the higher priority wins.
     #[serde(default)]
     pub priority: i32,

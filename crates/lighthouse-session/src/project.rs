@@ -14,7 +14,7 @@ use lighthouse_engine::{CommandModels, Engine};
 use lighthouse_model::Format;
 use lighthouse_plugin::{ModelClient, Registry};
 use lighthouse_rpc::{CommandModel, PluginCatalog, Registered, StartOptions, Started};
-use lighthouse_spec::{Catalog, CheckKind, Files, FixKind, load_local, local_files};
+use lighthouse_spec::{Catalog, CheckKind, Files, FixKind, ProjectFiles, load_local, local_files};
 use lighthouse_spec::{Config, FILE_NAME, Layers, Surface};
 
 use crate::{
@@ -213,6 +213,16 @@ impl Session {
             layers: Layers::default(),
             comp,
         })
+    }
+
+    /// The files of the project, or of a copy of it at `root`: the listed
+    /// plugins' `ignores` and the project's own, as every run sees them. They
+    /// are read from the plugins' manifests, so that no process starts.
+    pub fn project_files(&self, root: &Path) -> Result<ProjectFiles> {
+        let search = lighthouse_rpc::search_dirs(&self.root);
+        let mut ignores = lighthouse_rpc::plugin_ignores(&self.config, &self.root, &search)?;
+        ignores.extend(self.config.ignores().iter().cloned());
+        Ok(ProjectFiles::new(root, &ignores)?)
     }
 
     /// The bundled and local plugins, the packs of the listed plugins, and the

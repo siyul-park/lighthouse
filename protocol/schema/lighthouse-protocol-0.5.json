@@ -1263,6 +1263,13 @@
         "id": {
           "type": "string"
         },
+        "ignores": {
+          "description": "Files this language does not claim although `globs` match them: the\nsame key, syntax and meaning as a plugin's `ignores` (gitignore\npatterns, rooted at the project), scoped to this language as ESLint's\n`ignores` is to the `files` beside it. Other languages still see them.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "priority": {
           "default": 0,
           "description": "Among providers matching a file, the higher priority wins.",

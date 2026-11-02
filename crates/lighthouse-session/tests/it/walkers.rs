@@ -6,7 +6,6 @@ use std::{
 };
 
 use lighthouse_session::{CheckRequest, baseline};
-use lighthouse_spec::ProjectFiles;
 
 use crate::fixture::{LONG, canonical, project, session, write};
 
@@ -25,16 +24,26 @@ fn the_check_validation_the_baseline_and_the_copy_list_the_same_files() {
         "m.yaml",
         "out/n.yaml",
         ".hidden/o.yaml",
+        "cfg/p.txt",
+        "cfg/q.yaml",
     ] {
         write(&root, file, LONG);
     }
     write(&root, ".gitignore", "out/\n");
+    write(
+        &root,
+        "lighthouse.toml",
+        &lighthouse_test_support::project(
+            "ignores = [\"cfg/\"]\n[rules]\n\"local/short\" = \"error\"\n",
+        ),
+    );
     write(&root, ".gitattributes", "third/** linguist-vendored\n");
-    let listing = ProjectFiles::new(&root, &[]).unwrap().list();
+    let session = session(&root);
+    let listing = session.project_files(&root).unwrap().list();
+    assert!(!listing.files.contains(&PathBuf::from("cfg/p.txt")));
     let listed: BTreeSet<PathBuf> = listing.files.iter().cloned().collect();
 
     // The check reports on every listed text file, and on no other.
-    let session = session(&root);
     let checked: BTreeSet<PathBuf> = lighthouse_session::check(
         &session,
         &CheckRequest {
@@ -63,9 +72,12 @@ fn the_check_validation_the_baseline_and_the_copy_list_the_same_files() {
         "third/f.txt",
         ".lighthouse/cache/g.txt",
         ".git/h.txt",
+        "cfg/p.txt",
     ] {
         let path = PathBuf::from(path);
-        let editable = baseline::editable(&root.join(&path), &root).is_some();
+        let editable = baseline::editable(&root.join(&path), &session)
+            .unwrap()
+            .is_some();
         // Vendored files are decided by `.gitattributes`, which a path alone does not carry.
         if path != Path::new("third/f.txt") {
             assert_eq!(editable, listed.contains(&path), "{}", path.display());

@@ -98,6 +98,9 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   component spans directories). Of several languages matching a file, the higher
   `priority` wins, then registration order; a `fallback: true` language only
   claims files no other language claims.
+- `ignores` (optional) are gitignore lines, rooted at the project, of files the language does not
+  claim although its `globs` match (Go: `_*/`, `.*/`). They are the plugin manifest's `ignores`
+  scoped to this language; another language still sees those files.
 - `conventions.test_globs` mark test files for the whole host: rules skip or
   target them by this flag.
 - `conventions.constructor_prefixes` are the name prefixes that make a function a
@@ -113,7 +116,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   has Go's convention. A project replaces any part in
   `[languages.<id>] testNaming = { prefix, snakeCase, variants, ancestors }`.
 - Each entry of `capabilities.languages` is the language's **language manifest**
-  (`LanguageManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `priority`, `fallback`, `conventions` and
+  (`LanguageManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `ignores`, `priority`, `fallback`, `conventions` and
   `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field
   for field; the plugin's own identity (`serverInfo`) is the plugin manifest.
 - The `capabilities` of a language list what its provider guarantees. `semantic-edges`: `calls`,
@@ -225,7 +228,7 @@ Result `{ fragments, sources, notices, incomplete }`:
   it reports every comment of the file, with its span, and the host reads the markers
   (`generated.markers`, unanchored regular expressions, one list for every language) in the comments
   that end before the file's first symbol; see [architecture](architecture.md#generated-code). It never filters paths: the host sends the files of the
-  project (see `ignores`), and `testdata`, `vendor`, hidden directories and the like
+  project (see `ignores`), and `testdata`, `vendor`, the directories a language ignores and the like
   are left out there.
 - `notices`: messages that leave the analysis complete (for example files
   excluded by build constraints).
@@ -541,7 +544,10 @@ languages = ["go"]                 # checked against what the process reports
 
 `spec.ignores` (optional) is what the plugin's toolchain leaves out of a project: the same key,
 syntax and meaning as the project's `ignores` (a list of `.gitignore` lines, rooted at the
-project), merged the same way and before the project's own. It applies when the plugin is listed.
+project), merged the same way and before the project's own. It applies when the plugin is listed,
+to every file. The same key in a language's declaration (`ignores` of the `LanguageManifest` that
+`initialize` returns, next to its `globs`) applies to the files that language claims only: the
+host does not send them to that provider, and other languages still see them.
 `[spec.generated]` (optional) has the shape of the project's `[generated]`: `files` patterns and
 `markers` (regular expressions searched in the head comments of any file), for the generated code of
 the plugin's ecosystem.
@@ -634,8 +640,9 @@ type-checks with `go/types`.
   edges. No `accesses-private` edges: Go cannot reach an unexported member from
   another package.
 - Packages are loaded per `go.mod`; Go files with no `go.mod` form one synthetic
-  module. The go tool's own skips (`testdata`, `vendor`, names starting with `.` or
-  `_`) are the `ignores` of the plugin manifest, so the host never sends those files.
+  module. The go tool's own skips are `ignores`: `testdata` and `vendor` in the plugin manifest
+  (for every language), names starting with `.` or `_` in the Go language declaration (for Go
+  files only), so the host never sends those files.
 - `package main` makes every symbol `private`; exported symbols under an
   `internal` directory are `internal`.
 - Load, parse and type errors become `incomplete` entries per file, with

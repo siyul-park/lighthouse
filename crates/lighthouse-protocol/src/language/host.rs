@@ -145,6 +145,7 @@ impl<P: HostParser> Provider for HostProvider<P> {
                 .iter()
                 .map(|glob| (*glob).to_owned())
                 .collect(),
+            ignores: Vec::new(),
             priority: PRIORITY,
             fallback: false,
             conventions: Conventions::default(),

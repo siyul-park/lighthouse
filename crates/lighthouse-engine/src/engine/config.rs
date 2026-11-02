@@ -196,6 +196,7 @@ pub(super) fn test_naming(registry: &Registry, config: &Config) -> BTreeMap<Stri
 pub(super) fn load_languages(
     registry: &Registry,
     config: &Config,
+    root: &Path,
 ) -> Result<(Vec<usize>, Vec<Language>), Error> {
     let mut providers = Vec::new();
     let mut languages = Vec::new();
@@ -207,6 +208,7 @@ pub(super) fn load_languages(
         let globs = manifest.globs.clone();
         languages.push(Language {
             files: glob_set(&globs)?,
+            ignored: lighthouse_spec::ignore_matcher(root, &manifest.ignores)?,
             tests: glob_set(&manifest.conventions.test_globs)?,
         });
     }

@@ -35,6 +35,9 @@ func (p *Provider) Manifest() []sdk.LanguageManifest {
 		ID:      language,
 		Aliases: []string{"go", "golang"},
 		Globs:   []string{"**/*.go"},
+		// The go command ignores directories whose name starts with `.` or `_`
+		// (`go help packages`); `.lighthouse` holds the decisions of the project.
+		Ignores: []string{"_*/", ".*/", "!/.lighthouse/"},
 		Conventions: sdk.Conventions{
 			TestGlobs:           []string{"**/*_test.go"},
 			ConstructorPrefixes: []string{"New", "new"},

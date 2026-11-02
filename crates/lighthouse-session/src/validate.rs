@@ -16,7 +16,7 @@ use lighthouse_checks::Composition;
 use lighthouse_model::{Format, Resource, documents, kind_of, resource};
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_rpc::PluginSpec;
-use lighthouse_spec::{Catalog, ProjectFiles};
+use lighthouse_spec::Catalog;
 use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
@@ -254,7 +254,7 @@ pub fn validate_paths(session: &Session, paths: &[PathBuf], examples: bool) -> R
     let mut found = Validated::default();
     let mut files = Vec::new();
     for path in paths {
-        collect(path, &mut files)?;
+        collect(session, path, &mut files)?;
     }
     files.sort();
     files.dedup();
@@ -326,7 +326,7 @@ fn built(
     }
 }
 
-fn collect(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+fn collect(session: &Session, path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     if path.is_file() {
         files.push(path.to_owned());
         return Ok(());
@@ -334,7 +334,7 @@ fn collect(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     if !path.is_dir() {
         return Err(format!("{}: no such file or directory", path.display()).into());
     }
-    let listing = ProjectFiles::new(path, &[])?.list();
+    let listing = session.project_files(path)?.list();
     files.extend(listing.files.iter().map(|f| path.join(f)));
     Ok(())
 }

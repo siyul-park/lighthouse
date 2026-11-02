@@ -210,6 +210,10 @@ pub struct LanguageManifest {
     /// alike.
     pub aliases: Vec<String>,
     pub globs: Vec<String>,
+    /// Gitignore patterns (the syntax of a plugin's `ignores`) of the files the
+    /// language does not claim although `globs` match them; other languages
+    /// still see them.
+    pub ignores: Vec<String>,
     pub conventions: Conventions,
     pub capabilities: Vec<Capability>,
     /// A fallback provider claims a file only when no other provider does.
@@ -226,6 +230,7 @@ impl LanguageManifest {
             id: id.into(),
             aliases: Vec::new(),
             globs,
+            ignores: Vec::new(),
             conventions: Conventions::default(),
             capabilities: Vec::new(),
             fallback: false,
