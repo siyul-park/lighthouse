@@ -178,7 +178,7 @@ fn reorder_puts_several_blocks_after_a_last_line_without_an_end_of_line() {
 
     assert_eq!(
         case(text, &symbols, vec![]).run(&[op]).unwrap(),
-        "fn c() {}\n\nfn d() {}\n\nfn e() {}\n\nfn a() {}\n\nfn b() {}\n"
+        "fn c() {}\n\nfn d() {}\n\nfn e() {}\n\nfn a() {}\n\nfn b() {}"
     );
 }
 

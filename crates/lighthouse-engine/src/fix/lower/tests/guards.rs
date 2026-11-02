@@ -20,7 +20,7 @@ fn a_korean_banner_and_a_multibyte_end_do_not_split_a_character() {
 
     assert_eq!(
         moved,
-        "// 도우미 함수들\nfn b() { \"한\" }\n\nfn a() {} // 끝\n"
+        "fn b() { \"한\" }\n\n// 도우미 함수들\nfn a() {} // 끝\n"
     );
     let deleted = case.run(&[EditOp::DeleteRange {
         file: FILE.into(),

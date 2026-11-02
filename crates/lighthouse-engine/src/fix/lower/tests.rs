@@ -16,6 +16,7 @@ mod moves;
 mod rename;
 mod reorder;
 mod scope;
+mod spacing;
 
 const FILE: &str = "a.src";
 

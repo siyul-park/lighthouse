@@ -175,33 +175,108 @@ pub(crate) fn whole_lines(text: &str, range: &Range<usize>) -> Option<Range<usiz
     if !(before_blank && after_blank) {
         return None;
     }
-    Some(with_blank(text, start..end))
+    Some(with_blank(text, start..end, None))
 }
 
-/// `lines`, widened by the blank line that follows it, else by the one that
-/// precedes it when nothing follows or a closing bracket does: what remains
-/// has one blank line where one belonged, never two and never a blank line
-/// against a bracket.
-pub(crate) fn with_blank(text: &str, lines: Range<usize>) -> Range<usize> {
-    let line_after = |from: usize| {
-        let end = text[from..].find('\n').map_or(text.len(), |n| from + n + 1);
-        &text[from..end]
-    };
-    if lines.end < text.len() && line_after(lines.end).trim().is_empty() {
-        return lines.start..lines.end + line_after(lines.end).len();
-    }
-    let closes = lines.end >= text.len()
-        || line_after(lines.end)
-            .trim_start()
-            .starts_with(['}', ')', ']']);
-    let before = &text[..lines.start];
-    if closes && let Some(prev) = before.strip_suffix('\n') {
-        let prev_start = prev.rfind('\n').map_or(0, |n| n + 1);
-        if before[prev_start..].trim().is_empty() {
-            return prev_start..lines.end;
+/// `lines` with the blank lines that go with it, so that what remains of the
+/// scope it leaves keeps the separation it had: the gap between its neighbours
+/// is one of the two it bridged, the one nearest `separation` (the larger when
+/// the scope has none), never their sum and never a blank line against an
+/// opening or a closing bracket. A declaration that closes its scope (a
+/// bracket, a dedent or the end of the file follows) takes the blank lines
+/// before it; one that opens it takes those after it.
+pub(crate) fn with_blank(
+    text: &str,
+    lines: Range<usize>,
+    separation: Option<usize>,
+) -> Range<usize> {
+    let above = blank_start(text, lines.start)..lines.start;
+    let below = lines.end..blank_end(text, lines.end);
+    let indent = text[lines.clone()]
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .map_or(0, indent_of);
+    let first = text[..above.start]
+        .trim_end()
+        .lines()
+        .next_back()
+        .is_none_or(|line| indent_of(line) < indent || line.trim_end().ends_with(['{', '(', '[']));
+    let last = text[below.end..]
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .is_none_or(|line| indent_of(line) < indent || line.trim_start().starts_with(['}', ')', ']']));
+    match (first, last) {
+        (true, true) => above.start..below.end,
+        (true, false) => lines.start..below.end,
+        (false, true) => without_final_eol(text, above.start..lines.end),
+        (false, false) => {
+            let (before, after) = (blank_count(text, &above), blank_count(text, &below));
+            let gap = separation.map_or(before.max(after), |s| {
+                s.clamp(before.min(after), before.max(after))
+            });
+            let taken = before + after - gap;
+            let from_below = taken.min(after);
+            let from_above = lines_len_back(&text[above.clone()], taken - from_below);
+            lines.start - from_above..below.start + lines_len(&text[below.clone()], from_below)
         }
     }
-    lines
+}
+
+/// The start of the blank lines that end at `at`, a line start.
+pub(crate) fn blank_start(text: &str, at: usize) -> usize {
+    let mut start = at;
+    while start > 0 {
+        let line = text[..start - 1].rfind('\n').map_or(0, |n| n + 1);
+        if !text[line..start - 1].trim().is_empty() {
+            break;
+        }
+        start = line;
+    }
+    start
+}
+
+/// The end of the blank lines that begin at `at`, a line start.
+pub(crate) fn blank_end(text: &str, at: usize) -> usize {
+    let mut end = at;
+    while end < text.len() {
+        let next = text[end..].find('\n').map_or(text.len(), |n| end + n + 1);
+        if !text[end..next].trim().is_empty() {
+            break;
+        }
+        end = next;
+    }
+    end
+}
+
+/// How many blank lines `run` holds.
+pub(crate) fn blank_count(text: &str, run: &Range<usize>) -> usize {
+    text[run.clone()].matches('\n').count()
+}
+
+/// The width of the whitespace that leads `line`.
+pub(crate) fn indent_of(line: &str) -> usize {
+    line.len() - line.trim_start().len()
+}
+
+/// The byte length of the first `count` lines of `run`.
+fn lines_len(run: &str, count: usize) -> usize {
+    run.split_inclusive('\n').take(count).map(str::len).sum()
+}
+
+/// The byte length of the last `count` lines of `run`.
+fn lines_len_back(run: &str, count: usize) -> usize {
+    run.split_inclusive('\n').rev().take(count).map(str::len).sum()
+}
+
+/// `range`, which runs to the end of the text, widened by the line end before
+/// it when the text has no line end of its own: what remains ends as the text
+/// did.
+fn without_final_eol(text: &str, range: Range<usize>) -> Range<usize> {
+    if range.end < text.len() || text.ends_with('\n') || range.start == 0 {
+        return range;
+    }
+    let eol = if text[..range.start].ends_with("\r\n") { 2 } else { 1 };
+    range.start - eol..range.end
 }
 
 #[cfg(test)]

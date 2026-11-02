@@ -39,7 +39,7 @@ fn a_move_takes_leading_comment_lines_of_the_extent_along() {
 }
 
 #[test]
-fn a_move_of_the_last_block_without_a_final_newline_stays_well_formed() {
+fn a_move_of_the_last_block_without_a_final_newline_leaves_the_file_without_one() {
     let case = case(
         "fn a() {}\n\nfn b() {}",
         &[("a", 1, 1), ("b", 3, 3)],
@@ -50,7 +50,7 @@ fn a_move_of_the_last_block_without_a_final_newline_stays_well_formed() {
         anchor: Anchor::Before(id("a")),
     };
 
-    assert_eq!(case.run(&[op]).unwrap(), "fn b() {}\n\nfn a() {}\n");
+    assert_eq!(case.run(&[op]).unwrap(), "fn b() {}\n\nfn a() {}");
 }
 
 #[test]

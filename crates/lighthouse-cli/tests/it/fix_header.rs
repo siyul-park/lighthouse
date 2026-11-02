@@ -11,7 +11,7 @@ use crate::fix::{lighthouse, read, rust_project, write};
 /// A project of `files` with the testing rules, in the language of `plugin`
 /// (`lang_python()`, say) as the plugin id `id`; `None` after a skip message
 /// when the language has no runtime here.
-fn project(
+pub(crate) fn project(
     id: &str,
     plugin: Option<std::path::PathBuf>,
     files: &[(&str, &str)],
@@ -32,7 +32,7 @@ fn project(
     Some(dir)
 }
 
-fn python(files: &[(&str, &str)]) -> Option<TempDir> {
+pub(crate) fn python(files: &[(&str, &str)]) -> Option<TempDir> {
     project("lang-python", lighthouse_test_support::lang_python(), files)
 }
 

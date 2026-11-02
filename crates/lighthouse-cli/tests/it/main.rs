@@ -17,6 +17,8 @@ mod fix_events;
 mod fix_groups;
 mod fix_header;
 mod fix_scope;
+mod fix_spacing;
+mod fix_unrelated;
 mod fix_trust;
 mod formatted_batches;
 mod fx;

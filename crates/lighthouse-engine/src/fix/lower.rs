@@ -26,6 +26,7 @@ use super::{
 
 mod imports;
 mod rename;
+mod spacing;
 
 impl<'a> Sources<'a> {
     pub(crate) fn new(root: &Path, project: &'a Project, overlays: &'a Overlays) -> Self {
@@ -171,7 +172,8 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        let range = with_blank(&text, block.lines.clone());
+        let separation = self.separation(&text, &block)?;
+        let range = with_blank(&text, block.lines.clone(), Some(separation));
         Ok(vec![TextEdit::delete(file, range)])
     }
 
@@ -236,22 +238,23 @@ impl<'a> Lowerer<'a> {
             ));
         }
         let text = self.sources.text(&file)?;
-        let removal = with_blank(&text, moved.lines.clone());
+        let carry = carried(&text, &moved);
+        let separation = self.separation(&text, &moved)?;
+        let removal = with_blank(&text, carry.clone(), Some(separation));
         let eol = eol_of(&text);
-        let mut block = text[moved.lines.clone()].to_owned();
+        let mut block = text[carry].to_owned();
         if !block.ends_with('\n') {
             block.push_str(eol);
         }
         let (at, inserted) = match anchor {
-            Anchor::After(_) => {
-                let lead = if text[..beside.lines.end].ends_with('\n') {
-                    eol.to_owned()
-                } else {
-                    eol.repeat(2)
-                };
-                (beside.lines.end, format!("{lead}{block}"))
-            }
-            Anchor::Before(_) => (beside.lines.start, format!("{block}{eol}")),
+            Anchor::After(_) => (
+                beside.lines.end,
+                spacing::after(&text, beside.lines.end, separation, &[block], eol),
+            ),
+            Anchor::Before(_) => (
+                carried(&text, &beside).start,
+                spacing::before(separation, &[block], eol),
+            ),
         };
         if removal.start < at && at < removal.end {
             return Err("the target lies inside the moved declaration".to_owned());
@@ -437,6 +440,22 @@ impl<'a> Lowerer<'a> {
         })
     }
 
+    /// The blank lines that set the declarations of the scope of `of` apart.
+    fn separation(&self, text: &str, of: &Block) -> Result<usize, String> {
+        let mut spans: Vec<Range<usize>> = self
+            .project
+            .symbols_in(&of.symbol.file)
+            .filter_map(|s| self.block(&Node::Symbol(s.id.clone())).ok())
+            .filter(|b| {
+                b.group.is_none() && b.container == of.container && b.scope == of.scope
+            })
+            .map(|b| carried(text, &b))
+            .collect();
+        spans.sort_by_key(|s| s.start);
+        spans.dedup();
+        Ok(spacing::separation(text, &spans))
+    }
+
     /// The declaration whose extent holds `symbol`, if its owner is one: a
     /// class body is a scope in a language that does not bracket it, and a
     /// member of it never moves out to the file or to another class. A method
@@ -492,11 +511,11 @@ enum Later {
     Named,
 }
 
-/// What is put after one anchor: the text, and the offset and module each of
-/// its blocks comes from.
+/// What is put at one anchor: the whole lines of each block, and the offset
+/// and module each comes from.
 #[derive(Default)]
 struct Put {
-    text: String,
+    bodies: Vec<String>,
     from: Vec<(usize, String)>,
 }
 
@@ -508,13 +527,13 @@ fn lines_of(text: &str, range: &Range<usize>) -> Option<Range<usize>> {
     (!shares).then_some(start..end)
 }
 
-/// `start`, moved up over the comments that lead its line: `//` lines and
-/// `/* */` blocks that begin their lines.
+/// `start`, moved up over the comments that lead its line: `//` and `#` lines
+/// and `/* */` blocks that begin their lines.
 fn with_leading_comments(text: &str, mut start: usize) -> usize {
     while start > 0 {
         let above = text[..start - 1].rfind('\n').map_or(0, |n| n + 1);
         let line = text[above..start].trim();
-        let opens = if line.starts_with("//") {
+        let opens = if comment_line(line) {
             Some(above)
         } else if line.ends_with("*/") {
             text[..start]
@@ -528,6 +547,12 @@ fn with_leading_comments(text: &str, mut start: usize) -> usize {
         start = opens;
     }
     start
+}
+
+/// Whether a trimmed line is a line comment: `//`, or `#` that does not open
+/// an attribute (`#[`, `#![`).
+fn comment_line(line: &str) -> bool {
+    line.starts_with("//") || (line.starts_with('#') && !line.starts_with("#[") && !line.starts_with("#!["))
 }
 
 /// The end of the line that holds the end of a range: just past the newline
@@ -570,6 +595,10 @@ fn moves(
         return (Vec::new(), Vec::new());
     }
     let eol = eol_of(text);
+    let separation = spacing::separation(
+        text,
+        &current.iter().map(|b| carried(text, b)).collect::<Vec<_>>(),
+    );
     let kept: BTreeSet<&SymbolId> = stays.iter().map(|&n| &current[n].symbol.id).collect();
     let body = |block: &Block| {
         let mut body = text[carried(text, block)].to_owned();
@@ -586,7 +615,10 @@ fn moves(
         .map(|b| carried(text, b))
         .collect();
     for range in joined(text, moved) {
-        edits.push(TextEdit::delete(file.clone(), with_blank(text, range)));
+        edits.push(TextEdit::delete(
+            file.clone(),
+            with_blank(text, range, Some(separation)),
+        ));
     }
     let first_kept = current.iter().find(|b| kept.contains(&b.symbol.id));
     let mut after: Option<&Block> = None;
@@ -596,43 +628,23 @@ fn moves(
             after = Some(block);
             continue;
         }
-        let Put { text: entry, from } = put.entry(after.map(|a| &a.symbol.id)).or_default();
+        let Put { bodies, from } = put.entry(after.map(|a| &a.symbol.id)).or_default();
         from.push((block.lines.start, block.symbol.id.module().to_owned()));
-        match after {
-            Some(beside) if text[..beside.lines.end].ends_with('\n') => {
-                entry.push_str(eol);
-                entry.push_str(&body(block));
-            }
-            Some(_) => {
-                // The anchor's last line has no end of line: the first
-                // declaration put there ends it and leaves a blank line.
-                entry.push_str(&eol.repeat(if entry.is_empty() { 2 } else { 1 }));
-                entry.push_str(&body(block));
-            }
-            None => {
-                entry.push_str(&body(block));
-                entry.push_str(eol);
-            }
-        }
+        bodies.push(body(block));
     }
     let mut placed = Vec::new();
-    for (
-        anchor,
-        Put {
-            text: inserted,
-            from,
-        },
-    ) in put
-    {
+    for (anchor, Put { bodies, from }) in put {
         let beside = match anchor {
             Some(id) => current.iter().find(|b| &b.symbol.id == id),
             None => first_kept,
         };
         let Some(beside) = beside else { continue };
-        let at = if anchor.is_some() {
-            beside.lines.end
+        let (at, inserted) = if anchor.is_some() {
+            let at = beside.lines.end;
+            (at, spacing::after(text, at, separation, &bodies, eol))
         } else {
-            beside.lines.start
+            let at = carried(text, beside).start;
+            (at, spacing::before(separation, &bodies, eol))
         };
         placed.extend(from.into_iter().map(|(from, module)| (from, at, module)));
         edits.push(TextEdit::insert(beside.symbol.file.clone(), at, inserted));
@@ -663,7 +675,7 @@ fn carried(text: &str, block: &Block) -> Range<usize> {
             .len();
         let above = text[..blanks].rfind('\n').map_or(0, |n| n + 1);
         let line = text[above..blanks].trim();
-        if blanks == start || blanks == 0 || !(line.starts_with("//") || line.ends_with("*/")) {
+        if blanks == start || blanks == 0 || !(comment_line(line) || line.ends_with("*/")) {
             return start..block.lines.end;
         }
         let line_end = text[blanks..]
