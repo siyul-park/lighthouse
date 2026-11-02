@@ -68,9 +68,19 @@ pub enum SelectorPart {
     Descend,
     Key(String),
     Index(usize),
+    /// `['a','b',0]`: the members named, in the order the selector lists
+    /// them (RFC 9535 selector list of names and indexes).
+    Union(Vec<SelectorMember>),
     Keys,
     Indices,
     Filter(SelectorFilter),
+}
+
+/// One name or index of a bracketed selector list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelectorMember {
+    Key(String),
+    Index(usize),
 }
 
 fn parse_key(source: &str, at: &mut usize) -> Result<SelectorPart, String> {
@@ -115,29 +125,59 @@ fn parse_key(source: &str, at: &mut usize) -> Result<SelectorPart, String> {
 fn parse_bracket(source: &str, at: &mut usize) -> Result<SelectorPart, String> {
     let bytes = source.as_bytes();
     *at += 1;
-    match bytes.get(*at).copied() {
-        Some(b'*') => {
-            *at += 1;
-            if bytes.get(*at) != Some(&b']') {
-                return Err("wildcard selector must be '[*]'".to_owned());
-            }
-            *at += 1;
-            Ok(SelectorPart::Indices)
+    if bytes.get(*at) == Some(&b'*') {
+        *at += 1;
+        if bytes.get(*at) != Some(&b']') {
+            return Err("wildcard selector must be '[*]'".to_owned());
         }
-        Some(b'\'' | b'"') => parse_quoted_key(source, at),
-        Some(b'0'..=b'9') => parse_index(source, at),
-        None => Err("unterminated bracket selector".to_owned()),
-        _ => Err("brackets accept '*', a numeric index, or a quoted key".to_owned()),
+        *at += 1;
+        return Ok(SelectorPart::Indices);
+    }
+    let mut members = Vec::new();
+    loop {
+        skip_spaces(bytes, at);
+        members.push(match bytes.get(*at).copied() {
+            Some(b'\'' | b'"') => SelectorMember::Key(parse_quoted_key(source, at)?),
+            Some(b'0'..=b'9') => SelectorMember::Index(parse_index(source, at)?),
+            None => return Err("unterminated bracket selector".to_owned()),
+            _ => {
+                return Err(
+                    "brackets accept '*', numeric indexes, or quoted keys, comma separated"
+                        .to_owned(),
+                );
+            }
+        });
+        skip_spaces(bytes, at);
+        match bytes.get(*at).copied() {
+            Some(b',') => *at += 1,
+            Some(b']') => {
+                *at += 1;
+                break;
+            }
+            _ => return Err("bracket selector must end with ']'".to_owned()),
+        }
+    }
+    Ok(match members.as_slice() {
+        [SelectorMember::Key(key)] => SelectorPart::Key(key.clone()),
+        [SelectorMember::Index(index)] => SelectorPart::Index(*index),
+        _ => SelectorPart::Union(members),
+    })
+}
+
+fn skip_spaces(bytes: &[u8], at: &mut usize) {
+    while bytes.get(*at) == Some(&b' ') {
+        *at += 1;
     }
 }
 
-fn parse_quoted_key(source: &str, at: &mut usize) -> Result<SelectorPart, String> {
+/// The key of a quoted name, after which `at` stands.
+fn parse_quoted_key(source: &str, at: &mut usize) -> Result<String, String> {
     let bytes = source.as_bytes();
     let quote = bytes[*at];
     let start = *at;
     *at += 1;
 
-    let key = if quote == b'"' {
+    if quote == b'"' {
         let mut escaped = false;
         while *at < bytes.len() {
             let byte = bytes[*at];
@@ -154,62 +194,51 @@ fn parse_quoted_key(source: &str, at: &mut usize) -> Result<SelectorPart, String
             return Err("unterminated quoted key selector".to_owned());
         }
         *at += 1;
-        serde_json::from_str::<String>(
+        return serde_json::from_str::<String>(
             source
                 .get(start..*at)
                 .ok_or("invalid UTF-8 selector boundary")?,
         )
-        .map_err(|_| "invalid escaped key in selector".to_owned())?
-    } else {
-        let mut key = String::new();
-        while *at < bytes.len() && bytes[*at] != quote {
-            if bytes[*at] == b'\\' {
-                *at += 1;
-                let escaped = source
-                    .get(*at..)
-                    .and_then(|tail| tail.chars().next())
-                    .ok_or("unterminated quoted key escape")?;
-                if !matches!(escaped, '\\' | '\'') {
-                    return Err("single-quoted keys only escape backslash and quote".to_owned());
-                }
-                key.push(escaped);
-                *at += escaped.len_utf8();
-            } else {
-                let ch = source[*at..]
-                    .chars()
-                    .next()
-                    .ok_or("invalid UTF-8 selector")?;
-                key.push(ch);
-                *at += ch.len_utf8();
+        .map_err(|_| "invalid escaped key in selector".to_owned());
+    }
+    let mut key = String::new();
+    while *at < bytes.len() && bytes[*at] != quote {
+        if bytes[*at] == b'\\' {
+            *at += 1;
+            let escaped = source
+                .get(*at..)
+                .and_then(|tail| tail.chars().next())
+                .ok_or("unterminated quoted key escape")?;
+            if !matches!(escaped, '\\' | '\'') {
+                return Err("single-quoted keys only escape backslash and quote".to_owned());
             }
+            key.push(escaped);
+            *at += escaped.len_utf8();
+        } else {
+            let ch = source[*at..]
+                .chars()
+                .next()
+                .ok_or("invalid UTF-8 selector")?;
+            key.push(ch);
+            *at += ch.len_utf8();
         }
-        if bytes.get(*at) != Some(&quote) {
-            return Err("unterminated quoted key selector".to_owned());
-        }
-        *at += 1;
-        key
-    };
-    if bytes.get(*at) != Some(&b']') {
-        return Err("quoted key selector must end with ']'".to_owned());
+    }
+    if bytes.get(*at) != Some(&quote) {
+        return Err("unterminated quoted key selector".to_owned());
     }
     *at += 1;
-    Ok(SelectorPart::Key(key))
+    Ok(key)
 }
 
-fn parse_index(source: &str, at: &mut usize) -> Result<SelectorPart, String> {
+fn parse_index(source: &str, at: &mut usize) -> Result<usize, String> {
     let bytes = source.as_bytes();
     let start = *at;
     while *at < bytes.len() && bytes[*at].is_ascii_digit() {
         *at += 1;
     }
-    if bytes.get(*at) != Some(&b']') {
-        return Err("array index must end with ']'".to_owned());
-    }
-    let index = source[start..*at]
+    source[start..*at]
         .parse()
-        .map_err(|_| "array index is too large")?;
-    *at += 1;
-    Ok(SelectorPart::Index(index))
+        .map_err(|_| "array index is too large".to_owned())
 }
 
 fn parse_filter(source: &str, at: &mut usize, bracketed: bool) -> Result<SelectorFilter, String> {

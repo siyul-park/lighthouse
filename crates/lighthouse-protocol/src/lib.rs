@@ -85,4 +85,6 @@ fn merge_models(schema: &mut serde_json::Value, models: &serde_json::Value) {
     }
 }
 
-pub use language::selector::{Selector, SelectorComparison, SelectorFilter, SelectorPart};
+pub use language::selector::{
+    Selector, SelectorComparison, SelectorFilter, SelectorMember, SelectorPart,
+};

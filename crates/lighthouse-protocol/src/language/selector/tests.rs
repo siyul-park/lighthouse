@@ -109,3 +109,31 @@ fn selector_keys_support_unicode_without_slicing_mid_character() {
         &[SelectorPart::Key(r"path\name".to_owned())]
     );
 }
+
+#[test]
+fn selector_parses_a_union_of_names_and_indexes() {
+    assert_eq!(
+        Selector::parse("$.events['select', \"each\",3]")
+            .unwrap()
+            .parts(),
+        &[
+            SelectorPart::Key("events".to_owned()),
+            SelectorPart::Union(vec![
+                SelectorMember::Key("select".to_owned()),
+                SelectorMember::Key("each".to_owned()),
+                SelectorMember::Index(3),
+            ]),
+        ]
+    );
+    assert_eq!(
+        Selector::parse("$['a']").unwrap().parts(),
+        &[SelectorPart::Key("a".to_owned())]
+    );
+}
+
+#[test]
+fn selector_rejects_a_malformed_union() {
+    for bad in ["$['a',]", "$['a' 'b']", "$['a','b'", "$[*,'a']"] {
+        assert!(Selector::parse(bad).is_err(), "{bad}");
+    }
+}
