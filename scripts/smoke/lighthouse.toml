@@ -12,4 +12,5 @@ plugins = [
   "lang-toml",
   "lang-markdown",
 ]
-extends = ["design/recommended", "go/recommended", "rust/recommended", "markdown/recommended"]
+# Only packs that need no outside program: the smoke test proves the build, not the runner's tools.
+extends = ["design/recommended", "go/recommended", "rust/recommended"]
