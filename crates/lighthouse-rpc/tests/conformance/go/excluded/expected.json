@@ -80,6 +80,9 @@
       "comments": [],
       "edges": [],
       "file": {
+        "facts": {
+          "stem": "os"
+        },
         "path": "os_windows.go"
       },
       "functions": [],

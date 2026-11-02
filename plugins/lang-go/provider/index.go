@@ -372,6 +372,7 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 			}
 			r.claimed[rel] = true
 			u := newUnit(rel, file, pkg, src, res)
+			u.frag.File.Facts = r.stemFacts(rel)
 			u.fence = r.fenceFiles[rel]
 			if module, ok := r.regionModules[rel]; ok {
 				u.module = module
@@ -526,7 +527,7 @@ func (r *run) unclaimed(rel string) {
 
 func (r *run) fileOnly(rel string) {
 	delete(r.encoded, rel)
-	r.fragments[rel] = emptyFragment(sdk.FileInfo{Path: rel})
+	r.fragments[rel] = emptyFragment(sdk.FileInfo{Path: rel, Facts: r.stemFacts(rel)})
 }
 
 // rel is the project-relative, slash-separated form of an absolute path.

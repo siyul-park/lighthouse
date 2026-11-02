@@ -1,0 +1,328 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Enter#function",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Enter is part of the example."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Enter#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":19,\"line\":4},\"close\":{\"col\":29,\"line\":4},\"statements\":[\"return 1\"],\"plain\":true}]",
+          "stem": "enter"
+        },
+        "path": "enter_arm64.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Enter#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "asm",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Enter is part of the example.",
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "enter_arm64.go",
+          "id": ".::Enter#function",
+          "kind": "function",
+          "name": "Enter",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "facts": {
+          "stem": "enter"
+        },
+        "path": "enter_other.go"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 3
+            },
+            "start": {
+              "col": 8,
+              "line": 3
+            }
+          },
+          "to": "testing"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::TestEnter#test"
+        },
+        {
+          "from": {
+            "symbol": ".::TestEnter#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "to": ".::Enter"
+        }
+      ],
+      "file": {
+        "path": "enter_test.go"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "manual_assertions": 1,
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
+          "statements": 2,
+          "symbol": ".::TestEnter#test",
+          "tokens": 16,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "asm",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "enter_test.go",
+          "id": ".::TestEnter#test",
+          "kind": "test",
+          "name": "TestEnter",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": ".::TestEnter#test",
+          "targets": [
+            ".::Enter"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [
+        {
+          "attached_to": ".::Extra#function",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Extra is part of the example."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Extra#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":19,\"line\":4},\"close\":{\"col\":29,\"line\":4},\"statements\":[\"return 3\"],\"plain\":true}]"
+        },
+        "path": "util_extra.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Extra#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "asm",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Extra is part of the example.",
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "util_extra.go",
+          "id": ".::Extra#function",
+          "kind": "function",
+          "name": "Extra",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 file(s) excluded by build constraints, e.g. enter_other.go; select another context with [languages.go] tags or env"
+  ]
+}

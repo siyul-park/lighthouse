@@ -4,6 +4,9 @@
       "comments": [],
       "edges": [],
       "file": {
+        "facts": {
+          "stem": "os"
+        },
         "path": "os_linux.go"
       },
       "functions": [],

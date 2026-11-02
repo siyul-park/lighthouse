@@ -19,7 +19,12 @@ spec:
     package is `x` or `x_test`. A build constraint in a file name is no part
     of the name (go/build: `name_GOOS_GOARCH`, `name_GOOS`, `name_GOARCH`,
     before `_test`): `x_arm64_test.go` is the test file of `x_arm64.go` when
-    that exists, else of `x.go`. Two findings, told apart by the evidence
+    that exists, else of the files whose stem is `x`. A file a `//go:build`
+    line constrains whose name only adds a word (`enter_other.go`, beside
+    `enter_arm64.go`) has the stem of the constrained file it excludes
+    (`enter`): the tests of the variants live in one `enter_test.go`, which
+    compiles in every build context, and a test file named after one variant
+    (`enter_other_test.go`) is paired with it too. Two findings, told apart by the evidence
     `kind`. `unpaired`: a test file named after no source file of its
     directory (`helpers_test.go` beside no `helpers.go`), reported at its first
     declaration; `export_test.go`, `main_test.go`, example files and benchmark
@@ -87,6 +92,7 @@ spec:
           size(owned) > 0 && symbol.file.endsWith('_test.go')
           && owned.file.split('/').slice(0, size(owned.file.split('/')) - 1) == parts.slice(0, size(parts) - 1)
           && symbol.file_stem != owned.file_stem + '_test'
+          && symbol.file != owned.file.replace('.go', '_test.go')
     where: unpaired || misplaced
     message: >-
       {{ unpaired

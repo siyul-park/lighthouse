@@ -33,6 +33,29 @@ func TestFileStem(t *testing.T) {
 		}, found)
 	})
 
+	t.Run("gives the variants of one source file one stem", func(t *testing.T) {
+		const tagged = "//go:build !arm64\n\npackage p\n"
+		for _, goarch := range []string{"arm64", "amd64"} {
+			found := stemsOf(t, "linux", goarch, map[string]string{
+				"enter_arm64.go": "package p\n",
+				"enter_other.go": tagged,
+				"util_extra.go":  "package p\n",
+				"util_tagged.go": tagged,
+				"enter_test.go":  "package p\n",
+				"enter_more.go":  "package p\n",
+			})
+
+			require.Equal(t, map[string]string{
+				"enter_arm64.go": "enter",
+				"enter_other.go": "enter",
+				"util_extra.go":  "",
+				"util_tagged.go": "",
+				"enter_test.go":  "",
+				"enter_more.go":  "",
+			}, found, goarch)
+		}
+	})
+
 	t.Run("knows every platform of go tool dist list", func(t *testing.T) {
 		out, err := exec.Command("go", "tool", "dist", "list").Output()
 		if err != nil {
@@ -51,14 +74,24 @@ func TestFileStem(t *testing.T) {
 // none).
 func stems(t *testing.T, goos, goarch string, names ...string) map[string]string {
 	t.Helper()
+	files := map[string]string{}
+	for _, name := range names {
+		files[name] = "package p\n"
+	}
+	return stemsOf(t, goos, goarch, files)
+}
+
+// stemsOf is stems for files with the given text.
+func stemsOf(t *testing.T, goos, goarch string, files map[string]string) map[string]string {
+	t.Helper()
 	root := t.TempDir()
 	write := func(name, body string) {
 		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(body), 0o644))
 	}
 	write("go.mod", "module example.com/p\n\ngo 1.22\n")
 	var refs []sdk.FileRef
-	for _, name := range names {
-		write(name, "package p\n")
+	for name, body := range files {
+		write(name, body)
 		refs = append(refs, sdk.FileRef{Path: name})
 	}
 	options, err := json.Marshal(map[string]any{"env": map[string]string{"GOOS": goos, "GOARCH": goarch}})

@@ -489,6 +489,17 @@ const OWNED_SOURCE: &str = "package foo\n\n// Foo is part of the example.\nfunc 
 
 /// The messages of the owner findings the build context `goarch` gives.
 fn owner_findings(plugin: &Path, root: &Path, goarch: &str) -> Vec<(String, String)> {
+    findings(
+        plugin,
+        root,
+        goarch,
+        &["testing/no-missing-owner", "testing/no-duplicate-owner"],
+    )
+}
+
+/// The rule ids and messages of the findings of `only` that the build context
+/// `goarch` gives.
+fn findings(plugin: &Path, root: &Path, goarch: &str, only: &[&str]) -> Vec<(String, String)> {
     let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"testing\"]\nextends = [\"testing/recommended\"]\n\n[languages.go]\nenv = {{ GOOS = \"linux\", GOARCH = \"{goarch}\" }}\n",
         plugin.to_str().unwrap()
@@ -501,7 +512,7 @@ fn owner_findings(plugin: &Path, root: &Path, goarch: &str) -> Vec<(String, Stri
         root,
     )
     .unwrap();
-    let only = ["testing/no-missing-owner", "testing/no-duplicate-owner"].map(str::to_owned);
+    let only = only.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
     let outcome = engine.check(&[], &only).unwrap();
     assert!(outcome.incomplete.is_empty(), "{:?}", outcome.incomplete);
     let mut found: Vec<(String, String)> = outcome
@@ -557,5 +568,70 @@ fn owner_tests_of_variants_that_exclude_each_other_are_no_duplicate() {
         assert_eq!(found.len(), 1, "{goarch}: {found:?}");
         assert_eq!(found[0].0, "testing/no-missing-owner", "{goarch}");
         assert!(found[0].1.contains("Bar"), "{goarch}: {found:?}");
+    }
+}
+
+/// Two files of one stem that exclude each other, a test of both, and a file
+/// of another stem.
+fn write_variants(root: &Path, test: &str) {
+    write(root, "go.mod", "module example.com/app\n");
+    write(
+        root,
+        "asm/enter_arm64.go",
+        "package asm\n\n// Enter is part of the example.\nfunc Enter() int { return 1 }\n",
+    );
+    write(
+        root,
+        "asm/enter_other.go",
+        "//go:build !arm64\n\npackage asm\n\n// Enter is part of the example.\nfunc Enter() int { return 2 }\n",
+    );
+    write(
+        root,
+        "asm/util_extra.go",
+        "package asm\n\n// Extra is part of the example.\nfunc Extra() int { return 3 }\n",
+    );
+    write(
+        root,
+        &format!("asm/{test}"),
+        "package asm\n\nimport \"testing\"\n\nfunc TestEnter(t *testing.T) { _ = Enter() }\n",
+    );
+}
+
+const OWNER_FILE: &[&str] = &["testing/owner-file"];
+
+#[test]
+fn a_test_file_pairs_with_the_platform_variants_of_its_source_in_every_build_context() {
+    let Some(plugin) = go_plugin() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write_variants(root, "enter_test.go");
+    for goarch in ["arm64", "amd64"] {
+        let found = findings(&plugin, root, goarch, OWNER_FILE);
+        assert_eq!(found, [], "{goarch}");
+    }
+}
+
+#[test]
+fn a_test_file_named_after_one_variant_is_still_its_literal_pair() {
+    let Some(plugin) = go_plugin() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write_variants(root, "enter_other_test.go");
+    assert_eq!(findings(&plugin, root, "amd64", OWNER_FILE), []);
+}
+
+#[test]
+fn a_test_of_a_variant_in_the_test_file_of_another_stem_is_misplaced() {
+    let Some(plugin) = go_plugin() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write_variants(root, "util_extra_test.go");
+    for goarch in ["arm64", "amd64"] {
+        let found = findings(&plugin, root, goarch, OWNER_FILE);
+        assert_eq!(found.len(), 1, "{goarch}: {found:?}");
+        assert!(
+            found[0].1.contains("belongs in enter_test.go"),
+            "{goarch}: {found:?}"
+        );
     }
 }

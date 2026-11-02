@@ -54,7 +54,7 @@ func (r *run) syntacticTests(rel string) {
 		module.Path, module.TestOf = dir+moduleSuffixTest, dir
 	}
 	frag := emptyFragment(sdk.FileInfo{Path: rel, Facts: map[string]string{syntacticFact: "true"}})
-	maps.Copy(frag.File.Facts, stemFacts(rel))
+	maps.Copy(frag.File.Facts, r.stemFacts(rel))
 	frag.Modules = []sdk.Module{module}
 	for _, decl := range file.Decls {
 		d, ok := decl.(*ast.FuncDecl)
