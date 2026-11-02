@@ -406,3 +406,164 @@ fn a_union_selects_the_members_it_names_in_its_order_below_each_match() {
         "after a descent the union names members at any depth"
     );
 }
+
+/// The `sources` this repository declared before `core/authoring` shared
+/// them, as injections.
+const BEFORE: &str = include_str!("before.toml");
+
+/// What an injection selected, without the id of the injection that did.
+type Region = (PathBuf, [u32; 2], String, Option<String>, String, String);
+
+/// The regions `injections` select from the files of the repository, from the
+/// ASTs the language plugins build of them, sorted.
+fn repository_regions(injections: &[InjectionSpec], asts: &[Source], root: &Path) -> Vec<Region> {
+    let inputs: Vec<Input> = asts
+        .iter()
+        .map(|ast| Input {
+            file: lighthouse_model::ucm::File {
+                path: PathBuf::from(&ast.path),
+                lang: String::new(),
+                hash: String::new(),
+                generated: false,
+                test: false,
+                facts: BTreeMap::new(),
+            },
+            text: std::fs::read_to_string(root.join(&ast.path)).unwrap(),
+            language: 0,
+        })
+        .collect();
+    let named = |name: &str| Some(name.to_lowercase());
+    let mut run = Run::default();
+    let selected = select(injections, asts.to_vec(), &inputs, &named, &mut run);
+    assert!(run.incomplete.is_empty(), "{:?}", run.incomplete);
+    let mut regions: Vec<Region> = selected
+        .into_iter()
+        .flat_map(|file| {
+            let path = file.file.path.clone();
+            file.sources.into_iter().map(move |source| {
+                (
+                    path.clone(),
+                    source.source_range,
+                    source.provider,
+                    source.syntax,
+                    source.context.to_string(),
+                    source.text,
+                )
+            })
+        })
+        .collect();
+    regions.sort();
+    regions
+}
+
+/// The files of the repository an injection of either set reads, by path.
+fn host_files(globs: &[String], root: &Path) -> Vec<PathBuf> {
+    let matcher = lighthouse_spec::glob_set(globs).unwrap();
+    let skipped = ["target", "node_modules", ".git", "dist"];
+    let walk = ignore::WalkBuilder::new(root)
+        .hidden(false)
+        .git_ignore(false)
+        .filter_entry(move |entry| !skipped.iter().any(|name| entry.file_name() == *name))
+        .build();
+    let mut found: Vec<PathBuf> = walk
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
+        .filter_map(|entry| entry.path().strip_prefix(root).ok().map(Path::to_owned))
+        .filter(|path| matcher.is_match(path))
+        .collect();
+    found.sort();
+    found
+}
+
+/// The ASTs the language plugins give the files, which they are asked for by
+/// the globs of the injections.
+fn repository_asts(files: &[PathBuf], globs: &[String], root: &Path) -> Vec<Source> {
+    let config = lighthouse_spec::Config::parse_inline(&format!(
+        "plugins = [{}]",
+        [
+            ("lang-yaml", lighthouse_test_support::lang_yaml()),
+            ("lang-toml", lighthouse_test_support::lang_toml()),
+            ("lang-markdown", lighthouse_test_support::lang_markdown()),
+        ]
+        .map(|(id, dir)| format!(
+            "{{ id = \"{id}\", path = {:?} }}",
+            dir.display().to_string()
+        ))
+        .join(", ")
+    ))
+    .unwrap();
+    let registry = lighthouse_test_support::pooled(lighthouse_plugin::Registry::default, &config)();
+    let workspace = lighthouse_plugin::Workspace {
+        root: root.to_owned(),
+        languages: BTreeMap::new(),
+        source_globs: globs.to_vec(),
+        constructors: BTreeMap::new(),
+        test_naming: BTreeMap::new(),
+        overlays: BTreeMap::new(),
+        cel_libraries: Vec::new(),
+        cache_dir: None,
+        sandbox: lighthouse_process::Policy::default(),
+    };
+    let mut asts = Vec::new();
+    for language in registry.languages() {
+        let provider = &language.provider;
+        let manifest = provider.manifest();
+        let own = lighthouse_spec::glob_set(&manifest.globs).unwrap();
+        let texts: Vec<(lighthouse_model::ucm::File, String)> = files
+            .iter()
+            .filter(|path| own.is_match(path))
+            .map(|path| {
+                let file = lighthouse_model::ucm::File {
+                    path: path.clone(),
+                    lang: manifest.id.clone(),
+                    hash: String::new(),
+                    generated: false,
+                    test: false,
+                    facts: BTreeMap::new(),
+                };
+                (file, std::fs::read_to_string(root.join(path)).unwrap())
+            })
+            .collect();
+        let sources: Vec<lighthouse_plugin::Source<'_>> = texts
+            .iter()
+            .map(|(file, text)| lighthouse_plugin::Source {
+                file,
+                text,
+                regions: &[],
+            })
+            .collect();
+        asts.extend(provider.index(&workspace, &sources).unwrap().sources);
+    }
+    asts
+}
+
+#[test]
+fn core_authoring_selects_the_regions_the_repository_had_before_it_shared_them() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let before = lighthouse_spec::Config::parse_inline(BEFORE).unwrap();
+    let now = lighthouse_spec::Config::parse(include_str!("../../../../../lighthouse.toml"))
+        .unwrap()
+        .inheriting(lighthouse_test_support::full().projects())
+        .unwrap();
+    let globs: Vec<String> = before
+        .injections()
+        .iter()
+        .chain(now.injections())
+        .flat_map(|injection| injection.files.clone())
+        .collect();
+    let files = host_files(&globs, &root);
+    let asts = repository_asts(&files, &globs, &root);
+
+    let was = repository_regions(before.injections(), &asts, &root);
+    let is = repository_regions(now.injections(), &asts, &root);
+
+    assert!(was.len() > 500, "the repository has regions: {}", was.len());
+    assert!(
+        now.injections().len() * 2 < before.injections().len(),
+        "the entries are consolidated: {} of {}",
+        now.injections().len(),
+        before.injections().len()
+    );
+    assert_eq!(is.len(), was.len());
+    assert!(is == was, "the regions differ");
+}

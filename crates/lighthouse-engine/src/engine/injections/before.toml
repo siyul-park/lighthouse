@@ -1,0 +1,158 @@
+# The `sources` the repository declared before `core/authoring` shared them,
+# in the shape of `injections`. The test beside it holds today's entries to the
+# regions of these.
+
+[[injections]]
+id = "pack-variables"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Pack\").spec.variables[*]"
+language = "cel"
+context = { identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" }, variable = { value = "$.expression", name = "$.name", params = "$.params[*]", shared = true } }
+
+[[injections]]
+id = "decision-variables"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.check.type == \"cel\").spec.check.variables[*]"
+language = "cel"
+context = { identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" }, variable = { value = "$.expression", name = "$.name", params = "$.params[*]", shared = false } }
+
+[[injections]]
+id = "decision-where"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.check.type == \"cel\").spec.check.where"
+language = "cel"
+context = { declared = true, identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" } }
+
+[[injections]]
+id = "decision-abstain"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.check.type == \"cel\").spec.check.abstain"
+language = "cel"
+context = { declared = true, identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" } }
+
+[[injections]]
+id = "decision-evidence"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.check.type == \"cel\").spec.check.evidence.*"
+language = "cel"
+context = { declared = true, identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" } }
+
+[[injections]]
+id = "decision-identity"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.check.type == \"cel\").spec.check.identity.*"
+language = "cel"
+context = { declared = true, identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" } }
+
+[[injections]]
+id = "decision-at"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.check.type == \"cel\").spec.check.at.*"
+language = "cel"
+context = { declared = true, identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" } }
+
+[[injections]]
+id = "decision-message"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.check.type == \"cel\").spec.check.message"
+language = "cel"
+syntax = "template"
+context = { declared = true, identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" } }
+
+[[injections]]
+id = "decision-fix"
+files = ["**/decisions/**/*.yaml", "**/decisions/**/*.yml", ".lighthouse/**/*.yaml", ".lighthouse/**/*.yml", "**/.lighthouse/**/*.yaml", "**/.lighthouse/**/*.yml"]
+select = "$.documents[*]?(@.kind == \"Decision\" && @.spec.fix.type == \"cel\").spec.fix.edits"
+language = "cel"
+context = { declared = true, identity = { kind = "$.documents[*].kind", name = "$.documents[*].metadata.name" } }
+
+[[injections]]
+id = "recipe-select"
+files = ["lighthouse.toml", "recipes/**/*.toml", ".lighthouse/**/*.toml", "**/.lighthouse/**/*.toml"]
+select = "$.models.providers.*.events.select"
+language = "cel"
+
+[[injections]]
+id = "recipe-each"
+files = ["lighthouse.toml", "recipes/**/*.toml", ".lighthouse/**/*.toml", "**/.lighthouse/**/*.toml"]
+select = "$.models.providers.*.events.each"
+language = "cel"
+
+[[injections]]
+id = "recipe-tool"
+files = ["lighthouse.toml", "recipes/**/*.toml", ".lighthouse/**/*.toml", "**/.lighthouse/**/*.toml"]
+select = "$.models.providers.*.events.tool"
+language = "cel"
+
+[[injections]]
+id = "recipe-path"
+files = ["lighthouse.toml", "recipes/**/*.toml", ".lighthouse/**/*.toml", "**/.lighthouse/**/*.toml"]
+select = "$.models.providers.*.events.path"
+language = "cel"
+
+[[injections]]
+id = "recipe-pattern"
+files = ["lighthouse.toml", "recipes/**/*.toml", ".lighthouse/**/*.toml", "**/.lighthouse/**/*.toml"]
+select = "$.models.providers.*.events.pattern"
+language = "cel"
+
+[[injections]]
+id = "recipe-command"
+files = ["lighthouse.toml", "recipes/**/*.toml", ".lighthouse/**/*.toml", "**/.lighthouse/**/*.toml"]
+select = "$.models.providers.*.events.command"
+language = "cel"
+
+[[injections]]
+id = "recipe-said"
+files = ["lighthouse.toml", "recipes/**/*.toml", ".lighthouse/**/*.toml", "**/.lighthouse/**/*.toml"]
+select = "$.models.providers.*.events.said"
+language = "cel"
+
+[[injections]]
+id = "project-event-select"
+files = ["lighthouse.toml"]
+select = "$.spec.models.providers.*.events.select"
+language = "cel"
+
+[[injections]]
+id = "project-event-each"
+files = ["lighthouse.toml"]
+select = "$.spec.models.providers.*.events.each"
+language = "cel"
+
+[[injections]]
+id = "project-event-tool"
+files = ["lighthouse.toml"]
+select = "$.spec.models.providers.*.events.tool"
+language = "cel"
+
+[[injections]]
+id = "project-event-path"
+files = ["lighthouse.toml"]
+select = "$.spec.models.providers.*.events.path"
+language = "cel"
+
+[[injections]]
+id = "project-event-pattern"
+files = ["lighthouse.toml"]
+select = "$.spec.models.providers.*.events.pattern"
+language = "cel"
+
+[[injections]]
+id = "project-event-command"
+files = ["lighthouse.toml"]
+select = "$.spec.models.providers.*.events.command"
+language = "cel"
+
+[[injections]]
+id = "project-event-said"
+files = ["lighthouse.toml"]
+select = "$.spec.models.providers.*.events.said"
+language = "cel"
+
+[[injections]]
+id = "markdown-code"
+files = ["**/*.md"]
+select = "$..?(@.kind == \"code_block\" && @.attributes[*] != \"ignore\" && @.attributes[*] != \"compile_fail\" && @.attributes[*] != \"invalid\")"
+languageFrom = "$.lang"
+context = { example = true, info = { select = "$.info" } }
