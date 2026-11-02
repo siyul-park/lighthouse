@@ -324,3 +324,39 @@ fn an_alias_two_languages_share_is_a_load_error() {
         "{err}"
     );
 }
+
+struct Ignoring(PluginManifest, &'static [&'static str]);
+
+impl Plugin for Ignoring {
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
+    }
+    fn ignores(&self) -> Vec<String> {
+        self.1.iter().map(|p| (*p).to_owned()).collect()
+    }
+}
+
+#[test]
+fn ignores_are_those_of_each_registered_plugin_in_registration_order() {
+    let manifest = |id: &str| PluginManifest {
+        id: id.to_owned(),
+        version: "0".to_owned(),
+    };
+    let mut registry = Registry::default();
+    registry
+        .register(&Ignoring(manifest("b"), &["target/", "!keep/"]))
+        .unwrap();
+    registry
+        .register(&Ignoring(manifest("a"), &["vendor/"]))
+        .unwrap();
+
+    let ignores: Vec<_> = registry.ignores().collect();
+
+    assert_eq!(
+        ignores,
+        [
+            ("b", ["target/".to_owned(), "!keep/".to_owned()].as_slice()),
+            ("a", ["vendor/".to_owned()].as_slice())
+        ]
+    );
+}

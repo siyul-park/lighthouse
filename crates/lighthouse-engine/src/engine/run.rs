@@ -14,7 +14,6 @@ impl Engine {
         let selected = self.select_rules(only);
         let ran: BTreeSet<String> = selected.iter().map(|r| r.manifest().id.clone()).collect();
         let mut run = Run {
-            notices: self.notices.iter().cloned().collect(),
             incomplete: self.startup.iter().cloned().chain(gaps).collect(),
             ran: ran.iter().cloned().collect(),
             active: self.active.iter().cloned().collect(),
@@ -124,7 +123,9 @@ impl Engine {
         run: &mut Run,
     ) -> (Vec<Input>, Project) {
         let started = Instant::now();
-        let inputs = self.read(overlays, run);
+        let listing = self.files.list();
+        run.notices.extend(listing.notices.iter().cloned());
+        let inputs = self.read(&listing, overlays, run);
         run.timings.read = started.elapsed();
         let (inputs, project) = self.build_project(inputs, overlays, run);
         let documented = selected
@@ -133,7 +134,7 @@ impl Engine {
         if !documented {
             return (inputs, project);
         }
-        let found = Documents::scan(&self.ws.root, overlays);
+        let found = Documents::scan(&self.ws.root, &listing.files, overlays);
         run.notices.extend(found.notices);
         (inputs, project.with_documents(found.documents))
     }

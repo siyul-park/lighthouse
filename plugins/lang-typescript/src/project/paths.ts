@@ -50,16 +50,6 @@ export function isTestFile(rel: string): boolean {
   return /\.(test|spec)\.[cm]?[jt]sx?$/.test(rel) || rel.split("/").includes("__tests__");
 }
 
-/** The paths the provider leaves with an empty fragment: dependencies, hidden directories, test data. */
-export function isIgnored(rel: string): boolean {
-  const parts = rel.split("/");
-  if (parts.includes(SNIPPETS_DIR)) return parts.includes("node_modules");
-  return rel.split("/").some((part, index, parts) => {
-    const isDirectory = index < parts.length - 1;
-    return isDirectory && (part === "node_modules" || part === "testdata" || part.startsWith("."));
-  });
-}
-
 /** A part of a symbol id, with the characters the id format reserves escaped. */
 export function idPart(name: string): string {
   return name.replaceAll("#", "%23").replaceAll("::", ":%3A");

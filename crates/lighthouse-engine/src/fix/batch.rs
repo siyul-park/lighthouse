@@ -63,7 +63,6 @@ impl Proposer<'_> {
         let Some(models) = self.models.as_ref() else {
             return Ok(Vec::new());
         };
-        let root = &self.engine.ws.root;
         let mut standing = texts.clone();
         let mut proposals = Vec::new();
         let mut accepted = 0;
@@ -77,7 +76,7 @@ impl Proposer<'_> {
                     ),
                 );
             }
-            let world = World::new(root, outcome, &standing);
+            let world = World::new(&self.engine.files, outcome, &standing);
             let ran = self.run_on(models, &world, &file, &group, sources, decline);
             match ran {
                 Ok(Some(run)) => {

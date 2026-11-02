@@ -1953,7 +1953,6 @@ dependencies = [
 name = "lighthouse-process"
 version = "0.1.0"
 dependencies = [
- "ignore",
  "libc",
  "tempfile",
 ]
@@ -2016,6 +2015,7 @@ dependencies = [
  "lighthouse-ml",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-report",
  "lighthouse-rpc",
@@ -2039,6 +2039,7 @@ version = "0.1.0"
 dependencies = [
  "cel",
  "globset",
+ "ignore",
  "include_dir",
  "insta",
  "lighthouse-model",

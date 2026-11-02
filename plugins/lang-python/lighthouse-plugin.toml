@@ -6,6 +6,9 @@ name = "lang-python"
 
 [spec]
 version = "0.1.0"
+# Bytecode caches (PEP 3147) and installed packages (`site-packages`, the
+# PEP 405 virtual environment directory `.venv`).
+ignores = ["__pycache__/", "site-packages/", ".venv/"]
 
 [spec.runtime]
 command = "./lang-python"

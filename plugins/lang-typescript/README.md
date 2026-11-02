@@ -32,7 +32,7 @@ Capabilities: `semantic-edges`, `extent`, `reference-sites`, `overlays`.
 - One module per file; overloads and merged declarations share one symbol whose primary node is the implementation.
 - Exported names are `public`, or `internal` when the nearest `package.json` is `private`; the rest and everything in test files is `private`; `protected` is `internal`.
 - Nothing is executed: no script, no build, no network; analysis needs the sources and the `typescript` this plugin ships with.
-- Declaration files, `node_modules`, `testdata` and hidden directories get empty fragments. A file with a syntax error is an `incomplete` entry and still has a fragment; type errors are not gaps.
+- Declaration files get empty fragments; `node_modules` is left out by the manifest `ignores`. A file with a syntax error is an `incomplete` entry and still has a fragment; type errors are not gaps.
 - A change to the wire goes through protocol `VERSION` and the other providers in the same commit.
 
 ### Fences of host files

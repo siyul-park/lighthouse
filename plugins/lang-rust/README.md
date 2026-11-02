@@ -35,7 +35,7 @@ Capabilities: `extent`, `reference-sites`, `overlays`, `source-ast`.
 - Names are resolved syntactically and macros are never expanded, so edges are a lower bound. A method called through a receiver of unknown type is a `heuristic` edge to every non-`pub` method of that name, which counting rules ignore; resolving it differently makes rules report code with unseen callers.
 - Cargo is never run: no build script, no network, no lock file needed.
 - The cache keys a file by its text and a digest of what other files and manifests contribute; a body edit re-analyzes one file, any other change misses everything.
-- `testdata` and hidden directories get empty fragments; a file that does not parse is an `incomplete` entry.
+- A file that does not parse is an `incomplete` entry.
 - A change to the wire goes through protocol `VERSION` and the other providers in the same commit.
 
 ### Fences of host files

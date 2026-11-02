@@ -1,83 +1,139 @@
-//! Telling generated code apart in the host, language-neutrally: the
-//! `.gitattributes` `linguist-generated` and `linguist-vendored` attributes
-//! (the GitHub standard; both leave a file out of Linguist's statistics and
-//! diffs, and vendored code is no more the project's to restyle than
-//! generated code is) and the project's `generated.files`. A provider's own marker (Go's `// Code
+//! Telling third-party and generated code apart in the host, language-neutrally:
+//! the `.gitattributes` `linguist-vendored` and `linguist-generated`
+//! attributes, which are two things (the GitHub Linguist standard): vendored
+//! code is not the project's, so the project leaves it out; generated code is
+//! the project's, but decisions skip it. A provider's own marker (Go's `// Code
 //! generated ... DO NOT EDIT.`, `@generated`) arrives with its fragment.
 
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use globset::{Glob, GlobBuilder, GlobMatcher};
 
 const ATTRIBUTES_FILE: &str = ".gitattributes";
-const ATTRIBUTES: [&str; 2] = ["linguist-generated", "linguist-vendored"];
 
-/// The `linguist-generated` and `linguist-vendored` lines of a `.gitattributes` at the project root,
-/// later lines winning. A pattern without a `/` matches at any depth, one
-/// with a leading `/` from the root; `linguist-generated=false` and
-/// `-linguist-generated` (likewise for `linguist-vendored`) switch it off again. Nested attribute files are not
-/// read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Attribute {
+    Generated,
+    Vendored,
+}
+
+/// One line of a `.gitattributes` file about one attribute.
+#[derive(Debug)]
+struct Rule {
+    /// The directory of the file the line is in; the pattern is relative to it.
+    base: PathBuf,
+    glob: GlobMatcher,
+    attribute: Attribute,
+    on: bool,
+}
+
+/// The `linguist-generated` and `linguist-vendored` lines of the
+/// `.gitattributes` files of a project, with git's semantics: a file's
+/// patterns are relative to its directory (a pattern without a `/` matches at
+/// any depth below it, one with a `/` from it), a file deeper in the tree
+/// overrides a shallower one, later lines win, and each attribute is decided
+/// on its own. `linguist-x=false`, `-linguist-x` and `!linguist-x` switch the
+/// attribute off again.
 #[derive(Debug, Default)]
 pub struct Attributes {
-    rules: Vec<(GlobMatcher, bool)>,
+    rules: Vec<Rule>,
 }
 
 impl Attributes {
-    /// The attributes of the project at `root`, and what the user should know
-    /// about them; none when it has no file. A file that cannot be read and a
-    /// pattern that is not a glob are notices: the attribute is not applied.
-    pub fn new(root: &Path) -> (Self, Vec<String>) {
-        let text = match fs::read_to_string(root.join(ATTRIBUTES_FILE)) {
-            Ok(text) => text,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return (Self::default(), Vec::new());
-            }
-            Err(e) => {
-                return (
-                    Self::default(),
-                    vec![format!("{ATTRIBUTES_FILE}: not read, {e}")],
-                );
-            }
-        };
+    /// The attributes of the project at `root`, read from the files at the
+    /// project-relative paths `files` (each a `.gitattributes`), and what the
+    /// user should know about them. A file that cannot be read and a pattern
+    /// that is not a glob are notices: the attribute is not applied.
+    pub fn new(root: &Path, files: &[PathBuf]) -> (Self, Vec<String>) {
+        let mut files: Vec<&PathBuf> = files
+            .iter()
+            .filter(|f| f.file_name().is_some_and(|n| n == ATTRIBUTES_FILE))
+            .collect();
+        files.sort_by_key(|f| (f.components().count(), (*f).clone()));
         let mut rules = Vec::new();
         let mut notices = Vec::new();
-        for line in text.lines() {
-            let mut parts = line.split_whitespace();
-            let Some(pattern) = parts.next().filter(|p| !p.starts_with('#')) else {
-                continue;
+        for file in files {
+            let base = file.parent().unwrap_or(Path::new("")).to_owned();
+            let text = match fs::read_to_string(root.join(file)) {
+                Ok(text) => text,
+                Err(e) => {
+                    notices.push(format!("{}: not read, {e}", file.display()));
+                    continue;
+                }
             };
-            let Some(on) = parts.filter_map(setting).next_back() else {
-                continue;
-            };
-            match matcher(pattern) {
-                Ok(glob) => rules.push((glob, on)),
-                Err(e) => notices.push(format!(
-                    "{ATTRIBUTES_FILE}: `{pattern}` is not a usable pattern, {e}"
-                )),
+            for line in text.lines() {
+                let mut parts = line.split_whitespace();
+                let Some(pattern) = parts.next().filter(|p| !p.starts_with('#')) else {
+                    continue;
+                };
+                let settings: Vec<(Attribute, bool)> = parts.filter_map(setting).collect();
+                if settings.is_empty() {
+                    continue;
+                }
+                match matcher(pattern) {
+                    Ok(glob) => {
+                        for (attribute, on) in settings {
+                            rules.push(Rule {
+                                base: base.clone(),
+                                glob: glob.clone(),
+                                attribute,
+                                on,
+                            });
+                        }
+                    }
+                    Err(e) => notices.push(format!(
+                        "{}: `{pattern}` is not a usable pattern, {e}",
+                        file.display()
+                    )),
+                }
             }
         }
         (Self { rules }, notices)
     }
 
-    /// Whether the last line that names `path` marks it generated.
+    /// Whether the last line that names `path` marks it `linguist-generated`.
     pub fn is_generated(&self, path: &Path) -> bool {
+        self.decided(path, Attribute::Generated)
+    }
+
+    /// Whether the last line that names `path` marks it `linguist-vendored`.
+    pub fn is_vendored(&self, path: &Path) -> bool {
+        self.decided(path, Attribute::Vendored)
+    }
+
+    fn decided(&self, path: &Path, attribute: Attribute) -> bool {
         self.rules
             .iter()
             .rev()
-            .find(|(glob, _)| glob.is_match(path))
-            .is_some_and(|(_, on)| *on)
+            .filter(|r| r.attribute == attribute)
+            .find(|r| {
+                path.strip_prefix(&r.base)
+                    .is_ok_and(|rel| r.glob.is_match(rel))
+            })
+            .is_some_and(|r| r.on)
     }
 }
 
 /// What an attribute token says about `linguist-generated` or
 /// `linguist-vendored`, if it names one.
-fn setting(token: &str) -> Option<bool> {
+fn setting(token: &str) -> Option<(Attribute, bool)> {
     let name = token.trim_start_matches(['-', '!']);
-    if ATTRIBUTES.contains(&name) {
-        return Some(name == token);
+    if let Some(attribute) = named(name) {
+        return Some((attribute, name == token));
     }
     let (name, value) = token.split_once('=')?;
-    ATTRIBUTES.contains(&name).then_some(value != "false")
+    Some((named(name)?, value != "false"))
+}
+
+fn named(name: &str) -> Option<Attribute> {
+    match name {
+        "linguist-generated" => Some(Attribute::Generated),
+        "linguist-vendored" => Some(Attribute::Vendored),
+        _ => None,
+    }
 }
 
 fn matcher(pattern: &str) -> Result<GlobMatcher, globset::Error> {

@@ -46,6 +46,13 @@
             "null"
           ]
         },
+        "ignores": {
+          "description": "The files the plugin's toolchain leaves out of a project: the same\nkey, syntax and meaning as the project's `ignores` (gitignore\npatterns, rooted at the project), and merged the same way, before the\nproject's own.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "provides": {
           "$ref": "#/$defs/Provides"
         },

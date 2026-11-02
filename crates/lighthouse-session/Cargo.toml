@@ -31,5 +31,6 @@ toml.workspace = true
 toml_edit.workspace = true
 
 [dev-dependencies]
+lighthouse-process.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }
 tempfile.workspace = true

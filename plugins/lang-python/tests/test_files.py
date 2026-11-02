@@ -2,7 +2,7 @@ import tempfile
 import unittest
 
 from lang_python.project import Project, declared_roots, decode
-from lang_python.project.files import is_ignored, is_stub
+from lang_python.project.files import is_stub
 
 
 def project(files: dict[str, str]) -> Project:
@@ -14,16 +14,6 @@ class FilePathTests(unittest.TestCase):
     def test_is_stub(self):
         self.assertTrue(is_stub("pkg/a.pyi"))
         self.assertFalse(is_stub("pkg/a.py"))
-
-    def test_is_ignored(self):
-        for rel in ("node_modules/x.py", "pkg/__pycache__/x.py", ".venv/x.py", "a/.hidden/b.py", "pkg/testdata/x.py"):
-            self.assertTrue(is_ignored(rel), rel)
-        for rel in ("pkg/a.py", ".hidden.py", "a/b/c.py"):
-            self.assertFalse(is_ignored(rel), rel)
-
-    def test_is_ignored_keeps_the_fences_of_hidden_hosts_visible(self):
-        self.assertFalse(is_ignored("docs/.lighthouse-snippets/guide.md.1/snippet.py"))
-        self.assertTrue(is_ignored("node_modules/.lighthouse-snippets/guide.md.1/snippet.py"))
 
 
 class ProjectTests(unittest.TestCase):

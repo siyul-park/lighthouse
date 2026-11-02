@@ -214,17 +214,10 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
             _ => None,
         })
         .collect();
-    let (skipped, files) = requested_files(params);
+    let files = requested_files(params);
     let mut incomplete: BTreeSet<(Option<String>, String)> = BTreeSet::new();
     let mut editions = Manifests::default();
-    let mut fragments: BTreeMap<String, Fragment> = skipped
-        .iter()
-        .map(|rel| {
-            let mut fragment = empty_fragment(rel);
-            state_edition(&mut fragment, &root, &mut editions, &mut incomplete);
-            (rel.clone(), fragment)
-        })
-        .collect();
+    let mut fragments: BTreeMap<String, Fragment> = BTreeMap::new();
     let mut notices = Vec::new();
 
     let found = packages(&root, &files);
@@ -322,9 +315,8 @@ fn analyzed(
     (fragment, stats)
 }
 
-/// The requested paths, sorted and deduplicated: the ones left alone, then
-/// the ones to analyze.
-fn requested_files(params: &IndexParams) -> (Vec<String>, Vec<String>) {
+/// The requested paths, sorted and deduplicated.
+fn requested_files(params: &IndexParams) -> Vec<String> {
     let mut files: Vec<String> = params
         .inputs
         .iter()
@@ -335,13 +327,7 @@ fn requested_files(params: &IndexParams) -> (Vec<String>, Vec<String>) {
         .collect();
     files.sort();
     files.dedup();
-    files.into_iter().partition(|f| ignored(f))
-}
-
-/// Directories the analysis leaves alone: `testdata` and hidden ones.
-fn ignored(rel: &str) -> bool {
-    rel.split('/')
-        .any(|part| part == "testdata" || part.starts_with('.'))
+    files
 }
 
 fn empty_fragment(path: &str) -> Fragment {

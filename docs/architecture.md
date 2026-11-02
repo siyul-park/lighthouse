@@ -77,9 +77,35 @@ depend on another. A gap anywhere in the analysis is reported whatever paths wer
 requested.
 
 A file-level filter is all there is for now: a finding in a changed file is
-reported even on a line the change did not touch. Files the project never wants
-analyzed (fixtures that are broken on purpose) are listed in `.lighthouseignore`,
-in `.gitignore` syntax; unlike a report filter, that removes them from analysis.
+reported even on a line the change did not touch. Which files belong to the
+project is decided once, by the host, and every command that lists files
+(check, the document scan, `spec validate`, the baseline of an edit, the copy a
+fix runs in) uses that answer; unlike a report filter, it removes the files from
+the analysis. A file is *ignored* when, in this order:
+
+1. it is in `.git/`, or in the state directory but for `.lighthouse/decisions/`
+   (Lighthouse's own layout, the only built-in);
+2. a `.gitignore` (nested ones, `.git/info/exclude`) keeps it out: the
+   repository's own statement of "not ours". The user's global excludes are not
+   read, so the project is the same on every machine;
+3. a pattern of `ignores` keeps it out. `ignores` is a list of `.gitignore`
+   lines, rooted at the project, in `lighthouse.toml`, in a shareable project
+   (inherited through `extends`, extended first) and in a plugin manifest (the
+   listed plugins' first: a plugin declares what its toolchain ignores, such as
+   Go's `testdata/`, `vendor/`, `_*/` and `.*/`, Rust's `target/`, TypeScript's
+   `node_modules/`, Python's `__pycache__/`, `site-packages/` and `.venv/`).
+   Later patterns win, as in a `.gitignore`, so `!` brings a file back;
+4. `.gitattributes` marks it `linguist-vendored`: third-party code is not the
+   project's. (`linguist-generated` is a different thing: generated files stay
+   in the project and decisions skip them by `scope.generated`.) Nested
+   `.gitattributes` files follow git: a pattern is relative to its file's
+   directory, a deeper file overrides a shallower one, later lines win, and
+   each attribute is decided on its own.
+
+Hidden directories have no special rule: `.github/` workflows are project
+files. Where a toolchain ignores them (Go), its plugin says so. Providers
+receive the list and analyze what they are given; a provider that needs files
+outside it for type information may read them but never reports on them.
 
 ## Terms
 
@@ -111,7 +137,7 @@ spec: { ... }
 | `Decision` | a decision: `title context scope requirement status supersedes consequences severity options languages check fix provenance examples` | `plugins/<plugin>/decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
 | `Pack` | title, intro and the ordered sections, each listing its decisions | `plugins/<plugin>/decisions/<pack>/pack.yaml` |
 | `SourceMap` | which decision covers each normative line of the documents a catalog came from | `plugins/<plugin>/decisions/<pack>/sources.yaml` |
-| `Project` | `lighthouse.toml`: `plugins extends injections languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config and which brings its `rules`, `overrides`, `injections` and `plugins` (the union of the `plugins` over the chain; a later `injections` entry of the same `id` replaces the earlier). `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (`strict` also switches on every kind of a decision whose `kinds` option enables only some by default); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
+| `Project` | `lighthouse.toml`: `plugins extends injections ignores languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config and which brings its `rules`, `overrides`, `injections`, `ignores`, `generated` files and `plugins` (the union of the `plugins`, `ignores` and `generated` files over the chain; a later `injections` entry of the same `id` replaces the earlier). `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (`strict` also switches on every kind of a decision whose `kinds` option enables only some by default); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
 | `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
 | `Judgment`, `Suppression` | records of the decision log | `.lighthouse/decisions.jsonl` |
 
@@ -144,7 +170,7 @@ runs them). Readers accept the current format only.
 
 Meaning is shared; the environment is personal. The keys that decide findings, or what may change
 the shared repository, are the project's alone (`lighthouse.toml`, committed): `plugins`,
-`extends`, `injections`, `languages`, `overrides`, `generated`, `[fix]`, and per decision `level`, `options`,
+`extends`, `injections`, `ignores`, `languages`, `overrides`, `generated`, `[fix]`, and per decision `level`, `options`,
 `generated`, `evaluation` and `safety`. The keys that say how this machine computes and applies are the
 environment: `[models]` (bindings, `providers`, `routing`, `budget`, `explore`),
 `rules."<id>".classification` and `rules."<id>".agent`, `[fix] unsafe` and `[sandbox]`. They are read from four

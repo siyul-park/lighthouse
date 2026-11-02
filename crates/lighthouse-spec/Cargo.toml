@@ -11,6 +11,7 @@ doctest = false
 [dependencies]
 cel.workspace = true
 globset.workspace = true
+ignore.workspace = true
 include_dir.workspace = true
 lighthouse-model.workspace = true
 lighthouse-process.workspace = true

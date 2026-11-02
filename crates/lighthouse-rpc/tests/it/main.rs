@@ -4,6 +4,7 @@ mod agent;
 mod catalogs;
 mod command;
 mod conformance;
+mod conventions;
 mod events;
 mod host;
 mod provider;

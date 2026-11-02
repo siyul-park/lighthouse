@@ -459,16 +459,11 @@ fn repository_regions(injections: &[InjectionSpec], asts: &[Source], root: &Path
 /// The files of the repository an injection of either set reads, by path.
 fn host_files(globs: &[String], root: &Path) -> Vec<PathBuf> {
     let matcher = lighthouse_spec::glob_set(globs).unwrap();
-    let skipped = ["target", "node_modules", ".git", "dist"];
-    let walk = ignore::WalkBuilder::new(root)
-        .hidden(false)
-        .git_ignore(false)
-        .filter_entry(move |entry| !skipped.iter().any(|name| entry.file_name() == *name))
-        .build();
-    let mut found: Vec<PathBuf> = walk
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
-        .filter_map(|entry| entry.path().strip_prefix(root).ok().map(Path::to_owned))
+    let mut found: Vec<PathBuf> = lighthouse_spec::ProjectFiles::new(root, &[])
+        .unwrap()
+        .list()
+        .files
+        .into_iter()
         .filter(|path| matcher.is_match(path))
         .collect();
     found.sort();
@@ -503,6 +498,7 @@ fn repository_asts(files: &[PathBuf], globs: &[String], root: &Path) -> Vec<Sour
         cel_libraries: Vec::new(),
         cache_dir: None,
         sandbox: lighthouse_process::Policy::default(),
+        ignores: Vec::new(),
     };
     let mut asts = Vec::new();
     for language in registry.languages() {

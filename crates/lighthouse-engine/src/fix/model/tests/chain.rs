@@ -2,6 +2,7 @@
 //! accepted with, and an edit made over texts that are not there any more is a
 //! conflict. And the files a change reaches.
 
+use crate::fix::rewrite::files_of;
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Mutex};
 
 use lighthouse_model::{
@@ -239,14 +240,14 @@ fn a_run_sees_the_edits_accepted_before_it_and_a_stale_result_is_a_conflict() {
     let outcome = run(Vec::new(), Vec::new());
     let first = Overlays::from([(PathBuf::from(FILE), "first run\n".to_owned())]);
 
-    let scratch = Scratch::new(root.path(), &first).unwrap();
+    let scratch = Scratch::new(files_of(root.path()), &first).unwrap();
     assert_eq!(
         fs::read_to_string(scratch.path().join(FILE)).unwrap(),
         "first run\n",
         "the copy of the second run holds what the first was accepted with"
     );
 
-    let world = World::new(root.path(), &outcome, &first);
+    let world = World::new(files_of(root.path()), &outcome, &first);
     let found = |text: &str| BTreeMap::from([(PathBuf::from(FILE), hash::sha256(text))]);
     assert_eq!(conflict(&found("first run\n"), &world), None);
     let stale = conflict(&found("disk\n"), &world).unwrap();
@@ -331,7 +332,7 @@ fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_confli
         requirement: String::new(),
         context: String::new(),
     };
-    let world = || World::new(root.path(), &outcome, &texts);
+    let world = || World::new(files_of(root.path()), &outcome, &texts);
     let batch = fixer.batch(
         &world(),
         std::path::Path::new(FILE),

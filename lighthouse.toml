@@ -20,6 +20,10 @@ injections = [
 ]
 
 
+# Fixture projects of the plugin conformance suite: broken or incomplete on
+# purpose, and checked against their goldens instead of by lint.
+ignores = ["crates/lighthouse-rpc/tests/conformance/*/*/project/"]
+
 [spec.generated]
 # What `lighthouse docs generate` writes: edited in its generator.
 files = ["docs/cli.md", "docs/mcp.md", "docs/decisions/**", "skills/lighthouse/SKILL.md"]

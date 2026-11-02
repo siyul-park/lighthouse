@@ -76,7 +76,7 @@ class RegionTests(unittest.TestCase):
     def test_a_fence_is_a_module_whose_edges_land_in_the_host(self):
         code = "from pkg.core import compute\n\n\ndef demo():\n    return compute(1)\n"
         text = "# Title\n\n```python\n" + code + "```\n"
-        result = index(LIB, paths=[], regions=[host("docs/guide.md", text, code)])
+        result = index(LIB, regions=[host("docs/guide.md", text, code)])
         merged = fragment(result, "docs/guide.md")
         self.assertEqual([m["path"] for m in merged["modules"]], ["docs/.lighthouse-snippets/guide.md.1/snippet"])
         self.assertEqual(merged["symbols"][0]["file"], "docs/guide.md")
@@ -89,7 +89,7 @@ class RegionTests(unittest.TestCase):
     def test_a_fence_that_is_not_python_is_a_notice(self):
         code = ">>> compute(1)\n1\n"
         text = "```py\n" + code + "```\n"
-        result = index(LIB, paths=[], regions=[host("README.md", text, code)])
+        result = index(LIB, regions=[host("README.md", text, code)])
         self.assertEqual(fragment(result, "README.md")["symbols"], [])
         self.assertTrue(result["notices"][0].startswith("README.md:2: the Python fence is not valid Python"))
         self.assertEqual(result["incomplete"], [])
@@ -97,7 +97,7 @@ class RegionTests(unittest.TestCase):
     def test_names_the_prose_defines_degrade_to_syntactic_edges_with_a_notice(self):
         code = "def demo():\n    return compute(1)\n"
         text = "```python\n" + code + "```\n"
-        result = index(LIB, paths=[], regions=[host("README.md", text, code)])
+        result = index(LIB, regions=[host("README.md", text, code)])
         found = edges(result, "README.md", "calls")
         self.assertEqual([e[2:] for e in found], [("pkg/core::compute#function", "syntactic")])
         self.assertTrue(any("matched by name" in n for n in result["notices"]))
@@ -105,12 +105,12 @@ class RegionTests(unittest.TestCase):
     def test_a_fence_exports_only_what_its_own_all_lists(self):
         code = "__all__ = ['shown']\n\n\ndef shown():\n    pass\n\n\ndef hidden():\n    pass\n"
         text = "```python\n" + code + "```\n"
-        merged = fragment(index(LIB, paths=[], regions=[host("README.md", text, code)]), "README.md")
+        merged = fragment(index(LIB, regions=[host("README.md", text, code)]), "README.md")
         visibility = {s["name"]: s["visibility"] for s in merged["symbols"] if s["kind"] == "function"}
         self.assertEqual(visibility, {"shown": "public", "hidden": "private"})
         plain = "def demo():\n    pass\n"
         text = "```python\n" + plain + "```\n"
-        merged = fragment(index(LIB, paths=[], regions=[host("README.md", text, plain)]), "README.md")
+        merged = fragment(index(LIB, regions=[host("README.md", text, plain)]), "README.md")
         self.assertEqual([s["visibility"] for s in merged["symbols"] if s["name"] == "demo"], ["private"])
 
     def test_comments_are_mapped_through_the_text_map(self):
@@ -129,7 +129,7 @@ class RegionTests(unittest.TestCase):
             host_at += 2 + len(line)
         region = host("README.md", text, code, start)
         region["regions"][0]["text_map"] = segments
-        merged = fragment(index(LIB, paths=[], regions=[region]), "README.md")
+        merged = fragment(index(LIB, regions=[region]), "README.md")
         self.assertEqual(merged["comments"][0]["span"]["start"], {"line": 2, "col": 3})
         self.assertEqual(merged["comments"][0]["attached_to"], merged["symbols"][0]["id"])
 

@@ -7,12 +7,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-use ignore::WalkBuilder;
-
 use crate::is_project_secret;
-
-/// The directory of a repository, which is no part of a project.
-const REPOSITORY: &str = ".git";
 
 /// Makes `to`, which must not exist, a copy of `from`. The clone shares the
 /// blocks until either file is written, so a copy of a project costs its
@@ -24,37 +19,26 @@ pub fn clone_file(from: &Path, to: &Path) -> io::Result<()> {
     fs::copy(from, to).map(drop)
 }
 
-/// Copies the files of the project that its own ignore files keep, not those
-/// of the user's machine (`core.excludesFile`), so the copy is the same on
-/// every machine; except its secrets (the copy is writable and its programs may
-/// read it). Writes `texts` over the files. The paths of the files placed.
+/// Copies the `files` of the project at `root` (project-relative paths, as the
+/// project lists them: what its ignore rules keep, not what the user's machine
+/// does, so the copy is the same on every machine), except its secrets (the
+/// copy is writable and its programs may read it). Writes `texts` over the
+/// files. The paths of the files placed.
 pub fn copy_project(
     root: &Path,
+    files: &[PathBuf],
     into: &Path,
     texts: &BTreeMap<PathBuf, String>,
 ) -> io::Result<BTreeSet<PathBuf>> {
     let mut placed = BTreeSet::new();
-    let walk = WalkBuilder::new(root)
-        .hidden(false)
-        .require_git(false)
-        .git_global(false)
-        .filter_entry(|entry| entry.file_name() != REPOSITORY)
-        .build();
-    for entry in walk {
-        let entry = entry.map_err(io::Error::other)?;
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
-        let Ok(relative) = entry.path().strip_prefix(root) else {
-            continue;
-        };
+    for relative in files {
         if is_project_secret(relative) {
             continue;
         }
         place(&into.join(relative), |target| {
-            clone_file(entry.path(), target)
+            clone_file(&root.join(relative), target)
         })?;
-        placed.insert(relative.to_owned());
+        placed.insert(relative.clone());
     }
     for (path, text) in texts {
         if path

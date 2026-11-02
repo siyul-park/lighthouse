@@ -13,7 +13,6 @@ mod timings;
 
 pub mod cache;
 
-pub use documents::SKIPPED_DIRS;
 pub use engine::{
     Availability, CommandModels, EXIT_INCOMPLETE, Engine, FailOn, ModelOptions, Needs, Overlays,
     Run, active,

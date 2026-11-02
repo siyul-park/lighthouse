@@ -86,7 +86,7 @@ impl Proposer<'_> {
             .get(&finding.fingerprint)
             .cloned()
             .unwrap_or_default();
-        let world = World::new(&engine.ws.root, outcome, texts);
+        let world = World::new(&engine.files, outcome, texts);
         let launch = Launch {
             program,
             finding,
@@ -186,7 +186,7 @@ impl Proposer<'_> {
             let ran = self.launch(launch, &self.engine.ws.root, None)?;
             return filtered(launch, ran);
         }
-        let scratch = Scratch::new(&self.engine.ws.root, world.texts).map_err(|e| {
+        let scratch = Scratch::new(&self.engine.files, world.texts).map_err(|e| {
             (
                 Class::Unanswered,
                 format!("the scratch copy of the project failed: {e}"),

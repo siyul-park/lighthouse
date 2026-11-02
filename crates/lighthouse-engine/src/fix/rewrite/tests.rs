@@ -1,6 +1,7 @@
 //! The rewrite path: the scope check, the scratch copy and the verification
 //! programs that run in it.
 
+use crate::fix::rewrite::files_of;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -67,7 +68,7 @@ fn the_scratch_copy_holds_the_files_and_texts_of_the_run_and_tells_what_was_chan
     fs::write(root.path().join(".lighthouse/local.toml"), "x = 1\n").unwrap();
     let texts = Overlays::from([("src/a.txt".into(), "overlay\n".to_owned())]);
 
-    let scratch = Scratch::new(root.path(), &texts).unwrap();
+    let scratch = Scratch::new(files_of(root.path()), &texts).unwrap();
     let at = scratch.path().to_owned();
 
     assert_eq!(
@@ -78,13 +79,18 @@ fn the_scratch_copy_holds_the_files_and_texts_of_the_run_and_tells_what_was_chan
     for secret in [".env", ".env.local", ".lighthouse/local.toml"] {
         assert!(!at.join(secret).exists(), "{secret} was copied");
     }
-    assert!(scratch.changes(root.path(), &texts).unwrap().is_empty());
+    assert!(
+        scratch
+            .changes(files_of(root.path()), &texts)
+            .unwrap()
+            .is_empty()
+    );
 
     fs::write(at.join("src/b.txt"), "changed\n").unwrap();
     fs::write(at.join("src/a.txt"), "on disk\n").unwrap();
     fs::remove_file(at.join("src/c.txt")).unwrap();
     fs::write(at.join("new.txt"), "new\n").unwrap();
-    let changes = scratch.changes(root.path(), &texts).unwrap();
+    let changes = scratch.changes(files_of(root.path()), &texts).unwrap();
 
     assert_eq!(
         changes[Path::new("src/b.txt")],
@@ -108,7 +114,7 @@ fn the_scratch_copy_is_a_clean_repository_of_its_own() {
     fs::write(root.path().join("a.txt"), "disk\n").unwrap();
     let texts = Overlays::from([("a.txt".into(), "overlay\n".to_owned())]);
 
-    let scratch = Scratch::new(root.path(), &texts).unwrap();
+    let scratch = Scratch::new(files_of(root.path()), &texts).unwrap();
     let git = |args: &[&str]| {
         let out = Command::new("git")
             .args(args)
@@ -148,7 +154,7 @@ fn the_verify_programs_run_over_a_copy_that_holds_the_fixed_texts() {
     };
 
     let passed = run_verify(
-        root.path(),
+        files_of(root.path()),
         &texts,
         &[sh("grep -q new a.txt"), sh("test ! -e skipped/b.txt")],
         &Policy::default(),
@@ -160,7 +166,7 @@ fn the_verify_programs_run_over_a_copy_that_holds_the_fixed_texts() {
     );
 
     let failed = run_verify(
-        root.path(),
+        files_of(root.path()),
         &texts,
         &[sh("echo one >&2; echo two >&2; exit 3"), sh("exit 0")],
         &Policy::default(),
@@ -171,7 +177,7 @@ fn the_verify_programs_run_over_a_copy_that_holds_the_fixed_texts() {
 
     fs::write(root.path().join(".env"), "KEY=fake\n").unwrap();
     let read = run_verify(
-        root.path(),
+        files_of(root.path()),
         &texts,
         &[sh(&format!(
             "test ! -e .env && ! cat '{}/.env' 2>/dev/null",
@@ -182,7 +188,7 @@ fn the_verify_programs_run_over_a_copy_that_holds_the_fixed_texts() {
     assert_eq!(read, Ok(()), "a command read the .env of the project");
 
     let escaping = crate::Overlays::from([(PathBuf::from("../x"), String::new())]);
-    assert!(run_verify(root.path(), &escaping, &[], &Policy::default()).is_err());
+    assert!(run_verify(files_of(root.path()), &escaping, &[], &Policy::default()).is_err());
 }
 
 /// Set in the child process the test below starts, with the `GIT_*`
@@ -195,7 +201,7 @@ fn a_git_directory_in_the_environment_never_receives_the_base_commit() {
         // The child: GIT_DIR names a repository of the user.
         let root = tempfile::tempdir().unwrap();
         fs::write(root.path().join("a.txt"), "x\n").unwrap();
-        let scratch = Scratch::new(root.path(), &Overlays::new()).unwrap();
+        let scratch = Scratch::new(files_of(root.path()), &Overlays::new()).unwrap();
         assert!(scratch.path().join(".git").exists(), "its own repository");
         return;
     }
@@ -253,7 +259,7 @@ fn a_secret_a_verify_program_prints_is_not_in_the_note_of_its_failure() {
     program.output = Some(lighthouse_spec::Output::Lines);
 
     let failed = run_verify_in(
-        root.path(),
+        files_of(root.path()),
         &Overlays::new(),
         &[program],
         &Policy::default(),
@@ -356,9 +362,13 @@ fn accepted(scope: FixScope, changed: &[&str]) -> Result<(), String> {
         file: Path::new("a.go"),
         extents: &[],
     };
-    accept(changes, &bounds, &World::new(Path::new("."), &run, &texts))
-        .map(|_| ())
-        .map_err(|(_, why)| why)
+    accept(
+        changes,
+        &bounds,
+        &World::new(files_of(Path::new(".")), &run, &texts),
+    )
+    .map(|_| ())
+    .map_err(|(_, why)| why)
 }
 
 #[test]

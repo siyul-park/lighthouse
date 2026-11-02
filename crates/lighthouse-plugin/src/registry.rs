@@ -27,6 +27,7 @@ enum Mark {
 #[derive(Default)]
 pub struct Registry {
     plugins: Vec<PluginManifest>,
+    ignores: Vec<(String, Vec<String>)>,
     languages: Vec<Language>,
     analyzers: BTreeMap<String, Box<dyn Analyzer>>,
     rules: BTreeMap<String, Box<dyn Rule>>,
@@ -48,6 +49,7 @@ impl Registry {
         let fixers = plugin.fixers();
         let models = plugin.models();
         let libraries = plugin.cel_libraries();
+        let ignores = plugin.ignores();
         let id = manifest.id.as_str();
         let own = |model: &str| model == id;
         let qualified = |item: &str| plugin_of(item) == id && item.contains('/');
@@ -85,6 +87,7 @@ impl Registry {
         self.check_libraries(&libraries, id)?;
 
         let id = manifest.id.clone();
+        self.ignores.push((id.clone(), ignores));
         self.plugins.push(manifest);
         self.languages
             .extend(languages.into_iter().map(|provider| Language {
@@ -114,6 +117,14 @@ impl Registry {
             .extend(models.into_iter().map(|m| (m.manifest().id.clone(), m)));
         self.libraries.extend(libraries);
         Ok(())
+    }
+
+    /// The `ignores` of each registered plugin, by plugin id, in the order
+    /// the plugins were registered.
+    pub fn ignores(&self) -> impl Iterator<Item = (&str, &[String])> {
+        self.ignores
+            .iter()
+            .map(|(id, p)| (id.as_str(), p.as_slice()))
     }
 
     /// The CEL libraries of the registered plugins and their function catalog.

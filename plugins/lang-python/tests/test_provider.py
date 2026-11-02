@@ -273,15 +273,14 @@ class FileTests(unittest.TestCase):
         self.assertEqual(fragment(result, "bad.py")["symbols"], [])
         self.assertEqual(len(fragment(result, "ok.py")["symbols"]), 1)
 
-    def test_stubs_hidden_directories_and_testdata_have_empty_fragments(self):
+    def test_stubs_have_empty_fragments_and_hidden_directories_are_analyzed(self):
         files = {
             "a.pyi": "def f() -> int: ...\n",
             ".h/x.py": "def f():\n    pass\n",
-            "testdata/y.py": "def f():\n    pass\n",
         }
         result = index(files)
-        for path in files:
-            self.assertEqual(fragment(result, path)["symbols"], [])
+        self.assertEqual(fragment(result, "a.pyi")["symbols"], [])
+        self.assertEqual(len(fragment(result, ".h/x.py")["symbols"]), 1)
         self.assertEqual(result["incomplete"], [])
 
     def test_a_missing_file_is_incomplete(self):

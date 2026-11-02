@@ -37,6 +37,7 @@ pub struct StartOptions<'a> {
 /// declared in the handshake, sharing one connection.
 pub struct RpcPlugin {
     manifest: PluginManifest,
+    ignores: Vec<String>,
     languages: Vec<wire::LanguageManifest>,
     models: Vec<lighthouse_plugin::Model>,
     client: Arc<Client>,
@@ -134,6 +135,7 @@ impl RpcPlugin {
             hash::sha256(binary.as_deref().unwrap_or(version.as_bytes()))
         };
         Ok(Self {
+            ignores: found.resource.spec.ignores.clone(),
             manifest: PluginManifest {
                 id: result.server_info.name,
                 version: result.server_info.version,
@@ -177,6 +179,10 @@ impl Plugin for RpcPlugin {
     /// The identity the process reported during the handshake.
     fn manifest(&self) -> &PluginManifest {
         &self.manifest
+    }
+
+    fn ignores(&self) -> Vec<String> {
+        self.ignores.clone()
     }
 
     /// One provider per language the process declared, all sharing its connection.

@@ -42,9 +42,12 @@ fn generated_code_is_told_apart_by_the_host_and_left_out_of_the_subjects() {
         ),
     ]);
 
-    assert_eq!(reported(&dir, ALL), ["a/x.txt", "vendor/v.txt"]);
+    assert_eq!(
+        reported(&dir, ALL),
+        [".gitattributes", "a/x.txt", "vendor/v.txt"]
+    );
     let by_config = format!("{ALL}[generated]\nfiles = [\"vendor/**\"]\n");
-    assert_eq!(reported(&dir, &by_config), ["a/x.txt"]);
+    assert_eq!(reported(&dir, &by_config), [".gitattributes", "a/x.txt"]);
 }
 
 #[test]
@@ -58,7 +61,7 @@ fn the_project_decides_whether_generated_code_is_checked() {
     let one_rule =
         "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = { level = \"error\", generated = true }\n";
     let skip_over_rule = "plugins = [\"fake\"]\n[generated]\ncheck = \"skip\"\n[rules]\n\"fake/each\" = { level = \"error\", generated = true }\n";
-    let all = ["a/x.txt", "gen/g.txt"];
+    let all = [".gitattributes", "a/x.txt", "gen/g.txt"];
 
     assert_eq!(reported(&dir, include), all);
     assert_eq!(reported(&dir, one_rule), all);

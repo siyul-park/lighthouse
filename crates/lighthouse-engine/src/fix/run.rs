@@ -296,7 +296,7 @@ impl Orchestrator<'_> {
                 "`[fix] verify` runs only in a trusted project (`lighthouse trust`)".to_owned(),
             );
         }
-        run_verify(&engine.ws.root, &self.texts, programs, &engine.ws.sandbox).err()
+        run_verify(&engine.files, &self.texts, programs, &engine.ws.sandbox).err()
     }
 
     /// A hash of every text the run holds, which two rounds share only when

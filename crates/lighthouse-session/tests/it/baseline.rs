@@ -183,6 +183,7 @@ fn editable() {
     let dir = project("error");
     let root = canonical(dir.path());
     write(&root, "src/x.rs", "fn main() {}\n");
+    write(&root, ".gitignore", "target/\n");
     write(&root, ".lighthouse/cache/y.txt", "x");
     fs::write(root.join("blob.bin"), [0u8, 1, 2]).unwrap();
 
@@ -198,5 +199,9 @@ fn editable() {
     assert_eq!(relative("blob.bin"), None, "binary");
     assert_eq!(relative("../escape.txt"), None, "outside the project");
     assert_eq!(baseline::editable(Path::new("/etc/hosts"), &root), None);
-    assert_eq!(relative("target/debug/x.txt"), None, "skipped directory");
+    assert_eq!(
+        relative("target/debug/x.txt"),
+        None,
+        "ignored by the repository"
+    );
 }

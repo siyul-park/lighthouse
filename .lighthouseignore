@@ -1,3 +1,0 @@
-# Fixture projects of the plugin conformance suite: broken or incomplete on
-# purpose, and checked against their goldens instead of by lint.
-crates/lighthouse-rpc/tests/conformance/*/*/project/

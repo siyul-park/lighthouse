@@ -10,7 +10,7 @@ use lighthouse_protocol::hash;
 use rayon::ThreadPool;
 
 use super::{regions::Views, *};
-use crate::documents::listed;
+use lighthouse_spec::{Attributes, Listing};
 
 /// Why a file the languages claim is not an input: a notice for binary data a
 /// fallback provider claims, otherwise a gap in the analysis.
@@ -54,43 +54,19 @@ pub(super) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
 impl Engine {
     /// Reads every file under the root that a listed language claims, side by
     /// side.
-    pub(super) fn read(&self, overlays: &Overlays, run: &mut Run) -> Vec<Input> {
-        let root = self.ws.root.clone();
-        let walk = WalkBuilder::new(&root)
-            .require_git(false)
-            .hidden(false)
-            .add_custom_ignore_filename(IGNORE_FILE)
-            .filter_entry(move |entry| entry.path().strip_prefix(&root).is_ok_and(listed))
-            .build();
-        let mut files = Vec::new();
-        for entry in walk {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(e) => {
-                    run.incomplete.push(Incomplete {
-                        path: None,
-                        provider: None,
-                        reason: format!("walk: {e}"),
-                    });
-                    continue;
-                }
-            };
-            if !entry.file_type().is_some_and(|t| t.is_file()) {
-                continue;
-            }
-            match entry.path().strip_prefix(&self.ws.root) {
-                Ok(rel) => files.push(rel.to_owned()),
-                Err(_) => run.incomplete.push(Incomplete {
-                    path: Some(entry.path().to_owned()),
-                    provider: None,
-                    reason: "outside the root, not checked".to_owned(),
-                }),
-            }
+    pub(super) fn read(&self, listing: &Listing, overlays: &Overlays, run: &mut Run) -> Vec<Input> {
+        for e in &listing.errors {
+            run.incomplete.push(Incomplete {
+                path: None,
+                provider: None,
+                reason: format!("walk: {e}"),
+            });
         }
+        let files = &listing.files;
         let read: Vec<Result<Input, Skipped>> = in_pool(|| {
             files
                 .par_iter()
-                .filter_map(|rel| self.read_input(rel, overlays))
+                .filter_map(|rel| self.read_input(rel, &listing.attributes, overlays))
                 .collect()
         });
         let mut inputs = Vec::new();
@@ -109,7 +85,12 @@ impl Engine {
 
     /// Reads one file if a listed language claims it, from its overlay when
     /// it has one; a file that cannot be read is not an input.
-    fn read_input(&self, rel: &Path, overlays: &Overlays) -> Option<Result<Input, Skipped>> {
+    fn read_input(
+        &self,
+        rel: &Path,
+        attributes: &Attributes,
+        overlays: &Overlays,
+    ) -> Option<Result<Input, Skipped>> {
         let &language = self
             .providers
             .iter()
@@ -142,7 +123,7 @@ impl Engine {
             path: rel.to_owned(),
             lang: self.provider(language).manifest().id.clone(),
             hash: hash::sha256(&text),
-            generated: self.config.is_generated(rel) || self.attributes.is_generated(rel),
+            generated: self.config.is_generated(rel) || attributes.is_generated(rel),
             test: self.languages[language].tests.is_match(rel),
             facts: Default::default(),
         };

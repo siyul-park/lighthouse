@@ -17,9 +17,10 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_engine::{SKIPPED_DIRS, cache};
-use lighthouse_model::{Diagnostic, STATE_DIR, evidence_digest, slashed, write_atomic};
+use lighthouse_engine::cache;
+use lighthouse_model::{Diagnostic, evidence_digest, slashed, write_atomic};
 use lighthouse_protocol::hash;
+use lighthouse_spec::ProjectFiles;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
@@ -174,10 +175,8 @@ pub fn gone(baselines: &[Baseline], findings: &[Diagnostic]) -> Vec<String> {
 pub fn editable(path: &Path, root: &Path) -> Option<PathBuf> {
     let absolute = resolved(path)?;
     let relative = absolute.strip_prefix(root).ok()?;
-    let skipped = relative
-        .components()
-        .any(|c| c.as_os_str() == STATE_DIR || SKIPPED_DIRS.iter().any(|d| c.as_os_str() == *d));
-    (!skipped && (!absolute.exists() || is_text(&absolute))).then(|| relative.to_owned())
+    let in_project = ProjectFiles::new(root, &[]).is_ok_and(|files| files.contains(relative));
+    (in_project && (!absolute.exists() || is_text(&absolute))).then(|| relative.to_owned())
 }
 
 fn read(path: &Path) -> Option<Baseline> {

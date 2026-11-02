@@ -220,8 +220,10 @@ Result `{ fragments, sources, notices, incomplete }`:
   `{file.<name>}` ([programs](programs.md#the-command-line)); the Rust provider states the `edition` of
   the crate that holds each file.
   A requested file with no fragment is incomplete. Files the provider
-  deliberately skips (excluded by the build context, `testdata`) get an empty
-  fragment.
+  deliberately skips (excluded by the build context) get an empty
+  fragment. A provider never filters paths: the host sends the files of the
+  project (see `ignores`), and `testdata`, `vendor`, hidden directories and the like
+  are left out there.
 - `notices`: messages that leave the analysis complete (for example files
   excluded by build constraints).
 - `sources`: provider-defined `Source` records for file inputs with `source_ast = true`.
@@ -534,6 +536,10 @@ args = []
 languages = ["go"]                 # checked against what the process reports
 ```
 
+`spec.ignores` (optional) is what the plugin's toolchain leaves out of a project: the same key,
+syntax and meaning as the project's `ignores` (a list of `.gitignore` lines, rooted at the
+project), merged the same way and before the project's own. It applies when the plugin is listed.
+
 `provides` lists the `languages` and `models` the plugin offers, so tools can see them
 without starting it; both are checked against what the process reports.
 
@@ -566,7 +572,7 @@ edges, visibility, ownership, spans, flow, tests, capabilities and a
 deterministic order. `cargo test -p lighthouse-rpc` runs the suite against the
 built plugin and validates every result against the schema.
 
-The cases `comments`, `errors`, `excluded`, `extents`, `flow`, `generated`, `signatures`, `tests`
+The cases `comments`, `errors`, `extents`, `flow`, `generated`, `signatures`, `tests`
 and `visibility` exist under the same name in every language, and `events` in every provider that
 reports body events; each language adds its own beside them. A shared case a language cannot
 run is listed with its reason in `NOT_APPLICABLE` of `crates/lighthouse-rpc/tests/it/conformance.rs`.
@@ -622,8 +628,8 @@ type-checks with `go/types`.
   edges. No `accesses-private` edges: Go cannot reach an unexported member from
   another package.
 - Packages are loaded per `go.mod`; Go files with no `go.mod` form one synthetic
-  module. `testdata`, `vendor` and names starting with `.` or `_` are skipped as
-  the go tool skips them.
+  module. The go tool's own skips (`testdata`, `vendor`, names starting with `.` or
+  `_`) are the `ignores` of the plugin manifest, so the host never sends those files.
 - `package main` makes every symbol `private`; exported symbols under an
   `internal` directory are `internal`.
 - Load, parse and type errors become `incomplete` entries per file, with
@@ -716,8 +722,7 @@ Rust with a notice.
   `incomplete` entry when another file of the project failed to parse, because
   the tree may then be cut short. A file shared by several targets (`mod common;`
   in each file of `tests/`) is analyzed once, as part of the first target, and
-  named by a notice; the other targets resolve the module to it. `testdata` and
-  hidden directories are skipped with empty fragments.
+  named by a notice; the other targets resolve the module to it.
 - Module paths use `/`, as the id format forbids `::` in a module: the library is
   the package name (`lighthouse_model`), its modules `lighthouse_model/ucm`;
   other targets are `pkg[bin:name]`, `pkg[test:name]`, `pkg[example:name]`,
@@ -800,9 +805,8 @@ and executes nothing of the project. It has no cache and does not return `source
   references resolve as `tsc` does. A file in no project goes in a default program
   (JavaScript allowed and not checked, `ESNext`, bundler resolution, strict).
   `allowJs` is always on, so requested JavaScript files are analyzed whatever the
-  project says. The manifest cannot exclude files, so `.d.ts` files, `node_modules`,
-  `testdata` and hidden directories are sent by the host and answered with empty
-  fragments.
+  project says. `.d.ts` files are sent by the host and answered with empty fragments;
+  `node_modules` is in the `ignores` of the manifest.
 - Modules: one per file, its path without extension (`src/util`). A test file
   (`.test.`, `.spec.`, `__tests__/`) has `test_of` set to the module it tests by
   name, else its directory.
@@ -896,7 +900,7 @@ settle are `semantic`.
   yielded value of an unannotated function. `implementation` marks a method that overrides one of a project base class,
   protocol or abstract class, or carries `@override`; `constructs` marks `__init__` and defs that return their own class.
 - Syntax errors are an `incomplete` entry per file (`line:col: message`) and the file keeps an empty fragment.
-  `.pyi` files, `testdata` and hidden directories are answered with empty fragments.
+  `.pyi` files are answered with empty fragments.
 - Fences: a Python region is a module of its own under `<dir>/.lighthouse-snippets/<file>.<n>/snippet.py` that uses the
   project from outside. A fence with invalid syntax is a notice; names the prose defines are `syntactic` edges to the
   project declarations that bear them, counted in one notice. Neither is a gap.

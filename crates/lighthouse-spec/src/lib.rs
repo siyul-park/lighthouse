@@ -12,7 +12,9 @@ mod env;
 mod error;
 mod example;
 mod expression;
+mod files;
 mod fix;
+mod ignores;
 mod model_check;
 mod options;
 mod pack;
@@ -40,7 +42,9 @@ pub use expression::{
     Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, parse_template,
     program_calls, program_identifiers,
 };
+pub use files::{Listing, ProjectFiles};
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
+pub use ignores::matcher as ignore_matcher;
 pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};
 pub use pack::{Pack, Section};

@@ -6,6 +6,8 @@ name = "lang-rust"
 
 [spec]
 version = "0.1.0"
+# Cargo's build output directory (`target`, `build.target-dir`).
+ignores = ["target/"]
 catalog = "decisions"
 
 [spec.runtime]

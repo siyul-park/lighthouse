@@ -5,26 +5,18 @@ import posixpath
 import sys
 import tokenize
 import tomllib
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 from lang_python.modules import SOURCE_SUFFIXES, module_path
 
 SNIPPETS_DIR = ".lighthouse-snippets"
-IGNORED_DIRS = frozenset({"node_modules", "testdata", "__pycache__", "site-packages"})
 
 
 def is_stub(rel: str) -> bool:
     """Whether a path is a type stub (`.pyi`), read for its types but never a subject."""
     return rel.endswith(".pyi")
-
-
-def is_ignored(rel: str) -> bool:
-    """Paths the provider answers with an empty fragment: dependencies, hidden directories, test data."""
-    parts = rel.split("/")
-    if SNIPPETS_DIR in parts:
-        return any(part in IGNORED_DIRS for part in parts[:-1])
-    return any(part in IGNORED_DIRS or part.startswith(".") for part in parts[:-1])
 
 
 STDLIB = frozenset(sys.stdlib_module_names)
@@ -44,26 +36,20 @@ class ModuleLoc:
 class Project:
     """The files of a project, as the request sees them: overlays stand in for files on disk."""
 
-    def __init__(self, root: str, overlays: dict[str, str], snippets: dict[str, str] | None = None):
+    def __init__(
+        self,
+        root: str,
+        overlays: dict[str, str],
+        snippets: dict[str, str] | None = None,
+        listed: Iterable[str] = (),
+    ):
         self.root = root
         self.overlays = overlays
         self.snippets = snippets or {}
-        self.files = self._scan()
+        self.files = frozenset(path for path in (*overlays, *listed) if path.endswith(SOURCE_SUFFIXES))
         self.dirs = self._directories()
         self.roots = self._roots()
         self._located: dict[tuple[str, str], ModuleLoc | None] = {}
-
-    def _scan(self) -> frozenset[str]:
-        found = set(self.overlays)
-        for here, dirs, names in os.walk(self.root):
-            rel_dir = os.path.relpath(here, self.root).replace(os.sep, "/")
-            dirs[:] = sorted(d for d in dirs if d not in IGNORED_DIRS and not d.startswith("."))
-            for name in names:
-                if name.endswith(SOURCE_SUFFIXES):
-                    rel = name if rel_dir == "." else posixpath.join(rel_dir, name)
-                    if not is_ignored(rel):
-                        found.add(rel)
-        return frozenset(found)
 
     def _directories(self) -> frozenset[str]:
         found = {""}

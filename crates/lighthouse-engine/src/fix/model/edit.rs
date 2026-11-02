@@ -244,7 +244,7 @@ pub(in crate::fix) fn conflict(
 /// What `member` leaves of the scratch copy of the project once it has been
 /// asked `prompt` in it. The copy is deleted on the way out, whatever happens.
 fn run(member: &Member<'_>, prompt: &str, world: &World<'_>) -> Result<Attempt, String> {
-    let scratch = Scratch::new(world.root, world.texts)
+    let scratch = Scratch::new(world.files, world.texts)
         .map_err(|e| format!("the scratch copy of the project failed: {e}"))?;
     let Edited {
         said,

@@ -53,11 +53,15 @@ pub struct PluginCatalog {
 
 /// A listed plugin whose handshake failed: registered without languages so the
 /// configuration stays valid, while its gap is reported as incomplete.
-struct Unavailable(lighthouse_plugin::PluginManifest);
+struct Unavailable(lighthouse_plugin::PluginManifest, Vec<String>);
 
 impl Plugin for Unavailable {
     fn manifest(&self) -> &lighthouse_plugin::PluginManifest {
         &self.0
+    }
+
+    fn ignores(&self) -> Vec<String> {
+        self.1.clone()
     }
 }
 
@@ -193,6 +197,7 @@ pub fn start(
                         id: one.id().to_owned(),
                         version: one.resource.spec.version.clone(),
                     },
+                    one.resource.spec.ignores.clone(),
                 )));
             }
             Err(e) => return Err(e),

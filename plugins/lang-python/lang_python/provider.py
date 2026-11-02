@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 from lang_python.project import Model
-from lang_python.project import is_ignored, is_stub
+from lang_python.project import is_stub
 from lang_python.modules import module_path
 from lang_python.project import Project
 from lang_python.regions import Remap, Snippet, host_line, plan_snippets
@@ -93,7 +93,7 @@ class _Indexing:
             else:
                 self.hosts.append(item["regions"])
         self.snippets = plan_snippets(self.hosts)
-        self.project = Project(self.root, overlays, {s.rel: s.text.text for s in self.snippets})
+        self.project = Project(self.root, overlays, {s.rel: s.text.text for s in self.snippets}, self.files)
         self.model = Model(self.project)
         self.reach = Reach(self.model)
         self.types = Types(self.reach)
@@ -119,7 +119,7 @@ class _Indexing:
         return {"fragments": self.fragments, "sources": [], "notices": self.notices, "incomplete": self.incomplete}
 
     def _file(self, rel: str) -> None:
-        if is_ignored(rel) or is_stub(rel):
+        if is_stub(rel):
             self.fragments.append(_empty_fragment(rel))
             return
         parsed = self.model.file(rel)

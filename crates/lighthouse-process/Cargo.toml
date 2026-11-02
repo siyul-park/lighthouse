@@ -8,7 +8,6 @@ publish.workspace = true
 doctest = false
 
 [dependencies]
-ignore.workspace = true
 tempfile.workspace = true
 
 [target.'cfg(unix)'.dependencies]

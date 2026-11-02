@@ -4,7 +4,7 @@ import { type Decl, type FileDecls, isScript } from "./symbols.ts";
 import { assignmentTarget } from "./commonjs.ts";
 import type { Lines } from "./extent/lines.ts";
 import type { Model } from "./model.ts";
-import { isIgnored, modulePath, relative, slashed } from "./project/paths.ts";
+import { modulePath, relative, slashed } from "./project/paths.ts";
 import type { EdgeKind, Node, Resolution, Span } from "./sdk/wire.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
@@ -156,7 +156,7 @@ export class Uses {
       symbol?.declarations?.find(ts.isSourceFile)?.fileName ?? this.model.resolveFile(specifier.text, this.decls.file);
     if (file !== undefined) {
       const rel = relative(this.model.root, file);
-      const inside = rel !== undefined && !isIgnored(rel) && SOURCE_FILE.test(file);
+      const inside = rel !== undefined && this.model.isSubject(rel) && SOURCE_FILE.test(file);
       return [inside ? modulePath(rel) : specifier.text, "semantic"];
     }
     if (symbol !== undefined || isBuiltin(specifier.text)) return [specifier.text, "semantic"];

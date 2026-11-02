@@ -115,10 +115,9 @@ const LANGS: [&Lang; 4] = [&GO, &RUST, &TYPESCRIPT, &PYTHON];
 
 /// The cases every language runs under the same name; each language adds its
 /// own beside them.
-const SHARED: [&str; 9] = [
+const SHARED: [&str; 8] = [
     "comments",
     "errors",
-    "excluded",
     "extents",
     "flow",
     "generated",
@@ -506,10 +505,10 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
             init.len()
         ));
         assert!(plugin.read().unwrap().error.is_none());
-        // Requests and responses of several hundred KB: ignored paths cost the
-        // plugin nothing but still produce one fragment each.
+        // Requests and responses of several hundred KB: files that are not
+        // there cost the plugin nothing but still produce an answer each.
         let files: Vec<String> = (0..6000)
-            .map(|n| format!("testdata/{n:0>40}{}", lang.exts[0]))
+            .map(|n| format!("absent/{n:0>40}{}", lang.exts[0]))
             .collect();
         let mut options = BTreeMap::new();
         options.insert("other".to_owned(), json!({ "blob": "x".repeat(300_000) }));
@@ -535,7 +534,7 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
             },
         };
         let result: wire::IndexResult = plugin.call(wire::INDEX, params);
-        assert_eq!(result.fragments.len(), files.len());
+        assert!(result.fragments.len() + result.incomplete.len() >= files.len());
         assert!(serde_json::to_vec(&result).unwrap().len() > 500_000);
         assert_eq!(plugin.finish(), Some(0));
     }

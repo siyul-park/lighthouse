@@ -77,10 +77,7 @@ func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, 
 	if notice := store.notice(); notice != "" {
 		r.result.Notices = append(r.result.Notices, notice)
 	}
-	candidates, ignored := r.candidates()
-	for _, rel := range ignored {
-		r.fileOnly(rel)
-	}
+	candidates := r.candidates()
 	for _, rel := range candidates {
 		if !r.claimed[rel] {
 			r.unclaimed(rel)
@@ -91,7 +88,7 @@ func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, 
 
 // prepare reads the environment and the cached facts and plans the units.
 func (p *Provider) prepare(pl *planner, store *cacheStore, params sdk.IndexParams) (*cachePlan, bool) {
-	candidates, _ := pl.r.candidates()
+	candidates := pl.r.candidates()
 	batches := pl.r.batches(candidates)
 	if len(batches) == 0 {
 		return nil, false
@@ -201,7 +198,7 @@ func sameFailures(r, sub *run) bool {
 	if len(sub.result.Incomplete) != len(sub.failed) {
 		return false
 	}
-	candidates, _ := r.candidates()
+	candidates := r.candidates()
 	for _, b := range r.batches(candidates) {
 		if n, failed := sub.failed[b.dir]; failed && n != len(b.files) {
 			return false

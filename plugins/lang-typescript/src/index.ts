@@ -16,6 +16,8 @@ export interface Request {
   overlays: Map<string, string>;
   /** Project-relative paths of the files to analyze. */
   requested: readonly string[];
+  /** Every file the host sent, analysed or not: the files of the project. */
+  listed: readonly string[];
   snippets: readonly Snippet[];
   result: Required<IndexResult>;
 }
@@ -31,6 +33,7 @@ interface Group {
 class Analysis {
   private readonly workspace: Workspace;
   private readonly fenced = new Map<Snippet, Fragment>();
+  private readonly subjects: ReadonlySet<string>;
   private unresolved = 0;
   private untyped = 0;
 
@@ -38,6 +41,7 @@ class Analysis {
     const overlays = new Map(request.overlays);
     for (const snippet of request.snippets) overlays.set(this.absolute(snippet.rel), snippet.text.text);
     this.workspace = new Workspace(request.root, overlays);
+    this.subjects = new Set([...request.listed, ...request.snippets.map((s) => s.rel)]);
   }
 
   index(): Map<Snippet, Fragment> {
@@ -84,7 +88,7 @@ class Analysis {
       return;
     }
     result.notices.push(...built.notices);
-    const model = new Model(built.program, this.request.root, built.host);
+    const model = new Model(built.program, built.host, { root: this.request.root, subjects: this.subjects });
     const reach = new Reach(model, this.request.root);
     const services: Services = { model, reach, types: new Types(model, reach) };
     for (const [file, rel] of members.files) this.indexFile(built.program, this.unitOf(services, file, rel), rel);

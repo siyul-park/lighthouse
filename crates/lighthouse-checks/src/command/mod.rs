@@ -215,7 +215,12 @@ impl CommandRule {
             PluginError::Incomplete(format!("the copy of the project failed: {e}"))
         };
         let dir = TempDir::new().map_err(failed)?;
-        copy_project(&ctx.workspace.root, dir.path(), overlays).map_err(failed)?;
+        let root = &ctx.workspace.root;
+        let files = lighthouse_spec::ProjectFiles::new(root, &ctx.workspace.ignores)
+            .map_err(|e| PluginError::Incomplete(e.to_string()))?
+            .list()
+            .files;
+        copy_project(root, &files, dir.path(), overlays).map_err(failed)?;
         let dir = Arc::new(dir);
         *held = Some((digest, dir.clone()));
         Ok(Some(dir))

@@ -1,5 +1,5 @@
 //! What a project takes from the projects it extends besides their rules: the
-//! `injections` and the `plugins`, merged the way ESLint merges the `plugins`
+//! `injections`, `ignores`, `generated` files and the `plugins`, merged the way ESLint merges the `plugins`
 //! of shareable configs.
 
 use super::{Config, InjectionSpec, Projects};
@@ -7,7 +7,8 @@ use crate::Error;
 
 impl Config {
     /// This project with what the projects it extends bring: their
-    /// `injections`, extended first and in order, where a later entry with
+    /// `ignores` and `generated.files`, the union in the order of the chain;
+    /// their `injections`, extended first and in order, where a later entry with
     /// the same `id` replaces the earlier in its place; and the union of their
     /// `plugins`, which follow its own listing, where the project's own entry wins. Resolving again
     /// changes nothing.
@@ -15,6 +16,9 @@ impl Config {
         let chain = self.chain(projects)?;
         let mut merged = self.clone();
         merged.injections = Vec::new();
+        merged.ignores = union(chain.iter().flat_map(|c| &c.ignores));
+        merged.generated_files = union(chain.iter().flat_map(|c| &c.generated_files));
+        merged.generated = super::globs(&merged.generated_files)?;
         for config in &chain {
             for injection in &config.injections {
                 put_injection(&mut merged.injections, injection);
@@ -39,6 +43,17 @@ impl Config {
     pub fn required_by(&self, id: &str) -> Option<&str> {
         self.required.get(id).map(String::as_str)
     }
+}
+
+/// The distinct entries, in the order they first come.
+fn union<'a>(entries: impl Iterator<Item = &'a String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for entry in entries {
+        if !out.contains(entry) {
+            out.push(entry.clone());
+        }
+    }
+    out
 }
 
 fn put_injection(into: &mut Vec<InjectionSpec>, injection: &InjectionSpec) {

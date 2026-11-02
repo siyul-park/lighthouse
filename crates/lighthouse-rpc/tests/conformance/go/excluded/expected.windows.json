@@ -89,28 +89,6 @@
         }
       ],
       "tests": []
-    },
-    {
-      "comments": [],
-      "edges": [],
-      "file": {
-        "path": "testdata/sample.go"
-      },
-      "functions": [],
-      "modules": [],
-      "symbols": [],
-      "tests": []
-    },
-    {
-      "comments": [],
-      "edges": [],
-      "file": {
-        "path": "vendor/dep/dep.go"
-      },
-      "functions": [],
-      "modules": [],
-      "symbols": [],
-      "tests": []
     }
   ],
   "incomplete": [],

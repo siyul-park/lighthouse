@@ -6,6 +6,8 @@ name = "lang-typescript"
 
 [spec]
 version = "0.1.0"
+# Where npm and every Node package manager install dependencies.
+ignores = ["node_modules/"]
 
 [spec.runtime]
 command = "./lang-typescript"

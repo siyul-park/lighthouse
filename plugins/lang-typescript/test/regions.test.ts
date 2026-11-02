@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { Provider } from "../src/provider.ts";
-import type { EmbeddedFile, Fragment, IndexResult } from "../src/sdk/wire.ts";
+import type { EmbeddedFile, Fragment, IndexInput, IndexResult } from "../src/sdk/wire.ts";
 
 const GREET = "src/index::greet#function";
 const MANIFEST = '{ "name": "demo", "private": false }\n';
@@ -51,12 +51,20 @@ function markdown(fences: { info?: string; body: string }[]): EmbeddedFile {
   return { path: "README.md", hash: "x", text, generated: false, test: false, facts: {}, regions: sources };
 }
 
+/** The TypeScript files of the project, as the host lists them. */
+function sources(root: string): IndexInput[] {
+  return fs
+    .readdirSync(root, { recursive: true, encoding: "utf8" })
+    .filter((rel) => rel.endsWith(".ts"))
+    .map((rel) => ({ kind: "file", file: { path: rel, hash: "x" } }));
+}
+
 function index(root: string, host: EmbeddedFile): IndexResult {
   const provider = new Provider("lang-typescript", "0");
   return provider.index({
     project: { root },
     language: "typescript",
-    inputs: [{ kind: "regions", regions: host }],
+    inputs: [...sources(root), { kind: "regions", regions: host }],
     context: { options: {} },
   });
 }
@@ -176,6 +184,7 @@ describe("fences of a host file", () => {
 });
 
 function fragmentOf(result: IndexResult): Fragment {
-  assert.equal(result.fragments.length, 1);
-  return result.fragments[0]!;
+  const host = result.fragments.filter((fragment) => fragment.file.path === "README.md");
+  assert.equal(host.length, 1);
+  return host[0]!;
 }

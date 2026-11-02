@@ -2,6 +2,7 @@
 //! its imports and, for the scope `files`, the places that refer to what may
 //! change; within a budget, and the same every time.
 
+use crate::fix::rewrite::files_of;
 use std::path::PathBuf;
 
 use lighthouse_model::{
@@ -224,7 +225,7 @@ impl Fixture {
         };
         let texts = self.texts();
         let root = PathBuf::from("/nowhere");
-        let world = World::new(&root, &outcome, &texts);
+        let world = World::new(files_of(&root), &outcome, &texts);
         let finding = self.finding();
         let extent =
             (scope == FixScope::Symbol).then(|| span(self.own_symbols[0].1, self.own_symbols[0].2));
@@ -521,7 +522,7 @@ fn a_symbol_inside_the_extent_of_another_is_not_given_twice() {
         };
         let texts = fixture.texts();
         let root = PathBuf::from("/nowhere");
-        let world = World::new(&root, &outcome, &texts);
+        let world = World::new(files_of(&root), &outcome, &texts);
         let finding = fixture.finding();
         let (_, from, to, _) = fixture.own_symbols[0];
 

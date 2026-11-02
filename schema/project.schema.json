@@ -499,7 +499,7 @@
     },
     "ProjectSpec": {
       "additionalProperties": false,
-      "description": "A project's configuration, and the shape of a shareable one: `extends`\nnames any project, the way an ESLint config extends a shareable config.\nAn extended project contributes its `extends`, `rules`, `overrides`,\n`injections` and `plugins`, the way an ESLint shareable config brings its\n`plugins`. Its `languages` belong to the project that is run.",
+      "description": "A project's configuration, and the shape of a shareable one: `extends`\nnames any project, the way an ESLint config extends a shareable config.\nAn extended project contributes its `extends`, `rules`, `overrides`,\n`injections`, `ignores`, `generated` and `plugins`, the way an ESLint shareable config brings its\n`plugins`. Its `languages` belong to the project that is run.",
       "properties": {
         "extends": {
           "description": "Projects whose rules apply first, in order: the `recommended` and\n`strict` projects of each pack (`core/recommended`), or any `Project`\ndocument of the catalog.",
@@ -515,6 +515,13 @@
         "generated": {
           "$ref": "#/$defs/GeneratedSpec",
           "description": "Which files are generated code, beyond what the providers and\n`.gitattributes` say, and whether it is checked."
+        },
+        "ignores": {
+          "description": "Files that are not the project's: gitignore patterns, rooted at the\nproject, that keep files out of the analysis altogether (never\nwalked, indexed, checked, copied or diffed), such as fixtures that are\nbroken on purpose. A plugin's `ignores` and those of the projects\n`extends` names come first; a later pattern wins, as in a\n`.gitignore`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "injections": {
           "description": "Regions of host files that are written in another language: a CEL\nexpression in a decision, code in a Markdown fence. The host language\nis inferred by normal file routing. Entries merge over `extends`,\nextended first; a later entry with the same `id` replaces the earlier.",

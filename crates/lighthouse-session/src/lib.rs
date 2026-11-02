@@ -50,8 +50,6 @@ pub use trust::{Basis, revoke, trust};
 pub use validate::{Problem, Validated, validate_paths};
 
 /// Directories no search for files enters.
-pub use lighthouse_engine::SKIPPED_DIRS;
-
 pub use lighthouse_model::Result;
 
 use lighthouse_checks::Composition;

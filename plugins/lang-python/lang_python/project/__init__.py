@@ -1,7 +1,7 @@
 """The project: its files and import roots, the parsed files and scopes, and names resolved to declarations."""
 
-from lang_python.project.files import IGNORED_DIRS, SNIPPETS_DIR, STDLIB, ModuleLoc, Project, decode, declared_roots
-from lang_python.project.files import is_ignored, is_stub
+from lang_python.project.files import SNIPPETS_DIR, STDLIB, ModuleLoc, Project, decode, declared_roots
+from lang_python.project.files import is_stub
 from lang_python.project.model import Model, ParsedFile
 from lang_python.project.resolve import (
     DeclVal,
@@ -18,7 +18,6 @@ from lang_python.project.scopes import COMPREHENSIONS, Scope, ScopeTree, binding
 
 __all__ = [
     "COMPREHENSIONS",
-    "IGNORED_DIRS",
     "SNIPPETS_DIR",
     "STDLIB",
     "DeclVal",
@@ -36,7 +35,6 @@ __all__ = [
     "decode",
     "declared_roots",
     "has_name",
-    "is_ignored",
     "is_stub",
     "resolver_of",
     "static_all",

@@ -68,6 +68,7 @@ impl Workspace {
             cel_libraries: Vec::new(),
             cache_dir: None,
             sandbox: Policy::default(),
+            ignores: Vec::new(),
         }
     }
 
@@ -191,6 +192,9 @@ pub struct Workspace {
     pub cache_dir: Option<PathBuf>,
     /// How the programs the project names run: the project's `[sandbox]`.
     pub sandbox: Policy,
+    /// The `ignores` of the project, with those of its plugins first: what
+    /// keeps files out of the project, for whoever lists its files again.
+    pub ignores: Vec<String>,
 }
 
 /// What a language provider declares about itself: which files are its own and
@@ -393,6 +397,11 @@ pub trait Plugin {
     }
     /// The CEL libraries of the plugin; each id is qualified with the plugin's.
     fn cel_libraries(&self) -> Vec<Box<dyn CelLibrary>> {
+        Vec::new()
+    }
+    /// The files its toolchain leaves out of a project (`testdata/`,
+    /// `node_modules/`), as the project's `ignores` are written.
+    fn ignores(&self) -> Vec<String> {
         Vec::new()
     }
 }

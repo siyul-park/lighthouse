@@ -13,7 +13,6 @@ use crate::{
     facts::FindingFacts,
     timings::Timings,
 };
-use ignore::WalkBuilder;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Options, Severity, Suppressed,
@@ -24,8 +23,8 @@ use lighthouse_plugin::{
     Workspace,
 };
 use lighthouse_spec::{
-    Attributes, Catalog, Config, GeneratedCheck, GlobSet, Models as BoundModels, Projects, Routing,
-    RuleConfig, Subject as DecisionSubject,
+    Catalog, Config, GeneratedCheck, GlobSet, Models as BoundModels, ProjectFiles, Projects,
+    Routing, RuleConfig, Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
@@ -53,10 +52,6 @@ use config::{
 use models::RunModels;
 pub(crate) use route::{Member, Refusal, Route, Usage};
 pub(crate) use scopes::Scopes;
-
-/// Name of the file, in `.gitignore` syntax, that keeps files out of the
-/// analysis altogether, such as fixtures that are broken on purpose.
-pub const IGNORE_FILE: &str = ".lighthouseignore";
 
 /// Process exit code of a run whose analysis was incomplete.
 pub const EXIT_INCOMPLETE: u8 = 3;
@@ -242,10 +237,8 @@ pub struct Engine {
     /// Rules whose decision is about the project's own documents (the `spec`
     /// domain): a run that selects one finds those documents first.
     documented: BTreeSet<String>,
-    /// The `linguist-generated` and `linguist-vendored` attributes of the project.
-    attributes: Attributes,
-    /// What assembling the engine found worth telling; every run reports it.
-    notices: Vec<String>,
+    /// The files of the project: what every walk of it lists.
+    pub(crate) files: ProjectFiles,
     pub(crate) ws: Workspace,
     /// What the decisions that read the options of another read.
     inherited: BTreeMap<String, Inherited>,
@@ -315,7 +308,8 @@ impl Engine {
         validate_config(&registry, &config, &binding, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
-        let (attributes, notices) = Attributes::new(&root);
+        let ignores = ignores(&registry, &config);
+        let files = ProjectFiles::new(&root, &ignores)?;
         let ws = Workspace {
             root,
             source_globs: config
@@ -337,6 +331,7 @@ impl Engine {
                 .collect(),
             cache_dir: None,
             sandbox: config.sandbox().clone(),
+            ignores,
         };
         let enabled = active(&config, &projects)?;
         Ok(Self {
@@ -354,8 +349,7 @@ impl Engine {
                 .filter(|d| d.scope.subject == DecisionSubject::Decision)
                 .map(|d| d.id().to_owned())
                 .collect(),
-            attributes,
-            notices,
+            files,
             ws,
             inherited: inheritance(catalog),
             providers,
@@ -450,6 +444,18 @@ impl Engine {
         self.validate_only(only)?;
         self.run(Scopes::files(files), Vec::new(), only, &Overlays::new())
     }
+}
+
+/// The `ignores` that apply to the project: those of the listed plugins in the
+/// order they were registered, then the project's, in which the extended
+/// projects' come first.
+fn ignores(registry: &Registry, config: &Config) -> Vec<String> {
+    registry
+        .ignores()
+        .filter(|(id, _)| config.lists(id))
+        .flat_map(|(_, patterns)| patterns.iter().cloned())
+        .chain(config.ignores().iter().cloned())
+        .collect()
 }
 
 /// The starting position shared by ordered and round-robin model bindings.

@@ -21,7 +21,7 @@ use std::{
 
 use lighthouse_model::{Span, ucm::File};
 use lighthouse_protocol::hash;
-use lighthouse_spec::FixScope;
+use lighthouse_spec::{FixScope, ProjectFiles};
 
 use scope::{first_outside, reached};
 #[cfg(test)]
@@ -36,7 +36,7 @@ use crate::{
 
 /// What a program works over, which is also all it may read.
 pub(in crate::fix) struct World<'a> {
-    pub(in crate::fix) root: &'a Path,
+    pub(in crate::fix) files: &'a ProjectFiles,
     /// The check the findings come from.
     pub(in crate::fix) outcome: &'a Run,
     /// The texts that stand in for the files of the project: those of the
@@ -49,9 +49,13 @@ pub(in crate::fix) struct World<'a> {
 }
 
 impl<'a> World<'a> {
-    pub(in crate::fix) fn new(root: &'a Path, outcome: &'a Run, texts: &'a Overlays) -> Self {
+    pub(in crate::fix) fn new(
+        files: &'a ProjectFiles,
+        outcome: &'a Run,
+        texts: &'a Overlays,
+    ) -> Self {
         Self {
-            root,
+            files,
             outcome,
             texts,
             digest: OnceLock::new(),
@@ -62,7 +66,7 @@ impl<'a> World<'a> {
     pub(in crate::fix) fn text(&self, path: &Path) -> Option<String> {
         match self.texts.get(path) {
             Some(text) => Some(text.clone()),
-            None => fs::read_to_string(self.root.join(path)).ok(),
+            None => fs::read_to_string(self.files.root().join(path)).ok(),
         }
     }
 
@@ -111,7 +115,7 @@ pub(in crate::fix) fn collect(
     world: &World<'_>,
 ) -> Result<(Changes, BTreeMap<PathBuf, String>), String> {
     let changes = scratch
-        .changes(world.root, world.texts)
+        .changes(world.files, world.texts)
         .map_err(|e| format!("the scratch copy of the project could not be read: {e}"))?;
     let mut bases = BTreeMap::new();
     for (path, change) in &changes {
@@ -163,6 +167,12 @@ pub(in crate::fix) fn accept(
         return Err((Class::Unchanged, format!("{} changed no file", bounds.who)));
     }
     Ok(texts)
+}
+
+/// The files of the project at `root`, for the life of the test.
+#[cfg(test)]
+pub(in crate::fix) fn files_of(root: &Path) -> &'static ProjectFiles {
+    Box::leak(Box::new(ProjectFiles::new(root, &[]).expect("no patterns")))
 }
 
 /// What is wrong with the program having done `change` to `path`, if

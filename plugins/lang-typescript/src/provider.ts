@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type * as sdk from "./sdk/server.ts";
 import { index } from "./index.ts";
-import { isDeclarationFile, isIgnored, slashed } from "./project/paths.ts";
+import { isDeclarationFile, slashed } from "./project/paths.ts";
 import { type Snippet, planSnippets } from "./regions.ts";
 import type { EmbeddedFile, Fragment, IndexParams, IndexResult, LanguageManifest } from "./sdk/wire.ts";
 
@@ -52,7 +52,7 @@ export class Provider implements sdk.Provider {
     const requested = run.admit(files);
     const snippets = planSnippets(hosts);
     const { root, overlays, result } = run;
-    const regionFragments = index({ root, overlays, requested, snippets, result });
+    const regionFragments = index({ root, overlays, requested, listed: files, snippets, result });
     run.merge(hosts, snippets, regionFragments);
     result.fragments.sort((a, b) => (a.file.path < b.file.path ? -1 : a.file.path > b.file.path ? 1 : 0));
     return result;
@@ -76,7 +76,7 @@ class Indexing {
     const admitted: string[] = [];
     for (const rel of new Set(files)) {
       const abs = slashed(path.join(this.root, rel));
-      if (isIgnored(rel) || isDeclarationFile(rel)) {
+      if (isDeclarationFile(rel)) {
         this.result.fragments.push(emptyFragment(rel));
       } else if (!this.overlays.has(abs) && !fs.existsSync(abs)) {
         this.result.incomplete.push({ path: rel, reason: "cannot read the file" });

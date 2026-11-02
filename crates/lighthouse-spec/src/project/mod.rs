@@ -167,6 +167,8 @@ pub struct Config {
     /// The plugins only an extended project lists, with the project that
     /// does: set by [`Config::inheriting`].
     required: BTreeMap<String, String>,
+    ignores: Vec<String>,
+    generated_files: Vec<String>,
     generated: Option<GlobSet>,
     generated_check: Option<GeneratedCheck>,
     models: Models,
@@ -244,6 +246,7 @@ impl Config {
             })
             .collect::<Result<_, Error>>()?;
         validate_injections(&spec.injections)?;
+        crate::ignores::matcher(Path::new("/"), &spec.ignores)?;
         let mut languages = BTreeMap::new();
         for (id, language) in spec.languages {
             languages.insert(
@@ -265,7 +268,9 @@ impl Config {
             languages,
             injections: spec.injections,
             required: BTreeMap::new(),
+            ignores: spec.ignores,
             generated: globs(&spec.generated.files)?,
+            generated_files: spec.generated.files,
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
             sandbox: spec.sandbox.into(),
@@ -367,6 +372,12 @@ impl Config {
         self.languages
             .iter()
             .filter_map(|(id, l)| Some((id.as_str(), l.test_naming.as_ref()?)))
+    }
+
+    /// The project's `ignores` and, once [`Config::inheriting`] has resolved
+    /// it, those of the projects it extends, extended first.
+    pub fn ignores(&self) -> &[String] {
+        &self.ignores
     }
 
     /// Whether the project's `generated.files` name `path`.

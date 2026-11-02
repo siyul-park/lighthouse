@@ -102,6 +102,12 @@ pub struct PluginSpec {
     pub catalog: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "provides_nothing")]
     pub provides: Provides,
+    /// The files the plugin's toolchain leaves out of a project: the same
+    /// key, syntax and meaning as the project's `ignores` (gitignore
+    /// patterns, rooted at the project), and merged the same way, before the
+    /// project's own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignores: Vec<String>,
 }
 
 impl Spec for PluginSpec {

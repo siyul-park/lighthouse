@@ -16,7 +16,7 @@ use super::{
 /// A project's configuration, and the shape of a shareable one: `extends`
 /// names any project, the way an ESLint config extends a shareable config.
 /// An extended project contributes its `extends`, `rules`, `overrides`,
-/// `injections` and `plugins`, the way an ESLint shareable config brings its
+/// `injections`, `ignores`, `generated` and `plugins`, the way an ESLint shareable config brings its
 /// `plugins`. Its `languages` belong to the project that is run.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -59,6 +59,14 @@ pub struct ProjectSpec {
     /// them.
     #[serde(default, skip_serializing_if = "SignalsSpec::is_empty")]
     pub signals: SignalsSpec,
+    /// Files that are not the project's: gitignore patterns, rooted at the
+    /// project, that keep files out of the analysis altogether (never
+    /// walked, indexed, checked, copied or diffed), such as fixtures that are
+    /// broken on purpose. A plugin's `ignores` and those of the projects
+    /// `extends` names come first; a later pattern wins, as in a
+    /// `.gitignore`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignores: Vec<String>,
     /// Which files are generated code, beyond what the providers and
     /// `.gitattributes` say, and whether it is checked.
     #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]

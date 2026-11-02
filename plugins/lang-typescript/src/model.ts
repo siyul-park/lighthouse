@@ -2,7 +2,7 @@ import ts from "typescript";
 import { exportedNames } from "./commonjs.ts";
 import { type Decl, FileDecls } from "./symbols.ts";
 import { declareModuleBody } from "./functions.ts";
-import { isDeclarationFile, isIgnored, isTestFile, modulePath, relative, slashed } from "./project/paths.ts";
+import { isDeclarationFile, isTestFile, modulePath, relative, slashed } from "./project/paths.ts";
 import { selfReference } from "./project/selfref.ts";
 import { declareTests, importsRunner } from "./tests.ts";
 
@@ -16,10 +16,20 @@ export class Model {
 
   constructor(
     readonly program: ts.Program,
-    readonly root: string,
     private readonly host: ts.ModuleResolutionHost,
+    /** The project root, and the project-relative files of the request: the host lists the project, so only these are subjects. */
+    private readonly project: { readonly root: string; readonly subjects: ReadonlySet<string> },
   ) {
     this.checker = program.getTypeChecker();
+  }
+
+  get root(): string {
+    return this.project.root;
+  }
+
+  /** Whether a project-relative file is a subject of the project. */
+  isSubject(rel: string): boolean {
+    return this.project.subjects.has(rel);
   }
 
   /** The project-relative path of a source file, when it is a subject of the project. */
@@ -27,7 +37,7 @@ export class Model {
     if (isDeclarationFile(file.fileName) || this.program.isSourceFileFromExternalLibrary(file)) return undefined;
     if (this.program.isSourceFileDefaultLibrary(file)) return undefined;
     const rel = relative(this.root, slashed(file.fileName));
-    return rel === undefined || isIgnored(rel) ? undefined : rel;
+    return rel === undefined || !this.isSubject(rel) ? undefined : rel;
   }
 
   /** The declarations of a source file, or undefined for a file that is not the project's. */

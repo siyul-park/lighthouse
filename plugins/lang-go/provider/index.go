@@ -118,15 +118,7 @@ func newRun(params sdk.IndexParams, opts options) *run {
 }
 
 func (r *run) index() {
-	var candidates []string
-	for rel := range r.requested {
-		if ignoredPath(rel) {
-			r.fileOnly(rel)
-			continue
-		}
-		candidates = append(candidates, rel)
-	}
-	sort.Strings(candidates)
+	candidates := r.candidates()
 	batches := r.batches(candidates)
 	r.loads = len(batches)
 	loads := r.loadAll(batches)
@@ -159,19 +151,15 @@ func (r *run) edits(overlays []sdk.Overlay) (map[string][]byte, bool) {
 	return edits, true
 }
 
-// candidates are the requested files a provider analyzes, sorted, and the
-// ignored ones.
-func (r *run) candidates() (candidates, ignored []string) {
+// candidates are the requested files, sorted: the host lists the files of the
+// project, so every one is analyzed.
+func (r *run) candidates() []string {
+	candidates := make([]string, 0, len(r.requested))
 	for rel := range r.requested {
-		if ignoredPath(rel) {
-			ignored = append(ignored, rel)
-			continue
-		}
 		candidates = append(candidates, rel)
 	}
 	sort.Strings(candidates)
-	sort.Strings(ignored)
-	return candidates, ignored
+	return candidates
 }
 
 func (r *run) finish() sdk.IndexResult {
@@ -684,20 +672,6 @@ func describe(e packages.Error) string {
 		return msg
 	}
 	return strings.TrimPrefix(e.Pos, file+":") + ": " + msg
-}
-
-// ignoredPath applies the go tool's rule for names it skips: testdata and
-// vendor directories, and names starting with "." or "_".
-func ignoredPath(rel string) bool {
-	for _, part := range strings.Split(rel, "/") {
-		if part == snippetsDir {
-			continue
-		}
-		if part == "testdata" || part == "vendor" || strings.HasPrefix(part, ".") || strings.HasPrefix(part, "_") {
-			return true
-		}
-	}
-	return false
 }
 
 // declaredBefore orders types by where they are declared, which does not

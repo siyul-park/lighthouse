@@ -16,11 +16,11 @@ use lighthouse_checks::Composition;
 use lighthouse_model::{Format, Resource, documents, kind_of, resource};
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_rpc::PluginSpec;
-use lighthouse_spec::Catalog;
+use lighthouse_spec::{Catalog, ProjectFiles};
 use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
-use crate::{Result, SKIPPED_DIRS, Session, decisions::test_catalog};
+use crate::{Result, Session, decisions::test_catalog};
 
 /// The decision that asks decisions to be named well.
 const DECISION_NAMING: &str = "core/decision-naming";
@@ -334,20 +334,8 @@ fn collect(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     if !path.is_dir() {
         return Err(format!("{}: no such file or directory", path.display()).into());
     }
-    for entry in fs::read_dir(path)? {
-        let entry = entry?.path();
-        let name = entry
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default();
-        if entry.is_dir() {
-            if !SKIPPED_DIRS.contains(&name) {
-                collect(&entry, files)?;
-            }
-        } else {
-            files.push(entry);
-        }
-    }
+    let listing = ProjectFiles::new(path, &[])?.list();
+    files.extend(listing.files.iter().map(|f| path.join(f)));
     Ok(())
 }
 

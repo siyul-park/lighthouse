@@ -499,7 +499,7 @@ impl Proposer<'_> {
             file: &finding.file,
             extents: &extents,
         };
-        let world = World::new(&self.engine.ws.root, outcome, texts);
+        let world = World::new(&self.engine.files, outcome, texts);
         accept(changes, &bounds, &world)
             .map(|_| ())
             .map_err(|(_, why)| why)

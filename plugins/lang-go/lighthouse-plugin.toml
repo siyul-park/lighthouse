@@ -6,6 +6,10 @@ name = "lang-go"
 
 [spec]
 version = "0.1.0"
+# What the go command leaves out of `./...`: directories named `testdata` or
+# `vendor`, and those whose name starts with `.` or `_` (`go help packages`).
+# `.lighthouse` is re-included: it holds the decisions of the project.
+ignores = ["testdata/", "vendor/", "_*/", ".*/", "!/.lighthouse/"]
 catalog = "decisions"
 
 [spec.runtime]
