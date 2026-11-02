@@ -317,25 +317,6 @@ impl Orchestrator<'_> {
     }
 }
 
-/// `proposals` in order, in batches in which none edits a file another of the
-/// batch does: a fix is judged and shown with the safe fixes of its own change,
-/// which are told apart only where it is the one fix of a file.
-pub(super) fn apart(proposals: Vec<Proposal>) -> Vec<Vec<Proposal>> {
-    let mut batches: Vec<Vec<Proposal>> = Vec::new();
-    for p in proposals {
-        let free = batches.iter().position(|batch| {
-            !batch
-                .iter()
-                .any(|q| q.files.iter().any(|f| p.files.contains(f)))
-        });
-        match free {
-            Some(at) => batches[at].push(p),
-            None => batches.push(vec![p]),
-        }
-    }
-    batches
-}
-
 /// The files whose edits among `kept` are all of fixes that only move
 /// declarations, and together would repeat or drop one, with why.
 pub(super) fn scattering(

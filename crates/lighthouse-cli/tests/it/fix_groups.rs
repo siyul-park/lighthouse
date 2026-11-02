@@ -218,26 +218,57 @@ fn reversed_blocks(types: usize) -> String {
     text
 }
 
+/// The number in the line of `--timings` that ends `(N check(s))` or begins
+/// `timings: fix rounds N`: the work the fix run did.
+fn timed(stderr: &str, prefix: &str, suffix: &str) -> usize {
+    stderr
+        .lines()
+        .find_map(|line| {
+            let rest = line.strip_prefix(prefix)?;
+            let rest = rest.strip_suffix(suffix).unwrap_or(rest);
+            rest.rsplit(' ')
+                .next()?
+                .trim_start_matches('(')
+                .parse()
+                .ok()
+        })
+        .unwrap_or_else(|| panic!("no `{prefix}` line in:\n{stderr}"))
+}
+
 #[test]
-fn a_file_of_a_thousand_reversed_declarations_is_ordered_in_bounded_time() {
+fn a_file_of_a_thousand_reversed_declarations_is_ordered_in_bounded_work() {
     let source = reversed_blocks(500);
     let Some(dir) = go_project(&[("big.go", &source)], "") else {
         return;
     };
-    let started = std::time::Instant::now();
 
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--decision", "design/declaration-groups"])
+    let out = lighthouse(dir.path())
+        .args([
+            "check",
+            "--fix",
+            "--timings",
+            "--decision",
+            "design/declaration-groups",
+        ])
         .assert()
-        .success();
+        .success()
+        .get_output()
+        .clone();
 
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(45),
-        "{:?}",
-        started.elapsed()
-    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let rounds = timed(&stderr, "timings: fix rounds ", "");
+    let checks = timed(&stderr, "timings: fix checks ", " check(s))");
+    // One reorder settles the file: the work is the rounds and the checks, not
+    // a function of the 1000 declarations.
+    assert!(rounds <= MAX_ORDER_ROUNDS, "{rounds} rounds:\n{stderr}");
+    assert!(checks <= MAX_ORDER_CHECKS, "{checks} checks:\n{stderr}");
     assert_eq!(findings(&dir, "design/declaration-groups"), 0);
 }
+
+/// The rounds and whole checks the reorder of one file takes (one each), with room for a
+/// follow-up round.
+const MAX_ORDER_ROUNDS: usize = 2;
+const MAX_ORDER_CHECKS: usize = 3;
 
 const CALLER_FIRST: &str =
     "package demo\n\nfunc Run() int { return helper() }\n\nfunc helper() int { return 1 }\n";

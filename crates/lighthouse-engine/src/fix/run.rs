@@ -5,6 +5,7 @@ mod displaced;
 mod incomplete;
 mod rollback;
 mod settle;
+mod withheld;
 mod write;
 
 use std::{
@@ -23,7 +24,6 @@ use super::{
 };
 use chain::{Links, Mark};
 use cycle::Trail;
-use rollback::apart;
 
 use crate::{Engine, Error, FixTimings, Overlays, Run};
 
@@ -178,20 +178,6 @@ impl Orchestrator<'_> {
             .into_iter()
             .filter(|p| !self.permits(p.safety))
             .collect())
-    }
-
-    /// Verifies the `withheld` fixes the run may not write, over the state the
-    /// rounds left, and reports those the checks accept as previews. The texts
-    /// are left as they were. A fix is applied later by itself, so those that
-    /// edit the same file are verified in rounds of their own: each preview
-    /// carries the safe fixes of its own change.
-    fn preview(&mut self, outcome: &Run, withheld: Vec<Proposal>) -> Result<(), Error> {
-        for batch in apart(withheld) {
-            let start = self.mark();
-            self.apply_round(outcome, batch, self.rounds + 1)?;
-            self.withdraw(start);
-        }
-        Ok(())
     }
 
     /// The round that gives the findings the rules left to a model: its

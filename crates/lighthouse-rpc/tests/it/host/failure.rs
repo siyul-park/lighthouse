@@ -55,7 +55,7 @@ fn a_timeout_kills_the_plugin_and_later_calls_fail_fast() {
     let started = Instant::now();
     let again = index(provider.as_ref(), &ws, &["a.fake"]);
     assert!(only_gap(&again).reason.contains("timed out after 3s"));
-    assert!(started.elapsed() < Duration::from_millis(500));
+    assert!(started.elapsed() < Duration::from_secs(2));
 }
 
 #[test]

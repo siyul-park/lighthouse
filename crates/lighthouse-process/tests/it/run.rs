@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lighthouse_process::{Invocation, Sandbox, run, run_lines};
+use lighthouse_process::{GRACE, Invocation, Sandbox, run, run_lines};
 
 fn spec<'a>(argv: &'a [String], limit: Duration) -> Invocation<'a> {
     Invocation {
@@ -149,7 +149,7 @@ fn a_program_that_obeys_sigterm_stops_before_the_grace_runs_out() {
 
     assert!(run(&spec(&line, Duration::from_millis(100))).is_err());
 
-    assert!(started.elapsed() < Duration::from_millis(280));
+    assert!(started.elapsed() < GRACE);
 }
 
 #[test]
