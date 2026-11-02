@@ -9,6 +9,7 @@ mod check;
 mod decisions;
 mod descriptor;
 mod examples;
+mod extends;
 mod findings;
 mod generated;
 mod git;
@@ -33,6 +34,7 @@ pub use decisions::{
     decision_rows, decision_text, explain, test_decisions,
 };
 pub use descriptor::Fixing;
+pub use extends::{AUTHORING, Extended, ensure_extends};
 pub use findings::Remembered;
 pub use generated::{AGENT_LOOP, SKILL_MARKER, pack_docs, schema_of, schemas, skill, skill_for};
 pub use git::head;

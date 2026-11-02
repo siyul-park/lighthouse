@@ -7,7 +7,9 @@ use std::{
 };
 
 use lighthouse_model::{STATE_DIR, read_optional, write_atomic};
-use lighthouse_session::{DEFAULT_CONFIG, FILE_NAME, Session};
+use lighthouse_session::{
+    AUTHORING, DEFAULT_CONFIG, Extended, FILE_NAME, Session, ensure_extends, local_dir,
+};
 
 use crate::terminal::{Result, command::Agent, setup};
 
@@ -93,6 +95,17 @@ pub fn init(config: Option<&Path>, agent: Option<Agent>) -> Result<u8> {
         let attributes = format!("{STATE_DIR}/decisions.jsonl merge=union");
         if ensure_line(&path.with_file_name(".gitattributes"), &attributes)? {
             println!("added the decision log to .gitattributes (merge=union)");
+        }
+    }
+    // A project with decisions of its own extends the project that says where
+    // their CEL is.
+    if local_dir(&dir).is_dir() {
+        match ensure_extends(&dir, AUTHORING)? {
+            Extended::Added(path) => println!("added {AUTHORING} to extends in {}", path.display()),
+            Extended::Manual(path) => {
+                println!("add {AUTHORING} to extends in {} by hand", path.display());
+            }
+            Extended::Present => {}
         }
     }
     // The store is a local cache of one machine's checks and reviews.

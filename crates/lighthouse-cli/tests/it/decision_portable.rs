@@ -206,3 +206,18 @@ fn extending_core_authoring_without_its_plugins_names_the_project_that_needs_the
         "{said}"
     );
 }
+
+#[test]
+fn init_makes_a_project_with_decisions_extend_core_authoring() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join(".lighthouse/decisions")).unwrap();
+    let bare = tempfile::tempdir().unwrap();
+
+    lighthouse(dir.path()).arg("init").assert().success();
+    lighthouse(bare.path()).arg("init").assert().success();
+
+    let written = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
+    assert!(written.contains("\"core/authoring\""), "{written}");
+    let plain = fs::read_to_string(bare.path().join("lighthouse.toml")).unwrap();
+    assert!(!plain.contains("core/authoring"), "{plain}");
+}

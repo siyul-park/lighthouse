@@ -17,7 +17,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    DecisionTest, Result, Session,
+    AUTHORING, DecisionTest, Extended, Result, Session, ensure_extends,
     signal::{DUPLICATE_THRESHOLD, Duplicate, candidates, record_proposal, settle_derived},
     test_decisions,
 };
@@ -88,7 +88,38 @@ pub fn create_decision(
             .unwrap_or_default()
     );
     let duplicates = candidates(session, &query, Some(&id), DUPLICATE_THRESHOLD, DUPLICATES)?;
-    commit(session, &id, &name, document, Some(duplicates), by)
+    let mut authored = commit(session, &id, &name, document, Some(duplicates), by)?;
+    extend_authoring(session, &mut authored)?;
+    Ok(authored)
+}
+
+/// A project with decisions of its own extends `core/authoring`, which says
+/// where the CEL of those files is; a decision just written adds it when the
+/// project does not have it yet.
+fn extend_authoring(session: &Session, authored: &mut Authored) -> Result<()> {
+    if session
+        .config
+        .extends()
+        .iter()
+        .any(|name| name == AUTHORING)
+    {
+        return Ok(());
+    }
+    let said = match ensure_extends(&session.root, AUTHORING)? {
+        Extended::Added(path) => format!(
+            "added `{AUTHORING}` to `extends` in {} (it needs the plugins lang-yaml and lang-toml)",
+            path.display()
+        ),
+        Extended::Present => return Ok(()),
+        Extended::Manual(path) => {
+            format!(
+                "add `{AUTHORING}` to `extends` in {} by hand",
+                path.display()
+            )
+        }
+    };
+    authored.note = format!("{said}; {}", authored.note);
+    Ok(())
 }
 
 /// Replaces the local decision the `Decision` document names with it, keeping

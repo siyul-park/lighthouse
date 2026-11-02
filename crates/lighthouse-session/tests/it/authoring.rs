@@ -1,7 +1,7 @@
 //! Adding and replacing the decisions of a project, behind the gate: the
 //! candidate loads, compiles and passes its own examples.
 
-use lighthouse_session::{AgentKind, Attribution, Session};
+use lighthouse_session::{AgentKind, Attribution, Extended, Session, ensure_extends};
 use serde_json::{Value, json};
 
 use crate::fixture::{canonical, project, read, session};
@@ -163,4 +163,67 @@ fn replace_decision() {
             .to_string()
             .contains("not a local decision")
     );
+}
+
+#[test]
+fn create_decision_has_the_project_extend_core_authoring_once() {
+    let dir = project("error");
+    let made = lighthouse_session::create_decision(
+        &opened(dir.path()),
+        document("no-logs", "A log MUST NOT be committed."),
+        &kim(),
+    )
+    .unwrap();
+
+    assert!(
+        made.note.contains("added `core/authoring` to `extends`"),
+        "{}",
+        made.note
+    );
+    let config = read(dir.path(), "lighthouse.toml");
+    assert_eq!(config.matches("core/authoring").count(), 1, "{config}");
+
+    let second = lighthouse_session::create_decision(
+        &opened(dir.path()),
+        document("no-tmp", "A temporary file MUST NOT be committed."),
+        &kim(),
+    )
+    .unwrap();
+
+    assert!(!second.note.contains("core/authoring"), "{}", second.note);
+    let config = read(dir.path(), "lighthouse.toml");
+    assert_eq!(config.matches("core/authoring").count(), 1, "{config}");
+}
+
+#[test]
+fn ensure_extends_adds_a_project_to_a_toml_file_and_keeps_the_rest() {
+    let dir = project("error");
+    let root = dir.path();
+    let before = read(root, "lighthouse.toml");
+
+    let added = ensure_extends(root, "core/authoring").unwrap();
+    let again = ensure_extends(root, "core/authoring").unwrap();
+
+    assert_eq!(added, Extended::Added(root.join("lighthouse.toml")));
+    assert_eq!(again, Extended::Present);
+    let after = read(root, "lighthouse.toml");
+    assert!(after.contains("extends = [\"core/authoring\"]"), "{after}");
+    assert!(after.contains("\"local/short\""), "the rest stays: {after}");
+    assert_ne!(before, after);
+}
+
+#[test]
+fn ensure_extends_leaves_a_file_that_is_not_toml_to_the_person() {
+    let dir = project("error");
+    let root = dir.path();
+    std::fs::remove_file(root.join("lighthouse.toml")).unwrap();
+    std::fs::write(
+        root.join("lighthouse.yaml"),
+        "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata: {name: t}\nspec: {}\n",
+    )
+    .unwrap();
+
+    let done = ensure_extends(root, "core/authoring").unwrap();
+
+    assert_eq!(done, Extended::Manual(root.join("lighthouse.yaml")));
 }
