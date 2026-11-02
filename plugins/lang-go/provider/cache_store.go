@@ -44,7 +44,7 @@ type recordFile struct {
 const (
 	// cacheSchema versions the layout and meaning of everything in the cache
 	// directory; changing it makes every entry a miss.
-	cacheSchema = "lang-go-cache/2"
+	cacheSchema = "lang-go-cache/3"
 	// cacheLimit caps the size of the cache directory; the oldest entries go first.
 	cacheLimit = 256 << 20
 
