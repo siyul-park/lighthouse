@@ -15,6 +15,7 @@ mod guards;
 mod moves;
 mod rename;
 mod reorder;
+mod scope;
 
 const FILE: &str = "a.src";
 

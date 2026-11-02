@@ -1,6 +1,7 @@
 mod blame;
 mod chain;
 mod cycle;
+mod displaced;
 mod incomplete;
 mod rollback;
 mod settle;

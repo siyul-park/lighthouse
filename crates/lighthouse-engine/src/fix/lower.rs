@@ -24,6 +24,7 @@ use super::{
     scan::Containers,
 };
 
+mod header;
 mod rename;
 
 impl<'a> Sources<'a> {
@@ -94,12 +95,14 @@ impl<'a> Sources<'a> {
 }
 
 /// A declaration located in its file: the symbol, the whole lines its extent
-/// fills, the bracket it sits in and, for one of a parenthesized group, where
-/// that closes.
+/// fills, the bracket it sits in, the declaration whose body it is in (a class
+/// of a language that brackets nothing) and, for one of a parenthesized group,
+/// where that closes.
 struct Block {
     symbol: Symbol,
     lines: Range<usize>,
     container: Option<usize>,
+    scope: Option<SymbolId>,
     group: Option<usize>,
 }
 
@@ -226,7 +229,7 @@ impl<'a> Lowerer<'a> {
                 moved.symbol.name
             ));
         }
-        if moved.container != beside.container {
+        if moved.container != beside.container || moved.scope != beside.scope {
             return Err(format!(
                 "`{}` and `{}` are not in the same block, so moving one next to the other would change what it belongs to",
                 moved.symbol.name, beside.symbol.name
@@ -253,6 +256,7 @@ impl<'a> Lowerer<'a> {
         if removal.start < at && at < removal.end {
             return Err("the target lies inside the moved declaration".to_owned());
         }
+        self.below_imports(&file, &text, [at])?;
         Ok(vec![
             TextEdit::delete(file.clone(), removal),
             TextEdit::insert(file, at, inserted),
@@ -281,9 +285,13 @@ impl<'a> Lowerer<'a> {
         }
         let text = self.sources.text(&file)?;
         let blocks = self.units(blocks)?;
-        let mut containers: BTreeMap<Option<usize>, Vec<&Block>> = BTreeMap::new();
+        let mut containers: BTreeMap<(Option<usize>, Option<&SymbolId>), Vec<&Block>> =
+            BTreeMap::new();
         for block in &blocks {
-            containers.entry(block.container).or_default().push(block);
+            containers
+                .entry((block.container, block.scope.as_ref()))
+                .or_default()
+                .push(block);
         }
         let mut edits = Vec::new();
         for group in containers.values() {
@@ -297,7 +305,31 @@ impl<'a> Lowerer<'a> {
             }
             edits.extend(moves(&text, &current, group));
         }
+        let puts = edits
+            .iter()
+            .filter(|e| e.range.is_empty())
+            .map(|e| e.range.start);
+        self.below_imports(&file, &text, puts)?;
         Ok(edits)
+    }
+
+    /// Whether every offset of `at` is below the import header of `file`: no
+    /// declaration is put above an import, which would use a name before it
+    /// is bound.
+    fn below_imports(
+        &self,
+        file: &Path,
+        text: &str,
+        at: impl IntoIterator<Item = usize>,
+    ) -> Result<(), String> {
+        let language = self.project.file(file).map_or("", |f| f.lang.as_str());
+        let header = header::end(text, language);
+        if at.into_iter().any(|at| at < header) {
+            return Err(
+                "the move would put a declaration above the imports of the file".to_owned(),
+            );
+        }
+        Ok(())
     }
 
     /// `blocks` as the reorder moves them. A declaration directly inside a `(`
@@ -416,8 +448,21 @@ impl<'a> Lowerer<'a> {
             symbol: symbol.clone(),
             lines,
             container: container.open,
+            scope: self.scope_of(symbol),
             group: container.group,
         })
+    }
+
+    /// The declaration whose extent holds `symbol`, if its owner is one: a
+    /// class body is a scope in a language that does not bracket it, and a
+    /// member of it never moves out to the file or to another class. A method
+    /// declared apart from its owner (a Go receiver) is in the scope of the file.
+    fn scope_of(&self, symbol: &Symbol) -> Option<SymbolId> {
+        let owner = self.project.symbol(symbol.owner.as_ref()?)?;
+        let within = owner.extent.is_some_and(|extent| {
+            extent.start <= symbol.span.start && symbol.span.end <= extent.end
+        });
+        within.then(|| owner.id.clone())
     }
 
     /// Where the lines of `file` start, found once for all the operations on it.

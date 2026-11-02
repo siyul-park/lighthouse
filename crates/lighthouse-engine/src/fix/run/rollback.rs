@@ -21,6 +21,7 @@ use super::{
     super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator, Standing,
     blame::Blame,
+    displaced::{displaced, moved_files},
     settle::{Joined, fold},
 };
 use crate::{Error, Run};
@@ -75,6 +76,11 @@ impl Orchestrator<'_> {
             Some(self.recheck()?)
         };
         let (mut followed, mut joined) = (Vec::new(), Joined::default());
+        // The index of the changed texts says what the moves did to their
+        // files' symbols, before the safe fixes that follow touch them.
+        let displaced = after.as_ref().map_or_else(BTreeMap::new, |run| {
+            displaced(&moved_files(&kept), (&before.project, &run.project))
+        });
         let after = match after {
             Some(run) => {
                 let settled;
@@ -93,6 +99,9 @@ impl Orchestrator<'_> {
         if let Some(after) = &after {
             let blame = Blame::new(self.proposer.engine, (before, after), &scope);
             failed.extend(worse(&blame));
+            for (file, why) in displaced {
+                failed.entry(file).or_insert(why);
+            }
             verdict = judge(&kept, &merged, before, after);
             failed.extend(verdict.files.clone());
         }
@@ -333,18 +342,16 @@ pub(super) fn scattering(
     kept: &[Proposal],
     text: impl Fn(&Path) -> Option<String>,
 ) -> BTreeMap<PathBuf, String> {
-    let mut by_file: BTreeMap<&PathBuf, (bool, Vec<&TextEdit>)> = BTreeMap::new();
-    for p in kept {
-        for edit in &p.edits {
-            let entry = by_file.entry(&edit.file).or_insert((true, Vec::new()));
-            entry.0 &= p.moves_only;
-            entry.1.push(edit);
+    let moved = moved_files(kept);
+    let mut by_file: BTreeMap<&PathBuf, Vec<&TextEdit>> = BTreeMap::new();
+    for edit in kept.iter().flat_map(|p| &p.edits) {
+        if moved.contains(&edit.file) {
+            by_file.entry(&edit.file).or_default().push(edit);
         }
     }
     by_file
         .into_iter()
-        .filter(|(_, (moves, _))| *moves)
-        .filter_map(|(file, (_, edits))| {
+        .filter_map(|(file, edits)| {
             let before = text(file)?;
             let why = keeps_declarations(&before, &edits).err()?;
             Some((file.clone(), why))
