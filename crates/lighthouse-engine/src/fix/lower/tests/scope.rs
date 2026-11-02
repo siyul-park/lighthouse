@@ -2,6 +2,7 @@
 //! not show, and the imports lead the file.
 
 use super::*;
+use lighthouse_model::ucm::{Edge, EdgeKind, Node, Resolution, Target};
 
 const MODULE: &str = "import os\n\ndef fixture():\n    return 1\n\nclass Suite:\n    def test_a(self):\n        return 1\n\n    def test_b(self):\n        return 2\n\ndef helper():\n    return 3\n";
 
@@ -19,7 +20,23 @@ fn declared(text: &str, owner: Option<&str>, name: &str, (from, to): (u32, u32))
     }
 }
 
+/// An import of the module `m` on `line` of `text`, at the whole line.
+fn import(text: &str, line: u32) -> Edge {
+    let width = text.lines().nth(line as usize - 1).map_or(0, str::len);
+    Edge {
+        kind: EdgeKind::Imports,
+        from: Node::Module("m".to_owned()),
+        to: Target::Path("os".to_owned()),
+        resolution: Resolution::Syntactic,
+        site: Some(span((line, 1), (line, u32::try_from(width).unwrap() + 1))),
+    }
+}
+
 fn python(text: &str, symbols: Vec<Symbol>) -> Case {
+    python_with(text, symbols, Vec::new())
+}
+
+fn python_with(text: &str, symbols: Vec<Symbol>, edges: Vec<Edge>) -> Case {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join(FILE), text).unwrap();
     let project = Project::merge([Fragment {
@@ -32,6 +49,7 @@ fn python(text: &str, symbols: Vec<Symbol>) -> Case {
             facts: Default::default(),
         }],
         symbols,
+        edges,
         ..Fragment::default()
     }]);
     Case { dir, project }
@@ -104,12 +122,13 @@ fn methods_and_functions_listed_together_are_ordered_each_among_its_own() {
 }
 
 fn late() -> Case {
-    python(
+    python_with(
         LATE_IMPORT,
         vec![
             declared(LATE_IMPORT, None, "test_one", (1, 2)),
             declared(LATE_IMPORT, None, "CONST", (6, 6)),
         ],
+        vec![import(LATE_IMPORT, 4)],
     )
 }
 
@@ -140,39 +159,29 @@ fn a_declaration_is_put_below_the_imports_it_follows() {
     );
 }
 
-/// The text up to the end of the header of `text` in `language`.
-fn header(text: &str, language: &str) -> String {
-    text[..super::super::header::end(text, language)].to_owned()
-}
+const LOCAL_IMPORT: &str =
+    "def first():\n    import json\n    return json\n\ndef second():\n    return 2\n";
 
 #[test]
-fn the_header_is_the_imports_that_open_a_line() {
-    let text = "\"\"\"Doc.\"\"\"\nfrom __future__ import annotations\nfrom a import (\n    b,\n)\nimport d\n\nX = 1\nif X:\n    import hidden\n";
-    assert_eq!(
-        header(text, "python"),
-        "\"\"\"Doc.\"\"\"\nfrom __future__ import annotations\nfrom a import (\n    b,\n)\nimport d\n"
+fn an_import_inside_a_function_is_no_module_level_import() {
+    let case = python_with(
+        LOCAL_IMPORT,
+        vec![
+            declared(LOCAL_IMPORT, None, "first", (1, 3)),
+            declared(LOCAL_IMPORT, None, "second", (5, 6)),
+        ],
+        vec![import(LOCAL_IMPORT, 2)],
     );
-}
 
-#[test]
-fn the_header_of_a_rust_a_typescript_and_a_go_file_ends_with_their_last_import() {
+    let moved = case
+        .run(&[EditOp::Move {
+            node: id("second"),
+            anchor: Anchor::Before(id("first")),
+        }])
+        .unwrap();
+
     assert_eq!(
-        header(
-            "use a::{\n    b,\n};\nuse c;\n\nconst X: i32 = 1;\n",
-            "rust"
-        ),
-        "use a::{\n    b,\n};\nuse c;\n"
+        moved,
+        "def second():\n    return 2\n\ndef first():\n    import json\n    return json\n"
     );
-    assert_eq!(
-        header(
-            "import { a } from \"a\";\nimport b from \"b\";\n\nconst x = 1;\n",
-            "typescript"
-        ),
-        "import { a } from \"a\";\nimport b from \"b\";\n"
-    );
-    assert_eq!(
-        header("package p\n\nimport (\n\t\"a\"\n)\n\nconst x = 1\n", "go"),
-        "package p\n\nimport (\n\t\"a\"\n)\n"
-    );
-    assert_eq!(header("import os\n", "cobol"), "");
 }

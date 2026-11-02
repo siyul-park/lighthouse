@@ -24,7 +24,7 @@ use super::{
     scan::Containers,
 };
 
-mod header;
+mod imports;
 mod rename;
 
 impl<'a> Sources<'a> {
@@ -256,7 +256,11 @@ impl<'a> Lowerer<'a> {
         if removal.start < at && at < removal.end {
             return Err("the target lies inside the moved declaration".to_owned());
         }
-        self.below_imports(&file, &text, [at])?;
+        self.keeps_imports(
+            &file,
+            &text,
+            &[(moved.lines.start, at, moved.symbol.id.module().to_owned())],
+        )?;
         Ok(vec![
             TextEdit::delete(file.clone(), removal),
             TextEdit::insert(file, at, inserted),
@@ -294,6 +298,7 @@ impl<'a> Lowerer<'a> {
                 .push(block);
         }
         let mut edits = Vec::new();
+        let mut places = Vec::new();
         for group in containers.values() {
             let mut current: Vec<&Block> = group.clone();
             current.sort_by_key(|b| b.lines.start);
@@ -303,33 +308,12 @@ impl<'a> Lowerer<'a> {
             {
                 return Err("declarations to reorder overlap".to_owned());
             }
-            edits.extend(moves(&text, &current, group));
+            let (moved, placed) = moves(&text, &current, group);
+            edits.extend(moved);
+            places.extend(placed);
         }
-        let puts = edits
-            .iter()
-            .filter(|e| e.range.is_empty())
-            .map(|e| e.range.start);
-        self.below_imports(&file, &text, puts)?;
+        self.keeps_imports(&file, &text, &places)?;
         Ok(edits)
-    }
-
-    /// Whether every offset of `at` is below the import header of `file`: no
-    /// declaration is put above an import, which would use a name before it
-    /// is bound.
-    fn below_imports(
-        &self,
-        file: &Path,
-        text: &str,
-        at: impl IntoIterator<Item = usize>,
-    ) -> Result<(), String> {
-        let language = self.project.file(file).map_or("", |f| f.lang.as_str());
-        let header = header::end(text, language);
-        if at.into_iter().any(|at| at < header) {
-            return Err(
-                "the move would put a declaration above the imports of the file".to_owned(),
-            );
-        }
-        Ok(())
     }
 
     /// `blocks` as the reorder moves them. A declaration directly inside a `(`
@@ -508,6 +492,14 @@ enum Later {
     Named,
 }
 
+/// What is put after one anchor: the text, and the offset and module each of
+/// its blocks comes from.
+#[derive(Default)]
+struct Put {
+    text: String,
+    from: Vec<(usize, String)>,
+}
+
 /// The whole lines `range` fills, or `None` when other code shares them.
 fn lines_of(text: &str, range: &Range<usize>) -> Option<Range<usize>> {
     let start = text[..range.start].rfind('\n').map_or(0, |n| n + 1);
@@ -561,7 +553,12 @@ fn code_follows(rest: &str) -> bool {
 /// the longest run already in the order of `wanted`: each is removed and put
 /// after the block that precedes it in `wanted`, or before the first block
 /// that stays when none does.
-fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
+/// Also the offsets each moved block comes from and goes to, with its module.
+fn moves(
+    text: &str,
+    current: &[&Block],
+    wanted: &[&Block],
+) -> (Vec<TextEdit>, Vec<(usize, usize, String)>) {
     let rank: BTreeMap<&SymbolId, usize> = wanted
         .iter()
         .enumerate()
@@ -570,7 +567,7 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
     let ranks: Vec<usize> = current.iter().map(|b| rank[&b.symbol.id]).collect();
     let stays = longest_run(&ranks);
     if stays.len() == current.len() {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
     let eol = eol_of(text);
     let kept: BTreeSet<&SymbolId> = stays.iter().map(|&n| &current[n].symbol.id).collect();
@@ -593,13 +590,14 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
     }
     let first_kept = current.iter().find(|b| kept.contains(&b.symbol.id));
     let mut after: Option<&Block> = None;
-    let mut put: BTreeMap<Option<&SymbolId>, String> = BTreeMap::new();
+    let mut put: BTreeMap<Option<&SymbolId>, Put> = BTreeMap::new();
     for block in wanted {
         if kept.contains(&block.symbol.id) {
             after = Some(block);
             continue;
         }
-        let entry = put.entry(after.map(|a| &a.symbol.id)).or_default();
+        let Put { text: entry, from } = put.entry(after.map(|a| &a.symbol.id)).or_default();
+        from.push((block.lines.start, block.symbol.id.module().to_owned()));
         match after {
             Some(beside) if text[..beside.lines.end].ends_with('\n') => {
                 entry.push_str(eol);
@@ -617,7 +615,15 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
             }
         }
     }
-    for (anchor, inserted) in put {
+    let mut placed = Vec::new();
+    for (
+        anchor,
+        Put {
+            text: inserted,
+            from,
+        },
+    ) in put
+    {
         let beside = match anchor {
             Some(id) => current.iter().find(|b| &b.symbol.id == id),
             None => first_kept,
@@ -628,9 +634,10 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> Vec<TextEdit> {
         } else {
             beside.lines.start
         };
+        placed.extend(from.into_iter().map(|(from, module)| (from, at, module)));
         edits.push(TextEdit::insert(beside.symbol.file.clone(), at, inserted));
     }
-    edits
+    (edits, placed)
 }
 
 /// `ranges`, in file order, with those that only blank lines separate made one:

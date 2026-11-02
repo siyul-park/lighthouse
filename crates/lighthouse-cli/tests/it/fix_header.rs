@@ -188,3 +188,43 @@ fn a_rust_constant_is_not_moved_above_a_use() {
 
     assert_eq!(read(&dir, "src/lib.rs"), RUST_LATE_USE);
 }
+
+const PYTHON_LOCAL_IMPORT: &str = "import pytest\n\n\ndef test_json():\n    import json\n\n    assert json.dumps(1) == \"1\"\n\n\n@pytest.fixture\ndef build():\n    return 3\n";
+
+#[test]
+fn an_import_inside_a_function_does_not_hold_a_fixture_down() {
+    let Some(dir) = python(&[("test_json.py", PYTHON_LOCAL_IMPORT)]) else {
+        return;
+    };
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "--decision", "testing/file-layout"])
+        .assert()
+        .stderr(predicate::str::contains("above the imports").not());
+
+    let fixed = read(&dir, "test_json.py");
+    assert!(
+        fixed.find("def build").unwrap() < fixed.find("def test_json").unwrap(),
+        "{fixed}"
+    );
+}
+
+const RUST_INLINE_TESTS: &str = "/// A.\npub fn a() -> i32 {\n    LIMIT\n}\n\n/// The limit.\nconst LIMIT: i32 = 3;\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn reads_the_limit() {\n        assert_eq!(a(), 3);\n    }\n}\n";
+
+#[test]
+fn items_are_reordered_above_an_inline_test_module_that_uses_its_parent() {
+    let dir = rust_project(RUST_INLINE_TESTS, "");
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "--decision", "design/declaration-groups"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("above the imports").not());
+
+    let fixed = read(&dir, "src/lib.rs");
+    assert!(
+        fixed.find("const LIMIT").unwrap() < fixed.find("pub fn a").unwrap(),
+        "{fixed}"
+    );
+    assert!(fixed.ends_with("}\n") && fixed.contains("use super::*;"));
+}
