@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use crate::support::*;
 
 /// The fake plugin with the `fake/todo` rule declaring `reach`.
-struct Reading(Option<Reach>);
+struct Reading(Option<Reach>, bool);
 
 impl Plugin for Reading {
     fn manifest(&self) -> &PluginManifest {
@@ -33,7 +33,7 @@ impl Plugin for Reading {
             revision: "0".to_owned(),
             tools: Vec::new(),
         });
-        vec![Box::new(Declared(manifest))]
+        vec![Box::new(Declared(manifest, self.1))]
     }
 
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
@@ -41,12 +41,17 @@ impl Plugin for Reading {
     }
 }
 
-/// `Word` with a manifest of its own.
-struct Declared(RuleManifest);
+/// `Word` with a manifest of its own, which finds in a file what the file
+/// holds if `alone`.
+struct Declared(RuleManifest, bool);
 
 impl Rule for Declared {
     fn manifest(&self) -> &RuleManifest {
         &self.0
+    }
+
+    fn alone(&self, _: &str) -> bool {
+        self.1
     }
 
     fn validate(
@@ -66,12 +71,16 @@ impl Rule for Declared {
 }
 
 fn fixed(reach: Option<Reach>, files: &[(&str, &str)]) -> (TempDir, FixReport) {
+    fixed_by(reach, false, files)
+}
+
+fn fixed_by(reach: Option<Reach>, alone: bool, files: &[(&str, &str)]) -> (TempDir, FixReport) {
     let dir = tempfile::tempdir().unwrap();
     for (name, text) in files {
         fs::write(dir.path().join(name), text).unwrap();
     }
     let mut registry = Registry::default();
-    registry.register(&Reading(reach)).unwrap();
+    registry.register(&Reading(reach, alone)).unwrap();
     let config =
         Config::parse_inline("plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n").unwrap();
     let engine = Engine::new(
@@ -136,4 +145,25 @@ fn a_rule_that_reads_the_project_is_refused_by_any_gap() {
     assert_eq!(read(&dir, "a.toy"), "TODO\n");
     assert!(report.applied.is_empty());
     assert_eq!(report.declined.len(), 1);
+}
+
+#[test]
+fn a_rule_that_judges_a_file_by_itself_is_refused_only_by_a_gap_in_that_file() {
+    let (dir, report) = fixed_by(
+        None,
+        true,
+        &[
+            ("a.toy", "TODO\n"),
+            ("b.toy", "BROKEN\nTODO\n"),
+            ("c.toy", "BROKEN\n"),
+        ],
+    );
+
+    assert_eq!(read(&dir, "a.toy"), "DONE\n");
+    assert_eq!(read(&dir, "b.toy"), "BROKEN\nTODO\n");
+    assert_eq!(report.applied.len(), 1);
+    assert_eq!(report.declined.len(), 1);
+    assert_eq!(report.declined[0].file.to_string_lossy(), "b.toy");
+    assert!(report.declined[0].reason.contains("b.toy: cannot parse"));
+    assert!(report.notes.is_empty(), "{:?}", report.notes);
 }

@@ -409,9 +409,9 @@ pub(super) fn kept_proposals(
 /// The changed files whose check got worse: more findings of error or warn
 /// severity for some rule in a file, wherever in it (a finding that moves to
 /// another symbol of the file is not new, as `model::verify`'s `introduced`
-/// counts it), or a new gap in the analysis. A finding that is new in a file
-/// that was not changed is charged to the changed files it depends on (see
-/// [`Blame`]); a gap with no path condemns them all.
+/// counts it), or a new gap in the analysis. A finding or a gap that is new in
+/// a file that was not changed is charged to the changed files it depends on
+/// (see [`Blame`]); a gap with no path condemns them all.
 pub(super) fn worse(blame: &Blame<'_>) -> BTreeMap<PathBuf, String> {
     let (before, after) = blame.runs();
     let changed = blame.changed();
@@ -443,7 +443,20 @@ pub(super) fn worse(blame: &Blame<'_>) -> BTreeMap<PathBuf, String> {
                     format!("the file is no longer fully analyzed: {}", gap.reason)
                 });
             }
-            _ => {
+            // A file nobody changed is no one's doing but that of the changed
+            // files it has an edge to.
+            Some(path) => {
+                for cause in blame.reaching(path) {
+                    bad.entry(cause.clone()).or_insert_with(|| {
+                        format!(
+                            "the analysis became incomplete: {}: {}",
+                            path.display(),
+                            gap.reason
+                        )
+                    });
+                }
+            }
+            None => {
                 everyone.get_or_insert_with(|| {
                     format!("the analysis became incomplete: {}", gap.reason)
                 });

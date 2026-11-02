@@ -99,11 +99,7 @@ fn an_insert_before_the_first_kept_declaration_goes_above_its_comment() {
 #[test]
 fn members_with_one_blank_line_in_a_class_keep_one() {
     let text = "class K:\n    def a(self):\n        pass\n\n    def b(self):\n        pass\n\n    def c(self):\n        pass\n\n\nVALUE = 1\n";
-    let case = case(
-        text,
-        &[("a", 2, 3), ("b", 5, 6), ("c", 8, 9)],
-        vec![],
-    );
+    let case = case(text, &[("a", 2, 3), ("b", 5, 6), ("c", 8, 9)], vec![]);
 
     assert_eq!(
         case.run(&[after("c", "a")]).unwrap(),

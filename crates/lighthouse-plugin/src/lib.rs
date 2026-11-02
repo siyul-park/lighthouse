@@ -360,6 +360,12 @@ pub trait Rule: Send + Sync {
     fn after_suppression(&self) -> bool {
         false
     }
+    /// Whether what the rule finds in a file of `language` comes from that
+    /// file alone, whatever else the project holds: another file that is
+    /// incomplete, or that changed, cannot change it.
+    fn alone(&self, _language: &str) -> bool {
+        false
+    }
 }
 
 /// A bundle of language providers, analyzers, rules and fixers, all of whose

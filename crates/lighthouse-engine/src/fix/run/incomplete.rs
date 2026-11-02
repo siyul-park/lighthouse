@@ -19,7 +19,7 @@ pub(super) fn refusal(engine: &Engine, outcome: &Run, proposal: &Proposal) -> Op
     }
     let mut edited = proposal.files.clone();
     edited.push(proposal.file.clone());
-    let read: Vec<_> = match reach_of(engine, &proposal.rule_id) {
+    let read: Vec<_> = match reach_of(engine, outcome, proposal) {
         Reach::Local => edited.clone(),
         Reach::Neighbors => reach(&edited, outcome, outcome),
         Reach::Global => return outcome.incomplete.first().map(describe),
@@ -31,11 +31,23 @@ pub(super) fn refusal(engine: &Engine, outcome: &Run, proposal: &Proposal) -> Op
         .map(describe)
 }
 
-fn reach_of(engine: &Engine, rule: &str) -> Reach {
-    engine
-        .registry
-        .rule(rule)
-        .and_then(|rule| rule.manifest().caching.as_ref())
+/// How far the rule of `proposal` reads for its file: the file alone when the
+/// rule finds in a file of that language what the file holds, else as far as
+/// the rule declares.
+fn reach_of(engine: &Engine, outcome: &Run, proposal: &Proposal) -> Reach {
+    let Some(rule) = engine.registry.rule(&proposal.rule_id) else {
+        return Reach::Global;
+    };
+    let language = outcome
+        .project
+        .file(&proposal.file)
+        .map_or("", |file| file.lang.as_str());
+    if rule.alone(language) {
+        return Reach::Local;
+    }
+    rule.manifest()
+        .caching
+        .as_ref()
         .map_or(Reach::Global, |caching| caching.reach)
 }
 

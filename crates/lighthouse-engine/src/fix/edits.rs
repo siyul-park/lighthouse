@@ -204,7 +204,9 @@ pub(crate) fn with_blank(
     let last = text[below.end..]
         .lines()
         .find(|l| !l.trim().is_empty())
-        .is_none_or(|line| indent_of(line) < indent || line.trim_start().starts_with(['}', ')', ']']));
+        .is_none_or(|line| {
+            indent_of(line) < indent || line.trim_start().starts_with(['}', ')', ']'])
+        });
     match (first, last) {
         (true, true) => above.start..below.end,
         (true, false) => lines.start..below.end,
@@ -265,7 +267,11 @@ fn lines_len(run: &str, count: usize) -> usize {
 
 /// The byte length of the last `count` lines of `run`.
 fn lines_len_back(run: &str, count: usize) -> usize {
-    run.split_inclusive('\n').rev().take(count).map(str::len).sum()
+    run.split_inclusive('\n')
+        .rev()
+        .take(count)
+        .map(str::len)
+        .sum()
 }
 
 /// `range`, which runs to the end of the text, widened by the line end before
@@ -275,7 +281,11 @@ fn without_final_eol(text: &str, range: Range<usize>) -> Range<usize> {
     if range.end < text.len() || text.ends_with('\n') || range.start == 0 {
         return range;
     }
-    let eol = if text[..range.start].ends_with("\r\n") { 2 } else { 1 };
+    let eol = if text[..range.start].ends_with("\r\n") {
+        2
+    } else {
+        1
+    };
     range.start - eol..range.end
 }
 

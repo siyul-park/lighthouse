@@ -57,7 +57,13 @@ fn runs_around(text: &str, span: &Range<usize>) -> Vec<usize> {
 /// What goes in after the line that ends at `at`: each of `bodies` (whole
 /// lines) set apart by `separation` blank lines. When the text has no line end
 /// there, it is made one and what is put in leaves the text as it was, without.
-pub(super) fn after(text: &str, at: usize, separation: usize, bodies: &[String], eol: &str) -> String {
+pub(super) fn after(
+    text: &str,
+    at: usize,
+    separation: usize,
+    bodies: &[String],
+    eol: &str,
+) -> String {
     let unterminated = !text[..at].ends_with('\n');
     let mut put = String::new();
     if unterminated {

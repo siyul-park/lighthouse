@@ -62,6 +62,18 @@ impl CommandRule {
             })
     }
 
+    /// Whether the findings for a file of `language` are what the program
+    /// finds in that file alone: it is bundled, takes its files as arguments
+    /// and is `independent`, so that no other file, complete or not, changes
+    /// them.
+    pub(crate) fn alone(&self, scope: RunScope, language: &str) -> bool {
+        self.batched(scope)
+            && self
+                .programs
+                .of(language)
+                .is_some_and(|program| program.independent)
+    }
+
     /// The programs the findings come from, by name.
     pub(crate) fn tools(&self) -> Vec<String> {
         let names: BTreeSet<&String> = self

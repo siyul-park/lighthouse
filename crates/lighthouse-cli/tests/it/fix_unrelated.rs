@@ -1,48 +1,179 @@
-//! A file nobody edited does not undo the fixes of the others: one that does
-//! not parse, one of a language without a fix or a generated one, named among
-//! the paths to fix, or left in the project, rolls nothing back.
+//! A file nobody edited does not undo or hold back the fixes of the others:
+//! one that does not parse, one of another language, a generated one, named
+//! among the paths to fix or changed in the working tree, rolls nothing back
+//! and declines nothing but what reads it. Over Go and Python projects with the
+//! real plugins and their standard formatters.
+
+use std::{fs, path::Path, process::Command};
 
 use predicates::prelude::*;
+use tempfile::TempDir;
 
-use crate::fix::{lighthouse, read, rust_project, write};
+use crate::fix::{lighthouse, read, write};
 
-/// A function that reads a constant declared after it: `declaration-groups`
-/// moves the constant above it.
-fn misordered(n: u32) -> String {
-    format!(
-        "/// A.\npub fn a{n}() -> i32 {{\n    LIMIT\n}}\n\n/// The limit.\nconst LIMIT: i32 = {n};\n"
-    )
-}
+const UNFORMATTED: &str = "func   Helper() int {\nreturn 1\n}\n";
+const FORMATTED: &str = "func Helper() int {\n\treturn 1\n}\n";
+const BROKEN: &str = "func broken( {\n";
 
-const BROKEN: &str = "pub fn broken( {\n";
-
-#[test]
-fn a_file_that_does_not_parse_rolls_nothing_back() {
-    let dir = rust_project(&misordered(1), "");
-    write(dir.path(), "src/one.rs", &misordered(2));
-    write(dir.path(), "src/two.rs", &misordered(3));
-    write(dir.path(), "src/broken.rs", BROKEN);
-
-    lighthouse(dir.path())
-        .args([
-            "check",
-            "--fix",
-            "--decision",
-            "design/declaration-groups",
-            "src/lib.rs",
-            "src/one.rs",
-            "src/two.rs",
-            "src/broken.rs",
-        ])
-        .assert()
-        .stderr(predicate::str::contains("rolled back").not());
-
-    for file in ["src/lib.rs", "src/one.rs", "src/two.rs"] {
-        let fixed = read(&dir, file);
-        assert!(
-            fixed.find("const LIMIT").unwrap() < fixed.find("pub fn a").unwrap(),
-            "{file}: {fixed}"
+/// A Go project with the formatter rule, of the packages `p1` to `p3`
+/// unformatted, and the files `extra`; `None` after a skip message when there
+/// is no Go toolchain or no Python.
+fn project(extra: &[(&str, &str)]) -> Option<TempDir> {
+    let go = lighthouse_test_support::lang_go()?;
+    let python = lighthouse_test_support::lang_python()?;
+    let dir = tempfile::tempdir().unwrap();
+    lighthouse_test_support::installed(&dir.path().join(".home"), &go);
+    lighthouse_test_support::installed(&dir.path().join(".home"), &python);
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_test_support::project(
+            "plugins = [\"lang-go\", \"lang-python\"]\nextends = [\"core/recommended\", \"go/recommended\"]\n",
+        ),
+    );
+    write(dir.path(), "go.mod", "module example.com/demo\n\ngo 1.26\n");
+    for n in 1..=3 {
+        write(
+            dir.path(),
+            &format!("p{n}/a.go"),
+            &format!("package p{n}\n\n{UNFORMATTED}"),
         );
     }
-    assert_eq!(read(&dir, "src/broken.rs"), BROKEN);
+    for (name, text) in extra {
+        write(dir.path(), name, text);
+    }
+    Some(dir)
+}
+
+/// Whether `p1` to `p3` are formatted.
+fn formatted(dir: &TempDir) {
+    for n in 1..=3 {
+        assert_eq!(
+            read(dir, &format!("p{n}/a.go")),
+            format!("package p{n}\n\n{FORMATTED}")
+        );
+    }
+}
+
+#[test]
+fn a_go_file_that_does_not_parse_rolls_nothing_back() {
+    let broken = format!("package p4\n\n{BROKEN}");
+    let Some(dir) = project(&[("p4/a.go", &broken)]) else {
+        return;
+    };
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "p1", "p2", "p3", "p4"])
+        .assert()
+        .stderr(predicate::str::contains("rolled back").not())
+        .stderr(predicate::str::contains("not fixed").not())
+        .stderr(predicate::str::contains("3 fix(es) applied, 0 left alone"))
+        .stdout(predicate::str::contains("p4/a.go: incomplete"));
+
+    formatted(&dir);
+    assert_eq!(read(&dir, "p4/a.go"), broken);
+}
+
+#[test]
+fn a_python_file_that_does_not_parse_does_not_hold_the_go_fixes_back() {
+    let Some(dir) = project(&[("tool.py", "def broken(:\n")]) else {
+        return;
+    };
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "p1", "p2", "p3", "tool.py"])
+        .assert()
+        .stderr(predicate::str::contains("rolled back").not())
+        .stderr(predicate::str::contains("not fixed").not())
+        .stderr(predicate::str::contains("3 fix(es) applied, 0 left alone"))
+        .stdout(predicate::str::contains("tool.py: incomplete"));
+
+    formatted(&dir);
+}
+
+#[test]
+fn a_python_file_that_does_not_parse_does_not_hold_the_python_fixes_back() {
+    let Some(dir) = project(&[
+        ("a.py", "def fa( x ):\n    return x+1\n"),
+        ("b.py", "def fb( x ):\n    return x+1\n"),
+        ("bad.py", "def broken(:\n"),
+    ]) else {
+        return;
+    };
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "a.py", "b.py", "bad.py"])
+        .assert()
+        .stderr(predicate::str::contains("rolled back").not())
+        .stderr(predicate::str::contains("not fixed").not())
+        .stderr(predicate::str::contains("2 fix(es) applied, 0 left alone"))
+        .stdout(predicate::str::contains("bad.py: incomplete"));
+
+    assert_eq!(read(&dir, "a.py"), "def fa(x):\n    return x + 1\n");
+    assert_eq!(read(&dir, "b.py"), "def fb(x):\n    return x + 1\n");
+    assert_eq!(read(&dir, "bad.py"), "def broken(:\n");
+}
+
+#[test]
+fn a_generated_file_among_the_paths_changes_nothing_and_holds_nothing_back() {
+    let generated =
+        format!("// Code generated by tool. DO NOT EDIT.\n\npackage p5\n\n{UNFORMATTED}");
+    let Some(dir) = project(&[("p5/gen.go", &generated)]) else {
+        return;
+    };
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "p1", "p2", "p3", "p5"])
+        .assert()
+        .stderr(predicate::str::contains("rolled back").not())
+        .stderr(predicate::str::contains("3 fix(es) applied, 0 left alone"));
+
+    formatted(&dir);
+    assert_eq!(read(&dir, "p5/gen.go"), generated);
+}
+
+/// `git` in `dir`, quietly.
+fn git(dir: &Path, args: &[&str]) {
+    let status = Command::new("git")
+        .current_dir(dir)
+        .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+        .args(args)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .output()
+        .expect("git runs")
+        .status;
+    assert!(status.success(), "git {args:?}");
+}
+
+#[test]
+fn the_changed_files_are_fixed_though_one_of_them_does_not_parse() {
+    let broken = format!("package p4\n\n{BROKEN}");
+    let Some(dir) = project(&[("p4/a.go", "package p4\n\nfunc fine() {}\n")]) else {
+        return;
+    };
+    write(dir.path(), ".gitignore", ".home/\n.lighthouse/\n");
+    git(dir.path(), &["init", "-q"]);
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "init"]);
+    for n in 1..=3 {
+        let path = dir.path().join(format!("p{n}/a.go"));
+        fs::write(
+            &path,
+            format!("{}// edited\n", fs::read_to_string(&path).unwrap()),
+        )
+        .unwrap();
+    }
+    write(dir.path(), "p4/a.go", &broken);
+
+    lighthouse(dir.path())
+        .args(["check", "--fix", "--changed"])
+        .assert()
+        .stderr(predicate::str::contains("rolled back").not())
+        .stderr(predicate::str::contains("not fixed").not());
+
+    for n in 1..=3 {
+        let text = read(&dir, &format!("p{n}/a.go"));
+        assert!(text.contains(FORMATTED), "p{n}: {text}");
+    }
+    assert_eq!(read(&dir, "p4/a.go"), broken);
 }

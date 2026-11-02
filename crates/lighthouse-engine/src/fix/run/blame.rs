@@ -76,17 +76,21 @@ impl<'a> Blame<'a> {
     /// charged to: by the reach of the rule, none, those the file's symbols
     /// have an edge to or from, or all.
     pub(super) fn charged(&self, file: &Path, rule: &str) -> Vec<&'a PathBuf> {
-        match self.reach_of(rule) {
+        match self.reach_of(rule, file) {
             Reach::Local => Vec::new(),
             Reach::Global => self.changed.iter().collect(),
-            Reach::Neighbors => self
-                .changed
-                .iter()
-                .zip(self.reached())
-                .filter(|(_, reached)| reached.contains(file))
-                .map(|(changed, _)| changed)
-                .collect(),
+            Reach::Neighbors => self.reaching(file),
         }
+    }
+
+    /// The changed files that have an edge to or from `file`, in either state.
+    pub(super) fn reaching(&self, file: &Path) -> Vec<&'a PathBuf> {
+        self.changed
+            .iter()
+            .zip(self.reached())
+            .filter(|(_, reached)| reached.contains(file))
+            .map(|(changed, _)| changed)
+            .collect()
     }
 
     /// The unchanged files with a new finding that is charged to some changed
@@ -108,13 +112,24 @@ impl<'a> Blame<'a> {
         found
     }
 
-    /// How far a finding of `rule` reaches: a rule that declares nothing
-    /// reads the project.
-    fn reach_of(&self, rule: &str) -> Reach {
-        self.engine
-            .registry
-            .rule(rule)
-            .and_then(|rule| rule.manifest().caching.as_ref())
+    /// How far a finding of `rule` in `file` reaches: a rule that declares
+    /// nothing reads the project, and one that finds in a file of its language
+    /// what the file holds reads the file.
+    fn reach_of(&self, rule: &str, file: &Path) -> Reach {
+        let Some(rule) = self.engine.registry.rule(rule) else {
+            return Reach::Global;
+        };
+        let language = self
+            .after
+            .project
+            .file(file)
+            .map_or("", |f| f.lang.as_str());
+        if rule.alone(language) {
+            return Reach::Local;
+        }
+        rule.manifest()
+            .caching
+            .as_ref()
             .map_or(Reach::Global, |caching| caching.reach)
     }
 

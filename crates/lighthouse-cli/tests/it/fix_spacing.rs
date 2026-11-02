@@ -47,10 +47,7 @@ fn python_keeps_two_blank_lines_a_decorator_and_a_comment_with_its_fixture() {
 #[test]
 fn python_keeps_crlf_line_ends_and_the_separation() {
     let crlf = |text: &str| text.replace('\n', "\r\n");
-    let Some(dir) = python(&[
-        ("shapes.py", SHAPES),
-        ("test_shapes.py", &crlf(PYTHON)),
-    ]) else {
+    let Some(dir) = python(&[("shapes.py", SHAPES), ("test_shapes.py", &crlf(PYTHON))]) else {
         return;
     };
 
@@ -94,10 +91,7 @@ fn typescript_keeps_one_blank_line_where_two_runs_were_bridged() {
         return;
     };
 
-    assert_eq!(
-        fixed(&dir, "testing/file-layout", "svc.test.ts"),
-        TS_FIXED
-    );
+    assert_eq!(fixed(&dir, "testing/file-layout", "svc.test.ts"), TS_FIXED);
 }
 
 const RUST: &str = "/// Doubles.\n#[inline]\npub fn double() -> i32 {\n    LIMIT * 2\n}\n\n\n/// The limit.\n#[allow(dead_code)]\nconst LIMIT: i32 = 3;\n\n/// The name.\nstatic NAME: &str = \"n\";\n\n/// Uses the name.\npub fn name() -> &'static str {\n    NAME\n}\n";
@@ -122,8 +116,5 @@ fn go_moves_a_const_group_and_a_var_with_their_comments_and_one_blank_line() {
         return;
     };
 
-    assert_eq!(
-        fixed(&dir, "design/declaration-groups", "a.go"),
-        GO_FIXED
-    );
+    assert_eq!(fixed(&dir, "design/declaration-groups", "a.go"), GO_FIXED);
 }

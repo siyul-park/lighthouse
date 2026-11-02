@@ -446,9 +446,7 @@ impl<'a> Lowerer<'a> {
             .project
             .symbols_in(&of.symbol.file)
             .filter_map(|s| self.block(&Node::Symbol(s.id.clone())).ok())
-            .filter(|b| {
-                b.group.is_none() && b.container == of.container && b.scope == of.scope
-            })
+            .filter(|b| b.group.is_none() && b.container == of.container && b.scope == of.scope)
             .map(|b| carried(text, &b))
             .collect();
         spans.sort_by_key(|s| s.start);
@@ -552,7 +550,8 @@ fn with_leading_comments(text: &str, mut start: usize) -> usize {
 /// Whether a trimmed line is a line comment: `//`, or `#` that does not open
 /// an attribute (`#[`, `#![`).
 fn comment_line(line: &str) -> bool {
-    line.starts_with("//") || (line.starts_with('#') && !line.starts_with("#[") && !line.starts_with("#!["))
+    line.starts_with("//")
+        || (line.starts_with('#') && !line.starts_with("#[") && !line.starts_with("#!["))
 }
 
 /// The end of the line that holds the end of a range: just past the newline

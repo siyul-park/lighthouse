@@ -41,7 +41,7 @@ pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir>
 }
 
 /// The same, with the pack `go` and its recommended decisions: `core/formatted`.
-fn go_formatted_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
+pub(crate) fn go_formatted_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
     go_project_in(files, extra, "go")
 }
 

@@ -216,6 +216,10 @@ impl Rule for Check {
         matches!(&*self.kind, Kind::Cel(rule) if rule.after_suppression())
     }
 
+    fn alone(&self, language: &str) -> bool {
+        matches!(&*self.kind, Kind::Command(rule) if rule.alone(self.meta.scope, language))
+    }
+
     /// Accepts the options when they resolve against the decision's declared
     /// options: known keys of the declared types.
     fn validate(&self, options: &Options) -> Result<(), PluginError> {

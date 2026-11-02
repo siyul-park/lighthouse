@@ -74,8 +74,39 @@ impl Rule for Ghost {
     }
 }
 
-/// The toy plugin with the rule above, and a fix that declares `z`.
-struct Haunted(Option<Reach>);
+/// Cannot judge `ghost.toy` for as long as `a.toy` declares `fn z`: a gap that
+/// appears in a file nobody edited.
+struct Murk {
+    manifest: RuleManifest,
+}
+
+impl Rule for Murk {
+    fn manifest(&self) -> &RuleManifest {
+        &self.manifest
+    }
+
+    fn validate(&self, _: &Options) -> Result<(), PluginError> {
+        Ok(())
+    }
+
+    fn check(&self, ctx: &Context, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+        let (file, _) = ctx
+            .file
+            .ok_or_else(|| PluginError::Failed("no file".into()))?;
+        let declared = ctx
+            .project
+            .symbols_in(Path::new("a.toy"))
+            .any(|symbol| symbol.name == "z");
+        if file.path == Path::new("ghost.toy") && declared {
+            return Err(PluginError::Incomplete("the file is murky".to_owned()));
+        }
+        Ok(Vec::new())
+    }
+}
+
+/// The toy plugin with the rule above, and a fix that declares `z`; with `murky`,
+/// the rule leaves a gap in `ghost.toy` instead of a finding.
+struct Haunted(Option<Reach>, bool);
 
 impl Plugin for Haunted {
     fn manifest(&self) -> &PluginManifest {
@@ -87,10 +118,22 @@ impl Plugin for Haunted {
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
+        let ghost: Box<dyn Rule> = if self.1 {
+            let mut manifest = Word::new("fake/ghost", "GHOST").manifest().clone();
+            manifest.caching = self.0.map(|reach| Caching {
+                reach,
+                positions: false,
+                revision: "0".to_owned(),
+                tools: Vec::new(),
+            });
+            Box::new(Murk { manifest })
+        } else {
+            Box::new(Ghost::new(self.0))
+        };
         vec![
             Box::new(Word::new("fake/todo", "TODO")),
             Box::new(Word::new("fake/bad", "BAD")),
-            Box::new(Ghost::new(self.0)),
+            ghost,
         ]
     }
 
@@ -111,10 +154,19 @@ fn haunted_by(
     ghost: &str,
     repair: bool,
 ) -> (tempfile::TempDir, FixReport) {
+    ghosted((reach, fixer), ghost, (repair, false))
+}
+
+/// The same; `murky` says the ghost is a gap and not a finding.
+fn ghosted(
+    (reach, fixer): (Option<Reach>, &str),
+    ghost: &str,
+    (repair, murky): (bool, bool),
+) -> (tempfile::TempDir, FixReport) {
     let dir = project("fn a\nTODO\n");
     fs::write(dir.path().join("ghost.toy"), ghost).unwrap();
     let mut registry = Registry::default();
-    registry.register(&Haunted(reach)).unwrap();
+    registry.register(&Haunted(reach, murky)).unwrap();
     let config = Config::parse_inline(
         "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/bad\" = \"error\"\n\"fake/ghost\" = \"error\"\n",
     )
@@ -179,6 +231,24 @@ fn a_global_finding_that_turns_up_in_an_unchanged_file_charges_the_changed_files
         "{:?}",
         report.notes
     );
+}
+
+#[test]
+fn a_gap_that_turns_up_in_an_unchanged_file_charges_only_the_files_that_reach_it() {
+    let far = ghosted(
+        (Some(Reach::Neighbors), "fake/declare"),
+        "fn g\nBOO\n",
+        (false, true),
+    );
+    let near = ghosted(
+        (Some(Reach::Neighbors), "fake/declare"),
+        "fn g\ncall z\nBOO\n",
+        (false, true),
+    );
+
+    assert!(is_kept(&far.0), "{:?}", far.1.notes);
+    assert!(!is_kept(&near.0));
+    assert!(near.1.notes[0].contains("murky"), "{:?}", near.1.notes);
 }
 
 #[test]
