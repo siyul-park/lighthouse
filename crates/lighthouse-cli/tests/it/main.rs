@@ -8,6 +8,7 @@ mod cache_fixtures;
 mod checks;
 mod cli;
 mod command_sarif;
+mod decision_portable;
 mod environment;
 mod explore;
 mod fix;

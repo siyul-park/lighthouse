@@ -18,6 +18,17 @@ export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
 
 .PHONY: plugins cli test lint decisions docs ci fast
 
+# `decision test` of the decisions $(1) (all when empty), which fails when it
+# fails and also when it skipped an example: the gate lists every plugin and
+# trusts the project, so a skip is an example that never ran here. The command
+# itself exits 0 on a skip, as `cargo test` does on an ignored test; the
+# summary line is what says `0 skipped`.
+define test-examples
+out=$$(LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) decision test $(1)) || { printf '%s\n' "$$out"; exit 1; }; \
+printf '%s\n' "$$out"; \
+printf '%s\n' "$$out" | grep -q ', 0 skipped,' || { echo 'the gate runs every example: some were skipped' >&2; exit 1; }
+endef
+
 # Builds the out-of-process plugins; each directory holds the binary, its
 # lighthouse-plugin.toml and, for a plugin that provides packs, its `decisions/`:
 # the layout plugin discovery expects. Binaries are replaced by rename, never overwritten in place: macOS caches a binary's
@@ -80,11 +91,11 @@ lint: plugins cli
 	cd plugins/lang-python && ruff format --check . && ruff check . && python3 -I scripts/wire.py --check
 	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) check $(wildcard plugins/*/decisions)
 	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) check . --allow-incomplete
-	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) decision test 'markdown/*'
+	$(call test-examples,'markdown/*')
 
 # Every example of every checked decision, and the generated docs.
 decisions: plugins cli
-	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) decision test
+	$(call test-examples,)
 
 docs: cli
 	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) docs check
