@@ -124,13 +124,7 @@ impl<'a> Blame<'a> {
             .project
             .file(file)
             .map_or("", |f| f.lang.as_str());
-        if rule.alone(language) {
-            return Reach::Local;
-        }
-        rule.manifest()
-            .caching
-            .as_ref()
-            .map_or(Reach::Global, |caching| caching.reach)
+        rule.reach(language)
     }
 
     fn reached(&self) -> &[BTreeSet<PathBuf>] {

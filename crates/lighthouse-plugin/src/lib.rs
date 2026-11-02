@@ -360,11 +360,13 @@ pub trait Rule: Send + Sync {
     fn after_suppression(&self) -> bool {
         false
     }
-    /// Whether what the rule finds in a file of `language` comes from that
-    /// file alone, whatever else the project holds: another file that is
-    /// incomplete, or that changed, cannot change it.
-    fn alone(&self, _language: &str) -> bool {
-        false
+    /// How far what the rule finds in a file of `language` reaches: what its
+    /// manifest declares, and the whole project when it declares nothing.
+    fn reach(&self, _language: &str) -> Reach {
+        self.manifest()
+            .caching
+            .as_ref()
+            .map_or(Reach::Global, |caching| caching.reach)
     }
 }
 

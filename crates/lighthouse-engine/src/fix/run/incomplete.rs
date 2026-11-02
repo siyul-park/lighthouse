@@ -31,9 +31,7 @@ pub(super) fn refusal(engine: &Engine, outcome: &Run, proposal: &Proposal) -> Op
         .map(describe)
 }
 
-/// How far the rule of `proposal` reads for its file: the file alone when the
-/// rule finds in a file of that language what the file holds, else as far as
-/// the rule declares.
+/// How far the rule of `proposal` reads for the file of the proposal.
 fn reach_of(engine: &Engine, outcome: &Run, proposal: &Proposal) -> Reach {
     let Some(rule) = engine.registry.rule(&proposal.rule_id) else {
         return Reach::Global;
@@ -42,13 +40,7 @@ fn reach_of(engine: &Engine, outcome: &Run, proposal: &Proposal) -> Reach {
         .project
         .file(&proposal.file)
         .map_or("", |file| file.lang.as_str());
-    if rule.alone(language) {
-        return Reach::Local;
-    }
-    rule.manifest()
-        .caching
-        .as_ref()
-        .map_or(Reach::Global, |caching| caching.reach)
+    rule.reach(language)
 }
 
 fn covers(engine: &Engine, outcome: &Run, gap: &Incomplete, file: &Path) -> bool {

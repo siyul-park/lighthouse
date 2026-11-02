@@ -50,8 +50,12 @@ impl Rule for Declared {
         &self.0
     }
 
-    fn alone(&self, _: &str) -> bool {
-        self.1
+    fn reach(&self, _: &str) -> Reach {
+        if self.1 {
+            Reach::Local
+        } else {
+            self.0.caching.as_ref().map_or(Reach::Global, |c| c.reach)
+        }
     }
 
     fn validate(

@@ -216,8 +216,17 @@ impl Rule for Check {
         matches!(&*self.kind, Kind::Cel(rule) if rule.after_suppression())
     }
 
-    fn alone(&self, language: &str) -> bool {
-        matches!(&*self.kind, Kind::Command(rule) if rule.alone(self.meta.scope, language))
+    /// A command that finds in a file what the file alone holds reads only
+    /// that file, whatever the rule's declared reach.
+    fn reach(&self, language: &str) -> Reach {
+        match &*self.kind {
+            Kind::Command(rule) if rule.alone(self.meta.scope, language) => Reach::Local,
+            _ => self
+                .meta
+                .caching
+                .as_ref()
+                .map_or(Reach::Global, |caching| caching.reach),
+        }
     }
 
     /// Accepts the options when they resolve against the decision's declared
