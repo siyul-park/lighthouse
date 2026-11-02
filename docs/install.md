@@ -1,6 +1,6 @@
 # Install
 
-Lighthouse is the `lighthouse` executable and its plugins. A release archive holds both: the plugins sit in `plugins/` next to the executable, where discovery finds them, so unpacking the archive is the whole install. Until the official release every build is the prerelease `v0.0.0-<sha12>` of a commit (`lighthouse --version` prints `0.0.0-<sha12>`); pin the one you use. Releases are built for `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` and `aarch64-apple-darwin`.
+Lighthouse is the `lighthouse` executable and its plugins. A release archive holds both: the plugins sit in `plugins/` next to the executable, where discovery finds them, so unpacking the archive is the whole install. Until the official release every build is the prerelease `v0.0.0-<sha12>` of a commit (`lighthouse --version` prints `0.0.0-<sha12>`); pin the one you use. Releases are built for `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin` and `x86_64-apple-darwin`.
 
 ## GitHub Action
 

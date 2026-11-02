@@ -18,6 +18,7 @@ runs:
           Linux-X64) target=x86_64-unknown-linux-gnu ;;
           Linux-ARM64) target=aarch64-unknown-linux-gnu ;;
           macOS-ARM64) target=aarch64-apple-darwin ;;
+          macOS-X64) target=x86_64-apple-darwin ;;
           *) echo "Lighthouse has no build for $RUNNER_TARGET" >&2; exit 1 ;;
         esac
         name=lighthouse-$LIGHTHOUSE_VERSION-$target
