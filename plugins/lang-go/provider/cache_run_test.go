@@ -217,6 +217,48 @@ func TestProviderCache(t *testing.T) {
 	})
 }
 
+func TestProviderCacheBuildContext(t *testing.T) {
+	root, cache := t.TempDir(), t.TempDir()
+	writeTree(t, root, map[string]string{
+		"go.mod":             cacheModule,
+		"p/enter_arm64.go":   "package p\n\nfunc Enter() int { return 1 }\n",
+		"p/enter_other.go":   "//go:build !arm64\n\npackage p\n\nfunc Enter() int { return 2 }\n",
+		"p/tagged.go":        "//go:build tagged\n\npackage p\n\nfunc Tagged() {}\n",
+		"p/enter_test.go":    "package p\n\nimport \"testing\"\n\nfunc TestEnter(t *testing.T) { _ = Enter() }\n",
+		"q/q.go":             "package q\n\nimport \"example.com/m/p\"\n\nfunc Q() int { return p.Enter() }\n",
+		"p/enter_windows.go": "package p\n\nfunc Windows() {}\n",
+	})
+	contexts := []map[string]string{
+		{"GOOS": "linux", "GOARCH": "arm64"},
+		{"GOOS": "linux", "GOARCH": "amd64"},
+		{"GOOS": "windows", "GOARCH": "amd64"},
+		{"GOOS": "linux", "GOARCH": "amd64", "GOFLAGS": "-tags=tagged"},
+		{"GOOS": "linux", "GOARCH": "amd64", "CGO_ENABLED": "0"},
+	}
+	cold := make([]string, len(contexts))
+	for i, env := range contexts {
+		setBuildContext(t, env)
+		cold[i], _ = indexWith(t, provider.New("lang-go", "test"), root, "", nil)
+	}
+	g := provider.New("lang-go", "test")
+	for _, i := range []int{0, 1, 0, 2, 1, 1, 3, 0, 4, 3, 2, 2, 0} {
+		setBuildContext(t, contexts[i])
+		got, _ := indexWith(t, g, root, cache, nil)
+		require.JSONEq(t, cold[i], got, "context %v after the runs before it", contexts[i])
+	}
+}
+
+func TestProviderRejectedBuildContext(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{"go.mod": cacheModule, "p/p.go": "package p\n"})
+	setBuildContext(t, map[string]string{"GOOS": "darwin", "GOARCH": "386"})
+
+	got, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
+
+	require.Contains(t, got, "go list failed in")
+	require.Contains(t, got, "the go command listed no package")
+}
+
 // indexWith indexes every Go file of root, with the cache directory when it is
 // not empty, and returns the result as JSON.
 func indexWith(t *testing.T, g *provider.Provider, root, cache string, options map[string]json.RawMessage) (string, provider.RunStats) {
@@ -284,4 +326,13 @@ func writeFile(t *testing.T, root, name, text string) {
 	path := filepath.Join(root, filepath.FromSlash(name))
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte(text), 0o644))
+}
+
+// setBuildContext sets the go command's variables of one build context in the
+// process environment and clears the ones it leaves out.
+func setBuildContext(t *testing.T, env map[string]string) {
+	t.Helper()
+	for _, k := range []string{"GOOS", "GOARCH", "GOFLAGS", "CGO_ENABLED"} {
+		t.Setenv(k, env[k])
+	}
 }

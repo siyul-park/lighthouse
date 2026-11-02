@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/token"
 	"go/types"
@@ -323,6 +324,11 @@ func (r *run) loadPackages(b *batch) ([]*packages.Package, error) {
 	var pkgs []*packages.Package
 	var err error
 	r.opts.load(func() { pkgs, err = packages.Load(cfg, b.patterns(r.root)...) })
+	if err == nil && len(pkgs) == 0 && len(b.files) > 0 {
+		// An environment the go command rejects, such as an unsupported
+		// GOOS/GOARCH pair, lists nothing and says nothing to go/packages.
+		err = errors.New("the go command listed no package; check GOOS, GOARCH, GOFLAGS and the tags and env of [languages.go]")
+	}
 	return pkgs, err
 }
 

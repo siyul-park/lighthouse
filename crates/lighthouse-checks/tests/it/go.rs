@@ -635,3 +635,69 @@ fn a_test_of_a_variant_in_the_test_file_of_another_stem_is_misplaced() {
         );
     }
 }
+
+/// Everything a run of the build context `goarch` reports, as text: findings,
+/// notices and incompletes, with the result cache at `cache` when given.
+fn report(plugin: &Path, root: &Path, goarch: &str, cache: Option<&Path>) -> String {
+    let config = Config::parse_inline(&format!(
+        "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"testing\"]\nextends = [\"testing/recommended\"]\n\n[languages.go]\nenv = {{ GOOS = \"linux\", GOARCH = \"{goarch}\" }}\n",
+        plugin.to_str().unwrap()
+    ))
+    .unwrap();
+    let mut engine = Engine::new(
+        registry(plugin),
+        config,
+        lighthouse_test_support::bundled(),
+        root,
+    )
+    .unwrap();
+    if let Some(dir) = cache {
+        engine = engine.with_cache(dir.to_path_buf(), u64::MAX);
+    }
+    let outcome = engine.check(&[], &[]).unwrap();
+    let mut lines: Vec<String> = outcome
+        .diagnostics
+        .iter()
+        .map(|d| {
+            format!(
+                "{} {}:{} {}",
+                d.rule_id,
+                d.file.display(),
+                d.span.start.line,
+                d.message
+            )
+        })
+        .collect();
+    lines.extend(outcome.notices.iter().map(|n| format!("notice {n}")));
+    lines.extend(
+        outcome
+            .incomplete
+            .iter()
+            .map(|i| format!("incomplete {i:?}")),
+    );
+    lines.join("\n")
+}
+
+#[test]
+fn a_warm_run_in_a_build_context_equals_its_cold_run_whatever_context_ran_before() {
+    let Some(plugin) = go_plugin() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write_variants(root, "util_extra_test.go");
+    let cold = |goarch: &str| report(&plugin, root, goarch, None);
+    let (arm64, amd64) = (cold("arm64"), cold("amd64"));
+    assert_ne!(arm64, amd64, "the fixture must tell the contexts apart");
+
+    let cache = tempfile::tempdir().unwrap();
+    let cache = cache.path().join("cache");
+    for goarch in [
+        "arm64", "amd64", "amd64", "arm64", "arm64", "amd64", "arm64",
+    ] {
+        let want = if goarch == "arm64" { &arm64 } else { &amd64 };
+        assert_eq!(
+            &report(&plugin, root, goarch, Some(&cache)),
+            want,
+            "{goarch}"
+        );
+    }
+}
