@@ -18,7 +18,7 @@ use std::{
 };
 
 use lighthouse_model::{
-    Diagnostic, Fingerprint, Incomplete, Options, Reach, RunScope, Severity,
+    Diagnostic, Fingerprint, GeneratedSpec, Incomplete, Options, Reach, RunScope, Severity,
     ucm::{Applicability, Capability, File, Fragment, Project},
 };
 use lighthouse_process::Policy;
@@ -403,6 +403,11 @@ pub trait Plugin {
     /// `node_modules/`), as the project's `ignores` are written.
     fn ignores(&self) -> Vec<String> {
         Vec::new()
+    }
+    /// The files and the head-of-file markers that tell the generated code of
+    /// its ecosystem apart, as the project's `generated` is written.
+    fn generated(&self) -> GeneratedSpec {
+        GeneratedSpec::default()
     }
 }
 

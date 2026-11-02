@@ -5,7 +5,7 @@ import { Provider } from "../src/provider.ts";
 import { serve } from "../src/sdk/server.ts";
 
 const INITIALIZE = {
-  protocolVersion: "0.4",
+  protocolVersion: "0.5",
   clientInfo: { name: "test", version: "0" },
   workspaceFolders: [{ uri: "file:///workspace", name: "workspace" }],
 };

@@ -26,7 +26,7 @@ The Rust language provider: reads sources with `syn`, resolves names through its
 | `edges` | `calls`, `references`, `imports`, `implements`, `contains` with sites; `syntactic` or `heuristic` where names are not settled |
 | `functions` | flow, nesting, statements, tokens, signature, `events` (panicking macros, `unwrap`, `expect`), `forwards_to`, `implementation`, `constructs`, `manual_assertions` |
 | `tests` | `#[test]` and its framework variants, in unit and integration targets |
-| `comments`, `generated` | doc and line comments; `@generated` headers |
+| `comments` | doc and line comments (the host reads the `@generated` header) |
 
 Capabilities: `extent`, `reference-sites`, `overlays`, `source-ast`.
 
@@ -49,7 +49,7 @@ A Rust fence of a Markdown file is a unit of its own, as rustdoc reads a doctest
 
 ## Conformance
 
-Goldens: `crates/lighthouse-rpc/tests/conformance/rust`. Shared cases (the same name in every language plugin): `comments`, `errors`, `excluded`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`, and `events`. Own cases: `bins`, `calls`, `editions`, `guesses`, `impls`, `layout`, `macros`, `modules`, `private-traits`, `reexports`, `traits`, `support`, `unpublished`, `workspace`.
+Goldens: `crates/lighthouse-rpc/tests/conformance/rust`. Shared cases (the same name in every language plugin): `comments`, `errors`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`, and `events`. Own cases: `bins`, `calls`, `editions`, `guesses`, `impls`, `layout`, `macros`, `modules`, `private-traits`, `reexports`, `traits`, `support`, `unpublished`, `workspace`.
 
 ## Build
 

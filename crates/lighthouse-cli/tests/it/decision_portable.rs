@@ -133,7 +133,7 @@ fn what_a_project_extends_or_sets_does_not_change_what_its_examples_do() {
     let busy = project(
         &[("lang-go", go)],
         &["core/recommended", "design/strict", "go/recommended"],
-        "generated = { check = \"include\" }\n[rules]\n\"core/max-lines\" = \"off\"\n\"design/complexity\" = \"off\"\n[[overrides]]\nfiles = [\"**/*.yaml\"]\nrules = { \"core/max-len\" = \"off\" }\n",
+        "generated = { files = [\"nothing/\"] }\n[rules]\n\"core/max-lines\" = \"off\"\n\"design/complexity\" = \"off\"\n[[overrides]]\nfiles = [\"**/*.yaml\"]\nrules = { \"core/max-len\" = \"off\" }\n",
     );
 
     let plain = stdout(&decision_test(&bare, &[]));

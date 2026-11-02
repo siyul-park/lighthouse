@@ -11,6 +11,7 @@ use crate::{
     cache::{Cache, Error as CacheError},
     documents::Documents,
     facts::FindingFacts,
+    generated::Generated,
     timings::Timings,
 };
 use lighthouse_model::RunScope;
@@ -23,8 +24,8 @@ use lighthouse_plugin::{
     Workspace,
 };
 use lighthouse_spec::{
-    Catalog, Config, GeneratedCheck, GlobSet, Models as BoundModels, ProjectFiles, Projects,
-    Routing, RuleConfig, Subject as DecisionSubject,
+    Catalog, Config, GlobSet, Models as BoundModels, ProjectFiles, Projects, Routing, RuleConfig,
+    Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
@@ -239,6 +240,8 @@ pub struct Engine {
     documented: BTreeSet<String>,
     /// The files of the project: what every walk of it lists.
     pub(crate) files: ProjectFiles,
+    /// How generated code is told apart.
+    generated: Generated,
     pub(crate) ws: Workspace,
     /// What the decisions that read the options of another read.
     inherited: BTreeMap<String, Inherited>,
@@ -310,6 +313,7 @@ impl Engine {
         let root = root.canonicalize().map_err(io_error(root))?;
         let ignores = ignores(&registry, &config);
         let files = ProjectFiles::new(&root, &ignores)?;
+        let generated = Generated::new(&root, &registry, &config)?;
         let ws = Workspace {
             root,
             source_globs: config
@@ -350,6 +354,7 @@ impl Engine {
                 .map(|d| d.id().to_owned())
                 .collect(),
             files,
+            generated,
             ws,
             inherited: inheritance(catalog),
             providers,

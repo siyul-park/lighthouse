@@ -669,7 +669,6 @@ pub fn fragment(idx: &Index, file: usize) -> (Fragment, MacroStats) {
         frag: Fragment {
             file: FileInfo {
                 path: src.rel.clone(),
-                generated: src.generated,
                 facts: Default::default(),
             },
             ..Fragment::default()

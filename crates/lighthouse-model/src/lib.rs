@@ -12,6 +12,7 @@ mod error;
 mod fix;
 mod format;
 mod fs;
+mod generated;
 mod model_ref;
 mod resource;
 mod review;
@@ -40,6 +41,7 @@ pub use fs::{
     Base, STATE_DIR, file_in, read_optional, write_atomic, write_atomic_guarded, xdg_dir,
     xdg_dir_in, xdg_plugins,
 };
+pub use generated::GeneratedSpec;
 pub use model_ref::ModelRef;
 pub use resource::{API_VERSION, Metadata, Resource, Spec, is_uid, kind_of, new_uid, resource};
 pub use review::{AgentKind, Attribution, Judged, Judgment, Label, Role};

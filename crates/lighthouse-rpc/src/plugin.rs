@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::Incomplete;
+use lighthouse_model::{GeneratedSpec, Incomplete};
 
 use globset::{Glob, GlobSetBuilder};
 use lighthouse_plugin::{
@@ -38,6 +38,7 @@ pub struct StartOptions<'a> {
 pub struct RpcPlugin {
     manifest: PluginManifest,
     ignores: Vec<String>,
+    generated: GeneratedSpec,
     languages: Vec<wire::LanguageManifest>,
     models: Vec<lighthouse_plugin::Model>,
     client: Arc<Client>,
@@ -136,6 +137,7 @@ impl RpcPlugin {
         };
         Ok(Self {
             ignores: found.resource.spec.ignores.clone(),
+            generated: found.resource.spec.generated.clone(),
             manifest: PluginManifest {
                 id: result.server_info.name,
                 version: result.server_info.version,
@@ -183,6 +185,10 @@ impl Plugin for RpcPlugin {
 
     fn ignores(&self) -> Vec<String> {
         self.ignores.clone()
+    }
+
+    fn generated(&self) -> GeneratedSpec {
+        self.generated.clone()
     }
 
     /// One provider per language the process declared, all sharing its connection.
@@ -416,7 +422,6 @@ fn embedded_wire(source: &Source<'_>) -> wire::EmbeddedFile {
         path: source.file.path.to_string_lossy().replace('\\', "/"),
         hash: source.file.hash.clone(),
         text: source.text.to_owned(),
-        generated: source.file.generated,
         test: source.file.test,
         facts: source.file.facts.clone(),
         regions: source.regions.to_vec(),

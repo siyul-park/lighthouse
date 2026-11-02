@@ -292,10 +292,11 @@ class FileTests(unittest.TestCase):
         self.assertEqual(result["fragments"], [])
         self.assertIn("nope", result["incomplete"][0]["reason"])
 
-    def test_generated_markers_before_the_first_statement(self):
+    def test_every_comment_is_reported_for_the_host_to_read_the_head_of_a_file(self):
         result = index({"a.py": "# @generated\nX = 1\n", "b.py": "X = 1\n# @generated\n"})
-        self.assertTrue(fragment(result, "a.py")["file"]["generated"])
-        self.assertNotIn("generated", fragment(result, "b.py")["file"])
+        self.assertEqual([c["text"] for c in fragment(result, "a.py")["comments"]], ["# @generated"])
+        self.assertEqual([c["text"] for c in fragment(result, "b.py")["comments"]], ["# @generated"])
+        self.assertNotIn("generated", fragment(result, "a.py")["file"])
 
     def test_columns_count_utf8_bytes(self):
         result = index({"a.py": 'def f():\n    return "é" + g()\n\n\ndef g():\n    pass\n'})

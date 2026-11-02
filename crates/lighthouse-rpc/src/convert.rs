@@ -105,11 +105,9 @@ pub(crate) fn indexed(
                 .push(format!("{}: fragment dropped, {why}", path.display()));
             continue;
         }
-        let generated = fragment.file.generated;
         let facts = fragment.file.facts.clone();
         let mut converted = fragment_of(fragment)?;
         converted.files = vec![core::File {
-            generated: generated || file.generated,
             facts,
             ..(*file).clone()
         }];

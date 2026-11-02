@@ -24,8 +24,8 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
       body=$(dd bs=1 count="$n" 2>/dev/null)
     }
     languages='[{"id":"fake","globs":["**/*.fake"],"capabilities":["semantic-edges","future-thing"]}]'
-    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.4}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
-    fragment='{"file":{"path":"a.fake","generated":true},"modules":[{"path":"m"}],"symbols":[],"edges":[],"functions":[],"tests":[]}'
+    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.5}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
+    fragment='{"file":{"path":"a.fake"},"modules":[{"path":"m"}],"symbols":[],"edges":[],"functions":[],"tests":[]}'
     recv
     case "$mode" in
       crash_at_init) echo "dying early" >&2; exit 3;;

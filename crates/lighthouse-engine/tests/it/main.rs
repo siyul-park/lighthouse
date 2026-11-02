@@ -13,6 +13,7 @@ mod fix_judge;
 mod fix_kept;
 mod fix_safety;
 mod fix_write;
+mod generated;
 mod models;
 mod preview;
 mod scope;

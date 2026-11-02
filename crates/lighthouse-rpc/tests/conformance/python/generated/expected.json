@@ -112,7 +112,6 @@
         }
       ],
       "file": {
-        "generated": true,
         "path": "marked.py"
       },
       "functions": [
@@ -198,7 +197,6 @@
         }
       ],
       "file": {
-        "generated": true,
         "path": "message_pb2.py"
       },
       "functions": [],

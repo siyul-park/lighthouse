@@ -14,3 +14,9 @@ catalog = "decisions"
 
 [spec.runtime]
 command = "./lang-go"
+
+# `Code generated` and `DO NOT EDIT` on separate lines of one comment, as
+# protoc-gen-gogo writes them (the three-line header of gogoproto output),
+# which the standard marker of `core` (one line) misses.
+[spec.generated]
+markers = ['(?s)Code generated .*DO NOT EDIT']

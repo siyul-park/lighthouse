@@ -1,5 +1,26 @@
 {
   "$defs": {
+    "GeneratedSpec": {
+      "additionalProperties": false,
+      "description": "How generated code is told apart: the same shape in a project, in a\nplugin manifest and in anything `extends` brings; both lists merge as the\nunion. Whether generated code is a subject is not said here: a decision's\n`scope.generated` and a rule's `generated` say that.",
+      "properties": {
+        "files": {
+          "description": "Patterns of project-relative paths that are generated code: the syntax\nand the matcher of `ignores`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "markers": {
+          "description": "Regular expressions searched in the comments at the head of a file (the\nones before its first symbol), delimiters included, whatever its\nlanguage: a file one of them matches is generated code.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "Metadata": {
       "additionalProperties": false,
       "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
@@ -45,6 +66,10 @@
             "string",
             "null"
           ]
+        },
+        "generated": {
+          "$ref": "#/$defs/GeneratedSpec",
+          "description": "How the plugin's ecosystem marks its generated code: the same key,\nshape and merge as the project's `generated`."
         },
         "ignores": {
           "description": "The files the plugin's toolchain leaves out of a project: the same\nkey, syntax and meaning as the project's `ignores` (gitignore\npatterns, rooted at the project), and merged the same way, before the\nproject's own.",

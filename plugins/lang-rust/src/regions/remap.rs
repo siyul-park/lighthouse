@@ -110,7 +110,6 @@ impl Remap<'_> {
         });
         fragment.file = FileInfo {
             path: path.to_owned(),
-            generated: false,
             facts: Default::default(),
         };
         fragment

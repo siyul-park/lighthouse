@@ -9,7 +9,7 @@ import (
 //go:generate go run ./gen
 
 // ProtocolVersion is the wire protocol version this package implements.
-const ProtocolVersion = "0.4"
+const ProtocolVersion = "0.5"
 
 // SemanticEdges names the capability of reporting type-resolved edges.
 const SemanticEdges = "semantic-edges"

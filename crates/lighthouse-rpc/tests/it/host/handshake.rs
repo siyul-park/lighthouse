@@ -77,7 +77,7 @@ fn handshake_declares_languages_and_index_converts_the_result() {
     assert_eq!(indexed.fragments.len(), 1);
     let kept = &indexed.fragments[0].files[0];
     assert_eq!(kept.path, Path::new("a.fake"));
-    assert!(kept.generated);
+    assert!(!kept.generated, "the host decides");
     assert_eq!(kept.hash, "abc", "the engine's file data is kept");
     assert_eq!(indexed.fragments[0].modules[0].path, "m");
     assert_eq!(indexed.notices, ["from plugin"]);
@@ -124,7 +124,7 @@ fn handshake_refuses_other_protocol_versions_and_identities() {
         Err(e) => e.to_string(),
         Ok(_) => panic!("{mode} connected"),
     };
-    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.4"));
+    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.5"));
     assert!(message("identity").contains("identifies itself as `other`"));
     let early = message("crash_at_init");
     assert!(early.contains("plugin `fake`"), "{early}");

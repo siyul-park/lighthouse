@@ -19,10 +19,10 @@ serde_json.workspace = true
 serde_norway.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
+toml.workspace = true
 
 [dev-dependencies]
 lighthouse-engine.workspace = true
 lighthouse-rpc.workspace = true
 tempfile.workspace = true
-toml.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }

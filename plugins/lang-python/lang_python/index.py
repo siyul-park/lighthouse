@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from lang_python.symbols import MODULE_BODY, Decl
 from lang_python.extent import doc_of, extent_of, span_for
-from lang_python.generated import is_generated
 from lang_python.project import Model, ParsedFile
 from lang_python.project import SNIPPETS_DIR
 from lang_python.modules import directory_of, tested_module
@@ -95,10 +94,7 @@ class Unit:
         for symbol in symbols:
             starts.setdefault(symbol["span"]["start"]["line"], symbol["id"])
         fragment: Fragment = {
-            "file": {
-                "path": self.rel,
-                **({"generated": True} if is_generated(self.parsed.tree, self.parsed.tokens) else {}),
-            },
+            "file": {"path": self.rel},
             "modules": [self._module_record(decls.module)],
             "symbols": symbols,
             "edges": self.edges,

@@ -48,7 +48,7 @@ function markdown(fences: { info?: string; body: string }[]): EmbeddedFile {
     });
     text += "```\n\n";
   });
-  return { path: "README.md", hash: "x", text, generated: false, test: false, facts: {}, regions: sources };
+  return { path: "README.md", hash: "x", text, test: false, facts: {}, regions: sources };
 }
 
 /** The TypeScript files of the project, as the host lists them. */
@@ -158,7 +158,6 @@ describe("fences of a host file", () => {
       path: "README.md",
       hash: "x",
       text,
-      generated: false,
       test: false,
       facts: {},
       regions: [

@@ -190,7 +190,6 @@ impl Tree {
         let at = self.files.len();
         self.by_abs.insert(abs, at);
         self.files.push(SourceFile {
-            generated: generated_header(&text),
             line_starts: line_starts(&text),
             rel,
             text,
@@ -371,7 +370,6 @@ pub struct SourceFile {
     pub rel: String,
     pub text: String,
     pub ast: syn::File,
-    pub generated: bool,
     pub(crate) line_starts: Vec<usize>,
 }
 
@@ -500,23 +498,6 @@ pub(crate) fn line_starts(text: &str) -> Vec<usize> {
     let mut starts = vec![0];
     starts.extend(text.match_indices('\n').map(|(at, _)| at + 1));
     starts
-}
-
-/// `@generated` or `DO NOT EDIT` in the comments before the first item.
-fn generated_header(text: &str) -> bool {
-    for line in text.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        if !line.starts_with("//") && !line.starts_with("/*") && !line.starts_with('*') {
-            return false;
-        }
-        if line.contains("@generated") || line.contains("DO NOT EDIT") {
-            return true;
-        }
-    }
-    false
 }
 
 /// `#[path = "x.rs"]`, or the first `path` inside `#[cfg_attr(cond, path = ..)]`:

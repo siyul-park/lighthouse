@@ -322,8 +322,6 @@ pub struct EmbeddedFile {
     pub hash: String,
     pub text: String,
     #[serde(default)]
-    pub generated: bool,
-    #[serde(default)]
     pub test: bool,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub facts: BTreeMap<String, String>,
@@ -400,9 +398,6 @@ pub struct Fragment {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct FileInfo {
     pub path: String,
-    /// The file is machine-generated.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub generated: bool,
     /// What the provider says of the file besides that, by name, for a
     /// program to name as `{file.<name>}`: the `edition` of a Rust file's
     /// crate.

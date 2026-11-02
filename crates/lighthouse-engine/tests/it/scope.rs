@@ -51,25 +51,22 @@ fn generated_code_is_told_apart_by_the_host_and_left_out_of_the_subjects() {
 }
 
 #[test]
-fn the_project_decides_whether_generated_code_is_checked() {
+fn a_rule_decides_whether_generated_code_is_checked() {
     let dir = project(&[
         ("a/x.txt", b"1"),
         ("gen/g.txt", b"2"),
         (".gitattributes", b"gen/** linguist-generated\n"),
     ]);
-    let include = "plugins = [\"fake\"]\n[generated]\ncheck = \"include\"\n[rules]\n\"fake/each\" = \"error\"\n";
     let one_rule =
         "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = { level = \"error\", generated = true }\n";
-    let skip_over_rule = "plugins = [\"fake\"]\n[generated]\ncheck = \"skip\"\n[rules]\n\"fake/each\" = { level = \"error\", generated = true }\n";
-    let all = [".gitattributes", "a/x.txt", "gen/g.txt"];
+    let not_checked =
+        "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = { level = \"error\", generated = false }\n";
 
-    assert_eq!(reported(&dir, include), all);
-    assert_eq!(reported(&dir, one_rule), all);
     assert_eq!(
-        reported(&dir, skip_over_rule),
-        all,
-        "a rule's own setting wins over the project's"
+        reported(&dir, one_rule),
+        [".gitattributes", "a/x.txt", "gen/g.txt"]
     );
+    assert_eq!(reported(&dir, not_checked), [".gitattributes", "a/x.txt"]);
 }
 
 #[test]

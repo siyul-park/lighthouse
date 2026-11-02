@@ -360,3 +360,33 @@ fn ignores_are_those_of_each_registered_plugin_in_registration_order() {
         ]
     );
 }
+
+#[test]
+fn generated_is_that_of_each_registered_plugin() {
+    struct Marking(PluginManifest);
+    impl Plugin for Marking {
+        fn manifest(&self) -> &PluginManifest {
+            &self.0
+        }
+        fn generated(&self) -> lighthouse_model::GeneratedSpec {
+            lighthouse_model::GeneratedSpec {
+                files: vec!["*.gen.go".to_owned()],
+                markers: vec!["@generated".to_owned()],
+            }
+        }
+    }
+    let mut registry = Registry::default();
+    registry
+        .register(&Marking(PluginManifest {
+            id: "m".to_owned(),
+            version: "0".to_owned(),
+        }))
+        .unwrap();
+
+    let found: Vec<_> = registry.generated().collect();
+
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].0, "m");
+    assert_eq!(found[0].1.markers, ["@generated"]);
+    assert_eq!(found[0].1.files, ["*.gen.go"]);
+}

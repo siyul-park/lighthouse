@@ -27,7 +27,6 @@
         }
       ],
       "file": {
-        "generated": true,
         "path": "gen.ts"
       },
       "functions": [],
@@ -95,7 +94,6 @@
         }
       ],
       "file": {
-        "generated": true,
         "path": "marked.ts"
       },
       "functions": [],

@@ -1,5 +1,5 @@
 //! What a project takes from the projects it extends besides their rules: the
-//! `injections`, `ignores`, `generated` files and the `plugins`, merged the way ESLint merges the `plugins`
+//! `injections`, `ignores`, `generated` and the `plugins`, merged the way ESLint merges the `plugins`
 //! of shareable configs.
 
 use super::{Config, InjectionSpec, Projects};
@@ -7,7 +7,7 @@ use crate::Error;
 
 impl Config {
     /// This project with what the projects it extends bring: their
-    /// `ignores` and `generated.files`, the union in the order of the chain;
+    /// `ignores`, `generated.files` and `generated.markers`, the union in the order of the chain;
     /// their `injections`, extended first and in order, where a later entry with
     /// the same `id` replaces the earlier in its place; and the union of their
     /// `plugins`, which follow its own listing, where the project's own entry wins. Resolving again
@@ -18,7 +18,7 @@ impl Config {
         merged.injections = Vec::new();
         merged.ignores = union(chain.iter().flat_map(|c| &c.ignores));
         merged.generated_files = union(chain.iter().flat_map(|c| &c.generated_files));
-        merged.generated = super::globs(&merged.generated_files)?;
+        merged.generated_markers = union(chain.iter().flat_map(|c| &c.generated_markers));
         for config in &chain {
             for injection in &config.injections {
                 put_injection(&mut merged.injections, injection);

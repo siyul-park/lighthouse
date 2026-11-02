@@ -2,8 +2,6 @@ import ts from "typescript";
 import type { Lines } from "./extent/lines.ts";
 import type { Comment, Symbol as Sym } from "./sdk/wire.ts";
 
-const GENERATED = /@generated\b/;
-
 interface Range {
   pos: number;
   end: number;
@@ -12,47 +10,30 @@ interface Range {
 
 /** Every comment of the file, with adjacent line comments joined, and the symbol each documents. */
 export function commentsOf(file: ts.SourceFile, lines: Lines, symbols: readonly Sym[]): Comment[] {
-  const startingAt = new Map<number, string>();
-  for (const symbol of symbols) {
-    if (!startingAt.has(symbol.span.start.line)) startingAt.set(symbol.span.start.line, symbol.id);
-  }
+  const startingAt = new Map([...symbols].reverse().map((symbol) => [symbol.span.start.line, symbol.id]));
   const text = file.text;
-  const comments: Comment[] = [];
-  for (const group of groupRanges(lines, ranges(file))) {
+  return groupRanges(lines, ranges(file)).map((group): Comment => {
     const from = group[0]!.pos;
     const to = group[group.length - 1]!.end;
     const span = lines.span(from, to);
     const lineStart = lines.starts[span.start.line - 1] ?? 0;
     const alone = text.slice(lineStart, from).trim() === "";
     const attached = alone ? startingAt.get(span.end.line + 1) : undefined;
-    comments.push({
+    return {
       span,
       text: text.slice(from, to).replaceAll("\r\n", "\n"),
       ...(attached === undefined ? {} : { attached_to: attached }),
-    });
-  }
-  return comments;
-}
-
-/** Whether a comment above the first statement marks the file as generated. */
-export function isGenerated(file: ts.SourceFile): boolean {
-  const first = file.statements[0];
-  const end = first === undefined ? file.text.length : first.getStart(file);
-  for (const range of ranges(file)) {
-    if (range.pos >= end) break;
-    const text = file.text.slice(range.pos, range.end);
-    if (GENERATED.test(text) || text.toUpperCase().includes("DO NOT EDIT")) return true;
-  }
-  return false;
+    };
+  });
 }
 
 /** All comment ranges of a file, by position: those in the gaps between its tokens. */
 function ranges(file: ts.SourceFile): Range[] {
   const found = new Map<number, Range>();
+  const add = (start: number, end: number, kind: ts.CommentKind): void => {
+    found.set(start, { pos: start, end, multiline: kind === ts.SyntaxKind.MultiLineCommentTrivia });
+  };
   const collect = (pos: number): void => {
-    const add = (start: number, end: number, kind: ts.CommentKind): void => {
-      found.set(start, { pos: start, end, multiline: kind === ts.SyntaxKind.MultiLineCommentTrivia });
-    };
     ts.forEachLeadingCommentRange(file.text, pos, add);
     ts.forEachTrailingCommentRange(file.text, pos, add);
   };

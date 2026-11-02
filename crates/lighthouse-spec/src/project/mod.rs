@@ -46,7 +46,7 @@ pub use rules::{Level, RuleConfig, RuleSetting, Rules};
 pub use sandbox::SandboxSpec;
 pub use signals::{SignalsSpec, Surface};
 use spec::PluginEntry;
-pub use spec::{GeneratedCheck, InjectionSpec, OverrideSpec, ProjectSpec, TestNamingSpec};
+pub use spec::{InjectionSpec, OverrideSpec, ProjectSpec, TestNamingSpec};
 
 pub(crate) use standard::standard;
 
@@ -169,8 +169,7 @@ pub struct Config {
     required: BTreeMap<String, String>,
     ignores: Vec<String>,
     generated_files: Vec<String>,
-    generated: Option<GlobSet>,
-    generated_check: Option<GeneratedCheck>,
+    generated_markers: Vec<String>,
     models: Models,
     sandbox: Policy,
     fix: FixPolicy,
@@ -247,6 +246,8 @@ impl Config {
             .collect::<Result<_, Error>>()?;
         validate_injections(&spec.injections)?;
         crate::ignores::matcher(Path::new("/"), &spec.ignores)?;
+        crate::ignores::matcher(Path::new("/"), &spec.generated.files)?;
+        crate::generated::markers(&spec.generated.markers)?;
         let mut languages = BTreeMap::new();
         for (id, language) in spec.languages {
             languages.insert(
@@ -269,9 +270,8 @@ impl Config {
             injections: spec.injections,
             required: BTreeMap::new(),
             ignores: spec.ignores,
-            generated: globs(&spec.generated.files)?,
             generated_files: spec.generated.files,
-            generated_check: spec.generated.check,
+            generated_markers: spec.generated.markers,
             models: Models::new(&spec.models),
             sandbox: spec.sandbox.into(),
             fix: FixPolicy::new(spec.fix),
@@ -380,15 +380,15 @@ impl Config {
         &self.ignores
     }
 
-    /// Whether the project's `generated.files` name `path`.
-    pub fn is_generated(&self, path: &Path) -> bool {
-        self.generated.as_ref().is_some_and(|g| g.is_match(path))
+    /// The project's `generated.files` and, once [`Config::inheriting`] has
+    /// resolved it, those of the projects it extends, extended first.
+    pub fn generated_files(&self) -> &[String] {
+        &self.generated_files
     }
 
-    /// The project's `generated.check`: whether every decision checks
-    /// generated code, or none does; `None` leaves it to each decision.
-    pub fn generated_check(&self) -> Option<GeneratedCheck> {
-        self.generated_check
+    /// The project's `generated.markers`, likewise.
+    pub fn generated_markers(&self) -> &[String] {
+        &self.generated_markers
     }
 
     /// The same configuration with `id` enabled at `level`, and its pack's

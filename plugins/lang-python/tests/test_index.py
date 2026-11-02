@@ -69,10 +69,11 @@ class UnitTests(unittest.TestCase):
         self.assertEqual(fragment["modules"], [{"path": "tests/test_shape", "test_of": "pkg/shape"}])
         self.assertEqual(fragment["symbols"][0]["visibility"], "private")
 
-    def test_unit_index_marks_generated_files_and_attaches_comments(self):
+    def test_unit_index_reports_the_header_comment_and_attaches_the_next(self):
         files = {"g.py": "# @generated\n# about f\ndef f(): ...\n"}
         fragment = unit(files, "g.py").index().fragment
-        self.assertTrue(fragment["file"]["generated"])
+        self.assertNotIn("generated", fragment["file"], "the host decides")
+        self.assertEqual(fragment["comments"][0]["text"], "# @generated\n# about f")
         self.assertEqual(fragment["comments"][0]["attached_to"], "g::f#function")
 
 

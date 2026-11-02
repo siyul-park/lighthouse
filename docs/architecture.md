@@ -107,6 +107,28 @@ files. Where a toolchain ignores them (Go), its plugin says so. Providers
 receive the list and analyze what they are given; a provider that needs files
 outside it for type information may read them but never reports on them.
 
+## Generated code
+
+Generated files stay in the project; decisions skip them by `scope.generated`. The host decides
+once, for every language, that a file is generated when one of these holds:
+
+1. a pattern of `generated.files` names it (the syntax and the matcher of `ignores`);
+2. `.gitattributes` marks it `linguist-generated` (nested files read as git does, deeper wins, later
+   lines win);
+3. a regular expression of `generated.markers` is found, unanchored, in a comment at its head: the
+   comments of the file's fragment that end before its first symbol starts (all of them when it has no
+   symbol), delimiters included. Providers report every comment of a file and decide nothing; a
+   marker is not tied to a language, because generators write other languages' conventions (Go's
+   `Code generated ... DO NOT EDIT.` is in protoc, buf and sqlc output of every language).
+
+`generated` has the same shape (`files`, `markers`) in `lighthouse.toml`, in a plugin manifest
+(`[spec.generated]`) and in a shareable project, and merges as the union over the listed plugins
+and the `extends` chain. The defaults are the manifest of the bundled `core` plugin:
+`Code generated .* DO NOT EDIT\.` (go.dev/s/generatedcode) and `@generated\b` (rustfmt, Meta); a
+language plugin adds a marker only for a convention those miss (lang-go: the three-line header of
+protoc-gen-gogo; lang-python: protoc's `*_pb2.py` header). TypeScript has none to add: the
+generators of its ecosystem write `@generated` (protobuf-es, Relay) or the Go marker (ts-proto).
+
 ## Terms
 
 | Term | Means |
@@ -150,7 +172,7 @@ refuses two decisions with the same.
 Conventions: keys are lowerCamelCase, option names included (`maxWords`), durations are strings (`30s`), enums are lowercase kebab,
 paths are relative with `/`. A decision belongs to the pack its id names and to
 the section of that pack's file that lists it, so where the file lies carries no
-meaning. `scope` is `{subject, generated, tests, examples}` (`generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them; `examples: exclude|include|only`, default `include`, is the same for the code that documentation shows: a decision that needs a whole unit or the project graph sets `exclude`). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated` or `linguist-vendored`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
+meaning. `scope` is `{subject, generated, tests, examples}` (`generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them; `examples: exclude|include|only`, default `include`, is the same for the code that documentation shows: a decision that needs a whole unit or the project graph sets `exclude`). The host tells generated code apart once (see [Generated code](#generated-code)) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides the scope for one decision with `rules."<id>".generated = true|false`; there is no project-wide switch. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
 Schema object (`type`, `default`, `description` per property, closed with
 `additionalProperties: false`); `languages.<id>` holds the option values of one language and,
 for a `command` check or fix, the [program](programs.md) that runs for its files (`check`, `fix`), in place of

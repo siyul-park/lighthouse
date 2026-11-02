@@ -8,6 +8,7 @@ mod engine;
 mod error;
 mod facts;
 mod fix;
+mod generated;
 mod tester;
 mod timings;
 

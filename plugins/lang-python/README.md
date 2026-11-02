@@ -23,7 +23,7 @@ The Python language provider: parses each file with the `ast` of the interpreter
 | `edges` | `calls`, `references`, `imports`, `implements` with sites; `semantic` where scopes, imports and annotations settle the name, else `syntactic` |
 | `functions` | flow, nesting, statements, tokens, parameters, returns, signature, `forwards_to`, `implementation`, `constructs`, `manual_assertions` (an `if` that compares and only raises `AssertionError`, `Failed` or a `...Failure`, or calls `fail`) |
 | `tests` | `test_*` functions, `Test*` classes, `unittest.TestCase` methods; `parametrize` and loops over literal rows are tables; `nesting` counts the test classes around a test |
-| `comments`, `generated` | every comment; `# @generated` and `DO NOT EDIT` above the first statement |
+| `comments` | every comment (the host reads the `@generated` and `DO NOT EDIT` headers) |
 
 Capabilities: `semantic-edges` (partial: annotations, imports and local inference only), `extent`, `reference-sites`, `overlays`.
 
@@ -45,7 +45,7 @@ A `python`, `py`, `py3`, `python3` or `rusthon` fence of a Markdown file is a mo
 
 ## Conformance
 
-Goldens: `crates/lighthouse-rpc/tests/conformance/python`. Shared cases (the same name in every language plugin): `comments`, `errors`, `excluded`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`. Own cases: `annotations`, `asyncs`, `imports`, `members`, `models`, `modulebody`, `namespaces`, `projects`, `references`, `roles`, `scopes`, `unicode`.
+Goldens: `crates/lighthouse-rpc/tests/conformance/python`. Shared cases (the same name in every language plugin): `comments`, `errors`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`. Own cases: `annotations`, `asyncs`, `imports`, `members`, `models`, `modulebody`, `namespaces`, `projects`, `references`, `roles`, `scopes`, `unicode`.
 
 Not applicable: `events` (the provider reports no body events). Python has no counterpart of Go's `aliases`, `embedded`, `generics`, `layout`, `nomod`, `tags`, `wider` and `xtest`, so it has no case of those names.
 

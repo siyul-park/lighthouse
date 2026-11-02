@@ -155,31 +155,19 @@
       },
       "type": "object"
     },
-    "GeneratedCheck": {
-      "description": "Whether decisions check generated code.",
-      "enum": [
-        "skip",
-        "include"
-      ],
-      "type": "string"
-    },
     "GeneratedSpec": {
       "additionalProperties": false,
-      "description": "What a project says about generated code.",
+      "description": "How generated code is told apart: the same shape in a project, in a\nplugin manifest and in anything `extends` brings; both lists merge as the\nunion. Whether generated code is a subject is not said here: a decision's\n`scope.generated` and a rule's `generated` say that.",
       "properties": {
-        "check": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GeneratedCheck"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`skip`: no decision checks generated code; `include`: every decision\ndoes. Unset, each decision's own scope says. A rule's `generated`\nsetting wins over both."
-        },
         "files": {
-          "description": "Globs of project-relative paths that are generated code.",
+          "description": "Patterns of project-relative paths that are generated code: the syntax\nand the matcher of `ignores`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "markers": {
+          "description": "Regular expressions searched in the comments at the head of a file (the\nones before its first symbol), delimiters included, whatever its\nlanguage: a file one of them matches is generated code.",
           "items": {
             "type": "string"
           },
@@ -514,7 +502,7 @@
         },
         "generated": {
           "$ref": "#/$defs/GeneratedSpec",
-          "description": "Which files are generated code, beyond what the providers and\n`.gitattributes` say, and whether it is checked."
+          "description": "Which files are generated code, beyond what `.gitattributes` and the\nlisted plugins say."
         },
         "ignores": {
           "description": "Files that are not the project's: gitignore patterns, rooted at the\nproject, that keep files out of the analysis altogether (never\nwalked, indexed, checked, copied or diffed), such as fixtures that are\nbroken on purpose. A plugin's `ignores` and those of the projects\n`extends` names come first; a later pattern wins, as in a\n`.gitignore`.",

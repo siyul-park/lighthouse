@@ -123,7 +123,7 @@ impl Engine {
             path: rel.to_owned(),
             lang: self.provider(language).manifest().id.clone(),
             hash: hash::sha256(&text),
-            generated: self.config.is_generated(rel) || attributes.is_generated(rel),
+            generated: self.generated.names(rel) || attributes.is_generated(rel),
             test: self.languages[language].tests.is_match(rel),
             facts: Default::default(),
         };
@@ -204,6 +204,9 @@ impl Engine {
         }
         self.index_calls(&ws, file_calls, &views, &mut parts, None, run);
         let started = Instant::now();
+        for part in &mut parts {
+            self.generated.mark(part);
+        }
         let project = Project::merge(parts);
         run.timings.merge = started.elapsed();
         run.notices.extend(project.notices().iter().cloned());
@@ -726,15 +729,10 @@ impl Engine {
     }
 
     /// What code a rule may report on at a file: the decision's scope, unless
-    /// the project says otherwise for all its decisions (`generated.check`)
-    /// or for this rule (`generated`).
+    /// the project says otherwise for this rule (`generated`).
     fn applies(&self, declared: &Applicability, rule: &RuleConfig) -> Applicability {
-        let project = self
-            .config
-            .generated_check()
-            .map(|c| c == GeneratedCheck::Include);
         Applicability {
-            generated: rule.generated.or(project).unwrap_or(declared.generated),
+            generated: rule.generated.unwrap_or(declared.generated),
             ..declared.clone()
         }
     }

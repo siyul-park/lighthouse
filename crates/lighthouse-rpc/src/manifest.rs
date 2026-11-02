@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Format, Resource, STATE_DIR, Spec, documents, resource};
+use lighthouse_model::{Format, GeneratedSpec, Resource, STATE_DIR, Spec, documents, resource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -108,6 +108,10 @@ pub struct PluginSpec {
     /// project's own.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ignores: Vec<String>,
+    /// How the plugin's ecosystem marks its generated code: the same key,
+    /// shape and merge as the project's `generated`.
+    #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]
+    pub generated: GeneratedSpec,
 }
 
 impl Spec for PluginSpec {

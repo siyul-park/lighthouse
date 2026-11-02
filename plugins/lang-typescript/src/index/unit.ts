@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { manualAssertions } from "../tests/assertions.ts";
-import { commentsOf, isGenerated } from "../comments.ts";
+import { commentsOf } from "../comments.ts";
 import type { Decl } from "../symbols.ts";
 import { MODULE_BODY } from "../functions.ts";
 import { docOf, extentOf } from "../extent.ts";
@@ -94,7 +94,7 @@ export class Unit implements EdgeSink {
       if (decl.kind === "test") tests.push(this.testCase(decl));
     }
     const fragment: Fragment = {
-      file: { path: this.rel, ...(isGenerated(this.file) ? { generated: true } : {}) },
+      file: { path: this.rel },
       modules: [this.moduleRecord(decls.module)],
       symbols,
       edges: this.edges,

@@ -14,6 +14,7 @@ mod example;
 mod expression;
 mod files;
 mod fix;
+mod generated;
 mod ignores;
 mod model_check;
 mod options;
@@ -44,6 +45,7 @@ pub use expression::{
 };
 pub use files::{Listing, ProjectFiles};
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
+pub use generated::markers as generated_markers;
 pub use ignores::matcher as ignore_matcher;
 pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};
@@ -55,10 +57,10 @@ pub use program::{
 };
 pub use project::{
     BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule, EnvironmentSpec, Evaluation,
-    EventsSpec, FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GeneratedCheck, GlobSet,
-    InjectionSpec, Layer, Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef,
-    ProjectSpec, Projects, RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules,
-    SandboxSpec, SignalsSpec, Surface, Task, TestNamingSpec, glob_set,
+    EventsSpec, FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GlobSet, InjectionSpec, Layer,
+    Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
+    RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, SignalsSpec, Surface,
+    Task, TestNamingSpec, glob_set,
 };
 pub use scope::{Scope, Subject};
 pub(crate) use sources::SourceMapSpec;

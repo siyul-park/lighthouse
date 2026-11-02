@@ -23,7 +23,7 @@ The TypeScript and JavaScript language provider: loads one TypeScript 6.0.3 prog
 | `edges` | `calls`, `references`, `imports`, `implements` from the checker with sites; `syntactic` only for an unresolved relative import, a call on an `any` receiver, or a name the prose of a fence defines |
 | `functions` | flow, nesting, statements, tokens, signature, `forwards_to`, `implementation`, `constructs`, `manual_assertions` |
 | `tests` | `describe`, `it`, `test` and `suite` calls of the test frameworks (`node:test`, Jest, Vitest, Mocha, ...), with table (`each`) or scenario style |
-| `comments`, `generated` | every comment; `@generated` and `DO NOT EDIT` above the first statement |
+| `comments` | every comment (the host reads the `@generated` header) |
 
 Capabilities: `semantic-edges`, `extent`, `reference-sites`, `overlays`.
 
@@ -41,7 +41,7 @@ A fence of a Markdown file is a module of its own that consumes the package arou
 
 ## Conformance
 
-Goldens: `crates/lighthouse-rpc/tests/conformance/typescript`. Shared cases (the same name in every language plugin): `comments`, `errors`, `excluded`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`. Own cases: `commonjs`, `declarations`, `generics`, `heritage`, `imports`, `interop`, `jsdoc`, `jsx`, `members`, `merging`, `namespaces`, `nomodule`, `overloads`, `projects`, `references`, `scripts`, `traced`, `unicode`, `unresolved`.
+Goldens: `crates/lighthouse-rpc/tests/conformance/typescript`. Shared cases (the same name in every language plugin): `comments`, `errors`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`. Own cases: `commonjs`, `declarations`, `generics`, `heritage`, `imports`, `interop`, `jsdoc`, `jsx`, `members`, `merging`, `namespaces`, `nomodule`, `overloads`, `projects`, `references`, `scripts`, `traced`, `unicode`, `unresolved`.
 
 Not applicable: `events` (the provider reports no body events).
 

@@ -6,7 +6,6 @@ fn file(text: &str) -> SourceFile {
         rel: "src/lib.rs".to_owned(),
         text: text.to_owned(),
         ast: parse_file(text).unwrap(),
-        generated: false,
         line_starts: crate::project::line_starts(text),
     }
 }

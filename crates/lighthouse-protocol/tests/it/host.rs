@@ -146,7 +146,6 @@ fn regions_that_are_documents_are_read_and_the_others_are_a_notice() {
             path: "doc.md".to_owned(),
             hash: String::new(),
             text: String::new(),
-            generated: false,
             test: false,
             facts: BTreeMap::new(),
             regions: vec![region("/children/0", "x=1"), region("/children/1", "x!")],
@@ -191,7 +190,7 @@ fn serve_answers_the_handshake_and_an_index_request_until_exit() {
             1,
             INITIALIZE,
             json!({
-                "protocolVersion": "0.4",
+                "protocolVersion": "0.5",
                 "clientInfo": { "name": "t", "version": "0" },
                 "workspaceFolders": [{ "uri": "file:///p/", "name": "p" }],
             }),

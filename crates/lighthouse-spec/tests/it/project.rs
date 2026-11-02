@@ -352,19 +352,6 @@ context = {context}
 }
 
 #[test]
-fn config_is_generated() {
-    let config = Config::parse_inline(GENERATED).unwrap();
-
-    assert!(config.is_generated(Path::new("api/x.pb.go")));
-    assert!(!config.is_generated(Path::new("api/x.go")));
-    assert!(
-        !Config::parse_inline("")
-            .unwrap()
-            .is_generated(Path::new("x.pb.go"))
-    );
-}
-
-#[test]
 fn a_fix_table_in_the_repository_is_refused_because_trust_is_the_users() {
     assert!(Config::parse_inline("[fix]\ncommands = \"allow\"\n").is_err());
 }
@@ -543,17 +530,22 @@ fn the_entries_of_a_project_are_those_of_what_it_extends_and_its_own() {
     assert_eq!(ids, ["core/a", "core/b", "core/c"]);
 }
 
-const GENERATED: &str = "[generated]\nfiles = [\"**/*.pb.go\"]\ncheck = \"skip\"\n";
-
 #[test]
-fn config_generated_check() {
-    use lighthouse_spec::GeneratedCheck;
+fn generated_is_files_and_markers_and_nothing_else() {
+    let config =
+        Config::parse_inline("[generated]\nfiles = [\"*.pb.go\"]\nmarkers = ['Made by \\w+']\n")
+            .unwrap();
 
-    let config = Config::parse_inline(GENERATED).unwrap();
-    assert_eq!(config.generated_check(), Some(GeneratedCheck::Skip));
-    let include = Config::parse_inline("[generated]\ncheck = \"include\"").unwrap();
-    assert_eq!(include.generated_check(), Some(GeneratedCheck::Include));
-    assert_eq!(Config::parse_inline("").unwrap().generated_check(), None);
+    assert_eq!(config.generated_files(), ["*.pb.go"]);
+    assert_eq!(config.generated_markers(), ["Made by \\w+"]);
+    assert!(
+        Config::parse_inline("")
+            .unwrap()
+            .generated_files()
+            .is_empty()
+    );
+    assert!(Config::parse_inline("[generated]\ncheck = \"skip\"\n").is_err());
+    assert!(Config::parse_inline("[generated]\nmarkers = ['(']\n").is_err());
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! The plugin of one pack: the checks and fixers its decisions compile into,
 //! and what only code provides for it (the fallback text language of `core`).
 
+use lighthouse_model::GeneratedSpec;
 use lighthouse_plugin::{LanguageProvider, Plugin, PluginManifest, Rule};
 use lighthouse_spec::Catalog;
 
@@ -61,6 +62,15 @@ impl Plugin for Checks {
     /// The pack id with this crate's version.
     fn manifest(&self) -> &PluginManifest {
         &self.manifest
+    }
+
+    /// The generated-code markers of the manifest of `core`.
+    fn generated(&self) -> GeneratedSpec {
+        if self.manifest.id == CORE {
+            core_pack::generated()
+        } else {
+            GeneratedSpec::default()
+        }
     }
 
     /// The language providers only code provides.

@@ -30,7 +30,6 @@
         "facts": {
           "edition": "2024"
         },
-        "generated": true,
         "path": "src/gen.rs"
       },
       "functions": [

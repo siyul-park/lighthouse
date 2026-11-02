@@ -3,6 +3,8 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
+use lighthouse_model::GeneratedSpec;
+
 use crate::{
     Analyzer, CelCatalog, CelLibrary, Error, Fixer, LanguageManifest, LanguageProvider,
     ModelClient, Plugin, PluginManifest, Rule,
@@ -28,6 +30,7 @@ enum Mark {
 pub struct Registry {
     plugins: Vec<PluginManifest>,
     ignores: Vec<(String, Vec<String>)>,
+    generated: Vec<(String, GeneratedSpec)>,
     languages: Vec<Language>,
     analyzers: BTreeMap<String, Box<dyn Analyzer>>,
     rules: BTreeMap<String, Box<dyn Rule>>,
@@ -50,6 +53,7 @@ impl Registry {
         let models = plugin.models();
         let libraries = plugin.cel_libraries();
         let ignores = plugin.ignores();
+        let generated = plugin.generated();
         let id = manifest.id.as_str();
         let own = |model: &str| model == id;
         let qualified = |item: &str| plugin_of(item) == id && item.contains('/');
@@ -88,6 +92,7 @@ impl Registry {
 
         let id = manifest.id.clone();
         self.ignores.push((id.clone(), ignores));
+        self.generated.push((id.clone(), generated));
         self.plugins.push(manifest);
         self.languages
             .extend(languages.into_iter().map(|provider| Language {
@@ -125,6 +130,12 @@ impl Registry {
         self.ignores
             .iter()
             .map(|(id, p)| (id.as_str(), p.as_slice()))
+    }
+
+    /// The `generated` of each registered plugin, by plugin id, in the order
+    /// the plugins were registered.
+    pub fn generated(&self) -> impl Iterator<Item = (&str, &GeneratedSpec)> {
+        self.generated.iter().map(|(id, g)| (id.as_str(), g))
     }
 
     /// The CEL libraries of the registered plugins and their function catalog.

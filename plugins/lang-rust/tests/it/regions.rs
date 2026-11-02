@@ -198,7 +198,6 @@ fn fences(dir: &Path, bodies: &[(&str, Value)]) -> IndexResult {
         path: "README.md".to_owned(),
         hash: String::new(),
         text: host,
-        generated: false,
         test: false,
         facts: Default::default(),
         regions: sources,

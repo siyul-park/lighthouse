@@ -7,3 +7,14 @@ name = "core"
 [spec]
 version = "0.1.0"
 catalog = "decisions"
+
+# What generators leave at the head of what they write, for any language; a
+# language plugin adds one only for a convention these miss.
+[spec.generated]
+markers = [
+  # Go's standard marker, which protoc, buf, sqlc and others write in their
+  # languages too (https://go.dev/s/generatedcode).
+  'Code generated .* DO NOT EDIT\.',
+  # rustfmt's `format_generated_files`, Meta's and Phabricator's marker.
+  '@generated\b',
+]

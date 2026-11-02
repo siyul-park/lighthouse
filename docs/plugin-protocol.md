@@ -1,10 +1,10 @@
-# Plugin protocol 0.4
+# Plugin protocol 0.5
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.4.json`](../protocol/schema/lighthouse-protocol-0.4.json),
+[`protocol/schema/lighthouse-protocol-0.5.json`](../protocol/schema/lighthouse-protocol-0.5.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,7 +27,7 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.4"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.5"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
@@ -36,7 +36,7 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them remains valid in 0.4, and hosts ignore what they do not
+sends none of them remains valid in 0.5, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -46,7 +46,7 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Protocol 0.4 uses one `lighthouse/index` interface for physical files and selected source regions. Each input is a tagged `IndexInput`: `{ kind: "file", file, source_ast }` asks a provider to analyze a physical file and, when `source_ast` is true, return its selectable AST; `{ kind: "regions", regions }` asks it to analyze source regions selected by the core. A request may mix both kinds: a provider indexes the physical files and the regions together, in one pass (Go: one `packages.Load` per module), and answers one fragment per file, the regions' facts merged into the fragment of their host file. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
+Protocol 0.5 uses one `lighthouse/index` interface for physical files and selected source regions. Each input is a tagged `IndexInput`: `{ kind: "file", file, source_ast }` asks a provider to analyze a physical file and, when `source_ast` is true, return its selectable AST; `{ kind: "regions", regions }` asks it to analyze source regions selected by the core. A request may mix both kinds: a provider indexes the physical files and the regions together, in one pass (Go: one `packages.Load` per module), and answers one fragment per file, the regions' facts merged into the fragment of their host file. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
 
 The `source_ast` flag is per file, so a batch requests ASTs only where an injection's file globs match. Providers that advertise the `source-ast` capability MUST return one `Source` per requested file, with `path`, provider-defined serialized `ast`, and a separate `mapping` keyed by canonical JSON Pointer. Each mapping entry can carry a half-open UTF-8 byte `range`, a descendant `text_pointer` for a node's source-text scalar, and optional `text_map` segments from extracted-text bytes to original-host bytes. ASTs retain the parser/provider's structural shape; locations live in the sidecar rather than injected into every node. Providers parse and map only: they do not receive or interpret `spec.injections`, selector filters, destination keys, or `context`. The shared core evaluates selectors, filters and context projections, validates mappings, resolves the destination provider key, and forwards each selected region through the same `lighthouse/index` method. Injections are core configuration and are not transported through provider context.
 
@@ -72,7 +72,7 @@ plugin. A future method, added with its first consumer: `lighthouse/embed` (`POS
 The shape is MCP's, with LSP's names for the workspace. Params:
 
 ```json
-{ "protocolVersion": "0.4",
+{ "protocolVersion": "0.5",
   "clientInfo": { "name": "lighthouse", "version": "0.1.0" },
   "workspaceFolders": [{ "uri": "file:///abs/root", "name": "root" }] }
 ```
@@ -82,7 +82,7 @@ percent-encoded as RFC 8089 and RFC 3986 say. A plugin turns the URI back into a
 in Rust, `net/url` in Go) and refuses anything else. Result:
 
 ```json
-{ "protocolVersion": "0.4",
+{ "protocolVersion": "0.5",
   "serverInfo": { "name": "lang-go", "version": "0.1.0" },
   "capabilities": {
     "languages": [{ "id": "go", "globs": ["**/*.go"], "priority": 0,
@@ -140,7 +140,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   guesses), which makes its caller and reference sets lower bounds; no separate
   capability announces that.
 
-### Common source selection (protocol 0.4)
+### Common source selection (protocol 0.5)
 
 A provider that advertises `source-ast` supports the shared AST contract. For each
 file input whose `source_ast` is true, the provider MUST return a `Source` in
@@ -215,13 +215,16 @@ with an uncached run byte for byte. The field is optional.
 Result `{ fragments, sources, notices, incomplete }`:
 
 - `fragments`: one per analyzed file, sorted by path, each
-  `{ file: { path, generated?, facts? }, modules, symbols, edges, functions, tests, comments }`;
+  `{ file: { path, facts? }, modules, symbols, edges, functions, tests, comments }`;
   `facts` is what the provider says of the file by name, text to text, which a program names as
   `{file.<name>}` ([programs](programs.md#the-command-line)); the Rust provider states the `edition` of
   the crate that holds each file.
   A requested file with no fragment is incomplete. Files the provider
   deliberately skips (excluded by the build context) get an empty
-  fragment. A provider never filters paths: the host sends the files of the
+  fragment. A provider never says whether a file is generated:
+  it reports every comment of the file, with its span, and the host reads the markers
+  (`generated.markers`, unanchored regular expressions, one list for every language) in the comments
+  that end before the file's first symbol; see [architecture](architecture.md#generated-code). It never filters paths: the host sends the files of the
   project (see `ignores`), and `testdata`, `vendor`, hidden directories and the like
   are left out there.
 - `notices`: messages that leave the analysis complete (for example files
@@ -539,6 +542,9 @@ languages = ["go"]                 # checked against what the process reports
 `spec.ignores` (optional) is what the plugin's toolchain leaves out of a project: the same key,
 syntax and meaning as the project's `ignores` (a list of `.gitignore` lines, rooted at the
 project), merged the same way and before the project's own. It applies when the plugin is listed.
+`[spec.generated]` (optional) has the shape of the project's `[generated]`: `files` patterns and
+`markers` (regular expressions searched in the head comments of any file), for the generated code of
+the plugin's ecosystem.
 
 `provides` lists the `languages` and `models` the plugin offers, so tools can see them
 without starting it; both are checked against what the process reports.
@@ -787,8 +793,7 @@ Rust with a notice.
   One notice per run counts the files that define `macro_rules!` and the
   invocations that were not read (item position, or arguments that are not
   expressions) with an example; `include!` has a notice of its own. Attribute macros and derives leave the item as
-  written. A file whose header comment says `@generated` or `DO NOT EDIT` has
-  `generated` set.
+  written.
 
 ## `lang-typescript`
 

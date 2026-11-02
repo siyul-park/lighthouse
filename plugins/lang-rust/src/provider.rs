@@ -334,7 +334,6 @@ fn empty_fragment(path: &str) -> Fragment {
     Fragment {
         file: FileInfo {
             path: path.to_owned(),
-            generated: false,
             facts: Default::default(),
         },
         ..Fragment::default()
