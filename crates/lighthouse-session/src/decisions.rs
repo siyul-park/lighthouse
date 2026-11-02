@@ -307,8 +307,12 @@ pub(crate) fn test_catalog(
         languages
     };
     let mut found = examples::run(session, catalog, &plugins, &languages, &decisions, jobs)?;
-    let mut lacking = std::mem::take(&mut found.lacking);
-    for (plugin, examples) in unserved(&decisions, language, &registered) {
+    let mut lacking: BTreeMap<String, usize> = BTreeMap::new();
+    let unserved = unserved(&decisions, language, &registered);
+    for (plugin, examples) in std::mem::take(&mut found.lacking)
+        .into_iter()
+        .chain(unserved)
+    {
         *lacking.entry(plugin).or_default() += examples;
     }
     let mut skipped = std::mem::take(&mut found.skipped);
@@ -318,7 +322,7 @@ pub(crate) fn test_catalog(
     Ok(DecisionTest {
         decisions: decisions.len(),
         languages: languages.len(),
-        runs: found.runs,
+        runs: found.per_unit.len(),
         failures: found.failures,
         skipped,
         conflicts: found.conflicts,

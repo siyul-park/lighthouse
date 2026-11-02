@@ -3,11 +3,7 @@
 //! the results are put back in the order the units were listed in, so that a
 //! run reports the same whatever the number of workers.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Mutex,
-    time::Duration,
-};
+use std::{collections::BTreeSet, sync::Mutex, time::Duration};
 
 use lighthouse_engine::{RuleTester, Spent, Tested};
 use lighthouse_plugin::Registry;
@@ -23,12 +19,11 @@ const WORKER_STACK: usize = 8 << 20;
 /// What running the examples found, in the order of the units.
 #[derive(Default)]
 pub(crate) struct Found {
-    pub(crate) runs: usize,
     pub(crate) failures: Vec<String>,
     pub(crate) skipped: Vec<String>,
     /// The plugins examples need and the registry lacks, with how many
     /// examples each keeps from running.
-    pub(crate) lacking: BTreeMap<String, usize>,
+    pub(crate) lacking: Vec<(String, usize)>,
     pub(crate) conflicts: Vec<String>,
     pub(crate) spent: Spent,
     /// The time of each unit: decision, language and total.
@@ -40,7 +35,7 @@ struct Unit {
     language: String,
     decision: String,
     skipped: Vec<String>,
-    lacking: BTreeMap<String, usize>,
+    lacking: Vec<(String, usize)>,
     tested: Tested,
 }
 
@@ -65,11 +60,11 @@ pub(crate) fn run(
     let testers: Vec<(&String, RuleTester<'_>)> = languages
         .iter()
         .map(|language| {
-            let tester = RuleTester::new(fresh, catalog, &session.base)
-                .bundled(bundled)
-                .language(language)
-                .trusted(session.trusted());
-            (language, tester)
+            let tester = RuleTester::new(fresh, catalog, &session.base).bundled(bundled);
+            (
+                language,
+                tester.language(language).trusted(session.trusted()),
+            )
         })
         .collect();
     let units: Vec<(&String, &RuleTester<'_>, &Decision)> = testers
@@ -93,8 +88,7 @@ pub(crate) fn run(
             .map_err(|e| format!("cannot start the workers: {e}"))?;
         pool.install(|| units.par_iter().map(|(l, t, d)| unit(l, t, d)).collect())
     };
-    let why = failed.lock().map_err(|e| e.to_string())?.take();
-    if let Some(e) = why {
+    if let Some(e) = failed.lock().map_err(|e| e.to_string())?.take() {
         return Err(format!("plugins could not be started for every example: {e}").into());
     }
     Ok(merge(done))
@@ -106,7 +100,7 @@ fn unit(language: &str, tester: &RuleTester<'_>, decision: &Decision) -> Unit {
         language: language.to_owned(),
         decision: decision.id().to_owned(),
         skipped: tester.skipped(decision),
-        lacking: tester.lacking_plugins(decision),
+        lacking: tester.lacking_plugins(decision).into_iter().collect(),
         tested: tester.tested(decision),
     }
 }
@@ -122,11 +116,8 @@ fn merge(units: Vec<Unit>) -> Found {
                 .map(|line| format!("[{language}] {line}"))
                 .collect()
         };
-        found.runs += 1;
         found.skipped.extend(prefixed(unit.skipped));
-        for (plugin, examples) in unit.lacking {
-            *found.lacking.entry(plugin).or_default() += examples;
-        }
+        found.lacking.extend(unit.lacking);
         found.spent += unit.tested.spent;
         found.per_unit.push((
             unit.decision.clone(),

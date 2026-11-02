@@ -509,34 +509,14 @@ fn evaluate_selector<'a>(
                     next.extend(filter_matches(source_ast, &parent, filter)?.then_some(parent));
                 }
                 (SelectorPart::Descend, _) => descend(source_ast, &parent, &mut next),
-                (SelectorPart::Key(key), Value::Object(object)) => {
-                    next.extend(object.get(key).map(|value| Selected {
-                        value,
-                        pointer: pointer_child(&parent.pointer, key),
-                    }));
+                (SelectorPart::Key(key), _) => {
+                    next.extend(member(&parent, &SelectorMember::Key(key.clone())));
                 }
-                (SelectorPart::Index(index), Value::Array(array)) => {
-                    next.extend(array.get(*index).map(|value| Selected {
-                        value,
-                        pointer: pointer_child(&parent.pointer, &index.to_string()),
-                    }));
+                (SelectorPart::Index(index), _) => {
+                    next.extend(member(&parent, &SelectorMember::Index(*index)));
                 }
-                (SelectorPart::Union(members), value) => {
-                    next.extend(members.iter().filter_map(|member| match (member, value) {
-                        (SelectorMember::Key(key), Value::Object(object)) => {
-                            object.get(key).map(|value| Selected {
-                                value,
-                                pointer: pointer_child(&parent.pointer, key),
-                            })
-                        }
-                        (SelectorMember::Index(index), Value::Array(array)) => {
-                            array.get(*index).map(|value| Selected {
-                                value,
-                                pointer: pointer_child(&parent.pointer, &index.to_string()),
-                            })
-                        }
-                        _ => None,
-                    }));
+                (SelectorPart::Union(members), _) => {
+                    next.extend(members.iter().filter_map(|m| member(&parent, m)));
                 }
                 (SelectorPart::Keys, Value::Object(object)) => {
                     next.extend(object_children(source_ast, &parent.pointer, object));
@@ -553,6 +533,21 @@ fn evaluate_selector<'a>(
         current = next;
     }
     Ok(current)
+}
+
+/// The child of `parent` a name or an index selects, if it has one.
+fn member<'a>(parent: &Selected<'a>, member: &SelectorMember) -> Option<Selected<'a>> {
+    let (value, step) = match (member, parent.value) {
+        (SelectorMember::Key(key), Value::Object(object)) => (object.get(key)?, key.clone()),
+        (SelectorMember::Index(index), Value::Array(array)) => {
+            (array.get(*index)?, index.to_string())
+        }
+        _ => return None,
+    };
+    Some(Selected {
+        value,
+        pointer: pointer_child(&parent.pointer, &step),
+    })
 }
 
 /// The values of `object` below `pointer`, in the order of their source.

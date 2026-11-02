@@ -93,35 +93,6 @@ pub fn create_decision(
     Ok(authored)
 }
 
-/// A project with decisions of its own extends `core/authoring`, which says
-/// where the CEL of those files is; a decision just written adds it when the
-/// project does not have it yet.
-fn extend_authoring(session: &Session, authored: &mut Authored) -> Result<()> {
-    if session
-        .config
-        .extends()
-        .iter()
-        .any(|name| name == AUTHORING)
-    {
-        return Ok(());
-    }
-    let said = match ensure_extends(&session.root, AUTHORING)? {
-        Extended::Added(path) => format!(
-            "added `{AUTHORING}` to `extends` in {} (it needs the plugins lang-yaml and lang-toml)",
-            path.display()
-        ),
-        Extended::Present => return Ok(()),
-        Extended::Manual(path) => {
-            format!(
-                "add `{AUTHORING}` to `extends` in {} by hand",
-                path.display()
-            )
-        }
-    };
-    authored.note = format!("{said}; {}", authored.note);
-    Ok(())
-}
-
 /// Replaces the local decision the `Decision` document names with it, keeping
 /// the uid the decision has. A bundled decision is not changed in place: its
 /// level and options are the project's `rules`, and different wording or
@@ -157,6 +128,35 @@ pub fn replace_decision(
     }
     let name = name.to_owned();
     commit(session, &id, &name, document, None, by)
+}
+
+/// A project with decisions of its own extends `core/authoring`, which says
+/// where the CEL of those files is; a decision just written adds it when the
+/// project does not have it yet.
+fn extend_authoring(session: &Session, authored: &mut Authored) -> Result<()> {
+    if session
+        .config
+        .extends()
+        .iter()
+        .any(|name| name == AUTHORING)
+    {
+        return Ok(());
+    }
+    let said = match ensure_extends(&session.root, AUTHORING)? {
+        Extended::Added(path) => format!(
+            "added `{AUTHORING}` to `extends` in {} (it needs the plugins lang-yaml and lang-toml)",
+            path.display()
+        ),
+        Extended::Present => return Ok(()),
+        Extended::Manual(path) => {
+            format!(
+                "add `{AUTHORING}` to `extends` in {} by hand",
+                path.display()
+            )
+        }
+    };
+    authored.note = format!("{said}; {}", authored.note);
+    Ok(())
 }
 
 /// The id of a document and the name of the file it is kept in.
