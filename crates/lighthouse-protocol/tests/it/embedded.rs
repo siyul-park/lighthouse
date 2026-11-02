@@ -1,12 +1,12 @@
 //! The check of a selected source region against its host text.
 
-use lighthouse_protocol::{EmbeddedSource, TextMapSegment};
+use lighthouse_protocol::{EmbeddedRegion, TextMapSegment};
 use serde_json::Value;
 
-fn region(text: &str, range: [u32; 2], map: Option<Vec<TextMapSegment>>) -> EmbeddedSource {
-    EmbeddedSource {
+fn region(text: &str, range: [u32; 2], map: Option<Vec<TextMapSegment>>) -> EmbeddedRegion {
+    EmbeddedRegion {
         id: "r".to_owned(),
-        rule_id: "rule".to_owned(),
+        injection_id: "rule".to_owned(),
         node_pointer: "/a".to_owned(),
         source_pointer: "/a".to_owned(),
         provider: "cel".to_owned(),

@@ -31,14 +31,14 @@ function project(): string {
 /** A Markdown file whose fences are the given bodies, with the sources a core would select. */
 function markdown(fences: { info?: string; body: string }[]): EmbeddedFile {
   let text = "# Demo\n\n";
-  const sources: EmbeddedFile["sources"] = [];
+  const sources: EmbeddedFile["regions"] = [];
   fences.forEach((fence, index) => {
     text += `\`\`\`${fence.info ?? "ts"}\n`;
     const start = Buffer.byteLength(text);
     text += fence.body;
     sources.push({
       id: `fence-${index}`,
-      rule_id: "markdown-code",
+      injection_id: "markdown-code",
       node_pointer: `/children/${index}`,
       source_pointer: `/children/${index}/value`,
       provider: "typescript",
@@ -48,7 +48,7 @@ function markdown(fences: { info?: string; body: string }[]): EmbeddedFile {
     });
     text += "```\n\n";
   });
-  return { path: "README.md", hash: "x", text, generated: false, test: false, facts: {}, sources };
+  return { path: "README.md", hash: "x", text, generated: false, test: false, facts: {}, regions: sources };
 }
 
 function index(root: string, host: EmbeddedFile): IndexResult {
@@ -153,10 +153,10 @@ describe("fences of a host file", () => {
       generated: false,
       test: false,
       facts: {},
-      sources: [
+      regions: [
         {
           id: "f",
-          rule_id: "markdown-code",
+          injection_id: "markdown-code",
           node_pointer: "/children/0",
           source_pointer: "/children/0/value",
           provider: "typescript",

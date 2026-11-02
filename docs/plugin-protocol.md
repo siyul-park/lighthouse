@@ -175,7 +175,7 @@ manifest's aliases are the names GitHub Linguist lists); a candidate whose name 
 unknown to the enabled providers is text, and nothing is said of it. The core resolves `context`
 projections and declaration context before it creates source-region inputs.
 
-A selected region carries a stable id, its `rule_id`, `node_pointer`, and `source_pointer`,
+A selected region carries a stable id, the `injection_id` of the injection that selected it, `node_pointer`, and `source_pointer`,
 the opaque destination provider key, optional syntax and resolved context, source text,
 optional `text_map`, and original host `source_range`. The destination receives these records inside an IndexInput with
 kind regions; it uses the same index method as for files. The host file path and original

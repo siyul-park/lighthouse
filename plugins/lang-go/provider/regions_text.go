@@ -169,7 +169,7 @@ func (m remap) offset(p sdk.Position) (int, bool) {
 // host: its own bytes where the text is copied as is, the whole segment where
 // it was changed on the way (a tab, a line ending), the whole fence without a
 // map.
-func newRegionText(source *sdk.EmbeddedSource) regionText {
+func newRegionText(source *sdk.EmbeddedRegion) regionText {
 	from, to := int(source.SourceRange[0]), int(source.SourceRange[1])
 	host := make([][2]int, len(source.Text))
 	for i := range host {

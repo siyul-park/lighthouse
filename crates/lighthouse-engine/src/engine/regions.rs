@@ -9,7 +9,7 @@ use std::{
 };
 
 use lighthouse_model::ucm::{Fragment, REGIONS};
-use lighthouse_plugin::EmbeddedSource;
+use lighthouse_plugin::EmbeddedRegion;
 
 /// The reserved context key of a injection that marks its regions as
 /// example code.
@@ -24,7 +24,7 @@ pub(super) struct Views {
 
 impl Views {
     /// Notes that `path` has `sources` routed to the provider of `language`.
-    pub(super) fn add(&mut self, path: &Path, language: &str, sources: &[EmbeddedSource]) {
+    pub(super) fn add(&mut self, path: &Path, language: &str, sources: &[EmbeddedRegion]) {
         let example = sources.iter().all(is_example);
         self.by_path
             .entry(path.to_owned())
@@ -88,7 +88,7 @@ impl Views {
 }
 
 /// Whether a region is example code, as its injection says.
-pub(super) fn is_example(source: &EmbeddedSource) -> bool {
+pub(super) fn is_example(source: &EmbeddedRegion) -> bool {
     source
         .context
         .get(EXAMPLE)

@@ -17,7 +17,7 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    EdgeKind, EmbeddedFile, EmbeddedSource, FileInfo, Fragment, Incomplete, IndexParams,
+    EdgeKind, EmbeddedFile, EmbeddedRegion, FileInfo, Fragment, Incomplete, IndexParams,
     IndexResult,
 };
 
@@ -42,7 +42,7 @@ const INFO: &str = "info";
 
 struct Snippet<'a> {
     host: &'a EmbeddedFile,
-    source: &'a EmbeddedSource,
+    source: &'a EmbeddedRegion,
     /// What the fence is: the text the compiler reads, wrapped when the fence
     /// is statements.
     text: Text,
@@ -181,7 +181,7 @@ fn state_editions(
 fn snippets<'a>(root: &Path, files: &[&'a EmbeddedFile]) -> Vec<Snippet<'a>> {
     let mut found = Vec::new();
     for host in files {
-        let mut sources: Vec<&EmbeddedSource> = host.sources.iter().collect();
+        let mut sources: Vec<&EmbeddedRegion> = host.regions.iter().collect();
         sources.sort_by_key(|source| source.source_range);
         for (ordinal, source) in sources.into_iter().enumerate() {
             let shown = Text::of(source);
@@ -219,7 +219,7 @@ fn snippets<'a>(root: &Path, files: &[&'a EmbeddedFile]) -> Vec<Snippet<'a>> {
 
 /// The edition a fence asks for: `edition2021` among the words of the info
 /// string its injection hands on, split as rustdoc splits it.
-fn edition_of(source: &EmbeddedSource) -> Option<String> {
+fn edition_of(source: &EmbeddedRegion) -> Option<String> {
     let info = source.context.get(INFO)?.as_str()?;
     info.split(|c: char| c.is_whitespace() || c == ',')
         .find_map(|word| {

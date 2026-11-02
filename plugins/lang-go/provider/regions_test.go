@@ -250,15 +250,15 @@ func indexMixed(t *testing.T, root string, fences []fence) (sdk.IndexResult, *pr
 func index(t *testing.T, root string, fences []fence, files []sdk.IndexInput) (sdk.IndexResult, *provider.Provider) {
 	t.Helper()
 	var host strings.Builder
-	var sources []sdk.EmbeddedSource
+	var sources []sdk.EmbeddedRegion
 	for i, f := range fences {
 		host.WriteString("```go\n")
 		from := host.Len()
 		host.WriteString(f.body)
 		to := host.Len()
-		source := sdk.EmbeddedSource{
+		source := sdk.EmbeddedRegion{
 			ID:            fmt.Sprintf("fence-%d", i),
-			RuleID:        "markdown-go",
+			InjectionID:   "markdown-go",
 			NodePointer:   fmt.Sprintf("/children/%d", i),
 			SourcePointer: fmt.Sprintf("/children/%d/text", i),
 			Provider:      "go",
@@ -277,7 +277,7 @@ func index(t *testing.T, root string, fences []fence, files []sdk.IndexInput) (s
 	}
 	g := provider.New("lang-go", "test")
 	inputs := append(files, sdk.IndexInput{Kind: "regions", Regions: &sdk.EmbeddedFile{
-		Path: "README.md", Text: host.String(), Sources: sources,
+		Path: "README.md", Text: host.String(), Regions: sources,
 	}})
 	result, err := g.Index(sdk.IndexParams{
 		Project:  sdk.ProjectRef{Root: root},

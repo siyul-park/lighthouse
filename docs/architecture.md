@@ -13,7 +13,7 @@
           │                      plugins/lang-typescript (TypeScript compiler API)
           │                      plugins/lang-python (ast + symtable, standard library)
           │                      plugins/lang-yaml, lang-toml, lang-markdown (syntax
-          │                      trees of host files, for embedded sources)
+          │                      trees of host files, for embedded regions)
    code model (UCM, lighthouse_model::ucm)
 ```
 

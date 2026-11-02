@@ -95,23 +95,23 @@ impl<P: HostParser> HostProvider<P> {
     /// The provider has no code model to give them, so a region is read as far
     /// as there is anything to say: one that is not a document is a notice,
     /// since what a file writes in a fence is not always the language's.
-    fn regions(&self, regions: &EmbeddedFile, result: &mut IndexResult) {
+    fn regions(&self, file: &EmbeddedFile, result: &mut IndexResult) {
         result.fragments.push(Fragment {
             file: FileInfo {
-                path: regions.path.clone(),
+                path: file.path.clone(),
                 ..FileInfo::default()
             },
             ..Fragment::default()
         });
-        for source in &regions.sources {
+        for source in &file.regions {
             match self.parser.parse(&source.text) {
                 Ok(_) => {}
                 Err(HostError::Syntax(error)) => result.notices.push(format!(
                     "{}: the {} at {} is not a valid {} document: {error}",
-                    regions.path, self.language.id, source.node_pointer, self.language.title
+                    file.path, self.language.id, source.node_pointer, self.language.title
                 )),
                 Err(HostError::Tree(reason)) => result.incomplete.push(Incomplete {
-                    path: Some(regions.path.clone()),
+                    path: Some(file.path.clone()),
                     reason: format!(
                         "cannot expose the {} at {}: {reason}",
                         self.language.title, source.node_pointer

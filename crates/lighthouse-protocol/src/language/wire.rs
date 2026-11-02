@@ -327,14 +327,15 @@ pub struct EmbeddedFile {
     pub test: bool,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub facts: BTreeMap<String, String>,
-    pub sources: Vec<EmbeddedSource>,
+    pub regions: Vec<EmbeddedRegion>,
 }
 
-/// A source region produced by the core source engine.
+/// A region an injection selected, routed to the provider of its language.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct EmbeddedSource {
+pub struct EmbeddedRegion {
     pub id: String,
-    pub rule_id: String,
+    /// The injection that selected the region.
+    pub injection_id: String,
     /// JSON Pointer of the selected candidate in the host AST.
     pub node_pointer: String,
     /// JSON Pointer of the exact scalar whose text is analyzed.
@@ -353,7 +354,7 @@ pub struct EmbeddedSource {
     pub text_map: Option<Vec<TextMapSegment>>,
 }
 
-impl EmbeddedSource {
+impl EmbeddedRegion {
     /// Whether the original scalar range and the decoded-text map are valid
     /// against the host text.
     pub fn validate(&self, host: &str) -> Result<(), String> {

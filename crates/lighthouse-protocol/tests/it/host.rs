@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
-    Context, EmbeddedFile, EmbeddedSource, FileRef, IndexInput, IndexParams, Overlay, ProjectRef,
+    Context, EmbeddedFile, EmbeddedRegion, FileRef, IndexInput, IndexParams, Overlay, ProjectRef,
     TextOffsets,
     language::{HostError, HostLanguage, HostParser, HostProvider, HostTree, Provider},
 };
@@ -122,10 +122,10 @@ fn a_file_that_cannot_be_read_or_parsed_is_a_gap() {
     );
 }
 
-fn region(pointer: &str, text: &str) -> EmbeddedSource {
-    EmbeddedSource {
+fn region(pointer: &str, text: &str) -> EmbeddedRegion {
+    EmbeddedRegion {
         id: pointer.to_owned(),
-        rule_id: "fence".to_owned(),
+        injection_id: "fence".to_owned(),
         node_pointer: pointer.to_owned(),
         source_pointer: format!("{pointer}/text"),
         provider: "lines".to_owned(),
@@ -149,7 +149,7 @@ fn regions_that_are_documents_are_read_and_the_others_are_a_notice() {
             generated: false,
             test: false,
             facts: BTreeMap::new(),
-            sources: vec![region("/children/0", "x=1"), region("/children/1", "x!")],
+            regions: vec![region("/children/0", "x=1"), region("/children/1", "x!")],
         },
     }];
     let result = handler.index(request).unwrap();

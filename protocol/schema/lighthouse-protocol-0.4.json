@@ -409,9 +409,9 @@
         "path": {
           "type": "string"
         },
-        "sources": {
+        "regions": {
           "items": {
-            "$ref": "#/$defs/EmbeddedSource"
+            "$ref": "#/$defs/EmbeddedRegion"
           },
           "type": "array"
         },
@@ -427,17 +427,21 @@
         "path",
         "hash",
         "text",
-        "sources"
+        "regions"
       ],
       "type": "object"
     },
-    "EmbeddedSource": {
-      "description": "A source region produced by the core source engine.",
+    "EmbeddedRegion": {
+      "description": "A region an injection selected, routed to the provider of its language.",
       "properties": {
         "context": {
           "default": null
         },
         "id": {
+          "type": "string"
+        },
+        "injection_id": {
+          "description": "The injection that selected the region.",
           "type": "string"
         },
         "node_pointer": {
@@ -446,9 +450,6 @@
         },
         "provider": {
           "description": "The exact registered destination provider key.",
-          "type": "string"
-        },
-        "rule_id": {
           "type": "string"
         },
         "source_pointer": {
@@ -488,7 +489,7 @@
       },
       "required": [
         "id",
-        "rule_id",
+        "injection_id",
         "node_pointer",
         "source_pointer",
         "provider",

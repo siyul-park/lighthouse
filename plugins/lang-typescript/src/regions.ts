@@ -5,7 +5,7 @@ import { byteLineStarts, positionAtByte } from "./extent/lines.ts";
 import type {
   Comment,
   EmbeddedFile,
-  EmbeddedSource,
+  EmbeddedRegion,
   Edge,
   Fragment,
   FunctionSummary,
@@ -38,7 +38,7 @@ export interface RegionText {
 /** One fence as a unit of its own: a file beside its host that uses the project from outside. */
 export interface Snippet {
   host: EmbeddedFile;
-  source: EmbeddedSource;
+  source: EmbeddedRegion;
   /** The project-relative path of the unit's file. */
   rel: string;
   text: RegionText;
@@ -144,7 +144,7 @@ export class Remap {
 export function planSnippets(hosts: readonly EmbeddedFile[]): Snippet[] {
   const snippets: Snippet[] = [];
   for (const host of hosts) {
-    const sources = [...host.sources].sort((a, b) => a.source_range[0] - b.source_range[0]);
+    const sources = [...host.regions].sort((a, b) => a.source_range[0] - b.source_range[0]);
     sources.forEach((source, index) => {
       const dir = path.posix.dirname(host.path);
       const name = `${path.posix.basename(host.path)}.${index + 1}`;
@@ -155,7 +155,7 @@ export function planSnippets(hosts: readonly EmbeddedFile[]): Snippet[] {
   return snippets;
 }
 
-function extensionOf(source: EmbeddedSource): string {
+function extensionOf(source: EmbeddedRegion): string {
   const info = source.context?.["info"];
   const word =
     typeof info === "string"
@@ -175,7 +175,7 @@ function wrap(body: RegionText): RegionText {
 }
 
 /** The fence as it is written, each byte at its place in the host. */
-function regionText(source: EmbeddedSource): RegionText {
+function regionText(source: EmbeddedRegion): RegionText {
   const bytes = Buffer.byteLength(source.text);
   const [from, to] = source.source_range;
   const host: [number, number][] = Array.from({ length: bytes }, () => [from, to]);

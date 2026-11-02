@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lang_python.project import SNIPPETS_DIR
-from lang_python.sdk.wire import Comment, Edge, EmbeddedFile, EmbeddedSource, Fragment, Position, Span, Symbol
+from lang_python.sdk.wire import Comment, Edge, EmbeddedFile, EmbeddedRegion, Fragment, Position, Span, Symbol
 
 UNMAPPED = (-1, -1)
 
@@ -24,7 +24,7 @@ class Snippet:
     """One fence as a unit of its own: a file beside its host that uses the project from outside."""
 
     host: EmbeddedFile
-    source: EmbeddedSource
+    source: EmbeddedRegion
     rel: str
     text: _RegionText
 
@@ -33,7 +33,7 @@ def plan_snippets(hosts: list[EmbeddedFile]) -> list[Snippet]:
     """The units of the fences of the host files of a request, in the order of the fences."""
     snippets: list[Snippet] = []
     for host in hosts:
-        sources = sorted(host["sources"], key=lambda s: s["source_range"][0])
+        sources = sorted(host["regions"], key=lambda s: s["source_range"][0])
         for index, source in enumerate(sources):
             directory = posixpath.dirname(host["path"])
             name = "%s.%d" % (posixpath.basename(host["path"]), index + 1)
@@ -42,7 +42,7 @@ def plan_snippets(hosts: list[EmbeddedFile]) -> list[Snippet]:
     return snippets
 
 
-def _region_text(source: EmbeddedSource) -> _RegionText:
+def _region_text(source: EmbeddedRegion) -> _RegionText:
     """The fence as it is written, each byte at its place in the host."""
     text = source["text"]
     size = len(text.encode("utf-8"))

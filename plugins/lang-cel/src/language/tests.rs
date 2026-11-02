@@ -55,9 +55,9 @@ fn undeclared_source_expressions_keep_edges_without_becoming_functions() {
     let embedded = EmbeddedFile {
         file,
         text: host.to_owned(),
-        sources: vec![EmbeddedSource {
+        regions: vec![EmbeddedRegion {
             id: "decision-where:decisions/example.yaml:0:$.where".to_owned(),
-            rule_id: "decision-where".to_owned(),
+            injection_id: "decision-where".to_owned(),
             node_pointer: "/where".to_owned(),
             source_pointer: "/where".to_owned(),
             provider: "cel".to_owned(),
@@ -74,7 +74,7 @@ fn undeclared_source_expressions_keep_edges_without_becoming_functions() {
     let source = Source {
         file: &embedded.file,
         text: &embedded.text,
-        regions: &embedded.sources,
+        regions: &embedded.regions,
     };
     let indexed = Language::new()
         .index(&Workspace::new("/tmp"), &[source])
@@ -110,9 +110,9 @@ fn indexes_embedded_cel_at_original_host_coordinates() {
     let embedded = EmbeddedFile {
         file,
         text: host.to_owned(),
-        sources: vec![EmbeddedSource {
+        regions: vec![EmbeddedRegion {
             id: "decision-where:decisions/example.yaml:0:$.where".to_owned(),
-            rule_id: "decision-where".to_owned(),
+            injection_id: "decision-where".to_owned(),
             node_pointer: "/where".to_owned(),
             source_pointer: "/where".to_owned(),
             provider: "cel".to_owned(),
@@ -137,7 +137,7 @@ fn indexes_embedded_cel_at_original_host_coordinates() {
     let source = Source {
         file: &embedded.file,
         text: &embedded.text,
-        regions: &embedded.sources,
+        regions: &embedded.regions,
     };
     let indexed = Language::new()
         .index(&Workspace::new("/tmp"), &[source])
@@ -161,11 +161,11 @@ fn indexes_embedded_cel_at_original_host_coordinates() {
     );
 
     let mut unsupported = embedded.clone();
-    unsupported.sources[0].syntax = Some("sql".to_owned());
+    unsupported.regions[0].syntax = Some("sql".to_owned());
     let source = Source {
         file: &unsupported.file,
         text: &unsupported.text,
-        regions: &unsupported.sources,
+        regions: &unsupported.regions,
     };
     let indexed = Language::new()
         .index(&Workspace::new("/tmp"), &[source])
@@ -194,9 +194,9 @@ fn a_decision_resolves_the_shared_variable_of_its_pack() {
         let start = host.find(text).unwrap();
         [start as u32, (start + text.len()) as u32]
     };
-    let region = |pointer: &str, text: &str, context: serde_json::Value| EmbeddedSource {
+    let region = |pointer: &str, text: &str, context: serde_json::Value| EmbeddedRegion {
         id: format!("rule:{pointer}"),
-        rule_id: "rule".to_owned(),
+        injection_id: "rule".to_owned(),
         node_pointer: pointer.to_owned(),
         source_pointer: pointer.to_owned(),
         provider: "cel".to_owned(),

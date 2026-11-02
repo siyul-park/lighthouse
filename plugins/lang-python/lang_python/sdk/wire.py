@@ -191,14 +191,14 @@ TextMapSegment = TypedDict(
 )
 
 
-EmbeddedSource = TypedDict(
-    "EmbeddedSource",
+EmbeddedRegion = TypedDict(
+    "EmbeddedRegion",
     {
         "context": Any,
         "id": Required[str],
+        "injection_id": Required[str],
         "node_pointer": Required[str],
         "provider": Required[str],
-        "rule_id": Required[str],
         "source_pointer": Required[str],
         "source_range": Required[list[int]],
         "syntax": str | None,
@@ -216,7 +216,7 @@ EmbeddedFile = TypedDict(
         "generated": bool,
         "hash": Required[str],
         "path": Required[str],
-        "sources": Required[list[EmbeddedSource]],
+        "regions": Required[list[EmbeddedRegion]],
         "test": bool,
         "text": Required[str],
     },

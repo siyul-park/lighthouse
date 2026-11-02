@@ -288,7 +288,7 @@ impl Engine {
                         .chain(call.regions.iter().map(|file| Source {
                             file: &file.file,
                             text: &file.text,
-                            regions: &file.sources,
+                            regions: &file.regions,
                         }))
                         .collect();
                     let started = Instant::now();
@@ -352,16 +352,16 @@ impl Engine {
             .collect();
         let mut target_files: EmbeddedTargets = BTreeMap::new();
         for file in embedded {
-            if file.sources.is_empty() {
+            if file.regions.is_empty() {
                 continue;
             }
             let path = file.file.path.clone();
             let mut ids = BTreeSet::new();
-            let mut by_provider: BTreeMap<usize, Vec<lighthouse_plugin::EmbeddedSource>> =
+            let mut by_provider: BTreeMap<usize, Vec<lighthouse_plugin::EmbeddedRegion>> =
                 BTreeMap::new();
-            for source in file.sources {
+            for source in file.regions {
                 if source.id.is_empty()
-                    || source.rule_id.is_empty()
+                    || source.injection_id.is_empty()
                     || source.provider.is_empty()
                     || !ids.insert(source.id.clone())
                 {
@@ -409,7 +409,7 @@ impl Engine {
                     EmbeddedFile {
                         file: file.file.clone(),
                         text: file.text.clone(),
-                        sources,
+                        regions: sources,
                     },
                 );
             }
@@ -425,7 +425,7 @@ impl Engine {
         for (target, files) in target_files {
             let language = self.provider(*target).manifest().id.clone();
             for (path, file) in files {
-                views.add(path, &language, &file.sources);
+                views.add(path, &language, &file.regions);
             }
         }
         let native_files: BTreeSet<PathBuf> = parts

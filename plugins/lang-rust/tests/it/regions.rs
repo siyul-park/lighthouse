@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use lighthouse_protocol::{
-    EdgeKind, EmbeddedFile, EmbeddedSource, Fragment, IndexInput, IndexResult, Node, TextMapSegment,
+    EdgeKind, EmbeddedFile, EmbeddedRegion, Fragment, IndexInput, IndexResult, Node, TextMapSegment,
 };
 use serde_json::{Value, json};
 
@@ -201,7 +201,7 @@ fn fences(dir: &Path, bodies: &[(&str, Value)]) -> IndexResult {
         generated: false,
         test: false,
         facts: Default::default(),
-        sources,
+        regions: sources,
     };
     let root = dir.canonicalize().unwrap();
     exchange(
@@ -212,11 +212,11 @@ fn fences(dir: &Path, bodies: &[(&str, Value)]) -> IndexResult {
     )
 }
 
-fn source(at: usize, body: &str, from: usize, context: &Value) -> EmbeddedSource {
+fn source(at: usize, body: &str, from: usize, context: &Value) -> EmbeddedRegion {
     let to = from + body.len();
-    EmbeddedSource {
+    EmbeddedRegion {
         id: format!("fence-{at}"),
-        rule_id: "markdown-rust".to_owned(),
+        injection_id: "markdown-rust".to_owned(),
         node_pointer: format!("/children/{at}"),
         source_pointer: format!("/children/{at}/text"),
         provider: "rust".to_owned(),

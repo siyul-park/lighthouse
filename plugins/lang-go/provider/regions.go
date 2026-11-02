@@ -25,7 +25,7 @@ import (
 // snippet is one fence as a unit the go command loads.
 type snippet struct {
 	host   *sdk.EmbeddedFile
-	source *sdk.EmbeddedSource
+	source *sdk.EmbeddedRegion
 	// rel is the project-relative path of the unit's file.
 	rel string
 	// module is the module path the unit declares its symbols in.
@@ -117,9 +117,9 @@ func (r *run) admit(snippets []*snippet) {
 // snippets are the units of the fences of one host file, in the order of the
 // fences.
 func (r *run) snippets(host *sdk.EmbeddedFile) []*snippet {
-	sources := make([]*sdk.EmbeddedSource, len(host.Sources))
-	for i := range host.Sources {
-		sources[i] = &host.Sources[i]
+	sources := make([]*sdk.EmbeddedRegion, len(host.Regions))
+	for i := range host.Regions {
+		sources[i] = &host.Regions[i]
 	}
 	sort.SliceStable(sources, func(i, j int) bool { return sources[i].SourceRange[0] < sources[j].SourceRange[0] })
 	var out []*snippet
@@ -512,7 +512,7 @@ func parses(src string, mode parser.Mode) bool {
 }
 
 // contextString is the string an injection gave under key.
-func contextString(source *sdk.EmbeddedSource, key string) string {
+func contextString(source *sdk.EmbeddedRegion, key string) string {
 	var context map[string]json.RawMessage
 	if json.Unmarshal(source.Context, &context) != nil {
 		return ""

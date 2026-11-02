@@ -440,7 +440,7 @@ fn repository_regions(injections: &[InjectionSpec], asts: &[Source], root: &Path
         .into_iter()
         .flat_map(|file| {
             let path = file.file.path.clone();
-            file.sources.into_iter().map(move |source| {
+            file.regions.into_iter().map(move |source| {
                 (
                     path.clone(),
                     source.source_range,

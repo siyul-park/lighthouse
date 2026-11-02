@@ -16,7 +16,7 @@ pub use language::{
     server::{Handler, ServeError, serve},
     wire::{
         CacheRef, Call, Comment, Context, Conventions, Edge, EdgeKind, EmbeddedFile,
-        EmbeddedSource, Event, EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment,
+        EmbeddedRegion, Event, EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment,
         FunctionSummary, Implementation, Incomplete, IndexInput, IndexParams, IndexResult,
         InitializeParams, InitializeResult, LanguageManifest, Mapping, Methods, Module, Node,
         Overlay, Position, ProjectRef, Resolution, ServerCapabilities, Signature, Source, Span,

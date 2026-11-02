@@ -185,15 +185,16 @@ type TextMapSegment struct {
 	TextRange   [2]uint32 `json:"text_range"`
 }
 
-// EmbeddedSource: A source region produced by the core source engine.
-type EmbeddedSource struct {
+// EmbeddedRegion: A region an injection selected, routed to the provider of its language.
+type EmbeddedRegion struct {
 	Context json.RawMessage `json:"context,omitempty"`
 	ID      string          `json:"id"`
+	// The injection that selected the region.
+	InjectionID string `json:"injection_id"`
 	// JSON Pointer of the selected candidate in the host AST.
 	NodePointer string `json:"node_pointer"`
 	// The exact registered destination provider key.
 	Provider string `json:"provider"`
-	RuleID   string `json:"rule_id"`
 	// JSON Pointer of the exact scalar whose text is analyzed.
 	SourcePointer string `json:"source_pointer"`
 	// Whole source-scalar range, used when text_map is absent.
@@ -210,7 +211,7 @@ type EmbeddedFile struct {
 	Generated bool              `json:"generated"`
 	Hash      string            `json:"hash"`
 	Path      string            `json:"path"`
-	Sources   []EmbeddedSource  `json:"sources"`
+	Regions   []EmbeddedRegion  `json:"regions"`
 	Test      bool              `json:"test"`
 	Text      string            `json:"text"`
 }

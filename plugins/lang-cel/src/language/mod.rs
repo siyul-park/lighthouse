@@ -9,7 +9,7 @@ use lighthouse_model::{
     ucm::{Edge, EdgeKind, Fragment, Module, Node, Resolution, Symbol, SymbolId, Target},
 };
 use lighthouse_plugin::{
-    CelLibraryManifest, EmbeddedFile, EmbeddedSource, Error, Indexed, LanguageManifest,
+    CelLibraryManifest, EmbeddedFile, EmbeddedRegion, Error, Indexed, LanguageManifest,
     LanguageProvider, Source, Workspace,
 };
 
@@ -57,7 +57,7 @@ impl LanguageProvider for Language {
             .map(|source| EmbeddedFile {
                 file: source.file.clone(),
                 text: source.text.to_owned(),
-                sources: source.regions.to_vec(),
+                regions: source.regions.to_vec(),
             })
             .collect();
         let mut output = Indexed::default();
@@ -114,7 +114,7 @@ fn drafts(files: &[EmbeddedFile], output: &mut Indexed) -> Vec<FileDraft> {
         };
         let mut draft = FileDraft::empty(&source);
         let mut indexed = false;
-        for embedded in &file.sources {
+        for embedded in &file.regions {
             match add_source(&mut draft, file, embedded) {
                 Ok(()) => indexed = true,
                 Err(reason) => output.incomplete.push(Incomplete {
@@ -134,7 +134,7 @@ fn drafts(files: &[EmbeddedFile], output: &mut Indexed) -> Vec<FileDraft> {
 fn add_source(
     draft: &mut FileDraft,
     file: &EmbeddedFile,
-    source: &EmbeddedSource,
+    source: &EmbeddedRegion,
 ) -> Result<(), String> {
     let template = match source.syntax.as_deref() {
         None => None,
@@ -191,7 +191,7 @@ fn add_source(
     Ok(())
 }
 
-fn mapped_source(source: &EmbeddedSource, host: &Arc<Host>) -> MappedText {
+fn mapped_source(source: &EmbeddedRegion, host: &Arc<Host>) -> MappedText {
     let [source_start, source_end] = source.source_range.map(|n| n as usize);
     let mut starts = vec![source_start; source.text.len()];
     let mut ends = vec![source_end; source.text.len()];
@@ -232,7 +232,7 @@ fn mapped_source(source: &EmbeddedSource, host: &Arc<Host>) -> MappedText {
 
 fn variable_decl(
     draft: &mut FileDraft,
-    source: &EmbeddedSource,
+    source: &EmbeddedRegion,
     document: &str,
     name: &str,
     shared: bool,
@@ -313,7 +313,7 @@ fn metadata_string_opt(value: &serde_json::Value, key: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-fn source_name(source: &EmbeddedSource) -> String {
+fn source_name(source: &EmbeddedRegion) -> String {
     source
         .node_pointer
         .rsplit('/')

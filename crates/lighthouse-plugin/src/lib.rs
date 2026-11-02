@@ -32,7 +32,7 @@ pub use cel::{
 };
 pub use error::Error;
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
-pub use lighthouse_protocol::{Conventions, EmbeddedSource, Mapping, TestNaming, TextMapSegment};
+pub use lighthouse_protocol::{Conventions, EmbeddedRegion, Mapping, TestNaming, TextMapSegment};
 pub use memo::Memo;
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
@@ -235,7 +235,7 @@ impl LanguageManifest {
 pub struct EmbeddedFile {
     pub file: File,
     pub text: String,
-    pub sources: Vec<EmbeddedSource>,
+    pub regions: Vec<EmbeddedRegion>,
 }
 
 /// What a provider produced for a batch of files.
@@ -257,7 +257,7 @@ pub struct Source<'a> {
     pub text: &'a str,
     /// Empty for a physical file; populated when the same index interface
     /// analyzes source regions selected from another provider's syntax tree.
-    pub regions: &'a [EmbeddedSource],
+    pub regions: &'a [EmbeddedRegion],
 }
 
 /// Turns the files of one language into UCM fragments. Implementations must

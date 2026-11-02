@@ -12,23 +12,23 @@ def host(path: str, text: str, code: str, start: int | None = None) -> dict[str,
     at = text.index(code) if start is None else start
     source = {
         "id": "1",
-        "rule_id": "markdown-code",
+        "injection_id": "markdown-code",
         "node_pointer": "/children/0",
         "source_pointer": "/children/0/literal",
         "provider": "python",
         "text": code,
         "source_range": [at, at + len(code.encode())],
     }
-    return {"path": path, "hash": "0", "text": text, "sources": [source]}
+    return {"path": path, "hash": "0", "text": text, "regions": [source]}
 
 
 def two_fences() -> dict[str, Any]:
-    """A Markdown host with two fences, the second written first in the list of sources."""
+    """A Markdown host with two fences, the second written first in the list of regions."""
     first, second = "a = 1\n", "def demo():\n    pass\n"
     text = "# T\n\n```python\n" + first + "```\n\n```python\n" + second + "```\n"
     one = host("docs/guide.md", text, first)
     two = host("docs/guide.md", text, second)
-    one["sources"] = [two["sources"][0] | {"id": "2"}, one["sources"][0]]
+    one["regions"] = [two["regions"][0] | {"id": "2"}, one["regions"][0]]
     return one
 
 
@@ -128,7 +128,7 @@ class RegionTests(unittest.TestCase):
             text_at += len(line)
             host_at += 2 + len(line)
         region = host("README.md", text, code, start)
-        region["sources"][0]["text_map"] = segments
+        region["regions"][0]["text_map"] = segments
         merged = fragment(index(LIB, paths=[], regions=[region]), "README.md")
         self.assertEqual(merged["comments"][0]["span"]["start"], {"line": 2, "col": 3})
         self.assertEqual(merged["comments"][0]["attached_to"], merged["symbols"][0]["id"])

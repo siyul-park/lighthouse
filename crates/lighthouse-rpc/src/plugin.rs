@@ -413,7 +413,7 @@ fn embedded_wire(source: &Source<'_>) -> wire::EmbeddedFile {
         generated: source.file.generated,
         test: source.file.test,
         facts: source.file.facts.clone(),
-        sources: source.regions.to_vec(),
+        regions: source.regions.to_vec(),
     }
 }
 

@@ -3,7 +3,7 @@
 //! the page hides, and `##` stands for a shown `#`; a fence with statements
 //! and no item around them is the body of a `fn main`.
 
-use lighthouse_protocol::EmbeddedSource;
+use lighthouse_protocol::EmbeddedRegion;
 
 const WRAP_HEAD: &str = "fn main() {\n";
 const WRAP_TAIL: &str = "}\n";
@@ -18,7 +18,7 @@ pub(super) struct Text {
 
 impl Text {
     /// The fence as it is written, with its hidden lines unhidden.
-    pub(super) fn of(source: &EmbeddedSource) -> Self {
+    pub(super) fn of(source: &EmbeddedRegion) -> Self {
         let bytes = host_bytes(source);
         let mut text = Self {
             text: String::new(),
@@ -84,7 +84,7 @@ impl Text {
 /// The host bytes each byte of the fence's text comes from: the segment's own
 /// bytes when it is copied as is, the whole segment when it was changed on the
 /// way (a tab, a line ending), the whole fence without a map.
-fn host_bytes(source: &EmbeddedSource) -> Vec<[usize; 2]> {
+fn host_bytes(source: &EmbeddedRegion) -> Vec<[usize; 2]> {
     let [from, to] = source.source_range.map(|at| at as usize);
     let mut bytes = vec![[from, to]; source.text.len()];
     let linear = to - from == source.text.len();

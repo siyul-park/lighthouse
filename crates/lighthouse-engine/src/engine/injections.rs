@@ -5,7 +5,7 @@ use std::{
 
 use globset::{Glob, GlobSetBuilder};
 use lighthouse_model::Incomplete;
-use lighthouse_plugin::{EmbeddedFile, EmbeddedSource};
+use lighthouse_plugin::{EmbeddedFile, EmbeddedRegion};
 use lighthouse_protocol::Source;
 use lighthouse_protocol::{
     Selector, SelectorComparison, SelectorFilter, SelectorMember, SelectorPart, pointer_child,
@@ -119,7 +119,7 @@ pub(super) fn select(
             output.push(EmbeddedFile {
                 file: input.file.clone(),
                 text: input.text.clone(),
-                sources: selected,
+                regions: selected,
             });
         }
     }
@@ -175,7 +175,7 @@ fn select_rule(
     rule: &Injection<'_>,
     source_ast: &Source,
     named: Named<'_>,
-) -> Result<Vec<EmbeddedSource>, String> {
+) -> Result<Vec<EmbeddedRegion>, String> {
     let spec = rule.spec;
     let mut output = Vec::new();
     for candidate in evaluate_selector(source_ast, "", &rule.select)? {
@@ -224,9 +224,9 @@ fn select_rule(
             candidate.pointer.len(),
             candidate.pointer
         );
-        output.push(EmbeddedSource {
+        output.push(EmbeddedRegion {
             id,
-            rule_id: spec.id.clone(),
+            injection_id: spec.id.clone(),
             node_pointer: candidate.pointer,
             source_pointer: source.pointer,
             provider,
