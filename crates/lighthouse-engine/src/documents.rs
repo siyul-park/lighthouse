@@ -1,7 +1,10 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Component, Path},
+};
 
 use ignore::WalkBuilder;
-use lighthouse_model::{Document, Error, Format};
+use lighthouse_model::{Document, Error, Format, STATE_DIR};
 
 use crate::engine::{IGNORE_FILE, Overlays};
 
@@ -11,6 +14,19 @@ const MAX_BYTES: u64 = 1 << 20;
 
 /// Directories no command looks for documents in.
 pub const SKIPPED_DIRS: [&str; 4] = [".git", "target", "node_modules", "testdata"];
+
+/// Whether a walk of the project enters the entry at `rel`: of the state
+/// directory (cache, database, local state) only the decisions are the
+/// project's own files.
+pub(crate) fn in_project(rel: &Path) -> bool {
+    let mut parts = rel.components();
+    match (parts.next(), parts.next()) {
+        (Some(Component::Normal(first)), Some(Component::Normal(second))) if first == STATE_DIR => {
+            second == "decisions"
+        }
+        _ => true,
+    }
+}
 
 /// The documents found, and what could not be settled about them.
 #[derive(Default)]
@@ -27,15 +43,17 @@ impl Documents {
     /// reported, not skipped silently. `overlays` stand in for the files of the
     /// same path.
     pub(crate) fn scan(root: &Path, overlays: &Overlays) -> Self {
+        let base = root.to_owned();
         let walk = WalkBuilder::new(root)
             .require_git(false)
             .hidden(false)
             .add_custom_ignore_filename(IGNORE_FILE)
-            .filter_entry(|entry| {
+            .filter_entry(move |entry| {
                 entry
                     .file_name()
                     .to_str()
                     .is_none_or(|name| !SKIPPED_DIRS.contains(&name))
+                    && entry.path().strip_prefix(&base).is_ok_and(in_project)
             })
             .build();
         let mut found = Self::default();
@@ -84,5 +102,27 @@ impl Documents {
             e => format!("{label}: not read as a document: {e}"),
         }));
         self.documents.extend(documents);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::in_project;
+
+    #[test]
+    fn only_the_decisions_of_the_state_directory_are_in_the_project() {
+        for (path, expected) in [
+            (".lighthouse", true),
+            (".lighthouse/decisions", true),
+            (".lighthouse/decisions/a.yaml", true),
+            (".lighthouse/cache", false),
+            (".lighthouse/lighthouse.db", false),
+            ("src/.lighthouse/cache", true),
+            ("src/a.rs", true),
+        ] {
+            assert_eq!(in_project(Path::new(path)), expected, "{path}");
+        }
     }
 }

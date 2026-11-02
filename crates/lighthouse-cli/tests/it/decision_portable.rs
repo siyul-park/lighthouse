@@ -143,7 +143,7 @@ fn what_a_project_extends_or_sets_does_not_change_what_its_examples_do() {
     assert_eq!(summary(&plain), summary(&set), "{set}");
 }
 
-/// A decision file of the project with a variable its `where` never reads.
+/// A decision of the project's own layer (`.lighthouse/decisions`) with a variable its `where` never reads.
 const UNUSED_VARIABLE: &str = "apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
@@ -163,6 +163,25 @@ spec:
         expression: '3'
     where: file.lines > 3
     message: too long
+  examples:
+  - name: long
+    language: text
+    kind: invalid
+    files:
+    - path: note.txt
+      body: |-
+        a
+        b
+        c
+        d
+    expect: [{ line: 1 }]
+  - name: short
+    language: text
+    kind: valid
+    canonical: true
+    files:
+    - path: note.txt
+      body: a
 ";
 
 #[test]
@@ -176,7 +195,11 @@ fn a_project_that_extends_core_authoring_has_the_cel_of_its_decisions_checked() 
     for dir in [&with, &without] {
         lighthouse_test_support::installed(&dir.path().join(".home"), &yaml);
         lighthouse_test_support::installed(&dir.path().join(".home"), &toml);
-        write(dir.path(), "decisions/short.yaml", UNUSED_VARIABLE);
+        write(
+            dir.path(),
+            ".lighthouse/decisions/short.yaml",
+            UNUSED_VARIABLE,
+        );
     }
 
     let found = lighthouse(with.path()).arg("check").assert();
