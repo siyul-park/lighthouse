@@ -10,11 +10,18 @@ use crate::terminal::hook;
 use clap::{ColorChoice, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 
+/// What `--version` prints: the release workflow sets `LIGHTHOUSE_VERSION` at
+/// build time; any other build is the Cargo version marked `-dev`.
+const VERSION: &str = match option_env!("LIGHTHOUSE_VERSION") {
+    Some(version) => version,
+    None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
+};
+
 /// Where `docs generate` writes the agent skill.
 pub const SKILL_PATH: &str = "skills/lighthouse/SKILL.md";
 
 #[derive(Debug, Parser)]
-#[command(name = "lighthouse", version, about = "Design-quality linter")]
+#[command(name = "lighthouse", version = VERSION, about = "Design-quality linter")]
 pub struct Cli {
     /// The project file; the project root is then the current directory.
     #[arg(long, global = true, env = "LIGHTHOUSE_CONFIG", value_name = "FILE")]

@@ -127,6 +127,8 @@ The agent fixes it, or records why not. Either way the decision is kept.
 
 ## Quick start
 
+Install a release or build from source: [docs/install.md](docs/install.md).
+
 ```sh
 cargo install --path crates/lighthouse-cli   # the `lighthouse` binary
 make plugins                                  # language plugins into target/plugins/

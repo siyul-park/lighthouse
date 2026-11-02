@@ -1,0 +1,15 @@
+apiVersion = "lighthouse/v1alpha1"
+kind = "Project"
+metadata = { name = "smoke" }
+
+[spec]
+plugins = [
+  "lang-go",
+  "lang-rust",
+  "lang-typescript",
+  "lang-python",
+  "lang-yaml",
+  "lang-toml",
+  "lang-markdown",
+]
+extends = ["design/recommended", "go/recommended", "rust/recommended", "markdown/recommended"]

@@ -140,8 +140,11 @@ pub struct Provides {
 pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
     let mut dirs = vec![root.join(STATE_DIR).join("plugins")];
     dirs.extend(lighthouse_model::xdg_plugins());
+    // `current_exe` leaves a symlink unresolved on macOS; an install links
+    // `bin/lighthouse` to the executable that has its plugins beside it.
     if let Some(dir) = env::current_exe()
         .ok()
+        .and_then(|exe| fs::canonicalize(&exe).ok().or(Some(exe)))
         .and_then(|exe| exe.parent().map(|p| p.join("plugins")))
     {
         dirs.push(dir);

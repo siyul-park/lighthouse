@@ -1,0 +1,42 @@
+name: Install Lighthouse
+description: Installs a released Lighthouse and its plugins and puts it on the PATH.
+inputs:
+  version:
+    description: The release to install, such as 0.0.0-0123456789ab (the tag without its v).
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install
+      shell: sh
+      env:
+        LIGHTHOUSE_VERSION: ${{ inputs.version }}
+        RUNNER_TARGET: ${{ runner.os }}-${{ runner.arch }}
+      run: |
+        set -eu
+        case "$RUNNER_TARGET" in
+          Linux-X64) target=x86_64-unknown-linux-gnu ;;
+          Linux-ARM64) target=aarch64-unknown-linux-gnu ;;
+          macOS-ARM64) target=aarch64-apple-darwin ;;
+          *) echo "Lighthouse has no build for $RUNNER_TARGET" >&2; exit 1 ;;
+        esac
+        name=lighthouse-$LIGHTHOUSE_VERSION-$target
+        home=$RUNNER_TOOL_CACHE/lighthouse/$LIGHTHOUSE_VERSION/$target
+        if [ ! -x "$home/lighthouse" ]; then
+          base=https://github.com/siyul-park/lighthouse/releases/download/v$LIGHTHOUSE_VERSION
+          work=$(mktemp -d)
+          curl -fsSL -o "$work/$name.tar.gz" "$base/$name.tar.gz"
+          curl -fsSL -o "$work/SHA256SUMS" "$base/SHA256SUMS"
+          grep " $name.tar.gz\$" "$work/SHA256SUMS" > "$work/expected"
+          if command -v sha256sum > /dev/null 2>&1; then
+            (cd "$work" && sha256sum -c expected)
+          else
+            (cd "$work" && shasum -a 256 -c expected)
+          fi
+          mkdir -p "$home.tmp"
+          tar -xzf "$work/$name.tar.gz" -C "$home.tmp" --strip-components=1
+          rm -rf "$home"
+          mv "$home.tmp" "$home"
+          rm -rf "$work"
+        fi
+        echo "$home" >> "$GITHUB_PATH"
