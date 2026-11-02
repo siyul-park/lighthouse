@@ -288,6 +288,10 @@ pub struct FixRun {
     /// catalog's; needs `rules` or `fingerprints`. Its proposals are
     /// `unsafe`.
     pub fixer: Option<String>,
+    /// The check of the project as it stands on disk, made by the same engine,
+    /// when the caller already has it: the first round takes it for its own
+    /// instead of checking again.
+    pub initial: Option<Run>,
 }
 
 /// What a fix run did.

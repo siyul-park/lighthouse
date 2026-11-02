@@ -65,7 +65,7 @@ pub const EXIT_INCOMPLETE: u8 = 3;
 const MAX_FAILURES: usize = 3;
 
 /// The result of a run: findings, notices and the parts that were not analyzed.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Run {
     /// Sorted by file, line, column, rule; limited to the requested paths.
     pub diagnostics: Vec<Diagnostic>,

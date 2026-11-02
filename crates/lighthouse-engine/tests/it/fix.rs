@@ -145,6 +145,65 @@ fn a_fix_that_holds_is_applied_and_reported() {
 }
 
 #[test]
+fn a_round_that_applies_a_fix_checks_the_project_twice() {
+    let dir = project("fn a\nTODO here\n");
+    let engine = engine(&dir, "");
+
+    let report = engine
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
+        .unwrap();
+
+    // The first check, and the check of what the round applied, which the next
+    // round takes for its own.
+    assert_eq!(checks_per_round(&report), [(1, 2)]);
+}
+
+#[test]
+fn a_check_the_caller_made_of_the_project_is_the_first_check_of_the_run() {
+    let dir = project("fn a\nTODO here\n");
+    let engine = engine(&dir, "");
+    let initial = engine.check(&[], &[]).unwrap();
+
+    let report = engine
+        .fix(
+            &plan("fake/to-done", Safety::Safe),
+            &FixRun {
+                initial: Some(initial),
+                ..FixRun::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(text(&dir), "fn a\nDONE here\n");
+    assert_eq!(checks_per_round(&report), [(1, 1)]);
+}
+
+#[test]
+fn a_run_with_nothing_to_fix_checks_the_project_once() {
+    let dir = project("fn a\n");
+    let engine = engine(&dir, "");
+
+    let report = engine
+        .fix(&plan("fake/to-done", Safety::Safe), &FixRun::default())
+        .unwrap();
+
+    assert_eq!(checks_per_round(&report), [(1, 1)]);
+}
+
+#[test]
+fn a_round_rolled_back_whole_does_not_check_the_state_it_began_from_again() {
+    let dir = project("fn a\nTODO here\n");
+    let engine = engine(&dir, "");
+
+    let report = engine
+        .fix(&plan("fake/to-bad", Safety::Safe), &FixRun::default())
+        .unwrap();
+
+    assert_eq!(text(&dir), "fn a\nTODO here\n");
+    assert_eq!(checks_per_round(&report), [(1, 2)]);
+}
+
+#[test]
 fn a_fix_that_introduces_an_error_is_rolled_back() {
     let dir = project("fn a\nTODO here\n");
     let engine = engine(&dir, "");

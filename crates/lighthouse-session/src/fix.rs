@@ -365,7 +365,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         engine
     };
     let mut messages = notices;
-    let skip = suppressed(&engine, root, catalog, request.store)?;
+    let (skip, initial) = suppressed(&engine, root, catalog, request.store)?;
     let run = FixRun {
         paths: request.targets.paths.clone(),
         rules: Selector::new(&request.targets.rules)?.expand(
@@ -379,6 +379,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         dry_run: request.dry_run,
         unsafe_fixes: request.unsafe_fixes,
         fixer: request.fixer.clone(),
+        initial: Some(initial),
     };
     let mut report = engine.fix(&plan, &run)?;
     messages.extend(report.notes.iter().cloned());
@@ -463,14 +464,16 @@ fn shortest(report: &lighthouse_engine::FixReport) -> BTreeMap<&str, usize> {
 
 /// Reads the project as it is before any fix, recording it when the run uses
 /// the store, and returns the
-/// findings that judgments keep out of reports: a fixer leaves those alone.
+/// findings that judgments keep out of reports: a fixer leaves those alone. The
+/// check itself comes back too, as the fix's first check.
 fn suppressed(
     engine: &Engine,
     root: &std::path::Path,
     catalog: &Catalog,
     store: bool,
-) -> Result<BTreeSet<Fingerprint>> {
-    let mut outcome = engine.check(&[], &[])?;
+) -> Result<(BTreeSet<Fingerprint>, lighthouse_engine::Run)> {
+    let checked = engine.check(&[], &[])?;
+    let mut outcome = checked.clone();
     let all: BTreeSet<Fingerprint> = outcome
         .diagnostics
         .iter()
@@ -486,7 +489,7 @@ fn suppressed(
         .iter()
         .map(|d| d.fingerprint.clone())
         .collect();
-    Ok(all.difference(&kept).cloned().collect())
+    Ok((all.difference(&kept).cloned().collect(), checked))
 }
 
 /// A person's line for the counts of `decision`.
