@@ -453,3 +453,12 @@ pub fn read(dir: &TempDir, file: &str) -> String {
 pub fn text(dir: &TempDir) -> String {
     fs::read_to_string(dir.path().join("a.toy")).unwrap()
 }
+
+/// How many whole checks each round of a fix run made, as (round, checks).
+pub fn checks_per_round(report: &lighthouse_engine::FixReport) -> Vec<(usize, usize)> {
+    let mut counts: std::collections::BTreeMap<usize, usize> = std::collections::BTreeMap::new();
+    for (round, _) in &report.timings.checks {
+        *counts.entry(*round).or_default() += 1;
+    }
+    counts.into_iter().collect()
+}

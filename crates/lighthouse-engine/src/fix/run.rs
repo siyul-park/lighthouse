@@ -117,7 +117,7 @@ impl Orchestrator<'_> {
     /// check and, when it ended because nothing was left to apply, the
     /// proposals the run may not write over that state.
     fn apply_rules(&mut self) -> Result<(Run, Option<Vec<Proposal>>), Error> {
-        let mut checked: Option<Run> = None;
+        let mut checked: Option<Run> = self.proposer.run.initial.clone();
         // The states of the texts the rounds began from: one that comes again
         // means the rounds go round.
         let mut seen = BTreeSet::new();
@@ -128,7 +128,8 @@ impl Orchestrator<'_> {
                 None => self.recheck()?,
             };
             let outcome = self.watch(outcome, round)?;
-            if !seen.insert(self.state_hash()) {
+            let start = self.state_hash();
+            if !seen.insert(start.clone()) {
                 self.notes.push(format!(
                     "stopped after {} rounds: the texts are as they were at the start of an earlier round",
                     round - 1
@@ -146,6 +147,10 @@ impl Orchestrator<'_> {
             checked = self.apply_round(&outcome, proposals, round)?;
             if checked.is_none() && self.rounds == round - 1 {
                 // Everything this round was rolled back: stop rather than repeat it.
+                // The texts are those `outcome` checked, so it is their check.
+                if self.state_hash() == start {
+                    return Ok((outcome, None));
+                }
                 return Ok((self.recheck()?, None));
             }
             if round == MAX_ROUNDS {

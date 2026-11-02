@@ -220,6 +220,15 @@ impl Orchestrator<'_> {
                 .into_iter()
                 .map(|(file, text)| (file.clone(), self.texts.insert(file, text)))
                 .collect();
+            if seen.contains(&self.state_hash()) {
+                // The texts are as they were at an earlier state: a pass that
+                // goes round is undone whatever its check would say, so it is
+                // not checked.
+                for (file, text) in prior {
+                    self.restore_text(&file, text);
+                }
+                break;
+            }
             let mut next = self.recheck()?;
             // What this pass edited is judged like the changed files.
             let mut judged = scope.clone();
@@ -234,7 +243,7 @@ impl Orchestrator<'_> {
                         .any(|file| undone.contains_key(file))
                 });
                 bad = undone;
-                if !prior.is_empty() {
+                if !prior.is_empty() && !seen.contains(&self.state_hash()) {
                     next = self.recheck()?;
                     bad = worse(&Blame::new(engine, (&after, &next), &judged));
                 }

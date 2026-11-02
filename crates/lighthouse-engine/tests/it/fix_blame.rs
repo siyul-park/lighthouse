@@ -206,6 +206,8 @@ fn a_dependent_that_a_fix_breaks_is_repaired_by_the_safe_fix_of_its_own_finding(
     assert!(report.notes.is_empty(), "{:?}", report.notes);
     let repair = report.applied.iter().find(|a| a.rule_id == "fake/ghost");
     assert!(repair.is_some_and(|a| a.follow_up), "{:?}", report.applied);
+    // The first check, the change, and the safe fix that followed it.
+    assert_eq!(checks_per_round(&report), [(1, 3)]);
 }
 
 #[test]
@@ -219,6 +221,9 @@ fn the_repair_of_a_dependent_is_undone_with_the_change_that_called_for_it() {
     assert_eq!(text(&dir), "fn a\nTODO\n", "{:?}", report.notes);
     assert_eq!(read(&dir, "ghost.toy"), "fn g\nBOO\n");
     assert!(report.applied.is_empty(), "{:?}", report.applied);
+    // The change and its follow-up are rolled back to the state the round began
+    // from, whose check the round holds: no check of it again.
+    assert_eq!(checks_per_round(&report), [(1, 3)]);
 }
 
 /// Replaces the `TODO` with `DONE`, but with `BAD` in `b.toy`.
