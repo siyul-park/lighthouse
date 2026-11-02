@@ -21,7 +21,9 @@ spec:
     methods and interfaces do not require a missing-owner test, nor do methods
     that implement interface methods. A type counts as tested when one of its
     members is. Names use the longest matching symbol, so `TestStore_Get`
-    belongs to the method `Get`, not the type `Store`.
+    belongs to the method `Get`, not the type `Store`. A test in a file the
+    build context excludes (`foo_arm64_test.go` on amd64) is read from its
+    source alone and owns the symbol its name says.
 
     Rust: A function or type is owned by the test with its snake-case name
     (`get`, `store`), a method by `type_method`. Only crates with tests are

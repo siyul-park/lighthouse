@@ -24,6 +24,10 @@ use merge::{dedup_edges, resolve_all, sites_of, sorted_union};
 /// The fact of a file that lists its regions, see [`File::regions`].
 pub const REGIONS: &str = "regions";
 
+/// The fact of a file the provider read from its source alone, see
+/// [`File::is_syntactic`].
+pub const SYNTACTIC: &str = "syntactic";
+
 /// Provider feature that rules may require.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -186,6 +190,13 @@ impl File {
         self.facts
             .get("analysisLanguage")
             .map_or(&self.lang, String::as_str)
+    }
+
+    /// Whether the provider read the file from its source alone, as it does a
+    /// test file the build context excludes: its tests count for what their
+    /// names say, and no decision judges it.
+    pub fn is_syntactic(&self) -> bool {
+        self.facts.contains_key(SYNTACTIC)
     }
 
     /// Whether the file is a host whose regions are all example code.

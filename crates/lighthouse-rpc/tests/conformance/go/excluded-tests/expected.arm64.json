@@ -1,0 +1,339 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Foo#function",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Foo is part of the example."
+        },
+        {
+          "attached_to": ".::Bar#function",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "text": "// Bar is part of the example."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Foo#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Bar#function"
+        }
+      ],
+      "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":4,\"open\":{\"col\":17,\"line\":4},\"close\":{\"col\":27,\"line\":4},\"statements\":[\"return 1\"],\"plain\":true},{\"line\":7,\"open\":{\"col\":17,\"line\":7},\"close\":{\"col\":27,\"line\":7},\"statements\":[\"return 2\"],\"plain\":true}]"
+        },
+        "path": "foo.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Foo#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Bar#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "foo",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Foo is part of the example.",
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "foo.go",
+          "id": ".::Foo#function",
+          "kind": "function",
+          "name": "Foo",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Bar is part of the example.",
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "foo.go",
+          "id": ".::Bar#function",
+          "kind": "function",
+          "name": "Bar",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 3
+            },
+            "start": {
+              "col": 8,
+              "line": 3
+            }
+          },
+          "to": "testing"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::TestFoo#test"
+        },
+        {
+          "from": {
+            "symbol": ".::TestFoo#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "to": ".::Foo"
+        }
+      ],
+      "file": {
+        "facts": {
+          "stem": "foo_test"
+        },
+        "path": "foo_arm64_test.go"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "manual_assertions": 1,
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
+          "statements": 2,
+          "symbol": ".::TestFoo#test",
+          "tokens": 16,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "foo",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "foo_arm64_test.go",
+          "id": ".::TestFoo#test",
+          "kind": "test",
+          "name": "TestFoo",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": ".::TestFoo#test",
+          "targets": [
+            ".::Foo"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [],
+      "edges": [],
+      "file": {
+        "facts": {
+          "syntactic": "true"
+        },
+        "path": "foo_other_test.go"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "name": "foo",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "foo_other_test.go",
+          "id": ".::TestFoo#test",
+          "kind": "test",
+          "name": "TestFoo",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": ".::TestFoo#test",
+          "targets": [
+            ".::Foo"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 file(s) excluded by build constraints, e.g. foo_other_test.go; select another context with [languages.go] tags or env"
+  ]
+}

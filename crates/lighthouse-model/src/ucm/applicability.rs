@@ -39,9 +39,11 @@ impl Applicability {
     /// cover (nor do its regions), it is generated code the decision skips,
     /// test code it leaves to other decisions, a production file without test
     /// code in a decision that is only about tests, or without example code in
-    /// a decision that is only about examples.
+    /// a decision that is only about examples. A file the provider read from its
+    /// source alone is no subject of any decision.
     pub fn excludes(&self, project: &Project, file: &File) -> bool {
-        !(self.admits_host(file) || self.admits_regions(file))
+        file.is_syntactic()
+            || !(self.admits_host(file) || self.admits_regions(file))
             || (!self.generated && file.generated)
             || (self.tests == TestScope::Exclude && file.test)
             || (self.tests == TestScope::Only
@@ -54,7 +56,7 @@ impl Applicability {
 
     /// Whether a file is a subject of a decision about files.
     pub fn admits_file(&self, file: &File) -> bool {
-        if !self.admits_host(file) || (!self.generated && file.generated) {
+        if file.is_syntactic() || !self.admits_host(file) || (!self.generated && file.generated) {
             return false;
         }
         match self.tests {
@@ -71,7 +73,8 @@ impl Applicability {
     pub fn admits_comment(&self, file: Option<&File>) -> bool {
         match file {
             Some(file) => {
-                (self.admits_host(file) || self.admits_regions(file))
+                !file.is_syntactic()
+                    && (self.admits_host(file) || self.admits_regions(file))
                     && (self.generated || !file.generated)
             }
             None => self.generated,
@@ -97,6 +100,9 @@ impl Applicability {
             return false;
         }
         let all = |flag: fn(&File) -> bool| !files.is_empty() && files.iter().all(|f| flag(f));
+        if all(File::is_syntactic) {
+            return false;
+        }
         if !self.generated && all(|f| f.generated) {
             return false;
         }
@@ -116,7 +122,8 @@ impl Applicability {
     pub fn admits_symbol(&self, project: &Project, symbol: &Symbol) -> bool {
         let file = project.file(&symbol.file);
         let language = project.language_of(symbol);
-        if language.is_some_and(|language| !self.admits_language(language))
+        if file.is_some_and(File::is_syntactic)
+            || language.is_some_and(|language| !self.admits_language(language))
             || (!self.generated && file.is_some_and(|f| f.generated))
             || !self.examples.admits(project.in_example(&symbol.id))
         {

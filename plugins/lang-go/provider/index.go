@@ -137,6 +137,7 @@ func (r *run) index() {
 			r.unclaimed(rel)
 		}
 	}
+	r.excludedTests(candidates)
 }
 
 // edits are the overlays of a request by absolute path, when each stands in

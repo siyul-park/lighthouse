@@ -482,18 +482,24 @@ func (u *unit) edgeAs(kind string, from sdk.Node, to string, site *sdk.Span, res
 // lives: nothing of a main package is importable and symbols under an
 // internal directory are exported only inside the project.
 func (u *unit) visibility(name string) string {
-	switch {
-	case u.main || !ast.IsExported(name):
-		return visibilityPrivate
-	case u.internal:
-		return visibilityInternal
-	default:
-		return visibilityPublic
-	}
+	return visibilityOf(name, u.main, u.internal)
 }
 
 func (u *unit) info() *types.Info {
 	return u.pkg.TypesInfo
+}
+
+// visibilityOf is the visibility of a declaration of a main package or of a
+// path with an internal component.
+func visibilityOf(name string, main, internal bool) string {
+	switch {
+	case main || !ast.IsExported(name):
+		return visibilityPrivate
+	case internal:
+		return visibilityInternal
+	default:
+		return visibilityPublic
+	}
 }
 
 // baseName is the identifier a type expression names, behind pointers,

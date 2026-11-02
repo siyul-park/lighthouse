@@ -26,6 +26,10 @@ spec:
     (`get`, `store`), a method by `type_method`. Names that merely extend a
     symbol name are not owners; two tests with exactly the same owner name in
     different test crates, or inline and in `tests/`, are duplicate owners.
+
+    A test in a file the build context excludes (`foo_arm64_test.go` on
+    amd64) is read from its source alone and is never counted: such files
+    usually exclude one another, so `TestResume` in both is no duplicate.
   scope:
     subject: test
     examples: exclude
@@ -57,7 +61,7 @@ spec:
       - name: visible
         expression: visible_symbols(options.includeInternal)
       - name: owners
-        expression: symbol.tests
+        expression: symbol.tests.filter(t, !t.syntactic)
     where: >-
       symbol.visibility in visible
       && (symbol.kind == 'function' || symbol.kind == 'method'

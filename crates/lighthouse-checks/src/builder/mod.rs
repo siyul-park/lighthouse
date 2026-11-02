@@ -612,15 +612,22 @@ impl<'a> Builder<'a> {
     }
 
     /// The credited tests of a symbol, each a node with the way its name
-    /// matched.
+    /// matched and whether it is in a file the provider read from its source
+    /// alone (`syntactic`).
     fn tests(&self, symbol: &Symbol) -> Value {
         Value::Array(
             self.naming
                 .credited_tests(symbol)
                 .into_iter()
                 .filter_map(|(case, kind)| {
-                    let mut value = self.node(self.project.symbol(&case.symbol)?);
+                    let test = self.project.symbol(&case.symbol)?;
+                    let mut value = self.node(test);
                     value["match"] = json!(kind.as_str());
+                    value["syntactic"] = json!(
+                        self.project
+                            .file(&test.file)
+                            .is_some_and(lighthouse_model::ucm::File::is_syntactic)
+                    );
                     Some(value)
                 })
                 .collect(),

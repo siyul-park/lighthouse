@@ -86,6 +86,7 @@ func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, 
 			r.unclaimed(rel)
 		}
 	}
+	r.excludedTests(candidates)
 }
 
 // prepare reads the environment and the cached facts and plans the units.

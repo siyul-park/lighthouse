@@ -4,10 +4,10 @@ use std::{
 };
 
 use lighthouse_model::{
-    Document, Position, Span,
+    Document, Position, Span, TestScope,
     ucm::{
-        Comment, Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Project,
-        Resolution, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
+        Applicability, Comment, Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node,
+        Project, Resolution, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
     },
 };
 
@@ -821,4 +821,34 @@ fn file_is_example_when_every_region_of_it_is_example_code() {
         !file(None).is_example(),
         "a file with no regions is not a host"
     );
+}
+
+#[test]
+fn file_is_syntactic_when_the_provider_states_it_and_no_decision_judges_it() {
+    let file = |facts: &[(&str, &str)]| File {
+        path: PathBuf::from("foo_arm64_test.go"),
+        lang: "go".to_owned(),
+        hash: String::new(),
+        generated: false,
+        test: true,
+        facts: facts
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect(),
+    };
+    let built = file(&[("stem", "foo_test")]);
+    let excluded = file(&[("stem", "foo_test"), ("syntactic", "true")]);
+    let project = Project::merge([]);
+    let everything = Applicability {
+        generated: true,
+        tests: TestScope::Include,
+        ..Applicability::default()
+    };
+
+    assert!(!built.is_syntactic());
+    assert!(excluded.is_syntactic());
+    assert!(!everything.excludes(&project, &built));
+    assert!(everything.excludes(&project, &excluded));
+    assert!(everything.admits_file(&built));
+    assert!(!everything.admits_file(&excluded));
 }

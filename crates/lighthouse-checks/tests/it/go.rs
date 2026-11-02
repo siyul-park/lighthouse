@@ -484,3 +484,78 @@ fn every_checked_decision_passes_its_catalog_examples() {
     .check_all();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+const OWNED_SOURCE: &str = "package foo\n\n// Foo is part of the example.\nfunc Foo() int { return 1 }\n\n// Bar is part of the example.\nfunc Bar() int { return 2 }\n";
+
+/// The messages of the owner findings the build context `goarch` gives.
+fn owner_findings(plugin: &Path, root: &Path, goarch: &str) -> Vec<(String, String)> {
+    let config = Config::parse_inline(&format!(
+        "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"testing\"]\nextends = [\"testing/recommended\"]\n\n[languages.go]\nenv = {{ GOOS = \"linux\", GOARCH = \"{goarch}\" }}\n",
+        plugin.to_str().unwrap()
+    ))
+    .unwrap();
+    let engine = Engine::new(
+        registry(plugin),
+        config,
+        lighthouse_test_support::bundled(),
+        root,
+    )
+    .unwrap();
+    let only = ["testing/no-missing-owner", "testing/no-duplicate-owner"].map(str::to_owned);
+    let outcome = engine.check(&[], &only).unwrap();
+    assert!(outcome.incomplete.is_empty(), "{:?}", outcome.incomplete);
+    let mut found: Vec<(String, String)> = outcome
+        .diagnostics
+        .iter()
+        .map(|d| (d.rule_id.clone(), d.message.clone()))
+        .collect();
+    found.sort();
+    found
+}
+
+#[test]
+fn an_owner_test_in_a_file_the_build_context_excludes_is_an_owner() {
+    let Some(plugin) = go_plugin() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "go.mod", "module example.com/app\n");
+    write(root, "foo/foo.go", OWNED_SOURCE);
+    write(
+        root,
+        "foo/foo_test.go",
+        "package foo\n\nimport \"testing\"\n\nfunc TestBar(t *testing.T) { _ = Bar() }\n",
+    );
+    write(
+        root,
+        "foo/foo_arm64_test.go",
+        "package foo\n\nimport \"testing\"\n\nfunc TestFoo(t *testing.T) { _ = Foo() }\n",
+    );
+    // arm64 builds the file; amd64 excludes it. Neither has Foo without an owner.
+    assert_eq!(owner_findings(&plugin, root, "arm64"), []);
+    assert_eq!(owner_findings(&plugin, root, "amd64"), []);
+}
+
+#[test]
+fn owner_tests_of_variants_that_exclude_each_other_are_no_duplicate() {
+    let Some(plugin) = go_plugin() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "go.mod", "module example.com/app\n");
+    write(root, "foo/foo.go", OWNED_SOURCE);
+    write(
+        root,
+        "foo/foo_arm64_test.go",
+        "package foo\n\nimport \"testing\"\n\nfunc TestFoo(t *testing.T) { _ = Foo() }\n",
+    );
+    write(
+        root,
+        "foo/foo_other_test.go",
+        "//go:build !arm64\n\npackage foo\n\nimport \"testing\"\n\nfunc TestFoo(t *testing.T) { _ = Foo() }\n",
+    );
+    for goarch in ["arm64", "amd64"] {
+        let found = owner_findings(&plugin, root, goarch);
+        assert_eq!(found.len(), 1, "{goarch}: {found:?}");
+        assert_eq!(found[0].0, "testing/no-missing-owner", "{goarch}");
+        assert!(found[0].1.contains("Bar"), "{goarch}: {found:?}");
+    }
+}
