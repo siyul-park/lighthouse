@@ -307,8 +307,8 @@ directory are never checked.
 one directory each: `recipe.toml`, a fixture stream, the events it must give and the words it must say
 (a golden test maps the stream through the generic path). The recipes are configuration layers: copy
 one into `~/.config/lighthouse/config.toml` or `.lighthouse/local.toml`, or paste the provider into
-`lighthouse.toml`. They are not Projects to `extends`: an extended Project contributes `rules` and
-`overrides` only, and `models` is the environment of the machine, which comes from the project file
+`lighthouse.toml`. They are not Projects to `extends`: an extended Project contributes `rules`, `overrides`,
+`injections` and `plugins` only, and `models` is the environment of the machine, which comes from the project file
 and the user and local layers (see [architecture.md](architecture.md#configuration-layers)). A plugin's
 catalog layer holds decisions, packs and Projects, so it cannot carry providers either. Each recipe
 records the sources its flags and event shapes were checked against.

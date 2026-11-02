@@ -100,7 +100,10 @@ pub(super) fn validate_config(
 ) -> Result<(), Error> {
     for plugin in config.plugins() {
         if !registry.has_plugin(&plugin.id) {
-            return Err(Error::UnknownPlugin(plugin.id.clone()));
+            return Err(Error::UnknownPlugin {
+                id: plugin.id.clone(),
+                from: config.required_by(&plugin.id).map(str::to_owned),
+            });
         }
     }
     registry.validate()?;
@@ -114,15 +117,15 @@ pub(super) fn validate_config(
         }
     }
     validate_models(registry, config, binding)?;
-    for source in config.sources() {
-        let Some(provider) = source.language.provider.as_deref() else {
+    for injection in config.injections() {
+        let Some(provider) = injection.language.as_deref() else {
             continue;
         };
         let language = registry
             .languages()
             .iter()
             .find(|language| language.provider.manifest().id == provider)
-            .ok_or_else(|| Error::UnknownSourceProvider(provider.to_owned()))?;
+            .ok_or_else(|| Error::UnknownInjectionLanguage(provider.to_owned()))?;
         if !config.lists(&language.plugin) {
             return Err(Error::PluginNotListed(language.plugin.clone()));
         }

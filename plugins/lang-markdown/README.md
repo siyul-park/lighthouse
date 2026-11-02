@@ -42,7 +42,7 @@ Every node is an object with `kind` (comrak's `xml_node_name`: `document`, `bloc
 | `taskitem` | `checked` |
 | `code_block` | `fenced`, `fence` (the marker as written, absent when indented), `closed`, `info` (raw), `lang`, `attributes`, `text` |
 
-A fence's info string is read as rustdoc and mdBook read it: words separated by spaces and commas. `lang` is the first word as written and `attributes` the rest (`rust,ignore` → `rust`, `["ignore"]`; `rust no_run, edition2021` → `["no_run", "edition2021"]`). A fence with no language (or an indented block) has an empty `lang`. The provider knows no other language: which one a name stands for is what the languages declare as their aliases, and a source rule reads `lang` with `language.from`.
+A fence's info string is read as rustdoc and mdBook read it: words separated by spaces and commas. `lang` is the first word as written and `attributes` the rest (`rust,ignore` → `rust`, `["ignore"]`; `rust no_run, edition2021` → `["no_run", "edition2021"]`). A fence with no language (or an indented block) has an empty `lang`. The provider knows no other language: which one a name stands for is what the languages declare as their aliases, and an injection reads `lang` with `languageFrom`.
 
 ### The map
 

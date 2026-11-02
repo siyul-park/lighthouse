@@ -41,7 +41,7 @@ A Go fence of a Markdown file is a unit of its own, as an importer sees the modu
 
 - A fence with a `package` clause is a file as it is; declarations get `package main`; statements go in `func main`. The lines that wrap the fence are outside the host mapping, so a symbol, finding or fix that lands only on them is dropped, and what the wrapper declared or called is the unit's module's.
 - Imports the fence uses and does not write are settled by name: a name the standard library or the module holds once, or the root package of a requirement in the module cache, at once (`regions_known.go`); goimports (`golang.org/x/tools/imports`) is asked once for the module, for the names with several candidates or that only a requirement's sub-package may have. A name no one knows is left unresolved: prose defines names.
-- `language.context.package = "<dir>"` overlays the fence into that package, under its name, so unexported names resolve; its symbols belong to the package's own module (the fence is code in the package).
+- `context.package = "<dir>"` overlays the fence into that package, under its name, so unexported names resolve; its symbols belong to the package's own module (the fence is code in the package).
 - A fence that is not valid Go is a notice; one that does not type-check (names the prose defines) is counted in one notice and what resolves is reported. Neither is a gap. The names the type checker does not know are `syntactic` edges to the bare name (`calls Parse`, `references text`), which the model resolves when the project has one symbol so named.
 
 ## Conformance

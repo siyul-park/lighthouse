@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fmt::Write as _,
     fs,
     ops::{Add, AddAssign},
@@ -10,9 +11,7 @@ use rayon::prelude::*;
 use tempfile::TempDir;
 
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{
-    Catalog, CheckKind, Config, Decision, Example, ExampleKind, Fix, SourceRuleSpec,
-};
+use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, Fix};
 use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
@@ -35,8 +34,10 @@ pub struct RuleTester<'a> {
     registry: Box<dyn Fn() -> Registry + Send + Sync + 'a>,
     catalog: &'a Catalog,
     shipped: &'a Catalog,
+    /// The decisions whose programs are Lighthouse's own, which run without
+    /// trust.
+    bundled: &'a Catalog,
     language: Option<String>,
-    sources: Vec<SourceRuleSpec>,
     trusted: bool,
 }
 
@@ -52,8 +53,8 @@ impl<'a> RuleTester<'a> {
             registry: Box::new(registry),
             catalog,
             shipped,
+            bundled: shipped,
             language: None,
-            sources: Vec::new(),
             trusted: false,
         }
     }
@@ -71,9 +72,10 @@ impl<'a> RuleTester<'a> {
         self
     }
 
-    /// Configures embedded-source selections used by the real project.
-    pub fn sources(mut self, sources: &[SourceRuleSpec]) -> Self {
-        self.sources = sources.to_vec();
+    /// The catalog compiled into the tool, when `shipped` holds more: a
+    /// command check of its decisions needs no trust, as in a run.
+    pub fn bundled(mut self, bundled: &'a Catalog) -> Self {
+        self.bundled = bundled;
         self
     }
 
@@ -128,6 +130,7 @@ impl<'a> RuleTester<'a> {
             return tested;
         }
         let model_only = model_only(decision);
+        let registry = (self.registry)();
         for example in selected {
             // A candidate-only decision is not expected to emit a finding
             // without a bound model; its invalid example is checked by the
@@ -135,7 +138,9 @@ impl<'a> RuleTester<'a> {
             if model_only && example.kind == ExampleKind::Invalid {
                 continue;
             }
-            if absent(decision, example).is_some() {
+            if self.unrunnable(decision, example).is_some()
+                || !self.lacking(&registry, example).is_empty()
+            {
                 continue;
             }
             match self.run(decision, example, &mut tested.spent) {
@@ -154,9 +159,12 @@ impl<'a> RuleTester<'a> {
         tested
     }
 
-    /// The examples of `decision` that cannot run here because the program of
-    /// its command check is not installed, one line each. They are not failures:
-    /// the tool is the user's to install, and the decision says which it needs.
+    /// The examples of `decision` that cannot run here, one line each: the
+    /// program of its command check is not installed, or is not run because
+    /// the project is not trusted. They are not failures: the tool is the
+    /// user's to install and trust is the user's to give. An example that
+    /// needs a plugin that is not available is counted by
+    /// [`lacking`](Self::lacking) instead.
     pub fn skipped(&self, decision: &Decision) -> Vec<String> {
         if !self.applies(decision) {
             return Vec::new();
@@ -166,14 +174,43 @@ impl<'a> RuleTester<'a> {
             .iter()
             .filter(|example| self.selects(example))
             .filter_map(|example| {
-                let program = absent(decision, example)?;
-                Some(format!(
-                    "{} {}: `{program}` is not installed",
-                    decision.id(),
-                    example.name
-                ))
+                let reason = self.unrunnable(decision, example)?;
+                Some(format!("{} {}: {reason}", decision.id(), example.name))
             })
             .collect()
+    }
+
+    /// The plugins that examples of `decision` need and the registry lacks,
+    /// each with how many of its examples are not run for that. A plugin is
+    /// needed by an example when a shareable project whose injections produce
+    /// the language of the example lists it, as `core/authoring` lists the
+    /// plugins of the files its CEL is written in.
+    pub fn lacking_plugins(&self, decision: &Decision) -> BTreeMap<String, usize> {
+        let mut lacking = BTreeMap::new();
+        if !self.applies(decision) {
+            return lacking;
+        }
+        let registry = (self.registry)();
+        for example in decision.examples.iter().filter(|e| self.selects(e)) {
+            if self.unrunnable(decision, example).is_some() {
+                continue;
+            }
+            for plugin in self.lacking(&registry, example) {
+                *lacking.entry(plugin).or_default() += 1;
+            }
+        }
+        lacking
+    }
+
+    /// Why the example cannot run here, when it cannot: its command is not
+    /// installed, or is not run in a project that is not trusted.
+    fn unrunnable(&self, decision: &Decision, example: &Example) -> Option<String> {
+        let program = program(decision, example)?;
+        if !program.contains('/') && !on_path(&program) {
+            return Some(format!("`{program}` is not installed"));
+        }
+        (!self.trusted && !decision.bundled(self.bundled))
+            .then(|| format!("`{program}` is not run: this project is not trusted to run commands"))
     }
 
     /// Whether the decision applies to the language under test, always when
@@ -188,6 +225,43 @@ impl<'a> RuleTester<'a> {
         self.language
             .as_ref()
             .is_none_or(|language| *language == example.language || example.language == NEUTRAL)
+    }
+
+    /// The shareable projects an example of `language` runs extending: those
+    /// of the catalog whose injections produce that language, in name order.
+    /// What a language is written in is the data of those projects; the
+    /// example never sees the injections of the project that runs it.
+    fn extends(&self, language: &str) -> Vec<String> {
+        self.catalog
+            .projects()
+            .injecting(language)
+            .map(str::to_owned)
+            .collect()
+    }
+
+    /// The plugins an example needs that `registry` lacks: those the
+    /// projects it extends list, directly or through their own `extends`.
+    fn lacking(&self, registry: &Registry, example: &Example) -> Vec<String> {
+        let extends = self.extends(&example.language);
+        if extends.is_empty() {
+            return Vec::new();
+        }
+        let inherited = extending(&extends).and_then(|config| {
+            config
+                .inheriting(self.catalog.projects())
+                .map_err(|e| e.to_string())
+        });
+        inherited.map_or_else(
+            |_| Vec::new(),
+            |config| {
+                config
+                    .plugins()
+                    .iter()
+                    .filter(|plugin| !registry.has_plugin(&plugin.id))
+                    .map(|plugin| plugin.id.clone())
+                    .collect()
+            },
+        )
     }
 
     /// Runs `example` of `decision`; the conflicts it declares and still has.
@@ -212,7 +286,12 @@ impl<'a> RuleTester<'a> {
         let shared: &[&Decision] = if fixing { &[] } else { &others };
         let mut configured: Vec<(&Decision, Option<&Example>)> = vec![(decision, Some(example))];
         configured.extend(shared.iter().map(|other| (*other, None)));
-        let config = rules_config(self.catalog, &registry, &configured, &self.sources)?;
+        let config = rules_config(
+            self.catalog,
+            &registry,
+            &configured,
+            &self.extends(&example.language),
+        )?;
         // A valid example is checked once for its own decision and the others,
         // and the findings are told apart by their rule.
         let mut rules = vec![decision.id().to_owned()];
@@ -258,7 +337,7 @@ impl<'a> RuleTester<'a> {
                     return judge(example, &[]);
                 }
                 let (crossing, before) = timed(&mut spent.crossing, || {
-                    let crossing = self.crossing(&others, dir.path())?;
+                    let crossing = self.crossing(&others, example, dir.path())?;
                     let before = cross(&crossing, &others, example)?;
                     Ok::<_, String>((crossing, before))
                 })?;
@@ -453,7 +532,7 @@ fn rules_config(
     catalog: &Catalog,
     registry: &Registry,
     rules: &[(&Decision, Option<&Example>)],
-    sources: &[SourceRuleSpec],
+    extends: &[String],
 ) -> Result<Config, String> {
     let mut table = toml::Table::new();
     let mut set = |id: &str, level: String, options: toml::Table| {
@@ -507,12 +586,11 @@ fn rules_config(
     let mut root = toml::Table::new();
     root.insert("plugins".to_owned(), plugins.into());
     root.insert("rules".to_owned(), table.into());
-    let sources: Vec<toml::Value> = sources
-        .iter()
-        .map(|source| toml::Value::try_from(source).map_err(|e| e.to_string()))
-        .collect::<Result<_, _>>()?;
-    if !sources.is_empty() {
-        root.insert("sources".to_owned(), sources.into());
+    if !extends.is_empty() {
+        root.insert(
+            "extends".to_owned(),
+            toml::Value::try_from(extends).map_err(|e| e.to_string())?,
+        );
     }
     Config::parse_inline(&root.to_string()).map_err(|e| e.to_string())
 }
@@ -562,22 +640,23 @@ fn exempt(decision: &Decision, language: &str) -> bool {
     }
 }
 
-/// The program of `decision`'s command check for the language of `example`
-/// when it is not on the `PATH`.
-fn absent(decision: &Decision, example: &Example) -> Option<String> {
+/// The program of `decision`'s command check for the language of `example`.
+fn program(decision: &Decision, example: &Example) -> Option<String> {
     let Some(CheckKind::Command(command)) = decision.check.as_ref().map(|check| &check.kind) else {
         return None;
     };
-    let program = command
+    command
         .programs(decision)
         .of(&example.language)?
         .command
-        .first()?
-        .clone();
-    if program.contains('/') || on_path(&program) {
-        return None;
-    }
-    Some(program)
+        .first()
+        .cloned()
+}
+
+/// A configuration that extends `projects` and sets nothing else.
+fn extending(projects: &[String]) -> Result<Config, String> {
+    let list = toml::Value::try_from(projects).map_err(|e| e.to_string())?;
+    Config::parse_inline(&format!("extends = {list}")).map_err(|e| e.to_string())
 }
 
 fn on_path(program: &str) -> bool {

@@ -120,6 +120,12 @@ static LANG_PYTHON: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 
+static LANG_YAML: OnceLock<PathBuf> = OnceLock::new();
+
+static LANG_TOML: OnceLock<PathBuf> = OnceLock::new();
+
+static LANG_MARKDOWN: OnceLock<PathBuf> = OnceLock::new();
+
 static FAKE_MODEL: OnceLock<PathBuf> = OnceLock::new();
 
 static MODEL_LOCAL: OnceLock<PathBuf> = OnceLock::new();
@@ -188,6 +194,30 @@ pub fn lang_python() -> Option<PathBuf> {
 pub fn lang_rust() -> PathBuf {
     LANG_RUST
         .get_or_init(|| build_rust_plugin("lang-rust"))
+        .clone()
+}
+
+/// Directory of the `lang-yaml` plugin, built once per process like
+/// `lang-rust`.
+pub fn lang_yaml() -> PathBuf {
+    LANG_YAML
+        .get_or_init(|| build_rust_plugin("lang-yaml"))
+        .clone()
+}
+
+/// Directory of the `lang-toml` plugin, built once per process like
+/// `lang-rust`.
+pub fn lang_toml() -> PathBuf {
+    LANG_TOML
+        .get_or_init(|| build_rust_plugin("lang-toml"))
+        .clone()
+}
+
+/// Directory of the `lang-markdown` plugin, built once per process like
+/// `lang-rust`.
+pub fn lang_markdown() -> PathBuf {
+    LANG_MARKDOWN
+        .get_or_init(|| build_rust_plugin("lang-markdown"))
         .clone()
 }
 

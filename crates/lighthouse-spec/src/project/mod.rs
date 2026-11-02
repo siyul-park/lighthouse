@@ -6,6 +6,7 @@
 mod environment;
 mod events;
 mod fixing;
+mod inherit;
 mod layers;
 mod models;
 mod provider;
@@ -45,9 +46,7 @@ pub use rules::{Level, RuleConfig, RuleSetting, Rules};
 pub use sandbox::SandboxSpec;
 pub use signals::{SignalsSpec, Surface};
 use spec::PluginEntry;
-pub use spec::{
-    GeneratedCheck, OverrideSpec, ProjectSpec, SourceLanguageSpec, SourceRuleSpec, TestNamingSpec,
-};
+pub use spec::{GeneratedCheck, InjectionSpec, OverrideSpec, ProjectSpec, TestNamingSpec};
 
 pub(crate) use standard::standard;
 
@@ -139,6 +138,22 @@ impl Projects {
     pub fn get(&self, name: &str) -> Option<&Config> {
         self.by_name.get(name)
     }
+
+    /// The names, sorted, of the projects whose own injections produce
+    /// `language`: the shareable ones that say what a language is written in
+    /// (`core/authoring` for CEL). An injection that reads its language from
+    /// each region produces none in particular.
+    pub fn injecting<'a>(&'a self, language: &'a str) -> impl Iterator<Item = &'a str> {
+        self.by_name
+            .iter()
+            .filter(move |(_, config)| {
+                config
+                    .injections
+                    .iter()
+                    .any(|i| i.language.as_deref() == Some(language))
+            })
+            .map(|(name, _)| name.as_str())
+    }
 }
 
 /// Parsed `Project`: the content of `lighthouse.toml`, or of a shareable
@@ -148,7 +163,10 @@ pub struct Config {
     name: String,
     plugins: Vec<PluginRef>,
     languages: BTreeMap<String, LanguageConfig>,
-    sources: Vec<SourceRuleSpec>,
+    injections: Vec<InjectionSpec>,
+    /// The plugins only an extended project lists, with the project that
+    /// does: set by [`Config::inheriting`].
+    required: BTreeMap<String, String>,
     generated: Option<GlobSet>,
     generated_check: Option<GeneratedCheck>,
     models: Models,
@@ -225,7 +243,7 @@ impl Config {
                 })
             })
             .collect::<Result<_, Error>>()?;
-        validate_sources(&spec.sources)?;
+        validate_injections(&spec.injections)?;
         let mut languages = BTreeMap::new();
         for (id, language) in spec.languages {
             languages.insert(
@@ -245,7 +263,8 @@ impl Config {
                 .map(PluginRef::from_entry)
                 .collect(),
             languages,
-            sources: spec.sources,
+            injections: spec.injections,
+            required: BTreeMap::new(),
             generated: globs(&spec.generated.files)?,
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
@@ -296,9 +315,11 @@ impl Config {
         &self.plugins
     }
 
-    /// Embedded source rules; host formats are inferred by normal file routing.
-    pub fn sources(&self) -> &[SourceRuleSpec] {
-        &self.sources
+    /// The injections of this project and, once [`Config::inheriting`] has
+    /// resolved it, of the projects it extends; host formats are inferred by
+    /// normal file routing.
+    pub fn injections(&self) -> &[InjectionSpec] {
+        &self.injections
     }
 
     /// Whether `id` is listed in `plugins`.
@@ -559,51 +580,52 @@ fn parse_project(format: Format, path: &str, text: &str) -> Result<Resource<Proj
     Ok(resource::<ProjectSpec>(path, &docs.remove(0))?)
 }
 
-/// Why the source rules are not usable, when they are not.
-fn validate_sources(sources: &[SourceRuleSpec]) -> Result<(), Error> {
-    let mut source_ids = BTreeSet::new();
-    for (at, source) in sources.iter().enumerate() {
-        if source.id.is_empty() || source.select.is_empty() {
+/// Why the injections are not usable, when they are not.
+fn validate_injections(injections: &[InjectionSpec]) -> Result<(), Error> {
+    let mut ids = BTreeSet::new();
+    for (at, injection) in injections.iter().enumerate() {
+        let here = format!("injections[{at}]");
+        if injection.id.is_empty() || injection.select.is_empty() {
             return Err(Error::Config(format!(
-                "sources[{at}] requires non-empty id and select"
+                "{here} requires non-empty id and select"
             )));
         }
-        let language = &source.language;
-        let fixed = language.provider.is_some();
-        let dynamic = language.from.is_some();
-        if language.provider.as_deref().is_some_and(str::is_empty)
-            || language.from.as_deref().is_some_and(str::is_empty)
+        let fixed = injection.language.is_some();
+        let dynamic = injection.language_from.is_some();
+        if injection.language.as_deref().is_some_and(str::is_empty)
+            || injection
+                .language_from
+                .as_deref()
+                .is_some_and(str::is_empty)
             || fixed == dynamic
         {
             return Err(Error::Config(format!(
-                "sources[{at}].language requires exactly one non-empty provider or from"
+                "{here} requires exactly one non-empty language or languageFrom"
             )));
         }
-        if language.syntax.as_deref().is_some_and(str::is_empty) {
+        if injection.syntax.as_deref().is_some_and(str::is_empty) {
+            return Err(Error::Config(format!("{here}.syntax must not be empty")));
+        }
+        validate_selector(&injection.select, &format!("{here}.select"))?;
+        if let Some(selector) = &injection.language_from {
+            validate_selector(selector, &format!("{here}.languageFrom"))?;
+        }
+        if let Some(context) = &injection.context {
+            validate_injection_context(context, &format!("{here}.context"))?;
+        }
+        if injection.files.is_empty() {
             return Err(Error::Config(format!(
-                "sources[{at}].language.syntax must not be empty"
+                "injection `{}` requires at least one file glob",
+                injection.id
             )));
         }
-        validate_selector(&source.select, &format!("sources[{at}].select"))?;
-        if let Some(selector) = &language.from {
-            validate_selector(selector, &format!("sources[{at}].language.from"))?;
-        }
-        if let Some(context) = &language.context {
-            validate_source_context(context, &format!("sources[{at}].language.context"))?;
-        }
-        if source.files.is_empty() {
+        if !ids.insert(&injection.id) {
             return Err(Error::Config(format!(
-                "source `{}` requires at least one file glob",
-                source.id
+                "duplicate injection id `{}`",
+                injection.id
             )));
         }
-        if !source_ids.insert(&source.id) {
-            return Err(Error::Config(format!(
-                "duplicate source id `{}`",
-                source.id
-            )));
-        }
-        globs(&source.files)?;
+        globs(&injection.files)?;
     }
     Ok(())
 }
@@ -614,7 +636,7 @@ fn validate_selector(selector: &str, field: &str) -> Result<(), Error> {
         .map_err(|reason| Error::Config(format!("{} has an invalid selector: {}", field, reason)))
 }
 
-fn validate_source_context(context: &serde_json::Value, field: &str) -> Result<(), Error> {
+fn validate_injection_context(context: &serde_json::Value, field: &str) -> Result<(), Error> {
     let object = context
         .as_object()
         .ok_or_else(|| Error::Config(format!("{} must be an object", field)))?;

@@ -16,7 +16,7 @@ use lighthouse_model::ExampleScope;
 use lighthouse_spec::{Decision, Example};
 use similar::TextDiff;
 
-use super::{RuleTester, absent, rules_config};
+use super::{RuleTester, rules_config};
 use crate::{Engine, ModelOptions, Run};
 
 /// A finding of a decision other than the one the example is of.
@@ -46,16 +46,26 @@ impl RuleTester<'_> {
                     && d.applies_to(&example.language)
                     && d.scope.examples != ExampleScope::Exclude
                     && !model_only(d)
-                    && absent(d, example).is_none()
+                    && self.unrunnable(d, example).is_none()
             })
             .collect()
     }
 
     /// An engine over the files in `dir` that checks `others` and nothing else.
-    pub(super) fn crossing(&self, others: &[&Decision], dir: &Path) -> Result<Engine, String> {
+    pub(super) fn crossing(
+        &self,
+        others: &[&Decision],
+        example: &Example,
+        dir: &Path,
+    ) -> Result<Engine, String> {
         let registry = (self.registry)();
         let rules: Vec<(&Decision, Option<&Example>)> = others.iter().map(|d| (*d, None)).collect();
-        let config = rules_config(self.catalog, &registry, &rules, &self.sources)?;
+        let config = rules_config(
+            self.catalog,
+            &registry,
+            &rules,
+            &self.extends(&example.language),
+        )?;
         Ok(Engine::new(registry, config, self.catalog, dir)
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted)

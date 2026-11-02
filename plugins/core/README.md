@@ -8,6 +8,7 @@ The bundled declarative plugin of the language-independent decisions: size limit
 
 - `lighthouse-plugin.toml`: the manifest; `catalog = "decisions"` names the catalog.
 - `decisions/core/pack.yaml`: the pack and its sections; one directory per section holds the decisions.
+- `decisions/core/authoring.yaml`: the shareable project `core/authoring`: where the CEL of Lighthouse's own resource files is (decisions, packs, projects, recipes) as `injections`, and the `lang-yaml` and `lang-toml` plugins that host it. A project that writes decisions extends it; `lighthouse init` and `decision create` add it.
 
 ## Invariants
 

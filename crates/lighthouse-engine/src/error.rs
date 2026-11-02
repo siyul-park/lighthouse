@@ -14,12 +14,12 @@ pub enum Error {
     Plugin(#[from] lighthouse_plugin::Error),
     #[error("{}: {source}", path.display())]
     Io { path: PathBuf, source: io::Error },
-    #[error("unknown plugin `{0}`")]
-    UnknownPlugin(String),
+    #[error("unknown plugin `{id}`{}", extended(from))]
+    UnknownPlugin { id: String, from: Option<String> },
     #[error("unknown language `{0}` in `languages` configuration")]
     UnknownLanguage(String),
-    #[error("unknown source provider `{0}` in sources[].language.provider")]
-    UnknownSourceProvider(String),
+    #[error("unknown language `{0}` in injections[].language")]
+    UnknownInjectionLanguage(String),
     #[error("`{0}` belongs to a plugin not listed in `plugins`")]
     PluginNotListed(String),
     #[error("unknown model `{0}`: declare it under `[models.<name>]`")]
@@ -34,4 +34,11 @@ pub enum Error {
     /// file changed under it, a formatter that cannot run, an unknown fixer.
     #[error("{0}")]
     Fix(String),
+}
+
+/// Where a plugin that is not installed was asked for, when an extended
+/// project asked for it.
+fn extended(from: &Option<String>) -> String {
+    from.as_ref()
+        .map_or_else(String::new, |project| format!(" (extended from {project})"))
 }

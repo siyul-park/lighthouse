@@ -170,7 +170,7 @@ impl Engine {
 
     /// Has each provider index its files in one call, the providers side by
     /// side, and merges the fragments. The files that host source regions
-    /// (a source rule selects them) go first, so that a provider that analyzes
+    /// (an injection selects them) go first, so that a provider that analyzes
     /// regions is asked once, for its own files and for the regions together:
     /// what it loads for one it loads for both. Files a provider did not index
     /// drop out; the reason is recorded as incomplete.
@@ -211,7 +211,7 @@ impl Engine {
                 .any(|&index| self.provider(index).manifest().id == id)
                 .then(|| id.to_owned())
         };
-        let regions = sources::select(self.config.sources(), sources, &inputs, &named, run);
+        let regions = injections::select(self.config.injections(), sources, &inputs, &named, run);
         let target_files = self.route_embedded(regions, run);
         let views = self.view_regions(&target_files, &mut parts);
         for (target, files) in target_files {
@@ -229,7 +229,7 @@ impl Engine {
         (kept, project)
     }
 
-    /// The files source rules select, `None` when no rule does.
+    /// The files injections select, `None` when none does.
     fn hosts(&self) -> Option<globset::GlobSet> {
         if self.ws.source_globs.is_empty() {
             return None;

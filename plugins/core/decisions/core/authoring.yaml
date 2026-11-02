@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../../../../../schema/project.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Project
+metadata:
+  name: core/authoring
+spec:
+  # The hosts of the files below: a project that extends this one needs both.
+  plugins:
+    - lang-yaml
+    - lang-toml
+  # The CEL written in Lighthouse's own resource files: decisions and packs in
+  # YAML, projects and recipes in TOML. Each entry says which values are CEL
+  # and what the CEL provider is told about them.
+  injections:
+    - id: pack-variables
+      files: ['**/decisions/**/*.{yaml,yml}']
+      select: '$.documents[*]?(@.kind == "Pack").spec.variables[*]'
+      language: cel
+      context:
+        identity:
+          kind: $.documents[*].kind
+          name: $.documents[*].metadata.name
+        variable:
+          value: $.expression
+          name: $.name
+          params: $.params[*]
+          shared: true
+    - id: decision-variables
+      files: ['**/decisions/**/*.{yaml,yml}', '**/.lighthouse/**/*.{yaml,yml}']
+      select: '$.documents[*]?(@.kind == "Decision" && @.spec.check.type == "cel").spec.check.variables[*]'
+      language: cel
+      context:
+        identity:
+          kind: $.documents[*].kind
+          name: $.documents[*].metadata.name
+        variable:
+          value: $.expression
+          name: $.name
+          params: $.params[*]
+          shared: false
+    - id: decision-expressions
+      files: ['**/decisions/**/*.{yaml,yml}', '**/.lighthouse/**/*.{yaml,yml}']
+      select: '$.documents[*]?(@.kind == "Decision" && @.spec.check.type == "cel").spec.check[''where'',''abstain'']'
+      language: cel
+      context:
+        declared: true
+        identity:
+          kind: $.documents[*].kind
+          name: $.documents[*].metadata.name
+    - id: decision-keyed
+      files: ['**/decisions/**/*.{yaml,yml}', '**/.lighthouse/**/*.{yaml,yml}']
+      select: '$.documents[*]?(@.kind == "Decision" && @.spec.check.type == "cel").spec.check[''evidence'',''identity'',''at''].*'
+      language: cel
+      context:
+        declared: true
+        identity:
+          kind: $.documents[*].kind
+          name: $.documents[*].metadata.name
+    - id: decision-message
+      files: ['**/decisions/**/*.{yaml,yml}', '**/.lighthouse/**/*.{yaml,yml}']
+      select: '$.documents[*]?(@.kind == "Decision" && @.spec.check.type == "cel").spec.check.message'
+      language: cel
+      syntax: template
+      context:
+        declared: true
+        identity:
+          kind: $.documents[*].kind
+          name: $.documents[*].metadata.name
+    - id: decision-fix
+      files: ['**/decisions/**/*.{yaml,yml}', '**/.lighthouse/**/*.{yaml,yml}']
+      select: '$.documents[*]?(@.kind == "Decision" && @.spec.fix.type == "cel").spec.fix.edits'
+      language: cel
+      context:
+        declared: true
+        identity:
+          kind: $.documents[*].kind
+          name: $.documents[*].metadata.name
+    - id: events
+      files: [lighthouse.toml, 'recipes/**/*.toml', '**/.lighthouse/**/*.toml']
+      select: '$..models.providers.*.events[''select'',''each'',''tool'',''path'',''pattern'',''command'',''said'']'
+      language: cel

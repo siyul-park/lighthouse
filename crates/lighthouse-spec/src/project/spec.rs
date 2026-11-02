@@ -15,8 +15,9 @@ use super::{
 
 /// A project's configuration, and the shape of a shareable one: `extends`
 /// names any project, the way an ESLint config extends a shareable config.
-/// An extended project contributes its `extends`, `rules` and `overrides`.
-/// Its `plugins` and `languages` belong to the project that is run.
+/// An extended project contributes its `extends`, `rules`, `overrides`,
+/// `injections` and `plugins`, the way an ESLint shareable config brings its
+/// `plugins`. Its `languages` belong to the project that is run.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectSpec {
@@ -33,9 +34,12 @@ pub struct ProjectSpec {
     /// goes to the language's provider.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub languages: BTreeMap<String, ProjectLanguage>,
-    /// Embedded source rules. The host language is inferred by normal file routing.
+    /// Regions of host files that are written in another language: a CEL
+    /// expression in a decision, code in a Markdown fence. The host language
+    /// is inferred by normal file routing. Entries merge over `extends`,
+    /// extended first; a later entry with the same `id` replaces the earlier.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub sources: Vec<SourceRuleSpec>,
+    pub injections: Vec<InjectionSpec>,
     /// Level and options per decision id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub rules: BTreeMap<String, RuleSetting>,
@@ -61,35 +65,31 @@ pub struct ProjectSpec {
     pub generated: GeneratedSpec,
 }
 
-/// A source selection analyzed through a registered provider.
+/// A region of host files analyzed as another language, shaped like a
+/// tree-sitter injection: `select` is `injection.content`, `language` the
+/// fixed `injection.language`, `languageFrom` the dynamic
+/// `@injection.language` capture.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct SourceRuleSpec {
-    /// Stable rule identity within spec.sources.
+pub struct InjectionSpec {
+    /// Stable identity within `spec.injections`.
     pub id: String,
     /// Project-relative physical host-file globs.
     pub files: Vec<String>,
-    /// One selector over the host provider's selectable tree.
+    /// One JSONPath (RFC 9535) over the host provider's selectable tree,
+    /// picking the content of each region.
     pub select: String,
-    /// Provider selection and provider-specific interpretation/context.
-    pub language: SourceLanguageSpec,
-}
-
-/// Analysis destination for a source rule. Exactly one of provider and from
-/// is required; from reads the language of each candidate.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct SourceLanguageSpec {
-    /// Fixed opaque key in the provider registry.
+    /// The fixed language of every region: an id or alias of a provider.
+    /// Exactly one of `language` and `languageFrom`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
-    /// Candidate-relative selector returning the name of the language of each
-    /// candidate, as a document writes it: one of the aliases a provider
-    /// declares, in any case. A candidate whose name is absent or unknown is
+    pub language: Option<String>,
+    /// Region-relative selector returning the name of the language of each
+    /// region, as a document writes it: one of the aliases a provider
+    /// declares, in any case. A region whose name is absent or unknown is
     /// not analyzed; it is text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub from: Option<String>,
-    /// Optional interpretation owned by the selected provider.
+    pub language_from: Option<String>,
+    /// Optional interpretation owned by the language's provider.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
     /// Optional provider-specific values and selector projections.

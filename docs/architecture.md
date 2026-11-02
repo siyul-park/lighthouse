@@ -111,7 +111,7 @@ spec: { ... }
 | `Decision` | a decision: `title context scope requirement status supersedes consequences severity options languages check fix provenance examples` | `plugins/<plugin>/decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
 | `Pack` | title, intro and the ordered sections, each listing its decisions | `plugins/<plugin>/decisions/<pack>/pack.yaml` |
 | `SourceMap` | which decision covers each normative line of the documents a catalog came from | `plugins/<plugin>/decisions/<pack>/sources.yaml` |
-| `Project` | `lighthouse.toml`: `plugins extends languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config. `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (`strict` also switches on every kind of a decision whose `kinds` option enables only some by default); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
+| `Project` | `lighthouse.toml`: `plugins extends injections languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config and which brings its `rules`, `overrides`, `injections` and `plugins` (the union of the `plugins` over the chain; a later `injections` entry of the same `id` replaces the earlier). `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (`strict` also switches on every kind of a decision whose `kinds` option enables only some by default); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
 | `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
 | `Judgment`, `Suppression` | records of the decision log | `.lighthouse/decisions.jsonl` |
 
@@ -144,7 +144,7 @@ runs them). Readers accept the current format only.
 
 Meaning is shared; the environment is personal. The keys that decide findings, or what may change
 the shared repository, are the project's alone (`lighthouse.toml`, committed): `plugins`,
-`extends`, `languages`, `overrides`, `generated`, `[fix]`, and per decision `level`, `options`,
+`extends`, `injections`, `languages`, `overrides`, `generated`, `[fix]`, and per decision `level`, `options`,
 `generated`, `evaluation` and `safety`. The keys that say how this machine computes and applies are the
 environment: `[models]` (bindings, `providers`, `routing`, `budget`, `explore`),
 `rules."<id>".classification` and `rules."<id>".agent`, `[fix] unsafe` and `[sandbox]`. They are read from four

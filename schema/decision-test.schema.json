@@ -37,7 +37,7 @@
       "type": "integer"
     },
     "skipped": {
-      "description": "One line per example that was not run because the program its command\ncheck names is not installed; they are not failures.",
+      "description": "One line per example that was not run because the program its command\ncheck names is not installed or not trusted, and one per plugin that\nexamples need and is not available, with how many examples that keeps\nfrom running; none of them is a failure.",
       "items": {
         "type": "string"
       },

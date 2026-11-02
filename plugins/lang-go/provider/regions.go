@@ -85,7 +85,7 @@ func (k known) add(spec packageSpec) {
 
 // fences are the units of the Go fences of the host files of the request: each
 // a unit of its own that uses the module around the Markdown file from outside,
-// as an importer does, or a file of the package a source rule names. Their
+// as an importer does, or a file of the package an injection names. Their
 // imports are completed for all of them at once.
 func (r *run) fences(params sdk.IndexParams) []*snippet {
 	var snippets []*snippet
@@ -136,7 +136,7 @@ func (r *run) snippets(host *sdk.EmbeddedFile) []*snippet {
 			s.rel = path.Join(into, "zz_lighthouse_"+sanitize(name)+".go")
 			s.module, s.shared = "", true
 			if pkg == "" {
-				s.note = fmt.Sprintf("names `%s` in `language.context.%s`, which holds no Go package", into, packageKey)
+				s.note = fmt.Sprintf("names `%s` in `context.%s`, which holds no Go package", into, packageKey)
 				out = append(out, s)
 				continue
 			}
@@ -511,7 +511,7 @@ func parses(src string, mode parser.Mode) bool {
 	return err == nil
 }
 
-// contextString is the string a source rule gave under key.
+// contextString is the string an injection gave under key.
 func contextString(source *sdk.EmbeddedSource, key string) string {
 	var context map[string]json.RawMessage
 	if json.Unmarshal(source.Context, &context) != nil {

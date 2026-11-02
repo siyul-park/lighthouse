@@ -183,7 +183,7 @@ fn crate_with(lib: &str) -> tempfile::TempDir {
     project(&[("Cargo.toml", MANIFEST), ("src/lib.rs", lib)])
 }
 
-/// The fences of `README.md`, each with the context its source rule gives.
+/// The fences of `README.md`, each with the context its injection gives.
 fn fences(dir: &Path, bodies: &[(&str, Value)]) -> IndexResult {
     let mut host = String::new();
     let mut sources = Vec::new();

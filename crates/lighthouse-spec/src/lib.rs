@@ -51,10 +51,10 @@ pub use program::{
 };
 pub use project::{
     BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule, EnvironmentSpec, Evaluation,
-    EventsSpec, FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GeneratedCheck, GlobSet, Layer,
-    Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
-    RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, SignalsSpec,
-    SourceLanguageSpec, SourceRuleSpec, Surface, Task, TestNamingSpec, glob_set,
+    EventsSpec, FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GeneratedCheck, GlobSet,
+    InjectionSpec, Layer, Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef,
+    ProjectSpec, Projects, RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules,
+    SandboxSpec, SignalsSpec, Surface, Task, TestNamingSpec, glob_set,
 };
 pub use scope::{Scope, Subject};
 pub(crate) use sources::SourceMapSpec;

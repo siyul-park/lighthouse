@@ -48,7 +48,7 @@ files.
 
 Protocol 0.4 uses one `lighthouse/index` interface for physical files and selected source regions. Each input is a tagged `IndexInput`: `{ kind: "file", file, source_ast }` asks a provider to analyze a physical file and, when `source_ast` is true, return its selectable AST; `{ kind: "regions", regions }` asks it to analyze source regions selected by the core. A request may mix both kinds: a provider indexes the physical files and the regions together, in one pass (Go: one `packages.Load` per module), and answers one fragment per file, the regions' facts merged into the fragment of their host file. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
 
-The `source_ast` flag is per file, so a batch requests ASTs only where a source rule's file globs match. Providers that advertise the `source-ast` capability MUST return one `Source` per requested file, with `path`, provider-defined serialized `ast`, and a separate `mapping` keyed by canonical JSON Pointer. Each mapping entry can carry a half-open UTF-8 byte `range`, a descendant `text_pointer` for a node's source-text scalar, and optional `text_map` segments from extracted-text bytes to original-host bytes. ASTs retain the parser/provider's structural shape; locations live in the sidecar rather than injected into every node. Providers parse and map only: they do not receive or interpret `spec.sources`, selector filters, destination keys, or `language.context`. The shared core evaluates selectors, filters and context projections, validates mappings, resolves the destination provider key, and forwards each selected region through the same `lighthouse/index` method. Source rules are core configuration and are not transported through provider context.
+The `source_ast` flag is per file, so a batch requests ASTs only where an injection's file globs match. Providers that advertise the `source-ast` capability MUST return one `Source` per requested file, with `path`, provider-defined serialized `ast`, and a separate `mapping` keyed by canonical JSON Pointer. Each mapping entry can carry a half-open UTF-8 byte `range`, a descendant `text_pointer` for a node's source-text scalar, and optional `text_map` segments from extracted-text bytes to original-host bytes. ASTs retain the parser/provider's structural shape; locations live in the sidecar rather than injected into every node. Providers parse and map only: they do not receive or interpret `spec.injections`, selector filters, destination keys, or `context`. The shared core evaluates selectors, filters and context projections, validates mappings, resolves the destination provider key, and forwards each selected region through the same `lighthouse/index` method. Injections are core configuration and are not transported through provider context.
 
 ## Methods
 
@@ -156,23 +156,23 @@ by searching for equal source strings.
 The provider may expose several independent logical roots below one AST root, such as a
 YAML stream with a `documents` array. Selectors and identity resolution remain core-owned;
 identity values are scoped to the selected logical root when the root AST contains multiple
-documents. Each physical file is represented once even when multiple source rules select
+documents. Each physical file is represented once even when multiple injections select
 regions from it.
 
-The core owns selector parsing and evaluation. `select` and `language.from` use the same
-bounded path/filter grammar: `$`, named and quoted keys, numeric indices, dot-wildcard and array-wildcard,
+The core owns selector parsing and evaluation. `select` and `languageFrom` use the same
+bounded path/filter grammar: `$`, named and quoted keys, lists of them (`['select','each']`, RFC 9535 section 2.3.2), numeric indices, dot-wildcard and array-wildcard,
 the descendant segment `..` (as in RFC 9535 section 2.5.2: the next selector applies to the value and to every
 value below it, parents first), the filter `?( )` with equality/inequality predicates, conjunction and
 disjunction. The filter is this grammar's own, not the RFC's filter expression: it has no existence tests, no
 function extensions and no comparison but `==` and `!=`. `!=` holds when no selected
 value equals the operand, so a path that selects nothing satisfies it
 (`@.attributes[*] != "ignore"` is true of a block with no attributes). A tree whose blocks nest,
-such as Markdown, needs the descendant segment to reach a block at any depth. The host provider does not get the source
-rules and must not implement a private selection mode. `language` names the destination in one of two ways: `provider`, a fixed provider id, or `from`,
-a candidate-relative selector for the name the document gives the language (a fence's `lang`). The name is one
+such as Markdown, needs the descendant segment to reach a block at any depth. The host provider does not get the
+injections and must not implement a private selection mode. An injection names the destination in one of two ways: `language`, a fixed provider id or alias, or `languageFrom`,
+a region-relative selector for the name the document gives the language (a fence's `lang`). The name is one
 of the `aliases` of a provider's manifest, in any case (`Go`, `golang` and `go` are the language `go`; a
 manifest's aliases are the names GitHub Linguist lists); a candidate whose name is absent, not unique or
-unknown to the enabled providers is text, and nothing is said of it. The core resolves language.context
+unknown to the enabled providers is text, and nothing is said of it. The core resolves `context`
 projections and declaration context before it creates source-region inputs.
 
 A selected region carries a stable id, its `rule_id`, `node_pointer`, and `source_pointer`,
@@ -656,15 +656,15 @@ cannot map is an `incomplete` entry; the answer is a fragment of the host file a
   CommonMark and GFM nodes, each with a `kind`. A `code_block` carries the fence
   `info` as written, the `lang` (its first word), the `attributes` (the rest, split on
   spaces and commas as rustdoc and mdBook read them). Which language the `lang` names is the
-  core's to say (`language.from`, the aliases of the manifests). Its `text_pointer` names the body, whose `text_map` runs through the
+  core's to say (`languageFrom`, the aliases of the manifests). Its `text_pointer` names the body, whose `text_map` runs through the
   indentation of a list item or a block quote and the line endings of the file. The
   descendant segment `..` of the selector grammar reaches a block at any depth. Markdown
   has no subjects of its own yet: it is a language of files only.
 
 ### Regions, examples and what the file knows of them
 
-The engine tells each host file which languages its regions are in and whether a source
-rule marks them as example code (the reserved `language.context.example: true`): the
+The engine tells each host file which languages its regions are in and whether an
+injection marks them as example code (the reserved `context.example: true`): the
 files it returns carry the fact `regions` (`go:example,yaml:code`), the modules a
 region provider returns say their `language` and whether they are examples, and the
 file's `analysisLanguage` is the one language of its code that is not example code. An

@@ -1,7 +1,7 @@
 //! Looking at decisions and running their examples.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fmt::Write,
     fs,
     num::NonZeroUsize,
@@ -77,7 +77,9 @@ pub struct DecisionTest {
     /// One line per failing example; empty when every example holds.
     pub failures: Vec<String>,
     /// One line per example that was not run because the program its command
-    /// check names is not installed; they are not failures.
+    /// check names is not installed or not trusted, and one per plugin that
+    /// examples need and is not available, with how many examples that keeps
+    /// from running; none of them is a failure.
     pub skipped: Vec<String>,
     /// One line per conflict with another decision that an example declares
     /// and still has: a candidate for a contradiction, not a failure.
@@ -305,14 +307,20 @@ pub(crate) fn test_catalog(
         languages
     };
     let mut found = examples::run(session, catalog, &plugins, &languages, &decisions, jobs)?;
-    let mut failures = unregistered(&decisions, &registered);
-    failures.append(&mut found.failures);
+    let mut lacking = std::mem::take(&mut found.lacking);
+    for (plugin, examples) in unserved(&decisions, language, &registered) {
+        *lacking.entry(plugin).or_default() += examples;
+    }
+    let mut skipped = std::mem::take(&mut found.skipped);
+    skipped.extend(lacking.iter().map(|(plugin, examples)| {
+        format!("plugin `{plugin}` is not available: {examples} example(s) not run")
+    }));
     Ok(DecisionTest {
         decisions: decisions.len(),
         languages: languages.len(),
         runs: found.runs,
-        failures,
-        skipped: found.skipped,
+        failures: found.failures,
+        skipped,
         conflicts: found.conflicts,
         timings: TestTimings {
             plugin_start: start.as_secs_f64(),
@@ -368,21 +376,27 @@ fn slowest(mut spent: Vec<(String, String, Duration)>) -> Vec<SlowDecision> {
         .collect()
 }
 
-/// One failure for each decision whose languages name no registered provider:
-/// nothing would ever run it.
-fn unregistered(decisions: &[&Decision], registered: &BTreeSet<String>) -> Vec<String> {
-    decisions
-        .iter()
-        .filter(|d| !d.languages.is_empty() && !d.languages.keys().any(|l| registered.contains(l)))
-        .map(|d| {
-            let listed: Vec<&str> = d.languages.keys().map(String::as_str).collect();
-            format!(
-                "{}: applies to {}, which no registered provider serves",
-                d.id(),
-                listed.join(", ")
-            )
-        })
-        .collect()
+/// How many examples are written in a language no registered provider
+/// serves, by the plugin that would: the language `go` is served by `lang-go`.
+/// Only the language asked for counts, else every language; the
+/// language-neutral `text` needs none.
+fn unserved(
+    decisions: &[&Decision],
+    asked: Option<&str>,
+    registered: &BTreeSet<String>,
+) -> BTreeMap<String, usize> {
+    let mut lacking = BTreeMap::new();
+    let examples = decisions.iter().flat_map(|d| &d.examples);
+    for example in examples {
+        let language = &example.language;
+        if language != NEUTRAL
+            && asked.is_none_or(|asked| asked == language)
+            && !registered.contains(language)
+        {
+            *lacking.entry(format!("lang-{language}")).or_default() += 1;
+        }
+    }
+    lacking
 }
 
 fn status(decision: &Decision, registry: &Registry) -> Implementation {

@@ -43,7 +43,7 @@ Capabilities: `extent`, `reference-sites`, `overlays`, `source-ast`.
 A Rust fence of a Markdown file is a unit of its own, as rustdoc reads a doctest: a crate that uses the crate around the file from outside, so `use <crate>::` paths are edges to that crate's public symbols. The crate is the library of the nearest `Cargo.toml` with a `[package]`; without one only the standard library resolves.
 
 - A fence that parses as items stays as it is; statements are the body of a `fn main`. Wrapper lines and `#` lines are analyzed and never placed: rustdoc's hidden lines (`##` shows a `#`), outside the host mapping, so what only they declare is dropped and what they call is the module's.
-- `language.context.crate = "<module file>"` makes the fence code inside that module, where `crate::` and `super::` resolve; its symbols live in a module of their own.
+- `context.crate = "<module file>"` makes the fence code inside that module, where `crate::` and `super::` resolve; its symbols live in a module of their own.
 - A fence that is not valid Rust is a notice; one that uses names the project does not hold is counted in one notice and its edges stay syntactic. Neither is a gap.
 - `edition20xx` of the info string (`context.info`) is the `edition` fact of the host file when its fences agree; else the crate's edition around the file, else none, and fences that disagree are a notice. The facts of a region's file are merged over its host's; syn reads every edition the same.
 

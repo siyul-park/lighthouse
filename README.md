@@ -75,8 +75,11 @@ spec:
 
 A decision states its context once; each language realizes it in its own terms. Rules can
 be built in, written as CEL expressions over the code model, or added per project under
-`.lighthouse/decisions/`. Every decision ships executable examples, and `lighthouse decision test`
-runs them. Every spec document, `lighthouse.toml` included, has a JSON Schema in [schema/](schema).
+`.lighthouse/decisions/`; the project that writes decisions of its own extends `core/authoring`, which
+says where the CEL of Lighthouse's resource files is (`lighthouse init` and `decision create` add it).
+Every decision ships executable examples, and `lighthouse decision test` runs them, each in a project
+of its own, so the same answer in any project; an example that cannot run here (a plugin that is not
+available, a command that is not trusted or installed) is reported as skipped. Every spec document, `lighthouse.toml` included, has a JSON Schema in [schema/](schema).
 
 Precision comes before recall. A design rule that cries wolf gets ignored, so heuristics
 default to high thresholds, judgment calls become `info` review tasks instead of errors, and

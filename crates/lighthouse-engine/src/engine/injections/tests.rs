@@ -1,6 +1,5 @@
 use super::*;
 use lighthouse_protocol::TextMapSegment;
-use lighthouse_spec::SourceLanguageSpec;
 
 fn entry(range: [u32; 2]) -> lighthouse_plugin::Mapping {
     lighthouse_plugin::Mapping {
@@ -98,16 +97,16 @@ fn source_projection_uses_text_pointer_without_searching_values() {
         ]),
     };
     assert!(ast.validate(host).is_ok());
-    let rule = SourceRuleSpec {
+    let rule = InjectionSpec {
         id: "embedded".to_owned(),
         files: vec!["**/*.yaml".to_owned()],
         select: "$.expr-node".to_owned(),
-        language: SourceLanguageSpec {
-            provider: Some("cel".to_owned()),
-            ..SourceLanguageSpec::default()
-        },
+        language: Some("cel".to_owned()),
+        language_from: None,
+        syntax: None,
+        context: None,
     };
-    let result = select_rule(&CompiledRule::new(&rule), &ast, &|_| None).unwrap();
+    let result = select_rule(&Injection::new(&rule), &ast, &|_| None).unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].node_pointer, "/expr-node");
     assert_eq!(result[0].source_pointer, "/expr-node/source");
@@ -132,20 +131,19 @@ fn context_selectors_use_the_documented_scopes() {
             ("/where".to_owned(), entry([13, 18])),
         ]),
     };
-    let rule = SourceRuleSpec {
+    let rule = InjectionSpec {
         id: "where".to_owned(),
         files: vec!["decisions/**/*.yaml".to_owned()],
         select: "$?(@.kind == 'Decision' && @.language == 'cel').where".to_owned(),
-        language: SourceLanguageSpec {
-            provider: Some("cel".to_owned()),
-            context: Some(serde_json::json!({
-                "identity": {"kind":"$.kind"},
-                "declared": true
-            })),
-            ..SourceLanguageSpec::default()
-        },
+        language: Some("cel".to_owned()),
+        language_from: None,
+        syntax: None,
+        context: Some(serde_json::json!({
+            "identity": {"kind":"$.kind"},
+            "declared": true
+        })),
     };
-    let result = select_rule(&CompiledRule::new(&rule), &ast, &|_| None).unwrap();
+    let result = select_rule(&Injection::new(&rule), &ast, &|_| None).unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].provider, "cel");
     assert_eq!(result[0].text, "x > 1");
@@ -192,17 +190,17 @@ fn unsupported_composite_candidates_are_errors_not_empty_success() {
             ("/expr/nested".to_owned(), entry([2, 9])),
         ]),
     };
-    let rule = SourceRuleSpec {
+    let rule = InjectionSpec {
         id: "embedded".to_owned(),
         files: vec!["**/*.yaml".to_owned()],
         select: "$.expr".to_owned(),
-        language: SourceLanguageSpec {
-            provider: Some("cel".to_owned()),
-            ..SourceLanguageSpec::default()
-        },
+        language: Some("cel".to_owned()),
+        language_from: None,
+        syntax: None,
+        context: None,
     };
     assert!(
-        select_rule(&CompiledRule::new(&rule), &ast, &|_| None)
+        select_rule(&Injection::new(&rule), &ast, &|_| None)
             .unwrap_err()
             .contains("no explicit text_pointer")
     );
@@ -245,11 +243,11 @@ fn document(blocks: &[(&str, &str, &[&str])]) -> Source {
     }
 }
 
-fn markdown_rule() -> SourceRuleSpec {
+fn markdown_rule() -> InjectionSpec {
     let config = lighthouse_spec::Config::parse(include_str!("../../../../../lighthouse.toml"))
         .expect("the project's own configuration parses");
     config
-        .sources()
+        .injections()
         .iter()
         .find(|rule| rule.id == "markdown-code")
         .expect("the project reads the fences of its Markdown")
@@ -266,7 +264,7 @@ fn named(name: &str) -> Option<String> {
 
 fn analysed(blocks: &[(&str, &str, &[&str])]) -> Vec<(String, Value)> {
     let rule = markdown_rule();
-    select_rule(&CompiledRule::new(&rule), &document(blocks), &named)
+    select_rule(&Injection::new(&rule), &document(blocks), &named)
         .unwrap()
         .into_iter()
         .map(|source| (source.provider, source.context))
@@ -333,7 +331,7 @@ fn a_fence_in_a_list_is_found_below_the_top_of_the_document() {
     };
     let rule = markdown_rule();
 
-    let found = select_rule(&CompiledRule::new(&rule), &ast, &named).unwrap();
+    let found = select_rule(&Injection::new(&rule), &ast, &named).unwrap();
 
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].node_pointer, "/children/0/children/0");
@@ -380,4 +378,31 @@ fn a_filter_on_a_path_that_selects_nothing_holds_for_inequality_only() {
     assert_eq!(hits("$..?(@.j == 4)"), 1);
     assert_eq!(hits("$..?(@.zz == 4)"), 0);
     assert_eq!(hits("$..?(@.zz != 4)"), hits("$..?(@.k != 99)"));
+}
+
+#[test]
+fn a_union_selects_the_members_it_names_in_its_order_below_each_match() {
+    let ast = Source {
+        path: "doc.toml".to_owned(),
+        ast: serde_json::json!({"events": {"each": "a", "select": "b", "other": "c"}, "list": ["x", "y"]}),
+        mapping: BTreeMap::new(),
+    };
+    let named = |query: &str| -> Vec<String> {
+        evaluate(&ast, "", query)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.pointer)
+            .collect()
+    };
+
+    assert_eq!(
+        named("$.events['select','absent','each']"),
+        ["/events/select", "/events/each"]
+    );
+    assert_eq!(named("$.list[1,0]"), ["/list/1", "/list/0"]);
+    assert_eq!(
+        named("$..['select','each']"),
+        ["/events/select", "/events/each"],
+        "after a descent the union names members at any depth"
+    );
 }

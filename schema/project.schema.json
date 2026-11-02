@@ -188,6 +188,57 @@
       },
       "type": "object"
     },
+    "InjectionSpec": {
+      "additionalProperties": false,
+      "description": "A region of host files analyzed as another language, shaped like a\ntree-sitter injection: `select` is `injection.content`, `language` the\nfixed `injection.language`, `languageFrom` the dynamic\n`@injection.language` capture.",
+      "properties": {
+        "context": {
+          "description": "Optional provider-specific values and selector projections."
+        },
+        "files": {
+          "description": "Project-relative physical host-file globs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Stable identity within `spec.injections`.",
+          "type": "string"
+        },
+        "language": {
+          "description": "The fixed language of every region: an id or alias of a provider.\nExactly one of `language` and `languageFrom`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "languageFrom": {
+          "description": "Region-relative selector returning the name of the language of each\nregion, as a document writes it: one of the aliases a provider\ndeclares, in any case. A region whose name is absent or unknown is\nnot analyzed; it is text.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "select": {
+          "description": "One JSONPath (RFC 9535) over the host provider's selectable tree,\npicking the content of each region.",
+          "type": "string"
+        },
+        "syntax": {
+          "description": "Optional interpretation owned by the language's provider.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "files",
+        "select"
+      ],
+      "type": "object"
+    },
     "Level": {
       "description": "A level a project can set: a severity, or `off`, which only\nconfiguration has.",
       "enum": [
@@ -448,7 +499,7 @@
     },
     "ProjectSpec": {
       "additionalProperties": false,
-      "description": "A project's configuration, and the shape of a shareable one: `extends`\nnames any project, the way an ESLint config extends a shareable config.\nAn extended project contributes its `extends`, `rules` and `overrides`.\nIts `plugins` and `languages` belong to the project that is run.",
+      "description": "A project's configuration, and the shape of a shareable one: `extends`\nnames any project, the way an ESLint config extends a shareable config.\nAn extended project contributes its `extends`, `rules`, `overrides`,\n`injections` and `plugins`, the way an ESLint shareable config brings its\n`plugins`. Its `languages` belong to the project that is run.",
       "properties": {
         "extends": {
           "description": "Projects whose rules apply first, in order: the `recommended` and\n`strict` projects of each pack (`core/recommended`), or any `Project`\ndocument of the catalog.",
@@ -464,6 +515,13 @@
         "generated": {
           "$ref": "#/$defs/GeneratedSpec",
           "description": "Which files are generated code, beyond what the providers and\n`.gitattributes` say, and whether it is checked."
+        },
+        "injections": {
+          "description": "Regions of host files that are written in another language: a CEL\nexpression in a decision, code in a Markdown fence. The host language\nis inferred by normal file routing. Entries merge over `extends`,\nextended first; a later entry with the same `id` replaces the earlier.",
+          "items": {
+            "$ref": "#/$defs/InjectionSpec"
+          },
+          "type": "array"
         },
         "languages": {
           "additionalProperties": {
@@ -504,13 +562,6 @@
         "signals": {
           "$ref": "#/$defs/SignalsSpec",
           "description": "How long session signals are kept, and whether the agent hears about\nthem."
-        },
-        "sources": {
-          "description": "Embedded source rules. The host language is inferred by normal file routing.",
-          "items": {
-            "$ref": "#/$defs/SourceRuleSpec"
-          },
-          "type": "array"
         }
       },
       "type": "object"
@@ -868,69 +919,6 @@
           "description": "`shadow` records signals and prints nothing to the agent; `on` tells\nit. Default: `shadow`."
         }
       },
-      "type": "object"
-    },
-    "SourceLanguageSpec": {
-      "additionalProperties": false,
-      "description": "Analysis destination for a source rule. Exactly one of provider and from\nis required; from reads the language of each candidate.",
-      "properties": {
-        "context": {
-          "description": "Optional provider-specific values and selector projections."
-        },
-        "from": {
-          "description": "Candidate-relative selector returning the name of the language of each\ncandidate, as a document writes it: one of the aliases a provider\ndeclares, in any case. A candidate whose name is absent or unknown is\nnot analyzed; it is text.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "provider": {
-          "description": "Fixed opaque key in the provider registry.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "syntax": {
-          "description": "Optional interpretation owned by the selected provider.",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
-    "SourceRuleSpec": {
-      "additionalProperties": false,
-      "description": "A source selection analyzed through a registered provider.",
-      "properties": {
-        "files": {
-          "description": "Project-relative physical host-file globs.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "id": {
-          "description": "Stable rule identity within spec.sources.",
-          "type": "string"
-        },
-        "language": {
-          "$ref": "#/$defs/SourceLanguageSpec",
-          "description": "Provider selection and provider-specific interpretation/context."
-        },
-        "select": {
-          "description": "One selector over the host provider's selectable tree.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "files",
-        "select",
-        "language"
-      ],
       "type": "object"
     },
     "Stdin": {

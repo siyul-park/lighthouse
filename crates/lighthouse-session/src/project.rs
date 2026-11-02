@@ -139,16 +139,16 @@ impl Session {
             .map(|(origin, trusted)| (*origin, trusted.as_str()))
             .collect();
         let layers = personal.iter().map(|p| p.layer.clone()).collect();
-        let (config, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;
+        let (own, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;
         let bundled = lighthouse_checks::ids(&comp, &crate::libraries()?)?;
-        if let Some(listed) = config.plugins().iter().find(|p| bundled.contains(&p.id)) {
+        if let Some(listed) = own.plugins().iter().find(|p| bundled.contains(&p.id)) {
             return Err(format!(
                 "plugin `{}` is bundled: remove it from `plugins`",
                 listed.id
             )
             .into());
         }
-        if let Some(listed) = config.lists(LOCAL_PACK).then_some(LOCAL_PACK) {
+        if let Some(listed) = own.lists(LOCAL_PACK).then_some(LOCAL_PACK) {
             return Err(format!(
                 "plugin `{listed}` is the project's own decisions: remove it from `plugins`"
             )
@@ -160,14 +160,25 @@ impl Session {
             .map(|files| Catalog::from_local(files, comp.cel()))
             .transpose()?;
         let search = lighthouse_rpc::search_dirs(&root);
-        let listed = lighthouse_rpc::plugin_catalogs(&config, &root, &search)?;
+        let mut config = inheriting(&own, &layered(comp.bundled()?, local.as_ref())?);
         let commands = commands(&config, local.as_ref(), &root);
         let basis = Basis::of(&root, text, &texts, &files.unwrap_or_default(), &commands);
         let trusted = basis.trusted(&root);
-        let (loaded, withheld): (Vec<_>, Vec<_>) =
-            listed.into_iter().partition(|c| trusted || !c.local);
-        let base = shipped(&comp, &loaded)?;
-        let catalog = layered(&base, local.as_ref())?;
+        // The plugins an extended project lists are plugins of this one, and
+        // the catalogs they ship may hold projects that list more: go on
+        // until the listing no longer grows.
+        let (withheld, base, catalog) = loop {
+            let listed = lighthouse_rpc::plugin_catalogs(&config, &root, &search)?;
+            let (loaded, withheld): (Vec<_>, Vec<_>) =
+                listed.into_iter().partition(|c| trusted || !c.local);
+            let base = shipped(&comp, &loaded)?;
+            let catalog = layered(&base, local.as_ref())?;
+            let next = inheriting(&own, &catalog);
+            if next.plugins() == config.plugins() {
+                break (withheld, base, catalog);
+            }
+            config = next;
+        };
         if withheld.is_empty() {
             environment::check_local(&root, &personal, &catalog)?;
         }
@@ -564,6 +575,14 @@ fn commands(config: &Config, local: Option<&Catalog>, root: &Path) -> Vec<Progra
         }
     }
     found
+}
+
+/// `config` with what the projects it extends bring, as `catalog` has them;
+/// as it is when they cannot be resolved, which the run then reports.
+fn inheriting(config: &Config, catalog: &Catalog) -> Config {
+    config
+        .inheriting(catalog.projects())
+        .unwrap_or_else(|_| config.clone())
 }
 
 fn layered(base: &Catalog, local: Option<&Catalog>) -> Result<Catalog> {

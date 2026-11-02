@@ -254,83 +254,74 @@ fn config_test_naming() {
 }
 
 #[test]
-fn source_rules_use_one_language_field_for_provider_and_semantics() {
+fn injections_name_one_fixed_language_or_one_to_read_from_each_region() {
     let config = Config::parse_inline(
         r#"
-[[sources]]
+[[injections]]
 id = "condition"
 files = ["decisions/**/*.yaml"]
-language = { provider = "cel" }
+language = "cel"
 select = "$.spec.check.where"
 "#,
     )
     .unwrap();
-    assert_eq!(config.sources().len(), 1);
-    assert_eq!(
-        config.sources()[0].language.provider.as_deref(),
-        Some("cel")
-    );
+    assert_eq!(config.injections().len(), 1);
+    assert_eq!(config.injections()[0].language.as_deref(), Some("cel"));
     assert!(
         Config::parse_inline(
             r#"
-[[sources]]
+[[injections]]
 id = "condition"
 files = ["decisions/**/*.yaml"]
 host = "yaml"
-language = { provider = "cel" }
+language = "cel"
 select = "$.spec.check.where"
-"#
-        )
-        .is_err()
-    );
-    assert!(
-        Config::parse_inline(
-            r#"[[sources]]
-id = "condition"
-files = ["decisions/**/*.yaml"]
-select = "$.spec.check.where"
-language = { provider = "cel", from = "$.language" }
 "#
         )
         .is_err()
     );
     for language in [
-        r#"{ provider = "", from = "$.language" }"#,
-        r#"{ provider = "cel", from = "" }"#,
-        r#"{ from = "" }"#,
-        r#"{}"#,
+        r#"language = "cel"
+languageFrom = "$.language""#,
+        r#"language = """#,
+        r#"languageFrom = """#,
+        "",
     ] {
         let source = format!(
-            r#"[[sources]]
+            r#"[[injections]]
 id = "condition"
 files = ["decisions/**/*.yaml"]
 select = "$.spec.check.where"
-language = {language}
+{language}
 "#
         );
         assert!(
             Config::parse_inline(&source).is_err(),
-            "an empty or missing provider/from must be rejected: {language}"
+            "an empty, missing or doubled language must be rejected: {language}"
         );
     }
     let named = Config::parse_inline(
-        r#"[[sources]]
+        r#"[[injections]]
 id = "fences"
 files = ["**/*.md"]
 select = "$..?(@.kind == 'code_block')"
-language = { from = "$.lang", context = { example = true } }
+languageFrom = "$.lang"
+context = { example = true }
 "#,
     )
     .unwrap();
-    assert_eq!(named.sources()[0].language.from.as_deref(), Some("$.lang"));
-    assert_eq!(named.sources()[0].language.provider, None);
+    assert_eq!(
+        named.injections()[0].language_from.as_deref(),
+        Some("$.lang")
+    );
+    assert_eq!(named.injections()[0].language, None);
     assert!(
         Config::parse_inline(
-            r#"[[sources]]
+            r#"[[injections]]
 id = "condition"
 files = ["decisions/**/*.yaml"]
 select = "$?(@.kind = 'Decision').spec.check.where"
-language = { provider = "cel" }
+language = "cel"
 "#
         )
         .is_err(),
@@ -345,16 +336,17 @@ language = { provider = "cel" }
     ] {
         let source = format!(
             r#"
-[[sources]]
+[[injections]]
 id = "condition"
 files = ["decisions/**/*.yaml"]
 select = "$"
-language = {{ provider = "cel", context = {context} }}
+language = "cel"
+context = {context}
 "#
         );
         assert!(
             Config::parse_inline(&source).is_err(),
-            "invalid source context should fail config loading: {context}"
+            "invalid injection context should fail config loading: {context}"
         );
     }
 }
@@ -699,4 +691,114 @@ fn enabling_adds_plugins_that_are_not_listed_and_providers_are_the_projects_own(
     assert_eq!(config.plugins().len(), 1);
     assert!(config.providers().contains_key("p"));
     assert_eq!(config.providers().len(), 1);
+}
+
+/// A shareable project with the injections and plugins it brings.
+fn bringing(name: &str, extends: &[&str], toml: &str) -> Resource<ProjectSpec> {
+    let mut project = shared(name, extends, Rules::new());
+    let spec: ProjectSpec = toml::from_str(toml).unwrap();
+    project.spec.injections = spec.injections;
+    project.spec.plugins = spec.plugins;
+    project
+}
+
+fn injection(id: &str, select: &str) -> String {
+    format!(
+        "[[injections]]\nid = \"{id}\"\nfiles = [\"*.yaml\"]\nselect = \"{select}\"\nlanguage = \"cel\"\n"
+    )
+}
+
+#[test]
+fn injections_and_plugins_come_down_two_levels_of_extends_in_order() {
+    let projects = Projects::new([
+        bringing(
+            "p/base",
+            &[],
+            &format!(
+                "plugins = [\"lang-yaml\", \"lang-toml\"]\n{}{}",
+                injection("one", "$.a"),
+                injection("two", "$.b")
+            ),
+        ),
+        bringing(
+            "p/mid",
+            &["p/base"],
+            &format!(
+                "plugins = [\"lang-toml\", \"lang-go\"]\n{}{}",
+                injection("two", "$.mid"),
+                injection("three", "$.c")
+            ),
+        ),
+    ])
+    .unwrap();
+    let config = Config::parse_inline(&format!(
+        "plugins = [\"lang-rust\", \"lang-go\"]\nextends = [\"p/mid\"]\n{}",
+        injection("three", "$.own")
+    ))
+    .unwrap();
+
+    let all = config.inheriting(&projects).unwrap();
+
+    let ids: Vec<(&str, &str)> = all
+        .injections()
+        .iter()
+        .map(|i| (i.id.as_str(), i.select.as_str()))
+        .collect();
+    assert_eq!(
+        ids,
+        [("one", "$.a"), ("two", "$.mid"), ("three", "$.own")],
+        "extended first; the same id is replaced in its place"
+    );
+    let plugins: Vec<&str> = all.plugins().iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(
+        plugins,
+        ["lang-rust", "lang-go", "lang-yaml", "lang-toml"],
+        "own listing first, then the union of what is extended"
+    );
+    assert_eq!(all.required_by("lang-yaml"), Some("p/base"));
+    assert_eq!(all.required_by("lang-toml"), Some("p/base"));
+    assert_eq!(
+        all.required_by("lang-go"),
+        None,
+        "the project lists it itself"
+    );
+    let again = all.inheriting(&projects).unwrap();
+    assert_eq!(again.injections(), all.injections());
+    assert_eq!(again.plugins(), all.plugins());
+    assert_eq!(again.required_by("lang-yaml"), Some("p/base"));
+}
+
+#[test]
+fn a_project_without_extended_injections_or_plugins_stays_as_it_is() {
+    let config =
+        Config::parse_inline("plugins = [\"lang-go\"]\nextends = [\"core/recommended\"]").unwrap();
+
+    let all = config.inheriting(&projects()).unwrap();
+
+    assert_eq!(all.plugins(), config.plugins());
+    assert!(all.injections().is_empty());
+}
+
+#[test]
+fn projects_injecting_a_language_are_those_whose_own_injections_produce_it() {
+    let projects = Projects::new([
+        bringing("p/cel", &[], &injection("one", "$.a")),
+        bringing("p/other", &[], ""),
+        bringing("p/also", &["p/cel"], &injection("two", "$.b")),
+        bringing(
+            "p/dynamic",
+            &[],
+            "[[injections]]\nid = \"d\"\nfiles = [\"*.md\"]\nselect = \"$\"\nlanguageFrom = \"$.lang\"\n",
+        ),
+    ])
+    .unwrap();
+
+    let producing: Vec<&str> = projects.injecting("cel").collect();
+
+    assert_eq!(
+        producing,
+        ["p/also", "p/cel"],
+        "sorted, by their own entries"
+    );
+    assert_eq!(projects.injecting("go").count(), 0);
 }

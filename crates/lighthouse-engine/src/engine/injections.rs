@@ -8,10 +8,10 @@ use lighthouse_model::Incomplete;
 use lighthouse_plugin::{EmbeddedFile, EmbeddedSource};
 use lighthouse_protocol::Source;
 use lighthouse_protocol::{
-    Selector, SelectorComparison, SelectorFilter, SelectorPart, pointer_child, pointer_tokens,
-    pointer_value,
+    Selector, SelectorComparison, SelectorFilter, SelectorMember, SelectorPart, pointer_child,
+    pointer_tokens, pointer_value,
 };
-use lighthouse_spec::SourceRuleSpec;
+use lighthouse_spec::InjectionSpec;
 use serde_json::{Map, Value};
 
 use super::{Input, Run};
@@ -22,20 +22,21 @@ struct Selected<'a> {
     pointer: String,
 }
 
-struct CompiledRule<'a> {
-    spec: &'a SourceRuleSpec,
+/// An injection with its selectors parsed.
+struct Injection<'a> {
+    spec: &'a InjectionSpec,
     select: Selector,
     language_from: Option<Selector>,
 }
 
-impl<'a> CompiledRule<'a> {
-    fn new(spec: &'a SourceRuleSpec) -> Self {
+impl<'a> Injection<'a> {
+    fn new(spec: &'a InjectionSpec) -> Self {
         Self {
             spec,
             select: Selector::parse(&spec.select)
-                .expect("source selectors are validated by Config"),
-            language_from: spec.language.from.as_deref().map(|selector| {
-                Selector::parse(selector).expect("source selectors are validated by Config")
+                .expect("injection selectors are validated by Config"),
+            language_from: spec.language_from.as_deref().map(|selector| {
+                Selector::parse(selector).expect("injection selectors are validated by Config")
             }),
         }
     }
@@ -46,7 +47,7 @@ impl<'a> CompiledRule<'a> {
 pub(super) type Named<'a> = &'a dyn Fn(&str) -> Option<String>;
 
 pub(super) fn select(
-    rules: &[SourceRuleSpec],
+    injections: &[InjectionSpec],
     sources: Vec<Source>,
     inputs: &[Input],
     named: Named<'_>,
@@ -56,18 +57,18 @@ pub(super) fn select(
         .iter()
         .map(|input| (input.file.path.as_path(), input))
         .collect();
-    let rules: Vec<_> = rules.iter().map(CompiledRule::new).collect();
+    let rules: Vec<_> = injections.iter().map(Injection::new).collect();
     let mut matcher = GlobSetBuilder::new();
     let mut owners = Vec::new();
     for (index, rule) in rules.iter().enumerate() {
         for pattern in &rule.spec.files {
-            matcher.add(Glob::new(pattern).expect("source globs are validated by Config"));
+            matcher.add(Glob::new(pattern).expect("injection globs are validated by Config"));
             owners.push(index);
         }
     }
     let matcher = matcher
         .build()
-        .expect("source globs are validated by Config");
+        .expect("injection globs are validated by Config");
     let asts = accepted(sources, &files, run);
     let mut output = Vec::new();
     for (path, input) in files {
@@ -90,7 +91,7 @@ pub(super) fn select(
                     path: Some(path.to_path_buf()),
                     provider: None,
                     reason: format!(
-                        "source rule(s) {} require a source AST, but the host provider returned none",
+                        "injection(s) {} require a source AST, but the host provider returned none",
                         matching
                             .iter()
                             .map(|index| rules[*index].spec.id.as_str())
@@ -110,7 +111,7 @@ pub(super) fn select(
                 Err(reason) => run.incomplete.push(Incomplete {
                     path: Some(path.to_path_buf()),
                     provider: None,
-                    reason: format!("source rule {}: {reason}", rule.spec.id),
+                    reason: format!("injection {}: {reason}", rule.spec.id),
                 }),
             }
         }
@@ -171,20 +172,19 @@ fn accepted(
 }
 
 fn select_rule(
-    rule: &CompiledRule<'_>,
+    rule: &Injection<'_>,
     source_ast: &Source,
     named: Named<'_>,
 ) -> Result<Vec<EmbeddedSource>, String> {
     let spec = rule.spec;
     let mut output = Vec::new();
     for candidate in evaluate_selector(source_ast, "", &rule.select)? {
-        let provider = if let Some(provider) = &spec.language.provider {
+        let provider = if let Some(provider) = &spec.language {
             provider.clone()
         } else {
-            let selector = rule
-                .language_from
-                .as_ref()
-                .ok_or_else(|| "language requires exactly one of provider or from".to_owned())?;
+            let selector = rule.language_from.as_ref().ok_or_else(|| {
+                "an injection requires exactly one of language or languageFrom".to_owned()
+            })?;
             let values = evaluate_selector(source_ast, &candidate.pointer, selector)?;
             // A candidate with no name, or one no enabled language answers
             // to, is not code: it is text, and nothing is said of it.
@@ -230,7 +230,7 @@ fn select_rule(
             node_pointer: candidate.pointer,
             source_pointer: source.pointer,
             provider,
-            syntax: spec.language.syntax.clone(),
+            syntax: spec.syntax.clone(),
             context,
             text: source_text.to_owned(),
             source_range,
@@ -241,12 +241,11 @@ fn select_rule(
 }
 
 fn resolve_source<'a>(
-    rule: &SourceRuleSpec,
+    rule: &InjectionSpec,
     source_ast: &'a Source,
     candidate: &Selected<'a>,
 ) -> Result<Selected<'a>, String> {
     if let Some(variable) = rule
-        .language
         .context
         .as_ref()
         .and_then(|value| value.get("variable"))
@@ -254,18 +253,16 @@ fn resolve_source<'a>(
         let selector = variable
             .get("value")
             .and_then(Value::as_str)
-            .ok_or_else(|| "language.context.variable.value must be a selector".to_owned())?;
+            .ok_or_else(|| "context.variable.value must be a selector".to_owned())?;
         let values = evaluate(source_ast, &candidate.pointer, selector)?;
         if values.len() != 1 {
             return Err(format!(
-                "language.context.variable.value returned {} values; expected exactly one source",
+                "context.variable.value returned {} values; expected exactly one source",
                 values.len()
             ));
         }
         if !values[0].value.is_string() {
-            return Err(
-                "language.context.variable.value did not return a string scalar".to_owned(),
-            );
+            return Err("context.variable.value did not return a string scalar".to_owned());
         }
         return Ok(values[0].clone());
     }
@@ -298,11 +295,11 @@ fn resolve_source<'a>(
 }
 
 fn resolve_context(
-    rule: &SourceRuleSpec,
+    rule: &InjectionSpec,
     source_ast: &Source,
     candidate: &Selected<'_>,
 ) -> Result<Value, String> {
-    let Some(configured) = rule.language.context.as_ref().and_then(Value::as_object) else {
+    let Some(configured) = rule.context.as_ref().and_then(Value::as_object) else {
         return Ok(Value::Object(Map::new()));
     };
     let mut context = Map::new();
@@ -336,13 +333,13 @@ fn resolve_identity(
     value: &Value,
 ) -> Result<Value, String> {
     let identity = value.as_object().ok_or_else(|| {
-        "language.context.identity must be an object of root-relative selectors".to_owned()
+        "context.identity must be an object of root-relative selectors".to_owned()
     })?;
     let mut resolved = Map::new();
     for (name, selector) in identity {
         let selector = selector
             .as_str()
-            .ok_or_else(|| format!("language.context.identity.{name} must be a selector"))?;
+            .ok_or_else(|| format!("context.identity.{name} must be a selector"))?;
         let values = identity_values(source_ast, candidate, selector)?;
         if values.len() != 1 {
             return Err(format!(
@@ -362,7 +359,7 @@ fn resolve_variable(
 ) -> Result<Value, String> {
     let variable = value
         .as_object()
-        .ok_or_else(|| "language.context.variable must be an object".to_owned())?;
+        .ok_or_else(|| "context.variable must be an object".to_owned())?;
     let mut resolved = Map::new();
     for (field, setting) in variable {
         if field == "value" {
@@ -370,9 +367,9 @@ fn resolve_variable(
         }
         match field.as_str() {
             "name" => {
-                let selector = setting.as_str().ok_or_else(|| {
-                    "language.context.variable.name must be a selector".to_owned()
-                })?;
+                let selector = setting
+                    .as_str()
+                    .ok_or_else(|| "context.variable.name must be a selector".to_owned())?;
                 let values = evaluate(source_ast, &candidate.pointer, selector)?;
                 if values.len() != 1 {
                     return Err(format!(
@@ -387,9 +384,9 @@ fn resolve_variable(
                 resolved.insert("nameEnd".to_owned(), Value::from(range[1]));
             }
             "params" => {
-                let selector = setting.as_str().ok_or_else(|| {
-                    "language.context.variable.params must be a selector".to_owned()
-                })?;
+                let selector = setting
+                    .as_str()
+                    .ok_or_else(|| "context.variable.params must be a selector".to_owned())?;
                 let selected = evaluate(source_ast, &candidate.pointer, selector)?;
                 let mut values = Vec::with_capacity(selected.len());
                 let mut spans = Vec::with_capacity(selected.len());
@@ -428,7 +425,7 @@ fn resolve_projection(
     };
     let selector = selector
         .as_str()
-        .ok_or_else(|| format!("language.context.{key}.select must be a selector"))?;
+        .ok_or_else(|| format!("context.{key}.select must be a selector"))?;
     let values = evaluate(source_ast, &candidate.pointer, selector)?;
     if values.is_empty() {
         return Err(format!("context selector {selector} returned no values"));
@@ -522,6 +519,23 @@ fn evaluate_selector<'a>(
                     next.extend(array.get(*index).map(|value| Selected {
                         value,
                         pointer: pointer_child(&parent.pointer, &index.to_string()),
+                    }));
+                }
+                (SelectorPart::Union(members), value) => {
+                    next.extend(members.iter().filter_map(|member| match (member, value) {
+                        (SelectorMember::Key(key), Value::Object(object)) => {
+                            object.get(key).map(|value| Selected {
+                                value,
+                                pointer: pointer_child(&parent.pointer, key),
+                            })
+                        }
+                        (SelectorMember::Index(index), Value::Array(array)) => {
+                            array.get(*index).map(|value| Selected {
+                                value,
+                                pointer: pointer_child(&parent.pointer, &index.to_string()),
+                            })
+                        }
+                        _ => None,
                     }));
                 }
                 (SelectorPart::Keys, Value::Object(object)) => {

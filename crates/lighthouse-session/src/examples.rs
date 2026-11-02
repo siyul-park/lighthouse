@@ -3,7 +3,11 @@
 //! the results are put back in the order the units were listed in, so that a
 //! run reports the same whatever the number of workers.
 
-use std::{collections::BTreeSet, sync::Mutex, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Mutex,
+    time::Duration,
+};
 
 use lighthouse_engine::{RuleTester, Spent, Tested};
 use lighthouse_plugin::Registry;
@@ -22,6 +26,9 @@ pub(crate) struct Found {
     pub(crate) runs: usize,
     pub(crate) failures: Vec<String>,
     pub(crate) skipped: Vec<String>,
+    /// The plugins examples need and the registry lacks, with how many
+    /// examples each keeps from running.
+    pub(crate) lacking: BTreeMap<String, usize>,
     pub(crate) conflicts: Vec<String>,
     pub(crate) spent: Spent,
     /// The time of each unit: decision, language and total.
@@ -33,6 +40,7 @@ struct Unit {
     language: String,
     decision: String,
     skipped: Vec<String>,
+    lacking: BTreeMap<String, usize>,
     tested: Tested,
 }
 
@@ -52,12 +60,13 @@ pub(crate) fn run(
     jobs: usize,
 ) -> Result<Found> {
     let failed = Mutex::new(None);
+    let bundled = session.comp.bundled().map_err(|e| e.to_string())?;
     let fresh = || registry(session, plugins, &failed);
     let testers: Vec<(&String, RuleTester<'_>)> = languages
         .iter()
         .map(|language| {
             let tester = RuleTester::new(fresh, catalog, &session.base)
-                .sources(session.config.sources())
+                .bundled(bundled)
                 .language(language)
                 .trusted(session.trusted());
             (language, tester)
@@ -97,6 +106,7 @@ fn unit(language: &str, tester: &RuleTester<'_>, decision: &Decision) -> Unit {
         language: language.to_owned(),
         decision: decision.id().to_owned(),
         skipped: tester.skipped(decision),
+        lacking: tester.lacking_plugins(decision),
         tested: tester.tested(decision),
     }
 }
@@ -114,6 +124,9 @@ fn merge(units: Vec<Unit>) -> Found {
         };
         found.runs += 1;
         found.skipped.extend(prefixed(unit.skipped));
+        for (plugin, examples) in unit.lacking {
+            *found.lacking.entry(plugin).or_default() += examples;
+        }
         found.spent += unit.tested.spent;
         found.per_unit.push((
             unit.decision.clone(),

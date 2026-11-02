@@ -34,13 +34,13 @@ mod availability;
 mod cached;
 mod client;
 mod config;
+mod injections;
 mod models;
 mod phases;
 mod regions;
 mod route;
 mod run;
 mod scopes;
-mod sources;
 
 pub use availability::{Availability, Needs};
 use cached::RunCache;
@@ -310,6 +310,7 @@ impl Engine {
         root: &Path,
     ) -> Result<Self, Error> {
         let projects = catalog.projects().clone();
+        let config = config.inheriting(&projects)?;
         let binding = config.models(&projects)?;
         validate_config(&registry, &config, &binding, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
@@ -318,7 +319,7 @@ impl Engine {
         let ws = Workspace {
             root,
             source_globs: config
-                .sources()
+                .injections()
                 .iter()
                 .flat_map(|source| source.files.iter().cloned())
                 .collect(),

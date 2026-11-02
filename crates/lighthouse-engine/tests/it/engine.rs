@@ -590,7 +590,7 @@ fn construction_validates_plugins_presets_rules_and_options() {
     let err = |toml: &str| engine(&dir, toml).err().expect("config is invalid");
     assert!(matches!(
         err("plugins = [\"nope\"]"),
-        Error::UnknownPlugin(_)
+        Error::UnknownPlugin { .. }
     ));
     assert!(matches!(
         err("[languages.typo.testNaming]\nprefix = \"Test\""),

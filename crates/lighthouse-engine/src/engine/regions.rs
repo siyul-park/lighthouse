@@ -11,7 +11,7 @@ use std::{
 use lighthouse_model::ucm::{Fragment, REGIONS};
 use lighthouse_plugin::EmbeddedSource;
 
-/// The reserved context key of a source rule that marks its regions as
+/// The reserved context key of a injection that marks its regions as
 /// example code.
 const EXAMPLE: &str = "example";
 
@@ -87,7 +87,7 @@ impl Views {
     }
 }
 
-/// Whether a region is example code, as its source rule says.
+/// Whether a region is example code, as its injection says.
 pub(super) fn is_example(source: &EmbeddedSource) -> bool {
     source
         .context

@@ -1,7 +1,7 @@
 //! The Rust fences of host files, each a unit of its own, as rustdoc reads a
 //! doctest: its own crate that uses the crate around the Markdown file from
 //! outside, so a `use <crate>::` path is an edge to the crate's public symbols.
-//! `language.context.crate` names a module file instead, and the fence is code
+//! `context.crate` names a module file instead, and the fence is code
 //! inside that module, where `crate::` and `super::` resolve.
 //!
 //! What the fences declare and call is reported in the host's coordinates. A
@@ -50,7 +50,7 @@ struct Snippet<'a> {
     file: PathBuf,
     /// The unit's module path, or the name of the module it is in `into`.
     label: String,
-    /// The module file the fence is code of, from `language.context.crate`.
+    /// The module file the fence is code of, from `context.crate`.
     into: Option<PathBuf>,
     /// The package that governs the unit, as an index of the packages read.
     package: Option<usize>,
@@ -218,7 +218,7 @@ fn snippets<'a>(root: &Path, files: &[&'a EmbeddedFile]) -> Vec<Snippet<'a>> {
 }
 
 /// The edition a fence asks for: `edition2021` among the words of the info
-/// string its source rule hands on, split as rustdoc splits it.
+/// string its injection hands on, split as rustdoc splits it.
 fn edition_of(source: &EmbeddedSource) -> Option<String> {
     let info = source.context.get(INFO)?.as_str()?;
     info.split(|c: char| c.is_whitespace() || c == ',')
@@ -325,7 +325,7 @@ fn add(tree: &mut Tree, snippet: &Snippet, none: usize, result: &mut IndexResult
         result.incomplete.push(Incomplete {
             path: Some(snippet.host.path.clone()),
             reason: format!(
-                "`language.context.{CRATE}` names {}, which is no module file of a package of the project",
+                "`context.{CRATE}` names {}, which is no module file of a package of the project",
                 file.display()
             ),
         });

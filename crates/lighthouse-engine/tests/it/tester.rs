@@ -187,6 +187,11 @@ fn under_spec(text: &str) -> String {
 }
 
 fn catalog_with(fix: &str, examples: &str) -> Catalog {
+    Catalog::from_files(marker_files(fix, examples), &lighthouse_test_support::cel()).unwrap()
+}
+
+/// The pack `fake` with the decision `marker`.
+fn marker_files(fix: &str, examples: &str) -> lighthouse_spec::Files {
     let decision = format!(
         "apiVersion: lighthouse/v1alpha1
 kind: Decision
@@ -216,17 +221,13 @@ spec:
         under_spec(examples)
     );
     let pack = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: fake\nspec:\n  title: Fake\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [marker]\n";
-    Catalog::from_files(
-        [
-            ("fake/pack.yaml", pack),
-            ("fake/s/marker.yaml", decision.as_str()),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_owned(), v.to_owned()))
-        .collect(),
-        &lighthouse_test_support::cel(),
-    )
-    .unwrap()
+    [
+        ("fake/pack.yaml", pack),
+        ("fake/s/marker.yaml", decision.as_str()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_owned(), v.to_owned()))
+    .collect()
 }
 
 const HOLDING: &str = "  - name: flagged
@@ -384,17 +385,22 @@ spec:
       files: [{ path: a.txt, body: good }]
 ";
 
-#[test]
-fn rule_tester_skipped() {
+/// A catalog whose only decision is the command check `tool`.
+fn tool_catalog(tool: &str) -> Catalog {
     let pack = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: fake\nspec:\n  title: Fake\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [tool]\n";
-    let catalog = Catalog::from_files(
-        [("fake/pack.yaml", pack), ("fake/s/tool.yaml", MISSING_TOOL)]
+    Catalog::from_files(
+        [("fake/pack.yaml", pack), ("fake/s/tool.yaml", tool)]
             .into_iter()
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
             .collect(),
         &lighthouse_test_support::cel(),
     )
-    .unwrap();
+    .unwrap()
+}
+
+#[test]
+fn rule_tester_skipped() {
+    let catalog = tool_catalog(MISSING_TOOL);
     let tester = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
 
     let failures = tester.check_all();
@@ -739,4 +745,85 @@ fn spent_sums_by_phase() {
     let two = one + one;
     assert_eq!(two.check, Duration::from_millis(6));
     assert_eq!(two.total(), Duration::from_millis(12));
+}
+
+/// The command check `tool` over a program that is installed.
+fn installed_tool() -> String {
+    MISSING_TOOL.replace("lighthouse-no-such-tool", "sh")
+}
+
+#[test]
+fn rule_tester_skips_the_command_of_a_project_that_is_not_trusted() {
+    let catalog = tool_catalog(&installed_tool());
+    let decision = catalog.decision("fake/tool").unwrap();
+    let tester = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
+
+    let untrusted = tester.skipped(decision);
+    let trusted = tester.trusted(true).skipped(decision);
+
+    assert_eq!(
+        untrusted,
+        [
+            "fake/tool bad: `sh` is not run: this project is not trusted to run commands",
+            "fake/tool good: `sh` is not run: this project is not trusted to run commands"
+        ]
+    );
+    assert!(trusted.is_empty(), "{trusted:?}");
+}
+
+#[test]
+fn rule_tester_bundled_decisions_run_without_trust() {
+    let catalog = tool_catalog(&installed_tool());
+    let decision = catalog.decision("fake/tool").unwrap();
+
+    let tester =
+        RuleTester::new(registry, &catalog, lighthouse_test_support::bundled()).bundled(&catalog);
+
+    assert!(tester.skipped(decision).is_empty());
+}
+
+/// A shareable project that says `notes` is written by injection and needs
+/// the plugin `needs`.
+fn authoring(needs: &str) -> Catalog {
+    let project = format!(
+        "apiVersion: lighthouse/v1alpha1
+kind: Project
+metadata:
+  name: fake/authoring
+spec:
+  plugins: [{needs}]
+  injections:
+    - id: notes
+      files: ['**/*.md']
+      select: '$.text'
+      language: notes
+"
+    );
+    let mut files = marker_files("", HOLDING);
+    files.insert("fake/authoring.yaml".to_owned(), project);
+    Catalog::from_files(files, &lighthouse_test_support::cel()).unwrap()
+}
+
+#[test]
+fn rule_tester_lacking_plugins_counts_the_examples_that_need_one_the_registry_lacks() {
+    let catalog = authoring("lang-absent");
+    let decision = catalog.decision("fake/marker").unwrap();
+    let tester = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
+
+    let lacking = tester.lacking_plugins(decision);
+    let failures = tester.check_all();
+
+    assert_eq!(lacking.len(), 1);
+    assert_eq!(lacking["lang-absent"], 3, "{lacking:?}");
+    assert!(failures.is_empty(), "skipped, not failed: {failures:?}");
+}
+
+#[test]
+fn rule_tester_lacks_nothing_when_the_plugins_an_example_needs_are_there() {
+    let catalog = authoring("fake");
+    let decision = catalog.decision("fake/marker").unwrap();
+    let tester = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
+
+    assert!(tester.lacking_plugins(decision).is_empty());
+    assert!(tester.check_all().is_empty());
 }
