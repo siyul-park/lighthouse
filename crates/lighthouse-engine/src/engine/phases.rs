@@ -3,17 +3,14 @@
 
 use std::sync::OnceLock;
 
-use lighthouse_model::{
-    STATE_DIR,
-    ucm::{Capability, REGIONS},
-};
+use lighthouse_model::ucm::{Capability, REGIONS};
 use lighthouse_plugin::RuleManifest;
 
 use lighthouse_protocol::hash;
 use rayon::ThreadPool;
 
 use super::{regions::Views, *};
-use crate::documents::in_project;
+use crate::documents::listed;
 
 /// Why a file the languages claim is not an input: a notice for binary data a
 /// fallback provider claims, otherwise a gap in the analysis.
@@ -63,16 +60,7 @@ impl Engine {
             .require_git(false)
             .hidden(false)
             .add_custom_ignore_filename(IGNORE_FILE)
-            .filter_entry(move |entry| {
-                let hidden = entry
-                    .file_name()
-                    .to_str()
-                    .is_some_and(|n| n.starts_with('.'));
-                entry
-                    .path()
-                    .strip_prefix(&root)
-                    .is_ok_and(|rel| in_project(rel) && (!hidden || rel.starts_with(STATE_DIR)))
-            })
+            .filter_entry(move |entry| entry.path().strip_prefix(&root).is_ok_and(listed))
             .build();
         let mut files = Vec::new();
         for entry in walk {

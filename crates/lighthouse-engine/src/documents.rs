@@ -15,19 +15,6 @@ const MAX_BYTES: u64 = 1 << 20;
 /// Directories no command looks for documents in.
 pub const SKIPPED_DIRS: [&str; 4] = [".git", "target", "node_modules", "testdata"];
 
-/// Whether a walk of the project enters the entry at `rel`: of the state
-/// directory (cache, database, local state) only the decisions are the
-/// project's own files.
-pub(crate) fn in_project(rel: &Path) -> bool {
-    let mut parts = rel.components();
-    match (parts.next(), parts.next()) {
-        (Some(Component::Normal(first)), Some(Component::Normal(second))) if first == STATE_DIR => {
-            second == "decisions"
-        }
-        _ => true,
-    }
-}
-
 /// The documents found, and what could not be settled about them.
 #[derive(Default)]
 pub(crate) struct Documents {
@@ -105,11 +92,36 @@ impl Documents {
     }
 }
 
+/// Whether a walk of the project enters the entry at `rel`: of the state
+/// directory (cache, database, local state) only the decisions are the
+/// project's own files.
+pub(crate) fn in_project(rel: &Path) -> bool {
+    let mut parts = rel.components();
+    match (parts.next(), parts.next()) {
+        (Some(Component::Normal(first)), Some(Component::Normal(second))) if first == STATE_DIR => {
+            second == "decisions"
+        }
+        _ => true,
+    }
+}
+
+/// Whether the files checked include the entry at `rel`: those in no hidden
+/// directory, and the decisions of the state directory.
+pub(crate) fn listed(rel: &Path) -> bool {
+    in_project(rel)
+        && rel.components().all(|part| match part {
+            Component::Normal(name) => {
+                name == STATE_DIR || name.to_str().is_none_or(|n| !n.starts_with('.'))
+            }
+            _ => true,
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use super::in_project;
+    use super::{in_project, listed};
 
     #[test]
     fn only_the_decisions_of_the_state_directory_are_in_the_project() {
@@ -123,6 +135,19 @@ mod tests {
             ("src/a.rs", true),
         ] {
             assert_eq!(in_project(Path::new(path)), expected, "{path}");
+        }
+    }
+
+    #[test]
+    fn the_files_checked_are_those_in_no_hidden_directory_and_the_decisions() {
+        for (path, expected) in [
+            (".lighthouse/decisions/a.yaml", true),
+            (".lighthouse/cache/a.json", false),
+            (".github/ci.yaml", false),
+            ("src/.hidden/a.rs", false),
+            ("src/a.rs", true),
+        ] {
+            assert_eq!(listed(Path::new(path)), expected, "{path}");
         }
     }
 }
