@@ -32,28 +32,6 @@ pub(super) fn separation(text: &str, spans: &[Range<usize>]) -> usize {
         .map_or(1, |(run, _)| run)
 }
 
-/// The blank lines after `span` when code follows them, and before it when
-/// code precedes them, each at the indentation of the declaration.
-fn runs_around(text: &str, span: &Range<usize>) -> Vec<usize> {
-    let indent = text[span.clone()]
-        .lines()
-        .find(|l| !l.trim().is_empty())
-        .map_or(0, indent_of);
-    let beside = |code: Option<&str>| code.is_some_and(|line| indent_of(line) >= indent);
-    let mut runs = Vec::new();
-    let below = span.end..blank_end(text, span.end);
-    let next = text[below.end..].lines().next();
-    if beside(next) {
-        runs.push(blank_count(text, &below));
-    }
-    let above = blank_start(text, span.start)..span.start;
-    let prev = text[..above.start].trim_end().lines().next_back();
-    if beside(prev) {
-        runs.push(blank_count(text, &above));
-    }
-    runs
-}
-
 /// What goes in after the line that ends at `at`: each of `bodies` (whole
 /// lines) set apart by `separation` blank lines. When the text has no line end
 /// there, it is made one and what is put in leaves the text as it was, without.
@@ -86,4 +64,26 @@ pub(super) fn before(separation: usize, bodies: &[String], eol: &str) -> String 
         .iter()
         .map(|body| format!("{body}{}", eol.repeat(separation)))
         .collect()
+}
+
+/// The blank lines after `span` when code follows them, and before it when
+/// code precedes them, each at the indentation of the declaration.
+fn runs_around(text: &str, span: &Range<usize>) -> Vec<usize> {
+    let indent = text[span.clone()]
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .map_or(0, indent_of);
+    let beside = |code: Option<&str>| code.is_some_and(|line| indent_of(line) >= indent);
+    let mut runs = Vec::new();
+    let below = span.end..blank_end(text, span.end);
+    let next = text[below.end..].lines().next();
+    if beside(next) {
+        runs.push(blank_count(text, &below));
+    }
+    let above = blank_start(text, span.start)..span.start;
+    let prev = text[..above.start].trim_end().lines().next_back();
+    if beside(prev) {
+        runs.push(blank_count(text, &above));
+    }
+    runs
 }
