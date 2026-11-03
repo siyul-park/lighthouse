@@ -122,6 +122,33 @@ spec:
 
         // Mark is part of the example.
         func Mark(m Marker) bool { return m != nil }
+  - name: go-generic-type-satisfies-interface
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type cloner interface{ cloneValue() any }
+
+        // Slice is part of the example.
+        type Slice[T any] []T
+
+        func (s Slice[T]) cloneValue() any { return s }
+
+        // Table is part of the example.
+        type Table[K comparable] map[K]int
+
+        func (t *Table[K]) cloneValue() any { return t }
+
+        // Clone is part of the example.
+        func Clone(v any) any {
+            if c, ok := v.(cloner); ok {
+                return c.cloneValue()
+            }
+            return v
+        }
   - name: go-used-private-helper
     language: go
     kind: valid

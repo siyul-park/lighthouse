@@ -1,6 +1,7 @@
 package provider_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/siyul-park/lighthouse/plugins/lang-go/provider"
@@ -42,5 +43,32 @@ func TestProviderDeterminism(t *testing.T) {
 			again, _ := indexWith(t, provider.New("lang-go", "test"), root, cache, nil)
 			require.Equal(t, first, again, "run %d", run)
 		}
+	})
+}
+
+func TestProviderGenericImplementations(t *testing.T) {
+	// Slice satisfies cloner by value, Table by pointer, both through a type
+	// assertion; Pair satisfies the exported d.I of another package.
+	files := map[string]string{
+		"go.mod": cacheModule,
+		"d/d.go": "package d\n\ntype I interface {\n\tM() int\n\tN() int\n}\n",
+		"p/p.go": "package p\n\nimport \"example.com/m/d\"\n\n" +
+			"type cloner interface{ cloneValue() any }\n\n" +
+			"type Slice[T any] []T\n\nfunc (s Slice[T]) cloneValue() any { return s }\n\n" +
+			"type Table[K comparable] map[K]int\n\nfunc (t *Table[K]) cloneValue() any { return t }\n\n" +
+			"type Pair[A any] struct{ a A }\n\nfunc (Pair[A]) M() int { return 1 }\n\nfunc (*Pair[A]) N() int { return 2 }\n\n" +
+			"func unused[A any](Pair[A]) {}\n\n" +
+			"func Clone(v any) any {\n\tif c, ok := v.(cloner); ok {\n\t\treturn c.cloneValue()\n\t}\n\treturn v\n}\n\n" +
+			"var _ d.I = &Pair[int]{}\n",
+	}
+
+	t.Run("marks the methods of generic types that satisfy an interface as implementations", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, files)
+
+		got, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
+
+		require.Equal(t, 4, strings.Count(got, `"implementation":true`))
+		require.Contains(t, got, `{"from":{"symbol":"p::Pair#type"},"kind":"implements"`)
 	})
 }

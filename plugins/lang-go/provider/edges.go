@@ -44,7 +44,7 @@ func (u *unit) implementation(d *ast.FuncDecl) bool {
 		return false
 	}
 	named, ok := receiverNamed(recv.Type())
-	if !ok || named.TypeParams().Len() > 0 {
+	if !ok {
 		return false
 	}
 	if overridesPromoted(named, u.pkg.Types, d.Name.Name) {
@@ -265,8 +265,22 @@ func addParameters(info *types.Info, call *ast.CallExpr, add func(types.Type)) {
 	}
 }
 
-// satisfies reports whether the type, or a pointer to it, implements iface.
+// satisfies reports whether the type, or a pointer to it, implements iface. A
+// generic type is tested instantiated with its own type parameters, as
+// staticcheck's unused check does: types.Implements is false for an
+// uninstantiated generic type.
 func satisfies(named *types.Named, iface *types.Interface) bool {
+	if params := named.TypeParams(); params.Len() > 0 && named.TypeArgs().Len() == 0 {
+		args := make([]types.Type, params.Len())
+		for i := range args {
+			args[i] = params.At(i)
+		}
+		inst, err := types.Instantiate(nil, named, args, false)
+		if err != nil {
+			return false
+		}
+		named = inst.(*types.Named)
+	}
 	return types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface)
 }
 

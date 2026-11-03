@@ -388,7 +388,7 @@ func (r *run) implements(units []*unit) {
 	for _, t := range concrete {
 		for _, i := range interfaces {
 			iface := i.obj.Type().Underlying().(*types.Interface)
-			if !types.Implements(t.obj.Type(), iface) && !types.Implements(types.NewPointer(t.obj.Type()), iface) {
+			if !satisfies(t.obj.Type().(*types.Named), iface) {
 				continue
 			}
 			frag := r.fragments[t.unit.rel]
@@ -421,6 +421,8 @@ func (r *run) declaredTypes(units []*unit) (interfaces, concrete []declaredType)
 			switch {
 			case !isInterface:
 				concrete = append(concrete, t)
+			case isGeneric(t.obj):
+				// a generic interface is a constraint family, not a method set to match
 			case iface.NumMethods() > 1 || (iface.NumMethods() == 1 && r.opts.SmallInterfaces):
 				interfaces = append(interfaces, t)
 			}
@@ -429,7 +431,7 @@ func (r *run) declaredTypes(units []*unit) (interfaces, concrete []declaredType)
 	return interfaces, concrete
 }
 
-// typesOf lists the non-generic, non-alias types of u's package that are
+// typesOf lists the non-alias types of u's package that are
 // declared in a unit.
 func (r *run) typesOf(u *unit, byFile map[string]*unit) []declaredType {
 	var out []declaredType
@@ -441,8 +443,8 @@ func (r *run) typesOf(u *unit, byFile map[string]*unit) []declaredType {
 		}
 		rel, ok := r.rel(u.fset.Position(obj.Pos()).Filename)
 		owner := byFile[rel]
-		named, isNamed := obj.Type().(*types.Named)
-		if !ok || owner == nil || !isNamed || named.TypeParams().Len() > 0 {
+		_, isNamed := obj.Type().(*types.Named)
+		if !ok || owner == nil || !isNamed {
 			continue
 		}
 		out = append(out, declaredType{obj, owner})
@@ -685,4 +687,9 @@ func declaredBefore(a, b declaredType) bool {
 		return pa.Offset < pb.Offset
 	}
 	return a.obj.Id() < b.obj.Id()
+}
+
+func isGeneric(obj *types.TypeName) bool {
+	named, ok := obj.Type().(*types.Named)
+	return ok && named.TypeParams().Len() > 0
 }
