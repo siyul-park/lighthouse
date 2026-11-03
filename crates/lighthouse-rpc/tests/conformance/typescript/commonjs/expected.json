@@ -95,7 +95,8 @@
               "line": 19
             }
           },
-          "to": "lib::helper#function"
+          "to": "lib::helper#function",
+          "when": "load"
         },
         {
           "from": {
@@ -149,7 +150,8 @@
               "line": 23
             }
           },
-          "to": "lib::Widget#function"
+          "to": "lib::Widget#function",
+          "when": "load"
         }
       ],
       "file": {
@@ -458,7 +460,8 @@
               "line": 2
             }
           },
-          "to": "lib::twice#function"
+          "to": "lib::twice#function",
+          "when": "load"
         },
         {
           "from": {

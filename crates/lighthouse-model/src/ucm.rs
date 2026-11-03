@@ -11,18 +11,24 @@ mod applicability;
 mod discriminator;
 mod edit;
 mod function;
+mod load_order;
 mod merge;
 mod qualify;
 
 pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
+pub use load_order::{LoadNeed, LoadPoint};
 
 use crate::{Document, Span};
 use merge::{dedup_edges, resolve_all, sites_of, sorted_union};
 
 /// The fact of a file that lists its regions, see [`File::regions`].
 pub const REGIONS: &str = "regions";
+
+/// The fact of a file the host states for a language whose declarations are
+/// evaluated in the order they are written, see [`File::is_ordered`].
+pub const ORDERED: &str = "ordered";
 
 /// The fact of a file the provider read from its source alone, see
 /// [`File::is_syntactic`].
@@ -190,6 +196,13 @@ impl File {
         self.facts
             .get("analysisLanguage")
             .map_or(&self.lang, String::as_str)
+    }
+
+    /// Whether the language of the file evaluates its declarations in the order
+    /// they are written, so that a name must be bound above the code that uses
+    /// it as the module loads. The host states it from the language manifest.
+    pub fn is_ordered(&self) -> bool {
+        self.facts.contains_key(ORDERED)
     }
 
     /// Whether the provider read the file from its source alone, as it does a
@@ -385,6 +398,28 @@ pub struct Edge {
     /// edge per place.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub site: Option<Span>,
+    /// When the use is evaluated, see [`When`].
+    #[serde(default, skip_serializing_if = "When::is_call")]
+    pub when: When,
+}
+
+/// When the use an [`Edge`] states is evaluated.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum When {
+    /// When the code that holds the use runs: the body of a function.
+    #[default]
+    Call,
+    /// As the module loads, in the order the file is written: an initializer,
+    /// a decorator, a class base or the top-level code of a file.
+    Load,
+}
+
+impl When {
+    /// Whether this is the default.
+    pub fn is_call(&self) -> bool {
+        matches!(self, Self::Call)
+    }
 }
 
 /// How reliable an [`Edge`]'s target is.
@@ -480,6 +515,8 @@ struct Index {
     edges_from: BTreeMap<SymbolId, Vec<usize>>,
     /// The types that implement an interface, by resolved `implements` edges.
     implementers: BTreeMap<SymbolId, Vec<SymbolId>>,
+    /// Positions in `edges` of the edges evaluated as a file loads, by file.
+    loads: BTreeMap<PathBuf, Vec<usize>>,
 }
 
 /// One place that refers to a symbol, from an edge with a `site`.
@@ -516,6 +553,7 @@ impl Project {
         let mut index = Index::new(&all);
         index.sites = sites;
         index.origins = origins;
+        index.loads = load_order::index(&all, &index);
         Self {
             all,
             index,

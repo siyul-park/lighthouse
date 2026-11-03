@@ -139,7 +139,8 @@
               "line": 6
             }
           },
-          "to": "src/ns::Shapes::Shape#interface"
+          "to": "src/ns::Shapes::Shape#interface",
+          "when": "load"
         },
         {
           "from": {
@@ -157,7 +158,8 @@
               "line": 7
             }
           },
-          "to": "src/ns::Shapes::Circle::radius#field"
+          "to": "src/ns::Shapes::Circle::radius#field",
+          "when": "load"
         },
         {
           "from": {
@@ -247,7 +249,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Shapes#type"
+          "to": "src/ns::Shapes#type",
+          "when": "load"
         },
         {
           "from": {
@@ -265,7 +268,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Shapes::unit#function"
+          "to": "src/ns::Shapes::unit#function",
+          "when": "load"
         },
         {
           "from": {
@@ -283,7 +287,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Shapes::Circle::area#method"
+          "to": "src/ns::Shapes::Circle::area#method",
+          "when": "load"
         },
         {
           "from": {
@@ -301,7 +306,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Outer#type"
+          "to": "src/ns::Outer#type",
+          "when": "load"
         },
         {
           "from": {
@@ -319,7 +325,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Outer::Inner#type"
+          "to": "src/ns::Outer::Inner#type",
+          "when": "load"
         },
         {
           "from": {
@@ -337,7 +344,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Outer::Inner::depth#const"
+          "to": "src/ns::Outer::Inner::depth#const",
+          "when": "load"
         },
         {
           "from": {
@@ -355,7 +363,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Local#type"
+          "to": "src/ns::Local#type",
+          "when": "load"
         },
         {
           "from": {
@@ -373,7 +382,8 @@
               "line": 27
             }
           },
-          "to": "src/ns::Local::value#const"
+          "to": "src/ns::Local::value#const",
+          "when": "load"
         }
       ],
       "file": {

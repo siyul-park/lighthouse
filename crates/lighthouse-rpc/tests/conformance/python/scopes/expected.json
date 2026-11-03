@@ -197,7 +197,8 @@
               "line": 35
             }
           },
-          "to": "scopes::helper#function"
+          "to": "scopes::helper#function",
+          "when": "load"
         },
         {
           "from": {

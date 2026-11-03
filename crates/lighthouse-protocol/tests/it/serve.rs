@@ -43,7 +43,7 @@ fn replies(output: Vec<u8>) -> Vec<Message> {
 
 fn initialize_params() -> Value {
     json!({
-        "protocolVersion": "0.5",
+        "protocolVersion": "0.6",
         "clientInfo": { "name": "t", "version": "0" },
         "workspaceFolders": [{ "uri": "file:///p/", "name": "p" }],
     })

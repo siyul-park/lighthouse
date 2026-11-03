@@ -30,6 +30,7 @@ fn replace(file: &str, range: std::ops::Range<usize>, text: &str) -> TextEdit {
         file: file.into(),
         range,
         text: text.to_owned(),
+        rank: 0,
     }
 }
 

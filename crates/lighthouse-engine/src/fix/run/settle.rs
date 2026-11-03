@@ -152,6 +152,7 @@ fn restated(file: &Path, base: &str, end: &str, whole: bool) -> Option<TextEdit>
             file: file.to_owned(),
             range: 0..base.len(),
             text: end.to_owned(),
+            rank: 0,
         });
     }
     replace_changed(file, base, end)

@@ -331,7 +331,8 @@
               "line": 44
             }
           },
-          "to": "classes::traced#function"
+          "to": "classes::traced#function",
+          "when": "load"
         },
         {
           "from": {
@@ -457,7 +458,8 @@
               "line": 53
             }
           },
-          "to": "classes::Outer#type"
+          "to": "classes::Outer#type",
+          "when": "load"
         },
         {
           "from": {

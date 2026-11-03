@@ -112,6 +112,7 @@ impl Extractor<'_> {
                 to,
                 resolution,
                 site,
+                when: Default::default(),
             });
         }
     }

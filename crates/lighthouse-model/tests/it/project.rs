@@ -40,6 +40,7 @@ fn call(from: &Symbol, to: &str) -> Edge {
         to: Target::Path(to.to_owned()),
         resolution: Resolution::Syntactic,
         site: None,
+        when: Default::default(),
     }
 }
 
@@ -155,6 +156,7 @@ fn module_paths_and_duplicate_edges_are_handled() {
         to: Target::Path("b".to_owned()),
         resolution: Resolution::Syntactic,
         site: None,
+        when: Default::default(),
     };
     let fragment = |module: &str| Fragment {
         modules: vec![Module {
@@ -190,6 +192,7 @@ fn a_module_edge_remembers_the_file_of_the_first_fragment_that_has_it() {
         to: Target::Path(to.to_owned()),
         resolution: Resolution::Syntactic,
         site: None,
+        when: Default::default(),
     };
     let fragment = |path: &str, edges: Vec<Edge>| Fragment {
         files: vec![File {
@@ -235,6 +238,7 @@ fn an_import_at_several_sites_is_one_edge_with_the_site_of_the_first_file_in_pat
             start: Position { line, col: 1 },
             end: Position { line, col: 9 },
         }),
+        when: Default::default(),
     };
     let fragment = |path: &str, edges: Vec<Edge>| Fragment {
         files: vec![File {
@@ -425,6 +429,7 @@ fn ambiguous_call_targets_prefer_callables_and_other_kinds_stay_unresolved_with_
         to: Target::Path(to.to_owned()),
         resolution: Resolution::Syntactic,
         site: None,
+        when: Default::default(),
     };
     let project = Project::merge([Fragment {
         symbols: vec![caller.clone(), field, method.clone(), var, konst],
@@ -456,6 +461,7 @@ fn references_index_lists_value_uses_not_calls() {
         to: Target::Path(to.id.as_str().to_owned()),
         resolution: Resolution::Syntactic,
         site: None,
+        when: Default::default(),
     };
     let project = Project::merge([Fragment {
         symbols: vec![a.clone(), b.clone(), c.clone()],
@@ -497,6 +503,7 @@ fn heuristic_edges_are_possible_uses_not_calls() {
         to: Target::Path(b.id.as_str().to_owned()),
         resolution: Resolution::Heuristic,
         site: None,
+        when: Default::default(),
     };
     let project = Project::merge([Fragment {
         symbols: vec![a.clone(), b.clone()],
@@ -610,6 +617,7 @@ fn implements(ty: &Symbol, interface: &Symbol) -> Edge {
         to: Target::Resolved(Node::Symbol(interface.id.clone())),
         resolution: Resolution::Semantic,
         site: None,
+        when: Default::default(),
     }
 }
 
@@ -754,6 +762,7 @@ fn code_in_a_host_file_of_examples_is_example_code_in_any_module() {
         to: Target::Path(f.id.as_str().to_owned()),
         resolution: Resolution::Semantic,
         site: None,
+        when: Default::default(),
     };
     let own_call = Edge {
         kind: EdgeKind::Calls,
@@ -761,6 +770,7 @@ fn code_in_a_host_file_of_examples_is_example_code_in_any_module() {
         to: Target::Path(f.id.as_str().to_owned()),
         resolution: Resolution::Semantic,
         site: None,
+        when: Default::default(),
     };
     let project = Project::merge([
         host(&[("regions", "go:example")]),
@@ -789,6 +799,7 @@ fn a_syntactic_edge_to_a_bare_name_reaches_the_one_symbol_of_the_project_so_name
         to: Target::Path(name.to_owned()),
         resolution: Resolution::Syntactic,
         site: None,
+        when: Default::default(),
     };
     let project = Project::merge([Fragment {
         symbols: vec![f.clone(), twin_a, twin_b, user.clone()],

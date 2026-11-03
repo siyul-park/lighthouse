@@ -9,6 +9,7 @@ mod format;
 mod fs;
 mod glob;
 mod graph;
+mod load_order;
 mod model_ref;
 mod project;
 mod resource;

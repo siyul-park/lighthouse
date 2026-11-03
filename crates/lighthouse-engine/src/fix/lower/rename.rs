@@ -116,6 +116,7 @@ impl Lowerer<'_> {
             file: symbol.file.clone(),
             range: start..start + symbol.name.len(),
             text: name.to_owned(),
+            rank: 0,
         });
         let texts = sites
             .iter()
@@ -141,6 +142,7 @@ impl Lowerer<'_> {
                 file: site.file.clone(),
                 range,
                 text: name.to_owned(),
+                rank: 0,
             });
         }
         edits.sort_by(|a, b| (&a.file, a.range.start).cmp(&(&b.file, b.range.start)));

@@ -150,6 +150,7 @@ impl<P: HostParser> Provider for HostProvider<P> {
             fallback: false,
             conventions: Conventions::default(),
             capabilities: vec![SOURCE_AST.to_owned(), OVERLAYS.to_owned()],
+            ordered_declarations: false,
         }]
     }
 

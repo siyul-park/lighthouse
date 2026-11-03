@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::ucm::{Project, SymbolId, Visibility};
+use lighthouse_model::ucm::{LoadPoint, Project, SymbolId, Visibility};
 
 use super::super::propose::Proposal;
 
@@ -52,6 +52,37 @@ pub(super) fn displaced(
         .filter_map(|file| {
             let why = first_change(before, after, file)?;
             Some(((*file).clone(), why))
+        })
+        .collect()
+}
+
+/// The files among `files` whose code, as it loads, needs a name bound below
+/// it after the fix and did not before, with the first such need: a fix of any
+/// kind may put a declaration where the language evaluates it too early.
+pub(super) fn unordered(
+    files: &[PathBuf],
+    (before, after): (&Project, &Project),
+) -> BTreeMap<PathBuf, String> {
+    files
+        .iter()
+        .filter_map(|file| {
+            let was: BTreeSet<_> = before.load_breaks(file).into_iter().collect();
+            let broken = after
+                .load_breaks(file)
+                .into_iter()
+                .find(|need| !was.iter().any(|w| w.key() == need.key()))?;
+            let name = |id: &SymbolId| after.symbol(id).map_or_else(|| id.as_str().to_owned(), |s| s.name.clone());
+            let who = match &broken.user {
+                LoadPoint::Declaration(id) => format!("`{}`", name(id)),
+                LoadPoint::Site(site) => format!("the code of the file on line {}", site.start.line),
+            };
+            Some((
+                file.clone(),
+                format!(
+                    "the fix would break the load order of the file: {who} needs `{}` bound above it as the file loads",
+                    name(&broken.binding)
+                ),
+            ))
         })
         .collect()
 }

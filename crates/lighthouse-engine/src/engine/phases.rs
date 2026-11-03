@@ -3,7 +3,7 @@
 
 use std::sync::OnceLock;
 
-use lighthouse_model::ucm::{Capability, REGIONS};
+use lighthouse_model::ucm::{Capability, ORDERED, REGIONS};
 use lighthouse_plugin::RuleManifest;
 
 use lighthouse_protocol::hash;
@@ -276,6 +276,11 @@ impl Engine {
             match indexed {
                 Ok(mut indexed) => {
                     views.stamp(&mut indexed.fragments, &id);
+                    if provider.manifest().ordered_declarations {
+                        for file in indexed.fragments.iter_mut().flat_map(|f| &mut f.files) {
+                            file.facts.insert(ORDERED.to_owned(), String::new());
+                        }
+                    }
                     parts.extend(indexed.fragments);
                     run.notices.extend(indexed.notices);
                     run.incomplete

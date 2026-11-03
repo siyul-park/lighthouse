@@ -325,7 +325,8 @@
               "line": 47
             }
           },
-          "to": "models::Base#type"
+          "to": "models::Base#type",
+          "when": "load"
         },
         {
           "from": {
@@ -343,7 +344,8 @@
               "line": 58
             }
           },
-          "to": "models::Shape#interface"
+          "to": "models::Shape#interface",
+          "when": "load"
         }
       ],
       "file": {

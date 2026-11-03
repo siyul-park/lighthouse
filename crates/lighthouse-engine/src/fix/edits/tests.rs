@@ -84,3 +84,16 @@ fn a_move_edit_set_that_repeats_or_drops_a_declaration_is_declined() {
         "the reorder would not keep the file's declarations: it drops `fn b() {}` 1 time(s)"
     );
 }
+
+#[test]
+fn inserts_at_one_place_apply_in_the_order_of_their_sources() {
+    let text = "x = 1\ny = 2\n";
+    // The later source is listed first, as the order of the findings may.
+    let later = TextEdit::insert_from(PathBuf::new(), 0, "b\n".to_owned(), 20);
+    let earlier = TextEdit::insert_from(PathBuf::new(), 0, "a\n".to_owned(), 10);
+
+    assert_eq!(
+        apply(text, &[&later, &earlier]).unwrap(),
+        "a\nb\nx = 1\ny = 2\n"
+    );
+}

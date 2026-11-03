@@ -87,7 +87,8 @@
               "line": 15
             }
           },
-          "to": "body::setup#function"
+          "to": "body::setup#function",
+          "when": "load"
         },
         {
           "from": {
@@ -105,7 +106,8 @@
               "line": 18
             }
           },
-          "to": "body::main#function"
+          "to": "body::main#function",
+          "when": "load"
         }
       ],
       "file": {

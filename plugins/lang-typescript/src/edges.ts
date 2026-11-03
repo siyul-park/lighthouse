@@ -5,7 +5,8 @@ import { assignmentTarget } from "./commonjs.ts";
 import type { Lines } from "./extent/lines.ts";
 import type { Model } from "./model.ts";
 import { modulePath, relative, slashed } from "./project/paths.ts";
-import type { EdgeKind, Node, Resolution, Span } from "./sdk/wire.ts";
+import { testCallOf } from "./tests.ts";
+import type { EdgeKind, Node, Resolution, Span, When } from "./sdk/wire.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 
@@ -23,7 +24,7 @@ interface Reference {
 }
 /** Takes the edges a file states. */
 export interface EdgeSink {
-  edge(kind: EdgeKind, from: Node, to: string, site: Span | undefined, resolution: Resolution): void;
+  edge(kind: EdgeKind, from: Node, to: string, site: Span | undefined, resolution: Resolution, when?: When): void;
 }
 
 /** Walks a file once and states what each declaration calls, references, imports and implements. */
@@ -31,6 +32,10 @@ export class Uses {
   private readonly lines: Lines;
   /** Whether the file is a fence: names no declaration binds are the prose's, and stated by name. */
   private readonly fence: boolean;
+  /** How many function bodies and instance initializers enclose the code being read: it runs as the module loads when none does. */
+  private deferred = 0;
+  /** The depth at which a decorator of a parameter is evaluated: where its function is defined, not where it is called. */
+  private readonly definedAt = new Map<ts.Node, number>();
 
   constructor(
     private readonly model: Model,
@@ -45,12 +50,56 @@ export class Uses {
     this.visit(file, { module: this.decls.module });
   }
 
+  /** States a use that is evaluated as the module loads, or only when the code that holds it runs. */
+  private emit(use: { kind: EdgeKind; from: Node; to: string; site: Span; resolution: Resolution }): void {
+    this.sink.edge(use.kind, use.from, use.to, use.site, use.resolution, this.deferred === 0 ? "load" : "call");
+  }
+
   private visit(node: ts.Node, from: Node): void {
+    const level = this.definedAt.get(node);
+    if (level === undefined) {
+      this.visitHere(node, from);
+      return;
+    }
+    const saved = this.deferred;
+    this.deferred = level;
+    this.visitHere(node, from);
+    this.deferred = saved;
+  }
+
+  private visitHere(node: ts.Node, from: Node): void {
     const declared = this.declaredAt(node);
     const here: Node = declared === undefined ? from : { symbol: declared.id };
     if (ts.isConstructorDeclaration(node)) this.parameterProperties(node, here);
+    if (runsLater(node)) {
+      this.later(node, here);
+      return;
+    }
     if (this.visitModuleItem(node, here) || this.visitCall(node, here) || this.visitName(node, here)) return;
     ts.forEachChild(node, (child) => this.visit(child, here));
+  }
+
+  /**
+   * Code that runs when called, or when an object is made: what is evaluated where it is defined (decorators,
+   * a computed name) is read as the code around it, the rest is read as running later.
+   */
+  private later(node: ts.Node, here: Node): void {
+    const early = new Set<ts.Node>();
+    const decorated = (n: ts.Node): readonly ts.Decorator[] =>
+      ts.canHaveDecorators(n) ? (ts.getDecorators(n) ?? []) : [];
+    for (const decorator of decorated(node)) early.add(decorator);
+    for (const parameter of (node as ts.SignatureDeclaration).parameters ?? [])
+      for (const decorator of decorated(parameter)) this.definedAt.set(decorator, this.deferred);
+    const name = (node as ts.NamedDeclaration).name;
+    if (name !== undefined && ts.isComputedPropertyName(name)) early.add(name);
+    ts.forEachChild(node, (child) => {
+      if (early.has(child)) this.visit(child, here);
+    });
+    this.deferred++;
+    ts.forEachChild(node, (child) => {
+      if (!early.has(child)) this.visit(child, here);
+    });
+    this.deferred--;
   }
 
   /** Imports, exports and the assignments that declare: true when the node is one and has been read. */
@@ -93,7 +142,8 @@ export class Uses {
   private parameterProperties(node: ts.ConstructorDeclaration, from: Node): void {
     for (const parameter of node.parameters) {
       const field = this.decls.of(parameter);
-      if (field !== undefined) this.sink.edge("references", from, field.id, this.spanOf(parameter), "semantic");
+      if (field !== undefined)
+        this.emit({ kind: "references", from, to: field.id, site: this.spanOf(parameter), resolution: "semantic" });
     }
   }
 
@@ -258,7 +308,7 @@ export class Uses {
         const symbol = this.model.checker.getSymbolAtLocation(name);
         const decl = this.model.declsOfSymbol(symbol)[0];
         if (decl !== undefined) {
-          this.sink.edge("implements", from, decl.id, this.spanOf(name), "semantic");
+          this.emit({ kind: "implements", from, to: decl.id, site: this.spanOf(name), resolution: "semantic" });
         } else this.use({ name: name, from, call: false });
       } else this.visit(type.expression, from);
       this.visitAll(type.typeArguments, from);
@@ -296,7 +346,13 @@ export class Uses {
     if (found.length > 0) {
       this.add(call ? "calls" : "references", found, at);
     } else if (this.model.declsNamed(textOf(name)).length > 0 && this.unknownTarget(symbol, at)) {
-      this.sink.edge(call ? "calls" : "references", from, textOf(name), this.spanOf(name), "syntactic");
+      this.emit({
+        kind: call ? "calls" : "references",
+        from,
+        to: textOf(name),
+        site: this.spanOf(name),
+        resolution: "syntactic",
+      });
       this.mayName(name, from);
     }
   }
@@ -305,7 +361,8 @@ export class Uses {
   private mayName(name: ts.Node, from: Node): void {
     const candidates = this.model.declsNamed(textOf(name)).filter((d) => d.kind === "function" || d.kind === "method");
     if (candidates.length === 0 || candidates.length > MAX_CANDIDATES) return;
-    for (const decl of candidates) this.sink.edge("references", from, decl.id, this.spanOf(name), "heuristic");
+    for (const decl of candidates)
+      this.emit({ kind: "references", from, to: decl.id, site: this.spanOf(name), resolution: "heuristic" });
   }
 
   /** Whether a name resolves nowhere because of an unresolved import or a receiver of type `any`. */
@@ -326,18 +383,35 @@ export class Uses {
     const decl = found[0];
     if (decl === undefined) return;
     const callable = decl.kind === "function" || decl.kind === "method";
-    this.sink.edge(
-      kind === "calls" && callable ? "calls" : "references",
-      at.from,
-      decl.id,
-      this.spanOf(at.name),
-      "semantic",
-    );
+    this.emit({
+      kind: kind === "calls" && callable ? "calls" : "references",
+      from: at.from,
+      to: decl.id,
+      site: this.spanOf(at.name),
+      resolution: "semantic",
+    });
   }
 
   private spanOf(node: ts.Node): Span {
     return this.lines.span(node.getStart(this.decls.file), node.end);
   }
+}
+
+/**
+ * Whether the code of a node runs only when it is called or an object is made: a function that is not called where
+ * it is written, and the initializer of an instance property. The callback of a test suite, and a function called
+ * where it is written, run as the module loads.
+ */
+function runsLater(node: ts.Node): boolean {
+  if (ts.isPropertyDeclaration(node)) return (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Static) === 0;
+  if (!ts.isFunctionLike(node) || ts.isClassStaticBlockDeclaration(node)) return false;
+  if (!ts.isArrowFunction(node) && !ts.isFunctionExpression(node)) return true;
+  let at: ts.Node = node;
+  while (at.parent !== undefined && ts.isParenthesizedExpression(at.parent)) at = at.parent;
+  const parent = at.parent;
+  if (parent === undefined || !ts.isCallExpression(parent)) return true;
+  if (parent.expression === at) return false;
+  return testCallOf(parent)?.suite !== true;
 }
 
 function textOf(node: ts.Node): string {

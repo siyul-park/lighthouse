@@ -15,7 +15,7 @@ use std::{
 use crate::metrics::{MEASURES, Measures, propagation::System};
 use lighthouse_model::{
     Position, Span,
-    ucm::{Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility},
+    ucm::{Comment, FunctionSummary, LoadNeed, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
 use lighthouse_plugin::{Annotations, Context, Error, Workspace};
 use serde_json::{Map, Value, json};
@@ -64,6 +64,8 @@ pub(crate) struct Builder<'a> {
     annotations: Arc<Annotations>,
     declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
     related: RefCell<BTreeMap<SymbolId, Value>>,
+    /// What each file needs of its own declarations as it loads, found once.
+    loads: RefCell<BTreeMap<PathBuf, Rc<Vec<LoadNeed>>>>,
     related_needs: Needs,
 }
 
@@ -93,6 +95,7 @@ impl<'a> Builder<'a> {
             annotations: ctx.memo.slot(),
             declared: RefCell::default(),
             related: RefCell::default(),
+            loads: RefCell::default(),
             related_needs: needs.of_related(),
         })
     }
@@ -117,6 +120,7 @@ impl<'a> Builder<'a> {
             annotations: Arc::default(),
             declared: RefCell::default(),
             related: RefCell::default(),
+            loads: RefCell::default(),
             related_needs: needs.of_related(),
         }
     }

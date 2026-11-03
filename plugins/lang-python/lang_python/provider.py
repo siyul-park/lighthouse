@@ -42,6 +42,7 @@ def language() -> LanguageManifest:
             "test_naming": {"prefix": "test_", "snake_case": True, "variants": False, "ancestors": False},
         },
         "capabilities": CAPABILITIES,
+        "ordered_declarations": True,
     }
 
 

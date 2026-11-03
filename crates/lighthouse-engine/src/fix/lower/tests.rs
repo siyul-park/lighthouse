@@ -12,6 +12,7 @@ use crate::fix::edits::apply;
 
 mod deletes;
 mod guards;
+mod load_order;
 mod moves;
 mod rename;
 mod reorder;

@@ -25,6 +25,7 @@ use tempfile::TempDir;
 pub fn toy() -> LanguageManifest {
     LanguageManifest {
         capabilities: vec![lighthouse_model::ucm::Capability::Overlays],
+        ordered_declarations: true,
         ..LanguageManifest::new("toy", vec!["**/*.toy".to_owned()])
     }
 }
@@ -69,7 +70,8 @@ impl LanguageProvider for Toy {
                     })
                 })
                 .collect();
-            // `call name` refers to the symbol `name` from the function above it.
+            // `call name` refers to the symbol `name` from the function above it;
+            // `load name` does too, as the file loads.
             let mut edges = Vec::new();
             let mut current = None;
             for (n, line) in source.text.lines().enumerate() {
@@ -79,8 +81,10 @@ impl LanguageProvider for Toy {
                 {
                     current = Some(SymbolId::new("m", &[], name, SymbolKind::Function));
                 }
+                let loads = line.starts_with("load ");
                 let target = line
                     .strip_prefix("call ")
+                    .or_else(|| line.strip_prefix("load "))
                     .and_then(|l| l.split_whitespace().next());
                 if let (Some(from), Some(name)) = (&current, target) {
                     let at = |col: usize| Position {
@@ -88,7 +92,11 @@ impl LanguageProvider for Toy {
                         col: u32::try_from(col + 1).unwrap(),
                     };
                     edges.push(Edge {
-                        kind: EdgeKind::Calls,
+                        kind: if loads {
+                            EdgeKind::References
+                        } else {
+                            EdgeKind::Calls
+                        },
                         from: Node::Symbol(from.clone()),
                         to: Target::Resolved(Node::Symbol(SymbolId::new(
                             "m",
@@ -101,6 +109,11 @@ impl LanguageProvider for Toy {
                             start: at(0),
                             end: at(line.len()),
                         }),
+                        when: if loads {
+                            lighthouse_model::ucm::When::Load
+                        } else {
+                            Default::default()
+                        },
                     });
                 }
             }

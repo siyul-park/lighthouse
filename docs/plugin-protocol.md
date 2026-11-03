@@ -1,10 +1,10 @@
-# Plugin protocol 0.5
+# Plugin protocol 0.6
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.5.json`](../protocol/schema/lighthouse-protocol-0.5.json),
+[`protocol/schema/lighthouse-protocol-0.6.json`](../protocol/schema/lighthouse-protocol-0.6.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,7 +27,7 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.5"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.6"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
@@ -36,7 +36,7 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them remains valid in 0.5, and hosts ignore what they do not
+sends none of them remains valid in 0.6, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -116,8 +116,8 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   has Go's convention. A project replaces any part in
   `[languages.<id>] testNaming = { prefix, snakeCase, variants, ancestors }`.
 - Each entry of `capabilities.languages` is the language's **language manifest**
-  (`LanguageManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `ignores`, `priority`, `fallback`, `conventions` and
-  `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field
+  (`LanguageManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `ignores`, `priority`, `fallback`, `conventions`, `capabilities` and
+  `ordered_declarations`. It is what the host's `LanguageProvider::manifest()` returns, field
   for field; the plugin's own identity (`serverInfo`) is the plugin manifest.
 - The `capabilities` of a language list what its provider guarantees. `semantic-edges`: `calls`,
   `references`, `implements` and `accesses-private` edges are resolved by the
@@ -142,6 +142,10 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   `semantic-edges` is syntactic: its edges come from names (and, where marked,
   guesses), which makes its caller and reference sets lower bounds; no separate
   capability announces that.
+- `ordered_declarations` (default false) says the language evaluates the declarations of a
+  file in the order they are written (Python, JavaScript, TypeScript; Go and Rust have
+  order-free package scope). The host then never moves a declaration above a binding that
+  code needs as the file loads (see `when` of an edge), and rejects a fix that does.
 
 ### Common source selection (protocol 0.5)
 
@@ -387,7 +391,7 @@ The host treats failures as follows, always turning them into
 
 ### Edges
 
-`{ kind, from, to, resolution, site? }`. `from` is `{ "module": path }` or
+`{ kind, from, to, resolution, site?, when? }`. `from` is `{ "module": path }` or
 `{ "symbol": id }`. `to` is a string: a module path, a full symbol id, or a
 kind-less id (`module::owner::name`) which the host resolves when it names
 exactly one symbol (for `calls`, exactly one function or method). Providers
@@ -411,6 +415,14 @@ several places is one edge per place, and the host keeps one edge with every sit
 provider reports sites for the edges it emits from function bodies and for `imports`
 edges, where the site is the import as written (a Go import spec, a Rust `use` item);
 `contains` edges have none.
+
+`when` (optional, `call` by default) says when the use is evaluated: `load` when it runs as
+the module executes (the initializer of a variable or a static or class field, a decorator, a
+class base, a Python default argument, a Python class body, a top-level statement, the callback
+of a test suite that runs at load), `call` when it runs only if the code that holds it is
+called (a function body, a test body). The host closes `load` uses over the functions they
+call. A provider of a language with `ordered_declarations` reports it on every `calls`,
+`references` and `implements` edge it can.
 
 `resolution` is `semantic` when the target comes from type information,
 `syntactic` when it comes from names alone, and `heuristic` for a guess: the

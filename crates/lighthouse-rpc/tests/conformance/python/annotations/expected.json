@@ -123,7 +123,8 @@
               "line": 8
             }
           },
-          "to": "annotations::Node#type"
+          "to": "annotations::Node#type",
+          "when": "load"
         },
         {
           "from": {

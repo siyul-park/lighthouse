@@ -11,6 +11,7 @@ mod fix_blame;
 mod fix_incomplete;
 mod fix_judge;
 mod fix_kept;
+mod fix_load_order;
 mod fix_safety;
 mod fix_write;
 mod generated;

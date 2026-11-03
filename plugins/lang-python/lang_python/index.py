@@ -30,6 +30,13 @@ from lang_python.sdk.wire import (
 )
 
 
+def _edge_of(kind: EdgeKind, source: Node, to: str, site: Span | None, resolution: Resolution) -> Edge:
+    edge: Edge = {"kind": kind, "from": source, "to": to, "resolution": resolution}
+    if site is not None:
+        edge["site"] = site
+    return edge
+
+
 @dataclass
 class Indexed:
     """What indexing a file gave: its fragment and how many of its imports and names could not be resolved."""
@@ -61,17 +68,23 @@ class Unit:
 
     def edge(self, kind: EdgeKind, source: Node, to: str, site: Span | None, resolution: Resolution) -> None:
         """Records an edge once, however often it is stated; a call or reference also says what its source touches."""
-        owner = source.get("symbol") or source.get("module") or ""
-        key = json.dumps([kind, owner, to, site])
+        self._keep(_edge_of(kind, source, to, site, resolution))
+
+    def load_edge(self, kind: EdgeKind, source: Node, to: str, site: Span | None, resolution: Resolution) -> None:
+        """The same for a use that is evaluated as the module loads."""
+        edge = _edge_of(kind, source, to, site, resolution)
+        edge["when"] = "load"
+        self._keep(edge)
+
+    def _keep(self, edge: Edge) -> None:
+        key = json.dumps([edge["kind"], edge["from"], edge["to"], edge.get("site"), edge.get("when")], sort_keys=True)
         if key in self.seen:
             return
         self.seen.add(key)
-        edge: Edge = {"kind": kind, "from": source, "to": to, "resolution": resolution}
-        if site is not None:
-            edge["site"] = site
         self.edges.append(edge)
-        if kind in ("calls", "references") and "symbol" in source:
-            self.targets.setdefault(source["symbol"], {})[to] = None
+        source = edge["from"]
+        if edge["kind"] in ("calls", "references") and "symbol" in source:
+            self.targets.setdefault(source["symbol"], {})[edge["to"]] = None
 
     def index(self) -> Indexed:
         """The fragment of the file, with the count of imports that resolved nowhere and whether names were guessed."""

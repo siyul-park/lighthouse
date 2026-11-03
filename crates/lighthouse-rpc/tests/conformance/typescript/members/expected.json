@@ -179,7 +179,8 @@
               "line": 14
             }
           },
-          "to": "src/m::Mode#type"
+          "to": "src/m::Mode#type",
+          "when": "load"
         },
         {
           "from": {
@@ -197,7 +198,8 @@
               "line": 21
             }
           },
-          "to": "src/m::Options#type"
+          "to": "src/m::Options#type",
+          "when": "load"
         },
         {
           "from": {
@@ -215,7 +217,8 @@
               "line": 21
             }
           },
-          "to": "src/m::Mode#type"
+          "to": "src/m::Mode#type",
+          "when": "load"
         },
         {
           "from": {
@@ -233,7 +236,8 @@
               "line": 21
             }
           },
-          "to": "src/m::Mode::Read#variant"
+          "to": "src/m::Mode::Read#variant",
+          "when": "load"
         },
         {
           "from": {
@@ -251,7 +255,8 @@
               "line": 26
             }
           },
-          "to": "src/m::Box::value#field"
+          "to": "src/m::Box::value#field",
+          "when": "load"
         },
         {
           "from": {

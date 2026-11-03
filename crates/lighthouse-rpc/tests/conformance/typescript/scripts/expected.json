@@ -392,7 +392,8 @@
               "line": 5
             }
           },
-          "to": "lib::lib#function"
+          "to": "lib::lib#function",
+          "when": "load"
         }
       ],
       "file": {
@@ -504,7 +505,8 @@
               "line": 15
             }
           },
-          "to": "run::usedAtLoad#function"
+          "to": "run::usedAtLoad#function",
+          "when": "load"
         }
       ],
       "file": {

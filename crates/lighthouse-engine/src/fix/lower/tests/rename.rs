@@ -12,6 +12,7 @@ fn reference(from: &str, to: &str, site: Option<Span>, resolution: Resolution) -
         to: Target::Path(format!("m::{to}")),
         resolution,
         site,
+        when: Default::default(),
     }
 }
 

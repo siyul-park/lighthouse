@@ -17,6 +17,11 @@ pub(crate) struct TextEdit {
     pub file: PathBuf,
     pub range: Range<usize>,
     pub text: String,
+    /// Where in the file the text came from, for inserts at one place: they
+    /// are applied in the order of their sources, however the edits were
+    /// listed. Zero when it says nothing.
+    #[serde(default)]
+    pub rank: usize,
 }
 
 impl TextEdit {
@@ -25,6 +30,7 @@ impl TextEdit {
             file,
             range,
             text: String::new(),
+            rank: 0,
         }
     }
 
@@ -33,6 +39,15 @@ impl TextEdit {
             file,
             range: at..at,
             text,
+            rank: 0,
+        }
+    }
+
+    /// An insert of text that came from `rank` in the file, see [`TextEdit::rank`].
+    pub(crate) fn insert_from(file: PathBuf, at: usize, text: String, rank: usize) -> Self {
+        Self {
+            rank,
+            ..Self::insert(file, at, text)
         }
     }
 }
@@ -78,6 +93,7 @@ pub(crate) fn replace_changed(file: &Path, old: &str, new: &str) -> Option<TextE
         file: file.to_owned(),
         range: start..end,
         text: new[from..to].to_owned(),
+        rank: 0,
     })
 }
 
@@ -92,12 +108,12 @@ pub(crate) fn overlap(a: &Range<usize>, b: &Range<usize>) -> bool {
     }
 }
 
-/// Applies edits of one file to its text. Edits at the same offset apply in
-/// the order given. Ranges that are out of bounds, inside a character, or
+/// Applies edits of one file to its text. Edits at the same offset apply by their
+/// `rank`, then in the order given. Ranges that are out of bounds, inside a character, or
 /// that overlap are an error: nothing here panics.
 pub(crate) fn apply(text: &str, edits: &[&TextEdit]) -> Result<String, String> {
     let mut order: Vec<(usize, &&TextEdit)> = edits.iter().enumerate().collect();
-    order.sort_by_key(|(n, e)| (e.range.start, e.range.end, *n));
+    order.sort_by_key(|(n, e)| (e.range.start, e.range.end, e.rank, *n));
     let mut out = String::with_capacity(text.len());
     let mut at = 0;
     for (_, edit) in order {

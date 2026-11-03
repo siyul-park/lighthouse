@@ -2,7 +2,7 @@ import type { Readable, Writable } from "node:stream";
 import { StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
 import type { IndexParams, IndexResult, InitializeParams, InitializeResult, LanguageManifest } from "./wire.ts";
 
-export const PROTOCOL_VERSION = "0.5";
+export const PROTOCOL_VERSION = "0.6";
 
 const PARSE_ERROR = -32700;
 

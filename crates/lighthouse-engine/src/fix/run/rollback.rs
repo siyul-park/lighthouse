@@ -21,7 +21,7 @@ use super::{
     super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator, Standing,
     blame::Blame,
-    displaced::{displaced, moved_files},
+    displaced::{displaced, moved_files, unordered},
     settle::{Joined, fold},
 };
 use crate::{Error, Run};
@@ -79,7 +79,12 @@ impl Orchestrator<'_> {
         // The index of the changed texts says what the moves did to their
         // files' symbols, before the safe fixes that follow touch them.
         let displaced = after.as_ref().map_or_else(BTreeMap::new, |run| {
-            displaced(&moved_files(&kept), (&before.project, &run.project))
+            let projects = (&before.project, &run.project);
+            let mut found = displaced(&moved_files(&kept), projects);
+            for (file, why) in unordered(&changed, projects) {
+                found.entry(file).or_insert(why);
+            }
+            found
         });
         let after = match after {
             Some(run) => {

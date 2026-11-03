@@ -327,6 +327,10 @@
         "to": {
           "description": "A module path, a symbol id, or a kind-less symbol id\n(`module::owner::name`) that names exactly one symbol.",
           "type": "string"
+        },
+        "when": {
+          "$ref": "#/$defs/When",
+          "description": "When the use is evaluated: `call` (the default) when the code that\nholds it runs, `load` when it runs as the module executes, as the\ninitializer of a variable or a class field, a decorator, a class base\nor a default argument (Python), or the top-level code of the file. A\n`load` use of a name needs the name bound above it (languages that\ndeclare `ordered_declarations`)."
         }
       },
       "required": [
@@ -1270,6 +1274,10 @@
           },
           "type": "array"
         },
+        "ordered_declarations": {
+          "description": "The language evaluates a file's declarations in the order they are\nwritten (Python, JavaScript, TypeScript): a name must be bound above\nthe code that uses it as the module loads. The host then keeps the\nedges whose `when` is `load` in order when it moves declarations;\nlanguages with order-free package scope (Go, Rust) leave it unset.",
+          "type": "boolean"
+        },
         "priority": {
           "default": 0,
           "description": "Among providers matching a file, the higher priority wins.",
@@ -2046,6 +2054,21 @@
         "internal"
       ],
       "type": "string"
+    },
+    "When": {
+      "description": "When an edge's use is evaluated.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "When the code that holds the use runs: the body of a function.",
+          "type": "string"
+        },
+        {
+          "const": "load",
+          "description": "As the module loads, in the order the file is written.",
+          "type": "string"
+        }
+      ]
     },
     "WorkspaceFolder": {
       "description": "A root of the workspace, as in LSP.",

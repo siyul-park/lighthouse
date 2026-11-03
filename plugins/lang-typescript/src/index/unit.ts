@@ -23,6 +23,7 @@ import type {
   Span,
   Symbol as Sym,
   TestCase,
+  When,
 } from "../sdk/wire.ts";
 
 /** What indexing a file gave: its fragment and how many of its imports resolve nowhere. */
@@ -64,12 +65,19 @@ export class Unit implements EdgeSink {
     this.test = isTestFile(rel);
   }
 
-  edge(kind: EdgeKind, from: Node, to: string, site: Span | undefined, resolution: Resolution): void {
+  edge(kind: EdgeKind, from: Node, to: string, site: Span | undefined, resolution: Resolution, when?: When): void {
     const owner = "symbol" in from ? from.symbol : from.module;
-    const key = `${kind}\0${owner}\0${to}\0${site === undefined ? "" : JSON.stringify(site)}`;
+    const key = `${kind}\0${owner}\0${to}\0${site === undefined ? "" : JSON.stringify(site)}\0${when ?? ""}`;
     if (this.seen.has(key)) return;
     this.seen.add(key);
-    this.edges.push({ kind, from, to, resolution, ...(site === undefined ? {} : { site }) });
+    this.edges.push({
+      kind,
+      from,
+      to,
+      resolution,
+      ...(site === undefined ? {} : { site }),
+      ...(when === "load" ? { when } : {}),
+    });
     if (kind === "imports" && resolution === "syntactic" && !to.startsWith("node:")) this.unresolved++;
     if (kind === "calls" || kind === "references") {
       const set = this.targets.get(owner) ?? new Set<string>();

@@ -106,7 +106,8 @@
               "line": 7
             }
           },
-          "to": "src/legacy::Legacy#type"
+          "to": "src/legacy::Legacy#type",
+          "when": "load"
         }
       ],
       "file": {

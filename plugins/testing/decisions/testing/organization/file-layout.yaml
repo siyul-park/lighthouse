@@ -69,19 +69,31 @@ spec:
         expression: >-
           s.kind == 'type' || s.kind == 'interface' ? 0
             : s.kind == 'const' ? 1 : s.kind == 'var' ? 2 : 3
+      # The fixture is put before the first declaration of a later group, or
+      # the first test; below the declarations it needs as the file loads.
+      - name: floor
+        expression: "size(symbol.load_after) > 0 ? symbol.load_after[size(symbol.load_after) - 1].pos : 0"
       - name: anchor
         expression: >-
-          cel.bind(c, file.symbols.filter(d, d.id != symbol.id
+          cel.bind(c, file.symbols.filter(d, d.id != symbol.id && d.pos > floor
               && (d.kind == 'test' || d.declaration && group_rank(d) > group_rank(symbol))).sortBy(d, d.pos),
             size(c) > 0 ? c[0] : first)
       - name: user
         expression: >-
           cel.bind(c, (symbol.callers + symbol.references).filter(u, u.file == symbol.file && u.pos > symbol.pos),
             size(c) > 0 ? c.sortBy(u, u.pos)[0] : {})
+      # Python, JavaScript and TypeScript evaluate a file in the order it is
+      # written: `load_after` are the declarations a declaration needs bound
+      # above it as the file loads, `load_before` the code that needs it bound
+      # above that. A move that breaks one is not asked for.
       - name: misplaced_fixture
-        expression: symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
+        expression: >-
+          symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
+            && symbol.load_after.all(b, b.pos < first.pos)
       - name: misplaced_helper
-        expression: symbol.test_role == 'test-helper' && size(user) > 0
+        expression: >-
+          symbol.test_role == 'test-helper' && size(user) > 0
+            && symbol.load_before.all(x, x.pos > user.pos)
       - name: owner_tests
         expression: "tests.filter(t, has(t.owned) && t.owned != null && t.owned.file != '')"
       - name: homes
@@ -97,7 +109,9 @@ spec:
       - name: at_index
         expression: "comparable.map(t, t.id).indexOf(symbol.id)"
       - name: misplaced_order
-        expression: "symbol.kind == 'test' && at_index >= 0 && at_index in out_of_order"
+        expression: >-
+          symbol.kind == 'test' && at_index >= 0 && at_index in out_of_order
+            && comparable.all(t, size(t.load_after) == 0)
       - name: mine
         expression: "misplaced_order ? comparable.filter(u, u.id == symbol.id)[0] : {}"
       - name: above
@@ -480,3 +494,154 @@ spec:
 
           def test_get_is_one(store: Store) -> None:
               assert store.get() == 1
+    - name: typescript-helper-that-a-suite-uses-as-it-loads-stays-above
+      language: typescript
+      kind: valid
+      files:
+      - path: store.ts
+        body: |-
+          /** Part of the example. */
+          export function get(): number {
+            return 1;
+          }
+      - path: store.test.ts
+        body: |-
+          import { describe, expect, it } from "vitest";
+          import { get } from "./store";
+
+          const want = 1;
+
+          const check = (value: number): void => {
+            expect(value).toBe(want);
+          };
+
+          describe("get", () => {
+            check(get());
+            it("returns the wanted value", () => {
+              expect(get()).toBe(want);
+            });
+          });
+    - name: typescript-fixtures-keep-the-order-their-initializers-need
+      language: typescript
+      kind: invalid
+      fixed:
+      - path: store.test.ts
+        body: |-
+          import { expect, it } from "vitest";
+          import { get } from "./store";
+
+          const base = 1;
+
+          const want = base + 1;
+
+          it("returns the wanted value", () => {
+            expect(get()).toBe(want);
+          });
+      files:
+      - path: store.ts
+        body: |-
+          /** Part of the example. */
+          export function get(): number {
+            return 2;
+          }
+      - path: store.test.ts
+        body: |-
+          import { expect, it } from "vitest";
+          import { get } from "./store";
+
+          it("returns the wanted value", () => {
+            expect(get()).toBe(want);
+          });
+
+          const base = 1;
+          const want = base + 1;
+      expect:
+      - line: 8
+    - name: python-fixtures-keep-the-order-their-values-need
+      language: python
+      kind: invalid
+      fixed:
+      - path: test_limits.py
+        body: |-
+          _BASE = 2
+
+
+          MAX = _BASE * 2
+
+
+          def test_max() -> None:
+              assert MAX == 4
+      files:
+      - path: test_limits.py
+        body: |-
+          def test_max() -> None:
+              assert MAX == 4
+
+
+          _BASE = 2
+          MAX = _BASE * 2
+      expect:
+      - line: 5
+    - name: python-fixtures-keep-the-order-their-decorators-and-bases-need
+      language: python
+      kind: invalid
+      fixed:
+      - path: test_rows.py
+        body: |-
+          LIMIT = 4
+
+
+          def register(limit: int):
+              def wrap(function):
+                  return function
+
+              return wrap
+
+
+          class Base:
+              pass
+
+
+          class Row(Base):
+              pass
+
+
+          @register(LIMIT)
+          def make(size: int = LIMIT) -> int:
+              return size
+
+
+          def test_make() -> None:
+              assert make() == 4
+      files:
+      - path: test_rows.py
+        body: |-
+          def test_make() -> None:
+              assert make() == 4
+
+
+          LIMIT = 4
+
+
+          def register(limit: int):
+              def wrap(function):
+                  return function
+
+              return wrap
+
+
+          @register(LIMIT)
+          def make(size: int = LIMIT) -> int:
+              return size
+
+
+          class Base:
+              pass
+
+
+          class Row(Base):
+              pass
+      expect:
+      - line: 5
+      - line: 8
+      - line: 20

@@ -147,7 +147,8 @@
               "line": 4
             }
           },
-          "to": "src/sig::Config#interface"
+          "to": "src/sig::Config#interface",
+          "when": "load"
         },
         {
           "from": {
@@ -165,7 +166,8 @@
               "line": 5
             }
           },
-          "to": "src/sig::Config#interface"
+          "to": "src/sig::Config#interface",
+          "when": "load"
         },
         {
           "from": {
@@ -183,7 +185,8 @@
               "line": 11
             }
           },
-          "to": "src/sig::Service::config#field"
+          "to": "src/sig::Service::config#field",
+          "when": "load"
         },
         {
           "from": {

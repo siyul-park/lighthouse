@@ -2,7 +2,8 @@
 
 import ast
 import builtins
-from typing import Any, Callable, Protocol
+import contextlib
+from typing import Any, Callable, Iterator, Protocol
 
 from lang_python.symbols import FUNCTION_NODES, Decl, bound_names
 from lang_python.project import Model, ParsedFile
@@ -18,7 +19,7 @@ from lang_python.project import (
     static_all,
 )
 from lang_python.project import COMPREHENSIONS, Scope
-from lang_python.sdk.wire import EdgeKind, Node, Resolution, Span
+from lang_python.sdk.wire import EdgeKind, Node, Resolution, Span, When
 
 MAX_CANDIDATES = 8
 CALLABLE = ("function", "method", "test")
@@ -37,8 +38,20 @@ def _literal_prefix(expr: ast.expr) -> str:
     return ""
 
 
+def _defers_annotations(tree: ast.Module) -> bool:
+    """Whether the module turns on `from __future__ import annotations`."""
+    return any(
+        isinstance(stmt, ast.ImportFrom)
+        and stmt.module == "__future__"
+        and any(alias.name == "annotations" for alias in stmt.names)
+        for stmt in tree.body
+    )
+
+
 class _EdgeSink(Protocol):
     def edge(self, kind: EdgeKind, source: Node, to: str, site: Span | None, resolution: Resolution) -> None: ...
+
+    def load_edge(self, kind: EdgeKind, source: Node, to: str, site: Span | None, resolution: Resolution) -> None: ...
 
 
 class Uses:
@@ -56,6 +69,11 @@ class Uses:
         self.scopes: dict[int, Scope] = {}
         self.unresolved_imports = 0
         self.guessed = False
+        # When the code being read runs: as the module loads at its top level, in a class body and in the
+        # decorators, bases and default arguments of a definition; only when called inside a function body.
+        self.when: When = "load"
+        # Annotations are not evaluated as the module loads when `from __future__ import annotations` is on.
+        self.deferred_annotations = _defers_annotations(parsed.tree)
         self._handlers: tuple[tuple[type | tuple[type, ...], Callable[[Any, Scope, Node], None]], ...] = (
             (FUNCTION_NODES, self._function),
             (ast.ClassDef, self._klass),
@@ -94,6 +112,20 @@ class Uses:
         else:
             self._children(node, scope, owner)
 
+    @contextlib.contextmanager
+    def _running(self, when: When) -> Iterator[None]:
+        saved, self.when = self.when, when
+        try:
+            yield
+        finally:
+            self.when = saved
+
+    def _edge(self, kind: EdgeKind, source: Node, to: str, site: Span | None, resolution: Resolution) -> None:
+        if self.when == "load":
+            self.sink.load_edge(kind, source, to, site, resolution)
+        else:
+            self.sink.edge(kind, source, to, site, resolution)
+
     def _children(self, node: ast.AST, scope: Scope, owner: Node) -> None:
         for child in ast.iter_child_nodes(node):
             self._visit(child, scope, owner)
@@ -116,8 +148,9 @@ class Uses:
             self._annotation(node.returns, scope, here)
         inner = self.parsed.scopes().enter(node, scope)
         self.scopes[id(node)] = inner
-        for stmt in node.body:
-            self._visit(stmt, inner, here)
+        with self._running("call"):
+            for stmt in node.body:
+                self._visit(stmt, inner, here)
 
     def _lambda_(self, node: ast.Lambda, scope: Scope, owner: Node) -> None:
         args = node.args
@@ -125,7 +158,8 @@ class Uses:
             self._visit(default, scope, owner)
         inner = self.parsed.scopes().enter(node, scope)
         self.scopes[id(node)] = inner
-        self._visit(node.body, inner, owner)
+        with self._running("call"):
+            self._visit(node.body, inner, owner)
 
     def _comprehension(self, node: ast.AST, scope: Scope, owner: Node) -> None:
         generators = node.generators  # type: ignore[attr-defined]
@@ -204,7 +238,7 @@ class Uses:
         if isinstance(value, DeclVal) and value.decl.kind in TYPES:
             self._walk_names(inner, scope, owner)
             kind: EdgeKind = "implements" if self._is_contract(value.decl) else "references"
-            self.sink.edge(kind, owner, value.decl.id, self._name_span(inner), "semantic")
+            self._edge(kind, owner, value.decl.id, self._name_span(inner), "semantic")
             if isinstance(base, ast.Subscript):
                 self._visit(base.slice, scope, owner)
             return
@@ -392,21 +426,27 @@ class Uses:
         if call and decl.kind in TYPES:
             constructor = self.resolver.member(decl, "__init__")
             if constructor is not None:
-                self.sink.edge("calls", owner, constructor.id, site, resolution)
+                self._edge("calls", owner, constructor.id, site, resolution)
                 return
         kind: EdgeKind = "calls" if call and decl.kind in CALLABLE else "references"
         if kind == "references" and source == decl.id:
             return
-        self.sink.edge(kind, owner, decl.id, site, resolution)
+        self._edge(kind, owner, decl.id, site, resolution)
 
     # annotations
 
     def _annotation(self, expr: ast.expr, scope: Scope, owner: Node) -> None:
-        """A type annotation: its names are uses; a quoted one is read with positions mapped into the quotes."""
+        """A type annotation: its names are uses, evaluated as the module loads unless the file defers annotations
+        or the annotation is quoted; a quoted one is read with positions mapped into the quotes."""
         if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
-            inner = self._quoted(expr)
-            if inner is not None:
-                self._annotation(inner, scope, owner)
+            expr, quoted = self._quoted(expr), True
+        else:
+            quoted = False
+        if expr is None:
+            return
+        if (quoted or self.deferred_annotations) and self.when == "load":
+            with self._running("call"):
+                self._annotation(expr, scope, owner)
             return
         if isinstance(expr, ast.Subscript):
             self._annotation(expr.value, scope, owner)

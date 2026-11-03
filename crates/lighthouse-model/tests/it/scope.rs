@@ -308,6 +308,7 @@ fn with_example() -> (Project, Symbol, Symbol) {
                 start: Position { line: 3, col: 2 },
                 end: Position { line: 3, col: 6 },
             }),
+            when: Default::default(),
         }],
         ..Fragment::default()
     }]);

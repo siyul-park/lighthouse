@@ -27,9 +27,14 @@ FILES = {
 class Sink:
     def __init__(self):
         self.edges: list[tuple[str, str, str, str]] = []
+        self.loads: list[tuple[str, str, str]] = []
 
     def edge(self, kind, source, to, site, resolution):
         self.edges.append((kind, source.get("symbol") or source["module"], to, resolution))
+
+    def load_edge(self, kind, source, to, site, resolution):
+        self.edge(kind, source, to, site, resolution)
+        self.loads.append((kind, source.get("symbol") or source["module"], to))
 
 
 def uses(rel: str = "lib/app.py", fence: bool = False):
@@ -91,6 +96,42 @@ class UsesTests(unittest.TestCase):
         Uses(model, model.file("m.py"), sink).run()
         used = {to for kind, frm, to, res in sink.edges if kind == "references" and res == "syntactic"}
         self.assertEqual(used, {"m::Validator::_check_name#method", "m::Validator::_check_size#method"})
+
+    def test_what_runs_as_the_module_loads_is_marked_load(self):
+        source = (
+            "from __future__ import annotations\n\n\n"
+            "LIMIT = 4\nOTHER = LIMIT * 2\n\n\n"
+            "class Base: ...\n\n\n"
+            "def register(n): ...\n\n\n"
+            "@register(LIMIT)\n"
+            "def make(x=LIMIT, y: Base = None):\n"
+            "    return x * OTHER\n\n\n"
+            "class Row(Base):\n"
+            "    size = LIMIT\n"
+            "    def m(self, z=OTHER):\n"
+            "        return LIMIT\n"
+        )
+        model = model_of({"m.py": source})
+        sink = Sink()
+        Uses(model, model.file("m.py"), sink).run()
+        loads = {(owner.split("::")[-1], to.split("::")[-1]) for _, owner, to in sink.loads}
+        self.assertIn(("OTHER#const", "LIMIT#const"), loads)
+        self.assertIn(("make#function", "LIMIT#const"), loads)
+        self.assertIn(("make#function", "register#function"), loads)
+        self.assertIn(("Row#type", "Base#type"), loads)
+        self.assertIn(("size#field", "LIMIT#const"), loads)
+        self.assertIn(("m#method", "OTHER#const"), loads)
+        # The body of a function and an annotation of a file that defers them run later.
+        self.assertNotIn(("make#function", "OTHER#const"), loads)
+        self.assertNotIn(("m#method", "LIMIT#const"), loads)
+        self.assertNotIn(("make#function", "Base#type"), loads)
+
+    def test_a_decorator_that_reads_a_later_constant_is_a_use_while_loading_only_at_the_top_level(self):
+        source = "def outer():\n    @deco(K)\n    def inner(): ...\n    return inner\n\n\nK = 1\n\n\ndef deco(k): ...\n"
+        model = model_of({"m.py": source})
+        sink = Sink()
+        Uses(model, model.file("m.py"), sink).run()
+        self.assertEqual(sink.loads, [])
 
 
 if __name__ == "__main__":

@@ -445,6 +445,7 @@ fn declare(fragment: &mut Fragment, from: Node, symbol: Symbol) {
         to: Target::Path(symbol.id.as_str().to_owned()),
         resolution: Resolution::Syntactic,
         site: Some(symbol.span),
+        when: Default::default(),
     });
     fragment.symbols.push(symbol);
 }

@@ -199,7 +199,8 @@
               "line": 31
             }
           },
-          "to": "src/shapes::move#function"
+          "to": "src/shapes::move#function",
+          "when": "load"
         }
       ],
       "file": {

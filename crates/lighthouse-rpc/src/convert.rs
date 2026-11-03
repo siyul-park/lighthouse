@@ -49,6 +49,7 @@ pub(crate) fn language_manifest(language: &wire::LanguageManifest) -> LanguageMa
             .collect(),
         fallback: language.fallback,
         priority: language.priority,
+        ordered_declarations: language.ordered_declarations,
     }
 }
 
@@ -287,6 +288,10 @@ fn edge(e: wire::Edge) -> Result<core::Edge, String> {
         to: core::Target::Path(e.to),
         resolution: resolution(e.resolution),
         site: e.site.map(span),
+        when: match e.when {
+            wire::When::Call => core::When::Call,
+            wire::When::Load => core::When::Load,
+        },
     })
 }
 

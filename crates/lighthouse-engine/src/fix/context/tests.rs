@@ -120,6 +120,7 @@ fn calls(from: &Symbol, to: &Symbol, line: u32) -> Edge {
         to: Target::Resolved(Node::Symbol(to.id.clone())),
         resolution: Resolution::Semantic,
         site: Some(span(line, line)),
+        when: Default::default(),
     }
 }
 
@@ -142,6 +143,7 @@ impl Fixture {
             to: Target::Path(name),
             resolution: Resolution::Semantic,
             site: None,
+            when: Default::default(),
         };
         let mut edges = vec![calls(&own[0], &own[1], self.inside.0)];
         edges.push(import(self.inside.1.to_owned()));

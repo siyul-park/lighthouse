@@ -220,6 +220,9 @@ pub struct LanguageManifest {
     pub fallback: bool,
     /// Among regular providers the higher priority claims a file first.
     pub priority: i32,
+    /// The language evaluates declarations in the order they are written, so
+    /// that the host keeps load-time uses in order when it moves them.
+    pub ordered_declarations: bool,
 }
 
 impl LanguageManifest {
@@ -235,6 +238,7 @@ impl LanguageManifest {
             capabilities: Vec::new(),
             fallback: false,
             priority: 0,
+            ordered_declarations: false,
         }
     }
 }

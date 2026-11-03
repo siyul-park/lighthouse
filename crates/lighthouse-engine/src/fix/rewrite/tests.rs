@@ -303,6 +303,7 @@ fn call(from: &Symbol, to: &Symbol) -> Edge {
         to: Target::Resolved(Node::Symbol(to.id.clone())),
         resolution: Resolution::Semantic,
         site: Some(span((1, 20), (1, 30))),
+        when: Default::default(),
     }
 }
 

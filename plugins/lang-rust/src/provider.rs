@@ -65,6 +65,7 @@ impl language::Provider for Provider {
             capabilities: ["extent", "reference-sites", "overlays", "source-ast"]
                 .map(str::to_owned)
                 .to_vec(),
+            ordered_declarations: false,
         }]
     }
 

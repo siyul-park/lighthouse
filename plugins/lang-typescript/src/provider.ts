@@ -30,6 +30,7 @@ export class Provider implements sdk.Provider {
           test_naming: { prefix: "", snake_case: false, variants: false, ancestors: false },
         },
         capabilities: ["semantic-edges", "extent", "reference-sites", "overlays"],
+        ordered_declarations: true,
       },
     ];
   }

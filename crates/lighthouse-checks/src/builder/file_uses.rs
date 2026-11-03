@@ -1,7 +1,9 @@
 //! The facts of what a symbol is tied to: who calls it and what it calls or
 //! references in its own file.
 
-use lighthouse_model::ucm::{Symbol, SymbolId};
+use std::rc::Rc;
+
+use lighthouse_model::ucm::{LoadNeed, LoadPoint, Symbol, SymbolId};
 use serde_json::{Map, Value, json};
 
 use super::Builder;
@@ -12,6 +14,12 @@ impl Builder<'_> {
     pub(super) fn tie_facts(&self, map: &mut Map<String, Value>, symbol: &Symbol, needs: &Needs) {
         if needs.field("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));
+        }
+        if needs.field("load_after") {
+            map.insert("load_after".to_owned(), self.load_after(symbol));
+        }
+        if needs.field("load_before") {
+            map.insert("load_before".to_owned(), self.load_before(symbol));
         }
         if needs.field("file_uses") {
             map.insert("file_uses".to_owned(), self.file_uses(symbol));
@@ -31,5 +39,53 @@ impl Builder<'_> {
             .collect();
         ids.sort();
         json!(ids.into_iter().map(SymbolId::as_str).collect::<Vec<_>>())
+    }
+}
+
+impl Builder<'_> {
+    /// The declarations `symbol` must stay below, as `{id, pos}`: the bindings
+    /// its code needs as the file loads.
+    fn load_after(&self, symbol: &Symbol) -> Value {
+        let project = self.project;
+        let mut found: Vec<Value> = self
+            .loads(symbol)
+            .iter()
+            .filter(|n| n.user == LoadPoint::Declaration(symbol.id.clone()))
+            .filter_map(|n| project.symbol(&n.binding))
+            .map(|s| json!({"id": s.id.as_str(), "pos": crate::facts::pos(s.span.start)}))
+            .collect();
+        found.sort_by_key(|v| v["pos"].as_u64());
+        Value::Array(found)
+    }
+
+    /// The code that must stay below `symbol`, as `{id, pos}`: the declarations
+    /// and the top-level code that need it as the file loads (`id` is empty
+    /// for top-level code).
+    fn load_before(&self, symbol: &Symbol) -> Value {
+        let project = self.project;
+        let mut found: Vec<Value> = self
+            .loads(symbol)
+            .iter()
+            .filter(|n| n.binding == symbol.id)
+            .filter_map(|n| match &n.user {
+                LoadPoint::Declaration(id) => {
+                    project.symbol(id).map(|s| (id.as_str(), s.span.start))
+                }
+                LoadPoint::Site(span) => Some(("", span.start)),
+            })
+            .map(|(id, at)| json!({"id": id, "pos": crate::facts::pos(at)}))
+            .collect();
+        found.sort_by_key(|v| v["pos"].as_u64());
+        Value::Array(found)
+    }
+
+    /// What the file of `symbol` needs of its declarations as it loads, in a
+    /// language that evaluates them in order; nothing in another.
+    fn loads(&self, symbol: &Symbol) -> Rc<Vec<LoadNeed>> {
+        let mut loads = self.loads.borrow_mut();
+        let found = loads
+            .entry(symbol.file.clone())
+            .or_insert_with(|| Rc::new(self.project.load_needs(&symbol.file)));
+        Rc::clone(found)
     }
 }

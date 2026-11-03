@@ -5,7 +5,7 @@ import { Provider } from "../src/provider.ts";
 import { serve } from "../src/sdk/server.ts";
 
 const INITIALIZE = {
-  protocolVersion: "0.5",
+  protocolVersion: "0.6",
   clientInfo: { name: "test", version: "0" },
   workspaceFolders: [{ uri: "file:///workspace", name: "workspace" }],
 };
@@ -64,13 +64,16 @@ describe("the protocol loop", () => {
 
     const result = replies[0]!.result as {
       serverInfo: { name: string };
-      capabilities: { languages: { id: string; aliases: string[]; capabilities: string[] }[] };
+      capabilities: {
+        languages: { id: string; aliases: string[]; capabilities: string[]; ordered_declarations?: boolean }[];
+      };
     };
     const [language] = result.capabilities.languages;
     assert.equal(result.serverInfo.name, "lang-typescript");
     assert.equal(language?.id, "typescript");
     assert.deepEqual(language?.aliases, ["typescript", "ts", "tsx", "typescriptreact", "javascript", "js", "node"]);
     assert.deepEqual(language?.capabilities, ["semantic-edges", "extent", "reference-sites", "overlays"]);
+    assert.equal(language?.ordered_declarations, true);
   });
 
   it("refuses a request before initialize, another protocol version and unknown methods", async () => {

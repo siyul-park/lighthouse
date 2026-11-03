@@ -193,6 +193,7 @@ fn run_proposals(plan: &FixPlan, number: usize, run: &Accepted<'_>) -> Vec<Propo
             file: file.clone(),
             range: 0..before.len(),
             text: after.clone(),
+            rank: 0,
         })
         .collect();
     let bases: BTreeMap<PathBuf, String> = run

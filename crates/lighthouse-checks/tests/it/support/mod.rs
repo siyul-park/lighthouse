@@ -199,6 +199,7 @@ impl World {
             to: Target::Path(to.id.as_str().to_owned()),
             resolution: Resolution::Syntactic,
             site: None,
+            when: Default::default(),
         });
     }
 
@@ -399,6 +400,7 @@ impl World {
                                     to: Target::Path(to.clone()),
                                     resolution: Resolution::Syntactic,
                                     site: None,
+                                    when: Default::default(),
                                 }),
                         )
                         .chain(
@@ -411,6 +413,7 @@ impl World {
                                     to: Target::Path(i.to.clone()),
                                     resolution: Resolution::Syntactic,
                                     site: i.line.map(at),
+                                    when: Default::default(),
                                 }),
                         )
                         .collect(),

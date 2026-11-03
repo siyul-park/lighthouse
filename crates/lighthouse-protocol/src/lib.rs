@@ -21,7 +21,7 @@ pub use language::{
         InitializeParams, InitializeResult, LanguageManifest, Mapping, Methods, Module, Node,
         Overlay, Position, ProjectRef, Resolution, ServerCapabilities, Signature, Source, Span,
         Symbol, SymbolKind, SymbolRole, TestCase, TestNaming, TestStyle, TextMapSegment, TypeRef,
-        Visibility, WorkspaceFolder, pointer_child, pointer_tokens, pointer_value,
+        Visibility, When, WorkspaceFolder, pointer_child, pointer_tokens, pointer_value,
     },
 };
 pub use model::{
@@ -41,7 +41,7 @@ pub use model::{
 pub use route::{FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
-pub const VERSION: &str = "0.5";
+pub const VERSION: &str = "0.6";
 
 /// Request: handshake; the first message of a session.
 pub const INITIALIZE: &str = "initialize";

@@ -171,7 +171,8 @@
               "line": 23
             }
           },
-          "to": "refs::Engine#type"
+          "to": "refs::Engine#type",
+          "when": "load"
         },
         {
           "from": {

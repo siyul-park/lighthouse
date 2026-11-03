@@ -89,6 +89,10 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("touched_by_tests", Reach::Global),
     ("module_tested", Reach::Global),
     ("local_callers", Reach::Global),
+    // What a file needs of its own declarations as it loads: read from the
+    // edges of the file, where only the source order matters.
+    ("load_after", Reach::Global),
+    ("load_before", Reach::Global),
     ("param_structs", Reach::Global),
     ("module_imports", Reach::Global),
     // The exported types of other modules that carry the subject's name.

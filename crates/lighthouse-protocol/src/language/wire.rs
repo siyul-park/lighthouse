@@ -178,6 +178,13 @@ pub struct LanguageManifest {
     /// Hosts ignore unknown values.
     #[serde(default)]
     pub capabilities: Vec<String>,
+    /// The language evaluates a file's declarations in the order they are
+    /// written (Python, JavaScript, TypeScript): a name must be bound above
+    /// the code that uses it as the module loads. The host then keeps the
+    /// edges whose `when` is `load` in order when it moves declarations;
+    /// languages with order-free package scope (Go, Rust) leave it unset.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub ordered_declarations: bool,
 }
 
 /// Layout conventions of a language that the host cannot infer from its files.
@@ -525,6 +532,32 @@ pub struct Edge {
     /// several places is one edge per place. Added in 0.1 before 1.0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub site: Option<Span>,
+    /// When the use is evaluated: `call` (the default) when the code that
+    /// holds it runs, `load` when it runs as the module executes, as the
+    /// initializer of a variable or a class field, a decorator, a class base
+    /// or a default argument (Python), or the top-level code of the file. A
+    /// `load` use of a name needs the name bound above it (languages that
+    /// declare `ordered_declarations`).
+    #[serde(default, skip_serializing_if = "When::is_call")]
+    pub when: When,
+}
+
+/// When an edge's use is evaluated.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum When {
+    /// When the code that holds the use runs: the body of a function.
+    #[default]
+    Call,
+    /// As the module loads, in the order the file is written.
+    Load,
+}
+
+impl When {
+    /// Whether this is the default, which the wire leaves out.
+    pub fn is_call(&self) -> bool {
+        matches!(self, Self::Call)
+    }
 }
 
 /// How reliable an edge's target is.

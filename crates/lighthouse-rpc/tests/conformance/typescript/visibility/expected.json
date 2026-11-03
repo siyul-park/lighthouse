@@ -297,7 +297,8 @@
               "line": 9
             }
           },
-          "to": "src/owner::Owner::dep#field"
+          "to": "src/owner::Owner::dep#field",
+          "when": "load"
         },
         {
           "from": {
@@ -315,7 +316,8 @@
               "line": 9
             }
           },
-          "to": "src/owner::Owner::name#field"
+          "to": "src/owner::Owner::name#field",
+          "when": "load"
         },
         {
           "from": {
@@ -441,7 +443,8 @@
               "line": 34
             }
           },
-          "to": "src/owner::Internal#type"
+          "to": "src/owner::Internal#type",
+          "when": "load"
         },
         {
           "from": {
@@ -459,7 +462,8 @@
               "line": 34
             }
           },
-          "to": "src/owner::Internal::member#field"
+          "to": "src/owner::Internal::member#field",
+          "when": "load"
         },
         {
           "from": {
@@ -477,7 +481,8 @@
               "line": 35
             }
           },
-          "to": "src/owner::Internal#type"
+          "to": "src/owner::Internal#type",
+          "when": "load"
         },
         {
           "from": {
@@ -495,7 +500,8 @@
               "line": 38
             }
           },
-          "to": "src/owner::local#const"
+          "to": "src/owner::local#const",
+          "when": "load"
         }
       ],
       "file": {

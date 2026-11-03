@@ -81,7 +81,8 @@
               "line": 11
             }
           },
-          "to": "src/over::Writer::target#field"
+          "to": "src/over::Writer::target#field",
+          "when": "load"
         },
         {
           "from": {

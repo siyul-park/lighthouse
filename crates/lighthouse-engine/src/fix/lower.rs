@@ -19,12 +19,14 @@ use lighthouse_model::{
 
 use crate::Overlays;
 
+use self::load_order::Placed;
 use super::{
     edits::{TextEdit, whole_lines, with_blank},
     scan::Containers,
 };
 
 mod imports;
+mod load_order;
 mod rename;
 mod spacing;
 
@@ -145,6 +147,7 @@ impl<'a> Lowerer<'a> {
                     file: file.clone(),
                     range,
                     text: text.clone(),
+                    rank: 0,
                 }])
             }
         }
@@ -210,6 +213,7 @@ impl<'a> Lowerer<'a> {
             file: symbol.file.clone(),
             range: name,
             text: "_".to_owned(),
+            rank: 0,
         });
         Ok(edits)
     }
@@ -264,9 +268,19 @@ impl<'a> Lowerer<'a> {
             &text,
             &[(moved.lines.start, at, moved.symbol.id.module().to_owned())],
         )?;
+        self.keeps_load_order(
+            &file,
+            &text,
+            &[Placed {
+                lines: moved.lines.clone(),
+                at,
+                seq: 0,
+                module: moved.symbol.id.module().to_owned(),
+            }],
+        )?;
         Ok(vec![
             TextEdit::delete(file.clone(), removal),
-            TextEdit::insert(file, at, inserted),
+            TextEdit::insert_from(file, at, inserted, moved.lines.start),
         ])
     }
 
@@ -311,11 +325,22 @@ impl<'a> Lowerer<'a> {
             {
                 return Err("declarations to reorder overlap".to_owned());
             }
-            let (moved, placed) = moves(&text, &current, group);
+            let ids: Vec<&SymbolId> = group.iter().map(|b| &b.symbol.id).collect();
+            let wanted: Vec<&Block> = self
+                .respecting(&file, &ids)?
+                .into_iter()
+                .map(|n| group[n])
+                .collect();
+            let (moved, placed) = moves(&text, &current, &wanted);
             edits.extend(moved);
             places.extend(placed);
         }
-        self.keeps_imports(&file, &text, &places)?;
+        let imports: Vec<_> = places
+            .iter()
+            .map(|p| (p.lines.start, p.at, p.module.clone()))
+            .collect();
+        self.keeps_imports(&file, &text, &imports)?;
+        self.keeps_load_order(&file, &text, &places)?;
         Ok(edits)
     }
 
@@ -509,12 +534,12 @@ enum Later {
     Named,
 }
 
-/// What is put at one anchor: the whole lines of each block, and the offset
+/// What is put at one anchor: the whole lines of each block, and the lines
 /// and module each comes from.
 #[derive(Default)]
 struct Put {
     bodies: Vec<String>,
-    from: Vec<(usize, String)>,
+    from: Vec<(Range<usize>, String)>,
 }
 
 /// The whole lines `range` fills, or `None` when other code shares them.
@@ -578,11 +603,7 @@ fn code_follows(rest: &str) -> bool {
 /// after the block that precedes it in `wanted`, or before the first block
 /// that stays when none does.
 /// Also the offsets each moved block comes from and goes to, with its module.
-fn moves(
-    text: &str,
-    current: &[&Block],
-    wanted: &[&Block],
-) -> (Vec<TextEdit>, Vec<(usize, usize, String)>) {
+fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> (Vec<TextEdit>, Vec<Placed>) {
     let rank: BTreeMap<&SymbolId, usize> = wanted
         .iter()
         .enumerate()
@@ -628,7 +649,7 @@ fn moves(
             continue;
         }
         let Put { bodies, from } = put.entry(after.map(|a| &a.symbol.id)).or_default();
-        from.push((block.lines.start, block.symbol.id.module().to_owned()));
+        from.push((block.lines.clone(), block.symbol.id.module().to_owned()));
         bodies.push(body(block));
     }
     let mut placed = Vec::new();
@@ -645,8 +666,23 @@ fn moves(
             let at = carried(text, beside).start;
             (at, spacing::before(separation, &bodies, eol))
         };
-        placed.extend(from.into_iter().map(|(from, module)| (from, at, module)));
-        edits.push(TextEdit::insert(beside.symbol.file.clone(), at, inserted));
+        let rank = from.iter().map(|(lines, _)| lines.start).min().unwrap_or(0);
+        placed.extend(
+            from.into_iter()
+                .enumerate()
+                .map(|(seq, (lines, module))| Placed {
+                    lines,
+                    at,
+                    seq,
+                    module,
+                }),
+        );
+        edits.push(TextEdit::insert_from(
+            beside.symbol.file.clone(),
+            at,
+            inserted,
+            rank,
+        ));
     }
     (edits, placed)
 }

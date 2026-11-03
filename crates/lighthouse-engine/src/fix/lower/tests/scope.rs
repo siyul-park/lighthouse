@@ -29,6 +29,7 @@ fn import(text: &str, line: u32) -> Edge {
         to: Target::Path("os".to_owned()),
         resolution: Resolution::Syntactic,
         site: Some(span((line, 1), (line, u32::try_from(width).unwrap() + 1))),
+        when: Default::default(),
     }
 }
 

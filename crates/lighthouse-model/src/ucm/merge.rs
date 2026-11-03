@@ -160,7 +160,7 @@ pub(super) fn dedup_edges(all: &mut Fragment, runs: &[EdgeRun]) -> BTreeMap<usiz
         .iter()
         .map(|e| {
             let file = files.next().flatten();
-            let fresh = seen.insert((e.kind, &e.from, &e.to, e.resolution));
+            let fresh = seen.insert((e.kind, &e.from, &e.to, e.resolution, e.when));
             if fresh {
                 if let (Node::Module(_), Some(file)) = (&e.from, file) {
                     origins.insert(kept, file.clone());

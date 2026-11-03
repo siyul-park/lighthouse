@@ -375,6 +375,7 @@ fn edge(
         to: Target::Path(to.as_str().to_owned()),
         resolution,
         site: Some(site),
+        when: Default::default(),
     }
 }
 

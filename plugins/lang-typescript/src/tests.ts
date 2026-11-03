@@ -3,6 +3,8 @@ import { type FileDecls, type FunctionBody, functionInitializer } from "./symbol
 import { unwrap } from "./commonjs.ts";
 
 const TEST_NAMES = new Set(["describe", "it", "test", "suite", "context", "specify"]);
+/** The test names whose callback runs as the file loads, declaring the tests inside. */
+const SUITE_NAMES = new Set(["describe", "suite", "context"]);
 const RUNNERS = new Set(["vitest", "@jest/globals", "mocha", "node:test", "bun:test", "@playwright/test", "ava"]);
 
 /** A call of a test framework that declares a test, a suite or a table of them. */
@@ -10,16 +12,20 @@ export interface TestCall {
   title: string;
   callback: FunctionBody | undefined;
   each: boolean;
+  /** A suite: its callback runs as the file loads. */
+  suite: boolean;
 }
 
 /** The test a call declares: `describe("x", fn)`, `it.skip("x", fn)`, `test.each(rows)("x", fn)`. */
 export function testCallOf(call: ts.CallExpression): TestCall | undefined {
   let each = false;
+  let suite = false;
   let current: ts.Expression = call.expression;
   for (;;) {
     current = unwrap(current);
     if (ts.isIdentifier(current)) {
       if (!TEST_NAMES.has(current.text)) return undefined;
+      suite = SUITE_NAMES.has(current.text);
       break;
     }
     if (ts.isPropertyAccessExpression(current)) {
@@ -37,7 +43,7 @@ export function testCallOf(call: ts.CallExpression): TestCall | undefined {
     .reverse()
     .map((a) => functionInitializer(a))
     .find((f) => f !== undefined);
-  return { title: first.text, callback, each };
+  return { title: first.text, callback, each, suite };
 }
 
 /** Whether a file is written for a test framework: it imports a runner. */

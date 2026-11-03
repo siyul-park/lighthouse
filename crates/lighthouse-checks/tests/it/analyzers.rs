@@ -71,6 +71,7 @@ fn call(from: &Symbol, to: &Symbol) -> Edge {
         to: Target::Path(to.id.as_str().to_owned()),
         resolution: Resolution::Syntactic,
         site: None,
+        when: Default::default(),
     }
 }
 

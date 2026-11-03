@@ -412,7 +412,8 @@
               "line": 49
             }
           },
-          "to": "src/calc.test::Row#type"
+          "to": "src/calc.test::Row#type",
+          "when": "load"
         },
         {
           "from": {
@@ -430,7 +431,8 @@
               "line": 50
             }
           },
-          "to": "src/calc.test::FIXTURE#const"
+          "to": "src/calc.test::FIXTURE#const",
+          "when": "load"
         }
       ],
       "file": {

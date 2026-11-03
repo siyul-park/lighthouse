@@ -85,6 +85,7 @@ fn project_calling(result: &str, calls: bool) -> Project {
         to: Target::Resolved(Node::Symbol(f.id.clone())),
         resolution: Resolution::Semantic,
         site: None,
+        when: Default::default(),
     };
     Project::merge([Fragment {
         files: vec![file("a.go"), file("b.go"), file("c.go")],
@@ -156,6 +157,7 @@ fn with_module_level_use(without_f: bool) -> Project {
         to: Target::Resolved(Node::Symbol(f.id.clone())),
         resolution: Resolution::Semantic,
         site: Some(super::span((1, 1), (1, 9))),
+        when: Default::default(),
     };
     let (symbols, functions) = if without_f {
         (Vec::new(), Vec::new())

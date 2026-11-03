@@ -190,7 +190,7 @@ fn serve_answers_the_handshake_and_an_index_request_until_exit() {
             1,
             INITIALIZE,
             json!({
-                "protocolVersion": "0.5",
+                "protocolVersion": "0.6",
                 "clientInfo": { "name": "t", "version": "0" },
                 "workspaceFolders": [{ "uri": "file:///p/", "name": "p" }],
             }),

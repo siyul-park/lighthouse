@@ -37,6 +37,7 @@ fn call(from: &Symbol, to: &str, site: Option<Span>) -> Edge {
         to: Target::Path(format!("m::{to}")),
         resolution: Resolution::Semantic,
         site,
+        when: Default::default(),
     }
 }
 
