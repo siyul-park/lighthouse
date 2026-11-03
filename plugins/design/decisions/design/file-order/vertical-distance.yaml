@@ -27,18 +27,25 @@ spec:
     select: function
     variables:
     - name: separators
-      expression: 'func.kind == ''method'' && func.gap.previous != null && !in_private(func.id) ? func.gap.between.filter(b,
-        (b.kind != ''method'' || b.owner_key != func.owner_key)
-        && !laid_between(func.gap.previous, func.id, b.id)) : []'
+      expression: >-
+        func.kind != 'method' || func.gap.previous == null ? []
+        : !in_private(func.id)
+        ? func.gap.between.filter(b, (b.kind != 'method' || b.owner_key != func.owner_key)
+            && !laid_between(func.gap.previous, func.id, b.id))
+        : !in_private(func.gap.previous) ? []
+        : func.gap.between.filter(b, in_private(b.id)
+            && !reaches(func.gap.previous, b.id) && !reaches(b.id, func.id))
     - name: separated
       expression: size(separators) > 0
     where: separated
     message: "{{ 'method ' + func.name + ' is separated from the other methods of
       its type by ' + string(size(separators)) + ' other declaration(s) (' + separators[0].name
-      + '); keep an owner’s methods together' }}"
+      + '); keep an owner’s methods together' + (in_private(func.id) ? ', or move ' + separators[0].name
+      + ' after the code that uses it' : '') }}"
     evidence:
       symbols: "[func.gap.previous, separators[0].id, func.id]"
       distance: size(separators)
+      users: "placed.filter(s, separators[0].id in s.file_uses).map(s, s.id)"
     identity:
       subject: func.id
   fix:
@@ -238,6 +245,96 @@ spec:
         func (a A) Two() int { return 2 }
     expect:
     - line: 13
+  - name: gap-private-free-function-between
+    language: go
+    kind: invalid
+    options:
+      groups: [public-type, private-type, public-function, method, private]
+      blocks: kind
+    fixed:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{}
+
+        // Run is part of the example.
+        func (a A) Run() int { return load() + a.box() + a.boxI64() }
+
+        func load() int { return 0 }
+
+        func (a A) box() int { return 1 }
+
+        func (a A) boxI64() int { return 3 }
+
+        func clone() int { return 2 }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{}
+
+        // Run is part of the example.
+        func (a A) Run() int { return load() + a.box() + a.boxI64() }
+
+        func load() int { return 0 }
+
+        func (a A) box() int { return 1 }
+
+        func clone() int { return 2 }
+
+        func (a A) boxI64() int { return 3 }
+    expect:
+    - line: 15
+  - name: gap-private-helper-chain-valid
+    language: go
+    kind: valid
+    options:
+      groups: [public-type, private-type, public-function, method, private]
+      blocks: kind
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{}
+
+        // Run is part of the example.
+        func (a A) Run() int { return a.box() + a.boxI64() }
+
+        func (a A) box() int { return clone() }
+
+        func clone() int { return cloneMap() }
+
+        func cloneMap() int { return 2 }
+
+        func (a A) boxI64() int { return 3 }
+  - name: gap-private-helper-after-caller-valid
+    language: go
+    kind: valid
+    options:
+      groups: [public-type, private-type, public-function, method, private]
+      blocks: kind
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // A is part of the example.
+        type A struct{}
+
+        // Run is part of the example.
+        func (a A) Run() int { return a.box() + a.boxI64() }
+
+        func (a A) box() int { return clone() }
+
+        func clone() int { return 2 }
+
+        func (a A) boxI64() int { return 3 }
   - name: gap-rust-invalid
     language: rust
     kind: invalid

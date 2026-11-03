@@ -209,6 +209,25 @@ spec:
               && lo / 1000000 == groups.indexOf('method') && hi / 1000000 == lo / 1000000
               && at / 1000000 == lo / 1000000)))
           : false
+    # What each placed declaration uses within the file, as indexes of
+    # `placed_ids`.
+    - name: placed_uses
+      expression: >-
+        placed.map(s, s.file_uses.map(u, placed_ids.indexOf(u)).filter(i, i >= 0))
+    # The declarations at the indexes `set` and everything they use, one more
+    # call deep; four of these nested reach a helper of a helper of a helper.
+    - name: one_deeper
+      params: [set]
+      expression: (set + set.map(i, placed_uses.slice(i, i + 1)[0]).flatten()).distinct()
+    # Whether `to` is `from` or a helper of it: reached from `from` through
+    # calls and references within the file, eight deep.
+    - name: reaches
+      params: [from, to]
+      expression: >-
+        cel.bind(first, placed_ids.indexOf(from),
+        cel.bind(two, one_deeper(one_deeper([first])),
+        cel.bind(four, one_deeper(one_deeper(two)),
+        placed_ids.indexOf(to) in one_deeper(one_deeper(one_deeper(one_deeper(four)))))))
     # The name of the caller in the group `private` that comes last in the
     # order of its ranks, for the declaration with this id; empty when it has
     # none: the declaration it must follow.
