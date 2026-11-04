@@ -64,7 +64,9 @@ impl Plugin for Fixture {
         let go = LanguageManifest {
             conventions: Conventions {
                 test_globs: vec!["**/*_test.ucm".to_owned()],
-                constructor_prefixes: vec!["New".to_owned(), "new".to_owned()],
+                constructor_prefixes: ["New", "new", "MustNew", "mustNew"]
+                    .map(str::to_owned)
+                    .to_vec(),
                 ..Conventions::default()
             },
             ..LanguageManifest::new("go", vec!["**/*.ucm".to_owned()])

@@ -77,6 +77,24 @@ spec:
         := range s.items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
     expect:
     - line: 9
+  - name: must-constructor-helper
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // Store is part of the example.
+        type Store struct{ items []int }
+
+        // Total is part of the example.
+        func (s *Store) Total() int { return len(mustNewStore(s).items) }
+
+        // Count is part of the example.
+        func (s *Store) Count() int { return len(mustNewStore(s).items) + 1 }
+
+        func mustNewStore(s *Store) *Store { return &Store{items: s.items} }
   - name: shared-by-a-free-function
     language: go
     kind: valid

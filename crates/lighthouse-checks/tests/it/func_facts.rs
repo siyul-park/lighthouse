@@ -202,3 +202,27 @@ fn symbol_func_reads_the_same_facts_as_a_function_select() {
         flagged(&w, "function", CONTIGUITY_AS_CEL, &options)
     );
 }
+
+#[test]
+fn a_must_constructor_builds_what_its_new_form_builds() {
+    let mut w = World::default();
+    let server = w.symbol("m", "Server", SymbolKind::Type, "m/a.ucm");
+    let must = w.func("m", "MustNewServer", "m/a.ucm");
+    let lower = w.func("m", "mustNewServer", "m/a.ucm");
+    let options = json!({});
+    let lines = |condition| -> BTreeSet<u32> {
+        flagged(&w, "function", condition, &options)
+            .into_iter()
+            .map(|(_, line)| line)
+            .collect()
+    };
+    assert_eq!(
+        lines("func.constructor_named && func.built == 'Server'"),
+        BTreeSet::from([must.span.start.line, lower.span.start.line])
+    );
+    assert_eq!(
+        lines("func.role == 'constructor'"),
+        BTreeSet::from([must.span.start.line, lower.span.start.line])
+    );
+    let _ = server;
+}

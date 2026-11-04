@@ -86,7 +86,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   "serverInfo": { "name": "lang-go", "version": "0.1.0" },
   "capabilities": {
     "languages": [{ "id": "go", "globs": ["**/*.go"], "priority": 0,
-                    "conventions": { "test_globs": ["**/*_test.go"], "constructor_prefixes": ["New", "new"],
+                    "conventions": { "test_globs": ["**/*_test.go"], "constructor_prefixes": ["New", "new", "MustNew", "mustNew"],
                                      "test_naming": { "prefix": "Test", "snake_case": false, "variants": true, "ancestors": false } },
                     "capabilities": ["semantic-edges"] }] } }
 ```

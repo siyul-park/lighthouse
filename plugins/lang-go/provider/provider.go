@@ -40,7 +40,7 @@ func (p *Provider) Manifest() []sdk.LanguageManifest {
 		Ignores: []string{"_*/", ".*/", "!/.lighthouse/"},
 		Conventions: sdk.Conventions{
 			TestGlobs:           []string{"**/*_test.go"},
-			ConstructorPrefixes: []string{"New", "new"},
+			ConstructorPrefixes: []string{"New", "new", "MustNew", "mustNew"},
 			TestNaming:          sdk.TestNaming{Prefix: "Test", Variants: true},
 		},
 		Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast", "cache-overlays"},

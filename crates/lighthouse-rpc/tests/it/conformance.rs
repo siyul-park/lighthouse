@@ -51,7 +51,7 @@ const GO: Lang = Lang {
     manifest_id: "lang-go",
     globs: &["**/*.go"],
     test_globs: &["**/*_test.go"],
-    constructor_prefixes: &["New", "new"],
+    constructor_prefixes: &["New", "new", "MustNew", "mustNew"],
     capabilities: &[
         "semantic-edges",
         "extent",

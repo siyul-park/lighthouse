@@ -591,6 +591,9 @@ spec:
             // NewService is part of the example.
             func NewService() *Service { return &Service{} }
 
+            // MustNewService is part of the example.
+            func MustNewService() *Service { return NewService() }
+
             // Run is part of the example.
             func (s *Service) Run() int { return 1 }
 
@@ -613,13 +616,16 @@ spec:
             // NewService is part of the example.
             func NewService() *Service { return &Service{} }
 
+            // MustNewService is part of the example.
+            func MustNewService() *Service { return NewService() }
+
             func (l *lowering) run() int { return 1 }
 
             func newLowering() *lowering { return &lowering{} }
       expect:
-        - line: 12
-        - line: 16
-          message: "newLowering is a constructor of lowering: it goes in lowering's block after its option builders, above run (line 14)"
+        - line: 9
+        - line: 19
+          message: "newLowering is a constructor of lowering: it goes in lowering's block after its option builders, above run (line 17)"
     - name: rust-invalid
       language: rust
       kind: invalid
