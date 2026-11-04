@@ -21,7 +21,7 @@ use std::{
 };
 
 use lighthouse_model::{Diagnostic, RunScope};
-use lighthouse_plugin::{Context, RuleManifest};
+use lighthouse_plugin::{Context, Pending, RuleManifest};
 use lighthouse_spec::{Batching, Stdin};
 use serde_json::{Map, Value};
 
@@ -62,16 +62,35 @@ impl CommandRule {
             })
     }
 
+    /// Whether the findings for a file may be stored: no program keeps a
+    /// secret in its environment, and the decision either is bundled or says
+    /// what its programs read, `independent` (the file alone) or `follows`
+    /// (what it names too).
+    pub(crate) fn cacheable(&self, scope: RunScope) -> bool {
+        scope == RunScope::File
+            && self.programs.all().next().is_some()
+            && self.programs.all().all(|p| p.env.is_empty())
+            && (self.bundled || self.programs.all().all(|p| p.independent || p.follows))
+    }
+
     /// Whether the findings for a file of `language` are what the program
-    /// finds in that file alone: it is bundled, takes its files as arguments
-    /// and is `independent`, so that no other file, complete or not, changes
-    /// them.
+    /// finds in that file alone: it is cacheable and `independent`, or bundled
+    /// and given the text on stdin, so that no other file, complete or not,
+    /// changes them.
     pub(crate) fn alone(&self, scope: RunScope, language: &str) -> bool {
-        self.batched(scope)
-            && self
-                .programs
-                .of(language)
-                .is_some_and(|program| program.independent)
+        self.cacheable(scope)
+            && self.programs.of(language).is_some_and(|program| {
+                program.independent || (self.bundled && program.stdin == Stdin::File)
+            })
+    }
+
+    /// Whether the findings for a file of `language` also depend on the
+    /// project's other files: the program is cacheable but not `independent`,
+    /// so it may read what the file names.
+    pub(crate) fn siblings(&self, scope: RunScope, language: &str) -> bool {
+        self.cacheable(scope)
+            && self.programs.of(language).is_some()
+            && !self.alone(scope, language)
     }
 
     /// The programs the findings come from, by name.
@@ -103,11 +122,14 @@ impl CommandRule {
     /// over a group of files answered for. Files the rule is not applied to
     /// are left out.
     fn answers(&self, check: Check) -> Findings {
-        let (_, ctx, _) = check;
+        let (meta, ctx, _) = check;
         let mut answers = BTreeMap::new();
         for (program, files) in self.assigned(ctx) {
+            // The files the cache had findings for are not run again.
+            let pending = ctx.memo.slot::<Pending>();
             let files: Vec<PathBuf> = files
                 .into_iter()
+                .filter(|path| pending.wants(&meta.id, path))
                 .filter(|path| {
                     ctx.project
                         .file(path)

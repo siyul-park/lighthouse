@@ -28,7 +28,7 @@ const RETIRED: [&str; 3] = ["rule", "path", "root"];
 
 /// The keys a program table may have, for the loaders that read it beside
 /// others.
-pub(crate) const FIELDS: [&str; 9] = [
+pub(crate) const FIELDS: [&str; 10] = [
     "command",
     "env",
     "timeout",
@@ -36,6 +36,7 @@ pub(crate) const FIELDS: [&str; 9] = [
     "output",
     "success",
     "independent",
+    "follows",
     "sarif",
     "sandbox",
 ];
@@ -147,12 +148,25 @@ pub struct Program {
     /// (linters exit 1 with findings), `[0]` otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub success: Option<Vec<i32>>,
-    /// A run over several files finds in each file what a run over that file
-    /// alone finds, as `gofmt -l` does; not so for a program that follows
-    /// what a file names, as `rustfmt` follows `mod`. Lets a check run one
-    /// program for the files of a batch and tell each file its findings.
+    /// What the program finds in a file depends on that file and the
+    /// program's configuration alone, as `gofmt -l` and `markdownlint-cli2`
+    /// do; not so for a program that follows what a file names, as `rustfmt`
+    /// follows `mod` and `lychee` follows links. A run over several files
+    /// (`{files}`) then finds in each what a run over it alone finds, which
+    /// lets a check run one program for the files of a batch and tell each
+    /// file its findings. A bundled check that is `independent` keeps the
+    /// findings of a file for as long as the file, the program and its
+    /// configuration are as they were.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub independent: bool,
+    /// The program reads what a file names besides the file (the file a link
+    /// points to, the modules a `mod` declares), as `lychee` does. A bundled
+    /// check keeps the findings of a file while the project's files, the text
+    /// of its files of the same language, the program and its configuration
+    /// are as they were. A check that is neither `independent` nor `follows`
+    /// is run every time, unless it is bundled with Lighthouse.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub follows: bool,
     /// How a SARIF log is read; only with `output: sarif`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sarif: Option<Sarif>,
@@ -172,6 +186,7 @@ impl Program {
             output: None,
             success: None,
             independent: false,
+            follows: false,
             sarif: None,
             sandbox: None,
         }
@@ -274,8 +289,14 @@ impl Program {
         if self.stdin == Stdin::File && self.batching() == Batching::Files {
             return Some("`stdin: file` needs one file: use `{file}`, not `{files}`".to_owned());
         }
-        if self.independent && self.batching() != Batching::Files {
-            return Some("`independent` is for a program run over `{files}`".to_owned());
+        if (self.independent || self.follows) && self.batching() == Batching::Once {
+            return Some(
+                "`independent` and `follows` are for a program run over `{files}` or `{file}`"
+                    .to_owned(),
+            );
+        }
+        if self.independent && self.follows {
+            return Some("`independent` and `follows` exclude each other".to_owned());
         }
         if self.sarif.is_some() && output != Output::Sarif {
             return Some("`sarif` needs `output: sarif`".to_owned());

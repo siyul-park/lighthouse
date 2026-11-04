@@ -199,6 +199,27 @@ fn a_body_edit_of_a_neighbor_that_changes_nothing_it_is_described_by_changes_no_
 }
 
 #[test]
+fn the_siblings_digest_follows_the_paths_and_the_files_of_the_language() {
+    let world = World::new();
+    let siblings = |w: &World| *w.digests().siblings("rust").unwrap();
+
+    assert_eq!(siblings(&world), siblings(&World::new()));
+    assert!(world.digests().siblings("go").is_none());
+
+    let mut moved = World::new();
+    moved.b.symbols[0].span = at(40);
+    assert_ne!(siblings(&moved), siblings(&world), "what a file holds");
+
+    let mut edited = World::new();
+    edited.b.files[0].hash = "edited".to_owned();
+    assert_ne!(siblings(&edited), siblings(&world), "the text of a file");
+
+    let mut grown = World::new();
+    grown.b.files.push(file("src/new.rs"));
+    assert_ne!(siblings(&grown), siblings(&world), "a path");
+}
+
+#[test]
 fn the_project_digest_is_stable_and_follows_any_change() {
     let world = World::new();
     assert_eq!(world.digests().project(), world.digests().project());

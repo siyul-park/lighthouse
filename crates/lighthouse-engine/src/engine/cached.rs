@@ -15,7 +15,7 @@ use std::{
 
 use crate::cache::{Cache, Digest, Digests, KeyBuilder, Stored, tools};
 use lighthouse_model::{ExampleScope, Reach, TestScope};
-use lighthouse_plugin::Models;
+use lighthouse_plugin::{Models, Pending};
 use serde::{Deserialize, Serialize};
 
 use super::*;
@@ -26,6 +26,15 @@ pub(super) struct RunCache<'c> {
     digests: Digests,
     documents_digest: Digest,
     prefixes: HashMap<String, Prefix>,
+}
+
+/// How far the findings of one unit reach: what its key is built from.
+#[derive(Clone, Copy)]
+struct Reaching<'l> {
+    reach: Reach,
+    /// The language of the file when its findings also depend on the project's
+    /// files, its own language's text included.
+    siblings: Option<&'l str>,
 }
 
 /// What is known of a rule before any unit runs.
@@ -71,12 +80,17 @@ impl Engine {
         let Some((run, prefix)) = prefix else {
             return rule.check(ctx, options);
         };
-        match ctx.file {
-            Some((file, _)) if prefix.reach == Reach::Global => {
-                run.in_row(prefix, file, rule, ctx, options)
-            }
-            _ => run.alone(prefix, rule, ctx, options),
+        let Some((file, _)) = ctx.file else {
+            return run.alone(prefix, Reaching::of(prefix.reach), (rule, ctx, options));
+        };
+        let reaching = Reaching {
+            reach: rule.reach(&file.lang),
+            siblings: rule.siblings(&file.lang).then_some(file.lang.as_str()),
+        };
+        if reaching.reach == Reach::Global && reaching.siblings.is_none() {
+            return run.in_row(prefix, file, rule, ctx, options);
         }
+        run.alone(prefix, reaching, (rule, ctx, options))
     }
 
     /// The cache of a run over `project`, with the project hashed for its
@@ -114,6 +128,9 @@ impl Engine {
         (cache, project): (&Cache, &Project),
     ) -> HashMap<String, Prefix> {
         let base = self.cache_base();
+        // The files that choose a version or configure a program, read once
+        // for every rule that runs one.
+        let selectors = std::cell::OnceCell::new();
         selected
             .iter()
             .filter_map(|rule| {
@@ -127,12 +144,9 @@ impl Engine {
                     .part(&caching.revision)
                     .part([caching.reach as u8, u8::from(caching.positions)]);
                 if !caching.tools.is_empty() {
-                    key.part(tools::identity(
-                        &caching.tools,
-                        &self.ws.root,
-                        project,
-                        cache,
-                    ));
+                    let selectors =
+                        selectors.get_or_init(|| tools::selectors(&self.ws.root, project));
+                    key.part(tools::identity(&caching.tools, selectors, cache));
                 }
                 let prefix = Prefix {
                     key,
@@ -167,6 +181,26 @@ impl Engine {
 }
 
 impl RunCache<'_> {
+    /// Notes, for each file the cache has no findings of `rule` for, that the
+    /// rule has to be run for it, so that a rule that runs a program over a
+    /// batch of files runs it over those alone.
+    pub(super) fn expect(&self, rule: &dyn Rule, ctx: &Context, options: &Options) {
+        let Some((file, _)) = ctx.file else { return };
+        let reaching = Reaching {
+            reach: rule.reach(&file.lang),
+            siblings: rule.siblings(&file.lang).then_some(file.lang.as_str()),
+        };
+        let cached = self.prefixes.get(&rule.manifest().id).and_then(|prefix| {
+            let key = self.key(prefix, reaching, &tag(&ctx.applies, options), Some(file))?;
+            self.cache.get::<Stored>(&key)
+        });
+        if cached.is_none() {
+            ctx.memo
+                .slot::<Pending>()
+                .add(&rule.manifest().id, &file.path);
+        }
+    }
+
     /// Hands the rows that gained files to the cache.
     pub(super) fn store_rows(&self) {
         for prefix in self.prefixes.values() {
@@ -202,13 +236,12 @@ impl RunCache<'_> {
     fn alone(
         &self,
         prefix: &Prefix,
-        rule: &dyn Rule,
-        ctx: &Context,
-        options: &Options,
+        reaching: Reaching,
+        (rule, ctx, options): (&dyn Rule, &Context, &Options),
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
         let tag = tag(&ctx.applies, options);
         let file = ctx.file.map(|(file, _)| file);
-        let Some(key) = self.key(prefix, &tag, file) else {
+        let Some(key) = self.key(prefix, reaching, &tag, file) else {
             return rule.check(ctx, options);
         };
         let stored = self.cache.get::<Stored>(&key);
@@ -275,17 +308,30 @@ impl RunCache<'_> {
         Ok(found)
     }
 
-    /// The key of a unit over `file` (the project for a project rule), by the
-    /// reach of its rule; `None` when the file is not one the digests know.
-    fn key(&self, prefix: &Prefix, tag: &str, file: Option<&File>) -> Option<Digest> {
+    /// The key of a unit over `file` (the project for a project rule), by how
+    /// far its findings reach; `None` when the file is not one the digests
+    /// know.
+    fn key(
+        &self,
+        prefix: &Prefix,
+        reaching: Reaching,
+        tag: &str,
+        file: Option<&File>,
+    ) -> Option<Digest> {
         let mut key = prefix.key.clone();
-        key.part(tag);
-        match (file, prefix.reach) {
+        key.part(tag).part([reaching.reach as u8]);
+        match (file, reaching.reach) {
+            (Some(file), Reach::Global) if reaching.siblings.is_some() => {
+                let digests = self.digests.file(&file.path)?;
+                key.part(file.path.as_os_str().as_encoded_bytes())
+                    .part(digests.slice)
+                    .part(self.digests.siblings(reaching.siblings?)?);
+            }
             (Some(file), Reach::Local | Reach::Neighbors) => {
                 let digests = self.digests.file(&file.path)?;
                 key.part(file.path.as_os_str().as_encoded_bytes())
                     .part(digests.slice);
-                if prefix.reach == Reach::Neighbors {
+                if reaching.reach == Reach::Neighbors {
                     key.part(if prefix.positions {
                         digests.neighbors_at
                     } else {
@@ -319,6 +365,16 @@ impl RunCache<'_> {
                 fresh: Mutex::default(),
             }
         })
+    }
+}
+
+impl Reaching<'_> {
+    /// A unit that reads as far as `reach` and no further.
+    fn of(reach: Reach) -> Self {
+        Self {
+            reach,
+            siblings: None,
+        }
     }
 }
 

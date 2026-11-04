@@ -3,7 +3,9 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use lighthouse_plugin::Memo;
+use std::path::Path;
+
+use lighthouse_plugin::{Memo, Pending};
 
 #[derive(Default)]
 struct Counter(AtomicUsize);
@@ -34,6 +36,39 @@ fn memo_slot() {
     });
 
     assert!(slots.iter().all(|slot| Arc::ptr_eq(slot, &slots[0])));
+}
+
+#[test]
+fn pending() {
+    let pending = Pending::default();
+    assert!(
+        pending.wants("r", Path::new("a")),
+        "nothing looked up: wanted"
+    );
+
+    pending.add("r", Path::new("a"));
+
+    assert!(pending.wants("r", Path::new("a")));
+    assert!(!pending.wants("r", Path::new("b")));
+    assert!(pending.wants("other", Path::new("b")));
+}
+
+#[test]
+fn pending_add() {
+    let pending = Pending::default();
+    pending.add("r", Path::new("a"));
+    pending.add("r", Path::new("b"));
+
+    assert!(pending.wants("r", Path::new("a")) && pending.wants("r", Path::new("b")));
+}
+
+#[test]
+fn pending_wants() {
+    let pending = Pending::default();
+    pending.add("r", Path::new("a"));
+
+    assert!(pending.wants("r", Path::new("a")));
+    assert!(!pending.wants("r", Path::new("c")));
 }
 
 #[test]

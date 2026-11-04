@@ -277,8 +277,12 @@
           },
           "type": "array"
         },
+        "follows": {
+          "description": "The program reads what a file names besides the file (the file a link\npoints to, the modules a `mod` declares), as `lychee` does. A bundled\ncheck keeps the findings of a file while the project's files, the text\nof its files of the same language, the program and its configuration\nare as they were. A check that is neither `independent` nor `follows`\nis run every time, unless it is bundled with Lighthouse.",
+          "type": "boolean"
+        },
         "independent": {
-          "description": "A run over several files finds in each file what a run over that file\nalone finds, as `gofmt -l` does; not so for a program that follows\nwhat a file names, as `rustfmt` follows `mod`. Lets a check run one\nprogram for the files of a batch and tell each file its findings.",
+          "description": "What the program finds in a file depends on that file and the\nprogram's configuration alone, as `gofmt -l` and `markdownlint-cli2`\ndo; not so for a program that follows what a file names, as `rustfmt`\nfollows `mod` and `lychee` follows links. A run over several files\n(`{files}`) then finds in each what a run over it alone finds, which\nlets a check run one program for the files of a batch and tell each\nfile its findings. A bundled check that is `independent` keeps the\nfindings of a file for as long as the file, the program and its\nconfiguration are as they were.",
           "type": "boolean"
         },
         "output": {
@@ -357,8 +361,12 @@
           "description": "Variables the program is given besides the one allowlist. A value may\nhold `${NAME}`, the user's variable `NAME`, which is never written\ninto a command line, a note, a log or a cache key; a variable that is\nnot set fails the run, naming it.",
           "type": "object"
         },
+        "follows": {
+          "description": "The program reads what a file names besides the file (the file a link\npoints to, the modules a `mod` declares), as `lychee` does. A bundled\ncheck keeps the findings of a file while the project's files, the text\nof its files of the same language, the program and its configuration\nare as they were. A check that is neither `independent` nor `follows`\nis run every time, unless it is bundled with Lighthouse.",
+          "type": "boolean"
+        },
         "independent": {
-          "description": "A run over several files finds in each file what a run over that file\nalone finds, as `gofmt -l` does; not so for a program that follows\nwhat a file names, as `rustfmt` follows `mod`. Lets a check run one\nprogram for the files of a batch and tell each file its findings.",
+          "description": "What the program finds in a file depends on that file and the\nprogram's configuration alone, as `gofmt -l` and `markdownlint-cli2`\ndo; not so for a program that follows what a file names, as `rustfmt`\nfollows `mod` and `lychee` follows links. A run over several files\n(`{files}`) then finds in each what a run over it alone finds, which\nlets a check run one program for the files of a batch and tell each\nfile its findings. A bundled check that is `independent` keeps the\nfindings of a file for as long as the file, the program and its\nconfiguration are as they were.",
           "type": "boolean"
         },
         "output": {
@@ -1389,8 +1397,12 @@
           "description": "Variables the program is given besides the one allowlist. A value may\nhold `${NAME}`, the user's variable `NAME`, which is never written\ninto a command line, a note, a log or a cache key; a variable that is\nnot set fails the run, naming it.",
           "type": "object"
         },
+        "follows": {
+          "description": "The program reads what a file names besides the file (the file a link\npoints to, the modules a `mod` declares), as `lychee` does. A bundled\ncheck keeps the findings of a file while the project's files, the text\nof its files of the same language, the program and its configuration\nare as they were. A check that is neither `independent` nor `follows`\nis run every time, unless it is bundled with Lighthouse.",
+          "type": "boolean"
+        },
         "independent": {
-          "description": "A run over several files finds in each file what a run over that file\nalone finds, as `gofmt -l` does; not so for a program that follows\nwhat a file names, as `rustfmt` follows `mod`. Lets a check run one\nprogram for the files of a batch and tell each file its findings.",
+          "description": "What the program finds in a file depends on that file and the\nprogram's configuration alone, as `gofmt -l` and `markdownlint-cli2`\ndo; not so for a program that follows what a file names, as `rustfmt`\nfollows `mod` and `lychee` follows links. A run over several files\n(`{files}`) then finds in each what a run over it alone finds, which\nlets a check run one program for the files of a batch and tell each\nfile its findings. A bundled check that is `independent` keeps the\nfindings of a file for as long as the file, the program and its\nconfiguration are as they were.",
           "type": "boolean"
         },
         "output": {

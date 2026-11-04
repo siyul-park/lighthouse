@@ -33,7 +33,7 @@ pub use cel::{
 pub use error::Error;
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
 pub use lighthouse_protocol::{Conventions, EmbeddedRegion, Mapping, TestNaming, TextMapSegment};
-pub use memo::Memo;
+pub use memo::{Memo, Pending};
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
     Decided, DecisionRef, EditRequest, Edited, Example, Explored, FAIL_AT, FineTuneJobError,
@@ -373,6 +373,19 @@ pub trait Rule: Send + Sync {
     /// once the other rules' findings are known, and its findings are not
     /// themselves suppressed.
     fn after_suppression(&self) -> bool {
+        false
+    }
+    /// Whether the rule runs one program over a batch of files, so that the
+    /// host looks up what it has stored for the files first and gives the
+    /// batch only the files that are left (see [`Pending`]).
+    fn batches(&self) -> bool {
+        false
+    }
+    /// Whether what the rule finds in a file of `language` also depends on the
+    /// paths of the project's files and on the content of its files of that
+    /// language, as a link depends on the file it names and a formatter that
+    /// follows `mod` on the modules it reads.
+    fn siblings(&self, _language: &str) -> bool {
         false
     }
     /// How far what the rule finds in a file of `language` reaches: what its

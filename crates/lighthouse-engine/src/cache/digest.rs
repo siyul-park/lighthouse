@@ -25,13 +25,16 @@ use lighthouse_protocol::hash::Hasher;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use super::{Error, neighbors::Ties};
+use super::{Error, KeyBuilder, neighbors::Ties};
 
 /// The digests of a project: one per file and one for all of it.
 #[derive(Debug, Default)]
 pub struct Digests {
     project: Digest,
     files: HashMap<PathBuf, FileDigest>,
+    /// By language: the paths of the project's files with the text of those of
+    /// that language, for the rules whose findings in a file depend on them.
+    siblings: HashMap<String, Digest>,
 }
 
 impl Digests {
@@ -60,10 +63,19 @@ impl Digests {
             feed(&mut whole, module)?;
         }
         ties.orphans(&mut whole)?;
+        let files: HashMap<PathBuf, FileDigest> =
+            paths.into_iter().map(Path::to_owned).zip(digests).collect();
         Ok(Self {
             project: whole.finish(),
-            files: paths.into_iter().map(Path::to_owned).zip(digests).collect(),
+            siblings: siblings(project, &files),
+            files,
         })
+    }
+
+    /// The digest of the paths of the project's files and the text of those
+    /// of `language`; `None` for a language the project has no file of.
+    pub fn siblings(&self, language: &str) -> Option<&Digest> {
+        self.siblings.get(language)
     }
 
     /// The digest of everything the project holds.
@@ -126,4 +138,33 @@ pub(crate) fn feed<T: Serialize + ?Sized>(hasher: &mut Hasher, value: &T) -> Res
         hasher.update([0]);
         Ok(())
     })
+}
+
+/// For each language, the paths of the project's files and the text (as the
+/// file digests have it) of its files of that language.
+fn siblings(project: &Project, digests: &HashMap<PathBuf, FileDigest>) -> HashMap<String, Digest> {
+    let mut files: Vec<_> = project.files.iter().collect();
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    let mut paths = KeyBuilder::new();
+    let mut languages: HashMap<&str, KeyBuilder> = HashMap::new();
+    for file in files {
+        let path = file.path.as_os_str().as_encoded_bytes();
+        paths.part(path);
+        if let Some(digest) = digests.get(&file.path) {
+            languages
+                .entry(&file.lang)
+                .or_default()
+                .part(path)
+                .part(digest.slice);
+        }
+    }
+    let paths = paths.finish();
+    languages
+        .into_iter()
+        .map(|(language, text)| {
+            let mut key = KeyBuilder::new();
+            key.part(paths).part(text.finish());
+            (language.to_owned(), key.finish())
+        })
+        .collect()
 }

@@ -21,6 +21,10 @@ spec:
     documentation world uses. When MD2 gives links, a CEL check over them
     replaces the program and this reasoning with it.
 
+    A link reads other files: the one it names, and the headings in it. A
+    file's finding is kept for as long as the file, the program, the paths of
+    the project's files and the text of its Markdown files are as they were.
+
     The program is not bundled. A project without lychee on its `PATH` has an
     incomplete analysis for its Markdown files, never a clean one. The finding
     of a file that fails is the end of what lychee printed, which names each
@@ -49,6 +53,7 @@ spec:
           - "{file}"
         output: status
         success: [0]
+        follows: true
   provenance:
     wasDerivedFrom:
       - 'lychee: https://github.com/lycheeverse/lychee (examples verified with 0.24.2)'

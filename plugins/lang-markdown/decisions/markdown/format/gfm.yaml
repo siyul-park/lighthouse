@@ -13,7 +13,9 @@ spec:
     owns these rules (MD001 to MD059) and fixes the ones it marks fixable, so
     the decision runs it and does not restate them. It reads the repository's
     own `.markdownlint-cli2.*` configuration, which is where a project turns a
-    rule off.
+    rule off. What it finds in a file depends on that file and that
+    configuration alone, so a file's finding is kept for as long as the file,
+    the program and the configuration are as they were.
 
     The program is not bundled. A project without markdownlint-cli2 on its
     `PATH` has an incomplete analysis for its Markdown files, and a finding is
@@ -44,6 +46,7 @@ spec:
           - "{file}"
         output: status
         success: [0]
+        independent: true
       fix:
         command:
           - markdownlint-cli2

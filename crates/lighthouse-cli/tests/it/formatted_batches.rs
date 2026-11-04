@@ -128,9 +128,12 @@ fn one_run_formats_every_file_and_a_run_without_changes_starts_none() {
         "package demo\n\n// A is a, changed.\nfunc A() {}\n",
     );
     assert_eq!(check(&project), first);
-    assert_eq!(
-        runs(&project.log).len(),
-        2,
-        "one run for the changed project"
+    let after_edit = runs(&project.log);
+    assert_eq!(after_edit.len(), 2, "one run for the changed file");
+    assert!(
+        after_edit[1].contains("a.go")
+            && !after_edit[1].contains("b.go")
+            && !after_edit[1].contains("c.go"),
+        "only the file that changed is formatted: {after_edit:?}"
     );
 }

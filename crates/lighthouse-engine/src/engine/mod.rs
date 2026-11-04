@@ -184,6 +184,28 @@ struct Scene<'a> {
     models: &'a dyn lighthouse_plugin::Models,
 }
 
+impl<'a> Scene<'a> {
+    /// What a rule reads when run for `file` (the project when `None`).
+    fn context(
+        &'a self,
+        trusted: bool,
+        file: Option<(&'a File, &'a str)>,
+        (notices, applies): (&'a Notices, Applicability),
+    ) -> Context<'a> {
+        Context {
+            workspace: self.workspace,
+            project: self.project,
+            file,
+            facts: self.facts,
+            trusted,
+            memo: self.memo,
+            notices,
+            applies,
+            models: self.models,
+        }
+    }
+}
+
 pub(crate) struct Input {
     pub(crate) file: File,
     pub(crate) text: String,

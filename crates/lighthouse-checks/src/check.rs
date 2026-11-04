@@ -110,18 +110,13 @@ impl Check {
         // The findings of a program that reads the code model are stored;
         // those of a command, which reads whatever the program reads, and of
         // a rule that reads the directives, which depend on what every other
-        // rule found, are not. A bundled command that judges a file by its
-        // text alone is, and so is one that formats files in batches, which
-        // reads the project's files and its configuration but no secret.
+        // rule found, are not. A bundled command that judges a file with no
+        // secret in its environment is: by the file's text alone when the
+        // program is `independent`, else by the project's files of its
+        // language too (what the file names).
         meta.caching = match &kind {
             Kind::Cel(rule) if rule.after_suppression() => None,
-            Kind::Command(rule) if rule.local(meta.scope) => Some(Caching {
-                reach: Reach::Local,
-                positions: false,
-                revision,
-                tools: rule.tools(),
-            }),
-            Kind::Command(rule) if rule.batched(meta.scope) => Some(Caching {
+            Kind::Command(rule) if rule.cacheable(meta.scope) => Some(Caching {
                 reach: Reach::Global,
                 positions: false,
                 revision,
@@ -214,6 +209,14 @@ impl Rule for Check {
 
     fn after_suppression(&self) -> bool {
         matches!(&*self.kind, Kind::Cel(rule) if rule.after_suppression())
+    }
+
+    fn batches(&self) -> bool {
+        matches!(&*self.kind, Kind::Command(rule) if rule.batched(self.meta.scope))
+    }
+
+    fn siblings(&self, language: &str) -> bool {
+        matches!(&*self.kind, Kind::Command(rule) if rule.siblings(self.meta.scope, language))
     }
 
     /// A command that finds in a file what the file alone holds reads only

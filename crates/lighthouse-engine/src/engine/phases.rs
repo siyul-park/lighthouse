@@ -1,7 +1,7 @@
 //! The phases of a run between reading files and collecting findings: read the
 //! files, have the providers index them, compute the facts and apply the rules.
 
-use std::sync::OnceLock;
+use std::{borrow::Cow, sync::OnceLock};
 
 use lighthouse_model::ucm::{Capability, ORDERED, REGIONS};
 use lighthouse_plugin::RuleManifest;
@@ -509,6 +509,7 @@ impl Engine {
     }
 
     fn apply_file_rules(&self, scene: &Scene) -> Result<Gathered, Error> {
+        self.expect_batches(scene)?;
         let per_file: Vec<Result<Gathered, Error>> = scene
             .inputs
             .par_iter()
@@ -519,6 +520,47 @@ impl Engine {
             all.merge(gathered?);
         }
         Ok(all)
+    }
+
+    /// Before the rules run, notes for each rule that runs a program over a
+    /// batch of files which files the result cache has nothing for, so that
+    /// the batch holds those alone.
+    fn expect_batches(&self, scene: &Scene) -> Result<(), Error> {
+        let Some(cache) = scene.cache else {
+            return Ok(());
+        };
+        let batching: Vec<&&dyn Rule> = scene
+            .rules
+            .iter()
+            .filter(|r| r.batches() && !r.after_suppression())
+            .collect();
+        if batching.is_empty() {
+            return Ok(());
+        }
+        let checked: Vec<Result<(), Error>> = scene
+            .inputs
+            .par_iter()
+            .map(|input| {
+                let resolved =
+                    self.config
+                        .resolve(&input.file.path, &input.file.lang, &self.projects)?;
+                let file = scene.project.file(&input.file.path).unwrap_or(&input.file);
+                for rule in &batching {
+                    let mut scratch = Gathered::default();
+                    let Some((options, _, applies)) =
+                        self.judged(scene, **rule, &resolved, file, &mut scratch)
+                    else {
+                        continue;
+                    };
+                    let notices = Notices::default();
+                    let at = Some((file, input.text.as_str()));
+                    let ctx = scene.context(self.trusted, at, (&notices, applies));
+                    cache.expect(**rule, &ctx, &options);
+                }
+                Ok(())
+            })
+            .collect();
+        checked.into_iter().collect()
     }
 
     fn apply_to_file(&self, scene: &Scene, input: &Input) -> Result<Gathered, Error> {
@@ -582,27 +624,12 @@ impl Engine {
             .iter()
             .filter(|r| r.manifest().scope == RunScope::File && r.after_suppression() == after)
         {
-            let meta = rule.manifest();
-            let Some(config) = resolved.get(&meta.id) else {
+            let Some((options, level, applies)) =
+                self.judged(scene, *rule, &resolved, file, &mut gathered)
+            else {
                 continue;
             };
-            let Some(level) = config.level else { continue };
-            let applies = self.applies(&meta.applicability, config);
-            if applies.excludes(scene.project, file) {
-                continue;
-            }
-            if let Some((language, missing)) = self.lacking(meta, &applies, file) {
-                gathered.notices.insert(format!(
-                    "{}: skipped for language `{language}`, missing capability {missing}",
-                    meta.id
-                ));
-                gathered
-                    .unsettled
-                    .insert((meta.id.clone(), Some(input.file.path.clone())));
-                continue;
-            }
             let at = Some((file, input.text.as_str()));
-            let options = options_at(&self.inherited, &resolved, &meta.id, &config.options);
             self.run_one(scene, *rule, (&options, level, applies), at, &mut gathered)?;
         }
         // Settle the models queued by this phase with the same resolved levels.
@@ -615,6 +642,39 @@ impl Engine {
                 .extend(found.into_iter().map(|d| answered(d, level)));
         }
         Ok(gathered)
+    }
+
+    /// How `rule` is to judge `file` as the configuration sets it: its
+    /// options, level and applicability; `None` when it is off, leaves the
+    /// file out or cannot read it (a provider without a capability it needs,
+    /// which is noticed and left unsettled).
+    fn judged<'a>(
+        &'a self,
+        scene: &Scene,
+        rule: &dyn Rule,
+        resolved: &'a lighthouse_spec::Rules,
+        file: &File,
+        gathered: &mut Gathered,
+    ) -> Option<(Cow<'a, Options>, Severity, Applicability)> {
+        let meta = rule.manifest();
+        let config = resolved.get(&meta.id)?;
+        let level = config.level?;
+        let applies = self.applies(&meta.applicability, config);
+        if applies.excludes(scene.project, file) {
+            return None;
+        }
+        if let Some((language, missing)) = self.lacking(meta, &applies, file) {
+            gathered.notices.insert(format!(
+                "{}: skipped for language `{language}`, missing capability {missing}",
+                meta.id
+            ));
+            gathered
+                .unsettled
+                .insert((meta.id.clone(), Some(file.path.clone())));
+            return None;
+        }
+        let options = options_at(&self.inherited, resolved, &meta.id, &config.options);
+        Some((options, level, applies))
     }
 
     /// The first language the rule looks at in `file` whose provider lacks a
@@ -710,17 +770,7 @@ impl Engine {
     ) -> Result<(), Error> {
         let meta = rule.manifest();
         let notices = Notices::default();
-        let ctx = Context {
-            workspace: scene.workspace,
-            project: scene.project,
-            file,
-            facts: scene.facts,
-            trusted: self.trusted,
-            memo: scene.memo,
-            notices: &notices,
-            applies,
-            models: scene.models,
-        };
+        let ctx = scene.context(self.trusted, file, (&notices, applies));
         let started = Instant::now();
         let checked = self.run_rule(scene, rule, &ctx, options);
         gathered.notices.extend(notices.take());

@@ -20,7 +20,7 @@ use super::{Cache, KeyBuilder};
 
 /// Files that choose which version of a toolchain runs, or configure a
 /// formatter, wherever the project has a directory.
-const SELECTORS: [&str; 22] = [
+const SELECTORS: [&str; 36] = [
     ".go-version",
     ".tool-versions",
     "rust-toolchain",
@@ -43,6 +43,21 @@ const SELECTORS: [&str; 22] = [
     ".ruff.toml",
     "pyproject.toml",
     "package.json",
+    // markdownlint-cli2 (its own files, and markdownlint's) and lychee.
+    ".markdownlint-cli2.jsonc",
+    ".markdownlint-cli2.yaml",
+    ".markdownlint-cli2.cjs",
+    ".markdownlint-cli2.mjs",
+    ".markdownlint.jsonc",
+    ".markdownlint.json",
+    ".markdownlint.yaml",
+    ".markdownlint.yml",
+    ".markdownlint.cjs",
+    ".markdownlint.mjs",
+    ".markdownlintignore",
+    "lychee.toml",
+    ".lycheerc.toml",
+    ".lycheeignore",
 ];
 /// Files of the user's toolchain managers that choose a version for every
 /// project, relative to the home directory.
@@ -52,8 +67,9 @@ const SELECTING_VARIABLES: [&str; 3] = ["RUSTUP_TOOLCHAIN", "GOENV_VERSION", "GO
 /// How long a program may take to say its version.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// The identity of `tools` in the project at `root`.
-pub(crate) fn identity(tools: &[String], root: &Path, project: &Project, cache: &Cache) -> String {
+/// The identity of `tools`, given the digest of the files that choose their
+/// version or configure them ([`selectors`]).
+pub(crate) fn identity(tools: &[String], selectors: &str, cache: &Cache) -> String {
     let mut hasher = Hasher::new();
     for (name, value) in SELECTING_VARIABLES.map(|name| (name, env::var_os(name))) {
         hasher.update(name);
@@ -63,11 +79,39 @@ pub(crate) fn identity(tools: &[String], root: &Path, project: &Project, cache: 
                 .unwrap_or_default(),
         );
     }
-    let selectors = selectors(root, project);
-    hasher.update(&selectors);
+    hasher.update(selectors);
     for tool in tools {
         hasher.update(tool);
-        hasher.update(found(tool, &selectors, cache));
+        hasher.update(found(tool, selectors, cache));
+    }
+    hasher.hex()
+}
+
+/// The digest of the files that choose a version or configure a formatter:
+/// those of the user's toolchain managers, and those in the directories of
+/// the project.
+pub(crate) fn selectors(root: &Path, project: &Project) -> String {
+    let mut dirs: BTreeSet<PathBuf> = BTreeSet::from([PathBuf::new()]);
+    for file in &project.files {
+        dirs.extend(file.path.ancestors().skip(1).map(Path::to_owned));
+    }
+    let mut hasher = Hasher::new();
+    let mut feed = |label: &Path, path: &Path| {
+        if let Ok(text) = fs::read(path) {
+            hasher.update(label.as_os_str().as_encoded_bytes());
+            hasher.update(&text);
+        }
+    };
+    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
+        for name in GLOBAL_SELECTORS {
+            feed(Path::new(name), &home.join(name));
+        }
+    }
+    for dir in &dirs {
+        for name in SELECTORS {
+            let relative = dir.join(name);
+            feed(&relative, &root.join(&relative));
+        }
     }
     hasher.hex()
 }
@@ -161,33 +205,4 @@ fn which(tool: &str) -> Option<PathBuf> {
         .map(|dir| dir.join(tool))
         .find(|candidate| candidate.is_file())
         .and_then(|candidate| candidate.canonicalize().ok())
-}
-
-/// The digest of the files that choose a version or configure a formatter:
-/// those of the user's toolchain managers, and those in the directories of
-/// the project.
-fn selectors(root: &Path, project: &Project) -> String {
-    let mut dirs: BTreeSet<PathBuf> = BTreeSet::from([PathBuf::new()]);
-    for file in &project.files {
-        dirs.extend(file.path.ancestors().skip(1).map(Path::to_owned));
-    }
-    let mut hasher = Hasher::new();
-    let mut feed = |label: &Path, path: &Path| {
-        if let Ok(text) = fs::read(path) {
-            hasher.update(label.as_os_str().as_encoded_bytes());
-            hasher.update(&text);
-        }
-    };
-    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
-        for name in GLOBAL_SELECTORS {
-            feed(Path::new(name), &home.join(name));
-        }
-    }
-    for dir in &dirs {
-        for name in SELECTORS {
-            let relative = dir.join(name);
-            feed(&relative, &root.join(&relative));
-        }
-    }
-    hasher.hex()
 }

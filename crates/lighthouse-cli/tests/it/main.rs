@@ -33,6 +33,7 @@ mod hook_trust;
 mod internal;
 mod judgments;
 mod layers;
+mod markdown_cache;
 mod mcp;
 mod mcp_contract;
 mod models;
