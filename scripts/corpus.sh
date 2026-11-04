@@ -19,8 +19,13 @@
 #              `--base main/lighthouse --base-plugins main/plugins`.
 #   repo-dir   default: cel, qlbridge (under $CORPUS_HOME, default ~/Projects)
 #              and this repository's HEAD. Each is copied out with
-#              `git archive HEAD`, never touched; the codelab/ directory of cel
-#              is removed from the copy.
+#              `git archive HEAD`, never touched; what the analysis of a
+#              corpus cannot load is removed from the copy (cel: codelab/,
+#              which is no Go module of the build, conformance/ and repl/,
+#              which need the Bazel build's inputs, and tools/celtest/ with
+#              policy/test/, its only importer, which build against another
+#              revision of cel's policy package), so
+#              that the analysis is complete and `fix` does not refuse it.
 #
 # Each corpus is checked by both binaries with scripts/baseline/strict-go.toml
 # (strict-root.toml for a Cargo workspace), `--format json --detail full --limit 1000000`,
@@ -93,6 +98,9 @@ corpus() {
     mkdir -p "$dir/tree"
     git -C "$src" archive HEAD | tar -x -C "$dir/tree"
     rm -rf "$dir/tree/codelab"
+    case $label in
+    cel) rm -rf "$dir/tree/conformance" "$dir/tree/repl" "$dir/tree/tools/celtest" "$dir/tree/policy/test" ;;
+    esac
     preset=strict-go
     [ ! -f "$dir/tree/Cargo.toml" ] || preset=strict-root
     sed "s|@PLUGINS@|$plugins|g" "scripts/baseline/$preset.toml" >"$dir/config.toml"
