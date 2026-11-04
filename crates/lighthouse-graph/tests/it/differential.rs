@@ -216,7 +216,7 @@ fn check_executed(
         let kind = kind_of(label);
         let global = matches!(edit, Edit::Config | Edit::Version);
         let fine = match kind {
-            "report" => true,
+            "report" | "par-report" => true,
             "facts" if global => true,
             "facts" => allowed.contains(path_of(label)),
             _ => (!global && allowed.contains(path_of(label))) || tainted.contains(path_of(label)),
@@ -240,6 +240,7 @@ pub fn run(seed: u64, steps: usize) {
     db.set_verify(0);
     apply(&mut db, &sim.project, &sim.known);
     pull(&db);
+    pull_par(&db);
     db.take_executed();
     let mut tainted = BTreeSet::new();
     for step in 0..steps {
@@ -251,12 +252,14 @@ pub fn run(seed: u64, steps: usize) {
         }
         apply(&mut db, &sim.project, &sim.known);
         let graph = pull(&db);
+        let fanned = pull_par(&db);
         let ran = db.take_executed();
         assert_eq!(
             graph,
             from_scratch(&sim.project, &sim.known),
             "seed {seed} step {step} after {edit:?}"
         );
+        assert_eq!(fanned, graph, "seed {seed} step {step}: fan-out report");
         check_executed(&sim, &before, &edit, &tainted, &ran);
     }
 }

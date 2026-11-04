@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -8,7 +8,7 @@ use crate::{
     node::{Dep, Hash, Locked, NodeId},
 };
 
-/// The most waits a cycle search follows: a bound against a wait chain that
+/// The most frames a cycle search visits: a bound against a claim graph that
 /// is already broken.
 const MAX_HOPS: usize = 100_000;
 
@@ -27,10 +27,13 @@ struct Reads {
     durability: Durability,
 }
 
+/// The claim graph around a frame: what it runs now, and whose claims its
+/// threads wait for. Several threads may work for one frame (a fan-out), so
+/// both are lists.
 #[derive(Default)]
 struct Link {
-    child: Option<Arc<Frame>>,
-    waiting: Option<Arc<Frame>>,
+    children: Vec<Arc<Frame>>,
+    waiting: Vec<Arc<Frame>>,
 }
 
 impl Frame {
@@ -66,12 +69,27 @@ impl Frame {
         (std::mem::take(&mut reads.list), reads.durability)
     }
 
-    pub(crate) fn set_child(&self, child: Option<Arc<Frame>>) {
-        self.link.locked().child = child;
+    pub(crate) fn add_child(&self, child: &Arc<Frame>) {
+        self.link.locked().children.push(child.clone());
     }
 
-    pub(crate) fn set_waiting(&self, owner: Option<Arc<Frame>>) {
-        self.link.locked().waiting = owner;
+    pub(crate) fn remove_child(&self, child: &Arc<Frame>) {
+        remove(&mut self.link.locked().children, child);
+    }
+
+    pub(crate) fn add_waiting(&self, owner: &Arc<Frame>) {
+        self.link.locked().waiting.push(owner.clone());
+    }
+
+    pub(crate) fn remove_waiting(&self, owner: &Arc<Frame>) {
+        remove(&mut self.link.locked().waiting, owner);
+    }
+
+    /// What this frame depends on: the frames it runs and the owners of the
+    /// claims its threads wait for.
+    fn needs(&self) -> Vec<Arc<Frame>> {
+        let link = self.link.locked();
+        link.children.iter().chain(&link.waiting).cloned().collect()
     }
 
     fn chain(self: &Arc<Self>) -> Vec<Arc<Frame>> {
@@ -82,37 +100,48 @@ impl Frame {
         chain.reverse();
         chain
     }
+}
 
-    fn leaf(self: &Arc<Self>) -> Arc<Frame> {
-        let mut leaf = self.clone();
-        loop {
-            let child = leaf.link.locked().child.clone();
-            match child {
-                Some(child) => leaf = child,
-                None => return leaf,
-            }
-        }
+fn remove(list: &mut Vec<Arc<Frame>>, frame: &Arc<Frame>) {
+    if let Some(at) = list.iter().position(|found| Arc::ptr_eq(found, frame)) {
+        list.swap_remove(at);
     }
 }
 
-/// The nodes of a cycle that waiting for `wanted`, claimed by `owner`, would
-/// close, if it would: `owner` is a frame of the caller's own chain, or what
-/// `owner` runs is blocked, hop by hop, on a frame of that chain. Call with
-/// the wait lock held so that two threads cannot each miss the other's wait.
-pub(crate) fn cycle(me: &Arc<Frame>, owner: &Arc<Frame>, wanted: &NodeId) -> Option<Vec<NodeId>> {
+/// The nodes of a cycle that waiting for a node claimed by `owner` would
+/// close, if it would: some frame of the caller's own chain (the frames that
+/// are waiting for the caller to finish) is reached from `owner` by following
+/// what frames run and wait for, across threads and through fan-outs. Call
+/// with the wait lock held so that two threads cannot each miss the other's
+/// wait.
+pub(crate) fn cycle(me: &Arc<Frame>, owner: &Arc<Frame>) -> Option<Vec<NodeId>> {
     let mine = me.chain();
-    let mut tail = vec![wanted.clone()];
-    let mut current = owner.clone();
-    for _ in 0..MAX_HOPS {
-        if let Some(at) = mine.iter().position(|frame| Arc::ptr_eq(frame, &current)) {
-            let mut path: Vec<NodeId> = mine[at..].iter().map(|frame| frame.id.clone()).collect();
-            path.append(&mut tail);
+    let at = |frame: &Arc<Frame>| mine.iter().position(|found| Arc::ptr_eq(found, frame));
+    let mut came_from: HashMap<*const Frame, Arc<Frame>> = HashMap::new();
+    let mut seen: HashSet<*const Frame> = HashSet::from([Arc::as_ptr(owner)]);
+    let mut stack = vec![owner.clone()];
+    while let Some(frame) = stack.pop() {
+        if let Some(start) = at(&frame) {
+            let mut route = vec![frame.id.clone()];
+            let mut step = frame;
+            while let Some(before) = came_from.get(&Arc::as_ptr(&step)) {
+                route.push(before.id.clone());
+                step = before.clone();
+            }
+            route.reverse();
+            let mut path: Vec<NodeId> = mine[start..].iter().map(|f| f.id.clone()).collect();
+            path.extend(route);
             return Some(path);
         }
-        let leaf = current.leaf();
-        let next = leaf.link.locked().waiting.clone()?;
-        tail.push(leaf.id.clone());
-        current = next;
+        if seen.len() > MAX_HOPS {
+            return None;
+        }
+        for next in frame.needs() {
+            if seen.insert(Arc::as_ptr(&next)) {
+                came_from.insert(Arc::as_ptr(&next), frame.clone());
+                stack.push(next);
+            }
+        }
     }
     None
 }

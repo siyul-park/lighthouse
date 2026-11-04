@@ -21,6 +21,7 @@ mod db;
 mod dirty;
 mod error;
 mod explain;
+mod fan;
 mod frame;
 mod node;
 mod pull;

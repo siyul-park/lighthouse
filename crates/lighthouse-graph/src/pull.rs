@@ -52,7 +52,7 @@ impl Db {
             }
             if let State::Running(owner) = &node.state {
                 let owner = owner.clone();
-                self.block(&slot, node, id, &owner)?;
+                self.block(&slot, node, &owner)?;
                 continue;
             }
             let frame = Frame::new(id.clone(), self.frame.clone());
@@ -92,12 +92,13 @@ impl Db {
         want_value: bool,
     ) -> Result<(), Error> {
         let _claim = Claim(slot);
-        let caller = self.frame.iter();
-        caller
-            .clone()
-            .for_each(|caller| caller.set_child(Some(frame.clone())));
+        if let Some(caller) = &self.frame {
+            caller.add_child(frame);
+        }
         let result = self.within(frame).settle(slot, kind, want_value);
-        caller.for_each(|caller| caller.set_child(None));
+        if let Some(caller) = &self.frame {
+            caller.remove_child(frame);
+        }
         result
     }
 
@@ -110,29 +111,31 @@ impl Db {
     }
 
     /// Waits for the claim on a node to be released, unless that would close
-    /// a cycle.
+    /// a cycle. The wait parks the thread: see [`Db::par_map`] for why that
+    /// cannot starve the pool, and why helping with other work could.
     fn block(
         &self,
         slot: &Slot,
         node: MutexGuard<'_, Node>,
-        id: &NodeId,
         owner: &Arc<Frame>,
     ) -> Result<(), Error> {
         if let Some(me) = &self.frame {
             let _waits = self.shared.waits.locked();
-            if let Some(path) = cycle(me, owner, id) {
+            if let Some(path) = cycle(me, owner) {
                 return Err(Error::Cycle(
                     path.iter().map(|node| self.shared.label(node)).collect(),
                 ));
             }
-            me.set_waiting(Some(owner.clone()));
+            me.add_waiting(owner);
         }
         drop(
             slot.ready
                 .wait(node)
                 .unwrap_or_else(PoisonError::into_inner),
         );
-        self.frame.iter().for_each(|me| me.set_waiting(None));
+        if let Some(me) = &self.frame {
+            me.remove_waiting(owner);
+        }
         Ok(())
     }
 }

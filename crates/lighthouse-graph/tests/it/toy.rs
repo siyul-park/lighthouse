@@ -18,6 +18,8 @@ pub static USES: Query<String, Vec<String>> = Query::new("uses", uses);
 pub static DEPS: Query<String, Vec<(String, String)>> = Query::new("deps", deps);
 pub static FACTS: Query<String, Facts> = Query::new("facts", facts);
 pub static REPORT: Query<(), Vec<(String, Facts)>> = Query::new("report", report);
+/// The report again, fanned out over the files: it must equal `REPORT`.
+pub static PAR_REPORT: Query<(), Vec<(String, Facts)>> = Query::new("par-report", par_report);
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Parsed {
@@ -96,6 +98,15 @@ fn report(db: &Db, _: &()) -> Result<Vec<(String, Facts)>, Error> {
     Ok(all)
 }
 
+fn par_report(db: &Db, _: &()) -> Result<Vec<(String, Facts)>, Error> {
+    let files = db.input(&FILES, &())?.as_ref().clone();
+    db.par_map(files, |db, path| {
+        Ok((path.clone(), db.query(&FACTS, path)?.as_ref().clone()))
+    })
+    .into_iter()
+    .collect()
+}
+
 /// The inputs of a toy project.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Project {
@@ -127,6 +138,7 @@ pub fn register(db: &Db) {
     db.register_query(&DEPS);
     db.register_query(&FACTS);
     db.register_query(&REPORT);
+    db.register_query(&PAR_REPORT);
 }
 
 /// Opens a graph on disk, or in memory without a path, with all queries known.
@@ -160,6 +172,13 @@ pub fn apply(db: &mut Db, project: &Project, known: &[String]) {
     for (name, version) in &project.versions {
         db.set_version(name, version).expect("set version");
     }
+}
+
+pub fn pull_par(db: &Db) -> Vec<(String, Facts)> {
+    db.query(&PAR_REPORT, &())
+        .expect("par report")
+        .as_ref()
+        .clone()
 }
 
 pub fn pull(db: &Db) -> Vec<(String, Facts)> {
