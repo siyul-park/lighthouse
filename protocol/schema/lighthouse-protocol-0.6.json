@@ -1152,6 +1152,13 @@
             "$ref": "#/$defs/Source"
           },
           "type": "array"
+        },
+        "timings": {
+          "description": "Where the provider's time went, phase by phase, for the host's\n`--timings`; it changes nothing in the analysis.",
+          "items": {
+            "$ref": "#/$defs/PhaseTime"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -1489,6 +1496,26 @@
       "required": [
         "path",
         "text"
+      ],
+      "type": "object"
+    },
+    "PhaseTime": {
+      "description": "How long one phase of an index request took in the provider.",
+      "properties": {
+        "micros": {
+          "description": "Microseconds the phase took, summed over its runs.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "phase": {
+          "description": "What the provider calls the phase, such as `load` or `analyse`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "micros"
       ],
       "type": "object"
     },

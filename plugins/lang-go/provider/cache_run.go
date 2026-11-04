@@ -14,6 +14,10 @@ import (
 type RunStats struct {
 	Hits   []string
 	Misses []string
+	// Analysed are the directories the go command was given to load: the
+	// misses, and the units that declare interfaces when a miss has no old
+	// record to take its `implements` edges from.
+	Analysed []string
 	// Loads is how many times the request had the go command load packages:
 	// one for each module it holds files or fences of.
 	Loads int
@@ -36,6 +40,8 @@ type cachePlan struct {
 	// interfaces are the hit units that declare interfaces: the analysis of the
 	// misses needs them loaded to match types against them.
 	interfaces []*cacheUnit
+	// analysed are the units the analysis of the misses was given.
+	analysed []*cacheUnit
 }
 
 // indexCached answers the request from the cache where it can and analyzes
@@ -50,8 +56,10 @@ func (p *Provider) indexCached(r *run, params sdk.IndexParams, snippets []*snipp
 		return nil, false
 	}
 	store := &cacheStore{dir: params.Context.Cache.Dir}
+	planned := r.times.measure(phasePlan)
 	pl := &planner{r: r, edits: edits, used: map[string]fileFacts{}, units: map[string]*cacheUnit{}}
 	plan, ok := p.prepare(pl, store, params)
+	planned()
 	if !ok {
 		return nil, false
 	}
@@ -70,9 +78,11 @@ func (p *Provider) indexCached(r *run, params sdk.IndexParams, snippets []*snipp
 // finish installs the answer into r and keeps what the analysis learned.
 func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, pl *planner) {
 	install(r, plan, sub)
-	p.record(store, plan, sub)
+	p.record(store, plan, sub, r.times)
 	if !reflect.DeepEqual(pl.used, pl.facts) {
+		stored := r.times.measure(phaseStore)
 		store.write(factsFile, factsRecord{Version: cacheSchema, Files: pl.used})
+		stored()
 	}
 	if notice := store.notice(); notice != "" {
 		r.result.Notices = append(r.result.Notices, notice)
@@ -150,6 +160,10 @@ func (plan *cachePlan) stats() RunStats {
 			s.Misses = append(s.Misses, u.rel)
 		}
 	}
+	for _, u := range plan.analysed {
+		s.Analysed = append(s.Analysed, u.rel)
+	}
+	sort.Strings(s.Analysed)
 	return s
 }
 
@@ -161,9 +175,17 @@ func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan, snippets []*
 	if len(plan.misses) == 0 && len(snippets) == 0 {
 		return nil, true
 	}
-	// The interface units are always analyzed along: a method is an
-	// implementation of any interface of the project, named or not.
-	units := slices.Concat(plan.misses, plan.interfaces)
+	// A method is an implementation of any interface of the project, named or
+	// not, so the units that declare interfaces are analyzed along, unless
+	// every missed unit has its old record: its declarations and those of what
+	// it imports are as they were, and the `implements` edges of that record
+	// still hold (reuseImplements), so the interfaces need not be loaded.
+	reuse := len(plan.previous) == len(plan.misses)
+	units := plan.misses
+	if !reuse {
+		units = slices.Concat(plan.misses, plan.interfaces)
+	}
+	plan.analysed = units
 	wanted := map[string]bool{}
 	for _, u := range units {
 		for _, rel := range u.requested {
@@ -179,12 +201,13 @@ func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan, snippets []*
 		}
 	}
 	sub := newRun(subParams, r.opts)
+	sub.times = r.times
 	sub.admit(snippets)
 	sub.index()
 	if !sameFailures(r, sub) {
 		return sub, false
 	}
-	if len(plan.previous) == len(plan.misses) {
+	if reuse {
 		reuseImplements(sub, plan)
 	}
 	return sub, true

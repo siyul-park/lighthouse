@@ -689,6 +689,35 @@ fn timings() {
 }
 
 #[test]
+fn a_providers_phases_are_listed_under_its_index_line_and_summed_over_its_calls() {
+    use std::time::Duration;
+    let ms = Duration::from_millis;
+    let timings = lighthouse_engine::Timings {
+        index: vec![("go".to_owned(), ms(30)), ("rust".to_owned(), ms(5))],
+        index_phases: vec![
+            (
+                "go".to_owned(),
+                vec![("load".to_owned(), ms(10)), ("analyse".to_owned(), ms(2))],
+            ),
+            ("go".to_owned(), vec![("load".to_owned(), ms(5))]),
+        ],
+        ..Default::default()
+    };
+
+    let lines = timings.lines(Duration::ZERO, Duration::ZERO);
+
+    let at = lines
+        .iter()
+        .position(|l| l == "timings: index go 30.0ms")
+        .unwrap();
+    assert_eq!(
+        lines[at + 1],
+        "timings: index go: load 15.0ms, analyse 2.0ms"
+    );
+    assert_eq!(lines[at + 2], "timings: index rust 5.0ms");
+}
+
+#[test]
 fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
     let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2")]);
     let engine = engine(&dir, ALL).unwrap();

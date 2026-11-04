@@ -266,7 +266,12 @@ fn index_overlaid(
             }),
         },
     };
-    plugin.call::<Value>(wire::INDEX, params)
+    // How long a provider took is not what it found.
+    let mut result = plugin.call::<Value>(wire::INDEX, params);
+    if let Some(object) = result.as_object_mut() {
+        object.remove("timings");
+    }
+    result
 }
 
 fn golden(lang: &Lang) {

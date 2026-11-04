@@ -219,7 +219,7 @@ of what they depend on. Any doubt is a miss. A result with an `incomplete` entry
 never written. Conformance indexes every case cold, then warm, and compares the answer
 with an uncached run byte for byte. The field is optional.
 
-Result `{ fragments, sources, notices, incomplete }`:
+Result `{ fragments, sources, notices, incomplete, timings? }`:
 
 - `fragments`: one per analyzed file, sorted by path, each
   `{ file: { path, facts? }, modules, symbols, edges, functions, tests, comments }`;
@@ -243,6 +243,10 @@ Result `{ fragments, sources, notices, incomplete }`:
   scope, that could not be analyzed fully: load, parse and type errors, missing
   dependencies. A file listed here MAY still have a fragment with what could be
   recovered. Never drop a gap silently: "not checked" is not "passed".
+- `timings`: optional `{ phase, micros }` entries, in the order the phases ran, saying where the
+  provider's own time went (the Go provider: `plan`, `load`, `analyse`, `serialise`, `store`). The
+  host prints them under `check --timings` as `index <language>: <phase> <ms>, ...`; they change
+  nothing in the analysis, and a result is compared without them.
 
 ### `shutdown` (request) and `exit` (notification)
 

@@ -16,6 +16,9 @@ type interfaceSet struct {
 	once     sync.Once
 	byMethod map[string][]*types.Interface
 	wider    map[string][]*types.Interface
+	// near is wider without the interfaces of project packages the package
+	// does not reach through its imports.
+	near map[string][]*types.Interface
 	// embedders are the types of the package that embed a type, by the
 	// embedded type: its methods are promoted into them.
 	embedders map[*types.TypeName][]*types.Named
@@ -30,38 +33,37 @@ const resolutionSyntactic = "syntactic"
 // implementation reports whether the method satisfies an interface of the
 // project or of a package the code can import, named by the package or not:
 // some candidate interface has a method of the same name and the receiver
-// type (or a pointer to it) implements the interface.
-func (u *unit) implementation(d *ast.FuncDecl) bool {
+// type (or a pointer to it) implements the interface. far says that only an
+// interface of a package of the project that the unit's package does not import
+// does: what a request that loads the package alone does not see.
+func (u *unit) implementation(d *ast.FuncDecl) (impl, far bool) {
 	if d.Recv == nil {
-		return false
+		return false, false
 	}
 	fn, ok := u.info().Defs[d.Name].(*types.Func)
 	if !ok {
-		return false
+		return false, false
 	}
 	recv := fn.Type().(*types.Signature).Recv()
 	if recv == nil {
-		return false
+		return false, false
 	}
 	named, ok := receiverNamed(recv.Type())
 	if !ok {
-		return false
+		return false, false
 	}
 	if overridesPromoted(named, u.pkg.Types, d.Name.Name) {
-		return true
+		return true, false
 	}
 	set := u.res.interfacesOf(u.pkg)
-	for _, iface := range slices.Concat(set.byMethod[d.Name.Name], set.wider[d.Name.Name]) {
-		if satisfies(named, iface) {
-			return true
-		}
-		for _, holder := range set.embedders[named.Obj()] {
-			if satisfies(holder, iface) {
-				return true
-			}
-		}
+	name := d.Name.Name
+	if satisfiesAny(named, set, slices.Concat(set.byMethod[name], set.near[name])) {
+		return true, false
 	}
-	return false
+	if satisfiesAny(named, set, set.wider[name]) {
+		return true, true
+	}
+	return false, false
 }
 
 // constructs reports whether the function has no receiver and returns T, *T
@@ -172,6 +174,22 @@ func (u *unit) unresolvedUse(from sdk.Node, id *ast.Ident, call bool) {
 	}
 	site := span(u.fset, id.Pos(), id.End())
 	u.edgeAs(kind, from, id.Name, &site, resolutionSyntactic)
+}
+
+// satisfiesAny reports whether the type, or a type of the package that
+// embeds it, satisfies one of the interfaces.
+func satisfiesAny(named *types.Named, set *interfaceSet, ifaces []*types.Interface) bool {
+	for _, iface := range ifaces {
+		if satisfies(named, iface) {
+			return true
+		}
+		for _, holder := range set.embedders[named.Obj()] {
+			if satisfies(holder, iface) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func collectInterfaces(pkg *packages.Package) map[string][]*types.Interface {

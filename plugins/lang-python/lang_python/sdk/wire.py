@@ -492,6 +492,16 @@ Source = TypedDict(
 )
 
 
+PhaseTime = TypedDict(
+    "PhaseTime",
+    {
+        "micros": Required[int],
+        "phase": Required[str],
+    },
+    total=False,
+)
+
+
 IndexResult = TypedDict(
     "IndexResult",
     {
@@ -499,6 +509,7 @@ IndexResult = TypedDict(
         "incomplete": list[Incomplete],
         "notices": list[str],
         "sources": list[Source],
+        "timings": list[PhaseTime],
     },
     total=False,
 )

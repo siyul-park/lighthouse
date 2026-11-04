@@ -20,6 +20,7 @@ func (r IndexResult) MarshalJSON() ([]byte, error) {
 		Sources    []Source          `json:"sources,omitempty"`
 		Notices    []string          `json:"notices"`
 		Incomplete []Incomplete      `json:"incomplete"`
+		Timings    []PhaseTime       `json:"timings,omitempty"`
 	}
 	type entry struct {
 		path string
@@ -37,7 +38,7 @@ func (r IndexResult) MarshalJSON() ([]byte, error) {
 		entries = append(entries, entry{e.Path, e.JSON})
 	}
 	sort.SliceStable(entries, func(i, j int) bool { return entries[i].path < entries[j].path })
-	out := wire{Sources: r.Sources, Notices: r.Notices, Incomplete: r.Incomplete}
+	out := wire{Sources: r.Sources, Notices: r.Notices, Incomplete: r.Incomplete, Timings: r.Timings}
 	if r.Fragments != nil || len(r.Encoded) > 0 {
 		out.Fragments = make([]json.RawMessage, len(entries))
 		for i, e := range entries {

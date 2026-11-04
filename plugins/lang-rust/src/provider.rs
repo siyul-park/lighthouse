@@ -90,6 +90,7 @@ impl language::Provider for Provider {
                             path: None,
                             reason: format!("[languages.{LANGUAGE}]: {error}"),
                         }],
+                        timings: Vec::new(),
                     });
                 }
             },
@@ -276,6 +277,7 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
             .into_iter()
             .map(|(path, reason)| Incomplete { path, reason })
             .collect(),
+        timings: Vec::new(),
     }
 }
 

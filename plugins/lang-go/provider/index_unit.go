@@ -37,6 +37,9 @@ type unit struct {
 	cmap     ast.CommentMap
 	blocks   []declBlock
 	inlined  []inlineBody
+	// far are the methods that implement only an interface of a package of the
+	// project that this unit's package does not import.
+	far []string
 }
 
 // edgeKey identifies an emitted edge: the same relation at another site is
@@ -205,7 +208,7 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		ForwardsTo:       forwardTarget(d, u.info(), u.res),
 		Signature:        u.signature(d),
 		Events:           u.events(d),
-		Implementation:   u.implementation(d),
+		Implementation:   u.implements(id, d),
 		Constructs:       u.constructs(d),
 		Configures:       u.configures(d),
 		ManualAssertions: manual,
@@ -213,6 +216,16 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 	if isTestCase {
 		u.frag.Tests = append(u.frag.Tests, testCaseOf(d, id, usages, u.info()))
 	}
+}
+
+// implements reports whether the method implements an interface, and notes it
+// when only an interface of a package this one does not import says so.
+func (u *unit) implements(id string, d *ast.FuncDecl) bool {
+	implementation, far := u.implementation(d)
+	if far {
+		u.far = append(u.far, id)
+	}
+	return implementation
 }
 
 // usages are the distinct uses of a body in order of first use, and every

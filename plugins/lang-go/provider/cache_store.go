@@ -39,12 +39,16 @@ type unitRecord struct {
 type recordFile struct {
 	Path     string          `json:"path"`
 	Fragment json.RawMessage `json:"fragment"`
+	// Far are the methods of the file that implement only an interface of a
+	// package of the project that the file's package does not import: the one
+	// thing in a fragment that an analysis of the package alone cannot see.
+	Far []string `json:"far,omitempty"`
 }
 
 const (
 	// cacheSchema versions the layout and meaning of everything in the cache
 	// directory; changing it makes every entry a miss.
-	cacheSchema = "lang-go-cache/3"
+	cacheSchema = "lang-go-cache/4"
 	// cacheLimit caps the size of the cache directory; the oldest entries go first.
 	cacheLimit = 256 << 20
 
@@ -212,6 +216,16 @@ func (rec unitRecord) covers(u *cacheUnit) bool {
 	return true
 }
 
+// farOf is the methods of the file that only far interfaces give a role.
+func (rec unitRecord) farOf(rel string) []string {
+	for _, f := range rec.Files {
+		if f.Path == rel {
+			return f.Far
+		}
+	}
+	return nil
+}
+
 // unitName is the file of the record of a unit at a key. Records of one unit
 // share a prefix, so a new one can replace the old.
 func unitName(unit, key string) string {
@@ -222,17 +236,29 @@ func unitStem(unit string) string {
 	return digest(unit)[:16]
 }
 
-// reuseImplements puts the `implements` edges of the replaced records where the
-// analysis, which saw only the missed units, found some of its own. The
-// declarations of the unit and of everything it imports are unchanged, so
-// the old edges are the ones a full analysis would give.
+// reuseImplements puts what the analysis of the missed units alone could not
+// see where it found only its own: the `implements` edges of the replaced
+// records, and the `implementation` role of the methods that only an interface
+// of a package the unit does not import gives. The declarations of the unit and
+// of everything else are unchanged, so the old ones are what a full analysis
+// would give.
 func reuseImplements(sub *run, plan *cachePlan) {
 	for _, u := range plan.misses {
-		old := plan.previous[u].implementsOf()
+		previous := plan.previous[u]
+		old := previous.implementsOf()
 		for _, rel := range u.requested {
-			if frag := sub.fragments[rel]; frag != nil {
-				edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
-				frag.Edges = append(edges, old[rel]...)
+			frag := sub.fragments[rel]
+			if frag == nil {
+				continue
+			}
+			edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
+			frag.Edges = append(edges, old[rel]...)
+			far := previous.farOf(rel)
+			sub.far[rel] = far
+			for i := range frag.Functions {
+				if slices.Contains(far, frag.Functions[i].Symbol) {
+					frag.Functions[i].Implementation = true
+				}
 			}
 		}
 	}
@@ -267,18 +293,20 @@ func install(r *run, plan *cachePlan, sub *run) {
 
 // recordOf is the record of an analyzed unit; none when any of its files had a
 // problem, as only complete results are cached.
-func recordOf(u *cacheUnit, sub *run) (unitRecord, bool) {
+func recordOf(u *cacheUnit, sub *run, times *timings) (unitRecord, bool) {
 	rec := unitRecord{API: u.apiKey, Files: []recordFile{}, Excluded: []string{}}
 	for _, rel := range u.requested {
 		frag := sub.fragments[rel]
 		if _, bad := sub.problems[rel]; bad || frag == nil {
 			return unitRecord{}, false
 		}
+		encoded := times.measure(phaseSerialise)
 		data, err := json.Marshal(frag)
+		encoded()
 		if err != nil {
 			return unitRecord{}, false
 		}
-		rec.Files = append(rec.Files, recordFile{Path: rel, Fragment: data})
+		rec.Files = append(rec.Files, recordFile{Path: rel, Fragment: data, Far: sub.far[rel]})
 		if !sub.claimed[rel] {
 			if !sub.excludedFiles[rel] {
 				return unitRecord{}, false

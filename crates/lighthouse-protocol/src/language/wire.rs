@@ -326,6 +326,19 @@ pub struct IndexResult {
     /// still have a fragment with whatever could be recovered.
     #[serde(default)]
     pub incomplete: Vec<Incomplete>,
+    /// Where the provider's time went, phase by phase, for the host's
+    /// `--timings`; it changes nothing in the analysis.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub timings: Vec<PhaseTime>,
+}
+
+/// How long one phase of an index request took in the provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct PhaseTime {
+    /// What the provider calls the phase, such as `load` or `analyse`.
+    pub phase: String,
+    /// Microseconds the phase took, summed over its runs.
+    pub micros: u64,
 }
 
 /// One physical host document and regions selected for destination-provider analysis.

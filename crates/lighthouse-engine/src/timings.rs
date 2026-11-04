@@ -18,6 +18,9 @@ pub struct Timings {
     /// Indexing by each language provider, by language id; the providers run
     /// side by side.
     pub index: Vec<(String, Duration)>,
+    /// Where a provider says its own time went, by language id: the phases in
+    /// the order it ran them. Only providers that say are listed.
+    pub index_phases: Vec<(String, Vec<(String, Duration)>)>,
     /// Merging what the providers indexed into one project.
     pub merge: Duration,
     /// Each analyzer, over all files, in the order they ran.
@@ -45,11 +48,12 @@ impl Timings {
     /// findings and `total` the time of the whole run.
     pub fn lines(&self, report: Duration, total: Duration) -> Vec<String> {
         let mut out = vec![line("setup", self.setup), line("read", self.read)];
-        out.extend(
-            self.index
-                .iter()
-                .map(|(language, spent)| line(&format!("index {language}"), *spent)),
-        );
+        for (language, spent) in &self.index {
+            out.push(line(&format!("index {language}"), *spent));
+            if let Some(phases) = self.phases_of(language) {
+                out.push(format!("timings: index {language}: {phases}"));
+            }
+        }
         out.push(line("merge", self.merge));
         if self.hashing > Duration::ZERO {
             out.push(format!(
@@ -76,6 +80,30 @@ impl Timings {
         out.push(line("report", report));
         out.push(line("total", total));
         out
+    }
+
+    /// The phases a provider reported, as `load 12.0ms, analyse 3.0ms`, summed
+    /// over its calls; `None` when it reported none.
+    fn phases_of(&self, language: &str) -> Option<String> {
+        let mut totals: Vec<(&str, Duration)> = Vec::new();
+        for (phase, spent) in self
+            .index_phases
+            .iter()
+            .filter(|(id, _)| id == language)
+            .flat_map(|(_, phases)| phases)
+        {
+            match totals.iter_mut().find(|(name, _)| name == phase) {
+                Some((_, total)) => *total += *spent,
+                None => totals.push((phase, *spent)),
+            }
+        }
+        (!totals.is_empty()).then(|| {
+            totals
+                .iter()
+                .map(|(phase, spent)| format!("{phase} {:.1}ms", spent.as_secs_f64() * 1000.0))
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
     }
 
     /// Folds `times` into the total of each rule.

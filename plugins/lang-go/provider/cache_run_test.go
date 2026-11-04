@@ -124,6 +124,7 @@ func TestProviderCache(t *testing.T) {
 
 			require.JSONEq(t, want, got, step.name)
 			require.Equal(t, []string{"p"}, stats.Misses, step.name)
+			require.Equal(t, []string{"p"}, stats.Analysed, step.name+": the interface units are not loaded")
 			require.Contains(t, got, `"kind":"implements"`, step.name)
 			require.Contains(t, got, `"implementation":true`, step.name)
 		}
@@ -293,6 +294,9 @@ func indexWithOverlays(t *testing.T, g *provider.Provider, root, cache string, o
 	}
 	result, err := g.Index(params)
 	require.NoError(t, err)
+	require.NotEmpty(t, result.Timings, "an index request says where its time went")
+	// The time a request took is not part of what it found.
+	result.Timings = nil
 	raw, err := json.Marshal(result)
 	require.NoError(t, err)
 	stats := g.Stats()

@@ -47,6 +47,12 @@ type run struct {
 	// fenceFiles are the files that stand for the fences of host files: they
 	// are analysed with the rest but are no files of the request.
 	fenceFiles map[string]bool
+	// far holds, by file, the methods that implement only an interface of a
+	// package of the project that the package of the file does not import.
+	far map[string][]string
+	// times is where the request's time goes, shared with the analysis of the
+	// units the cache missed.
+	times *timings
 	// regionModules gives the module path of the unit of a fence by its file,
 	// where the unit's directory is not its own.
 	regionModules map[string]string
@@ -102,6 +108,8 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		regionModules: map[string]string{},
 		fenceFiles:    map[string]bool{},
 		result:        emptyResult(),
+		times:         &timings{},
+		far:           map[string][]string{},
 	}
 	for _, f := range params.FileInputs() {
 		r.requested[f.Path] = f
@@ -123,7 +131,10 @@ func (r *run) index() {
 	r.loads = len(batches)
 	loads := r.loadAll(batches)
 	for _, b := range batches {
-		r.analyze(b, loads.next())
+		waited := r.times.measure(phaseLoad)
+		got := loads.next()
+		waited()
+		r.analyze(b, got)
 	}
 	for _, rel := range candidates {
 		if !r.claimed[rel] {
@@ -163,6 +174,7 @@ func (r *run) candidates() []string {
 }
 
 func (r *run) finish() sdk.IndexResult {
+	defer r.times.measure(phaseSerialise)()
 	paths := make([]string, 0, len(r.fragments))
 	for path := range r.fragments {
 		if !r.fenceFiles[path] {
@@ -234,6 +246,7 @@ func (r *run) analyze(b *batch, l loaded) {
 	if !ok {
 		return
 	}
+	defer r.times.measure(phaseAnalyse)()
 	r.collectSources(pkgs)
 	res := newResolver(r.root, pkgs, r.localModule(b))
 	r.collectIgnored(pkgs)
@@ -253,6 +266,7 @@ func (r *run) loadAll(batches []*batch) *loader {
 		l.ready[i] = make(chan loaded, 1)
 	}
 	if r.opts.Go != "" {
+		defer r.times.measure(phaseLoad)()
 		for i, b := range batches {
 			pkgs, err := r.loadPackages(b)
 			l.ready[i] <- loaded{pkgs: pkgs, err: err}
@@ -373,6 +387,7 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 				u.frag.Modules[0].Path = module
 			}
 			r.fragments[rel] = u.fragment()
+			r.far[rel] = u.far
 			units = append(units, u)
 		}
 	}

@@ -64,7 +64,7 @@ export class Provider implements sdk.Provider {
 class Indexing {
   readonly root: string;
   readonly overlays = new Map<string, string>();
-  readonly result: Required<IndexResult> = { fragments: [], sources: [], notices: [], incomplete: [] };
+  readonly result: Required<Omit<IndexResult, "timings">> = { fragments: [], sources: [], notices: [], incomplete: [] };
 
   constructor(params: IndexParams) {
     this.root = fs.realpathSync(params.project.root);

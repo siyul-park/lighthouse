@@ -19,9 +19,10 @@ pub use language::{
         EmbeddedRegion, Event, EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment,
         FunctionSummary, Implementation, Incomplete, IndexInput, IndexParams, IndexResult,
         InitializeParams, InitializeResult, LanguageManifest, Mapping, Methods, Module, Node,
-        Overlay, Position, ProjectRef, Resolution, ServerCapabilities, Signature, Source, Span,
-        Symbol, SymbolKind, SymbolRole, TestCase, TestNaming, TestStyle, TextMapSegment, TypeRef,
-        Visibility, When, WorkspaceFolder, pointer_child, pointer_tokens, pointer_value,
+        Overlay, PhaseTime, Position, ProjectRef, Resolution, ServerCapabilities, Signature,
+        Source, Span, Symbol, SymbolKind, SymbolRole, TestCase, TestNaming, TestStyle,
+        TextMapSegment, TypeRef, Visibility, When, WorkspaceFolder, pointer_child, pointer_tokens,
+        pointer_value,
     },
 };
 pub use model::{

@@ -378,7 +378,11 @@ fn fragments_are_deterministic() {
     let Some(f) = Fixture::new(&store()) else {
         return;
     };
-    assert_eq!(f.index(), f.index());
+    // What it took is not what it found.
+    let (first, second) = (f.index(), f.index());
+    assert_eq!(first.fragments, second.fragments);
+    assert_eq!(first.notices, second.notices);
+    assert_eq!(first.incomplete, second.incomplete);
     f.add("internal/util/extra.go", "package util\n");
     assert_eq!(f.index().fragments.len(), 3);
 }

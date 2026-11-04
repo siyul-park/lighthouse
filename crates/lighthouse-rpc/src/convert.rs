@@ -71,6 +71,11 @@ pub(crate) fn indexed(
         result.incomplete.into_iter().map(incomplete_of).collect();
     let mut out = Indexed {
         notices: result.notices,
+        timings: result
+            .timings
+            .into_iter()
+            .map(|t| (t.phase, std::time::Duration::from_micros(t.micros)))
+            .collect(),
         ..Indexed::default()
     };
     let mut offered = BTreeSet::new();

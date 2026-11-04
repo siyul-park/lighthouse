@@ -142,7 +142,7 @@ func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
 	set := cached.(*interfaceSet)
 	set.once.Do(func() {
 		set.byMethod = collectInterfaces(pkg)
-		set.wider = r.widerInterfaces(pkg)
+		set.wider, set.near = r.widerInterfaces(pkg)
 		set.embedders = collectEmbedders(pkg)
 	})
 	return set
@@ -150,13 +150,18 @@ func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
 
 // widerInterfaces returns the interfaces a package may satisfy without naming
 // them, by method name.
-func (r *resolver) widerInterfaces(pkg *packages.Package) map[string][]*types.Interface {
+// The second map holds only those the package reaches through its imports: the
+// declared interfaces of the project's packages it imports, directly or not,
+// and the exported ones of the rest. A request that loads other packages of the
+// project finds more in the first; the second does not depend on what else
+// the request loaded.
+func (r *resolver) widerInterfaces(pkg *packages.Package) (all, near map[string][]*types.Interface) {
 	r.wider.once.Do(func() {
 		for _, p := range r.declared {
 			r.wider.project = append(r.wider.project, interfacesIn(p.Types, false)...)
 		}
 	})
-	found := newMethodIndex()
+	found, reached := newMethodIndex(), newMethodIndex()
 	found.add(r.wider.project...)
 	packages.Visit([]*packages.Package{pkg}, nil, func(p *packages.Package) {
 		cached, ok := r.wider.exported.Load(p.PkgPath)
@@ -164,8 +169,13 @@ func (r *resolver) widerInterfaces(pkg *packages.Package) map[string][]*types.In
 			cached, _ = r.wider.exported.LoadOrStore(p.PkgPath, interfacesIn(p.Types, true))
 		}
 		found.add(cached.([]*types.Interface)...)
+		if r.project[p.PkgPath] {
+			reached.add(interfacesIn(p.Types, false)...)
+		} else {
+			reached.add(cached.([]*types.Interface)...)
+		}
 	})
-	return found.byName
+	return found.byName, reached.byName
 }
 
 func (m *goModule) locate(importPath string) (string, bool) {

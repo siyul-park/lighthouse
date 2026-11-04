@@ -261,6 +261,8 @@ pub struct Indexed {
     pub notices: Vec<String>,
     /// Files or scopes that could not be analyzed.
     pub incomplete: Vec<Incomplete>,
+    /// Where the provider's own time went, phase by phase.
+    pub timings: Vec<(String, std::time::Duration)>,
 }
 
 /// A file handed to a provider with its text as read by the engine.

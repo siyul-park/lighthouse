@@ -84,6 +84,9 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 	if len(snippets) > 0 {
 		result = analysed.regionResult(result, snippets)
 	}
+	for _, ph := range r.times.phases() {
+		result.Timings = append(result.Timings, sdk.PhaseTime{Phase: ph.name, Micros: int(ph.spent.Microseconds())})
+	}
 	return result, nil
 }
 
@@ -96,15 +99,18 @@ func (p *Provider) Stats() RunStats {
 
 // record stores the units the analysis completed without a problem, and drops
 // what the cache holds of units that changed or are gone.
-func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
+func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run, times *timings) {
 	current := map[string]string{}
 	for _, u := range plan.units {
 		current[unitStem(u.rel)] = u.key
 	}
 	for _, u := range plan.misses {
-		if rec, ok := recordOf(u, sub); ok {
+		if rec, ok := recordOf(u, sub, times); ok {
+			stored := times.measure(phaseStore)
 			store.write(unitName(u.rel, u.key), rec)
+			stored()
 		}
 	}
+	defer times.measure(phaseStore)()
 	store.sweep(current)
 }

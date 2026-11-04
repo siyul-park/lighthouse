@@ -19,7 +19,7 @@ export interface Request {
   /** Every file the host sent, analysed or not: the files of the project. */
   listed: readonly string[];
   snippets: readonly Snippet[];
-  result: Required<IndexResult>;
+  result: Required<Omit<IndexResult, "timings">>;
 }
 
 /** The files of one program: those the program is made of and the fences that join it. */

@@ -353,7 +353,8 @@ configuration) and Bazel's action cache. For the dependents the "output" is the 
 a package without function bodies, so a body edit re-indexes one unit.
 
 `lighthouse check --timings` prints where a run's time went to stderr, one
-`timings:` line per phase: setup, read, each provider's index, merge, each
+`timings:` line per phase: setup, read, each provider's index (and, under it, the phases
+the provider reports of its own work), merge, each
 analyzer, the rules (wall clock, then the five slowest rules summed over the
 files they ran on), fingerprints, store, report and the total.
 

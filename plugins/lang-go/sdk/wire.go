@@ -502,6 +502,14 @@ type Source struct {
 	Path string `json:"path"`
 }
 
+// PhaseTime: How long one phase of an index request took in the provider.
+type PhaseTime struct {
+	// Microseconds the phase took, summed over its runs.
+	Micros int `json:"micros"`
+	// What the provider calls the phase, such as `load` or `analyse`.
+	Phase string `json:"phase"`
+}
+
 // IndexResult: A plugin's answer to `index`: one fragment per analyzed file plus what could
 // not be analyzed. A file is never silently dropped.
 type IndexResult struct {
@@ -514,6 +522,9 @@ type IndexResult struct {
 	Notices []string `json:"notices"`
 	// Serialized ASTs and independent source-map sidecars requested for selection.
 	Sources []Source `json:"sources"`
+	// Where the provider's time went, phase by phase, for the host's
+	// `--timings`; it changes nothing in the analysis.
+	Timings []PhaseTime `json:"timings,omitempty"`
 	// Encoded are fragments that are already JSON, merged in by path when the
 	// result is encoded; Fragments and Encoded never hold the same path.
 	Encoded []EncodedFragment `json:"-"`

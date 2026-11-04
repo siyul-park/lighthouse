@@ -275,6 +275,11 @@ impl Engine {
             run.timings.index.push((id.clone(), spent));
             match indexed {
                 Ok(mut indexed) => {
+                    if !indexed.timings.is_empty() {
+                        run.timings
+                            .index_phases
+                            .push((id.clone(), std::mem::take(&mut indexed.timings)));
+                    }
                     views.stamp(&mut indexed.fragments, &id);
                     if provider.manifest().ordered_declarations {
                         for file in indexed.fragments.iter_mut().flat_map(|f| &mut f.files) {
