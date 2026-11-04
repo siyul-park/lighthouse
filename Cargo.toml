@@ -11,6 +11,7 @@ publish = false
 assert_cmd = "2"
 async-openai = { version = "=0.42.0", default-features = false, features = ["chat-completion-types"] }
 base64 = "0.22"
+blake3 = "1"
 cel = "0.15"
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
@@ -23,6 +24,7 @@ insta = "1"
 jsonschema = "0.58"
 libc = "0.2"
 ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "api-24", "download-binaries", "tls-native"] }
+postcard = { version = "1", default-features = false, features = ["use-std"] }
 predicates = "3"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
@@ -50,6 +52,7 @@ uuid = { version = "1", features = ["v4"] }
 
 lang-cel = { path = "plugins/lang-cel" }
 lighthouse-checks = { path = "crates/lighthouse-checks" }
+lighthouse-graph = { path = "crates/lighthouse-graph" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }
 lighthouse-ml = { path = "crates/lighthouse-ml" }
 lighthouse-model = { path = "crates/lighthouse-model" }

@@ -1,0 +1,139 @@
+use std::{any::Any, fmt::Debug, marker::PhantomData, sync::Arc};
+
+use serde::{Serialize, de::DeserializeOwned};
+
+use crate::{Db, Error, node::Hash};
+
+/// What a key is: encoded to identify a node, decoded to run its query.
+pub trait Key: Serialize + DeserializeOwned + Debug + 'static {}
+impl<T: Serialize + DeserializeOwned + Debug + 'static> Key for T {}
+
+/// What a value is: encoded to be hashed and stored.
+pub trait Value: Serialize + DeserializeOwned + Send + Sync + 'static {}
+impl<T: Serialize + DeserializeOwned + Send + Sync + 'static> Value for T {}
+
+/// A kind of node, with its types erased so the graph can run and decode it
+/// from a name read off the disk.
+pub(crate) trait Kind: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn is_input(&self) -> bool;
+    fn execute(&self, db: &Db, key: &[u8]) -> Result<Output, Error>;
+    fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>>;
+    fn describe(&self, key: &[u8]) -> String;
+}
+
+/// A value as computed: itself, and the bytes it hashes and is stored as.
+pub(crate) struct Output {
+    pub value: Arc<dyn Any + Send + Sync>,
+    pub blob: Arc<[u8]>,
+}
+
+impl Output {
+    pub(crate) fn new<V: Value>(value: V) -> Result<Self, Error> {
+        let blob = encode(&value)?.into();
+        Ok(Self {
+            value: Arc::new(value),
+            blob,
+        })
+    }
+}
+
+/// A value set from outside, such as the content of a file. Declare it as a
+/// `static`.
+pub struct Input<K, V> {
+    name: &'static str,
+    types: PhantomData<fn(K) -> V>,
+}
+
+impl<K, V> Input<K, V> {
+    pub const fn new(name: &'static str) -> Self {
+        Self {
+            name,
+            types: PhantomData,
+        }
+    }
+}
+
+impl<K: Key, V: Value> Kind for Input<K, V> {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn is_input(&self) -> bool {
+        true
+    }
+
+    fn execute(&self, _: &Db, key: &[u8]) -> Result<Output, Error> {
+        Err(Error::MissingInput(describe::<K>(self.name, key)))
+    }
+
+    fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>> {
+        decode_value::<V>(blob)
+    }
+
+    fn describe(&self, key: &[u8]) -> String {
+        describe::<K>(self.name, key)
+    }
+}
+
+/// A value derived by a pure function of its key and of what it reads
+/// through the [`Db`]. Declare it as a `static`. A cycle among queries is
+/// reported as [`Error::Cycle`], so a query passes the errors of what it
+/// reads up with `?`.
+pub struct Query<K, V> {
+    name: &'static str,
+    run: fn(&Db, &K) -> Result<V, Error>,
+}
+
+impl<K, V> Query<K, V> {
+    pub const fn new(name: &'static str, run: fn(&Db, &K) -> Result<V, Error>) -> Self {
+        Self { name, run }
+    }
+}
+
+impl<K: Key, V: Value> Kind for Query<K, V> {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn is_input(&self) -> bool {
+        false
+    }
+
+    fn execute(&self, db: &Db, key: &[u8]) -> Result<Output, Error> {
+        let key: K = decode(key)?;
+        Output::new((self.run)(db, &key)?)
+    }
+
+    fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>> {
+        decode_value::<V>(blob)
+    }
+
+    fn describe(&self, key: &[u8]) -> String {
+        describe::<K>(self.name, key)
+    }
+}
+
+pub(crate) fn encode<T: Serialize>(value: &T) -> Result<Vec<u8>, Error> {
+    postcard::to_stdvec(value).map_err(|err| Error::Encode(err.to_string()))
+}
+
+pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, Error> {
+    postcard::from_bytes(bytes).map_err(|err| Error::Encode(err.to_string()))
+}
+
+pub(crate) fn hash(blob: &[u8]) -> Hash {
+    blake3::hash(blob).into()
+}
+
+fn decode_value<V: Value>(blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>> {
+    let value: V = postcard::from_bytes(blob).ok()?;
+    Some(Arc::new(value))
+}
+
+fn describe<K: Key>(name: &str, key: &[u8]) -> String {
+    match postcard::from_bytes::<K>(key) {
+        Ok(key) => format!("{name}({key:?})"),
+        Err(_) => format!("{name}(?)"),
+    }
+}
