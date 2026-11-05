@@ -96,7 +96,9 @@ class _Indexing:
         self.files = [file["path"] for unit in self.units for file in unit.get("files") or []]
         self.hosts: list[EmbeddedFile] = [host for unit in self.units for host in unit.get("regions") or []]
         self.snippets = plan_snippets(self.hosts)
-        self.project = Project(self.root, overlays, {s.rel: s.text.text for s in self.snippets}, params.get("files") or self.files)
+        self.project = Project(
+            self.root, overlays, {s.rel: s.text.text for s in self.snippets}, params.get("files") or self.files
+        )
         self.model = Model(self.project)
         self.reach = Reach(self.model)
         self.types = Types(self.reach)
@@ -120,8 +122,11 @@ class _Indexing:
         fragments = [fragment for fragment in found if fragment is not None]
         fragments.extend(fenced[host["path"]] for host in hosts)
         fragments.sort(key=lambda f: f["file"]["path"])
-        notices = ["%s: %d relative import(s) resolve to no file; their edges are syntactic" % (path, count)
-                   for path, count in sorted(self.unresolved.items()) if path in {f["path"] for f in files}]
+        notices = [
+            "%s: %d relative import(s) resolve to no file; their edges are syntactic" % (path, count)
+            for path, count in sorted(self.unresolved.items())
+            if path in {f["path"] for f in files}
+        ]
         if hosts:
             notices.extend(self.notices)
             if self.guessed:
