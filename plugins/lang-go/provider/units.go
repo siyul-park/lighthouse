@@ -51,6 +51,26 @@ type directory struct {
 	ifaces    string
 	imports   []string
 	deps      []*directory
+	// matching tells which interfaces can match the types of the directory,
+	// and which types can match the interfaces of the others.
+	matching matching
+}
+
+// matching is what decides, from text alone, whether the types of one
+// directory can implement an interface of another: a type implements an
+// interface only if it has a method of each name of the interface. It errs
+// towards "can": a name set that is not known is an open one.
+type matching struct {
+	// methods are the names of the methods the files declare.
+	methods map[string]bool
+	// open is set when the method sets of the types are not the declared
+	// methods alone (an embedded field promotes more), or are not known.
+	open bool
+	// interfaces are the explicit method names of each interface the files
+	// declare, one list for each; unknown when a type may stand for one that
+	// the text does not show.
+	interfaces [][]string
+	unknown    bool
 }
 
 // moduleRoot is a module that holds project code: its import path and the
@@ -60,6 +80,7 @@ type moduleRoot struct{ path, dir string }
 // dirDigest collects what the files of one directory contribute to its unit.
 type dirDigest struct {
 	content, api, ifaces, imports []string // ifaces holds only the non-empty
+	matching                      matching
 }
 
 // fileFacts are what the host needs to know about one Go source file, derived
@@ -75,6 +96,7 @@ type fileFacts struct {
 	// empty when there are none. `implements` edges read every project
 	// interface, so a unit that declares one is imported by all.
 	Interfaces string
+	matching   matching
 }
 
 // goEnvVars are the settings of the go command that decide which files make a
@@ -153,6 +175,7 @@ func (pl *planner) read(abs string) *directory {
 		return nil
 	}
 	d.seal(u)
+	u.matching = d.matching
 	return u
 }
 
@@ -183,6 +206,7 @@ func (pl *planner) goFile(u *directory, d *dirDigest, name string) bool {
 	if facts.Interfaces != "" {
 		d.ifaces = append(d.ifaces, name, facts.Interfaces)
 	}
+	d.matching.add(facts.matching)
 	d.imports = append(d.imports, facts.Imports...)
 	return true
 }
@@ -243,9 +267,11 @@ func (d *dirDigest) seal(u *directory) {
 }
 
 // plan reads every directory of the project and has the run load, besides the
-// units asked for, the directories that declare interfaces: a method is an
-// implementation of any interface of the project, so types are matched against
-// all of them.
+// units asked for, the directories that declare an interface the types of the
+// units can implement: a method is an implementation of any interface of the
+// project, so types are matched against all of them. A directory whose
+// interfaces list a method that no type of the units has is not loaded: loading
+// one makes the go command build every package it imports that an edit changed.
 func (r *run) plan(params sdk.IndexParams) *shape {
 	pl := &planner{r: r, dirs: map[string]*directory{}}
 	files := map[string][]string{}
@@ -259,6 +285,18 @@ func (r *run) plan(params sdk.IndexParams) *shape {
 		return s
 	}
 	pl.outside(batches)
+	mine := matching{}
+	for _, u := range params.Units {
+		if len(u.Files) > 0 {
+			d := pl.unit(filepath.Join(r.root, filepath.FromSlash(u.ID)))
+			s.asked[u.ID] = d
+			if d != nil {
+				mine.add(d.matching)
+			}
+		}
+		// The fences of host files are matched against every interface.
+		mine.open = mine.open || len(u.Regions) > 0
+	}
 	dirs := make([]string, 0, len(files))
 	for abs := range files {
 		dirs = append(dirs, abs)
@@ -270,15 +308,13 @@ func (r *run) plan(params sdk.IndexParams) *shape {
 			continue
 		}
 		s.interfaces = append(s.interfaces, d)
+		if !mine.mayMatch(d.matching) {
+			continue
+		}
 		for _, rel := range files[abs] {
 			if _, asked := r.requested[rel]; !asked {
 				r.requested[rel] = sdk.FileRef{Path: rel}
 			}
-		}
-	}
-	for _, u := range params.Units {
-		if len(u.Files) > 0 {
-			s.asked[u.ID] = pl.unit(filepath.Join(r.root, filepath.FromSlash(u.ID)))
 		}
 	}
 	return s
@@ -416,9 +452,9 @@ func factsOf(src []byte) fileFacts {
 	file, err := parser.ParseFile(fset, "", src, parser.SkipObjectResolution)
 	if file == nil {
 		whole := contentHash(src)
-		return fileFacts{API: whole, Interfaces: whole}
+		return fileFacts{API: whole, Interfaces: whole, matching: matching{open: true, unknown: true}}
 	}
-	facts := fileFacts{Imports: importsOf(file)}
+	facts := fileFacts{Imports: importsOf(file), matching: matchingOf(file)}
 	tf := fset.File(file.Pos())
 	if err != nil || tf == nil {
 		whole := contentHash(src)

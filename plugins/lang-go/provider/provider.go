@@ -16,6 +16,8 @@ type Provider struct {
 type RunStats struct {
 	// Loads is the number of batches the go command loaded.
 	Loads int
+	// Packages is the number of packages they gave.
+	Packages int
 }
 
 const language = "go"
@@ -82,7 +84,7 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 	planned()
 	r.admit(snippets)
 	r.index()
-	p.last = RunStats{Loads: r.loads}
+	p.last = RunStats{Loads: r.loads, Packages: r.packages}
 	found := r.finish()
 	result := emptyResult()
 	result.Units = r.unitResults(shape, params, snippets, found)

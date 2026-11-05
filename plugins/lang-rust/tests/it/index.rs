@@ -31,6 +31,7 @@ pub(crate) struct Answer {
     pub sources: Vec<Source>,
     pub notices: Vec<String>,
     pub incomplete: Vec<Incomplete>,
+    pub reads: Vec<String>,
 }
 
 impl From<IndexResult> for Answer {
@@ -40,12 +41,14 @@ impl From<IndexResult> for Answer {
             sources: Vec::new(),
             notices: result.notices,
             incomplete: result.incomplete,
+            reads: Vec::new(),
         };
         for unit in result.units {
             answer.fragments.extend(unit.fragments);
             answer.sources.extend(unit.sources);
             answer.notices.extend(unit.notices);
             answer.incomplete.extend(unit.incomplete);
+            answer.reads.extend(unit.reads);
         }
         answer
     }
@@ -485,4 +488,33 @@ fn an_inherited_edition_the_workspace_does_not_set_is_a_gap() {
         "{:?}",
         reasons(&result)
     );
+}
+
+#[test]
+fn the_workspace_above_the_project_that_decides_publish_is_read() {
+    let dir = project(&[
+        (
+            "Cargo.toml",
+            "[workspace]\nmembers = [\"inner\"]\n\n[workspace.package]\npublish = false\n",
+        ),
+        (
+            "inner/Cargo.toml",
+            "[package]\nname = \"inner\"\nversion = \"0.1.0\"\npublish.workspace = true\n",
+        ),
+        ("inner/src/lib.rs", "pub fn inner() {}\n"),
+    ]);
+    let outer = dir.path().canonicalize().unwrap().join("Cargo.toml");
+
+    let result = index(&dir.path().join("inner"), serde_json::json!({}));
+
+    assert_eq!(result.reads, [outer.to_string_lossy().into_owned()]);
+}
+
+#[test]
+fn a_package_that_reads_nothing_above_itself_reads_nothing() {
+    let dir = project(&[("Cargo.toml", MANIFEST), ("src/lib.rs", "pub fn a() {}\n")]);
+
+    let result = index(dir.path(), serde_json::json!({}));
+
+    assert!(result.reads.is_empty(), "{:?}", result.reads);
 }

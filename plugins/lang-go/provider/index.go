@@ -42,8 +42,9 @@ type run struct {
 	result          answer
 	// failed counts, per batch the go command could not list, its files.
 	failed map[string]int
-	// loads counts the batches the run had the go command load.
-	loads int
+	// loads counts the batches the run had the go command load, and packages
+	// the packages, test variants included, that the batches gave.
+	loads, packages int
 	// chain is where the go command keeps its libraries, once read.
 	chain *toolchain
 	// fenceFiles are the files that stand for the fences of host files: they
@@ -229,6 +230,7 @@ func (r *run) analyze(b *batch, l loaded) {
 	if !ok {
 		return
 	}
+	r.packages += len(pkgs)
 	defer r.times.measure(phaseAnalyse)()
 	r.collectSources(pkgs)
 	res := newResolver(r.root, pkgs, r.localModule(b))
@@ -278,7 +280,18 @@ func (r *run) unpack(b *batch, l loaded) ([]*packages.Package, bool) {
 		dir = b.dir
 	}
 	r.failed[b.dir] = len(b.files)
+	// The gap is told of the first file of the answer, so the unit that holds
+	// that file stores it with its own answer and a run that reuses the answer
+	// says it again; a gap of no file would be an answer that cannot be reused.
+	at := ""
+	for _, rel := range b.files {
+		if r.emit[rel] {
+			at = rel
+			break
+		}
+	}
 	r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{
+		Path:   at,
 		Reason: fmt.Sprintf("go list failed in %s, %d file(s) not analyzed: %v", dir, len(b.files), l.err),
 	})
 	for _, rel := range b.files {

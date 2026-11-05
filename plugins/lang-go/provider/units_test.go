@@ -3,6 +3,7 @@ package provider_test
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path"
@@ -130,6 +131,78 @@ func TestProviderUnits(t *testing.T) {
 		}
 
 		require.Equal(t, together, alone)
+	})
+
+	t.Run("loads the packages whose interfaces the types of the unit can implement", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, unitFixture)
+		packages := map[string]int{}
+		for _, unit := range unitRefs(t, root) {
+			g := provider.New("lang-go", "test")
+			_, err := g.Index(sdk.IndexParams{
+				Project:  sdk.ProjectRef{Root: root},
+				Language: "go",
+				Units:    []sdk.UnitRef{unit},
+				Files:    projectFiles(t, root),
+			})
+			require.NoError(t, err)
+			packages[unit.ID] = g.Stats().Packages
+		}
+
+		// e has the methods of the interface of d; no other package has any
+		// method, so none of them needs d to be loaded with it.
+		require.Equal(t, map[string]int{"a": 1, "b": 1, "c": 1, "d": 1, "e": 2}, packages)
+	})
+
+	t.Run("loads every interface package for a type that embeds another", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, unitFixture)
+		writeFile(t, root, "c/c.go", "package c\n\nimport \"example.com/m/e\"\n\ntype C struct{ e.E }\n")
+		g := provider.New("lang-go", "test")
+		var unit sdk.UnitRef
+		for _, ref := range unitRefs(t, root) {
+			if ref.ID == "c" {
+				unit = ref
+			}
+		}
+
+		_, err := g.Index(sdk.IndexParams{
+			Project:  sdk.ProjectRef{Root: root},
+			Language: "go",
+			Units:    []sdk.UnitRef{unit},
+			Files:    projectFiles(t, root),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, 2, g.Stats().Packages, "c and d, whose interface the methods it takes from e may implement")
+	})
+
+	t.Run("a failure of the go command is a gap of a unit, so its answer can be reused", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, unitFixture)
+		options, err := json.Marshal(map[string]any{"env": map[string]string{"GOOS": "linux", "GOARCH": "no-such-arch"}})
+		require.NoError(t, err)
+
+		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+			Project:  sdk.ProjectRef{Root: root},
+			Language: "go",
+			Units:    unitRefs(t, root),
+			Files:    projectFiles(t, root),
+			Context:  sdk.Context{Options: map[string]json.RawMessage{"go": options}},
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, result.Incomplete, "a gap of no unit is an answer the host cannot keep")
+		gaps := 0
+		for _, unit := range result.Units {
+			for _, gap := range unit.Incomplete {
+				if strings.HasPrefix(gap.Reason, "go list failed in") {
+					gaps++
+					require.NotEmpty(t, gap.Path)
+				}
+			}
+		}
+		require.Equal(t, 1, gaps)
 	})
 }
 

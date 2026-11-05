@@ -30,6 +30,9 @@ pub struct Package {
     /// The packages that `[dependencies]` and `[build-dependencies]` name, as
     /// opposed to `[dev-dependencies]`.
     pub runtime: BTreeSet<String>,
+    /// The manifests the package reads from above itself, which may lie
+    /// outside the project: the workspace that decides `publish.workspace`.
+    pub reads: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -167,8 +170,10 @@ pub fn load(dir: &Path) -> Result<Option<Package>, String> {
         .and_then(|l| l.get("name"))
         .and_then(Value::as_str)
         .map_or_else(|| crate_name(&name), crate_name);
+    let (publishable, reads) = publishable(dir, package);
     Ok(Some(Package {
-        publishable: publishable(dir, package),
+        publishable,
+        reads,
         targets: targets(dir, &name, package, &manifest),
         deps: dependencies(&manifest, &DEP_SECTIONS),
         runtime: dependencies(&manifest, &RUNTIME_SECTIONS)
@@ -190,6 +195,7 @@ pub fn synthetic(dir: &Path) -> Package {
         targets: targets(dir, "workspace", &empty, &empty),
         deps: BTreeMap::new(),
         runtime: BTreeSet::new(),
+        reads: Vec::new(),
     }
 }
 
@@ -199,16 +205,25 @@ pub fn crate_name(name: &str) -> String {
 }
 
 /// `publish = false`, `publish = []`, or `publish.workspace = true` with the
-/// workspace saying so.
-fn publishable(dir: &Path, package: &Table) -> bool {
+/// workspace saying so; and the manifests above `dir` that were read to tell.
+fn publishable(dir: &Path, package: &Table) -> (bool, Vec<PathBuf>) {
     match package.get("publish") {
-        None => true,
-        Some(Value::Table(t)) if t.get("workspace").and_then(Value::as_bool) == Some(true) => dir
-            .ancestors()
-            .skip(1)
-            .find_map(workspace_publish)
-            .unwrap_or(true),
-        Some(other) => is_publishable(other),
+        None => (true, Vec::new()),
+        Some(Value::Table(t)) if t.get("workspace").and_then(Value::as_bool) == Some(true) => {
+            let mut reads = Vec::new();
+            for ancestor in dir.ancestors().skip(1) {
+                let manifest = ancestor.join("Cargo.toml");
+                if !manifest.is_file() {
+                    continue;
+                }
+                reads.push(manifest);
+                if let Some(publish) = workspace_publish(ancestor) {
+                    return (publish, reads);
+                }
+            }
+            (true, reads)
+        }
+        Some(other) => (is_publishable(other), Vec::new()),
     }
 }
 

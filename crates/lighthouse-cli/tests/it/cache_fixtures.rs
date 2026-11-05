@@ -223,6 +223,55 @@ pub(crate) fn rust() -> Fixture {
                 mostly_warm: false,
             },
             Edit {
+                name: "path dependency added",
+                apply: |d| {
+                    let dep = d.with_extension("dep");
+                    write(
+                        &dep,
+                        "Cargo.toml",
+                        "[package]\nname = \"dep\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+                    );
+                    write(
+                        &dep,
+                        "src/lib.rs",
+                        "/// One.\npub fn value() -> usize {\n    1\n}\n",
+                    );
+                    let name = dep.file_name().unwrap().to_string_lossy().into_owned();
+                    replace(
+                        d,
+                        "Cargo.toml",
+                        "edition = \"2021\"\n",
+                        &format!(
+                            "edition = \"2021\"\n\n[dependencies]\ndep = {{ path = \"../{name}\" }}\n"
+                        ),
+                    );
+                    write(
+                        d,
+                        "src/outer.rs",
+                        "/// From the dependency.\npub fn outer() -> usize {\n    dep::value()\n}\n",
+                    );
+                    replace(
+                        d,
+                        "src/lib.rs",
+                        "mod util;\n",
+                        "mod util;\npub mod outer;\n",
+                    );
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "path dependency edited",
+                apply: |d| {
+                    let dep = d.with_extension("dep");
+                    write(
+                        &dep,
+                        "src/lib.rs",
+                        "/// One, as text.\npub fn value() -> String {\n    String::new()\n}\n",
+                    );
+                },
+                mostly_warm: false,
+            },
+            Edit {
                 name: "provider option changed",
                 apply: |d| {
                     replace(

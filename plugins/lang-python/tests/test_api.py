@@ -15,4 +15,20 @@ class ApiTests(unittest.TestCase):
             of("class C:\n    def m(self):\n        self.a = 1\n"),
             of("class C:\n    def m(self):\n        self.b = 1\n"),
         )
+        self.assertEqual(
+            of("class C:\n    def m(self):\n        return 1\n"),
+            of("class C:\n    def m(self):\n        return 2\n"),
+        )
+        self.assertEqual(
+            of("class C:\n    def m(self):\n        self.a = 1\n        print(1)\n"),
+            of("class C:\n    def m(self):\n        self.a = 1\n        print(2)\n"),
+        )
+        self.assertNotEqual(
+            of("class C:\n    def m(self):\n        self.a = A()\n"),
+            of("class C:\n    def m(self):\n        self.a = B()\n"),
+        )
+        self.assertNotEqual(
+            of("class C:\n    def m(self, x):\n        return x\n"),
+            of("class C:\n    def m(self):\n        return 1\n"),
+        )
         self.assertNotEqual(api.digest(None, "def f(:\n"), api.digest(None, "def g(:\n"))

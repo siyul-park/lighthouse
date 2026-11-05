@@ -266,6 +266,7 @@ impl Analysis<'_> {
             .into_iter()
             .map(|(path, reason)| Incomplete { path, reason })
             .collect();
+        out.reads = self.reads(&files);
         out.fragments.sort_by(|a, b| a.file.path.cmp(&b.file.path));
         let reached: Vec<&crate::project::SourceFile> = tree
             .files
@@ -273,6 +274,19 @@ impl Analysis<'_> {
             .filter(|file| files.contains(&file.rel))
             .collect();
         (out, Some(api::of(&reached)))
+    }
+}
+
+impl Analysis<'_> {
+    /// The manifests above the packages of the files that their answers read.
+    fn reads(&self, files: &[String]) -> Vec<String> {
+        let reads: BTreeSet<String> = files
+            .iter()
+            .filter_map(|rel| self.found.of.get(rel)?.as_ref().ok())
+            .flat_map(|&at| &self.found.list[at].reads)
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect();
+        reads.into_iter().collect()
     }
 }
 
@@ -289,6 +303,8 @@ pub(crate) struct Found {
     pub sources: Vec<Source>,
     pub notices: Vec<String>,
     pub incomplete: Vec<Incomplete>,
+    /// The files outside the unit the answer depends on.
+    pub reads: Vec<String>,
 }
 
 /// Collapses `.` and `..` so one file has one path however it was reached.
@@ -406,7 +422,7 @@ fn result_of(unit: &UnitRef, found: Found, api: Option<String>) -> UnitResult {
             true => vec![EVERY.to_owned()],
             false => Vec::new(),
         },
-        reads: Vec::new(),
+        reads: found.reads,
         notices: found.notices,
         incomplete: found.incomplete,
     }

@@ -293,6 +293,7 @@ fn packages(
         targets: Vec::new(),
         deps: BTreeMap::new(),
         runtime: BTreeSet::new(),
+        reads: Vec::new(),
     });
     list
 }

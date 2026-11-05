@@ -1,24 +1,50 @@
-"""What a file shows the others: its declarations without the bodies of its module functions."""
+"""What a file shows the others: its declarations without the bodies of its functions and methods."""
 
 import ast
 import copy
 import hashlib
 
+from lang_python.symbols import walk_flat
+
 
 class _Bare(ast.NodeTransformer):
-    """Empties the body of every function the module declares; a class keeps its methods, whose bodies set its
-    fields, and a function keeps its decorators, parameters and annotations."""
+    """Empties the body of every function the module declares, and of every method but for the statements that set
+    a field (`self.name = value`): a field a method declares is a member of its class, and the value gives its type.
+    A function keeps its decorators, parameters and annotations."""
+
+    def __init__(self) -> None:
+        self._in_class = False
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
-        node.body = [ast.Pass()]
+        node.body = self._fields(node) if self._in_class else [ast.Pass()]
         return node
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST:
-        node.body = [ast.Pass()]
+        node.body = self._fields(node) if self._in_class else [ast.Pass()]
         return node
 
     def visit_ClassDef(self, node: ast.ClassDef) -> ast.AST:
-        return node
+        outer, self._in_class = self._in_class, True
+        try:
+            return self.generic_visit(node)
+        finally:
+            self._in_class = outer
+
+    @staticmethod
+    def _fields(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.stmt]:
+        """The statements of a method that set an attribute of its first parameter, in order."""
+        first = node.args.args[0].arg if node.args.args else None
+        kept = [stmt for stmt in walk_flat(node.body) if first is not None and _sets(stmt, first)]
+        return kept or [ast.Pass()]
+
+
+def _sets(stmt: ast.stmt, receiver: str) -> bool:
+    """Whether a statement assigns `receiver.name`."""
+    targets = stmt.targets if isinstance(stmt, ast.Assign) else [stmt.target] if isinstance(stmt, ast.AnnAssign) else []
+    return any(
+        isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver
+        for target in targets
+    )
 
 
 def digest(tree: ast.Module | None, text: str) -> str:
