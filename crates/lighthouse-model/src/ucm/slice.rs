@@ -76,8 +76,9 @@ impl Slice {
     }
 }
 
-/// What every edge of the project adds up to: the reverse maps, and the edges
-/// a later file repeats, which the project does not keep.
+/// What every edge of the project adds up to, apart from where they are: the
+/// reverse maps, and the edges a later file repeats, which the project does
+/// not keep.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Edges {
     /// By file, the positions among the edges of its slice of those that
@@ -91,7 +92,6 @@ impl Edges {
     pub fn new<'a>(table: &Table, resolved: impl IntoIterator<Item = &'a Resolved>) -> Self {
         let mut seen = HashSet::new();
         let mut dropped: BTreeMap<PathBuf, Vec<u32>> = BTreeMap::new();
-        let mut sites: BTreeMap<SymbolId, Vec<Site>> = BTreeMap::new();
         let mut kept: Vec<&Edge> = Vec::new();
         for resolved in resolved {
             let slice = &resolved.slice;
@@ -100,9 +100,7 @@ impl Edges {
                 .iter()
                 .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
             for (at, edge) in slice.fragment.edges.iter().enumerate() {
-                if let Some((to, site)) = site_of(edge, files.next().flatten(), table) {
-                    sites.entry(to).or_default().push(site);
-                }
+                files.next();
                 let key = (edge.kind, &edge.from, &edge.to, edge.resolution, edge.when);
                 if seen.insert(key) {
                     kept.push(edge);
@@ -114,12 +112,9 @@ impl Edges {
                 }
             }
         }
-        order_sites(&mut sites);
-        let mut reverse = Reverse::link(table, kept.into_iter());
-        reverse.sites = sites;
         Self {
             dropped,
-            reverse: Arc::new(reverse),
+            reverse: Arc::new(Reverse::link(table, kept.into_iter())),
         }
     }
 }
@@ -133,7 +128,6 @@ pub struct Reverse {
     pub uses: BTreeMap<SymbolId, Vec<SymbolId>>,
     pub members: BTreeMap<SymbolId, Vec<SymbolId>>,
     pub implementers: BTreeMap<SymbolId, Vec<SymbolId>>,
-    pub sites: BTreeMap<SymbolId, Vec<Site>>,
     /// Every edge that ends at a symbol: its kind, resolution and start.
     pub incoming: BTreeMap<SymbolId, Vec<(EdgeKind, Resolution, Node)>>,
 }
@@ -224,6 +218,32 @@ impl Reverse {
             }
         }
         reverse
+    }
+}
+
+/// Where the edges refer to a symbol from, by the symbol: the one thing of the
+/// edges that an edit moving a line changes.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sites(pub BTreeMap<SymbolId, Vec<Site>>);
+
+impl Sites {
+    /// `resolved` are the slices in the order of their paths.
+    pub fn new<'a>(table: &Table, resolved: impl IntoIterator<Item = &'a Resolved>) -> Self {
+        let mut sites: BTreeMap<SymbolId, Vec<Site>> = BTreeMap::new();
+        for resolved in resolved {
+            let slice = &resolved.slice;
+            let mut files = slice
+                .runs
+                .iter()
+                .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
+            for edge in &slice.fragment.edges {
+                if let Some((to, site)) = site_of(edge, files.next().flatten(), table) {
+                    sites.entry(to).or_default().push(site);
+                }
+            }
+        }
+        order_sites(&mut sites);
+        Self(sites)
     }
 }
 

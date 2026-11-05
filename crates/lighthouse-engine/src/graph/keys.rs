@@ -16,12 +16,11 @@ use lighthouse_model::ucm::{
     Fragment, Incoming, Node, Project, Resolved, Symbol, SymbolId, Table, Target,
 };
 use lighthouse_spec::key;
-use serde::{Deserialize, Serialize};
 
 use super::model::{EDGES, Host, INCOMING, PROJECT, RESOLVED, SYMBOLS};
 use crate::cache::{Digest, KeyBuilder};
 
-pub(crate) static SHAPE: Query<String, Shape> = Query::new("shape", shape);
+pub(crate) static SHAPE: Query<(String, bool), Digest> = Query::new("shape", shape);
 pub(crate) static TIES: Query<(String, bool), Digest> = Query::new("ties", ties);
 /// The keys of a project: one per file and one for all of it.
 #[derive(Debug, Default)]
@@ -125,7 +124,9 @@ impl Keys {
 struct Tied<'a> {
     graph: &'a Graph,
     table: &'a Table,
-    all: Vec<Shape>,
+    /// Whether the shapes are those with the places of the symbols.
+    at: bool,
+    all: Vec<Digest>,
 }
 
 impl Tied<'_> {
@@ -143,36 +144,23 @@ impl Tied<'_> {
 
     /// The shape of the file of `symbol`, or the end as written when it is
     /// not a symbol of the project.
-    fn end(&self, symbol: Option<&SymbolId>, written: &[u8]) -> Result<Shape, Error> {
+    fn end(&self, symbol: Option<&SymbolId>, written: &[u8]) -> Result<Digest, Error> {
         match symbol.and_then(|id| self.table.entry(id)) {
-            Some(entry) => Ok(*self.graph.query(&SHAPE, &key(&entry.file))?),
+            Some(entry) => Ok(*self.graph.query(&SHAPE, &(key(&entry.file), self.at))?),
             None => {
                 let mut key = KeyBuilder::new();
                 key.part(written);
-                let digest = key.finish();
-                Ok(Shape {
-                    plain: digest,
-                    at: digest,
-                })
+                Ok(key.finish())
             }
         }
     }
 
     /// One tie of a symbol: the direction, the symbol, the kind and the
     /// resolution of the edge, and what is at the other end.
-    fn tie(&mut self, direction: &[u8], at: &SymbolId, kind: [u8; 2], other: Shape) {
-        let make = |digest: Digest| {
-            let mut key = KeyBuilder::new();
-            key.part(direction)
-                .part(at.as_str())
-                .part(kind)
-                .part(digest);
-            key.finish()
-        };
-        self.all.push(Shape {
-            plain: make(other.plain),
-            at: make(other.at),
-        });
+    fn tie(&mut self, direction: &[u8], at: &SymbolId, kind: [u8; 2], other: Digest) {
+        let mut key = KeyBuilder::new();
+        key.part(direction).part(at.as_str()).part(kind).part(other);
+        self.all.push(key.finish());
     }
 }
 
@@ -206,31 +194,29 @@ impl<'a> End<'a> {
 }
 
 /// A digest without and with the places of the symbols it covers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Shape {
-    pub plain: Digest,
-    pub at: Digest,
+#[derive(Debug, Clone, Copy)]
+struct Described {
+    plain: Digest,
+    at: Digest,
 }
 
-/// The shape of the symbols a file declares.
-fn shape(graph: &Graph, path: &String) -> Result<Shape, Error> {
+/// The shape of the symbols a file declares, with their places or without.
+/// The two are kinds of their own, so that what reads one is not run again
+/// when an edit only moves the symbols.
+fn shape(graph: &Graph, (path, at): &(String, bool)) -> Result<Digest, Error> {
     let resolved = graph.query(&RESOLVED, path)?;
     let table = graph.query(&SYMBOLS, &())?;
     let incoming = graph.query(&INCOMING, path)?;
-    let mut described: Vec<Shape> = declared(&resolved, &table)
+    let mut described: Vec<Described> = declared(&resolved, &table)
         .map(|symbol| describe(&resolved, &table, &incoming, symbol))
         .collect();
     described.sort_unstable_by_key(|d| d.at);
-    let mut plain = KeyBuilder::new();
-    let mut at = KeyBuilder::new();
+    let side = |d: &Described| if *at { d.at } else { d.plain };
+    let mut key = KeyBuilder::new();
     for d in &described {
-        plain.part(d.plain);
-        at.part(d.at);
+        key.part(side(d));
     }
-    Ok(Shape {
-        plain: plain.finish(),
-        at: at.finish(),
-    })
+    Ok(key.finish())
 }
 
 /// What the symbols of a file are tied to: each edge that starts or ends at
@@ -243,6 +229,7 @@ fn ties(graph: &Graph, (path, at): &(String, bool)) -> Result<Digest, Error> {
     let mut tied = Tied {
         graph,
         table: &table,
+        at: *at,
         all: Vec::new(),
     };
     for symbol in declared(&resolved, &table) {
@@ -273,12 +260,11 @@ fn ties(graph: &Graph, (path, at): &(String, bool)) -> Result<Digest, Error> {
             tied.edge(b"in", id, kind, End::of_node(from))?;
         }
     }
-    let side = |tie: &Shape| if *at { tie.at } else { tie.plain };
     let mut all = tied.all;
-    all.sort_unstable_by_key(side);
+    all.sort_unstable();
     let mut key = KeyBuilder::new();
     for tie in &all {
-        key.part(side(tie));
+        key.part(tie);
     }
     Ok(key.finish())
 }
@@ -300,7 +286,7 @@ fn declared<'a>(
 /// A description of a symbol: every field the facts of a node carry about a
 /// neighbor except its place, which only `at` includes. The fields are fed
 /// with their lengths, so that none runs into the next.
-fn describe(resolved: &Resolved, table: &Table, incoming: &Incoming, symbol: &Symbol) -> Shape {
+fn describe(resolved: &Resolved, table: &Table, incoming: &Incoming, symbol: &Symbol) -> Described {
     let id = &symbol.id;
     let part = &resolved.slice.fragment;
     let owner = symbol.owner.as_ref().and_then(|o| table.entry(o));
@@ -352,7 +338,7 @@ fn describe(resolved: &Resolved, table: &Table, incoming: &Incoming, symbol: &Sy
     for n in [span.start.line, span.start.col, span.end.line, span.end.col] {
         key.part(n.to_le_bytes());
     }
-    Shape {
+    Described {
         plain,
         at: key.finish(),
     }

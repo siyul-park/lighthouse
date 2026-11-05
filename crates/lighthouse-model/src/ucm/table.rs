@@ -34,21 +34,18 @@ pub struct Entry {
 }
 
 impl Table {
-    /// The table of the slices of a project, in the order of their paths: the
-    /// first declaration of an id wins, as it does when the fragments are
-    /// merged.
-    pub fn new<'a>(slices: impl IntoIterator<Item = &'a Slice>) -> Self {
+    /// The table of the outlines of a project's slices, in the order of their
+    /// paths: the first declaration of an id wins, as it does when the
+    /// fragments are merged.
+    pub fn new<'a>(outlines: impl IntoIterator<Item = &'a Outline>) -> Self {
         let mut symbols: BTreeMap<SymbolId, Entry> = BTreeMap::new();
         let mut modules: BTreeMap<String, Module> = BTreeMap::new();
         let mut files: BTreeMap<&std::path::Path, File> = BTreeMap::new();
-        for slice in slices {
-            let part = &slice.fragment;
-            for symbol in &part.symbols {
-                symbols
-                    .entry(symbol.id.clone())
-                    .or_insert_with(|| Entry::of(symbol));
+        for outline in outlines {
+            for (id, entry) in &outline.symbols {
+                symbols.entry(id.clone()).or_insert_with(|| entry.clone());
             }
-            for module in &part.modules {
+            for module in &outline.modules {
                 match modules.get_mut(&module.path) {
                     Some(kept) => reconcile(kept, module),
                     None => {
@@ -56,7 +53,7 @@ impl Table {
                     }
                 }
             }
-            for file in &part.files {
+            for file in &outline.files {
                 match files.get_mut(file.path.as_path()) {
                     Some(kept) => kept.facts.extend(file.facts.clone()),
                     None => {
@@ -143,6 +140,43 @@ impl Table {
             .take_while(|(id, _)| id.as_str().starts_with(&from))
             .map(|(id, entry)| (id, entry.kind))
             .collect()
+    }
+}
+
+/// What the table takes of a file's slice: its declarations as entries, its
+/// modules, and the facts of its files. Not a span and not a content hash, so
+/// that an edit that only moves things leaves it equal.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Outline {
+    pub symbols: Vec<(SymbolId, Entry)>,
+    pub modules: Vec<Module>,
+    pub files: Vec<File>,
+}
+
+impl Outline {
+    /// The outline of a slice.
+    pub fn new(slice: &Slice) -> Self {
+        let part = &slice.fragment;
+        Self {
+            symbols: part
+                .symbols
+                .iter()
+                .map(|symbol| (symbol.id.clone(), Entry::of(symbol)))
+                .collect(),
+            modules: part.modules.clone(),
+            files: part
+                .files
+                .iter()
+                .map(|file| File {
+                    path: file.path.clone(),
+                    lang: String::new(),
+                    hash: String::new(),
+                    generated: false,
+                    test: false,
+                    facts: file.facts.clone(),
+                })
+                .collect(),
+        }
     }
 }
 

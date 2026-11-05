@@ -2,7 +2,7 @@
 //! row is read when the node is pulled or validated, its value apart from the
 //! rest; writes of a run go out in one transaction.
 
-use std::{fs, path::Path, sync::Mutex};
+use std::{collections::HashMap, fs, path::Path, sync::Mutex};
 
 use rusqlite::{Connection, ErrorCode, OptionalExtension, params};
 
@@ -75,7 +75,13 @@ pub(crate) struct Meta {
 
 pub(crate) struct Store {
     conn: Mutex<Connection>,
+    /// Every row, read in one scan at the first load: a row is then taken
+    /// from memory, not asked of the connection one node at a time.
+    rows: Mutex<Option<Rows>>,
 }
+
+/// The rows of the nodes not yet touched, by kind and key.
+type Rows = HashMap<(String, Vec<u8>), Row>;
 
 impl Store {
     /// Opens `path`, creating it. A database that is damaged or of another
@@ -125,6 +131,7 @@ impl Store {
         }
         Ok(Self {
             conn: Mutex::new(conn),
+            rows: Mutex::new(None),
         })
     }
 
@@ -155,17 +162,33 @@ impl Store {
         Ok(meta.unwrap_or_default())
     }
 
-    /// The row of a node, without its value.
+    /// The row of a node, without its value; it is taken, so a node is loaded
+    /// once.
     pub(crate) fn load(&self, kind: &str, key: &[u8]) -> Result<Option<Row>, Error> {
+        let mut rows = self.rows.locked();
+        if rows.is_none() {
+            *rows = Some(self.scan()?);
+        }
+        Ok(rows
+            .as_mut()
+            .and_then(|rows| rows.remove(&(kind.to_owned(), key.to_vec()))))
+    }
+
+    /// Every row, without the values.
+    fn scan(&self) -> Result<Rows, Error> {
         let conn = self.conn.locked();
-        let mut statement = conn.prepare_cached(
-            "SELECT hash, deps, changed_at, verified_at, durability, input, used_at, value IS NOT NULL
-             FROM node WHERE kind = ?1 AND key = ?2",
+        let mut statement = conn.prepare(
+            "SELECT kind, key, hash, deps, changed_at, verified_at, durability, input, used_at, value IS NOT NULL
+             FROM node",
         )?;
-        let row = statement
-            .query_row(params![kind, key], read_row)
-            .optional()?;
-        Ok(row.flatten())
+        let mut found = Rows::new();
+        let mut cursor = statement.query([])?;
+        while let Some(row) = cursor.next()? {
+            if let Some(read) = read_row(row, 2)? {
+                found.insert((row.get(0)?, row.get(1)?), read);
+            }
+        }
+        Ok(found)
     }
 
     /// The stored value of a node.
@@ -206,20 +229,20 @@ impl Store {
     }
 }
 
-fn read_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Option<Row>> {
-    let hash: Vec<u8> = row.get(0)?;
+fn read_row(row: &rusqlite::Row<'_>, at: usize) -> rusqlite::Result<Option<Row>> {
+    let hash: Vec<u8> = row.get(at)?;
     let Ok(hash) = Hash::try_from(hash.as_slice()) else {
         return Ok(None);
     };
     Ok(Some(Row {
         hash,
-        deps: row.get(1)?,
-        changed_at: row.get::<_, i64>(2)? as u64,
-        verified_at: row.get::<_, i64>(3)? as u64,
-        durability: Durability::from_index(row.get(4)?),
-        input: row.get(5)?,
-        used_at: row.get::<_, i64>(6)? as u64,
-        has_value: row.get(7)?,
+        deps: row.get(at + 1)?,
+        changed_at: row.get::<_, i64>(at + 2)? as u64,
+        verified_at: row.get::<_, i64>(at + 3)? as u64,
+        durability: Durability::from_index(row.get(at + 4)?),
+        input: row.get(at + 5)?,
+        used_at: row.get::<_, i64>(at + 6)? as u64,
+        has_value: row.get(at + 7)?,
     }))
 }
 

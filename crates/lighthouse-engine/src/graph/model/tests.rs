@@ -337,7 +337,8 @@ fn a_body_edit_runs_no_resolution_and_the_symbol_table_stays_equal() {
     let ran = world.graph.take_executed();
     let count = |kind: &str| ran.iter().filter(|label| label.starts_with(kind)).count();
     assert_eq!(count("resolved("), 1, "{ran:?}");
-    assert_eq!(count("symbols("), 1);
+    assert_eq!(count("outline("), 1);
+    assert_eq!(count("symbols("), 0, "{ran:?}");
     assert_eq!(
         count("incoming("),
         0,

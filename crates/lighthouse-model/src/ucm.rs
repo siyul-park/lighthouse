@@ -25,8 +25,8 @@ pub use load_order::{LoadNeed, LoadPoint};
 
 use crate::{Document, Span};
 use merge::{dedup_edges, resolve_all, settle, sites_of, sorted_union};
-pub use slice::{Edges, Incoming, Resolved, Reverse, Slice, Tie, collisions, declared};
-pub use table::{Entry, Table};
+pub use slice::{Edges, Incoming, Resolved, Reverse, Sites, Slice, Tie, collisions, declared};
+pub use table::{Entry, Outline, Table};
 
 /// The fact of a file that lists its regions, see [`File::regions`].
 pub const REGIONS: &str = "regions";
@@ -522,6 +522,8 @@ struct Index {
     functions: BTreeMap<SymbolId, usize>,
     /// What the edges say, by the symbol at the end that is asked.
     reverse: Arc<Reverse>,
+    /// Where the edges refer to a symbol from.
+    sites: Arc<Sites>,
     /// The file of the fragment of each edge that starts at a module, by
     /// position in `edges`.
     origins: BTreeMap<usize, PathBuf>,
@@ -561,15 +563,22 @@ impl Project {
         let table = Table::of(&all);
         let sites = sites_of(&all, &table, &files);
         let origins = dedup_edges(&mut all, &files);
-        let mut reverse = Reverse::link(&table, all.edges.iter());
-        reverse.sites = sites;
-        Self::indexed(all, reverse, origins, notices)
+        let reverse = Reverse::link(&table, all.edges.iter());
+        Self::indexed(
+            all,
+            (Arc::new(reverse), Arc::new(Sites(sites))),
+            origins,
+            notices,
+        )
     }
 
     /// The project of slices resolved against one table, in the order of
     /// their paths, with the edges of all of them: what `merge` makes of the
     /// fragments, without resolving or linking anything again.
-    pub fn assemble<'a>(resolved: impl IntoIterator<Item = &'a Resolved>, edges: &Edges) -> Self {
+    pub fn assemble<'a>(
+        resolved: impl IntoIterator<Item = &'a Resolved>,
+        (edges, sites): (&Edges, &Arc<Sites>),
+    ) -> Self {
         let mut all = Fragment::default();
         let mut ambiguous = 0;
         let mut origins = BTreeMap::new();
@@ -606,17 +615,23 @@ impl Project {
         if ambiguous > 0 {
             notices.push(ambiguity(ambiguous));
         }
-        Self::indexed(all, (*edges.reverse).clone(), origins, notices)
+        Self::indexed(
+            all,
+            (edges.reverse.clone(), sites.clone()),
+            origins,
+            notices,
+        )
     }
 
     fn indexed(
         all: Fragment,
-        reverse: Reverse,
+        (reverse, sites): (Arc<Reverse>, Arc<Sites>),
         origins: BTreeMap<usize, PathBuf>,
         notices: Vec<String>,
     ) -> Self {
         let mut index = Index::new(&all);
-        index.reverse = Arc::new(reverse);
+        index.reverse = reverse;
+        index.sites = sites;
         index.origins = origins;
         index.loads = load_order::index(&all, &index);
         Self {
@@ -779,7 +794,7 @@ impl Project {
     /// references and the other relations alike, in file order. Empty when the
     /// provider reports no reference sites.
     pub fn sites(&self, id: &SymbolId) -> &[Site] {
-        slice(&self.inner.index.reverse.sites, id)
+        slice(&self.inner.index.sites.0, id)
     }
 
     /// The file the edge at position `at` of `edges` comes from, when it starts

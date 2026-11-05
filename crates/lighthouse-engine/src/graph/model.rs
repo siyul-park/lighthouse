@@ -3,10 +3,12 @@
 //! The host says what it knows of each file (`host`) and which files make the
 //! project (`paths`). From the provider's answers for the units the files are
 //! in, `part` makes the fragments of a file as the host stamps them, `slice`
-//! qualifies them, `symbols` is the table of all declarations, `resolved` the
-//! slice with its targets resolved against it, `edges` the reverse maps of
-//! all edges and `incoming` what the rest of the project says of the symbols
-//! of one file. `project` puts the files together; it is held in memory only.
+//! qualifies them, `declared` is the modules a file declares and `outline` what
+//! the table takes of a slice, `symbols` is the table of all declarations,
+//! `resolved` the slice with its targets resolved against it, `edges` the
+//! reverse maps of all edges, `sites` where they refer from and `incoming` what the rest of
+//! the project says of the symbols of one file. `project` puts the files
+//! together; it is held in memory only.
 //!
 //! Each kind is a function of the kinds it reads: an edit that changes
 //! nothing a node reads, such as a body in `symbols`, leaves it equal and what
@@ -20,8 +22,8 @@ use std::{
 
 use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use lighthouse_model::ucm::{
-    Edges, File, Fragment, Incoming, ORDERED, Project, REGIONS, Resolved, Slice, Table, collisions,
-    declared,
+    Edges, File, Fragment, Incoming, ORDERED, Outline, Project, REGIONS, Resolved, Sites, Slice,
+    Table, collisions, declared,
 };
 use lighthouse_spec::key;
 use serde::{Deserialize, Serialize};
@@ -39,11 +41,14 @@ pub(crate) static PATHS: Input<(), Vec<String>> = Input::new("paths");
 pub(crate) static MARKERS: Input<(), Vec<String>> = Input::new("markers");
 
 pub(crate) static PART: Query<String, Vec<Fragment>> = Query::new("part", part);
+pub(crate) static DECLARED: Query<String, Vec<(String, String)>> = Query::new("declared", declare);
 pub(crate) static COLLISIONS: Query<(), BTreeSet<String>> = Query::new("collisions", collide);
 pub(crate) static SLICE: Query<String, Slice> = Query::new("slice", slice);
+pub(crate) static OUTLINE: Query<String, Outline> = Query::new("outline", outline);
 pub(crate) static SYMBOLS: Query<(), Table> = Query::new("symbols", symbols);
 pub(crate) static RESOLVED: Query<String, Resolved> = Query::new("resolved", resolved);
 pub(crate) static EDGES: Query<(), Edges> = Query::new("edges", edges);
+pub(crate) static SITES: Query<(), Sites> = Query::new("sites", sites);
 pub(crate) static INCOMING: Query<String, Incoming> = Query::new("incoming", incoming);
 pub(crate) static PROJECT: Query<(), Project> = Query::new("project", project).transient();
 
@@ -260,13 +265,17 @@ fn part(graph: &Graph, path: &String) -> Result<Vec<Fragment>, Error> {
     Ok(parts)
 }
 
-/// The module paths declared in several languages, from every part.
+/// The module paths a file declares, each with the language it declares it in.
+fn declare(graph: &Graph, path: &String) -> Result<Vec<(String, String)>, Error> {
+    let parts = graph.query(&PART, path)?;
+    Ok(parts.iter().flat_map(declared).collect())
+}
+
+/// The module paths declared in several languages, from every file.
 fn collide(graph: &Graph, _: &()) -> Result<BTreeSet<String>, Error> {
-    let parts = each(graph, |graph, path| graph.query(&PART, path))?;
+    let found = each(graph, |graph, path| graph.query(&DECLARED, path))?;
     Ok(collisions(
-        parts
-            .iter()
-            .flat_map(|parts| parts.iter().flat_map(declared)),
+        found.iter().flat_map(|found| found.iter().cloned()),
     ))
 }
 
@@ -280,10 +289,16 @@ fn slice(graph: &Graph, path: &String) -> Result<Slice, Error> {
     ))
 }
 
+/// What the table takes of a file.
+fn outline(graph: &Graph, path: &String) -> Result<Outline, Error> {
+    let slice = graph.query(&SLICE, path)?;
+    Ok(Outline::new(&slice))
+}
+
 /// The table of the symbols of every file.
 fn symbols(graph: &Graph, _: &()) -> Result<Table, Error> {
-    let slices = each(graph, |graph, path| graph.query(&SLICE, path))?;
-    Ok(Table::new(slices.iter().map(Arc::as_ref)))
+    let outlines = each(graph, |graph, path| graph.query(&OUTLINE, path))?;
+    Ok(Table::new(outlines.iter().map(Arc::as_ref)))
 }
 
 fn resolved(graph: &Graph, path: &String) -> Result<Resolved, Error> {
@@ -298,6 +313,12 @@ fn edges(graph: &Graph, _: &()) -> Result<Edges, Error> {
     Ok(Edges::new(&table, resolved.iter().map(Arc::as_ref)))
 }
 
+fn sites(graph: &Graph, _: &()) -> Result<Sites, Error> {
+    let table = graph.query(&SYMBOLS, &())?;
+    let resolved = each(graph, |graph, path| graph.query(&RESOLVED, path))?;
+    Ok(Sites::new(&table, resolved.iter().map(Arc::as_ref)))
+}
+
 fn incoming(graph: &Graph, path: &String) -> Result<Incoming, Error> {
     let resolved = graph.query(&RESOLVED, path)?;
     let table = graph.query(&SYMBOLS, &())?;
@@ -308,7 +329,11 @@ fn incoming(graph: &Graph, path: &String) -> Result<Incoming, Error> {
 fn project(graph: &Graph, _: &()) -> Result<Project, Error> {
     let resolved = each(graph, |graph, path| graph.query(&RESOLVED, path))?;
     let edges = graph.query(&EDGES, &())?;
-    Ok(Project::assemble(resolved.iter().map(Arc::as_ref), &edges))
+    let sites = graph.query(&SITES, &())?;
+    Ok(Project::assemble(
+        resolved.iter().map(Arc::as_ref),
+        (&edges, &sites),
+    ))
 }
 
 /// A query of every path of the project, fanned out.
