@@ -19,6 +19,9 @@ use crate::{
 pub(crate) struct Shared {
     pub revision: AtomicU64,
     pub changed: [AtomicU64; Durability::COUNT],
+    /// The revision at each of the last commits, oldest first: what a count of
+    /// commits is worth in revisions.
+    pub marks: Mutex<Vec<u64>>,
     pub kinds: RwLock<HashMap<&'static str, Registered>>,
     pub slots: RwLock<HashMap<NodeId, Arc<Slot>>>,
     pub store: Store,
@@ -29,7 +32,7 @@ pub(crate) struct Shared {
     pub verify_count: AtomicU64,
     pub limit: AtomicU64,
     pub versions: Mutex<Versions>,
-    /// How many revisions a row that nothing verified is kept.
+    /// How many commits a row that nothing verified is kept.
     pub retain: u64,
 }
 
@@ -179,9 +182,39 @@ impl Shared {
                 .is_multiple_of(period)
     }
 
-    pub(crate) fn meta(&self) -> Result<Meta, Error> {
+    /// The revision the last `commits` commits go back to, `0` when there
+    /// were fewer.
+    pub(crate) fn horizon(&self, commits: u64) -> u64 {
+        let marks = self.marks.locked();
+        marks
+            .len()
+            .checked_sub(commits as usize)
+            .and_then(|at| marks.get(at))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// The marks with this commit's, the oldest dropped past `retain`.
+    pub(crate) fn marks_with(&self, revision: u64) -> Vec<u64> {
+        let mut marks = self.marks.locked().clone();
+        marks.push(revision);
+        let kept = marks.len().saturating_sub(self.retain as usize);
+        marks.drain(..kept);
+        marks
+    }
+
+    /// Rows last verified before this revision are older than `retain` commits.
+    pub(crate) fn oldest(&self, marks: &[u64]) -> u64 {
+        match marks.len() as u64 >= self.retain {
+            true => marks.first().copied().unwrap_or(0),
+            false => 0,
+        }
+    }
+
+    pub(crate) fn meta(&self, marks: &[u64]) -> Result<Meta, Error> {
         let versions = encode(&*self.versions.locked())?;
         Ok(Meta {
+            marks: encode(marks)?,
             revision: self.revision.load(Ordering::Acquire),
             changed: [0, 1, 2].map(|level| self.changed[level].load(Ordering::Acquire)),
             versions,
@@ -244,7 +277,7 @@ pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
     let value = node
         .blob
         .as_ref()
-        .filter(|_| !node.input)
+        .filter(|_| !node.input || node.persisted)
         .map(|blob| blob.to_vec());
     Write {
         kind: slot.id.kind.to_string(),
@@ -258,7 +291,7 @@ pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
 pub(crate) fn settle_clean(slot: &Arc<Slot>) {
     let mut node = slot.node.locked();
     if node.value_dirty {
-        node.on_disk = node.blob.is_some() && !node.input;
+        node.on_disk = node.blob.is_some() && (!node.input || node.persisted);
     }
     node.dirty = false;
     node.value_dirty = false;

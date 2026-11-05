@@ -27,6 +27,7 @@ pub(crate) struct Node {
     pub loaded: bool,
     pub present: bool,
     pub input: bool,
+    pub persisted: bool,
     pub hash: Hash,
     pub deps: Arc<[Dep]>,
     pub changed_at: u64,
@@ -82,6 +83,7 @@ impl Node {
             loaded: false,
             present: false,
             input: false,
+            persisted: false,
             hash: [0; 32],
             deps: Arc::from([]),
             changed_at: 0,
@@ -102,9 +104,16 @@ impl Node {
 
 impl Node {
     /// The node as an input just set to a value of this hash.
-    pub(crate) fn become_input(&mut self, hash: Hash, durability: Durability, revision: u64) {
+    pub(crate) fn become_input(
+        &mut self,
+        hash: Hash,
+        durability: Durability,
+        revision: u64,
+        persisted: bool,
+    ) {
         self.present = true;
         self.input = true;
+        self.persisted = persisted;
         self.hash = hash;
         self.deps = Arc::from([]);
         self.durability = durability;

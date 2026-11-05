@@ -192,10 +192,6 @@ mod eviction_order {
     }
 }
 
-/// How many revisions a row is kept in this test: small, so that the file is
-/// seen to stop growing within a few cycles.
-const RETAIN: u64 = 8;
-
 fn rows(path: &std::path::Path) -> i64 {
     let conn = rusqlite::Connection::open(path).expect("open the file");
     conn.query_row("SELECT count(*) FROM node", [], |row| row.get(0))
@@ -207,13 +203,9 @@ fn rows_of_files_that_are_gone_are_deleted_so_the_file_does_not_grow() {
     let dir = tempfile::tempdir().expect("dir");
     let path = dir.path().join("graph.db");
     let mut project = Project::new();
-    let options = Options {
-        retain: RETAIN,
-        ..options(&project)
-    };
-    let mut graph = open_with(Some(&path), options);
+    let mut graph = open(Some(&path), &project);
     let mut counts = Vec::new();
-    for cycle in 0..60 {
+    for cycle in 0..200 {
         let name = format!("f{cycle}");
         project
             .files
@@ -228,14 +220,14 @@ fn rows_of_files_that_are_gone_are_deleted_so_the_file_does_not_grow() {
         counts.push(rows(&path));
     }
 
-    let (middle, last) = (counts[30], counts[59]);
+    let (middle, last) = (counts[100], counts[199]);
     assert!(
         last <= middle,
-        "{middle} rows at 30, {last} at 59: {counts:?}"
+        "{middle} rows at 100, {last} at 199: {counts:?}"
     );
     assert!(
-        last < 60 * 5,
-        "the rows of 60 files are not all kept: {last}"
+        last < 100 * 5,
+        "the rows of 100 files are not all kept: {last}"
     );
     assert_eq!(
         pull(&graph),
@@ -289,5 +281,75 @@ mod registration {
         graph.query(&HIGH, &()).expect("pull");
         assert!(graph.take_executed().is_empty(), "low was used first");
         graph.commit().expect("commit");
+    }
+}
+
+mod persisted {
+    use lighthouse_graph::{Durability, Graph, Input, Options, Query};
+
+    static FRAGMENT: Input<String, String> = Input::new("fragment").persisted();
+    static TRANSIENT: Input<String, String> = Input::new("transient");
+    static SEEN: Query<String, String> = Query::new("seen", |graph, name| {
+        let fragment = graph.input(&FRAGMENT, name)?;
+        let transient = graph.input(&TRANSIENT, name)?;
+        Ok(format!(
+            "{}/{}",
+            fragment.as_deref().map_or("-", String::as_str),
+            transient.as_deref().map_or("-", String::as_str)
+        ))
+    });
+
+    fn reopen(path: &std::path::Path) -> Graph {
+        let options = Options {
+            verify: 0,
+            ..Options::default()
+        };
+        Graph::open(path, options).expect("open")
+    }
+
+    #[test]
+    fn a_persisted_input_is_read_after_reopen_and_an_ordinary_one_is_not() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let name = "a".to_owned();
+        let mut graph = reopen(&path);
+        for input in [&FRAGMENT, &TRANSIENT] {
+            graph
+                .set_input(input, &name, "one".to_owned(), Durability::Volatile)
+                .expect("set");
+        }
+        assert_eq!(*graph.query(&SEEN, &name).expect("pull"), "one/one");
+        graph.commit().expect("commit");
+        drop(graph);
+
+        let graph = reopen(&path);
+        let fragment = graph.input(&FRAGMENT, &name).expect("read");
+        assert_eq!(fragment.as_deref().map(String::as_str), Some("one"));
+        assert!(graph.input(&TRANSIENT, &name).expect("read").is_none());
+    }
+
+    #[test]
+    fn setting_an_equal_value_after_reopen_keeps_what_read_it_green() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let name = "a".to_owned();
+        let mut graph = reopen(&path);
+        graph
+            .set_input(&FRAGMENT, &name, "one".to_owned(), Durability::Volatile)
+            .expect("set");
+        graph.query(&SEEN, &name).expect("pull");
+        graph.commit().expect("commit");
+        drop(graph);
+
+        let mut graph = reopen(&path);
+        graph
+            .set_input(&FRAGMENT, &name, "one".to_owned(), Durability::Volatile)
+            .expect("set");
+        graph.query(&SEEN, &name).expect("pull");
+        assert!(graph.take_executed().is_empty());
+        graph
+            .set_input(&FRAGMENT, &name, "two".to_owned(), Durability::Volatile)
+            .expect("set");
+        assert_eq!(*graph.query(&SEEN, &name).expect("pull"), "two/-");
     }
 }

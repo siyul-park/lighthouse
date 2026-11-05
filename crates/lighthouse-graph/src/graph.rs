@@ -12,7 +12,7 @@ use crate::{
     explain, fan,
     frame::Frame,
     node::{Locked, NodeId},
-    query::{Kind, encode, hash},
+    query::{Kind, decode, encode, hash},
     shared::{Shared, Versions, drop_value, settle_clean, write_of},
     store::{Store, Write},
 };
@@ -21,9 +21,12 @@ use crate::{
 /// are dropped at [`Graph::commit`]: 256 MB.
 pub const DEFAULT_LIMIT: u64 = 256 << 20;
 
-/// Revisions a row is kept without being verified: about a million, which is
-/// some ten cold runs over a hundred thousand files.
-pub const DEFAULT_RETAIN: u64 = 1 << 20;
+/// Commits a row is kept without being verified. A row of a file that is gone
+/// is read by no run, so this is how long it outlives the file; a row that is
+/// read keeps itself alive. Sixty-four is a few days of commits at the pace a
+/// developer commits (each run, watch cycle or fix round is one), long enough
+/// that a branch switch does not lose the rows of the branch it left.
+pub const DEFAULT_RETAIN: u64 = 64;
 
 /// Verify mode samples one green node in this many when on by default.
 const VERIFY_PERIOD: u64 = 64;
@@ -51,9 +54,9 @@ pub struct Options {
     /// sampled. That values are produced only through the `Graph` is held by the
     /// types: a query gets a `Graph` and nothing else of the graph.
     pub verify: u64,
-    /// How many revisions a row that nothing set, validated or ran is kept:
+    /// How many commits a row that nothing set, validated or ran is kept:
     /// past that a commit deletes it, so that the rows of files that are gone
-    /// go too. A revision starts with each input that changes.
+    /// go too.
     pub retain: u64,
 }
 
@@ -96,6 +99,7 @@ impl Graph {
         let shared = Shared {
             revision: AtomicU64::new(meta.revision),
             changed: meta.changed.map(AtomicU64::new),
+            marks: Mutex::new(decode(&meta.marks).unwrap_or_default()),
             kinds: RwLock::default(),
             slots: RwLock::default(),
             store,
@@ -130,15 +134,19 @@ impl Graph {
         durability: Durability,
     ) -> Result<(), Error> {
         let registered = self.shared.register(input);
+        let persisted = registered.kind.persisted();
         let id = NodeId {
             kind: registered.name,
             key: encode(key)?.into(),
         };
-        let new_hash = hash(&encode(&value)?);
+        let blob = encode(&value)?;
+        let new_hash = hash(&blob);
         let slot = self.shared.slot(&id);
         let mut node = slot.node.locked();
         self.shared.load(&mut node, &id)?;
         node.value = Some(Arc::new(value));
+        node.persisted = persisted;
+        node.blob = persisted.then(|| blob.into());
         let moved = !node.present || node.hash != new_hash || node.durability != durability;
         if moved {
             let reach = if node.present {
@@ -147,12 +155,11 @@ impl Graph {
                 durability
             };
             let revision = self.shared.start_revision(reach);
-            node.become_input(new_hash, durability, revision);
+            node.become_input(new_hash, durability, revision, persisted);
             self.shared.dirty.mark(&slot, &mut node);
         } else {
-            let revision = self.shared.revision.load(Ordering::Acquire);
-            if revision.saturating_sub(node.verified_at) > self.shared.retain / 2 {
-                node.verified_at = revision;
+            if node.verified_at < self.shared.horizon(self.shared.retain / 2) {
+                node.verified_at = self.shared.revision.load(Ordering::Acquire);
                 self.shared.dirty.mark(&slot, &mut node);
             }
         }
@@ -263,15 +270,16 @@ impl Graph {
     }
 
     /// Writes what changed since the last commit in one transaction, deletes
-    /// the rows nothing verified for [`Options::retain`] revisions and prunes
+    /// the rows nothing verified for [`Options::retain`] commits and prunes
     /// values over the limit. Call it with no pull running.
     pub fn commit(&mut self) -> Result<(), Error> {
         let slots = self.shared.dirty.take();
         let revision = self.shared.revision.load(Ordering::Acquire);
         let writes: Vec<Write> = slots.iter().map(|slot| write_of(slot, revision)).collect();
-        let meta = self.shared.meta()?;
+        let marks = self.shared.marks_with(revision);
+        let meta = self.shared.meta(&marks)?;
         let limit = self.shared.limit.load(Ordering::Acquire);
-        let forget = revision.saturating_sub(self.shared.retain);
+        let forget = self.shared.oldest(&marks);
         let pruned = match self.shared.store.commit(&writes, &meta, limit, forget) {
             Ok(pruned) => pruned,
             Err(err) => {
@@ -279,6 +287,7 @@ impl Graph {
                 return Err(err);
             }
         };
+        *self.shared.marks.locked() = marks;
         for slot in &slots {
             settle_clean(slot);
         }

@@ -13,7 +13,7 @@ use crate::{
 
 /// Bumped whenever a table or what a value means changes: a database of
 /// another version is replaced.
-const SCHEMA: i64 = 3;
+const SCHEMA: i64 = 4;
 
 /// Pruning goes down to this part of the limit, so that a run that is just
 /// over does not prune every time.
@@ -39,7 +39,8 @@ CREATE TABLE meta(
     volatile_changed INTEGER NOT NULL,
     stable_changed INTEGER NOT NULL,
     static_changed INTEGER NOT NULL,
-    versions BLOB NOT NULL
+    versions BLOB NOT NULL,
+    marks BLOB NOT NULL
 );";
 
 /// A node to write. A `value` of `None` with `with_value` clears the value.
@@ -69,6 +70,7 @@ pub(crate) struct Meta {
     pub revision: u64,
     pub changed: [u64; Durability::COUNT],
     pub versions: Vec<u8>,
+    pub marks: Vec<u8>,
 }
 
 pub(crate) struct Store {
@@ -138,13 +140,14 @@ impl Store {
         let conn = self.conn.locked();
         let meta = conn
             .query_row(
-                "SELECT revision, volatile_changed, stable_changed, static_changed, versions FROM meta WHERE id = 0",
+                "SELECT revision, volatile_changed, stable_changed, static_changed, versions, marks FROM meta WHERE id = 0",
                 [],
                 |row| {
                     Ok(Meta {
                         revision: row.get::<_, i64>(0)? as u64,
                         changed: [row.get::<_, i64>(1)? as u64, row.get::<_, i64>(2)? as u64, row.get::<_, i64>(3)? as u64],
                         versions: row.get(4)?,
+                        marks: row.get(5)?,
                     })
                 },
             )
@@ -255,16 +258,17 @@ fn put(tx: &rusqlite::Transaction<'_>, write: &Write) -> Result<(), Error> {
 
 fn put_meta(tx: &rusqlite::Transaction<'_>, meta: &Meta) -> Result<(), Error> {
     tx.execute(
-        "INSERT INTO meta(id, revision, volatile_changed, stable_changed, static_changed, versions)
-         VALUES (0, ?1, ?2, ?3, ?4, ?5)
+        "INSERT INTO meta(id, revision, volatile_changed, stable_changed, static_changed, versions, marks)
+         VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6)
          ON CONFLICT(id) DO UPDATE SET revision = ?1, volatile_changed = ?2, stable_changed = ?3,
-             static_changed = ?4, versions = ?5",
+             static_changed = ?4, versions = ?5, marks = ?6",
         params![
             meta.revision as i64,
             meta.changed[0] as i64,
             meta.changed[1] as i64,
             meta.changed[2] as i64,
-            meta.versions
+            meta.versions,
+            meta.marks
         ],
     )?;
     Ok(())

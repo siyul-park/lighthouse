@@ -17,6 +17,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync + 'static> Value for T {}
 pub(crate) trait Kind: Send + Sync {
     fn name(&self) -> &'static str;
     fn is_input(&self) -> bool;
+    fn persisted(&self) -> bool;
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error>;
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>>;
     fn describe(&self, key: &[u8]) -> String;
@@ -42,6 +43,7 @@ impl Output {
 /// `static`.
 pub struct Input<K, V> {
     name: &'static str,
+    persisted: bool,
     types: PhantomData<fn(K) -> V>,
 }
 
@@ -50,7 +52,18 @@ impl<K, V> Input<K, V> {
     pub const fn new(name: &'static str) -> Self {
         Self {
             name,
+            persisted: false,
             types: PhantomData,
+        }
+    }
+
+    /// Keeps the last value set in the store: it is readable after a reopen
+    /// until it is set again. An input that is not persisted reads as unset
+    /// in a process that did not set it.
+    pub const fn persisted(self) -> Self {
+        Self {
+            persisted: true,
+            ..self
         }
     }
 }
@@ -62,6 +75,10 @@ impl<K: Key, V: Value> Kind for Input<K, V> {
 
     fn is_input(&self) -> bool {
         true
+    }
+
+    fn persisted(&self) -> bool {
+        self.persisted
     }
 
     fn execute(&self, _: &Graph, key: &[u8]) -> Result<Output, Error> {
@@ -105,6 +122,10 @@ impl<K: Key, V: Value> Kind for Query<K, V> {
         false
     }
 
+    fn persisted(&self) -> bool {
+        false
+    }
+
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error> {
         let key: K = decode(key)?;
         Output::new((self.run)(graph, &key)?)
@@ -119,7 +140,7 @@ impl<K: Key, V: Value> Kind for Query<K, V> {
     }
 }
 
-pub(crate) fn encode<T: Serialize>(value: &T) -> Result<Vec<u8>, Error> {
+pub(crate) fn encode<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
     postcard::to_stdvec(value).map_err(|err| Error::Encode(err.to_string()))
 }
 
