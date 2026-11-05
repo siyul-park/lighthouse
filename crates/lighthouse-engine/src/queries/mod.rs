@@ -108,7 +108,8 @@ fn files(db: &Db, _: &()) -> Result<Vec<String>, Error> {
             }
         }
     }
-    files.sort();
+    // In the order of paths, which compares by component, as the listing does.
+    files.sort_by(|a, b| Path::new(a).cmp(Path::new(b)));
     Ok(files)
 }
 
