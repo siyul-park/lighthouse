@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 mod applicability;
 mod edit;
 mod function;
+mod kinds;
 mod load_order;
+mod markers;
 mod merge;
 mod model;
 mod qualify;
@@ -21,7 +23,12 @@ mod table;
 pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
+pub use kinds::{
+    EDGES, HOST, Host, INCOMING, MARKERS, ORDERED_BY, OUTLINE, PATHS, PAYLOAD, PROJECT, Payload,
+    REGIONS_UNIT, RESOLVED, SITES, SLICE, SYMBOLS, key,
+};
 pub use load_order::{LoadNeed, LoadPoint, load_needs};
+pub use markers::Markers;
 pub use model::{Boxed, Model};
 
 use crate::{Document, Span};

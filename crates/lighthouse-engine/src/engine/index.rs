@@ -17,11 +17,9 @@ use lighthouse_protocol::hash::Hasher;
 use super::*;
 use crate::{
     Error as EngineError,
-    graph::{
-        API, CLAIMED, EVERY, FRAGMENT, PAYLOAD, PROVIDER, Payload, Provider,
-        REGIONS as REGIONS_UNIT, Read, Stored, UNIT, UNITS,
-    },
+    graph::{API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, Read, Stored, UNIT, UNITS},
 };
+use lighthouse_model::ucm::{ORDERED_BY, PAYLOAD, Payload, REGIONS_UNIT};
 
 /// One language of the step: its call and what is known of it.
 struct Lane<'a> {
@@ -120,6 +118,12 @@ impl Engine {
             self.provider_of(language),
             Durability::Static,
         )?;
+        graph.set_input(
+            &ORDERED_BY,
+            &id,
+            manifest.ordered_declarations,
+            Durability::Static,
+        )?;
         let claimed: Vec<String> = by_path.keys().cloned().collect();
         graph.set_input(&CLAIMED, &id, claimed, Durability::Volatile)?;
         let units = graph.query(&UNITS, &id)?;
@@ -159,7 +163,6 @@ impl Engine {
             by: manifest.units.by.into(),
             manifest: manifest.units.manifest.clone().unwrap_or_default(),
             settings: manifest.units.settings.clone(),
-            ordered: manifest.ordered_declarations,
         }
     }
 

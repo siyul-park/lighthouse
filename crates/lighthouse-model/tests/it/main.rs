@@ -10,6 +10,7 @@ mod fs;
 mod glob;
 mod graph;
 mod load_order;
+mod markers;
 mod model_ref;
 mod project;
 mod resource;

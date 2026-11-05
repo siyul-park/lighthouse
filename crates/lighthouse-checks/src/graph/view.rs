@@ -12,12 +12,12 @@ use std::{
     sync::Arc,
 };
 
-use lighthouse_engine::graph::{EDGES, INCOMING, PATHS, RESOLVED, SITES, SYMBOLS};
 use lighthouse_graph::{Error, Graph};
 use lighthouse_model::ucm::{
     Boxed, Comment, Edge, Edges, File, FunctionSummary, Incoming, LoadNeed, Model, Module, Node,
     Resolved, Site, Sites, Symbol, SymbolId, Table, TestCase, When, load_needs,
 };
+use lighthouse_model::ucm::{EDGES, INCOMING, PATHS, RESOLVED, SITES, SYMBOLS};
 use lighthouse_spec::key;
 use typed_arena::Arena;
 

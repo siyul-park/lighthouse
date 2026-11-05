@@ -4,17 +4,15 @@
 
 mod detect;
 mod keys;
-mod model;
 mod open;
 mod pull;
 pub(crate) mod units;
 
 pub(crate) use detect::Detected;
 pub use keys::{FileKey, Keys};
-pub use model::{
-    EDGES, HOST, Host, INCOMING, MARKERS, OUTLINE, PATHS, PROJECT, RESOLVED, SITES, SLICE, SYMBOLS,
-};
 pub(crate) use units::{
-    API, CLAIMED, EVERY, FRAGMENT, PAYLOAD, PROVIDER, Payload, Provider, REGIONS, Read, Stored,
-    UNIT, UNITS,
+    API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, Read, Stored, UNIT, UNITS, set_units,
 };
+
+#[cfg(test)]
+mod tests;

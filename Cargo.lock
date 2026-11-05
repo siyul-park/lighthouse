@@ -1999,7 +1999,9 @@ dependencies = [
 name = "lighthouse-model"
 version = "0.1.0"
 dependencies = [
+ "lighthouse-graph",
  "lighthouse-protocol",
+ "regex",
  "schemars",
  "serde",
  "serde_json",

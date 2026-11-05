@@ -17,8 +17,8 @@ use lighthouse_model::ucm::{
 };
 use lighthouse_spec::key;
 
-use super::model::{EDGES, Host, INCOMING, PROJECT, RESOLVED, SYMBOLS};
 use crate::cache::{Digest, KeyBuilder};
+use lighthouse_model::ucm::{EDGES, INCOMING, PROJECT, RESOLVED, SYMBOLS};
 
 pub(crate) static SHAPE: Query<(String, bool), Digest> = Query::new("shape", shape);
 pub(crate) static TIES: Query<(String, bool), Digest> = Query::new("ties", ties);
@@ -98,7 +98,7 @@ impl Keys {
     /// without a run: what a cached result of a file would be keyed by.
     pub fn of(fragments: &[Fragment]) -> Result<Self, crate::Error> {
         let mut graph = Graph::in_memory(Options::default())?;
-        Host::set_units(&mut graph, fragments)?;
+        super::set_units(&mut graph, fragments)?;
         let project = graph.query(&PROJECT, &())?;
         Ok(Self::new(&graph, &project, true)?)
     }

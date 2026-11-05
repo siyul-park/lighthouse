@@ -9,7 +9,6 @@ doctest = false
 
 [dependencies]
 cel.workspace = true
-lighthouse-engine.workspace = true
 lighthouse-graph.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
@@ -25,6 +24,7 @@ toml.workspace = true
 typed-arena.workspace = true
 
 [dev-dependencies]
+lighthouse-engine.workspace = true
 lighthouse-rpc.workspace = true
 tempfile.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }

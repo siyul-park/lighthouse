@@ -9,7 +9,9 @@ test = false
 doctest = false
 
 [dependencies]
+lighthouse-graph.workspace = true
 lighthouse-protocol.workspace = true
+regex.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

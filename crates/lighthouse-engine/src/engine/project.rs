@@ -7,7 +7,7 @@ use lighthouse_graph::{Durability, Graph};
 use lighthouse_spec::key;
 
 use super::{index::Call, regions::Views, *};
-use crate::graph::{HOST, Host, MARKERS, PATHS, PROJECT};
+use lighthouse_model::ucm::{HOST, Host, MARKERS, PATHS, PROJECT};
 
 /// The unit each file of a run is in, and whether the unit is a host unit:
 /// one with files that injections take regions from.

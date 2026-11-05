@@ -17,6 +17,7 @@ mod held;
 use std::{path::Path, sync::Arc};
 
 use lighthouse_graph::{Error, Graph, Input, Query};
+pub use lighthouse_model::ucm::key;
 
 pub use content::{Content, Readable};
 pub use held::Held;
@@ -62,11 +63,6 @@ struct Child {
     name: String,
     at: String,
     is_dir: bool,
-}
-
-/// The key of a project-relative path in the kinds that take one.
-pub fn key(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
 }
 
 fn entries(graph: &Graph, dir: &String) -> Result<Entries, Error> {

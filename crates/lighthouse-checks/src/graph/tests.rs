@@ -6,11 +6,11 @@ use std::collections::BTreeSet;
 
 use super::kinds::{CONVENTIONS, Conventions, Pull, READS};
 use crate::{
-    fact::{Built, FACT, FUNCTION, SYMBOL, TEST, subject_key},
+    fact::{Built, FACT, FUNCTION, Fact, SYMBOL, TEST, subject_key},
     local::Local,
 };
-use lighthouse_engine::graph::Host;
 use lighthouse_graph::{Durability, Graph, Options};
+use lighthouse_model::ucm::Host;
 use lighthouse_model::{
     Position, Span,
     ucm::{
@@ -330,4 +330,37 @@ fn the_fact_of_a_subject_is_what_the_builder_makes_of_a_merge_after_every_edit()
     }
     assert!(compared > 1000, "{compared} facts were compared");
     assert!(present > 500, "only {present} of them were facts");
+}
+
+#[test]
+fn a_rule_sees_the_same_fields_when_another_rule_asks_for_more() {
+    let ws = Workspace::new(".");
+    let project = Project::merge(fragments(&[spec("m0", &["x", "y"]), spec("m1", &["z"])]));
+    let few = Reads {
+        fields: ["name".to_owned(), "kind".to_owned()].into(),
+        ..Reads::default()
+    };
+    let narrow = Local::new(&project, &ws, [(SYMBOL.to_owned(), few.clone())]);
+    let wide = Local::new(&project, &ws, [(SYMBOL.to_owned(), everything())]);
+    let mut seen = 0;
+
+    for symbol in project.symbols() {
+        let key = subject_key(SYMBOL, symbol.id.as_str());
+        let narrow = narrow
+            .pull(FACT, &key)
+            .unwrap()
+            .downcast::<Built>()
+            .unwrap();
+        let wide = wide.pull(FACT, &key).unwrap().downcast::<Built>().unwrap();
+        let (Some(Fact::Map(narrow)), Some(Fact::Map(wide))) = (narrow.fact(), wide.fact()) else {
+            panic!("{symbol:?} has no fact");
+        };
+        for (field, value) in narrow {
+            assert_eq!(wide.get(field), Some(value), "{field} of {:?}", symbol.id);
+        }
+        assert!(wide.len() > narrow.len());
+        seen += 1;
+    }
+
+    assert!(seen > 0);
 }

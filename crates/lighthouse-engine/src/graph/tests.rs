@@ -9,13 +9,12 @@ use lighthouse_graph::{Graph, Options};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Project, Resolution, Symbol,
-        SymbolId, SymbolKind, Target, Visibility,
+        Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, PROJECT, Project,
+        Resolution, Symbol, SymbolId, SymbolKind, Target, Visibility,
     },
 };
 
-use super::*;
-use crate::graph::Keys;
+use crate::graph::{Keys, set_units};
 
 /// A tiny deterministic generator.
 struct Rng(u64);
@@ -160,7 +159,7 @@ impl World {
             .enumerate()
             .map(|(at, spec)| spec.fragment(&spec.path(at)))
             .collect();
-        Host::set_units(&mut self.graph, &fragments).unwrap();
+        set_units(&mut self.graph, &fragments).unwrap();
     }
 
     fn project(&self) -> Project {

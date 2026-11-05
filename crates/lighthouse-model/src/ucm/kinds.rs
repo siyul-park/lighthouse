@@ -21,20 +21,25 @@ use std::{
 };
 
 use lighthouse_graph::{Durability, Error, Graph, Input, Query};
-use lighthouse_model::ucm::{
-    Edges, File, Fragment, Incoming, ORDERED, Outline, Project, REGIONS, Resolved, Sites, Slice,
-    Table, collisions, declared,
-};
-use lighthouse_spec::key;
 use serde::{Deserialize, Serialize};
 
-use super::units::{
-    By, FRAGMENT, PAYLOAD, PROVIDER, Payload, Provider, REGIONS as REGIONS_UNIT, Stored,
+use super::{
+    Edges, File, Fragment, Incoming, Markers, ORDERED, Outline, Project, REGIONS, Resolved, Sites,
+    Slice, Table, collisions, declared,
 };
-use crate::generated::Markers;
+
+/// The id of the unit that holds the regions selected in the project's files.
+pub const REGIONS_UNIT: &str = "#regions";
 
 /// What the host says of a file of the project. `Volatile`.
 pub static HOST: Input<String, Host> = Input::new("host");
+/// The languages that evaluate their declarations in the order they are
+/// written, by language id. `Static`.
+pub static ORDERED_BY: Input<String, bool> = Input::new("ordered_by");
+/// The fragments of the unit `(language, id)` as the provider gave them, and
+/// its source trees as JSON. Persisted and read only by what builds the model
+/// of a file, which validates without loading.
+pub static PAYLOAD: Input<(String, String), Payload> = Input::new("payload").persisted();
 /// The paths of the files of the project, sorted. `Volatile`.
 pub static PATHS: Input<(), Vec<String>> = Input::new("paths");
 /// The patterns of the markers of generated files. `Stable`.
@@ -59,6 +64,13 @@ pub static SITES: Query<(), Sites> = Query::new("sites", sites);
 pub static INCOMING: Query<String, Incoming> = Query::new("incoming", incoming);
 /// The files put together; held in memory only.
 pub static PROJECT: Query<(), Project> = Query::new("project", project).transient();
+
+/// The fragments of a unit, and its source trees as JSON.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Payload {
+    pub fragments: Vec<Fragment>,
+    pub sources: Vec<u8>,
+}
 
 /// How the host stamps the fragments a provider gave for a file.
 struct Stamping<'a> {
@@ -101,8 +113,8 @@ impl Stamping<'_> {
     fn ordered(&self, fragment: &mut Fragment, language: &str) -> Result<(), Error> {
         let ordered = self
             .graph
-            .input(&PROVIDER, &language.to_owned())?
-            .is_some_and(|provider| provider.ordered);
+            .input(&ORDERED_BY, &language.to_owned())?
+            .is_some_and(|ordered| *ordered);
         if ordered {
             for file in &mut fragment.files {
                 file.facts.insert(ORDERED.to_owned(), String::new());
@@ -164,9 +176,8 @@ pub struct Host {
 }
 
 impl Host {
-    /// Sets the inputs of a project that is the given fragments, one unit per
-    /// file, with nothing else known of the files: what the keys of fragments
-    /// made without a run are read from.
+    /// Sets the inputs of the model of the given fragments, one unit per file,
+    /// with nothing else known of the files.
     pub fn set_units(graph: &mut Graph, fragments: &[Fragment]) -> Result<(), Error> {
         let mut paths = Vec::new();
         for fragment in fragments {
@@ -174,20 +185,7 @@ impl Host {
                 continue;
             };
             let (language, path) = (file.lang.clone(), key(&file.path));
-            let provider = Provider {
-                identity: language.clone(),
-                by: By::File,
-                manifest: String::new(),
-                settings: Vec::new(),
-                ordered: false,
-            };
-            graph.set_input(&PROVIDER, &language, provider, Durability::Static)?;
             let unit = (language, path.clone());
-            let stored = Stored {
-                key: path.clone(),
-                clean: true,
-                ..Stored::default()
-            };
             let payload = Payload {
                 fragments: vec![fragment.clone()],
                 sources: Vec::new(),
@@ -198,7 +196,6 @@ impl Host {
                 staged: false,
                 views: Vec::new(),
             };
-            graph.set_input(&FRAGMENT, &unit, stored, Durability::Volatile)?;
             graph.set_input(&PAYLOAD, &unit, payload, Durability::Volatile)?;
             graph.set_input(&HOST, &path, host, Durability::Volatile)?;
             paths.push(path);
@@ -234,6 +231,11 @@ impl Host {
         let language = code.next()?;
         code.next().is_none().then_some(language)
     }
+}
+
+/// The key of a project-relative path in the kinds that take one.
+pub fn key(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
 }
 
 /// The fragments of a file, as the host stamps them: the ones of its unit,
@@ -367,6 +369,3 @@ fn has_content(fragment: &Fragment) -> bool {
         || !fragment.tests.is_empty()
         || !fragment.comments.is_empty()
 }
-
-#[cfg(test)]
-mod tests;

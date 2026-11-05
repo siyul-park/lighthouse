@@ -12,14 +12,11 @@ use std::{
     path::Path,
 };
 
-use lighthouse_graph::{Error, Graph, Input, Query};
-use lighthouse_model::ucm::Fragment;
+use lighthouse_graph::{Durability, Error, Graph, Input, Query};
+use lighthouse_model::ucm::{Fragment, Host, key};
 use lighthouse_plugin::UnitsBy;
 use lighthouse_spec::{CONTENT, FILES, Hash};
 use serde::{Deserialize, Serialize};
-
-/// The id of the unit that holds the regions selected in the project's files.
-pub(crate) const REGIONS: &str = "#regions";
 
 /// An import that stands for every unit of the language: a provider whose
 /// analysis of a unit reads what the others declare (a name looked up in the
@@ -40,10 +37,6 @@ pub(crate) static CLAIMED: Input<String, Vec<String>> = Input::new("claimed");
 /// so the host reads it for every unit of every run. Persisted: a run that
 /// finds the unit's key as it was takes it and starts no provider.
 pub(crate) static FRAGMENT: Input<(String, String), Stored> = Input::new("fragment").persisted();
-/// The fragments and source trees of the same answer. Persisted and read
-/// only by what builds the model of a file, which validates without loading.
-pub(crate) static PAYLOAD: Input<(String, String), Payload> = Input::new("payload").persisted();
-
 pub(crate) static UNITS: Query<String, Vec<Unit>> = Query::new("units", units);
 pub(crate) static SETTINGS: Query<String, Hash> = Query::new("settings", settings);
 pub(crate) static UNIT: Query<(String, String), Hash> = Query::new("unit", unit);
@@ -59,8 +52,6 @@ pub(crate) struct Provider {
     pub by: By,
     pub manifest: String,
     pub settings: Vec<String>,
-    /// The language evaluates its declarations in the order they are written.
-    pub ordered: bool,
 }
 
 /// How a language's files make units.
@@ -113,13 +104,6 @@ pub(crate) struct Stored {
     pub sources: bool,
 }
 
-/// The fragments of a unit, and its source trees as JSON.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Payload {
-    pub fragments: Vec<Fragment>,
-    pub sources: Vec<u8>,
-}
-
 /// A file outside the project that an answer depended on, with what the host
 /// saw of it: the discovered dependency of a build action (a depfile).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -155,6 +139,32 @@ impl Read {
             Some(_) => hash_of(&self.path) != self.hash,
         }
     }
+}
+
+/// Sets the inputs of a project that is the given fragments, one unit per
+/// file, with nothing else known of the files: what the keys of fragments made
+/// without a run are read from.
+pub(crate) fn set_units(graph: &mut Graph, fragments: &[Fragment]) -> Result<(), Error> {
+    for fragment in fragments {
+        let Some(file) = fragment.files.first() else {
+            continue;
+        };
+        let (language, path) = (file.lang.clone(), key(&file.path));
+        let provider = Provider {
+            identity: language.clone(),
+            by: By::File,
+            manifest: String::new(),
+            settings: Vec::new(),
+        };
+        graph.set_input(&PROVIDER, &language, provider, Durability::Static)?;
+        let stored = Stored {
+            key: path.clone(),
+            clean: true,
+            ..Stored::default()
+        };
+        graph.set_input(&FRAGMENT, &(language, path), stored, Durability::Volatile)?;
+    }
+    Host::set_units(graph, fragments)
 }
 
 /// The units of a language, sorted by id: it reads the paths of the files and
