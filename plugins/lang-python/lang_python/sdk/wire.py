@@ -530,6 +530,7 @@ UnitResult = TypedDict(
         "imports": list[str],
         "incomplete": list[Incomplete],
         "notices": list[str],
+        "reads": list[str],
         "sources": list[Source],
     },
     total=False,

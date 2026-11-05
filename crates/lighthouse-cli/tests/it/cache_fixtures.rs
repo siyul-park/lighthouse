@@ -49,6 +49,16 @@ pub(crate) fn probe(prefix: &str, language: &str) -> String {
             format!("package a\n\nfunc {prefix}x() {{}}\n"),
             "package a\n\nfunc zz() {}\n".to_owned(),
         ),
+        "typescript" => (
+            "a.ts",
+            format!("// probe\n\nexport function {prefix}x() {{}}\n"),
+            "// probe\n\nexport function zz() {}\n".to_owned(),
+        ),
+        "python" => (
+            "a.py",
+            format!("# probe\n\ndef {prefix}x():\n    pass\n"),
+            "# probe\n\ndef zz():\n    pass\n".to_owned(),
+        ),
         _ => (
             "src/lib.rs",
             format!("pub fn {prefix}x() {{}}\n"),
@@ -388,6 +398,45 @@ pub(crate) fn go() -> Option<Fixture> {
                 mostly_warm: false,
             },
             Edit {
+                name: "replace target added",
+                apply: |d| {
+                    let dep = d.with_extension("dep");
+                    write(&dep, "go.mod", "module example.com/dep\n\ngo 1.22\n");
+                    write(
+                        &dep,
+                        "dep.go",
+                        "package dep\n\n// Value is one.\nfunc Value() int {\n\treturn 1\n}\n",
+                    );
+                    let name = dep.file_name().unwrap().to_string_lossy().into_owned();
+                    replace(
+                        d,
+                        "go.mod",
+                        "go 1.25\n",
+                        &format!(
+                            "go 1.25\n\nrequire example.com/dep v0.0.0\n\nreplace example.com/dep => ../{name}\n"
+                        ),
+                    );
+                    write(
+                        d,
+                        "util/dep.go",
+                        "package util\n\nimport \"example.com/dep\"\n\n// FromDep reads the dependency.\nfunc FromDep() int {\n\treturn dep.Value()\n}\n",
+                    );
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "replace target edited",
+                apply: |d| {
+                    let dep = d.with_extension("dep");
+                    write(
+                        &dep,
+                        "dep.go",
+                        "package dep\n\n// Value is text now, which the importer cannot return as a number.\nfunc Value() string {\n\treturn \"two\"\n}\n",
+                    );
+                },
+                mostly_warm: false,
+            },
+            Edit {
                 name: "provider option changed",
                 apply: |d| {
                     replace(
@@ -430,4 +479,202 @@ pub(crate) fn project(fixture: &Fixture) -> TempDir {
     );
     trust(dir.path());
     dir
+}
+
+/// The edits every fixture shares: they are about the configuration, not the
+/// language.
+fn common(language: &'static str) -> [Edit; 1] {
+    [Edit {
+        name: "the decision's check edited",
+        apply: match language {
+            "typescript" => |d| {
+                write(
+                    d,
+                    ".lighthouse/decisions/probe.yaml",
+                    &probe("d", "typescript"),
+                )
+            },
+            _ => |d| write(d, ".lighthouse/decisions/probe.yaml", &probe("d", "python")),
+        },
+        mostly_warm: false,
+    }]
+}
+
+pub(crate) fn typescript() -> Option<Fixture> {
+    let plugin = lighthouse_test_support::lang_typescript()?;
+    let [decision] = common("typescript");
+    Some(Fixture {
+        name: "typescript",
+        language: "typescript",
+        toml: toml("lang-typescript", &plugin),
+        files: &[
+            (
+                "tsconfig.json",
+                "{\"compilerOptions\":{\"strict\":true,\"target\":\"es2022\",\"module\":\"esnext\",\"moduleResolution\":\"bundler\"},\"include\":[\"src\"]}\n",
+            ),
+            (
+                "src/store.ts",
+                "/** A store of numbers. */\nexport class Store {\n  private items: number[] = [];\n\n  /** Adds one. */\n  add(n: number): void {\n    this.items.push(n);\n  }\n\n  /** Sums them. */\n  sum(): number {\n    return this.items.reduce((a, b) => a + b, 0);\n  }\n}\n\n/** Loads the default items. */\nexport function load(): Store {\n  const s = new Store();\n  s.add(1);\n  s.add(2);\n  return s;\n}\n\nfunction bump(n: number): number {\n  return n + 1;\n}\n\n/** Bumps. */\nexport function bumped(): number {\n  return bump(1);\n}\n",
+            ),
+            (
+                "src/server.ts",
+                "import { load } from \"./store\";\n\n/** Serves. */\nexport function serve(): number {\n  return load().sum();\n}\n\n/** Doubles. */\nexport function double(n: number): number {\n  return n * 2;\n}\n",
+            ),
+            (
+                "src/util.ts",
+                "import { Store } from \"./store\";\n\n/** Totals. */\nexport function total(): number {\n  const s = new Store();\n  s.add(3);\n  return s.sum();\n}\n",
+            ),
+            (
+                "src/app.ts",
+                "import { serve } from \"./server\";\nimport { total } from \"./util\";\n\n/** Runs it all. */\nexport function run(): number {\n  return serve() + total();\n}\n",
+            ),
+        ],
+        edits: vec![
+            Edit {
+                name: "body-only edit",
+                apply: |d| replace(d, "src/store.ts", "n + 1", "n + 2"),
+                mostly_warm: true,
+            },
+            Edit {
+                name: "signature edit",
+                apply: |d| {
+                    replace(
+                        d,
+                        "src/server.ts",
+                        "double(n: number): number {\n  return n * 2",
+                        "double(n: number, m: number): number {\n  return n * m",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "rename of a called function",
+                apply: |d| {
+                    replace(
+                        d,
+                        "src/store.ts",
+                        "export function load()",
+                        "export function fetch()",
+                    );
+                    replace(d, "src/server.ts", "import { load }", "import { fetch }");
+                    replace(d, "src/server.ts", "return load()", "return fetch()");
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file added",
+                apply: |d| {
+                    write(
+                        d,
+                        "src/extra.ts",
+                        "/** Extra. */\nexport function extra(): number {\n  return 1;\n}\n",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file renamed",
+                apply: |d| fs::rename(d.join("src/extra.ts"), d.join("src/more.ts")).unwrap(),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "tsconfig edited",
+                apply: |d| replace(d, "tsconfig.json", "\"strict\":true", "\"strict\":false"),
+                mostly_warm: false,
+            },
+            decision,
+            Edit {
+                name: "file deleted",
+                apply: |d| {
+                    fs::remove_file(d.join("src/util.ts")).unwrap();
+                    replace(d, "src/app.ts", "import { total } from \"./util\";\n", "");
+                    replace(d, "src/app.ts", "serve() + total()", "serve()");
+                },
+                mostly_warm: false,
+            },
+        ],
+    })
+}
+
+pub(crate) fn python() -> Option<Fixture> {
+    let plugin = lighthouse_test_support::lang_python()?;
+    let [decision] = common("python");
+    Some(Fixture {
+        name: "python",
+        language: "python",
+        toml: toml("lang-python", &plugin),
+        files: &[
+            ("pkg/__init__.py", ""),
+            (
+                "pkg/store.py",
+                "\"\"\"A store of numbers.\"\"\"\n\n\nclass Store:\n    \"\"\"Holds numbers.\"\"\"\n\n    def __init__(self) -> None:\n        self.items: list[int] = []\n\n    def add(self, n: int) -> None:\n        \"\"\"Adds one.\"\"\"\n        self.items.append(n)\n\n    def sum(self) -> int:\n        \"\"\"Sums them.\"\"\"\n        return sum(self.items)\n\n\ndef load() -> Store:\n    \"\"\"Loads the default items.\"\"\"\n    s = Store()\n    s.add(1)\n    s.add(2)\n    return s\n\n\ndef bump(n: int) -> int:\n    return n + 1\n\n\ndef bumped() -> int:\n    \"\"\"Bumps.\"\"\"\n    return bump(1)\n",
+            ),
+            (
+                "pkg/server.py",
+                "from pkg.store import load\n\n\ndef serve() -> int:\n    \"\"\"Serves.\"\"\"\n    return load().sum()\n\n\ndef double(n: int) -> int:\n    \"\"\"Doubles.\"\"\"\n    return n * 2\n",
+            ),
+            (
+                "pkg/util.py",
+                "from pkg.store import Store\n\n\ndef total() -> int:\n    \"\"\"Totals.\"\"\"\n    s = Store()\n    s.add(3)\n    return s.sum()\n",
+            ),
+            (
+                "pkg/app.py",
+                "from pkg.server import serve\nfrom pkg.util import total\n\n\ndef run() -> int:\n    \"\"\"Runs it all.\"\"\"\n    return serve() + total()\n",
+            ),
+        ],
+        edits: vec![
+            Edit {
+                name: "body-only edit",
+                apply: |d| replace(d, "pkg/store.py", "n + 1", "n + 2"),
+                mostly_warm: true,
+            },
+            Edit {
+                name: "signature edit",
+                apply: |d| {
+                    replace(
+                        d,
+                        "pkg/server.py",
+                        "def double(n: int) -> int:\n    \"\"\"Doubles.\"\"\"\n    return n * 2",
+                        "def double(n: int, m: int) -> int:\n    \"\"\"Doubles.\"\"\"\n    return n * m",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "rename of a called function",
+                apply: |d| {
+                    replace(d, "pkg/store.py", "def load()", "def fetch()");
+                    replace(d, "pkg/server.py", "import load", "import fetch");
+                    replace(d, "pkg/server.py", "return load()", "return fetch()");
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file added",
+                apply: |d| {
+                    write(
+                        d,
+                        "pkg/extra.py",
+                        "def extra() -> int:\n    \"\"\"Extra.\"\"\"\n    return 1\n",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file renamed",
+                apply: |d| fs::rename(d.join("pkg/extra.py"), d.join("pkg/more.py")).unwrap(),
+                mostly_warm: false,
+            },
+            decision,
+            Edit {
+                name: "file deleted",
+                apply: |d| {
+                    fs::remove_file(d.join("pkg/util.py")).unwrap();
+                    replace(d, "pkg/app.py", "from pkg.util import total\n", "");
+                    replace(d, "pkg/app.py", "serve() + total()", "serve()");
+                },
+                mostly_warm: false,
+            },
+        ],
+    })
 }

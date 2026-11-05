@@ -2102,6 +2102,13 @@
           },
           "type": "array"
         },
+        "reads": {
+          "description": "Absolute paths of files outside the project whose content the answer\ndepended on (a `replace` target, a workspace member). The host records\nthem with the answer, as a depfile does, and asks again when one\nchanged.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "sources": {
           "description": "Serialized ASTs and independent source-map sidecars requested for selection.",
           "items": {

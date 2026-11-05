@@ -24,8 +24,8 @@ use super::{regions::Views, *};
 use crate::{
     Error as EngineError,
     graph::{
-        API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, REGIONS as REGIONS_UNIT, Stored, UNIT,
-        UNITS,
+        API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, REGIONS as REGIONS_UNIT, Read, Stored,
+        UNIT, UNITS,
     },
 };
 
@@ -358,7 +358,11 @@ impl Engine {
             let stored = graph.input(&FRAGMENT, &unit)?;
             let mut imports = BTreeMap::new();
             let mut stale = match &stored {
-                Some(stored) => stored.key != key || !stored.clean,
+                Some(stored) => {
+                    stored.key != key
+                        || !stored.clean
+                        || stored.reads.iter().any(|read| read.moved(stored.at))
+                }
                 None => true,
             };
             for (import, seen) in stored.iter().flat_map(|stored| &stored.imports) {
@@ -517,6 +521,8 @@ impl Engine {
                 for file in &mut fragment.files {
                     if let Some(now) = current.get(file.path.as_path()) {
                         let facts = std::mem::take(&mut file.facts);
+                        // What the host says of a file is read again; `generated` also stays
+                        // where the provider said it of a file the host did not (see `stored_of`).
                         let added = file.generated;
                         *file = (*now).clone();
                         file.generated |= added;
@@ -609,6 +615,12 @@ fn stored_of(
         imports,
         body: unit.body.clone(),
         api: unit.api.clone(),
+        reads: unit.reads.iter().map(|path| Read::of(path)).collect(),
+        at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| {
+                i64::try_from(since.as_nanos()).unwrap_or(i64::MAX)
+            }),
         fragment: serde_json::to_vec(&payload)
             .map_err(|e| lighthouse_graph::Error::Encode(e.to_string()))?,
     })

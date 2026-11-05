@@ -562,6 +562,11 @@ type UnitResult struct {
 	// keeps them with the unit and shows them again when it takes the unit
 	// as it is.
 	Notices []string `json:"notices,omitempty"`
+	// Absolute paths of files outside the project whose content the answer
+	// depended on (a `replace` target, a workspace member). The host records
+	// them with the answer, as a depfile does, and asks again when one
+	// changed.
+	Reads []string `json:"reads,omitempty"`
 	// Serialized ASTs and independent source-map sidecars requested for selection.
 	Sources []Source `json:"sources,omitempty"`
 }

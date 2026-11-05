@@ -25,6 +25,8 @@ type planner struct {
 	r       *run
 	modules []moduleRoot
 	dirs    map[string]*directory
+	// reads are the files outside the project the answers depend on.
+	reads []string
 }
 
 // directory is a package directory, the unit of the host. Its `api` covers its
@@ -95,9 +97,11 @@ func (r *run) plan(params sdk.IndexParams) *shape {
 		files[abs] = append(files[abs], rel)
 	}
 	s := &shape{pl: pl, asked: map[string]*directory{}}
-	if !pl.moduleRoots(r.batches(params.Files)) {
+	batches := r.batches(params.Files)
+	if !pl.moduleRoots(batches) {
 		return s
 	}
+	pl.outside(batches)
 	dirs := make([]string, 0, len(files))
 	for abs := range files {
 		dirs = append(dirs, abs)
@@ -184,6 +188,7 @@ func (r *run) directoryResult(s *shape, u sdk.UnitRef, found answer) sdk.UnitRes
 	if d := s.asked[u.ID]; d != nil {
 		res.Body, res.Api = d.content, apiOf(d)
 		res.Imports = s.importsOf(d)
+		res.Reads = s.pl.reads
 	}
 	return res
 }

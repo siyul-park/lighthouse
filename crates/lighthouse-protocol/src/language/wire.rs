@@ -399,6 +399,12 @@ pub struct UnitResult {
     /// other declares.
     #[serde(default)]
     pub imports: Vec<String>,
+    /// Absolute paths of files outside the project whose content the answer
+    /// depended on (a `replace` target, a workspace member). The host records
+    /// them with the answer, as a depfile does, and asks again when one
+    /// changed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reads: Vec<String>,
     /// Messages about this unit that leave its analysis complete. The host
     /// keeps them with the unit and shows them again when it takes the unit
     /// as it is.

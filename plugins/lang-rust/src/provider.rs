@@ -170,6 +170,7 @@ fn result_of(unit: &UnitRef, found: Found, api: Option<String>) -> UnitResult {
             true => vec![EVERY.to_owned()],
             false => Vec::new(),
         },
+        reads: Vec::new(),
         notices: found.notices,
         incomplete: found.incomplete,
     }

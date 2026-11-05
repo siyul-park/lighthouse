@@ -137,6 +137,7 @@ fn unit_of(
         body: result.body,
         api: result.api,
         imports: result.imports,
+        reads: result.reads,
         ..Fragments::default()
     };
     source_records(

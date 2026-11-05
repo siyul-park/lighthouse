@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use assert_cmd::Command;
 
 use crate::{
-    cache_fixtures::{Fixture, go, project, rust, write},
+    cache_fixtures::{Fixture, go, project, python, rust, typescript, write},
     checks::{home, trust},
 };
 
@@ -115,6 +115,8 @@ fn differential(fixture: &Fixture) {
         assert_eq!(again.run, expected, "{step}: again");
         assert_eq!(again.misses, 0, "{step}: again");
     }
+    // A replace target lives beside the project.
+    let _ = std::fs::remove_dir_all(dir.with_extension("dep"));
 }
 
 #[test]
@@ -125,6 +127,20 @@ fn rust_findings_are_the_same_with_and_without_the_cache() {
 #[test]
 fn go_findings_are_the_same_with_and_without_the_cache() {
     if let Some(fixture) = go() {
+        differential(&fixture);
+    }
+}
+
+#[test]
+fn typescript_findings_are_the_same_with_and_without_the_cache() {
+    if let Some(fixture) = typescript() {
+        differential(&fixture);
+    }
+}
+
+#[test]
+fn python_findings_are_the_same_with_and_without_the_cache() {
+    if let Some(fixture) = python() {
         differential(&fixture);
     }
 }

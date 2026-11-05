@@ -277,6 +277,8 @@ pub struct Fragments {
     pub api: String,
     /// The units of the project it imports, sorted.
     pub imports: Vec<String>,
+    /// Files outside the project the answer depended on, by absolute path.
+    pub reads: Vec<String>,
     /// Messages about the unit that leave its analysis complete.
     pub notices: Vec<String>,
     /// Files of the unit that could not be analyzed.
@@ -296,6 +298,7 @@ impl Fragments {
             body: hash.clone(),
             api: hash,
             imports: Vec::new(),
+            reads: Vec::new(),
             notices: Vec::new(),
             incomplete: Vec::new(),
         }

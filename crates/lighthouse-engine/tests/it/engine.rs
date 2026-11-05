@@ -787,6 +787,30 @@ fn hash_of_is_the_sha256_hex_the_model_records() {
 }
 
 #[test]
+fn an_overlay_on_a_warm_engine_gives_what_a_fresh_engine_gives() {
+    let dir = project(&[("a/x.txt", b"on disk"), ("b/y.txt", b"other")]);
+    let warm = engine(&dir, ALL).unwrap();
+    let overlays = lighthouse_engine::Overlays::from([("a/x.txt".into(), "overlaid".to_owned())]);
+    warm.check(&[], &[]).unwrap();
+
+    let got = warm.check_overlaid(&[], &[], &overlays).unwrap();
+    let back = warm.check(&[], &[]).unwrap();
+
+    let fresh = |overlays: &lighthouse_engine::Overlays| {
+        engine(&dir, ALL)
+            .unwrap()
+            .check_overlaid(&[], &[], overlays)
+            .unwrap()
+    };
+    let want = fresh(&overlays);
+    let plain = fresh(&Default::default());
+    assert_eq!(got.project, want.project);
+    assert_eq!(got.diagnostics, want.diagnostics);
+    assert_eq!(back.project, plain.project);
+    assert_eq!(back.diagnostics, plain.diagnostics);
+}
+
+#[test]
 fn an_overlaid_check_reads_the_overlay_not_the_disk_and_leaves_the_disk_alone() {
     let dir = project(&[("a.txt", b"on disk"), ("b.txt", b"other")]);
     let engine = engine(&dir, ALL).unwrap();

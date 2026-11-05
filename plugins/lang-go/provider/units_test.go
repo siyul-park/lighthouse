@@ -81,6 +81,29 @@ func TestProviderUnits(t *testing.T) {
 		require.Equal(t, before["c"].Api, after["c"].Api)
 	})
 
+	t.Run("a replace target outside the project is read, and its edit moves the api of the importer", func(t *testing.T) {
+		base := t.TempDir()
+		root := filepath.Join(base, "root")
+		writeTree(t, base, map[string]string{
+			"dep/go.mod": "module example.com/dep\n\ngo 1.22\n",
+			"dep/d.go":   "package dep\n\nfunc D() int { return 1 }\n",
+		})
+		require.NoError(t, os.Symlink(filepath.Join(base, "dep"), filepath.Join(base, "link")))
+		writeTree(t, root, map[string]string{
+			"go.mod": "module example.com/m\n\ngo 1.22\n\nrequire example.com/dep v0.0.0\n\nreplace example.com/dep => ../link\n",
+			"a.go":   "package m\n\nimport \"example.com/dep\"\n\nfunc A() int { return dep.D() }\n",
+		})
+		before := byID(unitsAt(t, root))
+		resolved, err := filepath.EvalSymlinks(filepath.Join(base, "dep", "d.go"))
+		require.NoError(t, err)
+		require.Contains(t, before["."].Reads, resolved)
+
+		writeFile(t, base, "dep/d.go", "package dep\n\nfunc D() int { return 1 }\n\nfunc E() {}\n")
+		after := byID(unitsAt(t, root))
+
+		require.NotEqual(t, before["."].Api, after["."].Api)
+	})
+
 	t.Run("answers the same whether the directories are asked together or alone", func(t *testing.T) {
 		root := t.TempDir()
 		writeTree(t, root, unitFixture)

@@ -26,7 +26,7 @@ pub(crate) use content::{Content, Readable};
 pub(crate) use detect::Detected;
 pub(crate) use open::Opened;
 pub(crate) use units::{
-    API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, REGIONS, Stored, UNIT, UNITS,
+    API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, REGIONS, Read, Stored, UNIT, UNITS,
 };
 
 /// A directory with fewer entries than this is hashed on one thread.

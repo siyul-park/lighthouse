@@ -75,8 +75,72 @@ pub(crate) struct Stored {
     pub imports: Vec<(String, String)>,
     pub body: String,
     pub api: String,
+    /// The files outside the project the answer read, as they were when it
+    /// was stored.
+    pub reads: Vec<Read>,
+    /// When it was stored, in nanoseconds since the epoch: a file modified
+    /// near that moment cannot be told apart by its stat.
+    pub at: i64,
     /// The fragments and the source trees, as JSON.
     pub fragment: Vec<u8>,
+}
+
+/// A file outside the project that an answer depended on, with what the host
+/// saw of it: the discovered dependency of a build action (a depfile).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Read {
+    pub path: String,
+    /// Length and modification time; none when the file was not there.
+    pub stat: Option<(u64, i64)>,
+    pub hash: String,
+}
+
+/// Two seconds, the coarsest granularity of a file system's timestamps.
+const RACY_NS: i64 = 2_000_000_000;
+
+impl Read {
+    /// What the host sees of the file at `path` now.
+    pub fn of(path: &str) -> Self {
+        let stat = stat_of(path);
+        let hash = stat.map_or_else(String::new, |_| hash_of(path));
+        Self {
+            path: path.to_owned(),
+            stat,
+            hash,
+        }
+    }
+
+    /// Whether the file is not what it was: its stat moved and its content
+    /// differs. A stat that did not move is trusted unless the file was
+    /// modified within [`RACY_NS`] of `at`, when it is read again.
+    pub fn moved(&self, at: i64) -> bool {
+        let now = stat_of(&self.path);
+        if now.is_some() && now == self.stat && now.is_some_and(|(_, m)| m + RACY_NS < at) {
+            return false;
+        }
+        match now {
+            None => self.stat.is_some(),
+            Some(_) => hash_of(&self.path) != self.hash,
+        }
+    }
+}
+
+fn stat_of(path: &str) -> Option<(u64, i64)> {
+    let meta = std::fs::metadata(path).ok()?;
+    let nanos = meta
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    Some((meta.len(), i64::try_from(nanos).ok()?))
+}
+
+fn hash_of(path: &str) -> String {
+    std::fs::read(path).map_or_else(
+        |_| String::new(),
+        |data| blake3::hash(&data).to_hex().to_string(),
+    )
 }
 
 /// The language of a provider, by id: its [`Provider`].
