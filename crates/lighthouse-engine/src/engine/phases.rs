@@ -1,6 +1,7 @@
 //! The phases of a run between reading files and collecting findings: read the
 //! files, have the providers index them, compute the facts and apply the rules.
 
+use lighthouse_model::ucm::Model;
 use std::{borrow::Cow, sync::OnceLock};
 
 use lighthouse_model::ucm::Capability;
@@ -344,6 +345,7 @@ impl Engine {
                     notices: &Notices::default(),
                     applies: Applicability::default(),
                     models: &lighthouse_plugin::NoModels,
+                    queries: &lighthouse_plugin::NoQueries,
                 })
             };
             match analyzer.manifest().scope {

@@ -7,7 +7,7 @@ use std::path::Path;
 use lighthouse_model::{
     Document, Position,
     ucm::{
-        Edge, Module, Node, Project, Symbol, SymbolKind, SymbolRole, Target, TestCase, Visibility,
+        Edge, Model, Module, Node, Symbol, SymbolKind, SymbolRole, Target, TestCase, Visibility,
     },
 };
 
@@ -34,7 +34,7 @@ pub(crate) fn pos(p: Position) -> u64 {
 }
 
 /// The fields that identify a declaration, for the nodes of a list.
-pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
+pub(crate) fn node(project: &dyn Model, s: &Symbol) -> Value {
     let owner = s.owner.as_ref().and_then(|o| project.symbol(o));
     let file = project.file(&s.file);
     json!({
@@ -70,7 +70,7 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
 /// The stem of a file: what its provider states, else its name without the
 /// extension. A provider leaves out of it what the language reads as no part
 /// of the name, such as Go's build constraint suffixes.
-pub(crate) fn file_stem(project: &Project, file: &Path) -> String {
+pub(crate) fn file_stem(project: &dyn Model, file: &Path) -> String {
     project
         .file(file)
         .and_then(|f| f.facts.get("stem").cloned())
@@ -81,7 +81,7 @@ pub(crate) fn file_stem(project: &Project, file: &Path) -> String {
         .unwrap_or_default()
 }
 
-pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
+pub(crate) fn symbol(project: &dyn Model, s: &Symbol) -> Value {
     let lang = project
         .language_of(s)
         .map_or_else(String::new, str::to_owned);
@@ -119,7 +119,7 @@ pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
 
 /// A symbol with its function summary; the metrics are zero for a symbol
 /// that has no body.
-pub(crate) fn function(project: &Project, s: &Symbol) -> Option<Value> {
+pub(crate) fn function(project: &dyn Model, s: &Symbol) -> Option<Value> {
     let summary = project.function(&s.id)?;
     Some(extended(
         symbol(project, s),
@@ -134,7 +134,7 @@ pub(crate) fn function(project: &Project, s: &Symbol) -> Option<Value> {
     ))
 }
 
-pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
+pub(crate) fn test(project: &dyn Model, s: &Symbol, case: &TestCase) -> Value {
     let targets: Vec<String> = case
         .targets
         .iter()
@@ -157,7 +157,7 @@ pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
     )
 }
 
-pub(crate) fn edge(project: &Project, e: &Edge) -> Value {
+pub(crate) fn edge(project: &dyn Model, e: &Edge) -> Value {
     let to = match &e.to {
         Target::Resolved(n) => graph_node(project, n),
         Target::Path(p) => json!({ "kind": "unresolved", "id": p, "module": "", "name": p }),
@@ -199,7 +199,7 @@ pub(crate) fn module(m: &Module, declared: &Declared) -> Value {
     })
 }
 
-pub(crate) fn file(project: &Project, f: &lighthouse_model::ucm::File, text: &str) -> Value {
+pub(crate) fn file(project: &dyn Model, f: &lighthouse_model::ucm::File, text: &str) -> Value {
     let functions = project
         .symbols_in(&f.path)
         .filter(|s| matches!(s.kind, SymbolKind::Function | SymbolKind::Method))
@@ -234,7 +234,7 @@ fn path(p: &Path) -> String {
     p.to_string_lossy().into_owned()
 }
 
-fn graph_node(project: &Project, n: &Node) -> Value {
+fn graph_node(project: &dyn Model, n: &Node) -> Value {
     match n {
         Node::Module(m) => json!({ "kind": "module", "id": m, "module": m, "name": m }),
         Node::Symbol(id) => {

@@ -2,6 +2,7 @@
 //! constructors are the whole vocabulary, and what each means over the code
 //! model is decided here, never in a decision.
 
+use lighthouse_model::ucm::Model;
 use std::path::{Path, PathBuf};
 
 use lighthouse_model::{

@@ -81,6 +81,7 @@ fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        queries: &lighthouse_plugin::NoQueries,
     };
     let analyzer = registry.order([MEASURES]).unwrap().remove(0);
     let value: Value = analyzer.run(&ctx).unwrap();

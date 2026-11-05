@@ -9,41 +9,42 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
-use crate::metrics::{MEASURES, Measures, propagation::System};
+use crate::metrics::{MEASURES, Measures};
 use lighthouse_model::{
     Position, Span,
-    ucm::{Comment, FunctionSummary, LoadNeed, Project, Symbol, SymbolId, SymbolKind, Visibility},
+    ucm::{Comment, FunctionSummary, LoadNeed, Model, Symbol, SymbolId, SymbolKind, Visibility},
 };
-use lighthouse_plugin::{Annotations, Context, Error, Workspace};
+use lighthouse_plugin::{Annotations, Context, Error, Reads, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    eval::{Fact, cel_fact, with_entries, with_fact},
+    eval::{Var, with_entries, with_nested},
+    fact::{FUNCTION, Fact, TEST},
     facts,
-    layout::{self, MODULE_BODY, contains},
+    indexes::Indexes,
+    layout::{self, MODULE_BODY},
     library::Needs,
     naming::Tests,
-    table::Table,
 };
 
 mod api;
-mod cohesion;
-mod cycle;
-mod effective;
+pub(crate) mod cohesion;
+pub(crate) mod cycle;
+pub(crate) mod effective;
 mod file_facts;
 mod file_uses;
 mod forward;
 mod gap;
-mod homonyms;
-mod imports;
-mod owned;
+pub(crate) mod homonyms;
+pub(crate) mod imports;
+pub(crate) mod owned;
 mod ownership;
-mod parent;
+pub(crate) mod parent;
 mod role;
-mod split;
+pub(crate) mod split;
 mod stability;
 mod style;
 mod unit;
@@ -51,16 +52,15 @@ mod widths;
 
 use forward::{forwarded, reaches};
 
-/// Builds the values of one run of a check over one file (or the project).
+/// Builds the values of one check over one file (or the project).
 pub(crate) struct Builder<'a> {
-    project: &'a Project,
+    project: &'a dyn Model,
     ws: &'a Workspace,
     needs: &'a Needs,
     language: String,
     naming: Tests<'a>,
     measures: Option<BTreeMap<SymbolId, Measures>>,
-    table: Arc<Table>,
-    indexes: Arc<Indexes>,
+    indexes: &'a dyn Indexes,
     annotations: Arc<Annotations>,
     declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
     related: RefCell<BTreeMap<SymbolId, Value>>,
@@ -69,8 +69,23 @@ pub(crate) struct Builder<'a> {
     related_needs: Needs,
 }
 
+/// What a builder reads: the code model, the project's indexes and the
+/// workspace.
+#[derive(Clone, Copy)]
+pub struct Over<'a> {
+    pub model: &'a dyn Model,
+    pub indexes: &'a dyn Indexes,
+    pub ws: &'a Workspace,
+}
+
 impl<'a> Builder<'a> {
-    pub(crate) fn new(ctx: &'a Context<'a>, needs: &'a Needs) -> Result<Self, Error> {
+    /// A builder of the facts the run of a check reads: what the analyzers
+    /// measured and the directives the engine judged are the run's own.
+    pub(crate) fn new(
+        ctx: &'a Context<'a>,
+        indexes: &'a dyn Indexes,
+        needs: &'a Needs,
+    ) -> Result<Self, Error> {
         let measures = if needs.field("metrics") {
             Some(ctx.fact(MEASURES)?)
         } else {
@@ -79,44 +94,35 @@ impl<'a> Builder<'a> {
         let language = ctx
             .file
             .map_or_else(String::new, |(file, _)| file.analysis_language().to_owned());
-        Ok(Self {
-            project: ctx.project,
+        let over = Over {
+            model: ctx.project,
+            indexes,
             ws: ctx.workspace,
-            needs,
-            naming: Tests::new(
-                ctx.workspace.test_naming(&language),
-                ctx.project,
-                ctx.memo.slot(),
-            ),
-            language,
+        };
+        Ok(Self {
             measures,
-            table: ctx.memo.slot(),
-            indexes: ctx.memo.slot(),
             annotations: ctx.memo.slot(),
-            declared: RefCell::default(),
-            related: RefCell::default(),
-            loads: RefCell::default(),
-            related_needs: needs.of_related(),
+            ..Self::over(over, needs, &language)
         })
     }
 
-    /// A builder outside a run of checks, for a fix: it has no analyzer facts
-    /// (`metrics` reads as not measured) and shares no cache with other rules.
-    pub(crate) fn standalone(
-        project: &'a Project,
-        ws: &'a Workspace,
-        needs: &'a Needs,
-        language: &str,
-    ) -> Self {
+    /// A builder over a model, with no analyzer facts (`metrics` reads as not
+    /// measured) and no directives: for a fix, and for the facts a graph
+    /// holds.
+    pub(crate) fn over(over: Over<'a>, needs: &'a Needs, language: &str) -> Self {
+        let Over {
+            model: project,
+            indexes,
+            ws,
+        } = over;
         Self {
             project,
             ws,
             needs,
             language: language.to_owned(),
-            naming: Tests::new(ws.test_naming(language), project, Arc::default()),
+            naming: Tests::new(ws.test_naming(language), project, indexes),
             measures: None,
-            table: Arc::default(),
-            indexes: Arc::default(),
+            indexes,
             annotations: Arc::default(),
             declared: RefCell::default(),
             related: RefCell::default(),
@@ -125,7 +131,28 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub(crate) fn project(&self) -> &'a Project {
+    /// `fact`, the variable of the subject `symbol`, with what only this run
+    /// knows of it: the metrics the analyzers measured.
+    pub(crate) fn measured(&self, symbol: &Symbol, fact: Var) -> Var {
+        if !self.needs.field("metrics") {
+            return fact;
+        }
+        let summary = self.project.function(&symbol.id);
+        let extra = Map::from_iter([("metrics".to_owned(), self.metrics(symbol, summary))]);
+        let fact = with_entries(fact.as_ref(), &extra);
+        if self.needs.field("func") {
+            with_nested(fact, "func", &extra)
+        } else {
+            fact
+        }
+    }
+
+    /// What went wrong in reading the project's indexes, if anything.
+    pub(crate) fn failure(&self) -> Option<Error> {
+        self.indexes.failure()
+    }
+
+    pub(crate) fn project(&self) -> &'a dyn Model {
         self.project
     }
 
@@ -222,48 +249,34 @@ impl<'a> Builder<'a> {
         value
     }
 
-    /// Like [`Builder::symbol`], in the form the CEL runtime holds it; the
-    /// base fields are built once per run for all checks.
-    pub(crate) fn symbol_fact(&self, symbol: &Symbol) -> Fact {
-        let extras = self.extras(symbol, self.project.function(&symbol.id));
-        let base = || Some(cel_fact(&facts::symbol(self.project, symbol)));
-        let fact = self
-            .table
-            .symbols
-            .with(&symbol.id, base, |base| {
-                with_entries(base.as_ref(), &extras)
-            })
-            .unwrap_or_else(|| cel_fact(&Value::Null));
-        if !self.needs.field("func") {
-            return fact;
+    /// A symbol as a subject of `select: symbol`: its facts, and its function's
+    /// as `func` when a check asks for them.
+    pub(crate) fn symbol_value(&self, symbol: &Symbol) -> Value {
+        let mut value = self.symbol(symbol);
+        if self.needs.field("func") {
+            value["func"] = self.function(symbol).unwrap_or(Value::Null);
         }
-        let func = self
-            .function_fact(symbol)
-            .unwrap_or_else(|| cel_fact(&Value::Null));
-        with_fact(fact, "func", func)
+        value
     }
 
-    /// Like [`Builder::function`], in the form the CEL runtime holds it.
-    /// `None` when the symbol is not a function (a type, a constant, a
-    /// variable): it has no summary, is no subject of a function check, and its
-    /// `func` is `null`. That is "not applicable", never a failure.
-    pub(crate) fn function_fact(&self, symbol: &Symbol) -> Option<Fact> {
+    /// A function or method with every fact its check asks for; `None` when
+    /// the symbol is not a function (a type, a constant, a variable): it has
+    /// no summary, is no subject of a function check, and its `func` is
+    /// `null`. That is "not applicable", never a failure.
+    pub(crate) fn function(&self, symbol: &Symbol) -> Option<Value> {
         let summary = self.project.function(&symbol.id)?;
-        let extras = self.extras(symbol, Some(summary));
-        let base = || facts::function(self.project, symbol).map(|v| cel_fact(&v));
-        self.table.functions.with(&symbol.id, base, |base| {
-            with_entries(base.as_ref(), &extras)
-        })
+        let mut value = facts::function(self.project, symbol)?;
+        self.enrich(&mut value, symbol, Some(summary));
+        Some(value)
     }
 
-    /// Like [`Builder::test`], in the form the CEL runtime holds it.
-    pub(crate) fn test_fact(&self, symbol: &Symbol) -> Option<Fact> {
+    /// A test with every fact its check asks for; `None` for a symbol that
+    /// is no test.
+    pub(crate) fn test(&self, symbol: &Symbol) -> Option<Value> {
         let case = self.project.test(&symbol.id)?;
-        let extras = self.extras(symbol, self.project.function(&symbol.id));
-        let base = || Some(cel_fact(&facts::test(self.project, symbol, case)));
-        self.table.tests.with(&symbol.id, base, |base| {
-            with_entries(base.as_ref(), &extras)
-        })
+        let mut value = facts::test(self.project, symbol, case);
+        self.enrich(&mut value, symbol, self.project.function(&symbol.id));
+        Some(value)
     }
 
     /// A module with the facts its check asks for.
@@ -276,8 +289,7 @@ impl<'a> Builder<'a> {
         if self.needs.field("symbols") {
             let mut symbols: Vec<&Symbol> = self
                 .project
-                .symbols
-                .iter()
+                .symbols()
                 .filter(|s| s.id.module() == module.path)
                 .collect();
             symbols.sort_by_key(|s| (&s.file, s.span.start, &s.id));
@@ -319,7 +331,6 @@ impl<'a> Builder<'a> {
             value["comments"] = Value::Array(
                 self.project
                     .comments_in(&file.path)
-                    .iter()
                     .map(|comment| self.comment(comment, text))
                     .collect(),
             );
@@ -437,7 +448,7 @@ impl<'a> Builder<'a> {
         if needs.field("module_tested") {
             map.insert(
                 "module_tested".to_owned(),
-                json!(module_tested(project, symbol.id.module())),
+                json!(self.indexes.tested(symbol.id.module())),
             );
         }
         if needs.field("gap") {
@@ -743,21 +754,33 @@ impl<'a> Builder<'a> {
     }
 }
 
-/// The indexes over the whole project that facts read, each built by the first
-/// check of a run that asks and shared by the others.
-#[derive(Default)]
-pub(crate) struct Indexes {
-    single: OnceLock<effective::Index>,
-    imports: OnceLock<BTreeMap<String, Vec<String>>>,
-    cycles: OnceLock<BTreeMap<String, Vec<String>>>,
-    types: OnceLock<BTreeMap<String, Vec<Value>>>,
-    owned: OnceLock<BTreeMap<SymbolId, Vec<SymbolId>>>,
-    names: OnceLock<BTreeMap<String, Vec<SymbolId>>>,
-    splits: OnceLock<BTreeMap<SymbolId, Value>>,
-    parents: OnceLock<parent::Uses>,
-    modules: OnceLock<System>,
-    symbols: OnceLock<System>,
+/// The facts of `symbol` as a subject of the sort `kind` (`symbol`,
+/// `function` or `test`) for the fields `reads` asks for; `None` when it has
+/// none of that sort. What only a run knows (the metrics the analyzers
+/// measured) is left out.
+pub fn subject(
+    kind: &str,
+    over: Over<'_>,
+    reads: &Reads,
+    symbol: &Symbol,
+) -> Result<Option<Fact>, Error> {
+    let needs = Needs::reading_fields(reads).without("metrics");
+    let language = over
+        .model
+        .file(&symbol.file)
+        .map_or("", |file| file.analysis_language());
+    let builder = Builder::over(over, &needs, language);
+    let value = match kind {
+        FUNCTION => builder.function(symbol),
+        TEST => builder.test(symbol),
+        _ => Some(builder.symbol_value(symbol)),
+    };
+    match builder.failure() {
+        Some(error) => Err(error),
+        None => Ok(value.map(|value| Fact::from(&value))),
+    }
 }
+
 /// A span as an expression sees it: where it is, in which file.
 pub(crate) fn span(file: &Path, span: Span) -> Value {
     json!({
@@ -765,6 +788,16 @@ pub(crate) fn span(file: &Path, span: Span) -> Value {
         "start": { "line": span.start.line, "col": span.start.col },
         "end": { "line": span.end.line, "col": span.end.col },
     })
+}
+
+/// The modules that some test module tests with tests: a module is tested
+/// when one of these is it or holds it.
+pub fn tested(project: &dyn Model) -> BTreeSet<String> {
+    project
+        .modules()
+        .filter(|m| project.tests_in(&m.path).next().is_some())
+        .map(|m| m.test_of.clone().unwrap_or_else(|| m.path.clone()))
+        .collect()
 }
 
 /// The number of blank lines between line `after` and line `before` (1-based,
@@ -781,7 +814,7 @@ fn blank_lines(text: &str, after: u32, before: u32) -> u32 {
 
 /// Whether test code uses the symbol, or a member of it. Heuristic references
 /// count: a call through a receiver of unknown type may reach the symbol.
-fn touched_by_tests(project: &Project, symbol: &Symbol) -> bool {
+fn touched_by_tests(project: &dyn Model, symbol: &Symbol) -> bool {
     let used_by_tests = |id| {
         project
             .callers(id)
@@ -794,19 +827,11 @@ fn touched_by_tests(project: &Project, symbol: &Symbol) -> bool {
 
 /// A type that declares no method: it is specified by the code that builds and
 /// reads it.
-fn data_only(project: &Project, symbol: &Symbol) -> bool {
+fn data_only(project: &dyn Model, symbol: &Symbol) -> bool {
     symbol.kind == SymbolKind::Type
         && !project.members(&symbol.id).iter().any(|id| {
             project
                 .symbol(id)
                 .is_some_and(|m| m.kind == SymbolKind::Method)
         })
-}
-
-/// Whether some test module tests `module` or an ancestor of it, with tests.
-fn module_tested(project: &Project, module: &str) -> bool {
-    project.modules.iter().any(|m| {
-        let tested = m.test_of.as_deref().unwrap_or(&m.path);
-        contains(tested, module) && !project.tests_in(&m.path).is_empty()
-    })
 }

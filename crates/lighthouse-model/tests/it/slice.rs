@@ -6,9 +6,9 @@ use std::{collections::BTreeSet, path::PathBuf, sync::Arc};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, Edges, Entry, File, Fragment, Incoming, Node, Outline, Project, Resolution,
-        Resolved, Reverse, Sites, Slice, Symbol, SymbolId, SymbolKind, Table, Target, Visibility,
-        collisions, declared,
+        Edge, EdgeKind, Edges, Entry, File, Fragment, Incoming, Module, Node, Outline, Project,
+        Resolution, Resolved, Reverse, Sites, Slice, Symbol, SymbolId, SymbolKind, Table, Target,
+        Visibility, collisions, declared,
     },
 };
 
@@ -89,4 +89,23 @@ fn fragment_of(project: &Project) -> Fragment {
         symbols: project.symbols.clone(),
         ..Fragment::default()
     }
+}
+
+#[test]
+fn table_modules() {
+    let module = |path: &str| Module {
+        path: path.to_owned(),
+        name: None,
+        test_of: None,
+        language: None,
+        example: false,
+    };
+    let table = Table::of(&Fragment {
+        modules: vec![module("b"), module("a")],
+        ..Fragment::default()
+    });
+
+    let paths: Vec<&str> = table.modules().map(|module| module.path.as_str()).collect();
+
+    assert_eq!(paths, ["a", "b"]);
 }

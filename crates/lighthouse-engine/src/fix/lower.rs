@@ -3,6 +3,7 @@
 //! one block of whole lines and an insertion of the same lines elsewhere, so
 //! comments and formatting travel with the declaration as written.
 
+use lighthouse_model::ucm::Model;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},

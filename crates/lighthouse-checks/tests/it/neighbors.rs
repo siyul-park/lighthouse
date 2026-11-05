@@ -2,6 +2,7 @@
 //! node, and every fact declared to reach no further than the neighbors, when
 //! it changes because of an edit in another file.
 
+use lighthouse_model::ucm::Model;
 use std::path::Path;
 
 use lighthouse_checks::probe;
@@ -50,6 +51,7 @@ fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Context)
         notices: &notices,
         applies: Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        queries: &lighthouse_plugin::NoQueries,
     };
     run(&ctx)
 }

@@ -2,6 +2,7 @@
 //! its fix is `symbol`. It is the symbol the finding is about, else the
 //! innermost one around it, else a small file as a whole.
 
+use lighthouse_model::ucm::Model;
 use lighthouse_model::{Diagnostic, LineIndex, Position, Span, ucm::Project};
 
 /// A file with this many lines or more has no extent without a symbol.

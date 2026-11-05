@@ -91,7 +91,7 @@ impl Builder<'_> {
                 .chain(chars)
                 .collect();
             let declared = |name: &str| {
-                self.project.symbols.iter().any(|s| {
+                self.project.symbols().any(|s| {
                     matches!(s.kind, SymbolKind::Type | SymbolKind::Interface)
                         && s.name == name
                         && s.id.module() == symbol.id.module()

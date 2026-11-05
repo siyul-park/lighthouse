@@ -1,6 +1,6 @@
 use lighthouse_model::{
     Diagnostic, Fingerprint, Position, Severity, Span,
-    ucm::{Fragment, Project, Symbol, SymbolId, SymbolKind, Visibility},
+    ucm::{Fragment, Model, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
 
 #[test]

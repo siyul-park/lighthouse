@@ -6,6 +6,7 @@
 //! them, and only a rule that reads the whole project (`global`, or one that
 //! declares nothing) by any change of the round.
 
+use lighthouse_model::ucm::Model;
 use std::{
     cell::OnceCell,
     collections::{BTreeMap, BTreeSet},

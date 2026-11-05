@@ -9,11 +9,11 @@ use lighthouse_model::{
 use serde_json::{Map, Value, json};
 
 use super::Builder;
-use crate::eval::{Fact, cel_fact};
+use crate::eval::{Var, cel_fact};
 
 /// One event of a function, ready to be judged.
 pub(crate) struct EventFact {
-    pub fact: Fact,
+    pub fact: Var,
     pub span: Span,
     /// What tells this event from the others of the function from one run to
     /// the next: its kind and its place among the events of that kind.

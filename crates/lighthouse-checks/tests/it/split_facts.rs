@@ -36,6 +36,7 @@ fn fact(project: &Project, name: &str) -> Value {
         notices: &notices,
         applies: Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        queries: &lighthouse_plugin::NoQueries,
     };
     probe::symbol_fact(&lighthouse_test_support::cel(), &ctx, &symbol, "split").unwrap()
 }

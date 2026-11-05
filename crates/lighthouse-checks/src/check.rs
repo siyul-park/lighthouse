@@ -3,6 +3,7 @@
 //! The decision supplies id, severity, scope, options and the examples that
 //! `lighthouse decision test` runs.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
@@ -10,7 +11,7 @@ use std::{
 
 use lighthouse_model::{Diagnostic, Options, Reach, RunScope};
 
-use lighthouse_plugin::{Caching, Context, Error as PluginError, Rule, RuleManifest};
+use lighthouse_plugin::{Caching, Context, Error as PluginError, Reads, Rule, RuleManifest};
 use lighthouse_protocol::hash;
 use lighthouse_spec::{CheckKind, Decision, Select};
 use serde_json::{Map, Value};
@@ -213,6 +214,13 @@ impl Rule for Check {
 
     fn batches(&self) -> bool {
         matches!(&*self.kind, Kind::Command(rule) if rule.batched(self.meta.scope))
+    }
+
+    fn reads(&self) -> Option<(&'static str, Reads)> {
+        match &*self.kind {
+            Kind::Cel(rule) => rule.reads(),
+            Kind::Command(_) => None,
+        }
     }
 
     fn siblings(&self, language: &str) -> bool {

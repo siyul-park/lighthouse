@@ -60,16 +60,28 @@ impl Evaluation<'_> {
                 found.extend(self.judge_events(symbol)?);
                 continue;
             }
-            let value = match self.rule.select {
-                Select::Function => self.builder.function_fact(symbol),
-                Select::Test => self.builder.test_fact(symbol),
-                _ => Some(self.builder.symbol_fact(symbol)),
+            let kind = match self.rule.select {
+                Select::Function => FUNCTION,
+                Select::Test => TEST,
+                _ => SYMBOL,
             };
-            if let Some(value) = value {
+            if let Some(value) = self.subject(kind, symbol)? {
                 found.extend(self.judge_symbol(symbol, value)?);
             }
         }
         Ok(found)
+    }
+
+    /// The facts of `symbol` as the sort of subject `kind` the graph holds
+    /// them, with the measures of this run; `None` when it has none of that
+    /// sort.
+    fn subject(&self, kind: &str, symbol: &Symbol) -> Result<Option<Var>, PluginError> {
+        let built = self
+            .queries
+            .pull(FACT, &subject_key(kind, symbol.id.as_str()))?
+            .downcast::<Built>()
+            .map_err(|_| PluginError::Failed(format!("`{FACT}` has an unexpected value")))?;
+        Ok(built.var().map(|var| self.builder.measured(symbol, var)))
     }
 
     /// One finding per event of the function, at the event.
@@ -196,11 +208,7 @@ impl Evaluation<'_> {
         Ok(found)
     }
 
-    fn judge_symbol(
-        &self,
-        symbol: &Symbol,
-        value: Fact,
-    ) -> Result<Option<Diagnostic>, PluginError> {
+    fn judge_symbol(&self, symbol: &Symbol, value: Var) -> Result<Option<Diagnostic>, PluginError> {
         let place = Anchor {
             file: symbol.file.clone(),
             span: symbol.span,
@@ -214,7 +222,7 @@ impl Evaluation<'_> {
     /// could not be found is the failure, not the expression that read it.
     fn judge(
         &self,
-        value: Fact,
+        value: Var,
         place: Anchor,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
@@ -227,7 +235,7 @@ impl Evaluation<'_> {
 
     fn judge_value(
         &self,
-        value: Fact,
+        value: Var,
         place: Anchor,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {

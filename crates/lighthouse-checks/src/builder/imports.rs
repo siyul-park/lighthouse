@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::ucm::{EdgeKind, Node, Project, Symbol, Target};
+use lighthouse_model::ucm::{EdgeKind, Model, Node, Symbol, Target};
 use serde_json::{Value, json};
 
 use super::Builder;
@@ -11,19 +11,14 @@ use super::Builder;
 impl Builder<'_> {
     /// The distinct import paths of the files of the symbol's module, sorted.
     pub(super) fn module_imports(&self, symbol: &Symbol) -> Value {
-        let imports = self.indexes.imports.get_or_init(|| index(self.project));
-        json!(
-            imports
-                .get(symbol.id.module())
-                .map_or(&[][..], Vec::as_slice)
-        )
+        json!(self.indexes.imports(symbol.id.module()))
     }
 }
 
 /// The import paths of every module.
-pub(super) fn index(project: &Project) -> BTreeMap<String, Vec<String>> {
+pub fn imports(project: &dyn Model) -> BTreeMap<String, Vec<String>> {
     let mut found: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for edge in project.edges.iter().filter(|e| e.kind == EdgeKind::Imports) {
+    for edge in project.edges().filter(|e| e.kind == EdgeKind::Imports) {
         let Node::Module(from) = &edge.from else {
             continue;
         };

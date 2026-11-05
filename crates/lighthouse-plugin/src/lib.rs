@@ -8,6 +8,7 @@ mod fix;
 mod memo;
 mod models;
 mod notices;
+mod queries;
 mod registry;
 
 use std::{
@@ -15,6 +16,7 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use lighthouse_model::{
@@ -46,6 +48,7 @@ pub use models::{
     request_of,
 };
 pub use notices::Notices;
+pub use queries::{NoQueries, Pulling, Queries, Reads};
 pub use registry::{Language, Registry, plugin_of};
 
 /// Identity of a plugin: `id` prefixes every analyzer, rule and fixer
@@ -116,6 +119,8 @@ pub struct Context<'a> {
     pub applies: Applicability,
     /// The models rules may put subjects to.
     pub models: &'a dyn Models,
+    /// The graph the run's facts and indexes are pulled from.
+    pub queries: &'a dyn Queries,
 }
 
 impl Context<'_> {
@@ -453,6 +458,12 @@ pub trait Rule: Send + Sync {
     fn siblings(&self, _language: &str) -> bool {
         false
     }
+    /// The sort of subject whose facts the rule's expressions read (`symbol`,
+    /// `function` or `test`) and the fields they read of it; none for a rule
+    /// that reads no fact of a subject.
+    fn reads(&self) -> Option<(&'static str, Reads)> {
+        None
+    }
     /// How far what the rule finds in a file of `language` reaches: what its
     /// manifest declares, and the whole project when it declares nothing.
     fn reach(&self, _language: &str) -> Reach {
@@ -493,11 +504,24 @@ pub trait Plugin {
     fn ignores(&self) -> Vec<String> {
         Vec::new()
     }
+    /// What the facts of rules are pulled with, if the plugin owns them.
+    fn pulling(&self) -> Option<Arc<dyn Pulling>> {
+        None
+    }
     /// The files and the head-of-file markers that tell the generated code of
     /// its ecosystem apart, as the project's `generated` is written.
     fn generated(&self) -> GeneratedSpec {
         GeneratedSpec::default()
     }
+}
+
+/// What the rules read of the facts of each sort of subject, merged.
+pub fn reads_of<'a>(rules: impl IntoIterator<Item = &'a dyn Rule>) -> BTreeMap<String, Reads> {
+    let mut found: BTreeMap<String, Reads> = BTreeMap::new();
+    for (subject, reads) in rules.into_iter().filter_map(Rule::reads) {
+        found.entry(subject.to_owned()).or_default().merge(&reads);
+    }
+    found
 }
 
 /// Deserializes rule options; unknown keys are rejected when `T` denies them.

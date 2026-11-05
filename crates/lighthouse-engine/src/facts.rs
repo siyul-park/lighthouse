@@ -1,3 +1,4 @@
+use lighthouse_model::ucm::Model;
 use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_model::{

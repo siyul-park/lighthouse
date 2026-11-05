@@ -3,23 +3,46 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::ucm::{Module, Project, SymbolId, SymbolKind, Visibility};
+use lighthouse_model::ucm::{Model, Module, SymbolId, SymbolKind, Visibility};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use super::Builder;
 
 /// What the production symbols of the project use across the modules.
-#[derive(Default)]
-pub(super) struct Uses {
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Uses {
     /// The modules that declare a production symbol.
-    production: BTreeSet<String>,
+    pub production: BTreeSet<String>,
     /// The production modules that use a symbol of each module, itself left
     /// out.
-    users: BTreeMap<String, BTreeSet<String>>,
+    pub users: BTreeMap<String, BTreeSet<String>>,
     /// The private symbols of its parent that each module uses.
-    reaches: BTreeMap<String, BTreeSet<SymbolId>>,
+    pub reaches: BTreeMap<String, BTreeSet<SymbolId>>,
     /// The modules whose symbols are used by their parent.
-    called: BTreeSet<String>,
+    pub called: BTreeSet<String>,
+}
+
+/// What the production symbols of the project use of one module, and of its
+/// parent.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Used {
+    pub production: bool,
+    pub users: BTreeSet<String>,
+    pub reaches: BTreeSet<SymbolId>,
+    pub called: bool,
+}
+
+impl Uses {
+    /// What the project uses of `module`.
+    pub fn of(&self, module: &str) -> Used {
+        Used {
+            production: self.production.contains(module),
+            users: self.users.get(module).cloned().unwrap_or_default(),
+            reaches: self.reaches.get(module).cloned().unwrap_or_default(),
+            called: self.called.contains(module),
+        }
+    }
 }
 
 impl Builder<'_> {
@@ -30,32 +53,28 @@ impl Builder<'_> {
     ///   uses, as nodes sorted by id;
     /// - `called`: the parent uses it.
     pub(super) fn module_parent(&self, module: &Module) -> Value {
-        let uses = self.indexes.parents.get_or_init(|| uses(self.project));
         let path = module.path.as_str();
+        let used = self.indexes.parent(path);
         let parent = parent_of(path).filter(|p| self.project.module(p).is_some());
-        let Some(parent) = parent.filter(|_| uses.production.contains(path)) else {
+        let Some(parent) = parent.filter(|_| used.production) else {
             return Value::Null;
         };
         json!({
             "path": parent,
-            "sole_user": uses.users.get(path).is_some_and(|u| u.len() == 1 && u.contains(parent)),
-            "reaches": uses.reaches.get(path).into_iter().flatten()
+            "sole_user": used.users.len() == 1 && used.users.contains(parent),
+            "reaches": used.reaches.iter()
                 .filter_map(|id| self.project.symbol(id))
                 .map(|s| self.node(s))
                 .collect::<Vec<_>>(),
-            "called": uses.called.contains(path),
+            "called": used.called,
         })
     }
 }
 
-/// The path of the module that holds `path`.
-fn parent_of(path: &str) -> Option<&str> {
-    path.rsplit_once('/').map(|(parent, _)| parent)
-}
-
-fn uses(project: &Project) -> Uses {
+/// What the production symbols of the project use across the modules.
+pub fn parents(project: &dyn Model) -> Uses {
     let mut found = Uses::default();
-    for symbol in project.symbols.iter().filter(|s| !project.in_test(&s.id)) {
+    for symbol in project.symbols().filter(|s| !project.in_test(&s.id)) {
         let from = symbol.id.module();
         found.production.insert(from.to_owned());
         for used in project.uses(&symbol.id) {
@@ -83,9 +102,14 @@ fn uses(project: &Project) -> Uses {
     found
 }
 
+/// The path of the module that holds `path`.
+fn parent_of(path: &str) -> Option<&str> {
+    path.rsplit_once('/').map(|(parent, _)| parent)
+}
+
 /// Whether `id` is a private function, method or field of a production
 /// module.
-fn is_private_member(project: &Project, id: &SymbolId) -> bool {
+fn is_private_member(project: &dyn Model, id: &SymbolId) -> bool {
     !project.in_test(id)
         && project.symbol(id).is_some_and(|s| {
             s.visibility == Visibility::Private

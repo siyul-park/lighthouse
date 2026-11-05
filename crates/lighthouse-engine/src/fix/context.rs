@@ -9,6 +9,7 @@
 //! under the digest of its brief. Nothing of a file the scratch copy of the
 //! project leaves out, such as an environment file, is ever in it.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},

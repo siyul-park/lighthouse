@@ -6,6 +6,7 @@
 //! a file the agent did not touch. The verdict must look at the findings there
 //! too.
 
+use lighthouse_model::ucm::Model;
 use std::{collections::BTreeSet, path::PathBuf};
 
 use lighthouse_model::ucm::{Project, Symbol};

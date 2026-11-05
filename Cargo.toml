@@ -41,6 +41,7 @@ sha2 = "0.10"
 similar = "2"
 syn = { version = "2", features = ["full", "visit"] }
 tempfile = "3"
+typed-arena = "2"
 thiserror = "2"
 tokenizers = { version = "0.23", default-features = false, features = ["onig"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

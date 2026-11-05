@@ -3,14 +3,14 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_model::ucm::{Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility};
+use lighthouse_model::ucm::{Model, Node, Symbol, SymbolId, SymbolKind, Target, Visibility};
 
 /// The private target a private undocumented wrapper only forwards to. The
 /// wrapper must have exactly one caller, test callers included, and no use as
 /// a value; a method that implements a trait or interface method may be
 /// reached through it, so it is left alone. A variable is no callee: it is
 /// forwarded when exactly one symbol reads it.
-pub(super) fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'p SymbolId> {
+pub(super) fn forwarded<'p>(project: &'p dyn Model, wrapper: &Symbol) -> Option<&'p SymbolId> {
     if wrapper.visibility != Visibility::Private
         || wrapper.doc.is_some()
         || uses(project, wrapper) != 1
@@ -35,7 +35,7 @@ pub(super) fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'
 }
 
 /// Whether a call chain leads from `from`, itself included, to one of `goals`.
-pub(super) fn reaches(project: &Project, from: &SymbolId, goals: &[&SymbolId]) -> bool {
+pub(super) fn reaches(project: &dyn Model, from: &SymbolId, goals: &[&SymbolId]) -> bool {
     let mut seen = BTreeSet::new();
     let mut stack = vec![from];
     while let Some(current) = stack.pop() {
@@ -51,7 +51,7 @@ pub(super) fn reaches(project: &Project, from: &SymbolId, goals: &[&SymbolId]) -
 
 /// How many symbols use `symbol`: the callers of a function, the readers of a
 /// variable.
-fn uses(project: &Project, symbol: &Symbol) -> usize {
+fn uses(project: &dyn Model, symbol: &Symbol) -> usize {
     if symbol.kind == SymbolKind::Var {
         project.references(&symbol.id).len()
     } else {

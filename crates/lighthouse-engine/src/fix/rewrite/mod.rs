@@ -12,6 +12,7 @@ mod scratch;
 #[cfg(test)]
 mod tests;
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,

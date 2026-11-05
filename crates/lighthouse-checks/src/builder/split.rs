@@ -17,17 +17,19 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::ucm::{Project, Symbol, SymbolId, SymbolKind, Visibility};
+use lighthouse_model::ucm::{Model, Symbol, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
 use super::Builder;
+use crate::fact::Fact;
 
 impl Builder<'_> {
     /// The `split` of a method that lives away from the file of its owner
     /// type; `{}` for any other symbol.
     pub(super) fn split(&self, symbol: &Symbol) -> Value {
-        let index = self.indexes.splits.get_or_init(|| index(self.project));
-        index.get(&symbol.id).cloned().unwrap_or_else(|| json!({}))
+        self.indexes
+            .split(&symbol.id)
+            .map_or_else(|| json!({}), |split| split.json())
     }
 }
 
@@ -41,7 +43,7 @@ struct Local<'p> {
 }
 
 impl<'p> Local<'p> {
-    fn of(project: &'p Project, file: &'p Path) -> Self {
+    fn of(project: &'p dyn Model, file: &'p Path) -> Self {
         let declared: Vec<&Symbol> = project
             .symbols_in(file)
             .filter(|s| !project.in_test(&s.id))
@@ -83,7 +85,7 @@ impl<'p> Local<'p> {
 
     /// Drops the units something outside the file uses, or nothing uses, and
     /// indexes the rest.
-    fn keep_local(&mut self, project: &'p Project) {
+    fn keep_local(&mut self, project: &'p dyn Model) {
         let file = self.file;
         self.units.retain(|unit| {
             let users = users(project, unit);
@@ -100,7 +102,7 @@ impl<'p> Local<'p> {
             .collect();
     }
 
-    fn facts(&self, project: &Project, methods: &[&Symbol], ty: &SymbolId, home: &Path) -> Value {
+    fn facts(&self, project: &dyn Model, methods: &[&Symbol], ty: &SymbolId, home: &Path) -> Value {
         let own: BTreeSet<&SymbolId> = methods.iter().map(|m| &m.id).collect();
         let reached = self.reached_only_from(project, &own);
         let helper_functions: usize = reached
@@ -125,7 +127,7 @@ impl<'p> Local<'p> {
 
     /// The units whose every user is a method of `own` or another such unit,
     /// and which `own` reaches.
-    fn reached_only_from(&self, project: &Project, own: &BTreeSet<&SymbolId>) -> BTreeSet<usize> {
+    fn reached_only_from(&self, project: &dyn Model, own: &BTreeSet<&SymbolId>) -> BTreeSet<usize> {
         let mut only: BTreeSet<usize> = (0..self.units.len()).collect();
         loop {
             let out: Vec<usize> = only
@@ -163,11 +165,10 @@ impl<'p> Local<'p> {
 }
 
 /// The `split` of every method away from its type's file.
-pub(super) fn index(project: &Project) -> BTreeMap<SymbolId, Value> {
+pub fn splits(project: &dyn Model) -> BTreeMap<SymbolId, Fact> {
     let mut away: BTreeMap<(&SymbolId, &Path), Vec<&Symbol>> = BTreeMap::new();
     let types = project
-        .symbols
-        .iter()
+        .symbols()
         .filter(|s| s.kind == SymbolKind::Type && !project.in_test(&s.id));
     for ty in types {
         for method in project
@@ -191,7 +192,7 @@ pub(super) fn index(project: &Project) -> BTreeMap<SymbolId, Value> {
         let Some(home) = project.symbol(ty).map(|t| t.file.as_path()) else {
             continue;
         };
-        let value = local.facts(project, &methods, ty, home);
+        let value = Fact::from(&local.facts(project, &methods, ty, home));
         for method in methods {
             found.insert(method.id.clone(), value.clone());
         }
@@ -201,7 +202,7 @@ pub(super) fn index(project: &Project) -> BTreeMap<SymbolId, Value> {
 
 /// The distinct symbols that call or reference any symbol of the unit, the
 /// unit's own symbols aside, test code aside.
-fn users<'p>(project: &'p Project, unit: &[&Symbol]) -> BTreeSet<&'p SymbolId> {
+fn users<'p>(project: &'p dyn Model, unit: &[&Symbol]) -> BTreeSet<&'p SymbolId> {
     unit.iter()
         .flat_map(|s| {
             project

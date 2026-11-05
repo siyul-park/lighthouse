@@ -14,6 +14,7 @@
 //! A batch that fails answers nothing either. The batches of a group run
 //! side by side, and their answers are joined in the order of the files.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     path::{Path, PathBuf},

@@ -16,14 +16,18 @@ mod checks;
 mod compose;
 mod error;
 mod eval;
+mod fact;
 mod facts;
 mod fix;
 mod glob;
+mod graph;
+mod indexes;
 mod library;
+#[cfg(test)]
+mod local;
 mod manifest;
 mod modules;
 mod naming;
-mod table;
 mod text;
 
 pub mod caching;

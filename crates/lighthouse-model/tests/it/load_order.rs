@@ -1,5 +1,6 @@
 //! What a file needs of its own declarations as it loads.
 
+use lighthouse_model::ucm::Model;
 use lighthouse_model::{
     Position, Span,
     ucm::{
@@ -305,4 +306,25 @@ fn is_ordered_follows_the_fact_the_host_states() {
 fn is_call_is_the_when_a_use_has_unless_it_says_load() {
     assert!(When::default().is_call());
     assert!(!When::Load.is_call());
+}
+
+#[test]
+fn load_needs() {
+    let edges = vec![edge(
+        Some(id(&[], "b")),
+        id(&[], "a"),
+        EdgeKind::References,
+        When::Load,
+        3,
+    )];
+    let symbols = vec![symbol(&[], "a", 1, true), symbol(&[], "b", 3, true)];
+    let ordered = project(true, symbols.clone(), edges.clone());
+    let free = project(false, symbols, edges);
+
+    let found = lighthouse_model::ucm::load_needs(&ordered, FILE.as_ref(), ordered.edges());
+    let unordered = lighthouse_model::ucm::load_needs(&free, FILE.as_ref(), free.edges());
+
+    assert_eq!(found, ordered.load_needs(FILE.as_ref()));
+    assert_eq!(found.len(), 1);
+    assert!(unordered.is_empty());
 }

@@ -2,6 +2,7 @@
 //! to: by the reach of its rule, nobody, the changed files it has an edge to,
 //! or all of them.
 
+use lighthouse_model::ucm::Model;
 use std::{fs, path::Path};
 
 use lighthouse_engine::{Engine, FixBinding, FixReport, FixRun, FixedBy, Needs};

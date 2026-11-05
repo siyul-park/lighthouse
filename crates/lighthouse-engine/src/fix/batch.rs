@@ -10,6 +10,7 @@
 //! text it started from, so that the orchestrator can apply, judge and undo
 //! the runs one at a time, the newest first.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},

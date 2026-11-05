@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::ucm::{Project, Symbol, SymbolId, SymbolKind, Visibility};
+use lighthouse_model::ucm::{Model, Symbol, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
 use super::{Builder, effective::named_params};
@@ -194,7 +194,7 @@ fn sole_owner(callers: &[&Symbol]) -> Option<String> {
 
 /// Whether `id` is declared in a generated file: a function cannot be moved
 /// next to code that is rewritten by a tool.
-fn generated(project: &Project, id: &SymbolId) -> bool {
+fn generated(project: &dyn Model, id: &SymbolId) -> bool {
     project
         .symbol(id)
         .and_then(|s| project.file(&s.file))
@@ -203,7 +203,7 @@ fn generated(project: &Project, id: &SymbolId) -> bool {
 
 /// The type whose member `id` is: not an interface, whose methods any type
 /// may provide.
-fn owner_type<'p>(project: &'p Project, id: &SymbolId) -> Option<&'p Symbol> {
+fn owner_type<'p>(project: &'p dyn Model, id: &SymbolId) -> Option<&'p Symbol> {
     project
         .symbol(id)?
         .owner
@@ -215,7 +215,7 @@ fn owner_type<'p>(project: &'p Project, id: &SymbolId) -> Option<&'p Symbol> {
 /// Whether the function calls or references the owner type or one of its
 /// members: without that, it has no more to do with the owner than with any
 /// other type, however few callers it has.
-fn uses_owner(project: &Project, symbol: &Symbol, owner: &str) -> bool {
+fn uses_owner(project: &dyn Model, symbol: &Symbol, owner: &str) -> bool {
     let Some(owner_id) = SymbolId::parse(owner)
         .and_then(|id| project.symbol(&id))
         .map(|o| o.id.clone())

@@ -6,6 +6,7 @@
 //! within the scope of the fix is the proposal; a run that changed nothing
 //! declines the finding, with what the program said as the reason.
 
+use lighthouse_model::ucm::Model;
 use std::{collections::BTreeMap, path::Path, time::Instant};
 
 use lighthouse_model::{Diagnostic, Safety};

@@ -5,22 +5,22 @@ use lighthouse_model::ucm::{Module, Symbol};
 use serde_json::{Value, json};
 
 use super::Builder;
-use crate::metrics::propagation::{self, Stability, System};
+use crate::{indexes::Reached, metrics::propagation::Stability};
 
 impl Builder<'_> {
     /// `{ ca, ce, instability, vfi, vfo, vfi_share, vfo_share, cyclic,
     /// component, core }` on the graph of modules, or null for a module that
     /// is no node: test code or generated.
     pub(super) fn module_stability(&self, module: &Module) -> Value {
-        let system = self
-            .indexes
-            .modules
-            .get_or_init(|| propagation::modules(self.project));
-        let Some(s) = system.of(&module.path) else {
+        let Some(Reached {
+            nodes,
+            stability: s,
+        }) = self.indexes.stability(&module.path)
+        else {
             return Value::Null;
         };
         let total = s.ca + s.ce;
-        let mut value = reached(system, s);
+        let mut value = reached(nodes, &s);
         value["instability"] = if total == 0 {
             Value::Null
         } else {
@@ -35,25 +35,25 @@ impl Builder<'_> {
     /// graph of symbols; `measured` is false, and the rest zero, for a symbol
     /// that is no node.
     pub(super) fn reach(&self, symbol: &Symbol) -> Value {
-        let system = self
-            .indexes
-            .symbols
-            .get_or_init(|| propagation::symbols(self.project));
-        let Some(s) = system.of(symbol.id.as_str()) else {
+        let Some(Reached {
+            nodes,
+            stability: s,
+        }) = self.indexes.reach(&symbol.id)
+        else {
             return json!({
                 "measured": false, "ca": 0, "ce": 0, "vfi": 0, "vfo": 0,
                 "vfi_share": 0.0, "vfo_share": 0.0, "cyclic": 0,
             });
         };
-        let mut value = reached(system, s);
+        let mut value = reached(nodes, &s);
         value["measured"] = json!(true);
         value
     }
 }
 
 /// The fields both shapes share.
-fn reached(system: &System, s: &Stability) -> Value {
-    let n = system.nodes.len() as f64;
+fn reached(nodes: usize, s: &Stability) -> Value {
+    let n = nodes as f64;
     json!({
         "ca": s.ca, "ce": s.ce, "vfi": s.vfi, "vfo": s.vfo,
         "vfi_share": round(f64::from(s.vfi) / n),

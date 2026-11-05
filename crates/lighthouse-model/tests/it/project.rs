@@ -1,3 +1,4 @@
+use lighthouse_model::ucm::Model;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -543,7 +544,6 @@ fn comments_are_sorted_and_found_by_file() {
     let texts = |path: &str| -> Vec<&str> {
         project
             .comments_in(Path::new(path))
-            .iter()
             .map(|c| c.text.as_str())
             .collect()
     };
@@ -596,8 +596,11 @@ fn indexes_answer_uses_members_and_tests_by_module() {
         "no self use"
     );
     assert_eq!(project.test(&test.id).map(|t| t.nesting), Some(0));
-    assert_eq!(project.tests_in("m[test]").len(), 1);
-    assert!(project.tests_in("m").is_empty(), "a prefix is not a module");
+    assert_eq!(project.tests_in("m[test]").count(), 1);
+    assert!(
+        project.tests_in("m").next().is_none(),
+        "a prefix is not a module"
+    );
 }
 
 fn typed(module: &str, name: &str, kind: SymbolKind, owner: Option<&Symbol>) -> Symbol {

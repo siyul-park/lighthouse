@@ -8,19 +8,20 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::ucm::{FunctionSummary, Project, Symbol, SymbolId, SymbolKind};
+use lighthouse_model::ucm::{FunctionSummary, Model, Symbol, SymbolId, SymbolKind};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use super::Builder;
 
 /// Who takes and touches which type.
-#[derive(Default)]
-pub(super) struct Index {
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Takers {
     /// Functions that name a type in their parameters, by the type's
     /// kind-less id.
-    takers: BTreeMap<String, Vec<SymbolId>>,
+    pub takers: BTreeMap<String, Vec<SymbolId>>,
     /// Symbols that call or reference each symbol through a resolved edge.
-    users: BTreeMap<SymbolId, Vec<SymbolId>>,
+    pub users: BTreeMap<SymbolId, Vec<SymbolId>>,
 }
 
 /// A struct that exists only for one function: its name, and for each field
@@ -41,17 +42,16 @@ impl Builder<'_> {
         let Some(summary) = summary else {
             return json!([]);
         };
-        let index = self.indexes.single.get_or_init(|| index(self.project));
         Value::Array(
             named_params(summary)
-                .filter_map(|ty| self.hidden(index, function, ty))
+                .filter_map(|ty| self.hidden(function, ty))
                 .map(|h| json!({ "struct": h.name, "fields": h.optional }))
                 .collect(),
         )
     }
 
     /// The struct `ty` names when it exists only for `function`.
-    fn hidden(&self, index: &Index, function: &Symbol, ty: &str) -> Option<Hidden> {
+    fn hidden(&self, function: &Symbol, ty: &str) -> Option<Hidden> {
         let project = self.project;
         // A struct is a `type`; where an interface lists only fields (a
         // TypeScript options interface) it is the same parameter list.
@@ -68,7 +68,7 @@ impl Builder<'_> {
         if fields.is_empty() || fields.len() != members.len() {
             return None;
         }
-        if !matches!(index.takers.get(ty)?.as_slice(), [only] if *only == function.id) {
+        if !matches!(self.indexes.takers(ty).as_slice(), [only] if *only == function.id) {
             return None;
         }
         let allowed = |user: &SymbolId| {
@@ -78,9 +78,8 @@ impl Builder<'_> {
         };
         let touched = std::iter::once(&id).chain(fields.iter().map(|f| &f.id));
         let others = touched
-            .filter_map(|t| index.users.get(t))
-            .flatten()
-            .any(|user| !allowed(user));
+            .flat_map(|t| self.indexes.users(t))
+            .any(|user| !allowed(&user));
         (!others).then(|| Hidden {
             name: symbol.name.clone(),
             optional: fields.iter().map(|f| f.optional).collect(),
@@ -98,17 +97,18 @@ pub(super) fn named_params(summary: &FunctionSummary) -> impl Iterator<Item = &s
         .filter_map(|p| p.symbol.as_deref())
 }
 
-fn index(project: &Project) -> Index {
-    let mut index = Index::default();
-    for summary in &project.functions {
+/// Who takes and touches which type in the project.
+pub fn takers(project: &dyn Model) -> Takers {
+    let mut index = Takers::default();
+    for summary in project.functions() {
         for ty in named_params(summary) {
-            let takers: &mut Vec<SymbolId> = index.takers.entry(ty.to_owned()).or_default();
-            if !takers.contains(&summary.symbol) {
-                takers.push(summary.symbol.clone());
+            let taking: &mut Vec<SymbolId> = index.takers.entry(ty.to_owned()).or_default();
+            if !taking.contains(&summary.symbol) {
+                taking.push(summary.symbol.clone());
             }
         }
     }
-    for symbol in &project.symbols {
+    for symbol in project.symbols() {
         for used in project.uses(&symbol.id) {
             index
                 .users

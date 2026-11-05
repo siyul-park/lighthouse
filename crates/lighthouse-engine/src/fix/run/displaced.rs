@@ -5,6 +5,7 @@
 //! code. The check of the changed texts has re-indexed them already, so the
 //! symbols of a file before and after are compared there.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},

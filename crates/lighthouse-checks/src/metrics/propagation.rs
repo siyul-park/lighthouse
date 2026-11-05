@@ -5,15 +5,16 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_model::ucm::{EdgeKind, Node, Project, Symbol, SymbolId, SymbolKind, Target};
+use lighthouse_model::ucm::{EdgeKind, Model, Node, Symbol, SymbolId, SymbolKind, Target};
 
 use lighthouse_model::graph::Graph;
+use serde::{Deserialize, Serialize};
 
 /// The size from which the largest cycle is the core of a system.
 const CORE_MIN: u32 = 2;
 
 /// A graph of named nodes with what each one reaches.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct System {
     /// The names of the nodes, sorted.
     pub nodes: Vec<String>,
@@ -37,7 +38,7 @@ impl System {
 }
 
 /// What one node reaches in its graph.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stability {
     /// Distinct nodes that use it directly.
     pub ca: u32,
@@ -56,10 +57,9 @@ pub struct Stability {
 }
 /// The production modules, joined by the symbols of one that use a symbol of
 /// the other and by imports.
-pub fn modules(project: &Project) -> System {
+pub fn modules(project: &dyn Model) -> System {
     let nodes: BTreeSet<&str> = project
-        .symbols
-        .iter()
+        .symbols()
         .filter(|s| production(project, s))
         .map(|s| s.id.module())
         .filter(|m| project.module(m).is_some_and(|m| m.test_of.is_none()))
@@ -67,8 +67,7 @@ pub fn modules(project: &Project) -> System {
     let names: Vec<&str> = nodes.into_iter().collect();
     let at = |name: &str| names.binary_search(&name).ok();
     let used = project
-        .symbols
-        .iter()
+        .symbols()
         .filter(|s| production(project, s))
         .flat_map(|s| {
             let from = s.id.module();
@@ -78,8 +77,7 @@ pub fn modules(project: &Project) -> System {
                 .map(move |id| (from, id.module()))
         });
     let imported = project
-        .edges
-        .iter()
+        .edges()
         .filter(|e| e.kind == EdgeKind::Imports)
         .filter_map(|e| match (&e.from, &e.to) {
             (Node::Module(from), Target::Resolved(Node::Module(to))) => {
@@ -95,10 +93,9 @@ pub fn modules(project: &Project) -> System {
 
 /// The production functions, methods, types and interfaces, joined by what
 /// each one uses.
-pub fn symbols(project: &Project) -> System {
+pub fn symbols(project: &dyn Model) -> System {
     let mut nodes: Vec<&Symbol> = project
-        .symbols
-        .iter()
+        .symbols()
         .filter(|s| production(project, s))
         .filter(|s| {
             matches!(
@@ -124,7 +121,7 @@ pub fn symbols(project: &Project) -> System {
 }
 
 /// Whether the symbol is code that ships and a person wrote.
-fn production(project: &Project, symbol: &Symbol) -> bool {
+fn production(project: &dyn Model, symbol: &Symbol) -> bool {
     !project.in_test(&symbol.id) && !project.file(&symbol.file).is_some_and(|f| f.generated)
 }
 

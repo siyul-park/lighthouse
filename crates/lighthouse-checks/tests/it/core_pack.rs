@@ -53,6 +53,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        queries: &lighthouse_plugin::NoQueries,
     };
     registry
         .rule("core/max-lines")

@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::ucm::{EdgeKind, Node, Project, Target};
+use lighthouse_model::ucm::{EdgeKind, Model, Node, Target};
 use serde_json::{Value, json};
 
 use super::Builder;
@@ -14,20 +14,18 @@ impl Builder<'_> {
     /// import graph that holds `module`, itself included and ascending; empty
     /// when the module is on no cycle (a component of one module).
     pub(super) fn module_cycle(&self, module: &str) -> Value {
-        let cycles = self.indexes.cycles.get_or_init(|| index(self.project));
-        json!(cycles.get(module).map_or(&[][..], Vec::as_slice))
+        json!(self.indexes.cycle(module))
     }
 }
 
 /// The component of every module that is on a cycle of import edges.
-fn index(project: &Project) -> BTreeMap<String, Vec<String>> {
+pub fn cycles(project: &dyn Model) -> BTreeMap<String, Vec<String>> {
     let unit = |node: &Node| match node {
         Node::Module(path) => path.clone(),
         Node::Symbol(id) => id.module().to_owned(),
     };
     let edges: Vec<(String, String)> = project
-        .edges
-        .iter()
+        .edges()
         .filter(|e| e.kind == EdgeKind::Imports)
         .filter_map(|edge| match &edge.to {
             Target::Resolved(to) => Some((unit(&edge.from), unit(to))),

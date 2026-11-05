@@ -67,7 +67,7 @@ impl Builder<'_> {
             .file(&expected)
             .filter(|f| !f.test)
             .or_else(|| {
-                self.project.files.iter().find(|f| {
+                self.project.files().find(|f| {
                     !f.test
                         && f.path.parent() == file.path.parent()
                         && f.path.extension() == file.path.extension()
@@ -75,7 +75,7 @@ impl Builder<'_> {
                 })
             })
             .map_or_else(String::new, |f| path(&f.path));
-        let sourced = self.project.files.iter().any(|f| {
+        let sourced = self.project.files().any(|f| {
             !f.test
                 && f.path.parent() == file.path.parent()
                 && f.path.extension() == file.path.extension()

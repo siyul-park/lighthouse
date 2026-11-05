@@ -2,6 +2,8 @@
 //! suppress what the source waives and give every finding its identity.
 
 use super::*;
+use lighthouse_model::ucm::Model;
+use lighthouse_plugin::{NoQueries, Queries};
 
 impl Engine {
     pub(super) fn run(
@@ -47,6 +49,14 @@ impl Engine {
             &memo,
             &mut run.timings,
         )?;
+        let mut guard = self.lock_graph();
+        if let (Some(pulling), Some(graph)) = (self.registry.pulling(), guard.as_mut()) {
+            pulling.inputs(graph, &selected, &workspace)?;
+        }
+        let queries: Box<dyn Queries + '_> = match (self.registry.pulling(), guard.as_ref()) {
+            (Some(pulling), Some(graph)) => pulling.queries(graph),
+            _ => Box::new(NoQueries),
+        };
         let scene = Scene {
             workspace: &workspace,
             rules: &selected,
@@ -56,6 +66,7 @@ impl Engine {
             memo: &memo,
             cache: run_cache.as_ref(),
             models: &models,
+            queries: queries.as_ref(),
         };
         let (found, unsettled) = self.collect(&scene, &mut run)?;
         run.questions = models.subjects();

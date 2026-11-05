@@ -5,26 +5,25 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_model::ucm::{
-    EdgeKind, Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility,
+    EdgeKind, Model, Node, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
 use serde_json::{Value, json};
 
 use super::Builder;
+use crate::fact::Fact;
 
 impl Builder<'_> {
     /// The non-test, non-generated types and interfaces of a module.
     pub(super) fn module_types(&self, module: &str) -> Value {
-        let types = self.indexes.types.get_or_init(|| index(self.project));
-        json!(types.get(module).map_or(&[][..], Vec::as_slice))
+        Value::Array(self.indexes.types(module).iter().map(Fact::json).collect())
     }
 }
 
 /// The types of every module.
-pub(super) fn index(project: &Project) -> BTreeMap<String, Vec<Value>> {
-    let mut found: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+pub fn types(project: &dyn Model) -> BTreeMap<String, Vec<Fact>> {
+    let mut found: BTreeMap<String, Vec<Fact>> = BTreeMap::new();
     let types = project
-        .symbols
-        .iter()
+        .symbols()
         .filter(|s| matches!(s.kind, SymbolKind::Type | SymbolKind::Interface))
         .filter(|s| !project.in_test(&s.id))
         .filter(|s| project.file(&s.file).is_some_and(|f| !f.generated));
@@ -32,12 +31,12 @@ pub(super) fn index(project: &Project) -> BTreeMap<String, Vec<Value>> {
         found
             .entry(ty.id.module().to_owned())
             .or_default()
-            .push(entry(project, ty));
+            .push(Fact::from(&entry(project, ty)));
     }
     found
 }
 
-fn entry(project: &Project, ty: &Symbol) -> Value {
+fn entry(project: &dyn Model, ty: &Symbol) -> Value {
     let methods: Vec<&Symbol> = project
         .members(&ty.id)
         .iter()
@@ -69,7 +68,7 @@ fn entry(project: &Project, ty: &Symbol) -> Value {
 /// host's `implementation` role) and methods that use no field and
 /// neither call nor are called by a sibling, which have no instance state to be
 /// cohesive with, as a static method has none.
-fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol]) -> Vec<Vec<String>> {
+fn groups(project: &dyn Model, ty: &Symbol, methods: &[&Symbol]) -> Vec<Vec<String>> {
     if methods.is_empty() {
         return Vec::new();
     }
@@ -102,7 +101,7 @@ fn groups(project: &Project, ty: &Symbol, methods: &[&Symbol]) -> Vec<Vec<String
 /// Joins the methods that call each other or use the same field of `ty`, and
 /// tells which methods are related to anything at all.
 fn join_methods(
-    project: &Project,
+    project: &dyn Model,
     ty: &Symbol,
     methods: &[&Symbol],
     parent: &mut [usize],

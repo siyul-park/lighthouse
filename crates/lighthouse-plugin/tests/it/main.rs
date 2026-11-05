@@ -4,6 +4,7 @@ mod libraries;
 mod memo;
 mod models;
 mod notices;
+mod queries;
 
 mod registry;
 

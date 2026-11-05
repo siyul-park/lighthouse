@@ -2,6 +2,7 @@
 //! projects, the facts `module.stability` and `reach(n)` read by cel checks,
 //! and the graphs of what the Go and Rust providers index.
 
+use lighthouse_model::ucm::Model;
 use std::{fs, path::Path};
 
 use lighthouse_checks::metrics::{

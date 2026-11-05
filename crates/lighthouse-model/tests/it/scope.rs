@@ -1,3 +1,4 @@
+use lighthouse_model::ucm::Model;
 use lighthouse_model::{
     ExampleScope, Position, Span, TestScope,
     ucm::{

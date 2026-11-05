@@ -5,6 +5,7 @@
 //! covers that file; a gap of a provider without one covers the files of that
 //! provider; a gap of neither covers everything.
 
+use lighthouse_model::ucm::Model;
 use std::path::Path;
 
 use lighthouse_model::{Incomplete, Reach};

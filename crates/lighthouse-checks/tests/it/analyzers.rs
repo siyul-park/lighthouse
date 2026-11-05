@@ -94,6 +94,7 @@ fn run(project: &Project, path: &str) -> BTreeMap<SymbolId, Measures> {
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        queries: &lighthouse_plugin::NoQueries,
     };
     serde_json::from_value(analyzer.run(&ctx).unwrap()).unwrap()
 }

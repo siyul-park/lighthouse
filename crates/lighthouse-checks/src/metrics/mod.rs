@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, sync::LazyLock};
 
 use lighthouse_model::{
     RunScope,
-    ucm::{FlowKind, FunctionSummary, Project, Symbol, SymbolId, SymbolKind},
+    ucm::{FlowKind, FunctionSummary, Model, Symbol, SymbolId, SymbolKind},
 };
 use lighthouse_plugin::{Analyzer, AnalyzerManifest, Context, Error, Plugin, PluginManifest};
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ pub struct Measures {
 
 impl Measures {
     /// Measures `symbol`, whose summary is `summary`.
-    pub fn of(project: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Self {
+    pub fn of(project: &dyn Model, symbol: &Symbol, summary: &FunctionSummary) -> Self {
         let (mut cyclomatic, mut cognitive) = (1, 0);
         for flow in &summary.flow {
             cyclomatic += match flow.kind {

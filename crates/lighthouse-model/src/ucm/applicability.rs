@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, sync::Arc};
 
-use super::{File, Module, Project, Symbol};
+use super::{File, Model, Module, Symbol};
 use crate::{ExampleScope, TestScope};
 
 /// What a decision's subjects may be, besides being of its subject kind:
@@ -41,7 +41,7 @@ impl Applicability {
     /// code in a decision that is only about tests, or without example code in
     /// a decision that is only about examples. A file the provider read from its
     /// source alone is no subject of any decision.
-    pub fn excludes(&self, project: &Project, file: &File) -> bool {
+    pub fn excludes(&self, project: &dyn Model, file: &File) -> bool {
         file.is_syntactic()
             || !(self.admits_host(file) || self.admits_regions(file))
             || (!self.generated && file.generated)
@@ -119,7 +119,7 @@ impl Applicability {
     /// example code as `tests` and `examples` demand. A symbol is test code
     /// when its file is a test file or its module exists to test another, and
     /// example code when its module is.
-    pub fn admits_symbol(&self, project: &Project, symbol: &Symbol) -> bool {
+    pub fn admits_symbol(&self, project: &dyn Model, symbol: &Symbol) -> bool {
         let file = project.file(&symbol.file);
         let language = project.language_of(symbol);
         if file.is_some_and(File::is_syntactic)

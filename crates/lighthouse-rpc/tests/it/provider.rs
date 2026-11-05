@@ -4,6 +4,7 @@
 mod fixture;
 mod shape;
 
+use lighthouse_model::ucm::Model;
 use std::path::Path;
 
 use fixture::*;

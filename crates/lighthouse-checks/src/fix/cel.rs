@@ -1,6 +1,7 @@
 //! A `cel` fix: one expression that returns the edits, evaluated for the
 //! subject of a finding with the variables of its check.
 
+use lighthouse_model::ucm::Model;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex, PoisonError},
@@ -14,9 +15,10 @@ use serde_json::{Map, Value, json};
 use super::edits::{self, Lowered, Place};
 use crate::{
     Composition, Error,
-    builder::{Builder, span},
-    eval::{Fact, cel_fact, compile, compile_shared, to_json},
+    builder::{Builder, Over, span},
+    eval::{Var, cel_fact, compile, compile_shared, to_json},
     glob::slashed,
+    indexes::Computed,
     library::{self, Needs},
     manifest::rule_options,
 };
@@ -45,8 +47,8 @@ struct FileValues {
     path: PathBuf,
     text: String,
     options: Map<String, Value>,
-    file: Option<Fact>,
-    variables: Vec<(String, Fact)>,
+    file: Option<Var>,
+    variables: Vec<(String, Var)>,
 }
 
 /// The values are read in place by every evaluation, never copied.
@@ -145,12 +147,13 @@ impl CelFix {
         let file = project.file(&finding.file);
         let language = file.map(|f| f.lang.as_str());
         let options = rule_options(&self.decision, request.options, language)?;
-        let builder = Builder::standalone(
-            project,
-            request.workspace,
-            &self.needs,
-            language.unwrap_or_default(),
-        );
+        let indexes = Computed::new(project, request.workspace);
+        let over = Over {
+            model: project,
+            indexes: &indexes,
+            ws: request.workspace,
+        };
+        let builder = Builder::over(over, &self.needs, language.unwrap_or_default());
         let needs_file = self.needs.ident("file") || self.select == Some(Select::File);
         let values = self.values(id, request, &options, &builder, needs_file)?;
         let mut scope = self.library.new_inner_scope();
@@ -178,16 +181,17 @@ impl CelFix {
         let comment = || {
             let comment = project
                 .comments_in(&finding.file)
-                .iter()
                 .find(|c| c.span == finding.span)?;
             Some(cel_fact(&builder.comment(comment, request.text)))
         };
         let subject = match self.select {
             Some(Select::Comment) => comment(),
             Some(Select::File) => values.file.as_ref().map(|f| f.clone_as_boxed()),
-            Some(Select::Function) => symbol.and_then(|s| builder.function_fact(s)),
-            Some(Select::Test) => symbol.and_then(|s| builder.test_fact(s)),
-            _ => symbol.map(|s| builder.symbol_fact(s)),
+            Some(Select::Function) => symbol
+                .and_then(|s| builder.function(s))
+                .map(|v| cel_fact(&v)),
+            Some(Select::Test) => symbol.and_then(|s| builder.test(s)).map(|v| cel_fact(&v)),
+            _ => symbol.map(|s| cel_fact(&builder.symbol_value(s))),
         };
         let subject = subject.unwrap_or_else(|| cel_fact(&Value::Null));
         if let Some(select) = self.select {
@@ -258,7 +262,7 @@ impl CelFix {
             let bound = program
                 .execute(&scope)
                 .map_err(|e| PluginError::Failed(format!("{id}: fix: variable `{name}`: {e}")))?;
-            if let Ok(fact) = Fact::try_from(bound.clone()) {
+            if let Ok(fact) = Var::try_from(bound.clone()) {
                 variables.push((name.clone(), fact));
             }
             scope.add_variable_from_value(name, bound);

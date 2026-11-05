@@ -5,6 +5,7 @@
 //! callback of a test suite, top-level code, and what they call). Needs that
 //! the file already breaks are left as they are.
 
+use lighthouse_model::ucm::Model;
 use std::{collections::BTreeMap, ops::Range, path::Path};
 
 use lighthouse_model::{

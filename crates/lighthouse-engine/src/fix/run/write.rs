@@ -1,6 +1,7 @@
 //! The text of a round and its landing on disk: the formatted candidates, and
 //! the verified result written in two phases.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,

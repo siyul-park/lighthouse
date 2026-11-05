@@ -5,7 +5,7 @@
 use std::collections::BTreeSet;
 
 use lighthouse_model::ucm::{
-    EdgeKind, FunctionSummary, Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility,
+    EdgeKind, FunctionSummary, Model, Node, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
 use serde_json::{Value, json};
 
@@ -51,7 +51,7 @@ fn named(symbol: &Symbol) -> Value {
 
 /// The single-use helpers of `root`, then theirs: breadth first, in the order
 /// of the callees.
-fn helpers_of<'p>(project: &'p Project, root: &'p SymbolId) -> Vec<&'p Symbol> {
+fn helpers_of<'p>(project: &'p dyn Model, root: &'p SymbolId) -> Vec<&'p Symbol> {
     let mut seen: BTreeSet<&SymbolId> = BTreeSet::from([root]);
     let mut order = vec![root];
     let mut found = Vec::new();
@@ -74,7 +74,7 @@ fn helpers_of<'p>(project: &'p Project, root: &'p SymbolId) -> Vec<&'p Symbol> {
 /// The one production function that calls the private function `callee`,
 /// when nothing else uses it: not a test, not a value use, not a call to
 /// itself, not a function that implements an interface.
-fn sole_caller<'p>(project: &'p Project, callee: &Symbol) -> Option<&'p Symbol> {
+fn sole_caller<'p>(project: &'p dyn Model, callee: &Symbol) -> Option<&'p Symbol> {
     let serves = callee.visibility == Visibility::Private
         && matches!(callee.kind, SymbolKind::Function | SymbolKind::Method)
         && project
@@ -100,7 +100,7 @@ fn sole_caller<'p>(project: &'p Project, callee: &Symbol) -> Option<&'p Symbol> 
 }
 
 /// `callers` hides the edge of a function to itself, so it is read here.
-fn calls_itself(project: &Project, id: &SymbolId) -> bool {
+fn calls_itself(project: &dyn Model, id: &SymbolId) -> bool {
     project.edges_from(id).any(|edge| {
         edge.kind == EdgeKind::Calls
             && matches!(&edge.to, Target::Resolved(Node::Symbol(to)) if to == id)

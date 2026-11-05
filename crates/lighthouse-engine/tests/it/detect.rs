@@ -2,6 +2,7 @@
 //! system the files and their hashes are those of a fresh walk, the findings
 //! are those of a run without a cache, and a file is read only when it moved.
 
+use lighthouse_model::ucm::Model;
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},

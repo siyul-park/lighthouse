@@ -10,6 +10,7 @@
 mod batch;
 pub mod sarif;
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},

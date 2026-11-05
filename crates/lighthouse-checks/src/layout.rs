@@ -2,7 +2,7 @@
 //! and the vocabulary that tells a declaration's owner and visibility. Order
 //! keys registered by other plugins use the same vocabulary.
 
-use lighthouse_model::ucm::{File, Project, Symbol, SymbolKind, SymbolRole, Visibility};
+use lighthouse_model::ucm::{File, Model, Symbol, SymbolKind, SymbolRole, Visibility};
 use lighthouse_plugin::Context;
 
 /// The name of the function that stands for the statements a module runs when
@@ -22,7 +22,7 @@ pub fn declarations<'a>(ctx: &Context<'a>) -> Vec<Vec<&'a Symbol>> {
 }
 
 /// [`declarations`] of `file`.
-pub fn declarations_in<'a>(project: &'a Project, file: &File) -> Vec<Vec<&'a Symbol>> {
+pub fn declarations_in<'a>(project: &'a dyn Model, file: &File) -> Vec<Vec<&'a Symbol>> {
     let mut all: Vec<&Symbol> = project
         .symbols_in(&file.path)
         .filter(|s| is_declaration(project, s))
@@ -91,7 +91,7 @@ pub fn has_word_prefix(name: &str, prefix: &str) -> bool {
 /// A type, interface, constant, variable, function or method that is not a
 /// member of an interface, not nested in a function body and not the body of a
 /// module.
-pub fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
+pub fn is_declaration(project: &dyn Model, symbol: &Symbol) -> bool {
     use SymbolKind::{Const, Function, Interface, Method, Type, Var};
     if !matches!(
         symbol.kind,

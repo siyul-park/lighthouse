@@ -1,3 +1,4 @@
+use lighthouse_model::ucm::Model;
 use std::path::PathBuf;
 
 use lighthouse_model::ucm::File;

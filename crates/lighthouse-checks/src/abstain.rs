@@ -4,7 +4,10 @@
 //! left to agent review.
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, Position, Span, ucm::SymbolId};
+use lighthouse_model::{
+    Diagnostic, Position, Span,
+    ucm::{Model, SymbolId},
+};
 use lighthouse_plugin::{
     Answered, Ask, Context, DecisionRef, Neighbor, RuleManifest, State, Subject,
 };

@@ -123,6 +123,11 @@ impl Table {
         self.modules.get(path)
     }
 
+    /// Every module, sorted by path.
+    pub fn modules(&self) -> impl Iterator<Item = &Module> {
+        self.modules.values()
+    }
+
     /// Whether the file at `path` is a host whose regions are all example code.
     pub fn is_example(&self, path: &std::path::Path) -> bool {
         self.examples.contains(path)

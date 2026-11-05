@@ -187,6 +187,8 @@ struct Scene<'a> {
     cache: Option<&'a RunCache<'a>>,
     /// The models the rules may ask.
     models: &'a dyn lighthouse_plugin::Models,
+    /// The graph the rules pull their facts and indexes from.
+    queries: &'a dyn lighthouse_plugin::Queries,
 }
 
 impl<'a> Scene<'a> {
@@ -207,6 +209,7 @@ impl<'a> Scene<'a> {
             notices,
             applies,
             models: self.models,
+            queries: self.queries,
         }
     }
 }

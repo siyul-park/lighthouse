@@ -34,23 +34,31 @@ use super::units::{
 use crate::generated::Markers;
 
 /// What the host says of a file of the project. `Volatile`.
-pub(crate) static HOST: Input<String, Host> = Input::new("host");
+pub static HOST: Input<String, Host> = Input::new("host");
 /// The paths of the files of the project, sorted. `Volatile`.
-pub(crate) static PATHS: Input<(), Vec<String>> = Input::new("paths");
+pub static PATHS: Input<(), Vec<String>> = Input::new("paths");
 /// The patterns of the markers of generated files. `Stable`.
-pub(crate) static MARKERS: Input<(), Vec<String>> = Input::new("markers");
+pub static MARKERS: Input<(), Vec<String>> = Input::new("markers");
 
 pub(crate) static PART: Query<String, Vec<Fragment>> = Query::new("part", part);
 pub(crate) static DECLARED: Query<String, Vec<(String, String)>> = Query::new("declared", declare);
 pub(crate) static COLLISIONS: Query<(), BTreeSet<String>> = Query::new("collisions", collide);
-pub(crate) static SLICE: Query<String, Slice> = Query::new("slice", slice);
-pub(crate) static OUTLINE: Query<String, Outline> = Query::new("outline", outline);
-pub(crate) static SYMBOLS: Query<(), Table> = Query::new("symbols", symbols);
-pub(crate) static RESOLVED: Query<String, Resolved> = Query::new("resolved", resolved);
-pub(crate) static EDGES: Query<(), Edges> = Query::new("edges", edges);
-pub(crate) static SITES: Query<(), Sites> = Query::new("sites", sites);
-pub(crate) static INCOMING: Query<String, Incoming> = Query::new("incoming", incoming);
-pub(crate) static PROJECT: Query<(), Project> = Query::new("project", project).transient();
+/// The fragments of a file, qualified.
+pub static SLICE: Query<String, Slice> = Query::new("slice", slice);
+/// What the table takes of a slice.
+pub static OUTLINE: Query<String, Outline> = Query::new("outline", outline);
+/// The table of all declarations.
+pub static SYMBOLS: Query<(), Table> = Query::new("symbols", symbols);
+/// A slice with its targets resolved against the table.
+pub static RESOLVED: Query<String, Resolved> = Query::new("resolved", resolved);
+/// The reverse maps of all edges.
+pub static EDGES: Query<(), Edges> = Query::new("edges", edges);
+/// Where the edges refer from.
+pub static SITES: Query<(), Sites> = Query::new("sites", sites);
+/// What the rest of the project says of the symbols of one file.
+pub static INCOMING: Query<String, Incoming> = Query::new("incoming", incoming);
+/// The files put together; held in memory only.
+pub static PROJECT: Query<(), Project> = Query::new("project", project).transient();
 
 /// How the host stamps the fragments a provider gave for a file.
 struct Stamping<'a> {
@@ -144,7 +152,7 @@ impl Stamping<'_> {
 /// What the host says of a file: the record it keeps, the unit the file is
 /// in, and what the injections made of it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Host {
+pub struct Host {
     pub file: File,
     /// The id of its unit, in the language of the file.
     pub unit: String,
@@ -159,7 +167,7 @@ impl Host {
     /// Sets the inputs of a project that is the given fragments, one unit per
     /// file, with nothing else known of the files: what the keys of fragments
     /// made without a run are read from.
-    pub(crate) fn set_units(graph: &mut Graph, fragments: &[Fragment]) -> Result<(), Error> {
+    pub fn set_units(graph: &mut Graph, fragments: &[Fragment]) -> Result<(), Error> {
         let mut paths = Vec::new();
         for fragment in fragments {
             let Some(file) = fragment.files.first() else {

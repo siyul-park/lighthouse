@@ -1,6 +1,7 @@
 #[path = "builders.rs"]
 mod builders;
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::BTreeMap,
     fs,

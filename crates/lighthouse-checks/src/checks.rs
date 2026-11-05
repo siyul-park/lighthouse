@@ -64,6 +64,11 @@ impl Plugin for Checks {
         &self.manifest
     }
 
+    /// The facts of the checks, pulled from the graph.
+    fn pulling(&self) -> Option<std::sync::Arc<dyn lighthouse_plugin::Pulling>> {
+        Some(std::sync::Arc::new(crate::graph::Pulls))
+    }
+
     /// The generated-code markers of the manifest of `core`.
     fn generated(&self) -> GeneratedSpec {
         if self.manifest.id == CORE {

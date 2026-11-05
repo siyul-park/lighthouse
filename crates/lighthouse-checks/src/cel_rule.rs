@@ -10,9 +10,9 @@ use std::{
 use cel::{Program, common::value::CowVal, context::VariableResolver};
 use lighthouse_model::{
     Diagnostic, Position, Reach, Span,
-    ucm::{Edge, File, Node, Project, Symbol, SymbolId},
+    ucm::{Edge, File, Model, Node, Project, Symbol, SymbolId},
 };
-use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
+use lighthouse_plugin::{Context, Error as PluginError, Queries, Reads, RuleManifest};
 use lighthouse_spec::{CelCheck, Decision, Env, Select};
 use serde_json::{Map, Value};
 
@@ -21,8 +21,10 @@ use crate::{
     abstain::{Abstain, Candidate},
     builder::Builder,
     caching,
-    eval::{Fact, Frame, Template, cel_fact, compile, compile_all, compile_shared},
+    eval::{Frame, Template, Var, cel_fact, compile, compile_all, compile_shared},
+    fact::{Built, FACT, FUNCTION, SYMBOL, TEST, subject_key},
     facts,
+    indexes::Queried,
     library::{self, Needs},
     metrics::MEASURES,
     modules::{self, Declared},
@@ -152,6 +154,17 @@ impl CelRule {
         self.abstain.is_some()
     }
 
+    /// The sort of subject whose facts the expressions read, and which fields.
+    pub(crate) fn reads(&self) -> Option<(&'static str, Reads)> {
+        let subject = match self.select {
+            Select::Symbol => SYMBOL,
+            Select::Function => FUNCTION,
+            Select::Test => TEST,
+            _ => return None,
+        };
+        Some((subject, self.needs.reads()))
+    }
+
     /// The analyzers whose facts the expressions read.
     pub(crate) fn analyzers(&self) -> Vec<String> {
         if self.needs.field("metrics") {
@@ -179,21 +192,27 @@ impl CelRule {
         options: &Map<String, Value>,
         focus: Option<&str>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
-        let builder = Builder::new(ctx, &self.needs)?;
+        let indexes = Queried::new(ctx.queries);
+        let builder = Builder::new(ctx, &indexes, &self.needs)?;
         let reviewing = self.reviews() && ctx.models.asks(&meta.id);
         let run = Evaluation {
             rule: self,
             reviewing,
             meta,
             builder,
+            queries: ctx.queries,
             focus,
             candidates: RefCell::default(),
             shared: Shared::new(self, meta.scope, cel_fact(&Value::Object(options.clone()))),
         };
-        let mut found = match meta.scope {
+        let found = match meta.scope {
             lighthouse_model::RunScope::File => run.check_file(ctx),
             lighthouse_model::RunScope::Project => run.check_project(ctx),
-        }?;
+        };
+        if let Some(error) = run.builder.failure() {
+            return Err(error);
+        }
+        let mut found = found?;
         if let Some(abstain) = self.abstain.as_ref().filter(|_| reviewing) {
             found.extend(abstain.settle(ctx, meta, run.candidates.take()));
         }
@@ -207,6 +226,7 @@ struct Evaluation<'a> {
     reviewing: bool,
     meta: &'a RuleManifest,
     builder: Builder<'a>,
+    queries: &'a dyn Queries,
     /// The language a run of a file with code in several is about: its
     /// symbols are the subjects, and the options are the language's. The
     /// subjects that are no symbol belong to the language of the file.
@@ -277,14 +297,14 @@ impl At {
 struct Judged<'a> {
     shared: &'a Shared<'a>,
     /// The selected value, under the name the check gives it.
-    value: Fact,
+    value: Var,
     /// Per variable of the check, its value for this subject; unused by one
     /// that reads nothing of the subject, which the file holds.
-    values: Vec<OnceLock<Option<Fact>>>,
+    values: Vec<OnceLock<Option<Var>>>,
 }
 
 impl<'a> Judged<'a> {
-    fn new(shared: &'a Shared<'a>, value: Fact) -> Self {
+    fn new(shared: &'a Shared<'a>, value: Var) -> Self {
         Self {
             shared,
             value,
@@ -299,7 +319,7 @@ impl<'a> Judged<'a> {
 
     /// The value of variable number `at` for the subject, `None` when it
     /// could not be found: `failed` says why.
-    fn compute(&self, at: usize) -> Option<Fact> {
+    fn compute(&self, at: usize) -> Option<Var> {
         let (name, program) = &self.shared.rule.variables[at];
         let mut scope = self.shared.rule.library.new_inner_scope();
         scope.set_variable_resolver(self);
@@ -307,7 +327,7 @@ impl<'a> Judged<'a> {
             .execute(&scope)
             .map_err(|e| format!("variable `{name}`: {e}"))
             .and_then(|value| {
-                Fact::try_from(value)
+                Var::try_from(value)
                     .map_err(|_| format!("variable `{name}`: the value cannot be held"))
             });
         match value {
@@ -348,18 +368,18 @@ impl VariableResolver for Judged<'_> {
 /// resolver.
 struct Shared<'a> {
     rule: &'a CelRule,
-    options: Fact,
-    file: OnceLock<Fact>,
+    options: Var,
+    file: OnceLock<Var>,
     /// The name of each variable that is file-level; none when the check runs
     /// over the project, which has no file.
     names: Vec<Option<String>>,
     /// Their values, `None` when one could not be found: `failed` says why.
-    values: Vec<OnceLock<Option<Fact>>>,
+    values: Vec<OnceLock<Option<Var>>>,
     failed: OnceLock<String>,
 }
 
 impl<'a> Shared<'a> {
-    fn new(rule: &'a CelRule, scope: lighthouse_model::RunScope, options: Fact) -> Self {
+    fn new(rule: &'a CelRule, scope: lighthouse_model::RunScope, options: Var) -> Self {
         let per_file = scope == lighthouse_model::RunScope::File;
         Self {
             rule,
@@ -378,7 +398,7 @@ impl<'a> Shared<'a> {
 
     /// The value of file-level variable number `at`, read through this
     /// resolver as the expressions of a judgment read it.
-    fn compute(&self, at: usize) -> Option<Fact> {
+    fn compute(&self, at: usize) -> Option<Var> {
         let (name, program) = &self.rule.variables[at];
         let mut scope = self.rule.library.new_inner_scope();
         scope.set_variable_resolver(self);
@@ -386,7 +406,7 @@ impl<'a> Shared<'a> {
             .execute(&scope)
             .map_err(|e| format!("variable `{name}`: {e}"))
             .and_then(|value| {
-                Fact::try_from(value)
+                Var::try_from(value)
                     .map_err(|_| format!("variable `{name}`: the value cannot be held"))
             });
         match value {

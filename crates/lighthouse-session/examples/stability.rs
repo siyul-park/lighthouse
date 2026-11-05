@@ -5,6 +5,7 @@
 //! usage: cargo run --release -q --example stability -p lighthouse-session --
 //!        --config <lighthouse.toml> <repo>
 
+use lighthouse_model::ucm::Model;
 use std::{
     env,
     path::{Path, PathBuf},

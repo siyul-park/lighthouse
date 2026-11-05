@@ -7,6 +7,7 @@
 //! Applying it later is writing exactly what was shown, if the files are still
 //! as they were, and never making the fix again.
 
+use lighthouse_model::ucm::Model;
 use std::{
     cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet, HashMap},

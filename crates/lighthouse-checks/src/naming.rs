@@ -6,10 +6,11 @@ use std::{
     sync::{Arc, Mutex, PoisonError},
 };
 
-use lighthouse_model::ucm::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
+use lighthouse_model::ucm::{Model, Module, Symbol, SymbolId, SymbolKind, TestCase};
 use lighthouse_plugin::TestNaming;
+use serde::{Deserialize, Serialize};
 
-use crate::layout::contains;
+use crate::{indexes::Indexes, layout::contains};
 
 /// How a test name maps to a symbol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,39 +29,52 @@ impl Match {
 }
 
 /// The tests of a project by the convention of a [`TestNaming`]. The tests of a
-/// set of modules are indexed by their names once per run, however many
-/// symbols and checks ask.
+/// set of modules are indexed by their names once, however many symbols and
+/// checks ask.
 pub(crate) struct Tests<'p> {
     naming: TestNaming,
-    project: &'p Project,
-    indexes: Arc<Indexes>,
+    project: &'p dyn Model,
+    credit: Credit<'p>,
 }
 
-/// The indexes of a run, by test prefix and the modules indexed; they live in
-/// the run's [`lighthouse_plugin::Memo`], shared by every check.
-#[derive(Default)]
-pub(crate) struct Indexes(Mutex<HashMap<IndexKey, Arc<Index>>>);
+/// Where the index of the tests of some modules comes from: a cache of the
+/// tests' own, or the run's indexes shared by every check.
+enum Credit<'p> {
+    Alone(Mutex<HashMap<Modules, Arc<Credited>>>),
+    Shared(&'p dyn Indexes),
+}
 
-type IndexKey = (String, Vec<String>);
+/// A prefix of test names and the modules whose tests are indexed.
+type Modules = (String, Vec<String>);
 
 /// The tests of some modules with the part of their names after the prefix,
 /// sorted by it, and where each came in the modules' order.
-struct Index {
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Credited {
     names: Vec<(String, usize, SymbolId)>,
 }
 
 impl<'p> Tests<'p> {
-    pub(crate) fn new(naming: TestNaming, project: &'p Project, indexes: Arc<Indexes>) -> Self {
+    pub(crate) fn new(
+        naming: TestNaming,
+        project: &'p dyn Model,
+        indexes: &'p dyn Indexes,
+    ) -> Self {
         Self {
             naming,
             project,
-            indexes,
+            credit: Credit::Shared(indexes),
         }
     }
 
-    /// The same project and indexes under the convention of another language.
-    pub(crate) fn in_language(&self, naming: TestNaming) -> Self {
-        Self::new(naming, self.project, Arc::clone(&self.indexes))
+    /// Tests whose index is made here, for what is computed once over a whole
+    /// project.
+    pub(crate) fn alone(naming: TestNaming, project: &'p dyn Model) -> Self {
+        Self {
+            naming,
+            project,
+            credit: Credit::Alone(Mutex::default()),
+        }
     }
 
     /// The tests of the modules that test `symbol`'s module from inside or
@@ -77,8 +91,7 @@ impl<'p> Tests<'p> {
         }
         let modules = self
             .project
-            .modules
-            .iter()
+            .modules()
             .filter(|m| m.path == module || tests_ancestor(m, module))
             .map(|m| m.path.clone())
             .collect();
@@ -109,31 +122,36 @@ impl<'p> Tests<'p> {
             .collect()
     }
 
-    fn index(&self, modules: Vec<String>) -> Arc<Index> {
-        let key = (self.naming.prefix.clone(), modules);
-        let mut indexes = self
-            .indexes
-            .0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        if let Some(index) = indexes.get(&key) {
-            return Arc::clone(index);
-        }
-        let mut names = Vec::new();
-        for module in &key.1 {
-            for test in self.project.tests_in(module) {
-                let rest = test_name(&test.symbol)
-                    .and_then(|name| name.strip_prefix(self.naming.prefix.as_str()));
-                if let Some(rest) = rest {
-                    names.push((rest.to_owned(), names.len(), test.symbol.clone()));
-                }
+    fn index(&self, modules: Vec<String>) -> Arc<Credited> {
+        let prefix = self.naming.prefix.as_str();
+        match &self.credit {
+            Credit::Shared(indexes) => indexes.credited(prefix, &modules),
+            Credit::Alone(cache) => {
+                let key = (prefix.to_owned(), modules);
+                let mut cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
+                let found = cache.entry(key).or_insert_with_key(|(prefix, modules)| {
+                    Arc::new(credited(self.project, prefix, modules))
+                });
+                Arc::clone(found)
             }
         }
-        names.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
-        let index = Arc::new(Index { names });
-        indexes.insert(key, Arc::clone(&index));
-        index
     }
+}
+
+/// The index of the tests of `modules` by the part of their names after
+/// `prefix`.
+pub fn credited(model: &dyn Model, prefix: &str, modules: &[String]) -> Credited {
+    let mut names = Vec::new();
+    for module in modules {
+        for test in model.tests_in(module) {
+            let rest = test_name(&test.symbol).and_then(|name| name.strip_prefix(prefix));
+            if let Some(rest) = rest {
+                names.push((rest.to_owned(), names.len(), test.symbol.clone()));
+            }
+        }
+    }
+    names.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
+    Credited { names }
 }
 
 pub(crate) fn snake(name: &str) -> String {
@@ -157,7 +175,7 @@ pub(crate) fn snake(name: &str) -> String {
 /// name for tests is `key`.
 fn maps(
     naming: &TestNaming,
-    project: &Project,
+    project: &dyn Model,
     rest: &str,
     key: &str,
     symbol: &Symbol,
@@ -173,7 +191,7 @@ fn maps(
 }
 
 /// The name tests use for a symbol: the name, or `Owner_name` for a method.
-fn key(naming: &TestNaming, project: &Project, symbol: &Symbol) -> Option<String> {
+fn key(naming: &TestNaming, project: &dyn Model, symbol: &Symbol) -> Option<String> {
     let spell = |s: &str| {
         if naming.snake_case {
             snake(s)
@@ -195,7 +213,7 @@ fn key(naming: &TestNaming, project: &Project, symbol: &Symbol) -> Option<String
 
 /// Whether `tail` starts with the name of a method of `symbol`, so that
 /// `TestStore_Get_Missing` belongs to `Get`, not to `Store`.
-fn names_a_member(project: &Project, symbol: &Symbol, tail: &str) -> bool {
+fn names_a_member(project: &dyn Model, symbol: &Symbol, tail: &str) -> bool {
     let first = tail.split('_').next().unwrap_or(tail);
     project.members(&symbol.id).iter().any(|id| {
         project.symbol(id).is_some_and(|m| {
@@ -205,10 +223,9 @@ fn names_a_member(project: &Project, symbol: &Symbol, tail: &str) -> bool {
 }
 
 /// Modules whose tests count for `module`: itself, and those that test it.
-fn testing_modules(project: &Project, module: &str) -> Vec<String> {
+fn testing_modules(project: &dyn Model, module: &str) -> Vec<String> {
     project
-        .modules
-        .iter()
+        .modules()
         .filter(|m| m.path == module || m.test_of.as_deref() == Some(module))
         .map(|m| m.path.clone())
         .collect()

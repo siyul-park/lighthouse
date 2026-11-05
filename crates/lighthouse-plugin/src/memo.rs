@@ -8,6 +8,11 @@ use std::{
 /// What the rules of one run share so that each computes a value once: one
 /// slot per type, created empty on first use. A slot holds its own
 /// synchronization, so rules running in parallel may fill it together.
+///
+/// The facts and indexes of the code model are queries of the graph, not
+/// slots. What is left is what the graph does not hold yet: the directives the
+/// engine judged, and the answers of command checks. The memo goes when
+/// command checks become nodes of the graph.
 #[derive(Default)]
 pub struct Memo {
     slots: Mutex<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,

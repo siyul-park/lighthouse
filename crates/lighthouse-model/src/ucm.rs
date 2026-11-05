@@ -9,11 +9,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod applicability;
-mod discriminator;
 mod edit;
 mod function;
 mod load_order;
 mod merge;
+mod model;
 mod qualify;
 mod slice;
 mod table;
@@ -21,7 +21,8 @@ mod table;
 pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
-pub use load_order::{LoadNeed, LoadPoint};
+pub use load_order::{LoadNeed, LoadPoint, load_needs};
+pub use model::{Boxed, Model};
 
 use crate::{Document, Span};
 use merge::{dedup_edges, resolve_all, settle, sites_of, sorted_union};
@@ -661,177 +662,11 @@ impl Project {
         &self.inner.notices
     }
 
-    /// The file at this exact project-relative path.
-    pub fn file(&self, path: &Path) -> Option<&File> {
-        let at = self
-            .inner
-            .all
-            .files
-            .binary_search_by(|f| f.path.as_path().cmp(path))
-            .ok()?;
-        self.inner.all.files.get(at)
-    }
-
-    /// The symbol with this id, if declared.
-    pub fn symbol(&self, id: &SymbolId) -> Option<&Symbol> {
-        self.inner
-            .all
-            .symbols
-            .get(*self.inner.index.symbols.get(id)?)
-    }
-
-    /// Symbols declared in `path`, sorted by id.
-    pub fn symbols_in<'a>(&'a self, path: &Path) -> impl Iterator<Item = &'a Symbol> + use<'a> {
-        let at = self
-            .inner
-            .index
-            .in_file
-            .get(path)
-            .map_or(&[][..], Vec::as_slice);
-        at.iter().map(|&i| &self.inner.all.symbols[i])
-    }
-
-    /// Whether the symbol is test code: declared in a test file, or in a module
-    /// that exists to test another (`test_of`), such as an inline `#[cfg(test)]`
-    /// module in a production file.
-    pub fn in_test(&self, id: &SymbolId) -> bool {
-        let in_test_file = self
-            .symbol(id)
-            .and_then(|s| self.file(&s.file))
-            .is_some_and(|f| f.test);
-        in_test_file
-            || self
-                .module(id.module())
-                .is_some_and(|m| m.test_of.is_some())
-    }
-
-    /// Whether the symbol is example code, which documentation shows and the
-    /// project does not use: declared in a module that example code declares,
-    /// or in a host file all of whose regions are example code (a fence in
-    /// the package of a project module declares no module of its own).
-    pub fn in_example(&self, id: &SymbolId) -> bool {
-        self.module(id.module()).is_some_and(|m| m.example)
-            || self
-                .symbol(id)
-                .and_then(|symbol| self.file(&symbol.file))
-                .is_some_and(File::is_example)
-    }
-
-    /// The language the symbol is in: the one its module's host stated, else
-    /// the language analyzed in its file; `None` for a file the model does not
-    /// know.
-    pub fn language_of(&self, symbol: &Symbol) -> Option<&str> {
-        self.module(symbol.id.module())
-            .and_then(|m| m.language.as_deref())
-            .or_else(|| self.file(&symbol.file).map(File::analysis_language))
-    }
-
-    /// The module with this path.
-    pub fn module(&self, path: &str) -> Option<&Module> {
-        let at = self
-            .inner
-            .all
-            .modules
-            .binary_search_by(|m| m.path.as_str().cmp(path))
-            .ok()?;
-        self.inner.all.modules.get(at)
-    }
-
-    /// The summary of a function or method symbol; `None` for other kinds.
-    pub fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
-        self.inner
-            .all
-            .functions
-            .get(*self.inner.index.functions.get(id)?)
-    }
-
-    /// Distinct symbols with a resolved, non-heuristic `calls` edge to `id`,
-    /// excluding itself.
-    pub fn callers(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.inner.index.reverse.callers, id)
-    }
-
-    /// Distinct symbols with a resolved `references` edge to `id`, excluding
-    /// itself: every use of `id` as a value rather than a call. Heuristic edges
-    /// are included: they say a symbol might be used.
-    pub fn references(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.inner.index.reverse.references, id)
-    }
-
-    /// Distinct symbols `id` calls or references through a resolved,
-    /// non-heuristic edge, excluding itself: every use `id` makes of another
-    /// symbol, whether as a call or as a value.
-    pub fn uses(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.inner.index.reverse.uses, id)
-    }
-
-    /// Symbols whose `owner` is `id`: fields, methods, associated items.
-    pub fn members(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.inner.index.reverse.members, id)
-    }
-
-    /// The test case of a test symbol.
-    pub fn test(&self, id: &SymbolId) -> Option<&TestCase> {
-        let at = self
-            .inner
-            .all
-            .tests
-            .binary_search_by(|t| t.symbol.cmp(id))
-            .ok()?;
-        self.inner.all.tests.get(at)
-    }
-
-    /// Test cases declared in `module`, ordered by id.
-    pub fn tests_in(&self, module: &str) -> &[TestCase] {
-        let prefix = format!("{module}::");
-        let tests = &self.inner.all.tests;
-        let start = tests.partition_point(|t| t.symbol.as_str() < prefix.as_str());
-        let len = tests[start..].partition_point(|t| t.symbol.as_str().starts_with(&prefix));
-        &tests[start..start + len]
-    }
-
-    /// Every place that refers to `id` through an edge that has a site: calls,
-    /// references and the other relations alike, in file order. Empty when the
-    /// provider reports no reference sites.
-    pub fn sites(&self, id: &SymbolId) -> &[Site] {
-        slice(&self.inner.index.sites.0, id)
-    }
-
     /// The file the edge at position `at` of `edges` comes from, when it starts
     /// at a module and its fragment is about one file; an edge that starts at
     /// a symbol comes from the file of the symbol.
     pub fn origin(&self, at: usize) -> Option<&Path> {
         self.inner.index.origins.get(&at).map(PathBuf::as_path)
-    }
-
-    /// Comments of `path`, in source order.
-    pub fn comments_in(&self, path: &Path) -> &[Comment] {
-        let comments = &self.inner.all.comments;
-        let start = comments.partition_point(|c| c.file.as_path() < path);
-        let end = comments.partition_point(|c| c.file.as_path() <= path);
-        &comments[start..end]
-    }
-
-    /// The edges that start at symbol `id`, in the project's edge order.
-    pub fn edges_from(&self, id: &SymbolId) -> impl Iterator<Item = &Edge> + use<'_> {
-        self.inner
-            .index
-            .edges_from
-            .get(id)
-            .into_iter()
-            .flatten()
-            .map(|at| &self.inner.all.edges[*at])
-    }
-
-    /// The types that implement the interface `id`, in test files too.
-    pub fn implementers(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.inner.index.reverse.implementers, id)
-    }
-
-    /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
-    /// excluding itself.
-    pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.inner.index.reverse.callees, id)
     }
 }
 
@@ -861,9 +696,4 @@ impl Index {
 
 fn ambiguity(count: usize) -> String {
     format!("{count} edge target(s) matched several symbols and stayed unresolved")
-}
-
-/// The entries of `map` under `id`, none when it has none.
-fn slice<'a, T>(map: &'a BTreeMap<SymbolId, Vec<T>>, id: &SymbolId) -> &'a [T] {
-    map.get(id).map_or(&[], Vec::as_slice)
 }

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::ucm::{Project, Symbol, SymbolId, SymbolKind, Visibility};
+use lighthouse_model::ucm::{Model, Symbol, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
 use super::Builder;
@@ -12,12 +12,14 @@ impl Builder<'_> {
     /// The ids of the exported, non-test, non-generated types and interfaces
     /// of other modules with the name of `symbol`; empty for anything else.
     pub(super) fn homonyms(&self, symbol: &Symbol) -> Value {
-        let named = self.indexes.names.get_or_init(|| index(self.project));
-        let found = named.get(&symbol.name).filter(|_| exported_type(symbol));
+        let found = if exported_type(symbol) {
+            self.indexes.names(&symbol.name)
+        } else {
+            Vec::new()
+        };
         json!(
             found
-                .into_iter()
-                .flatten()
+                .iter()
                 .filter(|id| id.module() != symbol.id.module())
                 .map(SymbolId::as_str)
                 .collect::<Vec<_>>()
@@ -26,11 +28,10 @@ impl Builder<'_> {
 }
 
 /// The exported types of the project by name.
-pub(super) fn index(project: &Project) -> BTreeMap<String, Vec<SymbolId>> {
+pub fn names(project: &dyn Model) -> BTreeMap<String, Vec<SymbolId>> {
     let mut found: BTreeMap<String, Vec<SymbolId>> = BTreeMap::new();
     let types = project
-        .symbols
-        .iter()
+        .symbols()
         .filter(|s| exported_type(s))
         .filter(|s| !project.in_test(&s.id))
         .filter(|s| project.file(&s.file).is_some_and(|f| !f.generated));

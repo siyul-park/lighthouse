@@ -1,3 +1,4 @@
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     path::{Path, PathBuf},
@@ -228,7 +229,6 @@ pub(crate) fn apply<'g>(found: Vec<Diagnostic>, project: &Project, gate: &'g Gat
 fn locate<'a>(project: &'a Project, file: &Path) -> Vec<Located<'a>> {
     project
         .comments_in(file)
-        .iter()
         .flat_map(|comment| {
             annotation::directives(&comment.text)
                 .into_iter()
@@ -443,7 +443,7 @@ fn annotation_span(at: &Located) -> Span {
 /// The line of the first thing in a file that is neither blank nor comment: a
 /// `lighthouse-disable` above it is at the top of the file. Imports are code.
 fn first_code_line(project: &Project, file: &Path, text: &str) -> u32 {
-    let comments = project.comments_in(file);
+    let comments: Vec<_> = project.comments_in(file).collect();
     let covered = |line: u32, content: &str| {
         comments.iter().any(|c| {
             let (start, end) = (c.span.start, c.span.end);

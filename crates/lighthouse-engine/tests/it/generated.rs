@@ -1,6 +1,7 @@
 //! Generated code, told apart by the host from the head comments the language
 //! plugins report: the fixtures the plugins' conformance suites keep.
 
+use lighthouse_model::ucm::Model;
 use std::{fs, path::Path};
 
 use lighthouse_engine::Engine;

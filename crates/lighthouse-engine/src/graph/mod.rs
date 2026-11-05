@@ -11,7 +11,9 @@ pub(crate) mod units;
 
 pub(crate) use detect::Detected;
 pub use keys::{FileKey, Keys};
-pub(crate) use model::{HOST, Host, MARKERS, PATHS, PROJECT};
+pub use model::{
+    EDGES, HOST, Host, INCOMING, MARKERS, OUTLINE, PATHS, PROJECT, RESOLVED, SITES, SLICE, SYMBOLS,
+};
 pub(crate) use units::{
     API, CLAIMED, EVERY, FRAGMENT, PAYLOAD, PROVIDER, Payload, Provider, REGIONS, Read, Stored,
     UNIT, UNITS,

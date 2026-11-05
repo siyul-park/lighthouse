@@ -4,6 +4,7 @@
 //! whole lines, so that indentation and the end of a line belong to the lines
 //! they are on.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,

@@ -9,6 +9,7 @@ use cel::{
         operators::{INDEX, OPT_INDEX, OPT_SELECT},
     },
 };
+use lighthouse_plugin::Reads;
 use lighthouse_spec::{Env, TemplatePart};
 
 /// The variables of an expression that are options, never nodes: a dynamic
@@ -74,6 +75,34 @@ impl Needs {
             needs.read(program);
         }
         needs
+    }
+
+    /// What a fact is built with: the fields these needs and `other` ask for.
+    pub(crate) fn reading_fields(reads: &Reads) -> Self {
+        Self {
+            fields: reads.fields.clone(),
+            related: reads.related.clone(),
+            dynamic: reads.dynamic,
+            related_dynamic: reads.related_dynamic,
+            ..Self::default()
+        }
+    }
+
+    /// These needs without the field `name`, unless any field may be read.
+    pub(crate) fn without(mut self, name: &str) -> Self {
+        self.fields.remove(name);
+        self.related.remove(name);
+        self
+    }
+
+    /// The fields of values these needs read.
+    pub(crate) fn reads(&self) -> Reads {
+        Reads {
+            fields: self.fields.clone(),
+            related: self.related.clone(),
+            dynamic: self.dynamic,
+            related_dynamic: self.related_dynamic,
+        }
     }
 
     /// Whether some expression reads the field `name` of a value (`n.callers`,

@@ -3,6 +3,7 @@
 //! it is bound. An import of a declaration's body (a function-local one) is no
 //! module-level import.
 
+use lighthouse_model::ucm::Model;
 use std::{ops::Range, path::Path};
 
 use lighthouse_model::{

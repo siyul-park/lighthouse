@@ -1,13 +1,14 @@
 use std::{
     cmp::Reverse,
     collections::{BTreeMap, BTreeSet},
+    sync::Arc,
 };
 
 use lighthouse_model::GeneratedSpec;
 
 use crate::{
     Analyzer, CelCatalog, CelLibrary, Error, Fixer, LanguageManifest, LanguageProvider,
-    ModelClient, Plugin, PluginManifest, Rule,
+    ModelClient, Plugin, PluginManifest, Pulling, Rule,
 };
 
 /// The analyzers of one dependency walk, dependencies first.
@@ -37,6 +38,7 @@ pub struct Registry {
     fixers: BTreeMap<String, Box<dyn Fixer>>,
     models: BTreeMap<String, Box<dyn ModelClient>>,
     libraries: Vec<Box<dyn CelLibrary>>,
+    pulling: Option<Arc<dyn Pulling>>,
 }
 
 impl Registry {
@@ -54,6 +56,7 @@ impl Registry {
         let libraries = plugin.cel_libraries();
         let ignores = plugin.ignores();
         let generated = plugin.generated();
+        let pulling = plugin.pulling();
         let id = manifest.id.as_str();
         let own = |model: &str| model == id;
         let qualified = |item: &str| plugin_of(item) == id && item.contains('/');
@@ -121,7 +124,13 @@ impl Registry {
         self.models
             .extend(models.into_iter().map(|m| (m.manifest().id.clone(), m)));
         self.libraries.extend(libraries);
+        self.pulling = pulling.or(self.pulling.take());
         Ok(())
+    }
+
+    /// What the facts of the rules are pulled with, when a plugin supplies it.
+    pub fn pulling(&self) -> Option<&dyn Pulling> {
+        self.pulling.as_deref()
     }
 
     /// The `ignores` of each registered plugin, by plugin id, in the order

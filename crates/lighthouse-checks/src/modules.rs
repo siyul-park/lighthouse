@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::ucm::{EdgeKind, Node, Project, Symbol, SymbolKind, Target};
+use lighthouse_model::ucm::{EdgeKind, Model, Node, Symbol, SymbolKind, Target};
 
 /// A module that declares a symbol.
 pub(crate) struct Declared<'p> {
@@ -31,10 +31,10 @@ pub(crate) struct Declared<'p> {
 }
 
 /// Every module that declares a symbol, by path, in one pass over the symbols.
-pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
+pub(crate) fn index(project: &dyn Model) -> BTreeMap<&str, Declared<'_>> {
     let mut modules: BTreeMap<&str, Declared> = BTreeMap::new();
     let mut extents: BTreeMap<(&str, &Path), (u32, u32)> = BTreeMap::new();
-    for symbol in &project.symbols {
+    for symbol in project.symbols() {
         let path = symbol.id.module();
         let span = symbol.extent.unwrap_or(symbol.span);
         let (first, last) = extents
@@ -65,7 +65,7 @@ pub(crate) fn index(project: &Project) -> BTreeMap<&str, Declared<'_>> {
             module.lines += last - first + 1;
         }
     }
-    for edge in project.edges.iter().filter(|e| e.kind == EdgeKind::Imports) {
+    for edge in project.edges().filter(|e| e.kind == EdgeKind::Imports) {
         let (Node::Module(from), Target::Resolved(Node::Module(to))) = (&edge.from, &edge.to)
         else {
             continue;

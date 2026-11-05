@@ -1,6 +1,7 @@
 //! Renames: a symbol and every site that refers to it, when the names the
 //! edit would make cannot capture or shadow another.
 
+use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,

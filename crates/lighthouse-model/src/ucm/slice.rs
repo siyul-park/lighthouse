@@ -263,6 +263,8 @@ pub struct Tie {
     pub members: Vec<SymbolId>,
     /// The symbols it calls, which what other files repeat decides.
     pub callees: Vec<SymbolId>,
+    /// The symbols it calls or references through a resolved edge.
+    pub uses: Vec<SymbolId>,
     /// Every edge that ends at it.
     pub edges: Vec<(EdgeKind, Resolution, Node)>,
 }
@@ -286,6 +288,7 @@ impl Incoming {
                 implementers: of(&reverse.implementers),
                 members: of(&reverse.members),
                 callees: of(&reverse.callees),
+                uses: of(&reverse.uses),
                 edges: reverse
                     .incoming
                     .get(&symbol.id)

@@ -9,6 +9,7 @@ pub mod place;
 mod tally;
 pub mod words;
 
+use lighthouse_model::ucm::Model;
 use std::path::{Path, PathBuf};
 
 use lighthouse_model::{ColumnUnit, Diagnostic, Position, Span, Suppression, byte_position};
