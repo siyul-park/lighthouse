@@ -21,8 +21,8 @@ use lighthouse_model::{
     ucm::{Applicability, File, Project},
 };
 use lighthouse_plugin::{
-    Context, EmbeddedFile, Facts, LanguageProvider, Memo, Notices, Registry, Rule, Source,
-    Workspace,
+    Annotations, Context, EmbeddedFile, Facts, LanguageProvider, Memo, Notices, Registry, Rule,
+    Source, Workspace,
 };
 use lighthouse_spec::{
     Catalog, Config, GlobSet, Held, Models as BoundModels, ProjectFiles, Projects, Routing,
@@ -182,6 +182,7 @@ struct Scene<'a> {
     project: &'a Project,
     facts: &'a Facts,
     memo: &'a Memo,
+    annotations: &'a Annotations,
     /// Where findings of an earlier run are looked up and kept, if the run has
     /// a cache.
     cache: Option<&'a RunCache<'a>>,
@@ -206,6 +207,7 @@ impl<'a> Scene<'a> {
             facts: self.facts,
             trusted,
             memo: self.memo,
+            annotations: self.annotations,
             notices,
             applies,
             models: self.models,

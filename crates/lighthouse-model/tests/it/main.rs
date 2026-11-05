@@ -24,3 +24,4 @@ mod symbol;
 mod text;
 mod time;
 mod vars;
+mod view;

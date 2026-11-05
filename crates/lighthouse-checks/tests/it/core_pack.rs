@@ -50,6 +50,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         facts: &facts,
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
+        annotations: &lighthouse_plugin::Annotations::default(),
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,

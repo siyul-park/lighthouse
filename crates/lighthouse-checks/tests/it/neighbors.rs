@@ -48,6 +48,7 @@ fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Context)
         facts: &facts,
         trusted: false,
         memo: &memo,
+        annotations: &lighthouse_plugin::Annotations::default(),
         notices: &notices,
         applies: Applicability::default(),
         models: &lighthouse_plugin::NoModels,

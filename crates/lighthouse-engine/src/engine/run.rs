@@ -37,6 +37,7 @@ impl Engine {
         });
         run.timings.hashing = started.elapsed();
         let memo = Memo::default();
+        let annotations = Annotations::default();
         // The rules read what the run stands in place of files, as the
         // providers do.
         let workspace = Workspace {
@@ -64,6 +65,7 @@ impl Engine {
             project: &project,
             facts: &facts,
             memo: &memo,
+            annotations: &annotations,
             cache: run_cache.as_ref(),
             models: &models,
             queries: queries.as_ref(),

@@ -9,10 +9,8 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     rc::Rc,
-    sync::Arc,
 };
 
-use crate::metrics::{MEASURES, Measures};
 use lighthouse_model::{
     Position, Span,
     ucm::{Comment, FunctionSummary, LoadNeed, Model, Symbol, SymbolId, SymbolKind, Visibility},
@@ -21,7 +19,6 @@ use lighthouse_plugin::{Annotations, Context, Error, Reads, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    eval::{Var, with_entries, with_nested},
     fact::{FUNCTION, Fact, TEST},
     facts,
     indexes::Indexes,
@@ -59,9 +56,8 @@ pub(crate) struct Builder<'a> {
     needs: &'a Needs,
     language: String,
     naming: Tests<'a>,
-    measures: Option<BTreeMap<SymbolId, Measures>>,
     indexes: &'a dyn Indexes,
-    annotations: Arc<Annotations>,
+    annotations: Option<&'a Annotations>,
     declared: RefCell<BTreeMap<PathBuf, Rc<Vec<Vec<&'a Symbol>>>>>,
     related: RefCell<BTreeMap<SymbolId, Value>>,
     /// What each file needs of its own declarations as it loads, found once.
@@ -86,11 +82,6 @@ impl<'a> Builder<'a> {
         indexes: &'a dyn Indexes,
         needs: &'a Needs,
     ) -> Result<Self, Error> {
-        let measures = if needs.field("metrics") {
-            Some(ctx.fact(MEASURES)?)
-        } else {
-            None
-        };
         let language = ctx
             .file
             .map_or_else(String::new, |(file, _)| file.analysis_language().to_owned());
@@ -100,8 +91,7 @@ impl<'a> Builder<'a> {
             ws: ctx.workspace,
         };
         Ok(Self {
-            measures,
-            annotations: ctx.memo.slot(),
+            annotations: Some(ctx.annotations),
             ..Self::over(over, needs, &language)
         })
     }
@@ -121,29 +111,12 @@ impl<'a> Builder<'a> {
             needs,
             language: language.to_owned(),
             naming: Tests::new(ws.test_naming(language), project, indexes),
-            measures: None,
             indexes,
-            annotations: Arc::default(),
+            annotations: None,
             declared: RefCell::default(),
             related: RefCell::default(),
             loads: RefCell::default(),
             related_needs: needs.of_related(),
-        }
-    }
-
-    /// `fact`, the variable of the subject `symbol`, with what only this run
-    /// knows of it: the metrics the analyzers measured.
-    pub(crate) fn measured(&self, symbol: &Symbol, fact: Var) -> Var {
-        if !self.needs.field("metrics") {
-            return fact;
-        }
-        let summary = self.project.function(&symbol.id);
-        let extra = Map::from_iter([("metrics".to_owned(), self.metrics(symbol, summary))]);
-        let fact = with_entries(fact.as_ref(), &extra);
-        if self.needs.field("func") {
-            with_nested(fact, "func", &extra)
-        } else {
-            fact
         }
     }
 
@@ -313,7 +286,7 @@ impl<'a> Builder<'a> {
     /// What the suppression directives of the file say, once the engine has
     /// judged them; `None` before.
     pub(crate) fn annotations(&self, file: &Path) -> Option<Vec<Value>> {
-        self.annotations.of(file)
+        self.annotations?.of(file)
     }
 
     /// A file with the facts about its text and its symbols.
@@ -652,8 +625,8 @@ impl<'a> Builder<'a> {
     /// What is measured of a function, the numbers of its signature among them;
     /// `measured` says whether the analyzer measured it.
     fn metrics(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Value {
-        let found = self.measures.as_ref().and_then(|m| m.get(&symbol.id));
-        let measures = found.copied().unwrap_or_default();
+        let found = self.indexes.measured(symbol);
+        let measures = found.unwrap_or_default();
         json!({
             "lines": measures.lines,
             "statements": measures.statements,
@@ -756,15 +729,14 @@ impl<'a> Builder<'a> {
 
 /// The facts of `symbol` as a subject of the sort `kind` (`symbol`,
 /// `function` or `test`) for the fields `reads` asks for; `None` when it has
-/// none of that sort. What only a run knows (the metrics the analyzers
-/// measured) is left out.
+/// none of that sort.
 pub fn subject(
     kind: &str,
     over: Over<'_>,
     reads: &Reads,
     symbol: &Symbol,
 ) -> Result<Option<Fact>, Error> {
-    let needs = Needs::reading_fields(reads).without("metrics");
+    let needs = Needs::reading_fields(reads);
     let language = over
         .model
         .file(&symbol.file)

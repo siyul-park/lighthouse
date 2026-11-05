@@ -12,7 +12,7 @@ use std::{
 
 use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use lighthouse_model::ucm::{Held, Model, SymbolId, View};
-use lighthouse_plugin::{Pulling, Queries, Reads, Rule, TestNaming, Workspace, reads_of};
+use lighthouse_plugin::{ANALYSIS, Pulling, Queries, Reads, Rule, TestNaming, Workspace, reads_of};
 use serde::{Deserialize, Serialize};
 
 use crate::layout::contains;
@@ -34,7 +34,7 @@ use crate::{
         CREDITED, CYCLES, IMPORTS, NAMES, OWNED, PARENTS, Queried, REACH, Reached, SPLIT,
         STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
     },
-    metrics::propagation,
+    metrics::{MEASURES, Measures, propagation},
     naming::{Credited, credited},
 };
 
@@ -145,6 +145,16 @@ impl Queries for Pull<'_> {
                 .query(&SUBJECT, &(sort.to_owned(), id.to_owned()))
                 .map_err(broken)?;
             return Ok(built);
+        }
+        if kind == MEASURES {
+            let (_, file) = subject_of(key);
+            let json = self
+                .graph
+                .query(&ANALYSIS, &(MEASURES.to_owned(), file.to_owned()))
+                .map_err(broken)?;
+            let measures: BTreeMap<SymbolId, Measures> = serde_json::from_str(&json)
+                .map_err(|e| lighthouse_plugin::Error::Failed(e.to_string()))?;
+            return Ok(Arc::new(measures));
         }
         let entry = self
             .graph

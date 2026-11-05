@@ -88,13 +88,6 @@ impl Needs {
         }
     }
 
-    /// These needs without the field `name`, unless any field may be read.
-    pub(crate) fn without(mut self, name: &str) -> Self {
-        self.fields.remove(name);
-        self.related.remove(name);
-        self
-    }
-
     /// The fields of values these needs read.
     pub(crate) fn reads(&self) -> Reads {
         Reads {

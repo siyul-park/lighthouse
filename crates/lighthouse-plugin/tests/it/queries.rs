@@ -140,3 +140,21 @@ fn registry_pulling() {
 
     assert!(registry.pulling().is_some());
 }
+
+#[test]
+fn analyzer_context_fact() {
+    let mut facts = lighthouse_plugin::Facts::new();
+    facts.insert("a/count", String::new(), serde_json::json!(3));
+    let model = lighthouse_model::ucm::Project::default();
+    let ctx = lighthouse_plugin::AnalyzerContext {
+        model: &model,
+        file: None,
+        facts: &facts,
+    };
+
+    assert_eq!(ctx.fact::<u32>("a/count").unwrap(), 3);
+    assert!(matches!(
+        ctx.fact::<u32>("a/missing"),
+        Err(Error::MissingFact(_))
+    ));
+}

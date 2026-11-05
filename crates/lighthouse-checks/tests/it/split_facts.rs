@@ -33,6 +33,7 @@ fn fact(project: &Project, name: &str) -> Value {
         facts: &facts,
         trusted: false,
         memo: &memo,
+        annotations: &lighthouse_plugin::Annotations::default(),
         notices: &notices,
         applies: Applicability::default(),
         models: &lighthouse_plugin::NoModels,

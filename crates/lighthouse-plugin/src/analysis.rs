@@ -20,6 +20,10 @@ use serde_json::Value;
 
 use crate::{Analyzer, Facts};
 
+/// The fact of the analyzer `id` for a file, or for the project when the key
+/// is empty, as JSON.
+pub static ANALYSIS: Query<(String, String), String> = Query::new("analysis", analysis).transient();
+
 /// What an analyzer reads: the model through the graph's view, the file it is
 /// run for with its text, and the facts of the analyzers it requires.
 pub struct AnalyzerContext<'a> {
@@ -45,10 +49,6 @@ impl AnalyzerContext<'_> {
     }
 }
 
-/// How the text of a file is read through the graph, recording the file's
-/// content as a dependency; `None` for a file that is no text.
-pub type TextOf = fn(&Graph, &str) -> Result<Arc<Option<String>>, Error>;
-
 /// The analyzers of a run by id, and how they read the text of a file: the
 /// data a graph that runs analyzers is opened with.
 pub struct Analyzers {
@@ -69,9 +69,9 @@ impl Analyzers {
     }
 }
 
-/// The fact of the analyzer `id` for a file, or for the project when the key
-/// is empty, as JSON.
-pub static ANALYSIS: Query<(String, String), String> = Query::new("analysis", analysis).transient();
+/// How the text of a file is read through the graph, recording the file's
+/// content as a dependency; `None` for a file that is no text.
+pub type TextOf = fn(&Graph, &str) -> Result<Arc<Option<String>>, Error>;
 
 fn analysis(graph: &Graph, (id, file): &(String, String)) -> Result<String, Error> {
     let analyzers = graph
@@ -85,10 +85,10 @@ fn analysis(graph: &Graph, (id, file): &(String, String)) -> Result<String, Erro
         "" => Arc::new(None),
         file => (analyzers.text)(graph, file)?,
     };
-    let focus = match (view.file(Path::new(file)), text.as_deref()) {
-        (Some(file), Some(text)) => Some((file, text)),
-        _ if file.is_empty() => None,
-        _ => return Ok(Value::Null.to_string()),
+    let focus = match view.file(Path::new(file)) {
+        Some(file) => Some((file, text.as_deref().unwrap_or_default())),
+        None if file.is_empty() => None,
+        None => return Ok(Value::Null.to_string()),
     };
     let fact = analyzer
         .run(&AnalyzerContext {

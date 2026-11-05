@@ -112,6 +112,9 @@ pub struct Context<'a> {
     pub trusted: bool,
     /// Values the rules of this run share, so that each is computed once.
     pub memo: &'a Memo,
+    /// What the suppression directives of the files say, once the engine has
+    /// judged them; read by the rules that run after suppression.
+    pub annotations: &'a Annotations,
     /// Where the rule says what it left out or could not read; drained after
     /// each rule into the notices of the run.
     pub notices: &'a Notices,

@@ -130,19 +130,23 @@ impl Analyzer for Metrics {
         let measures: BTreeMap<&SymbolId, Measures> = ctx
             .model
             .symbols_in(&file.path)
-            .filter(|symbol| {
-                matches!(
-                    symbol.kind,
-                    SymbolKind::Function | SymbolKind::Method | SymbolKind::Var
-                )
-            })
-            .filter_map(|symbol| {
-                let summary = ctx.model.function(&symbol.id)?;
-                Some((&symbol.id, Measures::of(ctx.model, symbol, summary)))
-            })
+            .filter_map(|symbol| Some((&symbol.id, measure(ctx.model, symbol)?)))
             .collect();
         serde_json::to_value(measures).map_err(|e| Error::Failed(e.to_string()))
     }
+}
+
+/// What is measured of `symbol`: a function, method or variable that has a
+/// summary; `None` for any other.
+pub(crate) fn measure(model: &dyn Model, symbol: &Symbol) -> Option<Measures> {
+    if !matches!(
+        symbol.kind,
+        SymbolKind::Function | SymbolKind::Method | SymbolKind::Var
+    ) {
+        return None;
+    }
+    let summary = model.function(&symbol.id)?;
+    Some(Measures::of(model, symbol, summary))
 }
 
 /// A body that is one multi-way branch with a single return per arm: a table

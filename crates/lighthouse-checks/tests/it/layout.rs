@@ -64,6 +64,7 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
         facts: &facts,
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
+        annotations: &lighthouse_plugin::Annotations::default(),
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,

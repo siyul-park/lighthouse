@@ -390,3 +390,15 @@ fn generated_is_that_of_each_registered_plugin() {
     assert_eq!(found[0].1.markers, ["@generated"]);
     assert_eq!(found[0].1.files, ["*.gen.go"]);
 }
+
+#[test]
+fn registry_analyzers() {
+    let mut registry = Registry::default();
+    registry
+        .register(&graph(&[("t/a", &[]), ("t/b", &["t/a"])]))
+        .unwrap();
+
+    let analyzers = registry.analyzers();
+
+    assert_eq!(analyzers.keys().collect::<Vec<_>>(), ["t/a", "t/b"]);
+}

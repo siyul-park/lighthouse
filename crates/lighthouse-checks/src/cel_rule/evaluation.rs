@@ -81,7 +81,7 @@ impl Evaluation<'_> {
             .pull(FACT, &subject_key(kind, symbol.id.as_str()))?
             .downcast::<Built>()
             .map_err(|_| PluginError::Failed(format!("`{FACT}` has an unexpected value")))?;
-        Ok(built.var().map(|var| self.builder.measured(symbol, var)))
+        Ok(built.var())
     }
 
     /// One finding per event of the function, at the event.

@@ -447,7 +447,7 @@ impl Engine {
         if !scene.rules.iter().any(|r| r.after_suppression()) {
             return Ok(Vec::new());
         }
-        let annotations = scene.memo.slot::<lighthouse_plugin::Annotations>();
+        let annotations = scene.annotations;
         let mut with_directives = BTreeSet::new();
         for input in scene.inputs {
             let path = &input.file.path;

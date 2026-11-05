@@ -1,14 +1,11 @@
 //! Evaluating the CEL of a check: compiled programs, message templates, and
 //! the frame in which one selected value is judged.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use cel::{
     Context, Program,
-    common::{
-        types::{CelMap, CelMapKey, CelNull, CelString},
-        value::Val,
-    },
+    common::{types::CelNull, value::Val},
     context::VariableResolver,
 };
 use lighthouse_plugin::Error as PluginError;
@@ -231,53 +228,4 @@ pub(crate) fn cel_value(value: &Value) -> cel::Value {
 /// A JSON value as a variable of the CEL runtime.
 pub(crate) fn cel_fact(value: &Value) -> Var {
     Var::try_from(cel_value(value)).unwrap_or_else(|_| Box::new(CelNull))
-}
-
-/// A copy of the map `base` with the entries of `extra` set over it; a copy
-/// of `base` itself when `base` is no map or `extra` is empty.
-pub(crate) fn with_entries(base: &(dyn Val + 'static), extra: &Map<String, Value>) -> Var {
-    let Some(map) = base.downcast_ref::<CelMap>().filter(|_| !extra.is_empty()) else {
-        return base.clone_as_boxed();
-    };
-    let mut entries: HashMap<CelMapKey, Var> = map
-        .inner()
-        .iter()
-        .map(|(key, value)| (key.clone(), value.clone_as_boxed()))
-        .collect();
-    for (key, value) in extra {
-        entries.insert(
-            CelMapKey::String(CelString::from(key.clone())),
-            cel_fact(value),
-        );
-    }
-    Box::new(CelMap::from(entries))
-}
-
-/// A copy of the map `base` with the entry `name` set to `value`; `base`
-/// itself when it is no map.
-pub(crate) fn with_fact(base: Var, name: &str, value: Var) -> Var {
-    let Some(map) = base.downcast_ref::<CelMap>() else {
-        return base;
-    };
-    let mut entries: HashMap<CelMapKey, Var> = map
-        .inner()
-        .iter()
-        .map(|(key, value)| (key.clone(), value.clone_as_boxed()))
-        .collect();
-    entries.insert(CelMapKey::String(CelString::from(name.to_owned())), value);
-    Box::new(CelMap::from(entries))
-}
-
-/// A copy of the map `base` with the entries of `extra` set over its entry
-/// `name`; `base` itself when it has no map under that name.
-pub(crate) fn with_nested(base: Var, name: &str, extra: &Map<String, Value>) -> Var {
-    let nested = base.downcast_ref::<CelMap>().and_then(|map| {
-        map.inner()
-            .get(&CelMapKey::String(CelString::from(name.to_owned())))
-            .map(|inner| with_entries(inner.as_ref(), extra))
-    });
-    match nested {
-        Some(nested) => with_fact(base, name, nested),
-        None => base,
-    }
 }

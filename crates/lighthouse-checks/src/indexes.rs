@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, Mutex, OnceLock, PoisonError},
 };
 
-use lighthouse_model::ucm::{Model, SymbolId};
+use lighthouse_model::ucm::{Model, Symbol, SymbolId};
 use lighthouse_plugin::{Error, Queries, Workspace};
 use serde::{Deserialize, Serialize};
 
@@ -26,9 +26,12 @@ use crate::{
         split::splits,
         tested,
     },
-    fact::Fact,
+    fact::{Fact, subject_key},
     layout::contains,
-    metrics::propagation::{self, Stability, System},
+    metrics::{
+        MEASURES, Measures, measure,
+        propagation::{self, Stability, System},
+    },
     naming::{Credited, credited},
 };
 
@@ -92,6 +95,9 @@ pub trait Indexes {
     fn tested(&self, module: &str) -> bool;
     /// The tests of `modules` by the part of their names after `prefix`.
     fn credited(&self, prefix: &str, modules: &[String]) -> Arc<Credited>;
+    /// What is measured of a function, method or variable; `None` for a
+    /// symbol the metrics analyzer does not measure.
+    fn measured(&self, symbol: &Symbol) -> Option<Measures>;
     /// What went wrong in answering, for a source that can fail.
     fn failure(&self) -> Option<Error> {
         None
@@ -138,6 +144,10 @@ impl<'a> Computed<'a> {
 }
 
 impl Indexes for Computed<'_> {
+    fn measured(&self, symbol: &Symbol) -> Option<Measures> {
+        measure(self.model, symbol)
+    }
+
     fn takers(&self, ty: &str) -> Vec<SymbolId> {
         let index = self.takers.get_or_init(|| takers(self.model));
         index.takers.get(ty).cloned().unwrap_or_default()
@@ -249,6 +259,28 @@ impl<'a> Queried<'a> {
 }
 
 impl Indexes for Queried<'_> {
+    fn measured(&self, symbol: &Symbol) -> Option<Measures> {
+        let file = symbol.file.to_string_lossy();
+        let found = self
+            .queries
+            .pull(MEASURES, &subject_key(MEASURES, &file))
+            .and_then(|value| {
+                value
+                    .downcast::<BTreeMap<SymbolId, Measures>>()
+                    .map_err(|_| Error::Failed(format!("`{MEASURES}` has an unexpected value")))
+            });
+        match found {
+            Ok(measures) => measures.get(&symbol.id).copied(),
+            Err(error) => {
+                self.failed
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .get_or_insert(error);
+                None
+            }
+        }
+    }
+
     fn takers(&self, ty: &str) -> Vec<SymbolId> {
         self.pull(TAKERS, ty)
     }

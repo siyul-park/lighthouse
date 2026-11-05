@@ -18,7 +18,11 @@ use lighthouse_model::{
         Symbol, SymbolId, SymbolKind, TestCase, TestStyle, Visibility,
     },
 };
-use lighthouse_plugin::{Queries, Reads, Workspace};
+use std::sync::Arc;
+
+use lighthouse_plugin::{ANALYSIS, Analyzers, Plugin, Queries, Reads, Workspace};
+
+use crate::metrics::{MEASURES, Metrics};
 
 struct Rng(u64);
 
@@ -254,6 +258,16 @@ fn everything() -> Reads {
     }
 }
 
+/// The analyzers of the graph: the metrics, over files that have no text.
+fn analyzers() -> Arc<Analyzers> {
+    let by_id = Metrics
+        .analyzers()
+        .into_iter()
+        .map(|analyzer| (analyzer.manifest().id.clone(), Arc::from(analyzer)))
+        .collect();
+    Arc::new(Analyzers::new(by_id, |_, _| Ok(Arc::new(None))))
+}
+
 fn fragments(specs: &[Spec]) -> Vec<Fragment> {
     specs
         .iter()
@@ -278,7 +292,7 @@ fn the_fact_of_a_subject_is_what_the_builder_makes_of_a_merge_after_every_edit()
             .collect();
         specs[0].calls.push(("x".to_owned(), "m1::y".to_owned()));
         specs[2].calls.push(("y".to_owned(), "x".to_owned()));
-        let mut graph = Graph::in_memory(Options::default()).unwrap();
+        let mut graph = Graph::in_memory(Options::default().data(analyzers())).unwrap();
         for kind in [SYMBOL, FUNCTION, TEST] {
             graph
                 .set_input(&READS, &kind.to_owned(), everything(), Durability::Stable)
@@ -363,4 +377,38 @@ fn a_rule_sees_the_same_fields_when_another_rule_asks_for_more() {
     }
 
     assert!(seen > 0);
+}
+
+#[test]
+fn an_edit_runs_the_analysis_of_the_file_it_changed_and_of_no_other() {
+    let mut specs = vec![spec("m0", &["x"]), spec("m1", &["y"])];
+    let mut graph = Graph::in_memory(Options::default().data(analyzers())).unwrap();
+    let pull = |graph: &Graph| -> Vec<String> {
+        (0..2)
+            .map(|at| {
+                let key = (MEASURES.to_owned(), specs_path(at));
+                (*graph.query(&ANALYSIS, &key).unwrap()).clone()
+            })
+            .collect()
+    };
+    Host::set_units(&mut graph, &fragments(&specs)).unwrap();
+    let before = pull(&graph);
+    graph.take_executed();
+
+    specs[1].shift = 3;
+    Host::set_units(&mut graph, &fragments(&specs)).unwrap();
+    let after = pull(&graph);
+    let ran = graph.take_executed();
+
+    assert_eq!(before[0], after[0]);
+    assert!(ran.iter().any(|label| label.contains("p1.rs")), "{ran:?}");
+    assert!(
+        !ran.iter()
+            .any(|label| label.contains("analysis") && label.contains("p0.rs")),
+        "{ran:?}"
+    );
+}
+
+fn specs_path(at: usize) -> String {
+    format!("p{at}.rs")
 }
