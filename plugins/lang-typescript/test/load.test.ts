@@ -20,11 +20,12 @@ function loads(text: string): string[] {
   const result = new Provider("lang-typescript", "0").index({
     project: { root },
     language: "typescript",
-    inputs: [{ kind: "file", file: { path: "a.test.ts", hash: "x" } }],
+    units: [{ id: "a.test.ts", key: "", files: [{ path: "a.test.ts", hash: "x" }], imports: {} }],
+    files: ["a.test.ts"],
     context: { options: {} },
   });
   const name = (id: string) => id.split("::").slice(1).join("::").replace(/#.*/, "");
-  return (result.fragments[0]!.edges ?? [])
+  return (result.units[0]!.fragments[0]!.edges ?? [])
     .filter((edge) => edge.when === "load")
     .map((edge) => `${"symbol" in edge.from ? name(edge.from.symbol) : "<module>"} -> ${name(edge.to)}`)
     .sort();

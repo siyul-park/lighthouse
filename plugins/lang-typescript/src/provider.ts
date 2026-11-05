@@ -1,10 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import type * as sdk from "./sdk/server.ts";
-import { index } from "./index.ts";
+import { digest } from "./api.ts";
+import { type Found, index } from "./index.ts";
 import { isDeclarationFile, slashed } from "./project/paths.ts";
 import { type Snippet, planSnippets } from "./regions.ts";
-import type { EmbeddedFile, Fragment, IndexParams, IndexResult, LanguageManifest } from "./sdk/wire.ts";
+import type {
+  EmbeddedFile,
+  Fragment,
+  Incomplete,
+  IndexParams,
+  IndexResult,
+  LanguageManifest,
+  UnitRef,
+  UnitResult,
+} from "./sdk/wire.ts";
 
 const LANGUAGE = "typescript";
 const SOURCE_GLOB = "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}";
@@ -31,32 +41,29 @@ export class Provider implements sdk.Provider {
         },
         capabilities: ["semantic-edges", "extent", "reference-sites", "overlays"],
         ordered_declarations: true,
+        units: { by: "file", settings: ["tsconfig.json", "jsconfig.json", "package.json"] },
       },
     ];
   }
 
   /**
-   * Analyzes every requested file, and the fences of host files, which go
-   * through the program of their project with the files: N files cost one load.
-   * Failures are reported as incomplete entries; a bad request never ends the process.
+   * Analyzes the files of the units asked for, and the fences of host files,
+   * which go through the program of their project with the files: N files cost
+   * one load. Failures are reported as incomplete entries; a bad request never
+   * ends the process.
    */
   index(params: IndexParams): IndexResult {
     const unknown = unknownOption(params.context?.options?.[LANGUAGE]);
-    if (unknown !== undefined) return { fragments: [], sources: [], notices: [], incomplete: [{ reason: unknown }] };
+    if (unknown !== undefined) return { units: [], notices: [], incomplete: [{ reason: unknown }] };
     const run = new Indexing(params);
-    const files: string[] = [];
-    const hosts: EmbeddedFile[] = [];
-    for (const input of params.inputs) {
-      if (input.kind === "file") files.push(input.file.path);
-      else hosts.push(input.regions);
-    }
+    const files = params.units.flatMap((unit) => (unit.files ?? []).map((file) => file.path));
+    const hosts: EmbeddedFile[] = params.units.flatMap((unit) => unit.regions ?? []);
     const requested = run.admit(files);
     const snippets = planSnippets(hosts);
-    const { root, overlays, result } = run;
-    const regionFragments = index({ root, overlays, requested, listed: files, snippets, result });
-    run.merge(hosts, snippets, regionFragments);
-    result.fragments.sort((a, b) => (a.file.path < b.file.path ? -1 : a.file.path > b.file.path ? 1 : 0));
-    return result;
+    const { root, overlays, found } = run;
+    const regionFragments = index({ root, overlays, requested, listed: params.files ?? files, snippets, result: found });
+    const fenced = run.merge(hosts, snippets, regionFragments);
+    return { units: params.units.map((unit) => run.unit(unit, fenced)), notices: [], incomplete: [] };
   }
 }
 
@@ -64,7 +71,10 @@ export class Provider implements sdk.Provider {
 class Indexing {
   readonly root: string;
   readonly overlays = new Map<string, string>();
-  readonly result: Required<Omit<IndexResult, "timings">> = { fragments: [], sources: [], notices: [], incomplete: [] };
+  readonly found: Found = { fragments: [], notices: [], incomplete: [], shapes: new Map(), fenceImports: new Set() };
+  /** Files with no analysis to give: declarations, and files that cannot be read. */
+  private readonly bare: Fragment[] = [];
+  private readonly gaps: Incomplete[] = [];
 
   constructor(params: IndexParams) {
     this.root = fs.realpathSync(params.project.root);
@@ -78,9 +88,9 @@ class Indexing {
     for (const rel of new Set(files)) {
       const abs = slashed(path.join(this.root, rel));
       if (isDeclarationFile(rel)) {
-        this.result.fragments.push(emptyFragment(rel));
+        this.bare.push(emptyFragment(rel));
       } else if (!this.overlays.has(abs) && !fs.existsSync(abs)) {
-        this.result.incomplete.push({ path: rel, reason: "cannot read the file" });
+        this.gaps.push({ path: rel, reason: "cannot read the file" });
       } else {
         admitted.push(rel);
       }
@@ -88,13 +98,13 @@ class Indexing {
     return admitted;
   }
 
-  /** Adds the fragments of the fences to the fragment of their host file, one per host file. */
+  /** The fragments of the fences, merged into one per host file. */
   merge(
     hosts: readonly EmbeddedFile[],
     snippets: readonly Snippet[],
     regionFragments: ReadonlyMap<Snippet, Fragment>,
-  ): void {
-    for (const host of hosts) {
+  ): Fragment[] {
+    return hosts.map((host) => {
       const merged = emptyFragment(host.path);
       for (const snippet of snippets) {
         const fragment = snippet.host === host ? regionFragments.get(snippet) : undefined;
@@ -106,8 +116,39 @@ class Indexing {
         merged.tests!.push(...(fragment.tests ?? []));
         merged.comments!.push(...(fragment.comments ?? []));
       }
-      this.result.fragments.push(merged);
+      return merged;
+    });
+  }
+
+  /** The answer for one unit: its files, or the fences of its host files. */
+  unit(unit: UnitRef, fenced: readonly Fragment[]): UnitResult {
+    const files = unit.files ?? [];
+    const own = new Set(files.map((file) => file.path));
+    const paths = [...own];
+    const byPath = (a: { file: { path: string } }, b: { file: { path: string } }) =>
+      a.file.path < b.file.path ? -1 : a.file.path > b.file.path ? 1 : 0;
+    const regions = (unit.regions ?? []).map((host) => host.path);
+    const fragments = [
+      ...this.found.fragments.filter((fragment) => own.has(fragment.file.path)),
+      ...this.bare.filter((fragment) => own.has(fragment.file.path)),
+      ...fenced.filter((fragment) => regions.includes(fragment.file.path)),
+    ].sort(byPath);
+    const incomplete = [...this.found.incomplete, ...this.gaps].filter(
+      (gap) => gap.path != null && (own.has(gap.path) || regions.includes(gap.path)),
+    );
+    const shapes = paths.flatMap((path) => this.found.shapes.get(path) ?? []);
+    const notices = [...new Set(shapes.flatMap((shape) => shape.notices))];
+    const hashes = [...files.map((file) => file.hash), ...(unit.regions ?? []).map((host) => host.hash)];
+    const body = digest(...hashes);
+    const result: UnitResult = { id: unit.id, fragments, body, api: body, imports: [], notices, incomplete };
+    if (regions.length > 0) {
+      result.notices = [...notices, ...this.found.notices];
+      result.imports = [...this.found.fenceImports].sort();
+    } else if (shapes.length > 0) {
+      result.api = digest(...shapes.map((shape) => shape.api));
+      result.imports = [...new Set(shapes.flatMap((shape) => shape.imports))].filter((id) => id !== unit.id).sort();
     }
+    return result;
   }
 }
 

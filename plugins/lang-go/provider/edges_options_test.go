@@ -117,10 +117,11 @@ func configured(t *testing.T, files map[string]string) map[string]string {
 		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(body), 0o600))
 		refs = append(refs, sdk.FileRef{Path: name})
 	}
-	result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+	result, err := indexOf(provider.New("lang-go", "test"), sdk.IndexParams{
 		Project:  sdk.ProjectRef{Root: root},
 		Language: "go",
-		Inputs:   fileInputs(refs),
+		Units:    oneUnit(refs),
+		Files:    filesOf(refs),
 	})
 	require.NoError(t, err)
 	require.Empty(t, result.Incomplete)

@@ -10,7 +10,7 @@ use std::{
 use lighthouse_engine::Engine;
 use lighthouse_plugin::{
     Error as PluginError, Indexed, LanguageManifest, LanguageProvider, Plugin, PluginManifest,
-    Registry, Source, Workspace,
+    Registry, Unit, Workspace,
 };
 use lighthouse_spec::Config;
 
@@ -25,11 +25,13 @@ impl LanguageProvider for Recorder {
     fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
-        self.1
-            .lock()
-            .unwrap()
-            .extend(files.iter().map(|s| s.file.path.clone()));
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, PluginError> {
+        self.1.lock().unwrap().extend(
+            units
+                .iter()
+                .flat_map(|unit| unit.files)
+                .map(|s| s.file.path.clone()),
+        );
         Ok(Indexed::default())
     }
 }

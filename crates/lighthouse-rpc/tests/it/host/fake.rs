@@ -1,10 +1,13 @@
 //! A plugin that is a shell script: the fixture the host tests connect to.
 
-use std::{fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
+use std::{collections::BTreeMap, fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
 
 use lighthouse_engine::Engine;
-use lighthouse_model::{Incomplete, ucm::File};
-use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Registry, Source, Workspace};
+use lighthouse_model::{
+    Incomplete,
+    ucm::{File, Fragment},
+};
+use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Registry, Source, Unit, Workspace};
 use lighthouse_rpc::{Error, RpcPlugin, StartOptions};
 use lighthouse_spec::Config;
 use tempfile::TempDir;
@@ -24,8 +27,9 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
       body=$(dd bs=1 count="$n" 2>/dev/null)
     }
     languages='[{"id":"fake","globs":["**/*.fake"],"capabilities":["semantic-edges","future-thing"]}]'
-    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.6}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
+    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.7}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
     fragment='{"file":{"path":"a.fake"},"modules":[{"path":"m"}],"symbols":[],"edges":[],"functions":[],"tests":[]}'
+    unit() { send '{"jsonrpc":"2.0","id":'"$id"',"result":{"units":[{"id":"u","body":"b","api":"a",'"$1"'}]}}'; }
     recv
     case "$mode" in
       crash_at_init) echo "dying early" >&2; exit 3;;
@@ -40,27 +44,27 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
         *'"method":"exit"'*) echo exit >> "$log"; exit 0;;
         *'"method":"lighthouse/index"'*)
           printf '%s' "$body" > "$log.request"
-          id=$(printf '%s' "$body" | sed 's/.*"id":\([0-9]*\).*/\1/')
+          id=$(printf '%s' "$body" | sed 's/^{"jsonrpc":"2.0","id":\([0-9]*\),.*/\1/')
           case "$mode" in
-            ok) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":['"$fragment"'],"notices":["from plugin"],"incomplete":[{"path":"a.fake","reason":"half"}]}}';;
+            ok) unit '"fragments":['"$fragment"'],"notices":["from plugin"],"incomplete":[{"path":"a.fake","reason":"half"}]';;
             noisy)
               for i in $(seq 1 500); do echo "line $i" >&2; done
               head -c 100000 /dev/zero | tr '\0' 'x' >&2; echo >&2
               for i in $(seq 1 2000); do send '{"jsonrpc":"2.0","method":"note","params":{}}'; done
-              send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":[]}}';;
-            dupe) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":['"$fragment"','"$fragment"'],"incomplete":[{"reason":"x"},{"reason":"x"}]}}';;
-        foreign) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":[{"file":{"path":"a.fake"},"symbols":[{"id":"m::x#function","kind":"function","visibility":"public","file":"b.fake","span":{"start":{"line":1,"col":1},"end":{"line":1,"col":2}},"name":"x"}]}]}}';;
-        stray) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":[{"file":{"path":"a.fake"},"modules":[{"path":"m"}],"edges":[{"kind":"calls","from":{"symbol":"m::y#function"},"to":"m::z","resolution":"semantic"}]}]}}';;
+              unit '"fragments":[]';;
+            dupe) unit '"fragments":['"$fragment"','"$fragment"'],"incomplete":[{"reason":"x"},{"reason":"x"}]';;
+        foreign) unit '"fragments":[{"file":{"path":"a.fake"},"symbols":[{"id":"m::x#function","kind":"function","visibility":"public","file":"b.fake","span":{"start":{"line":1,"col":1},"end":{"line":1,"col":2}},"name":"x"}]}]';;
+        stray) unit '"fragments":[{"file":{"path":"a.fake"},"modules":[{"path":"m"}],"edges":[{"kind":"calls","from":{"symbol":"m::y#function"},"to":"m::z","resolution":"semantic"}]}]';;
         deaf) sleep 300;;
             grandchild) sleep 300 & echo $! > "$log.pid"; sleep 300;;
             crash) echo "boom" >&2; echo "second line" >&2; exit 7;;
             sleep) sleep 30;;
             garbage) printf 'Content-Length: 4\r\n\r\nnope';;
-            badshape) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":"x"}}';;
-            badid) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":[{"file":{"path":"a.fake"},"symbols":[{"id":"nope","kind":"function","visibility":"public","file":"a.fake","span":{"start":{"line":1,"col":1},"end":{"line":1,"col":2}},"name":"x"}]}]}}';;
+            badshape) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"units":"x"}}';;
+            badid) unit '"fragments":[{"file":{"path":"a.fake"},"symbols":[{"id":"nope","kind":"function","visibility":"public","file":"a.fake","span":{"start":{"line":1,"col":1},"end":{"line":1,"col":2}},"name":"x"}]}]';;
             reject) send '{"jsonrpc":"2.0","id":'"$id"',"error":{"code":-32000,"message":"no thanks"}}';;
-            unrequested) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":[{"file":{"path":"zzz.fake"}}]}}';;
-            *) send '{"jsonrpc":"2.0","id":'"$id"',"result":{"fragments":[]}}';;
+            unrequested) unit '"fragments":[{"file":{"path":"zzz.fake"}}]';;
+            *) unit '"fragments":[]';;
           esac;;
       esac
     done
@@ -136,7 +140,31 @@ pub(super) fn file(path: &str) -> File {
     }
 }
 
-pub(super) fn index(provider: &dyn LanguageProvider, ws: &Workspace, paths: &[&str]) -> Indexed {
+/// What a provider answered for one request, its units together.
+pub(super) struct Answer {
+    pub(super) fragments: Vec<Fragment>,
+    pub(super) notices: Vec<String>,
+    pub(super) incomplete: Vec<Incomplete>,
+}
+
+impl From<Indexed> for Answer {
+    fn from(indexed: Indexed) -> Self {
+        let mut answer = Self {
+            fragments: Vec::new(),
+            notices: indexed.notices,
+            incomplete: indexed.incomplete,
+        };
+        for unit in indexed.units {
+            answer.fragments.extend(unit.fragments);
+            answer.notices.extend(unit.notices);
+            answer.incomplete.extend(unit.incomplete);
+        }
+        answer
+    }
+}
+
+/// The files at `paths` as one unit of `provider`.
+pub(super) fn index(provider: &dyn LanguageProvider, ws: &Workspace, paths: &[&str]) -> Answer {
     let files: Vec<File> = paths.iter().map(|p| file(p)).collect();
     let sources: Vec<Source> = files
         .iter()
@@ -146,12 +174,20 @@ pub(super) fn index(provider: &dyn LanguageProvider, ws: &Workspace, paths: &[&s
             regions: &[],
         })
         .collect();
-    provider.index(ws, &sources).unwrap()
+    let imports = BTreeMap::new();
+    let unit = Unit {
+        id: "u",
+        key: "",
+        files: &sources,
+        imports: &imports,
+    };
+    let every: Vec<String> = paths.iter().map(|p| (*p).to_owned()).collect();
+    provider.index(ws, &[unit], &every).unwrap().into()
 }
 
 pub(super) const T: Duration = Duration::from_secs(20);
 
-pub(super) fn only_gap(indexed: &Indexed) -> &Incomplete {
+pub(super) fn only_gap(indexed: &Answer) -> &Incomplete {
     assert_eq!(indexed.incomplete.len(), 1, "{:?}", indexed.incomplete);
     &indexed.incomplete[0]
 }

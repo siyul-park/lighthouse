@@ -4,11 +4,11 @@
 use std::path::Path;
 
 use lighthouse_protocol::{
-    EdgeKind, EmbeddedFile, EmbeddedRegion, Fragment, IndexInput, IndexResult, Node, TextMapSegment,
+    EdgeKind, EmbeddedFile, EmbeddedRegion, Fragment, Node, TextMapSegment, UnitRef,
 };
 use serde_json::{Value, json};
 
-use super::index::{exchange, project};
+use super::index::{Answer, exchange, project};
 
 const MANIFEST: &str = "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n";
 const LIB: &str = "pub fn greet() {}\n";
@@ -184,7 +184,7 @@ fn crate_with(lib: &str) -> tempfile::TempDir {
 }
 
 /// The fences of `README.md`, each with the context its injection gives.
-fn fences(dir: &Path, bodies: &[(&str, Value)]) -> IndexResult {
+fn fences(dir: &Path, bodies: &[(&str, Value)]) -> Answer {
     let mut host = String::new();
     let mut sources = Vec::new();
     for (at, (body, context)) in bodies.iter().enumerate() {
@@ -203,12 +203,14 @@ fn fences(dir: &Path, bodies: &[(&str, Value)]) -> IndexResult {
         regions: sources,
     };
     let root = dir.canonicalize().unwrap();
-    exchange(
-        &root,
-        vec![IndexInput::Regions { regions: file }],
-        json!({}),
-        None,
-    )
+    let unit = UnitRef {
+        id: "#regions".to_owned(),
+        key: String::new(),
+        files: Vec::new(),
+        regions: vec![file],
+        imports: Default::default(),
+    };
+    exchange(&root, unit, Vec::new(), json!({}))
 }
 
 fn source(at: usize, body: &str, from: usize, context: &Value) -> EmbeddedRegion {
@@ -230,7 +232,7 @@ fn source(at: usize, body: &str, from: usize, context: &Value) -> EmbeddedRegion
     }
 }
 
-fn fragment(result: &IndexResult) -> &Fragment {
+fn fragment(result: &Answer) -> &Fragment {
     assert_eq!(result.fragments.len(), 1, "{:?}", result.notices);
     &result.fragments[0]
 }

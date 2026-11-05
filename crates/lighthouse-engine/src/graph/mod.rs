@@ -15,6 +15,7 @@ mod detect;
 mod inputs;
 mod open;
 mod pull;
+mod units;
 
 use std::path::Path;
 
@@ -24,6 +25,9 @@ use lighthouse_spec::{Entries, Kind, Stat, read_entries};
 pub(crate) use content::{Content, Readable};
 pub(crate) use detect::Detected;
 pub(crate) use open::Opened;
+pub(crate) use units::{
+    API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, REGIONS, Stored, UNIT, UNITS,
+};
 
 /// A directory with fewer entries than this is hashed on one thread.
 const FAN_OUT: usize = 4;
@@ -62,7 +66,7 @@ struct Child {
     is_dir: bool,
 }
 
-pub(super) fn key(path: &Path) -> String {
+pub(crate) fn key(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 

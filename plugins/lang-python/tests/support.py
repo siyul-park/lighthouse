@@ -17,10 +17,22 @@ def write_project(root: str, files: dict[str, str]) -> None:
 
 
 def request(root: str, paths: list[str], regions: list[Any] | None = None, options: Any = None) -> dict[str, Any]:
-    inputs: list[Any] = [{"kind": "file", "file": {"path": p, "hash": "0"}} for p in paths]
-    inputs += [{"kind": "regions", "regions": r} for r in regions or []]
+    units: list[Any] = [{"id": p, "key": "0", "files": [{"path": p, "hash": "0"}]} for p in paths]
+    if regions:
+        units.append({"id": "#regions", "key": "0", "regions": regions})
     context: dict[str, Any] = {"options": {} if options is None else {"python": options}}
-    return {"project": {"root": root}, "language": "python", "inputs": inputs, "context": context}
+    return {"project": {"root": root}, "language": "python", "units": units, "files": paths, "context": context}
+
+
+def whole(result: dict[str, Any]) -> dict[str, Any]:
+    """The answers of all units as one: their fragments, sources, notices and gaps together."""
+    answers = result["units"]
+    return {
+        "units": answers,
+        "fragments": [f for answer in answers for f in answer["fragments"]],
+        "notices": [*result["notices"], *(n for answer in answers for n in answer["notices"])],
+        "incomplete": [*result["incomplete"], *(i for answer in answers for i in answer["incomplete"])],
+    }
 
 
 def index(files: dict[str, str], paths: list[str] | None = None, regions: list[Any] | None = None, options: Any = None):
@@ -28,7 +40,7 @@ def index(files: dict[str, str], paths: list[str] | None = None, regions: list[A
     with tempfile.TemporaryDirectory() as root:
         write_project(root, files)
         wanted = sorted(files) if paths is None else paths
-        return Provider("lang-python", "0").index(request(root, wanted, regions, options))  # type: ignore[arg-type]
+        return whole(Provider("lang-python", "0").index(request(root, wanted, regions, options)))  # type: ignore[arg-type]
 
 
 def fragment(result: dict[str, Any], path: str) -> dict[str, Any]:

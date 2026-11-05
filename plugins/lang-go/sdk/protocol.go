@@ -9,7 +9,7 @@ import (
 //go:generate go run ./gen
 
 // ProtocolVersion is the wire protocol version this package implements.
-const ProtocolVersion = "0.6"
+const ProtocolVersion = "0.7"
 
 // SemanticEdges names the capability of reporting type-resolved edges.
 const SemanticEdges = "semantic-edges"
@@ -34,15 +34,4 @@ func (f WorkspaceFolder) Path() (string, error) {
 		return "", fmt.Errorf("%q is not a file URI", f.URI)
 	}
 	return filepath.Clean(filepath.FromSlash(u.Path)), nil
-}
-
-// FileInputs returns physical-file inputs, preserving the request order.
-func (p IndexParams) FileInputs() []FileRef {
-	var files []FileRef
-	for _, input := range p.Inputs {
-		if input.Kind == "file" && input.File != nil {
-			files = append(files, *input.File)
-		}
-	}
-	return files
 }

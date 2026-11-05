@@ -14,9 +14,9 @@ use lighthouse_model::{
 };
 use lighthouse_model::{RunScope, ucm::Applicability};
 use lighthouse_plugin::{
-    Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
-    LanguageManifest, LanguageProvider, Plugin, PluginManifest, Registry, Rule, RuleManifest,
-    Source, Workspace,
+    Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Fragments,
+    Indexed, LanguageManifest, LanguageProvider, Plugin, PluginManifest, Registry, Rule,
+    RuleManifest, Unit, Workspace,
 };
 use lighthouse_spec::Config;
 use tempfile::TempDir;
@@ -37,110 +37,114 @@ impl LanguageProvider for Toy {
         &self.0
     }
 
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
-        let mut indexed = Indexed::default();
-        for source in files {
-            let symbols = source
-                .text
-                .lines()
-                .enumerate()
-                .filter_map(|(n, line)| {
-                    let name = line.strip_prefix("fn ")?.split_whitespace().next()?;
-                    let at = |col: usize| Position {
-                        line: u32::try_from(n + 1).unwrap(),
-                        col: u32::try_from(col + 1).unwrap(),
-                    };
-                    let span = Span {
-                        start: at(0),
-                        end: at(line.len()),
-                    };
-                    Some(Symbol {
-                        id: SymbolId::new("m", &[], name, SymbolKind::Function),
-                        kind: SymbolKind::Function,
-                        visibility: Visibility::Private,
-                        owner: None,
-                        file: source.file.path.clone(),
-                        span,
-                        extent: Some(span),
-                        doc: None,
-                        name: name.to_owned(),
-                        role: None,
-                        optional: false,
-                        type_ref: None,
-                    })
-                })
-                .collect();
-            // `call name` refers to the symbol `name` from the function above it;
-            // `load name` does too, as the file loads.
-            let mut edges = Vec::new();
-            let mut current = None;
-            for (n, line) in source.text.lines().enumerate() {
-                if let Some(name) = line
-                    .strip_prefix("fn ")
-                    .and_then(|l| l.split_whitespace().next())
-                {
-                    current = Some(SymbolId::new("m", &[], name, SymbolKind::Function));
-                }
-                let loads = line.starts_with("load ");
-                let target = line
-                    .strip_prefix("call ")
-                    .or_else(|| line.strip_prefix("load "))
-                    .and_then(|l| l.split_whitespace().next());
-                if let (Some(from), Some(name)) = (&current, target) {
-                    let at = |col: usize| Position {
-                        line: u32::try_from(n + 1).unwrap(),
-                        col: u32::try_from(col + 1).unwrap(),
-                    };
-                    edges.push(Edge {
-                        kind: if loads {
-                            EdgeKind::References
-                        } else {
-                            EdgeKind::Calls
-                        },
-                        from: Node::Symbol(from.clone()),
-                        to: Target::Resolved(Node::Symbol(SymbolId::new(
-                            "m",
-                            &[],
-                            name,
-                            SymbolKind::Function,
-                        ))),
-                        resolution: Resolution::Semantic,
-                        site: Some(Span {
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, PluginError> {
+        let mut out = Indexed::default();
+        for unit in units {
+            let mut indexed = Fragments::new(unit.id, Vec::new());
+            for source in unit.files {
+                let symbols = source
+                    .text
+                    .lines()
+                    .enumerate()
+                    .filter_map(|(n, line)| {
+                        let name = line.strip_prefix("fn ")?.split_whitespace().next()?;
+                        let at = |col: usize| Position {
+                            line: u32::try_from(n + 1).unwrap(),
+                            col: u32::try_from(col + 1).unwrap(),
+                        };
+                        let span = Span {
                             start: at(0),
                             end: at(line.len()),
-                        }),
-                        when: if loads {
-                            lighthouse_model::ucm::When::Load
-                        } else {
-                            Default::default()
-                        },
+                        };
+                        Some(Symbol {
+                            id: SymbolId::new("m", &[], name, SymbolKind::Function),
+                            kind: SymbolKind::Function,
+                            visibility: Visibility::Private,
+                            owner: None,
+                            file: source.file.path.clone(),
+                            span,
+                            extent: Some(span),
+                            doc: None,
+                            name: name.to_owned(),
+                            role: None,
+                            optional: false,
+                            type_ref: None,
+                        })
+                    })
+                    .collect();
+                // `call name` refers to the symbol `name` from the function above it;
+                // `load name` does too, as the file loads.
+                let mut edges = Vec::new();
+                let mut current = None;
+                for (n, line) in source.text.lines().enumerate() {
+                    if let Some(name) = line
+                        .strip_prefix("fn ")
+                        .and_then(|l| l.split_whitespace().next())
+                    {
+                        current = Some(SymbolId::new("m", &[], name, SymbolKind::Function));
+                    }
+                    let loads = line.starts_with("load ");
+                    let target = line
+                        .strip_prefix("call ")
+                        .or_else(|| line.strip_prefix("load "))
+                        .and_then(|l| l.split_whitespace().next());
+                    if let (Some(from), Some(name)) = (&current, target) {
+                        let at = |col: usize| Position {
+                            line: u32::try_from(n + 1).unwrap(),
+                            col: u32::try_from(col + 1).unwrap(),
+                        };
+                        edges.push(Edge {
+                            kind: if loads {
+                                EdgeKind::References
+                            } else {
+                                EdgeKind::Calls
+                            },
+                            from: Node::Symbol(from.clone()),
+                            to: Target::Resolved(Node::Symbol(SymbolId::new(
+                                "m",
+                                &[],
+                                name,
+                                SymbolKind::Function,
+                            ))),
+                            resolution: Resolution::Semantic,
+                            site: Some(Span {
+                                start: at(0),
+                                end: at(line.len()),
+                            }),
+                            when: if loads {
+                                lighthouse_model::ucm::When::Load
+                            } else {
+                                Default::default()
+                            },
+                        });
+                    }
+                }
+                if source.text.contains("BROKEN") {
+                    indexed.incomplete.push(Incomplete {
+                        path: Some(source.file.path.clone()),
+                        provider: None,
+                        reason: "cannot parse".to_owned(),
                     });
                 }
-            }
-            if source.text.contains("BROKEN") {
-                indexed.incomplete.push(Incomplete {
-                    path: Some(source.file.path.clone()),
-                    provider: None,
-                    reason: "cannot parse".to_owned(),
+                if source.text.contains("PARTIAL") {
+                    indexed.incomplete.push(Incomplete {
+                        path: None,
+                        provider: None,
+                        reason: "the provider stopped".to_owned(),
+                    });
+                }
+                indexed.fragments.push(Fragment {
+                    files: vec![File {
+                        ..source.file.clone()
+                    }],
+                    symbols,
+                    edges,
+                    ..Fragment::default()
                 });
             }
-            if source.text.contains("PARTIAL") {
-                indexed.incomplete.push(Incomplete {
-                    path: None,
-                    provider: None,
-                    reason: "the provider stopped".to_owned(),
-                });
-            }
-            indexed.fragments.push(Fragment {
-                files: vec![File {
-                    ..source.file.clone()
-                }],
-                symbols,
-                edges,
-                ..Fragment::default()
-            });
+            out.units.push(indexed);
         }
-        Ok(indexed)
+        Ok(out)
     }
 }
 

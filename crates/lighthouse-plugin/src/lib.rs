@@ -32,7 +32,9 @@ pub use cel::{
 };
 pub use error::Error;
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
-pub use lighthouse_protocol::{Conventions, EmbeddedRegion, Mapping, TestNaming, TextMapSegment};
+pub use lighthouse_protocol::{
+    Conventions, EmbeddedRegion, Mapping, TestNaming, TextMapSegment, Units, UnitsBy,
+};
 pub use memo::{Memo, Pending};
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
@@ -66,7 +68,6 @@ impl Workspace {
             test_naming: BTreeMap::new(),
             overlays: BTreeMap::new(),
             cel_libraries: Vec::new(),
-            cache_dir: None,
             sandbox: Policy::default(),
             ignores: Vec::new(),
         }
@@ -185,11 +186,6 @@ pub struct Workspace {
     pub overlays: BTreeMap<PathBuf, String>,
     /// CEL libraries registered by the host, as manifests for language providers.
     pub cel_libraries: Vec<CelLibraryManifest>,
-    /// The directory the host keeps derived data in between runs
-    /// (`.lighthouse/cache`), exactly when its result cache is on; a provider
-    /// may keep its own under a directory named by its plugin. `None` when the
-    /// run must not use a cache.
-    pub cache_dir: Option<PathBuf>,
     /// How the programs the project names run: the project's `[sandbox]`.
     pub sandbox: Policy,
     /// The `ignores` of the project, with those of its plugins first: what
@@ -223,6 +219,9 @@ pub struct LanguageManifest {
     /// The language evaluates declarations in the order they are written, so
     /// that the host keeps load-time uses in order when it moves them.
     pub ordered_declarations: bool,
+    /// How the language's files group into the units that are indexed and
+    /// kept one by one.
+    pub units: Units,
 }
 
 impl LanguageManifest {
@@ -239,6 +238,7 @@ impl LanguageManifest {
             fallback: false,
             priority: 0,
             ordered_declarations: false,
+            units: Units::default(),
         }
     }
 }
@@ -251,18 +251,55 @@ pub struct EmbeddedFile {
     pub regions: Vec<EmbeddedRegion>,
 }
 
-/// What a provider produced for a batch of files.
+/// What a provider produced for a batch of units.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Indexed {
-    pub fragments: Vec<Fragment>,
-    /// Serialized ASTs and source mappings returned for common source selection.
-    pub sources: Vec<lighthouse_protocol::Source>,
+    /// One per unit asked for.
+    pub units: Vec<Fragments>,
     /// Things the user should see that do not make the analysis incomplete.
     pub notices: Vec<String>,
     /// Files or scopes that could not be analyzed.
     pub incomplete: Vec<Incomplete>,
     /// Where the provider's own time went, phase by phase.
     pub timings: Vec<(String, std::time::Duration)>,
+}
+
+/// What a provider produced for one unit.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Fragments {
+    pub id: String,
+    pub fragments: Vec<Fragment>,
+    /// Serialized ASTs and source mappings returned for common source selection.
+    pub sources: Vec<lighthouse_protocol::Source>,
+    /// A hash of everything the unit's files hold.
+    pub body: String,
+    /// A hash of what an importer can see of the unit, and of what it imports.
+    pub api: String,
+    /// The units of the project it imports, sorted.
+    pub imports: Vec<String>,
+    /// Messages about the unit that leave its analysis complete.
+    pub notices: Vec<String>,
+    /// Files of the unit that could not be analyzed.
+    pub incomplete: Vec<Incomplete>,
+}
+
+impl Fragments {
+    /// The result of a unit that nothing imports: its `body` and `api` are a
+    /// hash of its fragments.
+    pub fn new(id: impl Into<String>, fragments: Vec<Fragment>) -> Self {
+        let text = serde_json::to_string(&fragments).unwrap_or_default();
+        let hash = lighthouse_protocol::hash::sha256(text);
+        Self {
+            id: id.into(),
+            fragments,
+            sources: Vec::new(),
+            body: hash.clone(),
+            api: hash,
+            imports: Vec::new(),
+            notices: Vec::new(),
+            incomplete: Vec::new(),
+        }
+    }
 }
 
 /// A file handed to a provider with its text as read by the engine.
@@ -275,13 +312,38 @@ pub struct Source<'a> {
     pub regions: &'a [EmbeddedRegion],
 }
 
-/// Turns the files of one language into UCM fragments. Implementations must
-/// be thread-safe, and `index` must not read outside `files` and `workspace`.
+/// A unit to index: the files (or the host file whose regions) it holds, and
+/// the `api` of what it imported when it was last indexed.
+#[derive(Debug, Clone, Copy)]
+pub struct Unit<'a> {
+    pub id: &'a str,
+    /// The host's key of the unit.
+    pub key: &'a str,
+    pub files: &'a [Source<'a>],
+    pub imports: &'a BTreeMap<String, String>,
+}
+
+/// Turns the units of one language into UCM fragments. Implementations must
+/// be thread-safe, and `index` must not read outside `units` and `workspace`.
 pub trait LanguageProvider: Send + Sync {
     fn manifest(&self) -> &LanguageManifest;
-    /// Indexes every physical file of this provider in one call. An `Err` means
-    /// the whole batch failed; every file is then incomplete.
-    fn index(&self, workspace: &Workspace, files: &[Source]) -> Result<Indexed, Error>;
+    /// What besides its manifest decides what the provider answers: the
+    /// digest of the binary of a plugin process, so that a rebuilt plugin is
+    /// asked again. Empty for a provider that is part of the host, whose
+    /// build the host's own identity covers.
+    fn identity(&self) -> String {
+        String::new()
+    }
+    /// Indexes the units in one call. `files` are all the files of the
+    /// language that the project holds, sorted, for an analysis that reads
+    /// beyond its unit. An `Err` means the whole batch failed; every file is
+    /// then incomplete.
+    fn index(
+        &self,
+        workspace: &Workspace,
+        units: &[Unit],
+        files: &[String],
+    ) -> Result<Indexed, Error>;
 }
 
 /// Computes one fact, declared by `id`, from the project and the facts of its `requires`.

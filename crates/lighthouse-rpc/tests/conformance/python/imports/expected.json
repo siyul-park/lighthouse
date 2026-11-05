@@ -958,7 +958,7 @@
   ],
   "incomplete": [],
   "notices": [
-    "1 relative import(s) resolve to no file; their edges are syntactic"
+    "main.py: 1 relative import(s) resolve to no file; their edges are syntactic"
   ],
   "sources": []
 }

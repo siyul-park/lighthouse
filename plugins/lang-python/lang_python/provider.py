@@ -1,14 +1,17 @@
 """The Python language provider: the manifest and one `index` request."""
 
+import hashlib
 import os
 from typing import Any
 
 from lang_python.project import Model
+from lang_python.sdk.wire import FileRef, UnitRef, UnitResult
 from lang_python.project import is_stub
 from lang_python.modules import module_path
 from lang_python.project import Project
 from lang_python.regions import Remap, Snippet, host_line, plan_snippets
 from lang_python.functions import Types
+from lang_python import api
 from lang_python.index import Indexed, Unit
 from lang_python.visibility import Reach
 from lang_python.sdk.wire import (
@@ -21,6 +24,9 @@ from lang_python.sdk.wire import (
 )
 
 LANGUAGE = "python"
+# The import that stands for every unit: a name is looked up in the whole project.
+EVERY = "*"
+SETTINGS = ["pyproject.toml"]
 # GitHub Linguist's name and aliases for Python (lib/linguist/languages.yml).
 ALIASES = ["python", "py", "py3", "python3", "rusthon"]
 SOURCE_GLOB = "**/*.{py,pyi}"
@@ -43,6 +49,7 @@ def language() -> LanguageManifest:
         },
         "capabilities": CAPABILITIES,
         "ordered_declarations": True,
+        "units": {"by": "file", "settings": SETTINGS},
     }
 
 
@@ -70,13 +77,12 @@ class Provider:
         return [language()]
 
     def index(self, params: IndexParams) -> IndexResult:
-        """Analyzes every requested file and the fences of host files. A failure on one file is an incomplete
-        entry; a bad request never ends the process."""
+        """Analyzes the files of every unit asked for and the fences of host files. A failure on one file is an
+        incomplete entry; a bad request never ends the process."""
         unknown = _unknown_option((params.get("context") or {}).get("options", {}).get(LANGUAGE))
         if unknown is not None:
-            return {"fragments": [], "sources": [], "notices": [], "incomplete": [{"reason": unknown}]}
-        run = _Indexing(params)
-        return run.run()
+            return {"units": [], "notices": [], "incomplete": [{"reason": unknown}]}
+        return _Indexing(params).run()
 
 
 class _Indexing:
@@ -86,61 +92,84 @@ class _Indexing:
         self.root = os.path.realpath(params["project"]["root"])
         context = params.get("context") or {}
         overlays = {o["path"]: o["text"] for o in context.get("overlays") or []}
-        self.files: list[str] = []
-        self.hosts: list[EmbeddedFile] = []
-        for item in params["inputs"]:
-            if item["kind"] == "file":
-                self.files.append(item["file"]["path"])
-            else:
-                self.hosts.append(item["regions"])
+        self.units = params["units"]
+        self.files = [file["path"] for unit in self.units for file in unit.get("files") or []]
+        self.hosts: list[EmbeddedFile] = [host for unit in self.units for host in unit.get("regions") or []]
         self.snippets = plan_snippets(self.hosts)
-        self.project = Project(self.root, overlays, {s.rel: s.text.text for s in self.snippets}, self.files)
+        self.project = Project(self.root, overlays, {s.rel: s.text.text for s in self.snippets}, params.get("files") or self.files)
         self.model = Model(self.project)
         self.reach = Reach(self.model)
         self.types = Types(self.reach)
-        self.fragments: list[Fragment] = []
         self.incomplete: list[Incomplete] = []
-        self.notices: list[str] = []
-        self.unresolved = 0
+        self.unresolved: dict[str, int] = {}
         self.guessed = 0
+        self.notices: list[str] = []
 
     def run(self) -> IndexResult:
-        for rel in dict.fromkeys(self.files):
-            self._file(rel)
-        for host, fragment in self._fences():
-            self.fragments.append(fragment)
-        self.fragments.sort(key=lambda f: f["file"]["path"])
-        if self.unresolved:
-            self.notices.append("%d relative import(s) resolve to no file; their edges are syntactic" % self.unresolved)
-        if self.guessed:
-            self.notices.append(
-                "%d Python fence(s) use names they do not define or import; those are matched by name (syntactic)"
-                % self.guessed
-            )
-        return {"fragments": self.fragments, "sources": [], "notices": self.notices, "incomplete": self.incomplete}
+        fenced = self._fences()
+        gaps = self.incomplete
+        units = [self._unit(unit, fenced, gaps) for unit in self.units]
+        return {"units": units, "notices": [], "incomplete": []}
 
-    def _file(self, rel: str) -> None:
+    def _unit(self, unit: UnitRef, fenced: dict[str, Fragment], gaps: list[Incomplete]) -> UnitResult:
+        """The answer for one unit: its files, or the fences of its host files."""
+        files = unit.get("files") or []
+        hosts = unit.get("regions") or []
+        self.incomplete = []
+        found = [self._file(file["path"]) for file in files]
+        fragments = [fragment for fragment in found if fragment is not None]
+        fragments.extend(fenced[host["path"]] for host in hosts)
+        fragments.sort(key=lambda f: f["file"]["path"])
+        notices = ["%s: %d relative import(s) resolve to no file; their edges are syntactic" % (path, count)
+                   for path, count in sorted(self.unresolved.items()) if path in {f["path"] for f in files}]
+        if hosts:
+            notices.extend(self.notices)
+            if self.guessed:
+                notices.append(
+                    "%d Python fence(s) use names they do not define or import; those are matched by name (syntactic)"
+                    % self.guessed
+                )
+        hashes = [file["hash"] for file in files] + [host["hash"] for host in hosts]
+        body = hashlib.sha256("\n".join(hashes).encode()).hexdigest()
+        result: UnitResult = {
+            "id": unit["id"],
+            "fragments": fragments,
+            "body": body,
+            "api": "" if hosts else self._api(files),
+            "imports": [] if hosts else [EVERY],
+            "notices": notices,
+            "incomplete": [*self.incomplete, *gaps] if hosts else self.incomplete,
+        }
+        return result
+
+    def _api(self, files: list[FileRef]) -> str:
+        parts = []
+        for file in files:
+            parsed = self.model.file(file["path"])
+            parts.append(file["hash"] if parsed is None else api.digest(parsed.tree, parsed.text))
+        return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+    def _file(self, rel: str) -> Fragment | None:
+        """The fragment of one file; None when the file cannot be read."""
         if is_stub(rel):
-            self.fragments.append(_empty_fragment(rel))
-            return
+            return _empty_fragment(rel)
         parsed = self.model.file(rel)
         if parsed is None:
             self.incomplete.append({"path": rel, "reason": "cannot read the file"})
-            return
+            return None
         if parsed.tree is None:
             self.incomplete.append({"path": rel, "reason": parsed.error or "cannot parse the file"})
             fragment = _empty_fragment(rel)
             fragment["modules"] = [{"path": module_path(rel)}]
-            self.fragments.append(fragment)
-            return
-        indexed = self._unit(rel)
+            return fragment
+        indexed = self._analyze(rel)
         if indexed is None:
-            self.fragments.append(_empty_fragment(rel))
-            return
-        self.unresolved += indexed.unresolved
-        self.fragments.append(indexed.fragment)
+            return _empty_fragment(rel)
+        if indexed.unresolved:
+            self.unresolved[rel] = indexed.unresolved
+        return indexed.fragment
 
-    def _unit(self, rel: str) -> Indexed | None:
+    def _analyze(self, rel: str) -> Indexed | None:
         parsed = self.model.file(rel)
         try:
             return Unit(self.model, self.reach, self.types, parsed).index()
@@ -150,7 +179,7 @@ class _Indexing:
             self.incomplete.append({"path": rel, "reason": "internal error: %s: %s" % (type(error).__name__, error)})
         return None
 
-    def _fences(self) -> list[tuple[EmbeddedFile, Fragment]]:
+    def _fences(self) -> dict[str, Fragment]:
         """The fragments of the host files: the facts of their fences, in the host's coordinates."""
         merged: dict[str, Fragment] = {}
         for host in self.hosts:
@@ -162,7 +191,7 @@ class _Indexing:
             target = merged[snippet.host["path"]]
             for key in ("modules", "symbols", "edges", "functions", "tests", "comments"):
                 target[key].extend(fragment.get(key, []))  # type: ignore[literal-required]
-        return [(host, merged[host["path"]]) for host in self.hosts]
+        return merged
 
     def _fence(self, snippet: Snippet) -> Fragment | None:
         parsed = self.model.file(snippet.rel)
@@ -172,7 +201,7 @@ class _Indexing:
                 % (snippet.host["path"], host_line(snippet))
             )
             return None
-        indexed = self._unit(snippet.rel)
+        indexed = self._analyze(snippet.rel)
         if indexed is None:
             return None
         if indexed.guessed:

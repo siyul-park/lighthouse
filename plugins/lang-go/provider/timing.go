@@ -21,17 +21,16 @@ type phase struct {
 // Phase names of the breakdown an index request reports to the host, which
 // prints it under `--timings`.
 const (
-	// phasePlan is keying the units and looking them up in the cache.
+	// phasePlan is reading the project's directories for the `api` of the
+	// units asked for and the interfaces that are loaded with them.
 	phasePlan = "plan"
 	// phaseLoad is the time the analysis waited for the go command to list,
 	// compile and type-check packages.
 	phaseLoad = "load"
 	// phaseAnalyse is reading the code model out of the loaded packages.
 	phaseAnalyse = "analyse"
-	// phaseSerialise is encoding fragments, for the answer and for the cache.
+	// phaseSerialise is gathering the fragments of the answer.
 	phaseSerialise = "serialise"
-	// phaseStore is writing records, the facts and the sweep of the cache.
-	phaseStore = "store"
 )
 
 // measure starts timing phase; the returned function stops it.

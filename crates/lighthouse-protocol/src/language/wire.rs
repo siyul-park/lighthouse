@@ -174,7 +174,7 @@ pub struct LanguageManifest {
     #[serde(default)]
     pub conventions: Conventions,
     /// Known values: `semantic-edges`, `extent`, `reference-sites`,
-    /// `complete-references`, `overlays`, `cache-overlays`, and `source-ast`.
+    /// `complete-references`, `overlays`, and `source-ast`.
     /// Hosts ignore unknown values.
     #[serde(default)]
     pub capabilities: Vec<String>,
@@ -185,6 +185,45 @@ pub struct LanguageManifest {
     /// languages with order-free package scope (Go, Rust) leave it unset.
     #[serde(default, skip_serializing_if = "is_false")]
     pub ordered_declarations: bool,
+    /// How the host groups the language's files into the units it indexes and
+    /// caches: a provider is asked only for the units whose content, or whose
+    /// imports' `api`, changed.
+    #[serde(default)]
+    pub units: Units,
+}
+
+/// The mapping from files to units, declared by the language as Bazel and
+/// Pants declare their package boundaries. The host applies it to the paths of
+/// the files; a provider is not asked.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Units {
+    pub by: UnitsBy,
+    /// With `by: manifest`, the file name that marks a unit's root, such as
+    /// `Cargo.toml`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<String>,
+    /// Names of the files that decide how every file of the language is read
+    /// (`go.mod`, `tsconfig.json`): the content of each file of such a name is
+    /// part of the key of every unit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub settings: Vec<String>,
+    /// Names of the environment variables that decide it too (`GOOS`): their
+    /// values are part of the key of every unit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub env: Vec<String>,
+}
+
+/// What a unit is.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UnitsBy {
+    /// The files of one directory (a Go package).
+    Directory,
+    /// One file (a TypeScript or Python module).
+    #[default]
+    File,
+    /// The files below a manifest, down to the next manifest (a Rust crate).
+    Manifest,
 }
 
 /// Layout conventions of a language that the host cannot infer from its files.
@@ -241,32 +280,51 @@ pub struct FileRef {
     pub path: String,
     /// SHA-256 of the file content, lowercase hex.
     pub hash: String,
+    /// Return the parsed tree of this file to the common source selector.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub source_ast: bool,
 }
 
-/// Index request. File and extracted-region inputs use the same provider method.
+/// Index request: the units whose result the host does not have.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct IndexParams {
     pub project: ProjectRef,
-    /// Registered provider key for this invocation (file or region inputs).
+    /// Registered provider key for this invocation.
     pub language: String,
-    pub inputs: Vec<IndexInput>,
+    /// Sorted by id.
+    pub units: Vec<UnitRef>,
+    /// Every file of the language that the project holds, sorted: what the
+    /// analysis of a unit may need to see of the others, as a crate sees the
+    /// crates around it. Only the files of `units` are indexed.
+    #[serde(default)]
+    pub files: Vec<String>,
     #[serde(default)]
     pub context: Context,
 }
 
-/// One input to the common provider interface.
+/// A unit to index: its files, or the regions selected in the host files.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum IndexInput {
-    /// A physical file owned by this provider.
-    File {
-        file: FileRef,
-        /// Return the parsed tree for this file to the common source selector.
-        #[serde(default, skip_serializing_if = "is_false")]
-        source_ast: bool,
-    },
-    /// Regions already selected by the common source engine.
-    Regions { regions: EmbeddedFile },
+pub struct UnitRef {
+    /// The unit's identity in the language: its directory, file or manifest
+    /// directory, project-relative and `/`-separated (`.` for the root);
+    /// `#regions` for the regions selected in the project's files.
+    pub id: String,
+    /// The files of the unit, sorted by path; empty for the unit of regions.
+    #[serde(default)]
+    pub files: Vec<FileRef>,
+    /// Regions already selected by the common source engine, by host file,
+    /// sorted by path: all the regions of the language make one unit, as the
+    /// analysis of one may read the others.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<EmbeddedFile>,
+    /// The host's key of the unit: BLAKE3 of what its result depends on at
+    /// the host's end. A provider may use it as a name and need not read it.
+    pub key: String,
+    /// The `api` of each unit the last result of this one imported, as the
+    /// host holds it now: what the provider may compute this unit's `api`
+    /// from instead of reading the imports again.
+    #[serde(default)]
+    pub imports: BTreeMap<String, String>,
 }
 
 /// Host-side settings that accompany an index request.
@@ -279,28 +337,16 @@ pub struct Context {
     /// are none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overlays: Option<Vec<Overlay>>,
-    /// Where the provider may cache derived results; absent when the host runs
-    /// without a cache.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cache: Option<CacheRef>,
 }
 
 /// The text that stands in for a file: a provider reads it instead of the
-/// file on disk, and must not read the disk for that path. Hosts send overlays
-/// for requested files only, as a fix run verifies edits before writing them.
+/// file on disk, and must not read the disk for that path. Hosts send every
+/// overlay of the run, as a fix run verifies edits before writing them and a
+/// unit may read a file of another.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Overlay {
     pub path: String,
     pub text: String,
-}
-
-/// The directory a provider may keep derived results in between runs.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct CacheRef {
-    /// Absolute path of a directory the host owns, `.lighthouse/cache/<plugin
-    /// id>/`. The provider reads and writes only inside it and its results are
-    /// the same with or without it.
-    pub dir: String,
 }
 
 /// The project an index request belongs to.
@@ -310,15 +356,14 @@ pub struct ProjectRef {
     pub root: String,
 }
 
-/// A plugin's answer to `index`: one fragment per analyzed file plus what could
-/// not be analyzed. A file is never silently dropped.
+/// A plugin's answer to `index`: the result of each requested unit plus what
+/// concerns the whole request. There is no answer of "unchanged": every requested
+/// unit comes back whole, and the host's equality of what it stored does the
+/// cutoff.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct IndexResult {
-    /// One fragment per analyzed file, ordered by path.
-    pub fragments: Vec<Fragment>,
-    /// Serialized ASTs and independent source-map sidecars requested for selection.
-    #[serde(default)]
-    pub sources: Vec<Source>,
+    /// One per requested unit, ordered by id.
+    pub units: Vec<UnitResult>,
     /// Messages that leave the analysis complete.
     #[serde(default)]
     pub notices: Vec<String>,
@@ -330,6 +375,38 @@ pub struct IndexResult {
     /// `--timings`; it changes nothing in the analysis.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timings: Vec<PhaseTime>,
+}
+
+/// The result of one unit.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct UnitResult {
+    pub id: String,
+    /// One fragment per analyzed file, ordered by path.
+    pub fragments: Vec<Fragment>,
+    /// Serialized ASTs and independent source-map sidecars requested for selection.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<Source>,
+    /// A hash of everything the unit's files hold, bodies included: the
+    /// provider's own, opaque to the host.
+    pub body: String,
+    /// A hash of what an importer can see of the unit: its exported
+    /// declarations and their types, and the `api` of what it imports, so
+    /// that it composes. A change of `body` that leaves it equal is cut off at
+    /// the host: the importers keep their results.
+    pub api: String,
+    /// The ids of the units of the project this one imports, sorted; `*`
+    /// stands for every unit, when the analysis of this one reads what any
+    /// other declares.
+    #[serde(default)]
+    pub imports: Vec<String>,
+    /// Messages about this unit that leave its analysis complete. The host
+    /// keeps them with the unit and shows them again when it takes the unit
+    /// as it is.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notices: Vec<String>,
+    /// Files of this unit that could not be analyzed, kept as `notices` are.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub incomplete: Vec<Incomplete>,
 }
 
 /// How long one phase of an index request took in the provider.

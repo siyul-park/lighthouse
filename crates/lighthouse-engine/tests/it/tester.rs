@@ -7,8 +7,8 @@ use lighthouse_model::{
 };
 use lighthouse_model::{RunScope, ucm::Applicability};
 use lighthouse_plugin::{
-    Context, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageManifest, LanguageProvider,
-    Plugin, PluginManifest, Registry, Rule, RuleManifest, Source, Workspace,
+    Context, Error, FixRequest, Fixer, FixerManifest, Fragments, Indexed, LanguageManifest,
+    LanguageProvider, Plugin, PluginManifest, Registry, Rule, RuleManifest, Unit, Workspace,
 };
 use lighthouse_spec::Catalog;
 
@@ -18,13 +18,21 @@ impl LanguageProvider for Notes {
     fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, Error> {
         Ok(Indexed {
-            fragments: files
+            units: units
                 .iter()
-                .map(|s| Fragment {
-                    files: vec![s.file.clone()],
-                    ..Fragment::default()
+                .map(|unit| {
+                    Fragments::new(
+                        unit.id,
+                        unit.files
+                            .iter()
+                            .map(|s| Fragment {
+                                files: vec![s.file.clone()],
+                                ..Fragment::default()
+                            })
+                            .collect(),
+                    )
                 })
                 .collect(),
             ..Indexed::default()

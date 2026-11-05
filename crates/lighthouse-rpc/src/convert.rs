@@ -6,7 +6,7 @@ use std::{
 };
 
 use lighthouse_model::{Incomplete, Position, Span, ucm as core};
-use lighthouse_plugin::{Indexed, LanguageManifest, Source};
+use lighthouse_plugin::{Fragments, Indexed, LanguageManifest, Source, Unit};
 use lighthouse_protocol as wire;
 
 /// `fn $name` converting a wire enum to the core enum of the same variants.
@@ -50,23 +50,21 @@ pub(crate) fn language_manifest(language: &wire::LanguageManifest) -> LanguageMa
         fallback: language.fallback,
         priority: language.priority,
         ordered_declarations: language.ordered_declarations,
+        units: language.units.clone(),
     }
 }
 
-/// Converts a result against the files that were requested. A fragment for a
-/// file nobody asked about, a second fragment for one file, and a fragment
-/// whose symbols or edges belong to another file are dropped with a notice; a
-/// requested file without an accepted fragment is incomplete. The `Err` side
-/// means the result is malformed.
+/// Converts a result against the units that were requested. A unit nobody
+/// asked about or a second result for one is dropped with a notice; in a
+/// unit, a fragment for a file nobody asked about, a second fragment for one
+/// file, and a fragment whose symbols or edges belong to another file are
+/// dropped with a notice; a requested file without an accepted fragment is
+/// incomplete. The `Err` side means the result is malformed.
 pub(crate) fn indexed(
     result: wire::IndexResult,
-    sources: &[Source],
+    units: &[Unit],
     required_asts: &BTreeSet<PathBuf>,
 ) -> Result<Indexed, String> {
-    let requested: BTreeMap<PathBuf, &core::File> = sources
-        .iter()
-        .map(|s| (s.file.path.clone(), s.file))
-        .collect();
     let mut incomplete: BTreeSet<Incomplete> =
         result.incomplete.into_iter().map(incomplete_of).collect();
     let mut out = Indexed {
@@ -78,38 +76,95 @@ pub(crate) fn indexed(
             .collect(),
         ..Indexed::default()
     };
-    let mut offered = BTreeSet::new();
-    let mut accepted = BTreeSet::new();
-    let by_path: BTreeMap<PathBuf, &Source> = sources
+    let asked: BTreeMap<&str, &Unit> = units.iter().map(|unit| (unit.id, unit)).collect();
+    let mut answered = BTreeSet::new();
+    for unit in result.units {
+        let Some(asked) = asked.get(unit.id.as_str()) else {
+            out.notices
+                .push(format!("{}: ignored, the unit was not requested", unit.id));
+            continue;
+        };
+        if !answered.insert(unit.id.clone()) {
+            out.notices.push(format!(
+                "{}: ignored, the plugin sent a second result for the unit",
+                unit.id
+            ));
+            continue;
+        }
+        let fragments = unit_of(unit, asked, required_asts)?;
+        out.units.push(fragments);
+    }
+    for unit in units.iter().filter(|unit| !answered.contains(unit.id)) {
+        incomplete.extend(
+            unit.files
+                .iter()
+                .map(|source| unanswered(&source.file.path)),
+        );
+    }
+    out.incomplete = incomplete.into_iter().collect();
+    Ok(out)
+}
+
+fn unanswered(path: &std::path::Path) -> Incomplete {
+    Incomplete {
+        path: Some(path.to_owned()),
+        provider: None,
+        reason: "the plugin returned no usable fragment".to_owned(),
+    }
+}
+
+/// The result of one unit, against the files it was given.
+fn unit_of(
+    result: wire::UnitResult,
+    asked: &Unit,
+    required_asts: &BTreeSet<PathBuf>,
+) -> Result<Fragments, String> {
+    let requested: BTreeMap<PathBuf, &core::File> = asked
+        .files
+        .iter()
+        .map(|s| (s.file.path.clone(), s.file))
+        .collect();
+    let by_path: BTreeMap<PathBuf, &Source> = asked
+        .files
         .iter()
         .map(|source| (source.file.path.clone(), source))
         .collect();
+    let mut notices = result.notices;
+    let mut incomplete: BTreeSet<Incomplete> =
+        result.incomplete.into_iter().map(incomplete_of).collect();
+    let mut out = Fragments {
+        id: result.id,
+        body: result.body,
+        api: result.api,
+        imports: result.imports,
+        ..Fragments::default()
+    };
     source_records(
         result.sources,
         &by_path,
-        &mut out,
+        (&mut out.sources, &mut notices),
         &mut incomplete,
         required_asts,
     );
+    let (mut offered, mut accepted) = (BTreeSet::new(), BTreeSet::new());
     for fragment in result.fragments {
         let path = PathBuf::from(&fragment.file.path);
         let Some(file) = requested.get(&path) else {
-            out.notices.push(format!(
+            notices.push(format!(
                 "{}: ignored, the file was not requested",
                 path.display()
             ));
             continue;
         };
         if !offered.insert(path.clone()) {
-            out.notices.push(format!(
+            notices.push(format!(
                 "{}: ignored, the plugin sent a second fragment",
                 path.display()
             ));
             continue;
         }
         if let Err(why) = belongs(&fragment) {
-            out.notices
-                .push(format!("{}: fragment dropped, {why}", path.display()));
+            notices.push(format!("{}: fragment dropped, {why}", path.display()));
             continue;
         }
         let facts = fragment.file.facts.clone();
@@ -121,13 +176,13 @@ pub(crate) fn indexed(
         accepted.insert(path);
         out.fragments.push(converted);
     }
-    for path in requested.keys().filter(|p| !accepted.contains(*p)) {
-        incomplete.insert(Incomplete {
-            path: Some(path.clone()),
-            provider: None,
-            reason: "the plugin returned no usable fragment".to_owned(),
-        });
-    }
+    incomplete.extend(
+        requested
+            .keys()
+            .filter(|p| !accepted.contains(*p))
+            .map(|path| unanswered(path)),
+    );
+    out.notices = notices;
     out.incomplete = incomplete.into_iter().collect();
     Ok(out)
 }
@@ -135,7 +190,7 @@ pub(crate) fn indexed(
 fn source_records(
     sources: Vec<wire::Source>,
     by_path: &BTreeMap<PathBuf, &Source>,
-    out: &mut Indexed,
+    (kept, notices): (&mut Vec<wire::Source>, &mut Vec<String>),
     incomplete: &mut BTreeSet<Incomplete>,
     required: &BTreeSet<PathBuf>,
 ) {
@@ -144,15 +199,14 @@ fn source_records(
     for source_ast in sources {
         let path = PathBuf::from(&source_ast.path);
         let Some(source) = by_path.get(&path) else {
-            out.notices.push(format!(
+            notices.push(format!(
                 "{}: ignored source AST, the file was not requested",
                 path.display()
             ));
             continue;
         };
         if !seen.insert(path.clone()) {
-            out.sources
-                .retain(|previous| previous.path != source_ast.path);
+            kept.retain(|previous| previous.path != source_ast.path);
             incomplete.insert(Incomplete {
                 path: Some(path.clone()),
                 provider: None,
@@ -169,7 +223,7 @@ fn source_records(
             });
             continue;
         }
-        out.sources.push(source_ast);
+        kept.push(source_ast);
     }
     for path in required {
         if by_path.contains_key(path) && !seen_paths.contains(path) {

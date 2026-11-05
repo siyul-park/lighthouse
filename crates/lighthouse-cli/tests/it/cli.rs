@@ -104,7 +104,7 @@ fn timings_go_to_stderr_and_leave_the_report_alone() {
     for phase in [
         "setup",
         "read",
-        "index text",
+        "fetch",
         "merge",
         "rules",
         "rule core/max-lines",

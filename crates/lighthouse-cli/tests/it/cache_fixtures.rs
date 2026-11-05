@@ -171,6 +171,60 @@ pub(crate) fn rust() -> Fixture {
                 mostly_warm: false,
             },
             Edit {
+                name: "signature edit",
+                apply: |d| {
+                    replace(
+                        d,
+                        "src/server.rs",
+                        "pub fn double(n: usize) -> usize {\n    n * 2",
+                        "pub fn double(n: usize, m: usize) -> usize {\n    n * m",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file added",
+                apply: |d| {
+                    write(
+                        d,
+                        "src/extra.rs",
+                        "/// Extra.\npub fn extra() -> usize {\n    1\n}\n",
+                    );
+                    replace(
+                        d,
+                        "src/lib.rs",
+                        "mod util;\n",
+                        "mod util;\npub mod extra;\n",
+                    );
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file renamed",
+                apply: |d| {
+                    fs::rename(d.join("src/extra.rs"), d.join("src/more.rs")).unwrap();
+                    replace(d, "src/lib.rs", "pub mod extra;", "pub mod more;");
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "Cargo.toml edited",
+                apply: |d| replace(d, "Cargo.toml", "edition = \"2024\"", "edition = \"2021\""),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "provider option changed",
+                apply: |d| {
+                    replace(
+                        d,
+                        "lighthouse.toml",
+                        "spec = { ",
+                        "spec = { languages = { rust = { unpublished = \"internal\" } }, ",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
                 name: "file deleted",
                 apply: |d| {
                     fs::remove_file(d.join("src/util.rs")).unwrap();
@@ -275,6 +329,74 @@ pub(crate) fn go() -> Option<Fixture> {
             Edit {
                 name: "the decision's check edited",
                 apply: |d| write(d, ".lighthouse/decisions/probe.yaml", &probe("d", "go")),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "signature edit",
+                apply: |d| {
+                    replace(
+                        d,
+                        "server/server.go",
+                        "func Double(n int) int {\n\treturn n * 2",
+                        "func Double(n, m int) int {\n\treturn n * m",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file added",
+                apply: |d| {
+                    write(
+                        d,
+                        "util/more.go",
+                        "package util\n\n// More is more.\nfunc More() int {\n\treturn 1\n}\n",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "file renamed",
+                apply: |d| fs::rename(d.join("util/more.go"), d.join("util/extra.go")).unwrap(),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "new package",
+                apply: |d| {
+                    write(
+                        d,
+                        "extra/extra.go",
+                        "package extra\n\n// Extra is extra.\nfunc Extra() int {\n\treturn 1\n}\n",
+                    );
+                    replace(
+                        d,
+                        "app/app.go",
+                        "// Run runs it all.",
+                        "var _ = extra.Extra\n\n// Run runs it all.",
+                    );
+                    replace(
+                        d,
+                        "app/app.go",
+                        "import (\n",
+                        "import (\n\t\"example.com/app/extra\"\n",
+                    );
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "go.mod edited",
+                apply: |d| replace(d, "go.mod", "go 1.26", "go 1.25"),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "provider option changed",
+                apply: |d| {
+                    replace(
+                        d,
+                        "lighthouse.toml",
+                        "spec = { ",
+                        "spec = { languages = { go = { tags = [\"extra\"] } }, ",
+                    )
+                },
                 mostly_warm: false,
             },
             Edit {

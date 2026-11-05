@@ -496,7 +496,6 @@ fn repository_asts(files: &[PathBuf], globs: &[String], root: &Path) -> Vec<Sour
         test_naming: BTreeMap::new(),
         overlays: BTreeMap::new(),
         cel_libraries: Vec::new(),
-        cache_dir: None,
         sandbox: lighthouse_process::Policy::default(),
         ignores: Vec::new(),
     };
@@ -528,7 +527,15 @@ fn repository_asts(files: &[PathBuf], globs: &[String], root: &Path) -> Vec<Sour
                 regions: &[],
             })
             .collect();
-        asts.extend(provider.index(&workspace, &sources).unwrap().sources);
+        let imports = std::collections::BTreeMap::new();
+        let unit = lighthouse_plugin::Unit {
+            id: ".",
+            key: "",
+            files: &sources,
+            imports: &imports,
+        };
+        let indexed = provider.index(&workspace, &[unit], &[]).unwrap();
+        asts.extend(indexed.units.into_iter().flat_map(|unit| unit.sources));
     }
     asts
 }

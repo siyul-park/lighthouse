@@ -15,9 +15,9 @@ use lighthouse_model::{
 };
 use lighthouse_model::{RunScope, TestScope, ucm::Applicability};
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Context, Conventions, Error as PluginError, Indexed,
+    Analyzer, AnalyzerManifest, Context, Conventions, Error as PluginError, Fragments, Indexed,
     LanguageManifest, LanguageProvider, Plugin, PluginManifest, Registry, Rule, RuleManifest,
-    Source, Workspace,
+    Source, Unit, Workspace,
 };
 use lighthouse_spec::Catalog;
 use lighthouse_spec::Config;
@@ -40,26 +40,31 @@ impl LanguageProvider for Any {
     fn manifest(&self) -> &LanguageManifest {
         &self.manifest
     }
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, PluginError> {
+        let files: Vec<&Source> = units.iter().flat_map(|unit| unit.files).collect();
         self.batches.lock().unwrap().push(files.len());
         let ends = |s: &Source, suffix: &str| s.file.path.to_string_lossy().ends_with(suffix);
         if files.iter().any(|s| ends(s, self.crash_on)) {
             return Err(PluginError::Failed("plugin crashed".to_owned()));
         }
         let mut indexed = Indexed::default();
-        for source in files {
-            if ends(source, self.fail_on) {
-                indexed.incomplete.push(Incomplete {
-                    path: Some(source.file.path.clone()),
-                    provider: None,
-                    reason: "cannot index".to_owned(),
+        for unit in units {
+            let mut answer = Fragments::new(unit.id, Vec::new());
+            for source in unit.files {
+                if ends(source, self.fail_on) {
+                    answer.incomplete.push(Incomplete {
+                        path: Some(source.file.path.clone()),
+                        provider: None,
+                        reason: "cannot index".to_owned(),
+                    });
+                    continue;
+                }
+                answer.fragments.push(Fragment {
+                    files: vec![source.file.clone()],
+                    ..Fragment::default()
                 });
-                continue;
             }
-            indexed.fragments.push(Fragment {
-                files: vec![source.file.clone()],
-                ..Fragment::default()
-            });
+            indexed.units.push(answer);
         }
         Ok(indexed)
     }
@@ -235,44 +240,25 @@ impl LanguageProvider for Fallback {
     fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, PluginError> {
         Ok(Indexed {
-            fragments: files
+            units: units
                 .iter()
-                .map(|s| Fragment {
-                    files: vec![s.file.clone()],
-                    ..Fragment::default()
+                .map(|unit| {
+                    Fragments::new(
+                        unit.id,
+                        unit.files
+                            .iter()
+                            .map(|s| Fragment {
+                                files: vec![s.file.clone()],
+                                ..Fragment::default()
+                            })
+                            .collect(),
+                    )
                 })
                 .collect(),
             ..Indexed::default()
         })
-    }
-}
-
-/// A provider that records the cache directory of every workspace it is given.
-struct CacheProbe(LanguageManifest, Arc<Mutex<Vec<Option<PathBuf>>>>);
-
-impl LanguageProvider for CacheProbe {
-    fn manifest(&self) -> &LanguageManifest {
-        &self.0
-    }
-    fn index(&self, ws: &Workspace, _: &[Source]) -> Result<Indexed, PluginError> {
-        self.1.lock().unwrap().push(ws.cache_dir.clone());
-        Ok(Indexed::default())
-    }
-}
-
-struct CacheProbePlugin(PluginManifest, Arc<Mutex<Vec<Option<PathBuf>>>>);
-
-impl Plugin for CacheProbePlugin {
-    fn manifest(&self) -> &PluginManifest {
-        &self.0
-    }
-    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(CacheProbe(
-            LanguageManifest::new("any", vec!["**".to_owned()]),
-            Arc::clone(&self.1),
-        ))]
     }
 }
 
@@ -491,7 +477,11 @@ fn each_provider_is_called_once_with_all_its_files() {
     .unwrap();
     engine.check(&root(&dir), &[]).unwrap();
     engine.check(&[dir.path().join("a")], &[]).unwrap();
-    assert_eq!(*batches.lock().unwrap(), [3, 3]);
+    assert_eq!(
+        *batches.lock().unwrap(),
+        [3],
+        "the second run finds every unit current and asks none"
+    );
 }
 
 #[test]
@@ -671,6 +661,24 @@ fn engine_check_gives_the_same_outcome_on_every_run_however_the_rules_interleave
         assert_eq!(again.notices, first.notices);
         assert_eq!(again.incomplete, first.incomplete);
     }
+}
+
+#[test]
+fn an_edit_sends_the_unit_it_changed_and_no_other() {
+    let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2"), ("z.txt", b"3")]);
+    let (registry, batches) = batched("!", "!");
+    let engine = Engine::new(
+        registry,
+        Config::parse_inline(ALL).unwrap(),
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
+    engine.check(&root(&dir), &[]).unwrap();
+    std::fs::write(dir.path().join("a/x.txt"), b"changed").unwrap();
+    engine.check(&root(&dir), &[]).unwrap();
+    engine.check(&root(&dir), &[]).unwrap();
+    assert_eq!(*batches.lock().unwrap(), [3, 1]);
 }
 
 #[test]

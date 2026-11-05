@@ -5,7 +5,9 @@ use lighthouse_model::{
     GeneratedSpec,
     ucm::{Capability, Fragment},
 };
-use lighthouse_plugin::{Error, Indexed, LanguageManifest, LanguageProvider, Source, Workspace};
+use lighthouse_plugin::{
+    Error, Fragments, Indexed, LanguageManifest, LanguageProvider, Unit, Workspace,
+};
 
 /// The manifest of the `core` plugin, which is catalog data: the markers it
 /// declares are the defaults of every project that lists the plugin.
@@ -33,16 +35,23 @@ impl LanguageProvider for Text {
         &self.manifest
     }
 
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
-        let fragments = files
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, Error> {
+        let units = units
             .iter()
-            .map(|source| Fragment {
-                files: vec![source.file.clone()],
-                ..Fragment::default()
+            .map(|unit| {
+                let fragments = unit
+                    .files
+                    .iter()
+                    .map(|source| Fragment {
+                        files: vec![source.file.clone()],
+                        ..Fragment::default()
+                    })
+                    .collect();
+                Fragments::new(unit.id, fragments)
             })
             .collect();
         Ok(Indexed {
-            fragments,
+            units,
             ..Indexed::default()
         })
     }

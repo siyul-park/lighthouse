@@ -9,8 +9,8 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    self as wire, FileRef, IndexInput, IndexParams, IndexResult, Message, read_message,
-    write_message,
+    self as wire, FileRef, Fragment, Incomplete, IndexParams, IndexResult, Message, Source,
+    UnitRef, read_message, write_message,
 };
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
@@ -25,50 +25,71 @@ pub(crate) fn project(files: &[(&str, &str)]) -> TempDir {
     dir
 }
 
-fn index(dir: &Path, options: serde_json::Value) -> IndexResult {
-    index_with(dir, options, None)
+/// What one `index` request answered, its units together.
+pub(crate) struct Answer {
+    pub fragments: Vec<Fragment>,
+    pub sources: Vec<Source>,
+    pub notices: Vec<String>,
+    pub incomplete: Vec<Incomplete>,
 }
 
-/// Like `index`, with a cache directory when one is given.
-pub(crate) fn index_with(
-    dir: &Path,
-    options: serde_json::Value,
-    cache: Option<&Path>,
-) -> IndexResult {
-    index_with_sources(dir, options, cache, false)
+impl From<IndexResult> for Answer {
+    fn from(result: IndexResult) -> Self {
+        let mut answer = Self {
+            fragments: Vec::new(),
+            sources: Vec::new(),
+            notices: result.notices,
+            incomplete: result.incomplete,
+        };
+        for unit in result.units {
+            answer.fragments.extend(unit.fragments);
+            answer.sources.extend(unit.sources);
+            answer.notices.extend(unit.notices);
+            answer.incomplete.extend(unit.incomplete);
+        }
+        answer
+    }
+}
+
+fn index(dir: &Path, options: serde_json::Value) -> Answer {
+    index_with_sources(dir, options, false)
 }
 
 pub(crate) fn index_with_sources(
     dir: &Path,
     options: serde_json::Value,
-    cache: Option<&Path>,
     source_ast: bool,
-) -> IndexResult {
+) -> Answer {
     let root = dir.canonicalize().unwrap();
     let mut paths = Vec::new();
     collect(&root, &root, &mut paths);
     paths.sort();
-    let inputs = paths
+    let files = paths
         .iter()
-        .map(|path| IndexInput::File {
+        .map(|path| FileRef {
+            path: path.clone(),
+            hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
             source_ast,
-            file: FileRef {
-                path: path.clone(),
-                hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
-            },
         })
         .collect();
-    exchange(&root, inputs, options, cache)
+    let unit = UnitRef {
+        id: ".".to_owned(),
+        key: String::new(),
+        files,
+        regions: Vec::new(),
+        imports: Default::default(),
+    };
+    exchange(&root, unit, paths, options)
 }
 
-/// One `index` request of `inputs` over the project at `root`, served by a
+/// One `index` request of the `unit` over the project at `root`, served by a
 /// provider of its own.
 pub(crate) fn exchange(
     root: &Path,
-    inputs: Vec<IndexInput>,
+    unit: UnitRef,
+    files: Vec<String>,
     options: serde_json::Value,
-    cache: Option<&Path>,
-) -> IndexResult {
+) -> Answer {
     let mut child = Command::new(env!("CARGO_BIN_EXE_lang-rust"))
         .current_dir(root)
         .stdin(Stdio::piped())
@@ -82,13 +103,11 @@ pub(crate) fn exchange(
             root: root.to_string_lossy().into_owned(),
         },
         language: "rust".to_owned(),
-        inputs,
+        units: vec![unit],
+        files,
         context: wire::Context {
             options: serde_json::from_value(options).unwrap(),
             overlays: None,
-            cache: cache.map(|dir| wire::CacheRef {
-                dir: dir.to_string_lossy().into_owned(),
-            }),
         },
     };
     let handshake = wire::InitializeParams {
@@ -109,7 +128,7 @@ pub(crate) fn exchange(
     let request = Message::request(2, wire::INDEX, params).unwrap();
     write_message(&mut stdin, &request).unwrap();
     let reply = read_message(&mut stdout).unwrap().unwrap();
-    let result = reply.into_result::<IndexResult>().unwrap().unwrap();
+    let result = reply.into_result::<IndexResult>().unwrap().unwrap().into();
     write_message(
         &mut stdin,
         &Message::request(3, wire::SHUTDOWN, ()).unwrap(),
@@ -135,7 +154,7 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<String>) {
 
 const MANIFEST: &str = "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n";
 
-fn reasons(result: &IndexResult) -> Vec<String> {
+fn reasons(result: &Answer) -> Vec<String> {
     result
         .incomplete
         .iter()
@@ -354,7 +373,7 @@ fn a_static_initializer_uses_what_it_names_and_enum_variants_are_variants() {
 }
 
 /// The `edition` fact of each file of `result`, by path.
-fn editions(result: &IndexResult) -> Vec<(String, String)> {
+fn editions(result: &Answer) -> Vec<(String, String)> {
     let mut found: Vec<(String, String)> = result
         .fragments
         .iter()

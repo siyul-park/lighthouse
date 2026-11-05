@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { Provider } from "../src/provider.ts";
-import type { EmbeddedFile, Fragment, IndexInput, IndexResult } from "../src/sdk/wire.ts";
+import type { EmbeddedFile, Fragment, IndexResult, UnitRef } from "../src/sdk/wire.ts";
 
 const GREET = "src/index::greet#function";
 const MANIFEST = '{ "name": "demo", "private": false }\n';
@@ -52,11 +52,11 @@ function markdown(fences: { info?: string; body: string }[]): EmbeddedFile {
 }
 
 /** The TypeScript files of the project, as the host lists them. */
-function sources(root: string): IndexInput[] {
+function sources(root: string): UnitRef[] {
   return fs
     .readdirSync(root, { recursive: true, encoding: "utf8" })
     .filter((rel) => rel.endsWith(".ts"))
-    .map((rel) => ({ kind: "file", file: { path: rel, hash: "x" } }));
+    .map((rel) => ({ id: rel, key: "", files: [{ path: rel, hash: "x" }], imports: {} }));
 }
 
 function index(root: string, host: EmbeddedFile): IndexResult {
@@ -64,7 +64,8 @@ function index(root: string, host: EmbeddedFile): IndexResult {
   return provider.index({
     project: { root },
     language: "typescript",
-    inputs: [...sources(root), { kind: "regions", regions: host }],
+    units: [...sources(root), { id: "#regions", key: "", files: [], regions: [host], imports: {} }],
+    files: sources(root).map((unit) => unit.id),
     context: { options: {} },
   });
 }
@@ -83,7 +84,7 @@ describe("fences of a host file", () => {
     assert.equal(imported?.to, "src/index");
     assert.deepEqual(imported?.site?.start, { line: 4, col: 1 });
     assert.equal(fragment.file.path, "README.md");
-    assert.deepEqual(result.incomplete, []);
+    assert.deepEqual(result.units.flatMap((unit) => unit.incomplete ?? []), []);
   });
 
   it("are modules of their own that the host does not see a wrapper of", () => {
@@ -122,8 +123,8 @@ describe("fences of a host file", () => {
 
     const edge = fragmentOf(result).edges!.find((candidate) => candidate.to === "greet");
     assert.equal(edge?.resolution, "syntactic");
-    assert.ok(result.notices!.some((notice) => notice.includes("do not type-check")));
-    assert.deepEqual(result.incomplete, []);
+    assert.ok(result.units.flatMap((unit) => unit.notices ?? []).some((notice) => notice.includes("do not type-check")));
+    assert.deepEqual(result.units.flatMap((unit) => unit.incomplete ?? []), []);
   });
 
   it("that are not valid code are a notice, not a gap", () => {
@@ -131,8 +132,8 @@ describe("fences of a host file", () => {
 
     const result = index(root, markdown([{ body: "this is { not code\n" }]));
 
-    assert.deepEqual(result.incomplete, []);
-    assert.ok(result.notices!.some((notice) => notice.includes("is not valid TypeScript")));
+    assert.deepEqual(result.units.flatMap((unit) => unit.incomplete ?? []), []);
+    assert.ok(result.units.flatMap((unit) => unit.notices ?? []).some((notice) => notice.includes("is not valid TypeScript")));
     assert.deepEqual(fragmentOf(result).symbols, []);
   });
 
@@ -183,7 +184,7 @@ describe("fences of a host file", () => {
 });
 
 function fragmentOf(result: IndexResult): Fragment {
-  const host = result.fragments.filter((fragment) => fragment.file.path === "README.md");
+  const host = result.units.flatMap((unit) => unit.fragments).filter((fragment) => fragment.file.path === "README.md");
   assert.equal(host.length, 1);
   return host[0]!;
 }

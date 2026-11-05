@@ -9,8 +9,8 @@ use lighthouse_model::{
     ucm::{Edge, EdgeKind, Fragment, Module, Node, Resolution, Symbol, SymbolId, Target},
 };
 use lighthouse_plugin::{
-    CelLibraryManifest, EmbeddedFile, EmbeddedRegion, Error, Indexed, LanguageManifest,
-    LanguageProvider, Source, Workspace,
+    CelLibraryManifest, EmbeddedFile, EmbeddedRegion, Error, Fragments, Indexed, LanguageManifest,
+    LanguageProvider, Source, Unit, Workspace,
 };
 
 mod analysis;
@@ -21,6 +21,13 @@ use source::{FileDraft, Host, MappedText, Parameter, Snippet, VariableDecl};
 
 pub struct Language {
     manifest: LanguageManifest,
+}
+
+/// What the analysis of the regions of one unit found.
+#[derive(Default)]
+struct Output {
+    fragments: Vec<Fragment>,
+    incomplete: Vec<Incomplete>,
 }
 
 impl Language {
@@ -50,28 +57,35 @@ impl LanguageProvider for Language {
         &self.manifest
     }
 
-    fn index(&self, workspace: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
-        let embedded: Vec<EmbeddedFile> = files
-            .iter()
-            .filter(|source| !source.regions.is_empty())
-            .map(|source| EmbeddedFile {
-                file: source.file.clone(),
-                text: source.text.to_owned(),
-                regions: source.regions.to_vec(),
-            })
-            .collect();
-        let mut output = Indexed::default();
-        if !embedded.is_empty() {
-            index_embedded_sources(&workspace.cel_libraries, &embedded, &mut output);
+    fn index(&self, workspace: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, Error> {
+        let mut indexed = Indexed::default();
+        for unit in units {
+            let embedded: Vec<EmbeddedFile> = unit
+                .files
+                .iter()
+                .filter(|source| !source.regions.is_empty())
+                .map(|source| EmbeddedFile {
+                    file: source.file.clone(),
+                    text: source.text.to_owned(),
+                    regions: source.regions.to_vec(),
+                })
+                .collect();
+            let mut output = Output::default();
+            if !embedded.is_empty() {
+                index_embedded_sources(&workspace.cel_libraries, &embedded, &mut output);
+            }
+            let mut fragments = Fragments::new(unit.id, output.fragments);
+            fragments.incomplete = output.incomplete;
+            indexed.units.push(fragments);
         }
-        Ok(output)
+        Ok(indexed)
     }
 }
 
 fn index_embedded_sources(
     libraries: &[CelLibraryManifest],
     files: &[EmbeddedFile],
-    output: &mut Indexed,
+    output: &mut Output,
 ) {
     let env = Env::stdlib();
     let drafts = drafts(files, output);
@@ -104,7 +118,7 @@ fn index_embedded_sources(
     });
 }
 
-fn drafts(files: &[EmbeddedFile], output: &mut Indexed) -> Vec<FileDraft> {
+fn drafts(files: &[EmbeddedFile], output: &mut Output) -> Vec<FileDraft> {
     let mut drafts = Vec::new();
     for file in files {
         let source = Source {
@@ -399,7 +413,7 @@ fn index_snippets(
     analysis: &mut Analysis<'_>,
     fragment: &mut Fragment,
     draft: &FileDraft,
-    output: &mut Indexed,
+    output: &mut Output,
 ) {
     for snippet in &draft.snippets {
         if snippet.declared {

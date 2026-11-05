@@ -7,7 +7,7 @@ use std::{
 use lighthouse_checks::metrics::MEASURES;
 use lighthouse_engine::Engine;
 use lighthouse_model::ucm::{File, Project};
-use lighthouse_plugin::{Context, Facts, Registry, Source, Workspace};
+use lighthouse_plugin::{Context, Facts, Registry, Source, Unit, Workspace};
 use lighthouse_spec::Config;
 use serde_json::Value;
 
@@ -53,18 +53,23 @@ fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
         facts: Default::default(),
     };
     let ws = Workspace::new(dir.path().canonicalize().unwrap());
-    let indexed = provider
-        .index(
-            &ws,
-            &[Source {
-                file: &file,
-                text: source,
-                regions: &[],
-            }],
-        )
-        .unwrap();
+    let no_imports = std::collections::BTreeMap::new();
+    let unit = Unit {
+        id: ".",
+        key: "",
+        files: &[Source {
+            file: &file,
+            text: source,
+            regions: &[],
+        }],
+        imports: &no_imports,
+    };
+    let indexed = provider.index(&ws, &[unit], &[]).unwrap();
+    let units = indexed.units;
     assert!(indexed.incomplete.is_empty(), "{:?}", indexed.incomplete);
-    let project = Project::merge(indexed.fragments);
+    assert!(units.iter().all(|u| u.incomplete.is_empty()));
+    let fragments: Vec<_> = units.into_iter().flat_map(|u| u.fragments).collect();
+    let project = Project::merge(fragments);
     let facts = Facts::new();
     let ctx = Context {
         workspace: &ws,

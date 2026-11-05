@@ -4,7 +4,7 @@ import json
 import sys
 from typing import Any, BinaryIO, Protocol
 
-PROTOCOL_VERSION = "0.6"
+PROTOCOL_VERSION = "0.7"
 
 PARSE_ERROR = -32700
 METHOD_NOT_FOUND = -32601
@@ -131,7 +131,7 @@ class _Session:
         if not self.initialized:
             raise _Failure(NOT_INITIALIZED, "`%s` before `initialize`" % method)
         if method == "lighthouse/index":
-            return self.provider.index(_require(params, ("project", "language", "inputs")))
+            return self.provider.index(_require(params, ("project", "language", "units")))
         if method == "shutdown":
             self.shutdown = True
             return None

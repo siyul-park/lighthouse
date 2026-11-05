@@ -1,8 +1,9 @@
+import tempfile
 import unittest
 
 from lang_python.provider import ALIASES, Provider, language
 
-from tests.support import edges, fragment, index, symbols
+from tests.support import edges, fragment, index, request, symbols, write_project
 
 
 class ManifestTests(unittest.TestCase):
@@ -306,3 +307,32 @@ class FileTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnitTests(unittest.TestCase):
+    def answers(self, files, paths=None):
+        with tempfile.TemporaryDirectory() as root:
+            write_project(root, files)
+            wanted = sorted(files) if paths is None else paths
+            result = Provider("lang-python", "0").index(request(root, wanted))
+            return {unit["id"]: unit for unit in result["units"]}
+
+    def test_a_unit_per_file_imports_every_unit(self):
+        answers = self.answers({"a.py": "def f():\n    pass\n", "b.py": "X = 1\n"})
+        self.assertEqual(sorted(answers), ["a.py", "b.py"])
+        self.assertEqual(answers["a.py"]["imports"], ["*"])
+
+    def test_a_function_body_edit_keeps_the_api(self):
+        one = self.answers({"a.py": "def f(x):\n    return x\n"})["a.py"]
+        two = self.answers({"a.py": "def f(x):\n    return x + 1\n"})["a.py"]
+        self.assertEqual(one["api"], two["api"])
+
+    def test_a_signature_edit_moves_the_api(self):
+        one = self.answers({"a.py": "def f(x):\n    return x\n"})["a.py"]
+        two = self.answers({"a.py": "def f(x, y):\n    return x\n"})["a.py"]
+        self.assertNotEqual(one["api"], two["api"])
+
+    def test_a_method_body_edit_moves_the_api(self):
+        one = self.answers({"a.py": "class C:\n    def __init__(self):\n        self.a = 1\n"})["a.py"]
+        two = self.answers({"a.py": "class C:\n    def __init__(self):\n        self.b = 1\n"})["a.py"]
+        self.assertNotEqual(one["api"], two["api"])

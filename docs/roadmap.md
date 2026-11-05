@@ -117,14 +117,13 @@ This adds findings, so it waits until automation exists to absorb them.
 
 ### Fast on large repositories
 
-- **Done:** per-unit provider caches with early cutoff and a host result cache keyed by
-  each rule's declared reach. Warm runs are byte-identical to cold runs
-  (`scripts/fastgate.sh`); a warm run on this repository takes 0.7 s.
+- **Done:** the host keeps one result per unit of each language, with early cutoff on the
+  `api` a provider reports, and a result cache keyed by each rule's declared reach; a run
+  with nothing stale starts no provider process. Warm runs are byte-identical to cold runs
+  (`scripts/fastgate.sh`).
 - **Next:**
   - type-check edited packages from source over dependency export data;
-  - cache failed units;
-  - let the host keep fragments, so providers answer "unchanged" (the index half of
-    protocol 0.2).
+  - cache failed units.
 - **Target:** a one-file edit costs under 40% of a cold run, reported per repository.
 - **Protocol 0.2, the rest:** LSP lifecycle, text sync, UTF-8 positions, and
   `lighthouse/check` for `rpc` checks.

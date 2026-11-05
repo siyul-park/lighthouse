@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
-    Context, EmbeddedFile, EmbeddedRegion, FileRef, IndexInput, IndexParams, Overlay, ProjectRef,
-    TextOffsets,
+    Context, EmbeddedFile, EmbeddedRegion, FileRef, IndexParams, IndexResult, Overlay, ProjectRef,
+    TextOffsets, UnitRef,
     language::{HostError, HostLanguage, HostParser, HostProvider, HostTree, Provider},
 };
 use serde_json::json;
@@ -48,16 +48,21 @@ fn params(overlays: &[(&str, &str)]) -> IndexParams {
             root: "/nonexistent-lighthouse-project".to_owned(),
         },
         language: "lines".to_owned(),
-        inputs: inputs
+        units: inputs
             .iter()
-            .map(|(path, source_ast)| IndexInput::File {
-                file: FileRef {
+            .map(|(path, source_ast)| UnitRef {
+                id: (*path).to_owned(),
+                files: vec![FileRef {
                     path: (*path).to_owned(),
                     hash: String::new(),
-                },
-                source_ast: *source_ast,
+                    source_ast: *source_ast,
+                }],
+                regions: Vec::new(),
+                key: String::new(),
+                imports: BTreeMap::new(),
             })
             .collect(),
+        files: Vec::new(),
         context: Context {
             overlays: Some(
                 overlays
@@ -71,6 +76,31 @@ fn params(overlays: &[(&str, &str)]) -> IndexParams {
             ..Context::default()
         },
     }
+}
+
+/// The trees of every unit of the result, and the fragments, in order.
+fn flat(
+    result: &IndexResult,
+) -> (
+    Vec<&lighthouse_protocol::Source>,
+    Vec<&lighthouse_protocol::Fragment>,
+) {
+    let sources = result.units.iter().flat_map(|unit| &unit.sources).collect();
+    let fragments = result
+        .units
+        .iter()
+        .flat_map(|unit| &unit.fragments)
+        .collect();
+    (sources, fragments)
+}
+
+/// The gaps of every unit of the result.
+fn gaps(result: &IndexResult) -> Vec<&lighthouse_protocol::Incomplete> {
+    result
+        .units
+        .iter()
+        .flat_map(|unit| &unit.incomplete)
+        .collect()
 }
 
 #[test]
@@ -88,36 +118,33 @@ fn the_provider_announces_its_language_and_the_source_ast_capability() {
 fn a_file_asked_for_its_tree_has_one_and_a_fragment() {
     let mut handler = HostProvider::new(Lines);
     let result = handler.index(params(&[("a.lines", "x=1")])).unwrap();
-    assert_eq!(result.sources.len(), 1, "a file not asked for has no tree");
-    assert_eq!(result.sources[0].path, "a.lines");
-    assert_eq!(result.sources[0].ast, json!({"text": "x=1"}));
-    assert_eq!(
-        result.fragments.len(),
-        2,
-        "every host file is a file subject"
-    );
-    assert_eq!(result.fragments[0].file.path, "a.lines");
-    assert_eq!(result.fragments[1].file.path, "b.lines");
-    assert!(result.incomplete.is_empty());
+    let (sources, fragments) = flat(&result);
+    assert_eq!(sources.len(), 1, "a file not asked for has no tree");
+    assert_eq!(sources[0].path, "a.lines");
+    assert_eq!(sources[0].ast, json!({"text": "x=1"}));
+    assert_eq!(fragments.len(), 2, "every host file is a file subject");
+    assert_eq!(fragments[0].file.path, "a.lines");
+    assert_eq!(fragments[1].file.path, "b.lines");
+    assert!(gaps(&result).is_empty());
 }
 
 #[test]
 fn a_file_that_cannot_be_read_or_parsed_is_a_gap() {
     let mut handler = HostProvider::new(Lines);
     let unreadable = handler.index(params(&[])).unwrap();
-    assert!(unreadable.sources.is_empty());
+    assert!(flat(&unreadable).0.is_empty());
     assert!(
-        unreadable.incomplete[0]
+        gaps(&unreadable)[0]
             .reason
             .starts_with("cannot read Lines host document"),
         "{:?}",
-        unreadable.incomplete
+        gaps(&unreadable)
     );
     let invalid = handler.index(params(&[("a.lines", "x!")])).unwrap();
-    assert_eq!(invalid.incomplete[0].reason, "invalid Lines: a bang");
+    assert_eq!(gaps(&invalid)[0].reason, "invalid Lines: a bang");
     let empty = handler.index(params(&[("a.lines", "")])).unwrap();
     assert_eq!(
-        empty.incomplete[0].reason,
+        gaps(&empty)[0].reason,
         "cannot expose Lines syntax tree: nothing to select"
     );
 }
@@ -141,23 +168,28 @@ fn region(pointer: &str, text: &str) -> EmbeddedRegion {
 fn regions_that_are_documents_are_read_and_the_others_are_a_notice() {
     let mut handler = HostProvider::new(Lines);
     let mut request = params(&[]);
-    request.inputs = vec![IndexInput::Regions {
-        regions: EmbeddedFile {
+    request.units = vec![UnitRef {
+        id: "#regions".to_owned(),
+        files: Vec::new(),
+        regions: vec![EmbeddedFile {
             path: "doc.md".to_owned(),
             hash: String::new(),
             text: String::new(),
             test: false,
             facts: BTreeMap::new(),
             regions: vec![region("/children/0", "x=1"), region("/children/1", "x!")],
-        },
+        }],
+        key: String::new(),
+        imports: BTreeMap::new(),
     }];
     let result = handler.index(request).unwrap();
-    assert!(result.incomplete.is_empty(), "{:?}", result.incomplete);
-    assert_eq!(result.fragments.len(), 1);
-    assert_eq!(result.fragments[0].file.path, "doc.md");
-    assert!(result.fragments[0].symbols.is_empty());
+    assert!(gaps(&result).is_empty(), "{:?}", gaps(&result));
+    let (_, fragments) = flat(&result);
+    assert_eq!(fragments.len(), 1);
+    assert_eq!(fragments[0].file.path, "doc.md");
+    assert!(fragments[0].symbols.is_empty());
     assert_eq!(
-        result.notices,
+        result.units[0].notices,
         ["doc.md: the lines at /children/1 is not a valid Lines document: a bang"]
     );
 }
@@ -190,7 +222,7 @@ fn serve_answers_the_handshake_and_an_index_request_until_exit() {
             1,
             INITIALIZE,
             json!({
-                "protocolVersion": "0.6",
+                "protocolVersion": "0.7",
                 "clientInfo": { "name": "t", "version": "0" },
                 "workspaceFolders": [{ "uri": "file:///p/", "name": "p" }],
             }),
@@ -202,7 +234,7 @@ fn serve_answers_the_handshake_and_an_index_request_until_exit() {
             json!({
                 "project": { "root": "/p" },
                 "language": "lines",
-                "inputs": [{ "kind": "file", "file": { "path": "a.lines", "hash": "" }, "source_ast": true }],
+                "units": [{ "id": "a.lines", "key": "", "files": [{ "path": "a.lines", "hash": "", "source_ast": true }] }],
                 "context": { "overlays": [{ "path": "a.lines", "text": "x=1" }] },
             }),
         )
@@ -229,5 +261,8 @@ fn serve_answers_the_handshake_and_an_index_request_until_exit() {
     let handshake = replies[0].clone().into_result::<Value>().unwrap().unwrap();
     assert_eq!(handshake["serverInfo"]["name"], "lang-lines");
     let indexed = replies[1].clone().into_result::<Value>().unwrap().unwrap();
-    assert_eq!(indexed["sources"][0]["ast"], json!({"text": "x=1"}));
+    assert_eq!(
+        indexed["units"][0]["sources"][0]["ast"],
+        json!({"text": "x=1"})
+    );
 }

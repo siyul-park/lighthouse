@@ -96,10 +96,11 @@ func stemsOf(t *testing.T, goos, goarch string, files map[string]string) map[str
 	}
 	options, err := json.Marshal(map[string]any{"env": map[string]string{"GOOS": goos, "GOARCH": goarch}})
 	require.NoError(t, err)
-	result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+	result, err := indexOf(provider.New("lang-go", "test"), sdk.IndexParams{
 		Project:  sdk.ProjectRef{Root: root},
 		Language: "go",
-		Inputs:   fileInputs(refs),
+		Units:    oneUnit(refs),
+		Files:    filesOf(refs),
 		Context:  sdk.Context{Options: map[string]json.RawMessage{"go": options}},
 	})
 	require.NoError(t, err)

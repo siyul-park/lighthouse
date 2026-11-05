@@ -86,7 +86,7 @@ class ServerTests(unittest.TestCase):
             "jsonrpc": "2.0",
             "id": 2,
             "method": "lighthouse/index",
-            "params": {"project": {"root": "/nonexistent"}, "language": "python", "inputs": [{"kind": "x"}]},
+            "params": {"project": {"root": "/nonexistent"}, "language": "python", "units": [{"kind": "x"}]},
         }
         _, replies = run(frame(INITIALIZE), frame(index), frame({"jsonrpc": "2.0", "id": 3, "method": "shutdown"}))
         self.assertEqual(replies[1]["error"]["code"], -32603)

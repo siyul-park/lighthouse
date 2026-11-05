@@ -12,7 +12,7 @@ use serde_json::Value;
 use super::provider::Provider;
 use crate::{
     Comment, Conventions, EmbeddedFile, ErrorObject, FileInfo, FileRef, Fragment, Incomplete,
-    IndexInput, IndexParams, IndexResult, LanguageManifest, Mapping, Source,
+    IndexParams, IndexResult, LanguageManifest, Mapping, Source, UnitRef, UnitResult, Units, hash,
 };
 
 /// The capability of a provider that exposes syntax trees.
@@ -95,28 +95,74 @@ impl<P: HostParser> HostProvider<P> {
     /// The provider has no code model to give them, so a region is read as far
     /// as there is anything to say: one that is not a document is a notice,
     /// since what a file writes in a fence is not always the language's.
-    fn regions(&self, file: &EmbeddedFile, result: &mut IndexResult) {
-        result.fragments.push(Fragment {
-            file: FileInfo {
-                path: file.path.clone(),
-                ..FileInfo::default()
-            },
-            ..Fragment::default()
-        });
+    fn region(&self, file: &EmbeddedFile, out: &mut UnitResult) -> Fragment {
         for source in &file.regions {
             match self.parser.parse(&source.text) {
                 Ok(_) => {}
-                Err(HostError::Syntax(error)) => result.notices.push(format!(
+                Err(HostError::Syntax(error)) => out.notices.push(format!(
                     "{}: the {} at {} is not a valid {} document: {error}",
                     file.path, self.language.id, source.node_pointer, self.language.title
                 )),
-                Err(HostError::Tree(reason)) => result.incomplete.push(Incomplete {
+                Err(HostError::Tree(reason)) => out.incomplete.push(Incomplete {
                     path: Some(file.path.clone()),
                     reason: format!(
                         "cannot expose the {} at {}: {reason}",
                         self.language.title, source.node_pointer
                     ),
                 }),
+            }
+        }
+        Fragment {
+            file: FileInfo {
+                path: file.path.clone(),
+                ..FileInfo::default()
+            },
+            ..Fragment::default()
+        }
+    }
+
+    /// The files of a unit: a fragment each, and the tree of those that asked.
+    fn files(
+        &self,
+        unit: &UnitRef,
+        root: &Path,
+        overlays: &BTreeMap<&str, &str>,
+        out: &mut UnitResult,
+    ) {
+        for file in &unit.files {
+            let text = match overlays.get(file.path.as_str()) {
+                Some(text) => Ok((*text).to_owned()),
+                None => fs::read_to_string(root.join(&file.path)),
+            };
+            let text = match text {
+                Ok(text) => text,
+                Err(error) => {
+                    if file.source_ast {
+                        out.incomplete.push(Incomplete {
+                            path: Some(file.path.clone()),
+                            reason: format!(
+                                "cannot read {} host document: {error}",
+                                self.language.title
+                            ),
+                        });
+                    }
+                    out.fragments.push(fragment_of(file, Vec::new()));
+                    continue;
+                }
+            };
+            match self.tree(&file.path, &text) {
+                Ok((source, comments)) => {
+                    if file.source_ast {
+                        out.sources.push(source);
+                    }
+                    out.fragments.push(fragment_of(file, comments));
+                }
+                Err(gap) => {
+                    if file.source_ast {
+                        out.incomplete.push(gap);
+                    }
+                    out.fragments.push(fragment_of(file, Vec::new()));
+                }
             }
         }
     }
@@ -151,6 +197,7 @@ impl<P: HostParser> Provider for HostProvider<P> {
             conventions: Conventions::default(),
             capabilities: vec![SOURCE_AST.to_owned(), OVERLAYS.to_owned()],
             ordered_declarations: false,
+            units: Units::default(),
         }]
     }
 
@@ -163,48 +210,26 @@ impl<P: HostParser> Provider for HostProvider<P> {
             .flatten()
             .map(|overlay| (overlay.path.as_str(), overlay.text.as_str()))
             .collect();
-        for input in &params.inputs {
-            let (file, source_ast) = match input {
-                IndexInput::File { file, source_ast } => (file, *source_ast),
-                IndexInput::Regions { regions } => {
-                    self.regions(regions, &mut result);
-                    continue;
-                }
-            };
-            let text = match overlays.get(file.path.as_str()) {
-                Some(text) => Ok((*text).to_owned()),
-                None => fs::read_to_string(Path::new(&params.project.root).join(&file.path)),
-            };
-            let text = match text {
-                Ok(text) => text,
-                Err(error) => {
-                    if source_ast {
-                        result.incomplete.push(Incomplete {
-                            path: Some(file.path.clone()),
-                            reason: format!(
-                                "cannot read {} host document: {error}",
-                                self.language.title
-                            ),
-                        });
-                    }
-                    result.fragments.push(fragment_of(file, Vec::new()));
-                    continue;
-                }
-            };
-            match self.tree(&file.path, &text) {
-                Ok((source, comments)) => {
-                    if source_ast {
-                        result.sources.push(source);
-                    }
-                    result.fragments.push(fragment_of(file, comments));
-                }
-                Err(gap) => {
-                    if source_ast {
-                        result.incomplete.push(gap);
-                    }
-                    result.fragments.push(fragment_of(file, Vec::new()));
-                }
+        let root = Path::new(&params.project.root);
+        for unit in &params.units {
+            let mut out = UnitResult::default();
+            self.files(unit, root, &overlays, &mut out);
+            for file in &unit.regions {
+                let fragment = self.region(file, &mut out);
+                out.fragments.push(fragment);
             }
+            // No importer reads a unit of a language that has no code model:
+            // what its files hold is all its `api` says.
+            let hashes: Vec<&str> = unit
+                .files
+                .iter()
+                .map(|file| file.hash.as_str())
+                .chain(unit.regions.iter().map(|file| file.hash.as_str()))
+                .collect();
+            out.body = hash::sha256(hashes.join("\n"));
+            out.api = out.body.clone();
+            out.id = unit.id.clone();
+            result.units.push(out);
         }
         Ok(result)
     }

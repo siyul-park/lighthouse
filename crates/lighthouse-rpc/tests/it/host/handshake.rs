@@ -100,8 +100,8 @@ fn handshake_declares_languages_and_index_converts_the_result() {
         fake.path().to_string_lossy().as_ref()
     );
     assert_eq!(
-        params["inputs"][0],
-        json!({ "kind": "file", "file": { "path": "a.fake", "hash": "abc" } })
+        params["units"][0]["files"][0],
+        json!({ "path": "a.fake", "hash": "abc" })
     );
     assert_eq!(params["context"]["options"]["fake"]["tags"][0], "x");
     assert!(params["context"].get("overlays").is_none());
@@ -124,7 +124,7 @@ fn handshake_refuses_other_protocol_versions_and_identities() {
         Err(e) => e.to_string(),
         Ok(_) => panic!("{mode} connected"),
     };
-    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.6"));
+    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.7"));
     assert!(message("identity").contains("identifies itself as `other`"));
     let early = message("crash_at_init");
     assert!(early.contains("plugin `fake`"), "{early}");
@@ -155,30 +155,18 @@ fn an_explicit_path_disambiguates_and_relative_commands_resolve_next_to_the_mani
 }
 
 #[test]
-fn the_cache_directory_is_named_by_the_plugin_binary_and_absent_with_overlays() {
+fn overlays_are_sent_with_the_request() {
     let fake = Fake::new("ok");
     let provider = fake.provider(T);
-    let cache = tempfile::tempdir().unwrap();
     let mut ws = Workspace::new(fake.path());
-    ws.cache_dir = Some(cache.path().to_owned());
-    let sent = || -> Value {
-        let text = fs::read_to_string(fake.logs().join("log.request")).unwrap();
-        serde_json::from_str::<Value>(&text).unwrap()["params"]["context"].clone()
-    };
-
-    index(provider.as_ref(), &ws, &["a.fake"]);
-
-    let digest =
-        lighthouse_protocol::hash::sha256(fs::read(fake.path().join("plugin.sh")).unwrap());
-    let expected = cache.path().join("fake").join(&digest[..16]);
-    assert_eq!(sent()["cache"]["dir"], expected.to_string_lossy().as_ref());
-    assert!(expected.is_dir());
-
     ws.overlays.insert("a.fake".into(), "edited".to_owned());
+
     index(provider.as_ref(), &ws, &["a.fake"]);
 
-    assert!(sent().get("cache").is_none(), "{}", sent());
-    assert_eq!(sent()["overlays"][0]["path"], "a.fake");
+    let text = fs::read_to_string(fake.logs().join("log.request")).unwrap();
+    let sent: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(sent["params"]["context"]["overlays"][0]["path"], "a.fake");
+    assert!(sent["params"]["context"].get("cache").is_none(), "{sent}");
 }
 
 #[test]

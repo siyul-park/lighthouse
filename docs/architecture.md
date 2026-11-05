@@ -339,18 +339,21 @@ shared through `Context::memo`: the base facts of a symbol that CEL checks read,
 the versions of a decision that the store records with each finding. Set
 `RAYON_NUM_THREADS=1` to run on one worker.
 
-Language providers keep what they derive from a file or package in
-`.lighthouse/cache/<plugin id>/`, a directory the host passes in `context.cache`
-(see the protocol). The cache is local and derived: never committed, always safe to delete, and
-bounded in size (oldest first). Every key covers the provider build, the options and
-the toolchain, and any doubt is a miss. A warm run must answer exactly like a cold one,
-which conformance checks over every fixture. The model is the build systems that proved
-it: Go's build action IDs (a content hash of the inputs plus the export data of the
-dependencies, so a dependent is rebuilt only when what it sees changed), rustc's
-incremental compilation with the red-green "early cutoff" of Salsa (a dependent is not
-recomputed when an input's output did not change), ESLint's `--cache` (file content plus
-configuration) and Bazel's action cache. For the dependents the "output" is the API, the text of
-a package without function bodies, so a body edit re-indexes one unit.
+The host keeps what a provider derives, one result per unit of the language (a
+package, a crate, a module), as the `fragment` input of the graph in
+`.lighthouse/cache/`. The cache is local and derived: never committed, always safe to
+delete, and bounded in size (oldest first). A unit is asked again only when its key
+changes (its files, the provider's settings files, its identity and options) or when
+the `api` of a unit it imported is no longer what it was; the provider does not keep
+a result of its own. A run that finds every unit current starts no provider process,
+and a warm run must answer exactly like a cold one, which the differential test checks
+over random edits. The model is the build systems that proved it: Go's build action
+IDs (a content hash of the inputs plus the export data of the dependencies, so a
+dependent is rebuilt only when what it sees changed), rustc's incremental compilation
+with the red-green "early cutoff" of Salsa (a dependent is not recomputed when an
+input's output did not change) and Bazel's action cache. For the dependents the
+"output" is the `api` a provider reports for a unit, its text without function bodies
+or the like, so a body edit re-indexes one unit.
 
 `lighthouse check --timings` prints where a run's time went to stderr, one
 `timings:` line per phase: setup, read, each provider's index (and, under it, the phases

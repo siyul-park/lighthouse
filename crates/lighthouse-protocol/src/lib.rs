@@ -15,14 +15,13 @@ pub use language::{
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
     server::{Handler, ServeError, serve},
     wire::{
-        CacheRef, Call, Comment, Context, Conventions, Edge, EdgeKind, EmbeddedFile,
-        EmbeddedRegion, Event, EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment,
-        FunctionSummary, Implementation, Incomplete, IndexInput, IndexParams, IndexResult,
-        InitializeParams, InitializeResult, LanguageManifest, Mapping, Methods, Module, Node,
-        Overlay, PhaseTime, Position, ProjectRef, Resolution, ServerCapabilities, Signature,
-        Source, Span, Symbol, SymbolKind, SymbolRole, TestCase, TestNaming, TestStyle,
-        TextMapSegment, TypeRef, Visibility, When, WorkspaceFolder, pointer_child, pointer_tokens,
-        pointer_value,
+        Call, Comment, Context, Conventions, Edge, EdgeKind, EmbeddedFile, EmbeddedRegion, Event,
+        EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment, FunctionSummary, Implementation,
+        Incomplete, IndexParams, IndexResult, InitializeParams, InitializeResult, LanguageManifest,
+        Mapping, Methods, Module, Node, Overlay, PhaseTime, Position, ProjectRef, Resolution,
+        ServerCapabilities, Signature, Source, Span, Symbol, SymbolKind, SymbolRole, TestCase,
+        TestNaming, TestStyle, TextMapSegment, TypeRef, UnitRef, UnitResult, Units, UnitsBy,
+        Visibility, When, WorkspaceFolder, pointer_child, pointer_tokens, pointer_value,
     },
 };
 pub use model::{
@@ -42,7 +41,7 @@ pub use model::{
 pub use route::{FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
-pub const VERSION: &str = "0.6";
+pub const VERSION: &str = "0.7";
 
 /// Request: handshake; the first message of a session.
 pub const INITIALIZE: &str = "initialize";

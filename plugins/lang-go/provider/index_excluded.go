@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -71,17 +70,10 @@ func (r *run) syntacticTests(rel string) {
 
 // targetsNamed are the edge targets of the symbols of the package at dir that
 // tests name `name`: a function, type or interface by its name, a method as
-// `Type_Method`. Fragments the cache answered are JSON not yet decoded.
+// `Type_Method`.
 func (r *run) targetsNamed(dir, name string) []string {
 	targets := []string{}
-	fragments := slices.Collect(maps.Values(r.fragments))
-	for _, raw := range r.encoded {
-		var f sdk.Fragment
-		if json.Unmarshal(raw, &f) == nil {
-			fragments = append(fragments, &f)
-		}
-	}
-	for _, f := range fragments {
+	for f := range maps.Values(r.fragments) {
 		for _, s := range f.Symbols {
 			target, kind, _ := strings.Cut(s.ID, "#")
 			rest, ok := strings.CutPrefix(target, dir+"::")

@@ -19,19 +19,6 @@
       ],
       "type": "object"
     },
-    "CacheRef": {
-      "description": "The directory a provider may keep derived results in between runs.",
-      "properties": {
-        "dir": {
-          "description": "Absolute path of a directory the host owns, `.lighthouse/cache/<plugin\nid>/`. The provider reads and writes only inside it and its results are\nthe same with or without it.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "dir"
-      ],
-      "type": "object"
-    },
     "Call": {
       "description": "Params and result types of one method.",
       "properties": {
@@ -154,17 +141,6 @@
     "Context": {
       "description": "Host-side settings that accompany an index request.",
       "properties": {
-        "cache": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CacheRef"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Where the provider may cache derived results; absent when the host runs\nwithout a cache."
-        },
         "options": {
           "additionalProperties": true,
           "default": {},
@@ -598,6 +574,10 @@
         "path": {
           "description": "Project-relative, `/`-separated.",
           "type": "string"
+        },
+        "source_ast": {
+          "description": "Return the parsed tree of this file to the common source selector.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1046,51 +1026,8 @@
       ],
       "type": "object"
     },
-    "IndexInput": {
-      "description": "One input to the common provider interface.",
-      "oneOf": [
-        {
-          "description": "A physical file owned by this provider.",
-          "properties": {
-            "file": {
-              "$ref": "#/$defs/FileRef"
-            },
-            "kind": {
-              "const": "file",
-              "type": "string"
-            },
-            "source_ast": {
-              "description": "Return the parsed tree for this file to the common source selector.",
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "kind",
-            "file"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Regions already selected by the common source engine.",
-          "properties": {
-            "kind": {
-              "const": "regions",
-              "type": "string"
-            },
-            "regions": {
-              "$ref": "#/$defs/EmbeddedFile"
-            }
-          },
-          "required": [
-            "kind",
-            "regions"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "IndexParams": {
-      "description": "Index request. File and extracted-region inputs use the same provider method.",
+      "description": "Index request: the units whose result the host does not have.",
       "properties": {
         "context": {
           "$ref": "#/$defs/Context",
@@ -1098,37 +1035,39 @@
             "options": {}
           }
         },
-        "inputs": {
+        "files": {
+          "default": [],
+          "description": "Every file of the language that the project holds, sorted: what the\nanalysis of a unit may need to see of the others, as a crate sees the\ncrates around it. Only the files of `units` are indexed.",
           "items": {
-            "$ref": "#/$defs/IndexInput"
+            "type": "string"
           },
           "type": "array"
         },
         "language": {
-          "description": "Registered provider key for this invocation (file or region inputs).",
+          "description": "Registered provider key for this invocation.",
           "type": "string"
         },
         "project": {
           "$ref": "#/$defs/ProjectRef"
+        },
+        "units": {
+          "description": "Sorted by id.",
+          "items": {
+            "$ref": "#/$defs/UnitRef"
+          },
+          "type": "array"
         }
       },
       "required": [
         "project",
         "language",
-        "inputs"
+        "units"
       ],
       "type": "object"
     },
     "IndexResult": {
-      "description": "A plugin's answer to `index`: one fragment per analyzed file plus what could\nnot be analyzed. A file is never silently dropped.",
+      "description": "A plugin's answer to `index`: the result of each requested unit plus what\nconcerns the whole request. There is no answer of \"unchanged\": every requested\nunit comes back whole, and the host's equality of what it stored does the\ncutoff.",
       "properties": {
-        "fragments": {
-          "description": "One fragment per analyzed file, ordered by path.",
-          "items": {
-            "$ref": "#/$defs/Fragment"
-          },
-          "type": "array"
-        },
         "incomplete": {
           "default": [],
           "description": "Files or scopes that could not be analyzed. A file listed here may\nstill have a fragment with whatever could be recovered.",
@@ -1145,24 +1084,23 @@
           },
           "type": "array"
         },
-        "sources": {
-          "default": [],
-          "description": "Serialized ASTs and independent source-map sidecars requested for selection.",
-          "items": {
-            "$ref": "#/$defs/Source"
-          },
-          "type": "array"
-        },
         "timings": {
           "description": "Where the provider's time went, phase by phase, for the host's\n`--timings`; it changes nothing in the analysis.",
           "items": {
             "$ref": "#/$defs/PhaseTime"
           },
           "type": "array"
+        },
+        "units": {
+          "description": "One per requested unit, ordered by id.",
+          "items": {
+            "$ref": "#/$defs/UnitResult"
+          },
+          "type": "array"
         }
       },
       "required": [
-        "fragments"
+        "units"
       ],
       "type": "object"
     },
@@ -1241,7 +1179,7 @@
         },
         "capabilities": {
           "default": [],
-          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, `cache-overlays`, and `source-ast`.\nHosts ignore unknown values.",
+          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, and `source-ast`.\nHosts ignore unknown values.",
           "items": {
             "type": "string"
           },
@@ -1290,6 +1228,13 @@
           "description": "Among providers matching a file, the higher priority wins.",
           "format": "int32",
           "type": "integer"
+        },
+        "units": {
+          "$ref": "#/$defs/Units",
+          "default": {
+            "by": "file"
+          },
+          "description": "How the host groups the language's files into the units it indexes and\ncaches: a provider is asked only for the units whose content, or whose\nimports' `api`, changed."
         }
       },
       "required": [
@@ -1484,7 +1429,7 @@
       ]
     },
     "Overlay": {
-      "description": "The text that stands in for a file: a provider reads it instead of the\nfile on disk, and must not read the disk for that path. Hosts send overlays\nfor requested files only, as a fix run verifies edits before writing them.",
+      "description": "The text that stands in for a file: a provider reads it instead of the\nfile on disk, and must not read the disk for that path. Hosts send every\noverlay of the run, as a fix run verifies edits before writing them and a\nunit may read a file of another.",
       "properties": {
         "path": {
           "type": "string"
@@ -2072,6 +2017,159 @@
         "text"
       ],
       "type": "object"
+    },
+    "UnitRef": {
+      "description": "A unit to index: its files, or the regions selected in the host files.",
+      "properties": {
+        "files": {
+          "default": [],
+          "description": "The files of the unit, sorted by path; empty for the unit of regions.",
+          "items": {
+            "$ref": "#/$defs/FileRef"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "The unit's identity in the language: its directory, file or manifest\ndirectory, project-relative and `/`-separated (`.` for the root);\n`#regions` for the regions selected in the project's files.",
+          "type": "string"
+        },
+        "imports": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "The `api` of each unit the last result of this one imported, as the\nhost holds it now: what the provider may compute this unit's `api`\nfrom instead of reading the imports again.",
+          "type": "object"
+        },
+        "key": {
+          "description": "The host's key of the unit: BLAKE3 of what its result depends on at\nthe host's end. A provider may use it as a name and need not read it.",
+          "type": "string"
+        },
+        "regions": {
+          "description": "Regions already selected by the common source engine, by host file,\nsorted by path: all the regions of the language make one unit, as the\nanalysis of one may read the others.",
+          "items": {
+            "$ref": "#/$defs/EmbeddedFile"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnitResult": {
+      "description": "The result of one unit.",
+      "properties": {
+        "api": {
+          "description": "A hash of what an importer can see of the unit: its exported\ndeclarations and their types, and the `api` of what it imports, so\nthat it composes. A change of `body` that leaves it equal is cut off at\nthe host: the importers keep their results.",
+          "type": "string"
+        },
+        "body": {
+          "description": "A hash of everything the unit's files hold, bodies included: the\nprovider's own, opaque to the host.",
+          "type": "string"
+        },
+        "fragments": {
+          "description": "One fragment per analyzed file, ordered by path.",
+          "items": {
+            "$ref": "#/$defs/Fragment"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "imports": {
+          "default": [],
+          "description": "The ids of the units of the project this one imports, sorted; `*`\nstands for every unit, when the analysis of this one reads what any\nother declares.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "incomplete": {
+          "description": "Files of this unit that could not be analyzed, kept as `notices` are.",
+          "items": {
+            "$ref": "#/$defs/Incomplete"
+          },
+          "type": "array"
+        },
+        "notices": {
+          "description": "Messages about this unit that leave its analysis complete. The host\nkeeps them with the unit and shows them again when it takes the unit\nas it is.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sources": {
+          "description": "Serialized ASTs and independent source-map sidecars requested for selection.",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "fragments",
+        "body",
+        "api"
+      ],
+      "type": "object"
+    },
+    "Units": {
+      "description": "The mapping from files to units, declared by the language as Bazel and\nPants declare their package boundaries. The host applies it to the paths of\nthe files; a provider is not asked.",
+      "properties": {
+        "by": {
+          "$ref": "#/$defs/UnitsBy"
+        },
+        "env": {
+          "description": "Names of the environment variables that decide it too (`GOOS`): their\nvalues are part of the key of every unit.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "manifest": {
+          "description": "With `by: manifest`, the file name that marks a unit's root, such as\n`Cargo.toml`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "settings": {
+          "description": "Names of the files that decide how every file of the language is read\n(`go.mod`, `tsconfig.json`): the content of each file of such a name is\npart of the key of every unit.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "by"
+      ],
+      "type": "object"
+    },
+    "UnitsBy": {
+      "description": "What a unit is.",
+      "oneOf": [
+        {
+          "const": "directory",
+          "description": "The files of one directory (a Go package).",
+          "type": "string"
+        },
+        {
+          "const": "file",
+          "description": "One file (a TypeScript or Python module).",
+          "type": "string"
+        },
+        {
+          "const": "manifest",
+          "description": "The files below a manifest, down to the next manifest (a Rust crate).",
+          "type": "string"
+        }
+      ]
     },
     "Visibility": {
       "description": "Who may use a symbol, as its language defines it; `internal` means visible\nwithin a bounded unit such as a crate, not outside it.",

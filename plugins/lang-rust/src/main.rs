@@ -2,7 +2,7 @@
 //! names through its own module tree and speaks the plugin protocol on stdin
 //! and stdout.
 
-mod cache;
+mod api;
 mod comments;
 mod extent;
 mod functions;

@@ -58,7 +58,6 @@ const GO: Lang = Lang {
         "reference-sites",
         "overlays",
         "source-ast",
-        "cache-overlays",
     ],
 };
 
@@ -226,7 +225,7 @@ fn index(
     options: &Value,
     files: &[String],
 ) -> Value {
-    index_overlaid(plugin, root, language, options, files, None, None)
+    index_overlaid(plugin, root, language, options, files, None)
 }
 
 fn index_overlaid(
@@ -236,23 +235,14 @@ fn index_overlaid(
     options: &Value,
     files: &[String],
     overlays: Option<Vec<wire::Overlay>>,
-    cache: Option<&Path>,
 ) -> Value {
     let params = IndexParams {
         project: wire::ProjectRef {
             root: root.to_string_lossy().into_owned(),
         },
         language: language.to_owned(),
-        inputs: files
-            .iter()
-            .map(|path| wire::IndexInput::File {
-                file: wire::FileRef {
-                    path: path.clone(),
-                    hash: "unused".to_owned(),
-                },
-                source_ast: false,
-            })
-            .collect(),
+        units: vec![unit_of(files, "unused")],
+        files: files.to_vec(),
         context: wire::Context {
             options: options
                 .as_object()
@@ -261,9 +251,6 @@ fn index_overlaid(
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect::<BTreeMap<_, _>>(),
             overlays,
-            cache: cache.map(|dir| wire::CacheRef {
-                dir: dir.to_string_lossy().into_owned(),
-            }),
         },
     };
     // How long a provider took is not what it found.
@@ -271,7 +258,44 @@ fn index_overlaid(
     if let Some(object) = result.as_object_mut() {
         object.remove("timings");
     }
-    result
+    serde_json::from_value::<wire::IndexResult>(result.clone())
+        .unwrap_or_else(|e| panic!("{language} did not answer an index result: {e}"));
+    together(result)
+}
+
+/// One unit that holds `files`.
+fn unit_of(files: &[String], hash: &str) -> wire::UnitRef {
+    wire::UnitRef {
+        id: ".".to_owned(),
+        key: String::new(),
+        files: files
+            .iter()
+            .map(|path| wire::FileRef {
+                path: path.clone(),
+                hash: hash.to_owned(),
+                source_ast: false,
+            })
+            .collect(),
+        regions: Vec::new(),
+        imports: Default::default(),
+    }
+}
+
+/// The answers of the units as one: their fragments, sources, notices and gaps
+/// after the run's own, the shape the goldens hold.
+fn together(mut result: Value) -> Value {
+    let units = result["units"].take();
+    let mut out = json!({
+        "fragments": [], "sources": [],
+        "notices": result["notices"].take(), "incomplete": result["incomplete"].take(),
+    });
+    for unit in units.as_array().into_iter().flatten() {
+        for key in ["fragments", "sources", "notices", "incomplete"] {
+            let items = unit[key].as_array().into_iter().flatten().cloned();
+            out[key].as_array_mut().unwrap().extend(items);
+        }
+    }
+    out
 }
 
 fn golden(lang: &Lang) {
@@ -298,9 +322,6 @@ fn golden(lang: &Lang) {
             let mut plugin = Plugin::start(&dir, &root);
             plugin.initialize(&root);
             let actual = index(&mut plugin, &root, lang.id, &options, &sources);
-            serde_json::from_value::<wire::IndexResult>(actual.clone()).unwrap_or_else(|e| {
-                panic!("{} {variant} is not an index result: {e}", case.display())
-            });
             assert_eq!(plugin.finish(), Some(0));
             let name = if variant.is_empty() {
                 "expected.json".to_owned()
@@ -319,69 +340,6 @@ fn golden(lang: &Lang) {
         failures.is_empty(),
         "stale goldens (UPDATE_GOLDEN=1 to regenerate): {failures:#?}"
     );
-}
-
-/// Every case indexed cold and then warm, each in a plugin process of its own,
-/// answers byte for byte what an uncached run does.
-fn cached_runs_equal_uncached(lang: &Lang) {
-    let Some(dir) = (lang.plugin)() else {
-        return;
-    };
-    let cases = conformance().join(lang.id);
-    let mut names: Vec<_> = fs::read_dir(&cases)
-        .unwrap()
-        .map(|e| e.unwrap().path())
-        .collect();
-    names.sort();
-    for case in names {
-        let root = case.join("project").canonicalize().unwrap();
-        let mut sources = Vec::new();
-        files(&root, &root, lang.exts, &mut sources);
-        for (variant, options) in variants(&case) {
-            let cache = tempfile::tempdir().unwrap();
-            let run = |cache: Option<&Path>| {
-                let mut plugin = Plugin::start(&dir, &root);
-                plugin.initialize(&root);
-                let result =
-                    index_overlaid(&mut plugin, &root, lang.id, &options, &sources, None, cache);
-                assert_eq!(plugin.finish(), Some(0));
-                pretty(&result)
-            };
-            let plain = run(None);
-            assert_eq!(
-                run(Some(cache.path())),
-                plain,
-                "{} {variant} cold",
-                case.display()
-            );
-            assert_eq!(
-                run(Some(cache.path())),
-                plain,
-                "{} {variant} warm",
-                case.display()
-            );
-        }
-    }
-}
-
-#[test]
-fn go_plugin_answers_the_same_with_a_cache() {
-    cached_runs_equal_uncached(&GO);
-}
-
-#[test]
-fn rust_plugin_answers_the_same_with_a_cache() {
-    cached_runs_equal_uncached(&RUST);
-}
-
-#[test]
-fn typescript_plugin_answers_the_same_with_a_cache() {
-    cached_runs_equal_uncached(&TYPESCRIPT);
-}
-
-#[test]
-fn python_plugin_answers_the_same_with_a_cache() {
-    cached_runs_equal_uncached(&PYTHON);
 }
 
 #[test]
@@ -522,24 +480,20 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
                 root: root.to_string_lossy().into_owned(),
             },
             language: lang.id.to_owned(),
-            inputs: files
-                .iter()
-                .map(|path| wire::IndexInput::File {
-                    file: wire::FileRef {
-                        path: path.clone(),
-                        hash: "0".to_owned(),
-                    },
-                    source_ast: false,
-                })
-                .collect(),
+            units: vec![unit_of(&files, "0")],
+            files: files.clone(),
             context: wire::Context {
                 options,
                 overlays: None,
-                cache: None,
             },
         };
         let result: wire::IndexResult = plugin.call(wire::INDEX, params);
-        assert!(result.fragments.len() + result.incomplete.len() >= files.len());
+        let fragments: usize = result
+            .units
+            .iter()
+            .map(|unit| unit.fragments.len() + unit.incomplete.len())
+            .sum();
+        assert!(fragments + result.incomplete.len() >= files.len());
         assert!(serde_json::to_vec(&result).unwrap().len() > 500_000);
         assert_eq!(plugin.finish(), Some(0));
     }
@@ -603,7 +557,6 @@ fn overlays_replace_the_text_a_provider_reads() {
                 path: file.to_owned(),
                 text: format!("{on_disk}{added}"),
             }]),
-            None,
         );
 
         assert!(

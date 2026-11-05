@@ -1,6 +1,7 @@
-//! The `initialize` and `index` methods: finds the packages of the requested
+//! The `initialize` and `index` methods: finds the packages of the project's
 //! files, builds the module tree of every crate target, and reports one
-//! fragment per file.
+//! fragment per file of the units asked for. A unit is a crate: the files below
+//! a `Cargo.toml`, down to the next.
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -8,14 +9,13 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    Conventions, ErrorObject, FileInfo, Fragment, Incomplete, IndexInput, IndexParams, IndexResult,
-    LanguageManifest, TestNaming, language,
+    Conventions, ErrorObject, FileInfo, Fragment, Incomplete, IndexParams, IndexResult,
+    LanguageManifest, Source, TestNaming, UnitRef, UnitResult, Units, UnitsBy, language,
 };
 use serde::Deserialize;
 
 use crate::{
-    cache::Cache,
-    index,
+    api, index,
     names::Index,
     project::cargo::{self, Manifests, Package, Target, TargetKind},
     project::{Root, Tree},
@@ -23,6 +23,9 @@ use crate::{
 };
 
 const LANGUAGE: &str = "rust";
+const MANIFEST: &str = "Cargo.toml";
+/// The import that stands for every unit of the language.
+const EVERY: &str = "*";
 
 pub struct Provider {
     id: String,
@@ -66,56 +69,109 @@ impl language::Provider for Provider {
                 .map(str::to_owned)
                 .to_vec(),
             ordered_declarations: false,
+            units: Units {
+                by: UnitsBy::Manifest,
+                manifest: Some(MANIFEST.to_owned()),
+                // What decides the packages, targets and editions of every file.
+                settings: [
+                    MANIFEST,
+                    "Cargo.lock",
+                    "rust-toolchain",
+                    "rust-toolchain.toml",
+                ]
+                .map(str::to_owned)
+                .to_vec(),
+                env: Vec::new(),
+            },
         }]
     }
 
     fn index(&mut self, params: IndexParams) -> Result<IndexResult, ErrorObject> {
-        let regions: Vec<_> = params
-            .inputs
-            .iter()
-            .filter_map(|input| match input {
-                IndexInput::Regions { regions } => Some(regions),
-                IndexInput::File { .. } => None,
-            })
-            .collect();
         let options = match params.context.options.get(LANGUAGE) {
             Some(raw) => match Options::deserialize(raw) {
                 Ok(options) => options,
                 Err(error) => {
                     return Ok(IndexResult {
-                        fragments: Vec::new(),
-                        sources: Vec::new(),
-                        notices: Vec::new(),
                         incomplete: vec![Incomplete {
                             path: None,
                             reason: format!("[languages.{LANGUAGE}]: {error}"),
                         }],
-                        timings: Vec::new(),
+                        ..IndexResult::default()
                     });
                 }
             },
             None => Options::default(),
         };
-        let provider = format!("{}@{}", self.id, self.version);
-        let has_files = params
-            .inputs
+        let root = normalize(Path::new(&params.project.root));
+        let all = &params.files;
+        let has_files = params.units.iter().any(|unit| !unit.files.is_empty());
+        let packages = packages(&root, if has_files { all } else { &[] });
+        let tree = module_tree(&root, &packages.list, &options, overlays(&params, &root));
+        let idx = Index::build(&tree, &packages.list);
+        let analysis = Analysis {
+            root: &root,
+            found: &packages,
+            tree: &tree,
+            idx: &idx,
+        };
+        let units = params
+            .units
             .iter()
-            .any(|input| matches!(input, IndexInput::File { .. }));
-        if regions.is_empty() {
-            return Ok(index_files(&params, &options, &provider));
-        }
-        let mut result = regions::index(&params, &regions, &options);
-        if has_files {
-            let files = index_files(&params, &options, &provider);
-            result.fragments.extend(files.fragments);
-            result.sources.extend(files.sources);
-            result.notices.extend(files.notices);
-            result.incomplete.extend(files.incomplete);
-            result
-                .fragments
-                .sort_by(|a, b| a.file.path.cmp(&b.file.path));
-        }
-        Ok(result)
+            .map(|unit| {
+                let (found, api) = match unit.regions.is_empty() {
+                    true => analysis.unit(unit),
+                    false => (regions_of(&params, unit, &options), None),
+                };
+                result_of(unit, found, api)
+            })
+            .collect();
+        Ok(IndexResult {
+            units,
+            ..IndexResult::default()
+        })
+    }
+}
+
+/// What the analysis of a unit found.
+#[derive(Default)]
+pub(crate) struct Found {
+    pub fragments: Vec<Fragment>,
+    pub sources: Vec<Source>,
+    pub notices: Vec<String>,
+    pub incomplete: Vec<Incomplete>,
+}
+
+/// The fences of the host files of a unit of regions.
+fn regions_of(params: &IndexParams, unit: &UnitRef, options: &Options) -> Found {
+    let hosts: Vec<_> = unit.regions.iter().collect();
+    regions::index(params, &hosts, options)
+}
+
+/// The wire result of a unit. A unit of files has the `api` of its skeletons; a
+/// unit of regions is imported by none, and what it holds is all its `api`
+/// says.
+fn result_of(unit: &UnitRef, found: Found, api: Option<String>) -> UnitResult {
+    let hashes: Vec<&str> = unit
+        .files
+        .iter()
+        .map(|file| file.hash.as_str())
+        .chain(unit.regions.iter().map(|file| file.hash.as_str()))
+        .collect();
+    let body = api::digest(&hashes);
+    UnitResult {
+        id: unit.id.clone(),
+        fragments: found.fragments,
+        sources: found.sources,
+        api: api.unwrap_or_else(|| body.clone()),
+        body,
+        // A fragment reads what the other crates declare, as a module tree of
+        // all of them resolves a path: every unit is imported.
+        imports: match unit.regions.is_empty() {
+            true => vec![EVERY.to_owned()],
+            false => Vec::new(),
+        },
+        notices: found.notices,
+        incomplete: found.incomplete,
     }
 }
 
@@ -204,80 +260,83 @@ pub fn normalize(path: &Path) -> PathBuf {
     out
 }
 
-fn index_files(params: &IndexParams, options: &Options, provider: &str) -> IndexResult {
-    let root = normalize(Path::new(&params.project.root));
-    let requested_asts: BTreeSet<String> = params
-        .inputs
-        .iter()
-        .filter_map(|input| match input {
-            IndexInput::File {
-                file,
-                source_ast: true,
-            } => Some(file.path.clone()),
-            _ => None,
-        })
-        .collect();
-    let files = requested_files(params);
-    let mut incomplete: BTreeSet<(Option<String>, String)> = BTreeSet::new();
-    let mut editions = Manifests::default();
-    let mut fragments: BTreeMap<String, Fragment> = BTreeMap::new();
-    let mut notices = Vec::new();
+/// The module tree and the name index of every file of the project, which a
+/// unit is analyzed in.
+struct Analysis<'a> {
+    root: &'a Path,
+    found: &'a Packages,
+    tree: &'a Tree,
+    idx: &'a Index<'a>,
+}
 
-    let found = packages(&root, &files);
-    let tree = module_tree(&root, &found.list, options, overlays(params, &root));
-    let idx = Index::build(&tree, &found.list);
-    let mut cache = Cache::open(params, provider, &tree, &files);
-    let mut orphans = Vec::new();
-    let mut macros = MacroSummary::default();
-    for rel in &files {
-        let mut fragment = empty_fragment(rel);
-        match (found.of.get(rel), tree.file_of(&normalize(&root.join(rel)))) {
-            (_, Some(file)) => {
-                let (extracted, stats) = analyzed(&idx, file, cache.as_mut());
-                macros.add(rel, &stats);
-                fragment = extracted;
+impl Analysis<'_> {
+    /// The fragments, trees and gaps of the files of a unit, and its `api`.
+    fn unit(&self, unit: &UnitRef) -> (Found, Option<String>) {
+        let files: Vec<String> = unit.files.iter().map(|file| file.path.clone()).collect();
+        let (root, tree) = (self.root, self.tree);
+        let mut out = Found::default();
+        let mut incomplete: BTreeSet<(Option<String>, String)> = BTreeSet::new();
+        let mut editions = Manifests::default();
+        let mut orphans = Vec::new();
+        let mut macros = MacroSummary::default();
+        for rel in &files {
+            let mut fragment = empty_fragment(rel);
+            match (
+                self.found.of.get(rel),
+                tree.file_of(&normalize(&root.join(rel))),
+            ) {
+                (_, Some(file)) => {
+                    let (extracted, stats) = index::fragment(self.idx, file);
+                    macros.add(rel, &stats);
+                    fragment = extracted;
+                }
+                (Some(Err(reason)), None) => {
+                    incomplete.insert((Some(rel.clone()), reason.clone()));
+                }
+                (_, None) => orphans.push(rel.clone()),
             }
-            (Some(Err(reason)), None) => {
-                incomplete.insert((Some(rel.clone()), reason.clone()));
+            state_edition(&mut fragment, root, &mut editions, &mut incomplete);
+            out.fragments.push(fragment);
+        }
+        for (rel, reason) in tree.problems.iter().filter(|(rel, _)| files.contains(rel)) {
+            incomplete.insert((Some(rel.clone()), reason.clone()));
+        }
+        unreached(&orphans, tree, &mut incomplete, &mut out.notices);
+        out.notices.extend(tree.included(&files));
+        out.notices.extend(macros.notice());
+        out.notices.extend(shared(tree, &files));
+        let wanted: BTreeSet<&str> = unit
+            .files
+            .iter()
+            .filter(|file| file.source_ast)
+            .map(|file| file.path.as_str())
+            .collect();
+        let mut seen_trees = BTreeSet::new();
+        for file in &tree.files {
+            if !wanted.contains(file.rel.as_str()) || !seen_trees.insert(file.rel.clone()) {
+                continue;
             }
-            (_, None) => orphans.push(rel.clone()),
-        }
-        state_edition(&mut fragment, &root, &mut editions, &mut incomplete);
-        fragments.insert(rel.clone(), fragment);
-    }
-    for (rel, reason) in &tree.problems {
-        incomplete.insert((Some(rel.clone()), reason.clone()));
-    }
-    unreached(&orphans, &tree, &mut incomplete, &mut notices);
-    notices.extend(tree.included(&files));
-    notices.extend(macros.notice());
-    notices.extend(shared(&tree));
-    notices.extend(cache.and_then(Cache::save));
-    let mut sources = Vec::new();
-    let mut seen_trees = BTreeSet::new();
-    for file in &tree.files {
-        if !requested_asts.contains(&file.rel) || !seen_trees.insert(file.rel.clone()) {
-            continue;
-        }
-        match crate::symbols::from_file(file) {
-            Ok(source_ast) => sources.push(source_ast),
-            Err(reason) => {
-                incomplete.insert((
-                    Some(file.rel.clone()),
-                    format!("cannot expose source: {reason}"),
-                ));
+            match crate::symbols::from_file(file) {
+                Ok(source_ast) => out.sources.push(source_ast),
+                Err(reason) => {
+                    incomplete.insert((
+                        Some(file.rel.clone()),
+                        format!("cannot expose source: {reason}"),
+                    ));
+                }
             }
         }
-    }
-    IndexResult {
-        fragments: fragments.into_values().collect(),
-        sources,
-        notices,
-        incomplete: incomplete
+        out.incomplete = incomplete
             .into_iter()
             .map(|(path, reason)| Incomplete { path, reason })
-            .collect(),
-        timings: Vec::new(),
+            .collect();
+        out.fragments.sort_by(|a, b| a.file.path.cmp(&b.file.path));
+        let reached: Vec<&crate::project::SourceFile> = tree
+            .files
+            .iter()
+            .filter(|file| files.contains(&file.rel))
+            .collect();
+        (out, Some(api::of(&reached)))
     }
 }
 
@@ -299,39 +358,6 @@ fn state_edition(
             incomplete.insert((Some(rel), reason));
         }
     }
-}
-
-/// The fragment of a file, from the cache when its text and context are
-/// unchanged.
-fn analyzed(
-    idx: &Index,
-    file: usize,
-    mut cache: Option<&mut Cache>,
-) -> (Fragment, index::MacroStats) {
-    let source = &idx.tree.files[file];
-    if let Some(hit) = cache.as_deref_mut().and_then(|c| c.get(source)) {
-        return hit;
-    }
-    let (fragment, stats) = index::fragment(idx, file);
-    if let Some(c) = cache {
-        c.put(source, &fragment, &stats);
-    }
-    (fragment, stats)
-}
-
-/// The requested paths, sorted and deduplicated.
-fn requested_files(params: &IndexParams) -> Vec<String> {
-    let mut files: Vec<String> = params
-        .inputs
-        .iter()
-        .filter_map(|input| match input {
-            IndexInput::File { file, .. } => Some(file.path.clone()),
-            IndexInput::Regions { .. } => None,
-        })
-        .collect();
-    files.sort();
-    files.dedup();
-    files
 }
 
 fn empty_fragment(path: &str) -> Fragment {
@@ -523,8 +549,8 @@ fn unreached(
 }
 
 /// Files that several crate targets reach are analyzed once; say so.
-fn shared(tree: &Tree) -> Option<String> {
-    let files: BTreeSet<&String> = tree.shared.iter().collect();
+fn shared(tree: &Tree, of: &[String]) -> Option<String> {
+    let files: BTreeSet<&String> = tree.shared.iter().filter(|rel| of.contains(rel)).collect();
     let example = files.first()?;
     Some(format!(
         "{} file(s) belong to several crate targets (a `mod` shared by tests, for example) and are analyzed once, as part of the first target, e.g. {example}",

@@ -50,7 +50,7 @@ func newHandler() stub {
 			if p.Language == "fail" {
 				return sdk.IndexResult{}, errors.New("no")
 			}
-			return sdk.IndexResult{Fragments: []sdk.Fragment{}, Notices: []string{p.Project.Root}, Incomplete: []sdk.Incomplete{}}, nil
+			return sdk.IndexResult{Units: []sdk.UnitResult{}, Notices: []string{p.Project.Root}, Incomplete: []sdk.Incomplete{}}, nil
 		},
 	}
 }
@@ -91,7 +91,7 @@ func TestServe(t *testing.T) {
 	t.Run("answers requests and stops after shutdown and exit", func(t *testing.T) {
 		var in strings.Builder
 		in.WriteString(request(t, 1, sdk.MethodInitialize, sdk.InitializeParams{ProtocolVersion: sdk.ProtocolVersion, WorkspaceFolders: []sdk.WorkspaceFolder{{URI: "file:///r%20x/", Name: "r x"}}}))
-		in.WriteString(request(t, 2, sdk.MethodIndex, sdk.IndexParams{Project: sdk.ProjectRef{Root: "/r"}, Language: "go"}))
+		in.WriteString(request(t, 2, sdk.MethodIndex, sdk.IndexParams{Project: sdk.ProjectRef{Root: "/r"}, Language: "go", Units: []sdk.UnitRef{}}))
 		in.WriteString(request(t, 3, "nope", struct{}{}))
 		in.WriteString(request(t, 4, sdk.MethodIndex, sdk.IndexParams{Language: "panic"}))
 		in.WriteString(request(t, 5, sdk.MethodIndex, sdk.IndexParams{Language: "fail"}))
@@ -109,7 +109,7 @@ func TestServe(t *testing.T) {
 		require.NoError(t, json.Unmarshal(got[0].Result, &init))
 		require.Equal(t, "x", init.ServerInfo.Name)
 		require.Equal(t, "stub", init.Capabilities.Languages[0].ID)
-		require.JSONEq(t, `{"fragments":[],"notices":["/r"],"incomplete":[]}`, string(got[1].Result))
+		require.JSONEq(t, `{"units":[],"notices":["/r"],"incomplete":[]}`, string(got[1].Result))
 		for i, code := range map[int]int{2: -32601, 3: -32603, 4: -32803, 5: -32602} {
 			require.NotNil(t, got[i].Error, "reply %d", i)
 			require.Equal(t, code, got[i].Error.Code, "reply %d", i)

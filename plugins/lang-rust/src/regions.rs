@@ -18,7 +18,6 @@ use std::{
 
 use lighthouse_protocol::{
     EdgeKind, EmbeddedFile, EmbeddedRegion, FileInfo, Fragment, Incomplete, IndexParams,
-    IndexResult,
 };
 
 use crate::{
@@ -26,7 +25,7 @@ use crate::{
     names::Index,
     project::cargo::{Manifests, Package, TargetKind},
     project::{Root, Tree},
-    provider::{Governor, Options, governor, normalize, overlays, roots},
+    provider::{Found, Governor, Options, governor, normalize, overlays, roots},
 };
 use remap::{Lines, Remap};
 use text::Text;
@@ -58,13 +57,9 @@ struct Snippet<'a> {
     edition: Option<String>,
 }
 
-pub(crate) fn index(
-    params: &IndexParams,
-    files: &[&EmbeddedFile],
-    options: &Options,
-) -> IndexResult {
+pub(crate) fn index(params: &IndexParams, files: &[&EmbeddedFile], options: &Options) -> Found {
     let root = normalize(Path::new(&params.project.root));
-    let mut result = IndexResult::default();
+    let mut result = Found::default();
     let mut snippets = snippets(&root, files);
     let mut tree = Tree::new(&root);
     tree.overlays = overlays(params, &root);
@@ -152,7 +147,7 @@ fn state_editions(
     root: &Path,
     snippets: &[Snippet],
     by_host: &mut BTreeMap<String, Fragment>,
-    result: &mut IndexResult,
+    result: &mut Found,
 ) {
     let mut crates = Manifests::default();
     for (path, fragment) in by_host.iter_mut() {
@@ -237,7 +232,7 @@ fn packages(
     snippets: &mut [Snippet],
     options: &Options,
     tree: &mut Tree,
-    result: &mut IndexResult,
+    result: &mut Found,
 ) -> Vec<Package> {
     let mut by_dir = BTreeMap::new();
     let mut homes: Vec<Option<PathBuf>> = Vec::new();
@@ -304,7 +299,7 @@ fn packages(
 
 /// Adds the unit to the tree: a crate of its own, or a module of the one it is
 /// code of.
-fn add(tree: &mut Tree, snippet: &Snippet, none: usize, result: &mut IndexResult) {
+fn add(tree: &mut Tree, snippet: &Snippet, none: usize, result: &mut Found) {
     let Some(file) = &snippet.into else {
         tree.add_crate(Root {
             label: snippet.label.clone(),

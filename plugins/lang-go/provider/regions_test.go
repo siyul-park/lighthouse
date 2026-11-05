@@ -24,7 +24,7 @@ const (
 	regionLib    = "package m\n\nfunc Hello() string { return \"x\" }\n\nfunc helper() {}\n"
 )
 
-func hasNotice(result sdk.IndexResult, part string) bool {
+func hasNotice(result answer, part string) bool {
 	for _, notice := range result.Notices {
 		if strings.Contains(notice, part) {
 			return true
@@ -184,7 +184,7 @@ func TestProviderIndexRegions(t *testing.T) {
 		for _, f := range result.Fragments {
 			paths = append(paths, f.File.Path)
 		}
-		require.Equal(t, []string{"README.md", "m.go"}, paths, "the fences have no fragment of their own")
+		require.ElementsMatch(t, []string{"README.md", "m.go"}, paths, "the fences have no fragment of their own")
 	})
 
 	t.Run("a directory without a Go package is a gap", func(t *testing.T) {
@@ -236,18 +236,18 @@ func regionProject(t *testing.T) string {
 }
 
 // indexFences indexes the fences of README.md, written one after the other.
-func indexFences(t *testing.T, root string, fences []fence) (sdk.IndexResult, *provider.Provider) {
+func indexFences(t *testing.T, root string, fences []fence) (answer, *provider.Provider) {
 	t.Helper()
 	return index(t, root, fences, nil)
 }
 
 // indexMixed indexes m.go and the fences of README.md in one request.
-func indexMixed(t *testing.T, root string, fences []fence) (sdk.IndexResult, *provider.Provider) {
+func indexMixed(t *testing.T, root string, fences []fence) (answer, *provider.Provider) {
 	t.Helper()
-	return index(t, root, fences, []sdk.IndexInput{{Kind: "file", File: &sdk.FileRef{Path: "m.go"}}})
+	return index(t, root, fences, []sdk.UnitRef{{ID: ".", Files: []sdk.FileRef{{Path: "m.go"}}}})
 }
 
-func index(t *testing.T, root string, fences []fence, files []sdk.IndexInput) (sdk.IndexResult, *provider.Provider) {
+func index(t *testing.T, root string, fences []fence, files []sdk.UnitRef) (answer, *provider.Provider) {
 	t.Helper()
 	var host strings.Builder
 	var sources []sdk.EmbeddedRegion
@@ -276,19 +276,24 @@ func index(t *testing.T, root string, fences []fence, files []sdk.IndexInput) (s
 		host.WriteString("```\n\n")
 	}
 	g := provider.New("lang-go", "test")
-	inputs := append(files, sdk.IndexInput{Kind: "regions", Regions: &sdk.EmbeddedFile{
+	units := append(files, sdk.UnitRef{ID: "#regions", Regions: []sdk.EmbeddedFile{{
 		Path: "README.md", Text: host.String(), Regions: sources,
-	}})
-	result, err := g.Index(sdk.IndexParams{
+	}}})
+	var paths []string
+	for _, unit := range files {
+		paths = append(paths, filesOf(unit.Files)...)
+	}
+	result, err := indexOf(g, sdk.IndexParams{
 		Project:  sdk.ProjectRef{Root: root},
 		Language: "go",
-		Inputs:   inputs,
+		Units:    units,
+		Files:    paths,
 	})
 	require.NoError(t, err)
 	return result, g
 }
 
-func edgeTo(t *testing.T, result sdk.IndexResult, name string) sdk.Edge {
+func edgeTo(t *testing.T, result answer, name string) sdk.Edge {
 	t.Helper()
 	fragment := onlyFragment(t, result)
 	for _, edge := range fragment.Edges {
@@ -300,7 +305,7 @@ func edgeTo(t *testing.T, result sdk.IndexResult, name string) sdk.Edge {
 	return sdk.Edge{}
 }
 
-func onlyFragment(t *testing.T, result sdk.IndexResult) sdk.Fragment {
+func onlyFragment(t *testing.T, result answer) sdk.Fragment {
 	t.Helper()
 	require.Len(t, result.Fragments, 1, "%v %v", result.Notices, result.Incomplete)
 	return result.Fragments[0]

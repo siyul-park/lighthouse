@@ -20,6 +20,11 @@ pub struct Timings {
     /// Indexing by each language provider, by language id; the providers run
     /// side by side.
     pub index: Vec<(String, Duration)>,
+    /// How many units each request to a provider asked for, by language id,
+    /// in the order of `index`. A run with nothing stale asks none.
+    pub sent: Vec<(String, usize)>,
+    /// Taking the answers of the units the providers were not asked for.
+    pub fetch: Duration,
     /// Where a provider says its own time went, by language id: the phases in
     /// the order it ran them. Only providers that say are listed.
     pub index_phases: Vec<(String, Vec<(String, Duration)>)>,
@@ -70,12 +75,17 @@ impl Timings {
             self.files.tree.chars().take(8).collect::<String>(),
             self.files.commit.as_secs_f64() * 1000.0
         ));
-        for (language, spent) in &self.index {
-            out.push(line(&format!("index {language}"), *spent));
+        for (at, (language, spent)) in self.index.iter().enumerate() {
+            let head = line(&format!("index {language}"), *spent);
+            out.push(match self.sent.get(at) {
+                Some((_, sent)) => format!("{head} ({sent} unit(s) sent)"),
+                None => head,
+            });
             if let Some(phases) = self.phases_of(language) {
                 out.push(format!("timings: index {language}: {phases}"));
             }
         }
+        out.push(line("fetch", self.fetch));
         out.push(line("merge", self.merge));
         if self.hashing > Duration::ZERO {
             out.push(format!(

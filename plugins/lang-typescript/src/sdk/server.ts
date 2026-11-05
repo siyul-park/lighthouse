@@ -2,7 +2,7 @@ import type { Readable, Writable } from "node:stream";
 import { StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
 import type { IndexParams, IndexResult, InitializeParams, InitializeResult, LanguageManifest } from "./wire.ts";
 
-export const PROTOCOL_VERSION = "0.6";
+export const PROTOCOL_VERSION = "0.7";
 
 const PARSE_ERROR = -32700;
 
@@ -139,7 +139,7 @@ function route(provider: Provider, message: Incoming, session: Session): Outcome
   }
   switch (message.method) {
     case "lighthouse/index": {
-      const params = decode<IndexParams>(message.params, ["project", "language", "inputs"]);
+      const params = decode<IndexParams>(message.params, ["project", "language", "units"]);
       if ("code" in params) return params;
       return { result: provider.index(params) };
     }

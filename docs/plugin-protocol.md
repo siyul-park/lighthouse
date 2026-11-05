@@ -1,10 +1,10 @@
-# Plugin protocol 0.6
+# Plugin protocol 0.7
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.6.json`](../protocol/schema/lighthouse-protocol-0.6.json),
+[`protocol/schema/lighthouse-protocol-0.7.json`](../protocol/schema/lighthouse-protocol-0.7.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,7 +27,7 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.6"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.7"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
@@ -36,7 +36,7 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them remains valid in 0.6, and hosts ignore what they do not
+sends none of them remains valid in 0.7, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -46,7 +46,9 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Protocol 0.5 uses one `lighthouse/index` interface for physical files and selected source regions. Each input is a tagged `IndexInput`: `{ kind: "file", file, source_ast }` asks a provider to analyze a physical file and, when `source_ast` is true, return its selectable AST; `{ kind: "regions", regions }` asks it to analyze source regions selected by the core. A request may mix both kinds: a provider indexes the physical files and the regions together, in one pass (Go: one `packages.Load` per module), and answers one fragment per file, the regions' facts merged into the fragment of their host file. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
+Protocol 0.7 indexes by unit. A request carries `units`: each is the files of one unit of the language (`files`, with `source_ast` asking for the selectable AST of a file) or the host files whose selected regions the core sends (`regions`). The provider answers one result per unit it was sent, the regions' facts merged into the fragment of their host file, in the unit with the id `#regions`. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
+
+The host keeps each answer: a run sends a provider only the units whose key changed (their files, the provider's settings files, its identity), or whose `imports` moved: a unit lists the units whose `api` it read, and is asked again when one of those `api` is no longer what it was when the unit was answered. A run with every unit current starts no provider process. A provider keeps nothing between requests; it answers from what the request holds and from the disk.
 
 The `source_ast` flag is per file, so a batch requests ASTs only where an injection's file globs match. Providers that advertise the `source-ast` capability MUST return one `Source` per requested file, with `path`, provider-defined serialized `ast`, and a separate `mapping` keyed by canonical JSON Pointer. Each mapping entry can carry a half-open UTF-8 byte `range`, a descendant `text_pointer` for a node's source-text scalar, and optional `text_map` segments from extracted-text bytes to original-host bytes. ASTs retain the parser/provider's structural shape; locations live in the sidecar rather than injected into every node. Providers parse and map only: they do not receive or interpret `spec.injections`, selector filters, destination keys, or `context`. The shared core evaluates selectors, filters and context projections, validates mappings, resolves the destination provider key, and forwards each selected region through the same `lighthouse/index` method. Injections are core configuration and are not transported through provider context.
 
@@ -117,7 +119,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   `[languages.<id>] testNaming = { prefix, snakeCase, variants, ancestors }`.
 - Each entry of `capabilities.languages` is the language's **language manifest**
   (`LanguageManifest`): `id`, `aliases` (the names a document gives the language, in any case; no two languages of a registry share one), `globs`, `ignores`, `priority`, `fallback`, `conventions`, `capabilities` and
-  `ordered_declarations`. It is what the host's `LanguageProvider::manifest()` returns, field
+  `ordered_declarations` and `units`. It is what the host's `LanguageProvider::manifest()` returns, field
   for field; the plugin's own identity (`serverInfo`) is the plugin manifest.
 - The `capabilities` of a language list what its provider guarantees. `semantic-edges`: `calls`,
   `references`, `implements` and `accesses-private` edges are resolved by the
@@ -126,9 +128,6 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   `overlays`: the provider analyzes the `overlays` of an index request instead of the
   files on disk; a host declines fixes in files of a provider without it (bundled
   providers declare it).
-  `cache-overlays`: the provider keys what it keeps in `context.cache` on the content of
-  the files it analyzed, the texts of `overlays` included, so the host gives it the cache
-  for a request that carries overlays too (a fix run checks one after another).
   `source-ast`: the provider can expose its serialized AST and per-pointer `mapping`
   when `source_ast` is requested. The provider parses and maps; core evaluates selectors,
   filters and context projections.
@@ -142,6 +141,12 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   `semantic-edges` is syntactic: its edges come from names (and, where marked,
   guesses), which makes its caller and reference sets lower bounds; no separate
   capability announces that.
+- `units` is how the host groups the files of the language into units: `by` is `directory`
+  (a Go package), `file` (a module) or `manifest` (the directory of the nearest file named
+  `manifest`, a crate). `settings` names the files that decide how every file is read
+  (`go.mod`, `tsconfig.json`) and `env` the environment variables that do (`GOOS`): their
+  content and values are part of the key of every unit, as are the plugin's identity, the
+  options of the language and its globs. A provider is not asked how to group.
 - `ordered_declarations` (default false) says the language evaluates the declarations of a
   file in the order they are written (Python, JavaScript, TypeScript; Go and Rust have
   order-free package scope). The host then never moves a declaration above a binding that
@@ -196,32 +201,23 @@ Params:
 
 ```json
 { "project": { "root": "/abs/root" }, "language": "go",
-  "inputs": [{ "kind": "file", "file": { "path": "pkg/a.go", "hash": "<sha256 hex>" } }],
+  "units": [{ "id": "pkg", "key": "<blake3 hex>",
+              "files": [{ "path": "pkg/a.go", "hash": "<sha256 hex>" }],
+              "imports": { "util": "<api>" } }],
+  "files": ["pkg/a.go", "util/u.go"],
   "context": { "options": { "go": { "tags": ["integration"] } } } }
 ```
 
-inputs contains every project file of the requested provider as a tagged file input, or a batch of already-selected source regions as region inputs. Physical paths are project-relative with slash separators. The request is project-level: one call carries the whole batch and the provider decides which packages, modules or build units it must load to analyze physical files, reading files from disk. Analysis scope is never narrowed to the files a user asked to see; reporting is the host's concern.
+`units` holds the units the host needs answered: for a unit of files, its `id` (see `units` of the manifest; `.` is the root), its host `key`, its `files` (project-relative, slash-separated paths with the SHA-256 of the content, and `source_ast` where the AST is wanted, sorted by path) and the `api` of each unit it imported when it was last answered; for the regions the core selected, a unit with the id `#regions` and the host files in `regions`. `files` lists every file of the language in the project, so a provider can read what the other units declare; the files of `units` are the ones it must analyze and answer for. A provider reads from disk, loads what its toolchain needs to analyze them (Go: one `packages.Load` per module), and never narrows analysis to the files a user asked to see; reporting is the host's concern.
 `context.options` holds the `spec.languages.<id>` tables of `lighthouse.toml`
 for every language, as JSON; a provider reads its own entry and MUST reject
 unknown keys in it (as an `incomplete` entry, see below).
 
-`context.cache` is `{ "dir": "/abs/root/.lighthouse/cache/<plugin id>/<binary digest>" }`, a directory
-the host owns, named by the digest of the plugin binary, and the provider MAY keep derived
-results in it between runs. It is absent when the host runs without a cache and, unless the
-provider declares `cache-overlays`, when the request carries `overlays`: their texts are not
-what is on disk. A provider reads and writes only inside it, writes
-atomically (a temporary file and a rename), and answers exactly the same with the
-directory empty, full or absent: the same fragments, the same notices (apart from one
-saying the directory cannot be written), the same `incomplete` entries. An entry is
-used only when its key matches, and a key covers everything the entry was computed
-from: the provider build, the options, the toolchain, and the content of the files and
-of what they depend on. Any doubt is a miss. A result with an `incomplete` entry is
-never written. Conformance indexes every case cold, then warm, and compares the answer
-with an uncached run byte for byte. The field is optional.
+A provider keeps nothing between requests and writes nothing to the project or to a directory of its own: what the host keeps of an answer is the unit result below. A provider answers the same whether it was sent every unit or one.
 
-Result `{ fragments, sources, notices, incomplete, timings? }`:
+Result `{ units, notices, incomplete, timings? }`: `notices` and `incomplete` are those of the run as a whole (a failure to start, an option it refuses); the rest is per unit. Each of `units` is `{ id, fragments, sources, body, api, imports, notices, incomplete }`:
 
-- `fragments`: one per analyzed file, sorted by path, each
+- `fragments`: one per analyzed file of the unit, sorted by path, each
   `{ file: { path, facts? }, modules, symbols, edges, functions, tests, comments }`;
   `facts` is what the provider says of the file by name, text to text, which a program names as
   `{file.<name>}` ([programs](programs.md#the-command-line)); the Rust provider states the `edition` of
@@ -234,17 +230,20 @@ Result `{ fragments, sources, notices, incomplete, timings? }`:
   that end before the file's first symbol; see [architecture](architecture.md#generated-code). It never filters paths: the host sends the files of the
   project (see `ignores`), and `testdata`, `vendor`, the directories a language ignores and the like
   are left out there.
-- `notices`: messages that leave the analysis complete (for example files
-  excluded by build constraints).
+- `body`: a hash of everything the unit holds, bodies included. It is the provider's own, opaque to the host.
+- `api`: a hash of what an importer can see of the unit, and of the `api` of what it imports, so that it composes: exported declarations and their types, not bodies. A body edit that leaves `api` as it was is cut off: the importers keep their results. It is better to move `api` too often than once too seldom; a provider that cannot tell what an importer reads of a unit gives its whole text.
+- `imports`: the ids of the units the analysis of this one read, sorted; `*` stands for every unit, when what any other declares is read (a name looked up in the whole project). The host asks the unit again when the `api` of one of them is not what it was.
+- `notices`: messages about the unit that leave the analysis complete (for example files
+  excluded by build constraints); the host shows them again when it takes the unit as it is.
 - `sources`: provider-defined `Source` records for file inputs with `source_ast = true`.
   Such requests are accepted only from providers advertising `source-ast`; the core
   evaluates selection rules and later sends chosen regions to a destination provider.
 - `incomplete`: `{ path?, reason }` for every file, or without `path` every
   scope, that could not be analyzed fully: load, parse and type errors, missing
   dependencies. A file listed here MAY still have a fragment with what could be
-  recovered. Never drop a gap silently: "not checked" is not "passed".
+  recovered. Never drop a gap silently: "not checked" is not "passed". A unit with an `incomplete` entry or a notice is asked again on every run.
 - `timings`: optional `{ phase, micros }` entries, in the order the phases ran, saying where the
-  provider's own time went (the Go provider: `plan`, `load`, `analyse`, `serialise`, `store`). The
+  provider's own time went (the Go provider: `plan`, `load`, `analyse`, `serialise`). The
   host prints them under `check --timings` as `index <language>: <phase> <ms>, ...`; they change
   nothing in the analysis, and a result is compared without them.
 
@@ -624,21 +623,17 @@ the import spec of every `imports` edge).
 Loads packages with `golang.org/x/tools/go/packages` (tests included) and
 type-checks with `go/types`.
 
-- Cache: the unit is a package directory (all its variants, tests included). Its key
-  is a digest of the provider build, the options, `go env` (version, GOOS/GOARCH, flags,
-  workspace), go.mod, go.sum and go.work, the content of every file of the directory,
-  the *API* of every project directory it imports, directly or not, and the interface
-  declarations of the whole project. A file's API is its text without function and
-  method bodies, so a body edit leaves every other unit's key unchanged (early cutoff,
-  as in rustc's incremental compilation and Go's build action IDs, which hash the
-  export data of dependencies rather than their sources). Only the changed
-  directories are loaded; the rest of the packages come from export data, as with any
-  `go/packages` load without `NeedDeps`. Where the unit's own API and its imports'
-  are unchanged, its old `implements` edges are reused; otherwise the directories that
-  declare interfaces are loaded too, so types are matched against all of them. A
-  `vendor` directory and the targets of local `replace` directives are fingerprinted
-  by file names, sizes and modification times. A unit with an `incomplete` entry is
-  analyzed again on every run.
+- Units: a package directory (all its variants, tests included). The `api` of a unit is
+  its text without function and method bodies and the `api` of every project directory it
+  imports, directly or not, so a body edit leaves every other unit's results alone (early
+  cutoff, as in rustc's incremental compilation and Go's build action IDs, which hash the
+  export data of dependencies rather than their sources). A unit imports the directories
+  that declare interfaces, because `implements` edges read every project interface: the
+  api of those moves only when an interface declaration does. Only the directories asked
+  for are loaded, besides those that declare interfaces. `go.mod`, `go.sum`, `go.work`,
+  `go.work.sum` and the `go env` values that decide a build are the settings of every unit.
+  Edits of a module outside the project (a `replace` to `../x`) are not seen until a file
+  of the project changes.
 - Context: `[languages.go]` accepts `tags` (build tags), `env` (for example
   `GOOS`, `GOARCH`, `GOTOOLCHAIN`), `go` and `small_interfaces`.
   - `go` is the go binary: an absolute path or a name looked up on `PATH`. The
@@ -736,13 +731,11 @@ Rust with a notice.
   (`package = "..."`) and workspace members, resolve through the extern prelude;
   `publish = false` (also inherited from `[workspace.package]`) marks a package
   without outside consumers.
-- Cache: the unit is a file. Parsing, the module tree and name resolution always run
-  (a parse is about half of a run, name resolution about 2%); the symbols, edges and
-  summaries of a file come from the cache when its text and its context are unchanged.
-  The context is a digest of the options, of every `Cargo.toml` above the requested files
-  and of every source file the module tree reached, without the bodies of its functions.
-  A body edit therefore analyzes one file; any other edit analyzes all of them again. A
-  tree with a parse error or a missing file is not cached.
+- Units: a crate (the nearest `Cargo.toml`). Parsing, the module tree and name resolution run
+  for the whole project on every request; the unit's fragments are those of its files. Its
+  `api` is a digest of the files' items without the bodies of their functions, and it
+  imports every unit: a body edit analyzes one crate, any other edit analyzes all of them
+  again. `Cargo.toml`, `Cargo.lock` and the toolchain files are the settings of every unit.
 - Modules follow `mod` declarations: `name.rs`, `name/mod.rs`, `#[path]`, nested
   inline modules, with the directory rules of mod-rs and non-mod-rs files. Every
   `cfg` branch is followed. A `mod` with no file, or a file that does not parse,
@@ -825,7 +818,10 @@ above a declaration to its last token), `reference-sites` and `overlays`. Langua
 `typescript`, aliases `typescript`, `ts`, `tsx`, `typescriptreact`, `javascript`, `js`
 and `node` (Linguist's names). It is a Node (24 or newer) process that loads
 TypeScript 6.0.3 from its own `node_modules`, never the one of the project it reads,
-and executes nothing of the project. It has no cache and does not return `source-ast`.
+and executes nothing of the project. It does not return `source-ast`. Its units are files; the
+`api` of a unit is its declarations without the bodies of functions that state a return type,
+and the `api` of the project files it imports, so that a body edit analyzes one file. `tsconfig.json`,
+`jsconfig.json` and `package.json` are the settings of every unit.
 
 - Context: no keys; any key is an `incomplete` entry.
 - Programs: one per owning `tsconfig.json` or `jsconfig.json` (the nearest above a
@@ -883,8 +879,10 @@ and executes nothing of the project. It has no cache and does not return `source
 Reports `semantic-edges`, `extent` (from the first decorator or the comment lines that lead a declaration, to its last
 token), `reference-sites` and `overlays`. Language `python`, aliases `python`, `py`, `py3`, `python3` and `rusthon`
 (GitHub Linguist's names). It is a Python process (3.11 or newer, standard library only, always `python3 -I`) that reads
-sources with the `ast` and `symtable` of the interpreter that runs it and never imports or executes the project. It has
-no cache and does not return `source-ast`. `semantic-edges` is partial: only names that scopes, imports and annotations
+sources with the `ast` and `symtable` of the interpreter that runs it and never imports or executes the project. It does
+not return `source-ast`. Its units are files; the `api` of a unit is its tree without the bodies of the functions of its
+module (a class keeps its methods), and it imports every unit, so a body edit of a function analyzes one file. `pyproject.toml`
+is the setting of every unit. `semantic-edges` is partial: only names that scopes, imports and annotations
 settle are `semantic`.
 
 - Context: no keys; any key is an `incomplete` entry. The interpreter is the `python3` on `PATH`; an older one refuses to

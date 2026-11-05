@@ -10,7 +10,7 @@ fn requested_source_ast_keeps_native_index_results() {
         ),
         ("src/lib.rs", "pub fn greet() { println!(\"hello\"); }\n"),
     ]);
-    let result = index_with_sources(dir.path(), json!({}), None, true);
+    let result = index_with_sources(dir.path(), json!({}), true);
 
     let ast = result
         .sources

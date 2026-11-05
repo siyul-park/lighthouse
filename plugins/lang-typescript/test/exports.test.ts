@@ -21,10 +21,11 @@ function visibilities(files: Record<string, string>, target: string): Record<str
   const result = new Provider("lang-typescript", "0").index({
     project: { root },
     language: "typescript",
-    inputs: [{ kind: "file", file: { path: target, hash: "x" } }],
+    units: [{ id: target, key: "", files: [{ path: target, hash: "x" }], imports: {} }],
+    files: [target],
     context: { options: {} },
   });
-  const fragment: Fragment = result.fragments[0]!;
+  const fragment: Fragment = result.units[0]!.fragments[0]!;
   return Object.fromEntries((fragment.symbols ?? []).map((symbol) => [symbol.name, symbol.visibility]));
 }
 

@@ -11,7 +11,7 @@ const FILE: &str = "graph.db";
 
 /// The open graph of an engine, and what a run knows of it.
 pub(crate) struct Opened {
-    pub(super) graph: Graph,
+    pub(crate) graph: Graph,
     pub(super) notice: Option<String>,
     /// The paths this process set an overlay for, at the last run.
     pub(super) overlaid: BTreeSet<String>,
@@ -22,7 +22,7 @@ pub(crate) struct Opened {
 impl Engine {
     /// Opens `graph.db` beside the result cache; without a cache, or when it
     /// cannot be opened, the graph lives in memory.
-    pub(super) fn open_graph(&self) -> Opened {
+    pub(crate) fn open_graph(&self) -> Opened {
         let options = |limit| Options {
             versions: [("binary".to_owned(), cache::build_identity())].into(),
             limit,

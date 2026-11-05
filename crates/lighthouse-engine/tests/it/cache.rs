@@ -17,8 +17,8 @@ use lighthouse_model::{
     ucm::{Applicability, Fragment},
 };
 use lighthouse_plugin::{
-    Caching, Context, Error as PluginError, Indexed, LanguageManifest, LanguageProvider, Plugin,
-    PluginManifest, Registry, Rule, RuleManifest, Source, Workspace,
+    Caching, Context, Error as PluginError, Fragments, Indexed, LanguageManifest, LanguageProvider,
+    Plugin, PluginManifest, Registry, Rule, RuleManifest, Unit, Workspace,
 };
 use lighthouse_spec::Config;
 use tempfile::TempDir;
@@ -31,13 +31,21 @@ impl LanguageProvider for Files {
     fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, PluginError> {
         Ok(Indexed {
-            fragments: files
+            units: units
                 .iter()
-                .map(|source| Fragment {
-                    files: vec![source.file.clone()],
-                    ..Fragment::default()
+                .map(|unit| {
+                    Fragments::new(
+                        unit.id,
+                        unit.files
+                            .iter()
+                            .map(|source| Fragment {
+                                files: vec![source.file.clone()],
+                                ..Fragment::default()
+                            })
+                            .collect(),
+                    )
                 })
                 .collect(),
             ..Indexed::default()

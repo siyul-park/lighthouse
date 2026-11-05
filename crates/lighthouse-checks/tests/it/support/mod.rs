@@ -14,8 +14,8 @@ use lighthouse_model::{
     },
 };
 use lighthouse_plugin::{
-    Conventions, Error, Indexed, LanguageManifest, LanguageProvider, Plugin, PluginManifest,
-    Registry, Source, TestNaming, Workspace,
+    Conventions, Error, Fragments, Indexed, LanguageManifest, LanguageProvider, Plugin,
+    PluginManifest, Registry, TestNaming, Unit, Workspace,
 };
 use lighthouse_spec::Catalog;
 use lighthouse_spec::Config;
@@ -28,15 +28,22 @@ impl LanguageProvider for Wire {
     fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
-    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
-        let fragments = files
+    fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, Error> {
+        let units = units
             .iter()
-            .map(|source| {
-                serde_json::from_str(source.text).map_err(|e| Error::Failed(e.to_string()))
+            .map(|unit| {
+                let fragments = unit
+                    .files
+                    .iter()
+                    .map(|source| {
+                        serde_json::from_str(source.text).map_err(|e| Error::Failed(e.to_string()))
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok(Fragments::new(unit.id, fragments))
             })
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<_, Error>>()?;
         Ok(Indexed {
-            fragments,
+            units,
             ..Indexed::default()
         })
     }

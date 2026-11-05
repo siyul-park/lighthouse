@@ -106,7 +106,7 @@ func dispatch(p Provider, m *Message, s *session) (result json.RawMessage, rerr 
 		return nil, &ResponseError{Code: codeNotInitialized, Message: fmt.Sprintf("`%s` before `initialize`", m.Method)}
 	case m.Method == MethodIndex:
 		var params IndexParams
-		if rerr := decode(m.Params, &params, "project", "language", "inputs"); rerr != nil {
+		if rerr := decode(m.Params, &params, "project", "language", "units"); rerr != nil {
 			return nil, rerr
 		}
 		return marshal(p.Index(params))

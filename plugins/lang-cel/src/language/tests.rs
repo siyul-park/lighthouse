@@ -76,9 +76,7 @@ fn undeclared_source_expressions_keep_edges_without_becoming_functions() {
         text: &embedded.text,
         regions: &embedded.regions,
     };
-    let indexed = Language::new()
-        .index(&Workspace::new("/tmp"), &[source])
-        .unwrap();
+    let indexed = run(source);
     assert!(indexed.incomplete.is_empty(), "{:?}", indexed.incomplete);
     assert!(
         indexed
@@ -139,9 +137,7 @@ fn indexes_embedded_cel_at_original_host_coordinates() {
         text: &embedded.text,
         regions: &embedded.regions,
     };
-    let indexed = Language::new()
-        .index(&Workspace::new("/tmp"), &[source])
-        .unwrap();
+    let indexed = run(source);
     assert!(indexed.incomplete.is_empty(), "{:?}", indexed.incomplete);
     let project = lighthouse_model::ucm::Project::merge(indexed.fragments);
     assert_eq!(project.files.len(), 1);
@@ -167,9 +163,7 @@ fn indexes_embedded_cel_at_original_host_coordinates() {
         text: &unsupported.text,
         regions: &unsupported.regions,
     };
-    let indexed = Language::new()
-        .index(&Workspace::new("/tmp"), &[source])
-        .unwrap();
+    let indexed = run(source);
     assert!(
         indexed
             .incomplete
@@ -232,9 +226,7 @@ fn a_decision_resolves_the_shared_variable_of_its_pack() {
         text: host,
         regions: &sources,
     };
-    let indexed = Language::new()
-        .index(&Workspace::new("/tmp"), &[source])
-        .unwrap();
+    let indexed = run(source);
     let project = lighthouse_model::ucm::Project::merge(indexed.fragments);
     let shared = project
         .symbols
@@ -254,4 +246,32 @@ fn template_syntax_rejects_unclosed_or_unmatched_delimiters() {
     assert!(template_parts("hello {{ value").is_err());
     assert!(template_parts("hello value }}").is_err());
     assert!(template_parts("{{ }}").is_err());
+}
+
+/// What the language answered for one source, as one unit.
+struct Answer {
+    fragments: Vec<lighthouse_model::ucm::Fragment>,
+    incomplete: Vec<lighthouse_model::Incomplete>,
+}
+
+fn run(source: Source) -> Answer {
+    let no_imports = std::collections::BTreeMap::new();
+    let unit = lighthouse_plugin::Unit {
+        id: "unit",
+        key: "",
+        files: &[source],
+        imports: &no_imports,
+    };
+    let indexed = Language::new()
+        .index(&Workspace::new("/tmp"), &[unit], &[])
+        .unwrap();
+    let mut answer = Answer {
+        fragments: Vec::new(),
+        incomplete: indexed.incomplete,
+    };
+    for unit in indexed.units {
+        answer.fragments.extend(unit.fragments);
+        answer.incomplete.extend(unit.incomplete);
+    }
+    answer
 }

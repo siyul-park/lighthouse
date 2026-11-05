@@ -89,9 +89,9 @@ func (k known) add(spec packageSpec) {
 // imports are completed for all of them at once.
 func (r *run) fences(params sdk.IndexParams) []*snippet {
 	var snippets []*snippet
-	for _, input := range params.Inputs {
-		if input.Kind == "regions" && input.Regions != nil {
-			snippets = append(snippets, r.snippets(input.Regions)...)
+	for _, u := range params.Units {
+		for i := range u.Regions {
+			snippets = append(snippets, r.snippets(&u.Regions[i])...)
 		}
 	}
 	r.complete(snippets)
@@ -227,7 +227,7 @@ func (r *run) complete(snippets []*snippet) {
 
 // regionResult adds to the result the fragments of the fences in the host's
 // coordinates, one fragment per host file.
-func (r *run) regionResult(result sdk.IndexResult, snippets []*snippet) sdk.IndexResult {
+func (r *run) regionResult(result answer, snippets []*snippet) answer {
 	merged := map[string]*sdk.Fragment{}
 	var untyped []string
 	// A host file with no fence worth reading has a fragment all the same.

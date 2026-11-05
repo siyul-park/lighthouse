@@ -1,7 +1,7 @@
 use lighthouse_model::RunScope;
 use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Context, Error, Indexed, LanguageManifest, LanguageProvider,
-    Plugin, PluginManifest, Registry, Source, Workspace, options,
+    Plugin, PluginManifest, Registry, Unit, Workspace, options,
 };
 use serde_json::Value;
 
@@ -144,7 +144,7 @@ impl LanguageProvider for Lang {
     fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
-    fn index(&self, _: &Workspace, _: &[Source]) -> Result<Indexed, Error> {
+    fn index(&self, _: &Workspace, _: &[Unit], _: &[String]) -> Result<Indexed, Error> {
         Ok(Indexed::default())
     }
 }

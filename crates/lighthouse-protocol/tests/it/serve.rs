@@ -43,14 +43,14 @@ fn replies(output: Vec<u8>) -> Vec<Message> {
 
 fn initialize_params() -> Value {
     json!({
-        "protocolVersion": "0.6",
+        "protocolVersion": "0.7",
         "clientInfo": { "name": "t", "version": "0" },
         "workspaceFolders": [{ "uri": "file:///p/", "name": "p" }],
     })
 }
 
 fn index_params() -> Value {
-    json!({ "project": { "root": "/p" }, "language": "x", "inputs": [] })
+    json!({ "project": { "root": "/p" }, "language": "x", "units": [] })
 }
 
 #[test]

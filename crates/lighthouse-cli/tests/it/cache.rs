@@ -99,7 +99,10 @@ fn differential(fixture: &Fixture) {
         let got = warm(dir);
         let step = format!("{}: {}", fixture.name, edit.name);
         assert_eq!(got.run, expected, "{step}");
-        assert!(got.hits > 0, "{step}: the cache answered nothing");
+        // A provider option is in the key of every unit: all of them are asked.
+        if edit.name != "provider option changed" {
+            assert!(got.hits > 0, "{step}: the cache answered nothing");
+        }
         if edit.mostly_warm {
             assert!(
                 got.misses < got.hits,

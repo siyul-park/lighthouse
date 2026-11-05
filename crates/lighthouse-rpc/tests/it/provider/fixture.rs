@@ -6,7 +6,7 @@ use std::{fs, path::Path, time::Duration};
 use lighthouse_model::ucm::{
     EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Target,
 };
-use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Source, Workspace};
+use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Source, Unit, Workspace};
 use lighthouse_rpc::RpcPlugin;
 use tempfile::TempDir;
 
@@ -39,7 +39,7 @@ impl Fixture {
         write(&self.root(), path, text);
     }
 
-    pub(super) fn index(&self) -> Indexed {
+    pub(super) fn index(&self) -> Answer {
         let root = self.root();
         let mut paths = Vec::new();
         collect(&root, &root, &mut paths);
@@ -68,13 +68,21 @@ impl Fixture {
                 regions: &[],
             })
             .collect();
+        let imports = std::collections::BTreeMap::new();
+        let unit = Unit {
+            id: ".",
+            key: "",
+            files: &sources,
+            imports: &imports,
+        };
         self.provider
-            .index(&Workspace::new(&root), &sources)
+            .index(&Workspace::new(&root), &[unit], &paths)
             .unwrap()
+            .into()
     }
 
     /// The indexed fragment of one file.
-    pub(super) fn fragment(&self, indexed: &Indexed, path: &str) -> Fragment {
+    pub(super) fn fragment(&self, indexed: &Answer, path: &str) -> Fragment {
         let want = Path::new(path);
         indexed
             .fragments
@@ -82,6 +90,30 @@ impl Fixture {
             .find(|f| f.files[0].path == want)
             .unwrap_or_else(|| panic!("no fragment for {path}"))
             .clone()
+    }
+}
+
+/// What one request answered, its units together.
+#[derive(PartialEq)]
+pub(super) struct Answer {
+    pub(super) fragments: Vec<Fragment>,
+    pub(super) notices: Vec<String>,
+    pub(super) incomplete: Vec<lighthouse_model::Incomplete>,
+}
+
+impl From<Indexed> for Answer {
+    fn from(indexed: Indexed) -> Self {
+        let mut answer = Self {
+            fragments: Vec::new(),
+            notices: indexed.notices,
+            incomplete: indexed.incomplete,
+        };
+        for unit in indexed.units {
+            answer.fragments.extend(unit.fragments);
+            answer.notices.extend(unit.notices);
+            answer.incomplete.extend(unit.incomplete);
+        }
+        answer
     }
 }
 

@@ -20,7 +20,7 @@ use lighthouse_model::{
     ucm::{Applicability, File, Fragment, Project},
 };
 use lighthouse_plugin::{
-    Context, EmbeddedFile, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, Source,
+    Context, EmbeddedFile, Facts, LanguageProvider, Memo, Notices, Registry, Rule, Source,
     Workspace,
 };
 use lighthouse_spec::{
@@ -34,6 +34,7 @@ mod availability;
 mod cached;
 mod client;
 mod config;
+mod index;
 mod injections;
 mod models;
 mod phases;
@@ -374,7 +375,6 @@ impl Engine {
                 .libraries()
                 .map(|library| library.manifest().clone())
                 .collect(),
-            cache_dir: None,
             sandbox: config.sandbox().clone(),
             ignores,
         };
@@ -431,9 +431,8 @@ impl Engine {
     /// Keeps what rules find in `dir`, at most `limit` bytes of it, so that a
     /// later run over code that did not change what a rule reads takes the
     /// findings instead of running the rule. The findings are the same either
-    /// way. Providers may keep their own data under the directory too.
+    /// way.
     pub fn with_cache(mut self, dir: PathBuf, limit: u64) -> Self {
-        self.ws.cache_dir = Some(dir.clone());
         self.cache = Some(CacheSettings { dir, limit });
         self
     }

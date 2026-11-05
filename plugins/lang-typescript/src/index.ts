@@ -8,7 +8,19 @@ import { Remap, type Snippet } from "./regions.ts";
 import { Types } from "./functions/signature.ts";
 import { type Services, Unit } from "./index/unit.ts";
 import { Reach } from "./visibility.ts";
-import type { Fragment, IndexResult } from "./sdk/wire.ts";
+import { Shapes, type Shape } from "./api.ts";
+import type { Fragment, Incomplete } from "./sdk/wire.ts";
+
+/** What the analysis of a request found: fragments, shapes and gaps, notices of the fences. */
+export interface Found {
+  fragments: Fragment[];
+  notices: string[];
+  incomplete: Incomplete[];
+  /** Of each analysed file: what importers see of it and what it imports. */
+  shapes: Map<string, Shape & { notices: string[] }>;
+  /** The project files the fences import. */
+  fenceImports: Set<string>;
+}
 
 /** What one index request asks to analyze. */
 export interface Request {
@@ -19,7 +31,7 @@ export interface Request {
   /** Every file the host sent, analysed or not: the files of the project. */
   listed: readonly string[];
   snippets: readonly Snippet[];
-  result: Required<Omit<IndexResult, "timings">>;
+  result: Found;
 }
 
 /** The files of one program: those the program is made of and the fences that join it. */
@@ -34,7 +46,7 @@ class Analysis {
   private readonly workspace: Workspace;
   private readonly fenced = new Map<Snippet, Fragment>();
   private readonly subjects: ReadonlySet<string>;
-  private unresolved = 0;
+  private shapes: Shapes | undefined;
   private untyped = 0;
 
   constructor(private readonly request: Request) {
@@ -87,11 +99,13 @@ class Analysis {
       for (const rel of members.files.values()) result.incomplete.push({ path: rel, reason });
       return;
     }
-    result.notices.push(...built.notices);
     const model = new Model(built.program, built.host, { root: this.request.root, subjects: this.subjects });
+    this.shapes = new Shapes(model);
     const reach = new Reach(model, this.request.root);
     const services: Services = { model, reach, types: new Types(model, reach) };
-    for (const [file, rel] of members.files) this.indexFile(built.program, this.unitOf(services, file, rel), rel);
+    for (const [file, rel] of members.files) {
+      this.indexFile(built.program, this.unitOf(services, file, rel), rel, built.notices);
+    }
     for (const snippet of members.snippets) {
       const unit = this.unitOf(services, this.absolute(snippet.rel), snippet.rel);
       this.indexSnippet(built.program, unit, snippet);
@@ -105,7 +119,7 @@ class Analysis {
       : new Unit(services, source, rel);
   }
 
-  private indexFile(program: ts.Program, unit: Unit | undefined, rel: string): void {
+  private indexFile(program: ts.Program, unit: Unit | undefined, rel: string, notices: readonly string[]): void {
     const { result } = this.request;
     if (unit === undefined) {
       result.incomplete.push({ path: rel, reason: "the program does not contain the file" });
@@ -114,7 +128,10 @@ class Analysis {
     const problem = syntaxProblem(program, unit.file);
     if (problem !== undefined) result.incomplete.push({ path: rel, reason: problem });
     const indexed = unit.index();
-    this.unresolved += indexed.unresolved;
+    const shape = this.shapes!.of(unit.file);
+    const own = [...notices];
+    if (indexed.unresolved > 0) own.push(unresolvedNotice(indexed.unresolved));
+    result.shapes.set(rel, { ...shape, notices: own });
     result.fragments.push(indexed.fragment);
   }
 
@@ -128,6 +145,7 @@ class Analysis {
       return;
     }
     if (program.getSemanticDiagnostics(unit.file).length > 0) this.untyped++;
+    for (const rel of this.shapes!.of(unit.file).imports) this.request.result.fenceImports.add(rel);
     const indexed = unit.index();
     const module = indexed.fragment.modules?.[0]?.path ?? "";
     this.fenced.set(snippet, new Remap(snippet, module).fragment(indexed.fragment));
@@ -135,11 +153,6 @@ class Analysis {
 
   private summarize(): void {
     const { notices } = this.request.result;
-    if (this.unresolved > 0) {
-      notices.push(
-        `${this.unresolved} import(s) resolve to no file (dependencies not installed, or paths the configuration does not map); their edges are syntactic`,
-      );
-    }
     if (this.untyped > 0) {
       notices.push(
         `${this.untyped} TypeScript/JavaScript fence(s) do not type-check (names the prose defines, or code that is not meant to compile); what resolves is reported`,
@@ -155,6 +168,10 @@ class Analysis {
  */
 export function index(request: Request): Map<Snippet, Fragment> {
   return new Analysis(request).index();
+}
+
+function unresolvedNotice(count: number): string {
+  return `${count} import(s) resolve to no file (dependencies not installed, or paths the configuration does not map); their edges are syntactic`;
 }
 
 function language(snippet: Snippet): string {

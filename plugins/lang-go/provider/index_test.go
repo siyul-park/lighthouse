@@ -13,7 +13,7 @@ const determinismRuns = 20
 // frameShaped has what plugins/lang-go/sdk has: two packages that declare the
 // same name, an external test package, and a test credited to several symbols.
 var frameShaped = map[string]string{
-	"go.mod":               cacheModule,
+	"go.mod":               testModule,
 	"sdk/frame.go":         "package sdk\n\ntype Message struct{ N int }\n\nfunc ReadMessage(n int) Message { return Message{n} }\n\nfunc WriteMessage(m Message) int { return m.N }\n",
 	"sdk/frame_test.go":    "package sdk_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/m/sdk\"\n)\n\nfunc TestWriteMessage(t *testing.T) {\n\tsdk.WriteMessage(sdk.Message{})\n}\n\nfunc TestReadMessage(t *testing.T) {\n\tfor _, tc := range []struct{ n int }{{1}, {2}} {\n\t\tt.Run(\"reads\", func(t *testing.T) { sdk.WriteMessage(sdk.ReadMessage(tc.n)) })\n\t}\n}\n",
 	"sdk/internal_test.go": "package sdk\n\nimport \"testing\"\n\nfunc TestMessage(t *testing.T) { _ = ReadMessage(1) }\n",
@@ -26,21 +26,9 @@ func TestProviderDeterminism(t *testing.T) {
 		root := t.TempDir()
 		writeTree(t, root, frameShaped)
 
-		first, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
+		first, _ := indexWith(t, provider.New("lang-go", "test"), root, nil)
 		for run := 1; run < determinismRuns; run++ {
-			again, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
-			require.Equal(t, first, again, "run %d", run)
-		}
-	})
-
-	t.Run("answers a cached run exactly like a cold one, run after run", func(t *testing.T) {
-		root := t.TempDir()
-		writeTree(t, root, frameShaped)
-		cache := t.TempDir()
-
-		first, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
-		for run := 0; run < determinismRuns; run++ {
-			again, _ := indexWith(t, provider.New("lang-go", "test"), root, cache, nil)
+			again, _ := indexWith(t, provider.New("lang-go", "test"), root, nil)
 			require.Equal(t, first, again, "run %d", run)
 		}
 	})
@@ -50,7 +38,7 @@ func TestProviderGenericImplementations(t *testing.T) {
 	// Slice satisfies cloner by value, Table by pointer, both through a type
 	// assertion; Pair satisfies the exported d.I of another package.
 	files := map[string]string{
-		"go.mod": cacheModule,
+		"go.mod": testModule,
 		"d/d.go": "package d\n\ntype I interface {\n\tM() int\n\tN() int\n}\n",
 		"p/p.go": "package p\n\nimport \"example.com/m/d\"\n\n" +
 			"type cloner interface{ cloneValue() any }\n\n" +
@@ -66,7 +54,7 @@ func TestProviderGenericImplementations(t *testing.T) {
 		root := t.TempDir()
 		writeTree(t, root, files)
 
-		got, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
+		got, _ := indexWith(t, provider.New("lang-go", "test"), root, nil)
 
 		require.Equal(t, 4, strings.Count(got, `"implementation":true`))
 		require.Contains(t, got, `{"from":{"symbol":"p::Pair#type"},"kind":"implements"`)

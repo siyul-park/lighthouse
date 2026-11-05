@@ -22,10 +22,11 @@ function fragmentOf(files: Record<string, string>, target: string): Fragment {
   const result = new Provider("lang-typescript", "0").index({
     project: { root },
     language: "typescript",
-    inputs: [{ kind: "file", file: { path: target, hash: "x" } }],
+    units: [{ id: target, key: "", files: [{ path: target, hash: "x" }], imports: {} }],
+    files: [target],
     context: { options: {} },
   });
-  return result.fragments[0]!;
+  return result.units[0]!.fragments[0]!;
 }
 
 const bodies = (fragment: Fragment) => (fragment.symbols ?? []).filter((symbol) => symbol.name === MODULE_BODY);

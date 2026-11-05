@@ -1,6 +1,8 @@
 package provider_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io/fs"
 	"os"
@@ -15,18 +17,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testModule is the go.mod of the projects the tests write.
+const testModule = "module example.com/m\n\ngo 1.22\n"
+
 const (
-	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.6.json"
+	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.7.json"
 	casesGlob  = "../../../crates/lighthouse-rpc/tests/conformance/go/*"
 )
 
-func fileInputs(files []sdk.FileRef) []sdk.IndexInput {
-	inputs := make([]sdk.IndexInput, 0, len(files))
-	for _, file := range files {
-		copy := file
-		inputs = append(inputs, sdk.IndexInput{Kind: "file", File: &copy})
+// answer is what one request answered, its units together.
+type answer struct {
+	Units      []sdk.UnitResult `json:"units"`
+	Fragments  []sdk.Fragment   `json:"fragments"`
+	Sources    []sdk.Source     `json:"sources"`
+	Notices    []string         `json:"notices"`
+	Incomplete []sdk.Incomplete `json:"incomplete"`
+}
+
+func together(result sdk.IndexResult) answer {
+	got := answer{Units: result.Units, Notices: result.Notices, Incomplete: result.Incomplete}
+	for _, unit := range result.Units {
+		got.Fragments = append(got.Fragments, unit.Fragments...)
+		got.Sources = append(got.Sources, unit.Sources...)
+		got.Notices = append(got.Notices, unit.Notices...)
+		got.Incomplete = append(got.Incomplete, unit.Incomplete...)
 	}
-	return inputs
+	return got
+}
+
+// indexOf indexes under params and puts the units together.
+func indexOf(g *provider.Provider, params sdk.IndexParams) (answer, error) {
+	result, err := g.Index(params)
+	return together(result), err
+}
+
+// oneUnit is one unit that holds the files.
+func oneUnit(files []sdk.FileRef) []sdk.UnitRef {
+	return []sdk.UnitRef{{ID: ".", Files: files}}
+}
+
+func filesOf(files []sdk.FileRef) []string {
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.Path)
+	}
+	return paths
 }
 
 func TestProviderManifest(t *testing.T) {
@@ -56,7 +91,8 @@ func TestProviderIndex(t *testing.T) {
 				result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
 					Project:  sdk.ProjectRef{Root: root},
 					Language: "go",
-					Inputs:   fileInputs(files),
+					Units:    oneUnit(files),
+					Files:    filesOf(files),
 					Context:  sdk.Context{Options: options},
 				})
 				require.NoError(t, err, "%s/%s", filepath.Base(dir), variant)
@@ -70,10 +106,11 @@ func TestProviderIndex(t *testing.T) {
 		path := filepath.Join(root, "p.go")
 		require.NoError(t, os.WriteFile(path, []byte("package p\n\nfunc Run() {}\n"), 0o644))
 
-		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+		result, err := indexOf(provider.New("lang-go", "test"), sdk.IndexParams{
 			Project:  sdk.ProjectRef{Root: root},
 			Language: "go",
-			Inputs:   fileInputs([]sdk.FileRef{{Path: "p.go"}}),
+			Units:    oneUnit([]sdk.FileRef{{Path: "p.go"}}),
+			Files:    filesOf([]sdk.FileRef{{Path: "p.go"}}),
 		})
 
 		require.NoError(t, err)
@@ -110,10 +147,11 @@ func helper(t *testing.T)             {}
 `)
 		g := provider.New("lang-go", "test")
 
-		result, err := g.Index(sdk.IndexParams{
+		result, err := indexOf(g, sdk.IndexParams{
 			Project:  sdk.ProjectRef{Root: root},
 			Language: "go",
-			Inputs:   fileInputs([]sdk.FileRef{{Path: "p_test.go"}, {Path: "p.go"}}),
+			Units:    oneUnit([]sdk.FileRef{{Path: "p_test.go"}, {Path: "p.go"}}),
+			Files:    filesOf([]sdk.FileRef{{Path: "p_test.go"}, {Path: "p.go"}}),
 		})
 
 		require.NoError(t, err)
@@ -144,10 +182,11 @@ func helper(t *testing.T)             {}
 		require.NoError(t, os.WriteFile(filepath.Join(root, "p.go"), []byte(
 			"package p\n\nfunc run() {}\n\nfunc build() int { return 1 }\n\nvar handlers = map[string]func(){\"a\": run}\n\nvar size = build()\n"), 0o644))
 
-		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+		result, err := indexOf(provider.New("lang-go", "test"), sdk.IndexParams{
 			Project:  sdk.ProjectRef{Root: root},
 			Language: "go",
-			Inputs:   fileInputs(goFiles(t, root)),
+			Units:    oneUnit(goFiles(t, root)),
+			Files:    filesOf(goFiles(t, root)),
 		})
 
 		require.NoError(t, err)
@@ -168,7 +207,7 @@ func helper(t *testing.T)             {}
 		g := provider.New("lang-go", "test")
 		options := map[string]json.RawMessage{"go": json.RawMessage(`{"tagz":[]}`)}
 
-		result, err := g.Index(sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
+		result, err := indexOf(g, sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
 
 		require.NoError(t, err)
 		require.Len(t, result.Incomplete, 1)
@@ -179,7 +218,7 @@ func helper(t *testing.T)             {}
 		g := provider.New("lang-go", "test")
 		options := map[string]json.RawMessage{"python": json.RawMessage(`{"anything":1}`)}
 
-		result, err := g.Index(sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
+		result, err := indexOf(g, sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
 
 		require.NoError(t, err)
 		require.Empty(t, result.Incomplete)
@@ -192,10 +231,11 @@ func helper(t *testing.T)             {}
 		t.Setenv("PATH", t.TempDir())
 		t.Setenv("GOROOT", "")
 
-		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+		result, err := indexOf(provider.New("lang-go", "test"), sdk.IndexParams{
 			Project:  sdk.ProjectRef{Root: root},
 			Language: "go",
-			Inputs:   fileInputs(goFiles(t, root)),
+			Units:    oneUnit(goFiles(t, root)),
+			Files:    filesOf(goFiles(t, root)),
 		})
 
 		require.NoError(t, err)
@@ -210,7 +250,7 @@ func helper(t *testing.T)             {}
 		g := provider.New("lang-go", "test")
 		options := map[string]json.RawMessage{"go": json.RawMessage(`{"go":"/nonexistent/go"}`)}
 
-		result, err := g.Index(sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
+		result, err := indexOf(g, sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
 
 		require.NoError(t, err)
 		require.Len(t, result.Incomplete, 1)
@@ -226,8 +266,11 @@ func TestSchemaRejectsWhatTheWireForbids(t *testing.T) {
 	}{
 		{name: "null lists", result: sdk.IndexResult{}},
 		{name: "unknown symbol kind", result: sdk.IndexResult{
-			Fragments: []sdk.Fragment{{Symbols: []sdk.Symbol{{ID: "m::x#function", Kind: "bogus", Visibility: "public"}}}},
-			Notices:   []string{}, Incomplete: []sdk.Incomplete{},
+			Units: []sdk.UnitResult{{
+				ID: "u", Body: "b", Api: "a", Notices: []string{}, Incomplete: []sdk.Incomplete{},
+				Fragments: []sdk.Fragment{{Symbols: []sdk.Symbol{{ID: "m::x#function", Kind: "bogus", Visibility: "public"}}}},
+			}},
+			Notices: []string{}, Incomplete: []sdk.Incomplete{},
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -303,4 +346,38 @@ func variants(t *testing.T, dir string) map[string]map[string]json.RawMessage {
 		found[""] = map[string]json.RawMessage{}
 	}
 	return found
+}
+
+// indexWith indexes the project as one unit and gives what it answered as
+// JSON, with the stats of the request.
+func indexWith(t *testing.T, g *provider.Provider, root string, options map[string]json.RawMessage) (string, provider.RunStats) {
+	t.Helper()
+	if options == nil {
+		options = map[string]json.RawMessage{}
+	}
+	files := hashedGoFiles(t, root)
+	result, err := indexOf(g, sdk.IndexParams{
+		Project:  sdk.ProjectRef{Root: root},
+		Language: "go",
+		Units:    oneUnit(files),
+		Files:    filesOf(files),
+		Context:  sdk.Context{Options: options},
+	})
+	require.NoError(t, err)
+	result.Units = nil
+	raw, err := json.Marshal(result)
+	require.NoError(t, err)
+	return string(raw), g.Stats()
+}
+
+func hashedGoFiles(t *testing.T, root string) []sdk.FileRef {
+	t.Helper()
+	files := goFiles(t, root)
+	for i := range files {
+		text, err := os.ReadFile(filepath.Join(root, files[i].Path))
+		require.NoError(t, err)
+		sum := sha256.Sum256(text)
+		files[i].Hash = hex.EncodeToString(sum[:])
+	}
+	return files
 }

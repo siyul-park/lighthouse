@@ -42,19 +42,16 @@ func TestSourceMappingPointersEscapeJSONPointerTokens(t *testing.T) {
 	require.True(t, ok, "field declaration is missing a pointer-keyed mapping entry")
 }
 
-func indexSource(t *testing.T, host string) (sdk.Source, sdk.IndexResult) {
+func indexSource(t *testing.T, host string) (sdk.Source, answer) {
 	t.Helper()
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "example.go"), []byte(host), 0600))
-	result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+	result, err := indexOf(provider.New("lang-go", "test"), sdk.IndexParams{
 		Project:  sdk.ProjectRef{Root: root},
 		Language: "go",
-		Inputs: []sdk.IndexInput{{
-			Kind:      "file",
-			File:      &sdk.FileRef{Path: "example.go", Hash: "test"},
-			SourceAST: true,
-		}},
-		Context: sdk.Context{Options: map[string]json.RawMessage{}},
+		Units:    oneUnit([]sdk.FileRef{{Path: "example.go", Hash: "test", SourceAST: true}}),
+		Files:    []string{"example.go"},
+		Context:  sdk.Context{Options: map[string]json.RawMessage{}},
 	})
 	require.NoError(t, err)
 	require.Len(t, result.Sources, 1, "incomplete=%+v", result.Incomplete)

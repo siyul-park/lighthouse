@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go/token"
@@ -25,21 +24,24 @@ type run struct {
 	opts options
 
 	// overlays hold the text that stands in for a file, by absolute path.
-	overlays     map[string][]byte
+	overlays map[string][]byte
+	// requested are the files the analysis loads: those of the units asked
+	// for and of the directories that declare interfaces, which are loaded to
+	// match types against them. emit are the files that have a fragment in the
+	// answer.
 	requested    map[string]sdk.FileRef
+	emit         map[string]bool
 	astRequested map[string]bool
 	fragments    map[string]*sdk.Fragment
 	claimed      map[string]bool
 	// problems holds one reason per file that could not be fully analyzed.
-	problems        map[string]string
-	excludedFiles   map[string]bool
-	excluded        int
-	excludedExample string
-	result          sdk.IndexResult
+	problems      map[string]string
+	excludedFiles map[string]bool
+	// excludedClaimed are the excluded files no package took.
+	excludedClaimed map[string]bool
+	result          answer
 	// failed counts, per batch the go command could not list, its files.
 	failed map[string]int
-	// encoded holds fragments that are already JSON, from the cache.
-	encoded map[string]json.RawMessage
 	// loads counts the batches the run had the go command load.
 	loads int
 	// chain is where the go command keeps its libraries, once read.
@@ -50,8 +52,7 @@ type run struct {
 	// far holds, by file, the methods that implement only an interface of a
 	// package of the project that the package of the file does not import.
 	far map[string][]string
-	// times is where the request's time goes, shared with the analysis of the
-	// units the cache missed.
+	// times is where the request's time goes.
 	times *timings
 	// regionModules gives the module path of the unit of a fence by its file,
 	// where the unit's directory is not its own.
@@ -94,29 +95,31 @@ const syntheticModule = "lighthouse.invalid/workspace"
 
 func newRun(params sdk.IndexParams, opts options) *run {
 	r := &run{
-		root:          params.Project.Root,
-		opts:          opts,
-		overlays:      map[string][]byte{},
-		requested:     map[string]sdk.FileRef{},
-		astRequested:  map[string]bool{},
-		fragments:     map[string]*sdk.Fragment{},
-		claimed:       map[string]bool{},
-		problems:      map[string]string{},
-		excludedFiles: map[string]bool{},
-		failed:        map[string]int{},
-		encoded:       map[string]json.RawMessage{},
-		regionModules: map[string]string{},
-		fenceFiles:    map[string]bool{},
-		result:        emptyResult(),
-		times:         &timings{},
-		far:           map[string][]string{},
+		root:            params.Project.Root,
+		opts:            opts,
+		overlays:        map[string][]byte{},
+		requested:       map[string]sdk.FileRef{},
+		emit:            map[string]bool{},
+		astRequested:    map[string]bool{},
+		fragments:       map[string]*sdk.Fragment{},
+		claimed:         map[string]bool{},
+		problems:        map[string]string{},
+		excludedFiles:   map[string]bool{},
+		failed:          map[string]int{},
+		excludedClaimed: map[string]bool{},
+		regionModules:   map[string]string{},
+		fenceFiles:      map[string]bool{},
+		result:          answer{},
+		times:           &timings{},
+		far:             map[string][]string{},
 	}
-	for _, f := range params.FileInputs() {
-		r.requested[f.Path] = f
-	}
-	for _, input := range params.Inputs {
-		if input.Kind == "file" && input.File != nil && input.SourceAST {
-			r.astRequested[input.File.Path] = true
+	for _, u := range params.Units {
+		for _, f := range u.Files {
+			r.requested[f.Path] = f
+			r.emit[f.Path] = true
+			if f.SourceAST {
+				r.astRequested[f.Path] = true
+			}
 		}
 	}
 	for _, o := range params.Context.Overlays {
@@ -144,24 +147,6 @@ func (r *run) index() {
 	r.excludedTests(candidates)
 }
 
-// edits are the overlays of a request by absolute path, when each stands in
-// for the text of an existing Go file: a unit is keyed on what its files say,
-// so the text of an edit is read where the disk's would be. An overlay that
-// adds, empties or removes a file, or is not Go, changes what the directory
-// holds and so what the units are: the request is then analyzed uncached.
-func (r *run) edits(overlays []sdk.Overlay) (map[string][]byte, bool) {
-	edits := make(map[string][]byte, len(overlays))
-	for _, o := range overlays {
-		path := filepath.Join(r.root, filepath.FromSlash(o.Path))
-		info, err := os.Stat(path)
-		if !strings.HasSuffix(o.Path, ".go") || o.Text == "" || err != nil || !info.Mode().IsRegular() {
-			return nil, false
-		}
-		edits[path] = []byte(o.Text)
-	}
-	return edits, true
-}
-
 // candidates are the requested files, sorted: the host lists the files of the
 // project, so every one is analyzed.
 func (r *run) candidates() []string {
@@ -173,11 +158,13 @@ func (r *run) candidates() []string {
 	return candidates
 }
 
-func (r *run) finish() sdk.IndexResult {
+// finish is the answer's fragments, trees and gaps, of the files that have
+// them in it, in order of path.
+func (r *run) finish() answer {
 	defer r.times.measure(phaseSerialise)()
 	paths := make([]string, 0, len(r.fragments))
 	for path := range r.fragments {
-		if !r.fenceFiles[path] {
+		if r.emit[path] && !r.fenceFiles[path] {
 			paths = append(paths, path)
 		}
 	}
@@ -185,19 +172,11 @@ func (r *run) finish() sdk.IndexResult {
 	for _, path := range paths {
 		r.result.Fragments = append(r.result.Fragments, *r.fragments[path])
 	}
-	encoded := make([]string, 0, len(r.encoded))
-	for path := range r.encoded {
-		encoded = append(encoded, path)
-	}
-	sort.Strings(encoded)
-	for _, path := range encoded {
-		r.result.Encoded = append(r.result.Encoded, sdk.EncodedFragment{Path: path, JSON: r.encoded[path]})
-	}
 	sort.Slice(r.result.Sources, func(i, j int) bool {
 		return r.result.Sources[i].Path < r.result.Sources[j].Path
 	})
 	for path, reason := range r.problems {
-		if r.fenceFiles[path] {
+		if r.fenceFiles[path] || !r.emit[path] {
 			continue
 		}
 		r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{Path: path, Reason: reason})
@@ -206,11 +185,6 @@ func (r *run) finish() sdk.IndexResult {
 		a, b := r.result.Incomplete[i], r.result.Incomplete[j]
 		return a.Path < b.Path || (a.Path == b.Path && a.Reason < b.Reason)
 	})
-	if r.excluded > 0 {
-		r.result.Notices = append(r.result.Notices, fmt.Sprintf(
-			"%d file(s) excluded by build constraints, e.g. %s; select another context with [languages.go] tags or env",
-			r.excluded, r.excludedExample))
-	}
 	return r.result
 }
 
@@ -527,17 +501,13 @@ func (r *run) unclaimed(rel string) {
 		return
 	}
 	if r.excludedFiles[rel] {
-		r.excluded++
-		if r.excludedExample == "" {
-			r.excludedExample = rel
-		}
+		r.excludedClaimed[rel] = true
 		return
 	}
 	r.problems[rel] = "not part of any package the go command loaded"
 }
 
 func (r *run) fileOnly(rel string) {
-	delete(r.encoded, rel)
 	r.fragments[rel] = emptyFragment(sdk.FileInfo{Path: rel, Facts: r.stemFacts(rel)})
 }
 
@@ -602,10 +572,18 @@ func positionFile(pos string) string {
 	return pos
 }
 
+// answer is what the analysis of a request found, before it is split into the
+// answers of the units.
+type answer struct {
+	Fragments  []sdk.Fragment
+	Sources    []sdk.Source
+	Notices    []string
+	Incomplete []sdk.Incomplete
+}
+
 func emptyResult() sdk.IndexResult {
 	return sdk.IndexResult{
-		Fragments:  []sdk.Fragment{},
-		Sources:    []sdk.Source{},
+		Units:      []sdk.UnitResult{},
 		Notices:    []string{},
 		Incomplete: []sdk.Incomplete{},
 	}
