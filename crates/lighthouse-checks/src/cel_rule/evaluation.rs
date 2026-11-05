@@ -1,6 +1,8 @@
 //! The judgments of one file: what each frame of a check reads, and the
 //! diagnostics it reports.
 
+use std::path::Path;
+
 use super::*;
 
 impl Evaluation<'_> {
@@ -38,7 +40,7 @@ impl Evaluation<'_> {
             Select::Symbol | Select::Function | Select::Test | Select::Event => {
                 self.check_symbols(ctx, file)
             }
-            Select::Comment => self.check_comments(ctx, file, text),
+            Select::Comment => self.check_comments(ctx, file),
             Select::Annotation => self.check_annotations(file),
             Select::File | Select::Edge | Select::Module | Select::Decision => Ok(Vec::new()),
         }
@@ -99,19 +101,14 @@ impl Evaluation<'_> {
     }
 
     /// The comments of `file` that are subjects of the decision's scope.
-    fn check_comments(
-        &self,
-        ctx: &Context,
-        file: &File,
-        text: &str,
-    ) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check_comments(&self, ctx: &Context, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
         let mut found = Vec::new();
-        for comment in project.comments_in(&file.path) {
+        for (at, comment) in project.comments_in(&file.path).enumerate() {
             if !ctx.applies.admits_comment(project.file(&comment.file)) {
                 continue;
             }
-            let value = cel_fact(&self.builder.comment(comment, text));
+            let value = self.comment(&file.path, at)?;
             let place = Anchor {
                 file: file.path.clone(),
                 span: comment.span,
@@ -120,6 +117,18 @@ impl Evaluation<'_> {
             found.extend(self.judge(value, place, &comment.text)?);
         }
         Ok(found)
+    }
+
+    /// The facts of comment number `at` of `file` as the graph holds them.
+    fn comment(&self, file: &Path, at: usize) -> Result<Var, PluginError> {
+        let built = self
+            .queries
+            .pull(FACT, &subject_key(COMMENT, &comment_id(file, at)))?
+            .downcast::<Built>()
+            .map_err(|_| PluginError::Failed(format!("`{FACT}` has an unexpected value")))?;
+        built.var().ok_or_else(|| {
+            PluginError::Failed(format!("{}: a comment has no facts", file.display()))
+        })
     }
 
     /// The directives of `file`, one subject per rule each names, as the

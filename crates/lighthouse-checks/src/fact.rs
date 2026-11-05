@@ -19,6 +19,10 @@ pub const SYMBOL: &str = "symbol";
 pub const FUNCTION: &str = "function";
 /// The sort of a test.
 pub const TEST: &str = "test";
+/// The sort of a comment: its id is the file and the place among the file's
+/// comments. The sort of file is not here: its facts hold the directives, which
+/// the engine judges after the rules, so they are made for each run.
+pub const COMMENT: &str = "comment";
 
 /// The value of a fact node: the tree, or none when the subject has no fact
 /// of this sort, and the tree in the form the runtime holds it, made when
@@ -137,4 +141,15 @@ pub fn subject_key(subject: &str, id: &str) -> String {
 /// The sort and the id a [`subject_key`] names.
 pub fn subject_of(key: &str) -> (&str, &str) {
     key.split_once('\0').unwrap_or_default()
+}
+
+/// The id of the comment `at` of `file`, for [`subject_key`].
+pub fn comment_id(file: &std::path::Path, at: usize) -> String {
+    format!("{}\0{at}", file.to_string_lossy())
+}
+
+/// The file and the place a [`comment_id`] names.
+pub fn comment_of(id: &str) -> Option<(&str, usize)> {
+    let (file, at) = id.rsplit_once('\0')?;
+    Some((file, at.parse().ok()?))
 }

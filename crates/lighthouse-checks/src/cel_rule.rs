@@ -22,7 +22,7 @@ use crate::{
     builder::Builder,
     caching,
     eval::{Frame, Template, Var, cel_fact, compile, compile_all, compile_shared},
-    fact::{Built, FACT, FUNCTION, SYMBOL, TEST, subject_key},
+    fact::{Built, COMMENT, FACT, FUNCTION, SYMBOL, TEST, comment_id, subject_key},
     facts,
     indexes::Queried,
     library::{self, Needs},

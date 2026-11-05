@@ -6,11 +6,11 @@ use std::collections::BTreeSet;
 
 use super::kinds::{CONVENTIONS, Conventions, Pull, READS};
 use crate::{
-    fact::{Built, FACT, FUNCTION, Fact, SYMBOL, TEST, subject_key},
+    fact::{Built, COMMENT, FACT, FUNCTION, Fact, SYMBOL, TEST, comment_id, subject_key},
     local::Local,
 };
 use lighthouse_graph::{Durability, Graph, Options};
-use lighthouse_model::ucm::Host;
+use lighthouse_model::ucm::{Comment, Host};
 use lighthouse_model::{
     Position, Span,
     ucm::{
@@ -18,6 +18,7 @@ use lighthouse_model::{
         Symbol, SymbolId, SymbolKind, TestCase, TestStyle, Visibility,
     },
 };
+use lighthouse_spec::{Content, OVERLAY};
 use std::sync::Arc;
 
 use lighthouse_plugin::{ANALYSIS, Analyzers, Plugin, Queries, Reads, Workspace};
@@ -407,6 +408,48 @@ fn an_edit_runs_the_analysis_of_the_file_it_changed_and_of_no_other() {
             .any(|label| label.contains("analysis") && label.contains("p0.rs")),
         "{ran:?}"
     );
+}
+
+#[test]
+fn the_facts_of_a_comment_follow_the_text_of_its_file() {
+    let mut graph = Graph::in_memory(Options::default()).unwrap();
+    let mut part = Spec {
+        shift: 2,
+        ..spec("m0", &["x"])
+    }
+    .fragment("p0.rs");
+    part.comments = vec![Comment {
+        file: "p0.rs".into(),
+        span: Span {
+            start: Position { line: 1, col: 1 },
+            end: Position { line: 1, col: 6 },
+        },
+        text: "// hi".to_owned(),
+        attached_to: None,
+    }];
+    Host::set_units(&mut graph, &[part]).unwrap();
+    let text = |graph: &mut Graph, text: &str| {
+        let content = Some(Content::of_text(text));
+        graph
+            .set_input(&OVERLAY, &"p0.rs".to_owned(), content, Durability::Volatile)
+            .unwrap();
+    };
+    let field = |graph: &Graph, name: &str| {
+        let key = subject_key(COMMENT, &comment_id("p0.rs".as_ref(), 0));
+        let built = Pull::new(graph).pull(FACT, &key).unwrap();
+        let built = built.downcast::<Built>().unwrap();
+        let Some(Fact::Map(map)) = built.fact() else {
+            panic!("no fact");
+        };
+        map[name].clone()
+    };
+
+    text(&mut graph, "// hi\nfn x() {}\n");
+    assert_eq!(field(&graph, "standalone"), Fact::Bool(true));
+    assert_eq!(field(&graph, "gap"), Fact::Int(0));
+
+    text(&mut graph, "// hi\n\nfn x() {}\n");
+    assert_eq!(field(&graph, "gap"), Fact::Int(1));
 }
 
 fn specs_path(at: usize) -> String {

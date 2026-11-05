@@ -753,6 +753,21 @@ pub fn subject(
     }
 }
 
+/// The facts of `comment`, a comment of a file whose text is `text`.
+pub fn comment_subject(over: Over<'_>, comment: &Comment, text: &str) -> Result<Fact, Error> {
+    let needs = Needs::default();
+    let language = over
+        .model
+        .file(&comment.file)
+        .map_or("", |file| file.analysis_language());
+    let builder = Builder::over(over, &needs, language);
+    let value = builder.comment(comment, text);
+    match builder.failure() {
+        Some(error) => Err(error),
+        None => Ok(Fact::from(&value)),
+    }
+}
+
 /// A span as an expression sees it: where it is, in which file.
 pub(crate) fn span(file: &Path, span: Span) -> Value {
     json!({

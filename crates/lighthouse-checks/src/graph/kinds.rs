@@ -13,6 +13,7 @@ use std::{
 use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use lighthouse_model::ucm::{Held, Model, SymbolId, View};
 use lighthouse_plugin::{ANALYSIS, Pulling, Queries, Reads, Rule, TestNaming, Workspace, reads_of};
+use lighthouse_spec::TEXT;
 use serde::{Deserialize, Serialize};
 
 use crate::layout::contains;
@@ -20,6 +21,7 @@ use crate::{
     builder::{
         Over,
         cohesion::types,
+        comment_subject,
         cycle::cycles,
         effective::{Takers, takers},
         homonyms::names,
@@ -29,7 +31,7 @@ use crate::{
         split::splits,
         subject, tested,
     },
-    fact::{Built, FACT, FUNCTION, Fact, SYMBOL, TEST, subject_of},
+    fact::{Built, COMMENT, FACT, FUNCTION, Fact, SYMBOL, TEST, comment_of, subject_of},
     indexes::{
         CREDITED, CYCLES, IMPORTS, NAMES, OWNED, PARENTS, Queried, REACH, Reached, SPLIT,
         STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
@@ -269,6 +271,9 @@ fn fact(graph: &Graph, (kind, id): &(String, String)) -> Result<Built, Error> {
     let view = View::new(graph, &held)?;
     let pull = Pull::new(graph);
     let indexes = Queried::new(&pull);
+    if kind == COMMENT {
+        return comment(graph, &view, &indexes, &ws, id);
+    }
     let found = SymbolId::parse(id).and_then(|id| view.symbol(&id));
     let fact = match found {
         Some(symbol) => {
@@ -285,6 +290,32 @@ fn fact(graph: &Graph, (kind, id): &(String, String)) -> Result<Built, Error> {
         return Err(error);
     }
     Ok(Built::of(fact))
+}
+
+/// The facts of one comment, made of the model and the text of its file; none
+/// when the file has no such comment.
+fn comment(
+    graph: &Graph,
+    view: &View<'_>,
+    indexes: &Queried<'_>,
+    ws: &Workspace,
+    id: &str,
+) -> Result<Built, Error> {
+    let Some((file, at)) = comment_of(id) else {
+        return Ok(Built::of(None));
+    };
+    let path = std::path::Path::new(file);
+    let Some(comment) = view.comments_in(path).nth(at) else {
+        return Ok(Built::of(None));
+    };
+    let text = graph.query(&TEXT, &file.to_owned())?;
+    let over = Over {
+        model: view,
+        indexes,
+        ws,
+    };
+    let fact = comment_subject(over, comment, text.as_deref().unwrap_or("")).map_err(failed)?;
+    view.failure().map_or(Ok(Built::of(Some(fact))), Err)
 }
 
 fn workspace(graph: &Graph) -> Result<Workspace, Error> {
