@@ -21,6 +21,9 @@ use serde::{Deserialize, Serialize};
 pub(crate) use content::{Content, Readable};
 pub(crate) use detect::{Detected, Graph};
 
+/// A directory with fewer entries than this is hashed on one thread.
+const FAN_OUT: usize = 4;
+
 /// The root of the project: what a path is relative to.
 pub(crate) static ROOT: Input<(), String> = Input::new("root");
 /// What decides the file list besides the file system: a hash of the
@@ -39,9 +42,6 @@ pub(crate) static ENTRIES: Input<String, Vec<(String, bool)>> = Input::new("entr
 pub(crate) static CONTENT: Query<String, Content> = Query::new("content", content::content);
 pub(crate) static DIR: Query<String, Hash> = Query::new("dir", dir);
 pub(crate) static FILES: Query<(), Vec<String>> = Query::new("files", files);
-
-/// A directory with fewer entries than this is hashed on one thread.
-const FAN_OUT: usize = 4;
 
 pub(crate) type Hash = [u8; 32];
 

@@ -30,6 +30,14 @@ use crate::{Attributes, Listing, ProjectFiles};
 /// two seconds (FAT) and a change in the same tick is not told by the time.
 pub const RACY_NS: i64 = 2_000_000_000;
 
+struct Walk<'a> {
+    project: &'a ProjectFiles,
+    previous: &'a Dirs,
+    since: Option<i64>,
+    out: Walked,
+    files: Vec<PathBuf>,
+}
+
 /// What a walk found.
 #[derive(Default)]
 pub struct Walked {
@@ -92,6 +100,7 @@ pub struct Stat {
 }
 
 impl Stat {
+    /// The stat of what `meta` describes.
     pub fn of(meta: &fs::Metadata) -> Self {
         #[cfg(unix)]
         {
@@ -145,14 +154,6 @@ impl ProjectFiles {
         walk.visit(Path::new(""), &mut Vec::new());
         walk.finish()
     }
-}
-
-struct Walk<'a> {
-    project: &'a ProjectFiles,
-    previous: &'a Dirs,
-    since: Option<i64>,
-    out: Walked,
-    files: Vec<PathBuf>,
 }
 
 impl Walk<'_> {

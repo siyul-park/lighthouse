@@ -247,8 +247,9 @@ fn a_query_that_found_an_input_unset_stays_green_while_it_is_unset() {
     assert!(db.take_executed().is_empty(), "nothing it read moved");
 }
 
+/// An explanation has a line for each step from the node to the input.
 #[test]
-fn explanation_has_a_line_for_each_step_from_the_node_to_the_input() {
+fn explanation() {
     let mut project = Project::new();
     project
         .files
@@ -272,8 +273,9 @@ fn explanation_has_a_line_for_each_step_from_the_node_to_the_input() {
     assert!(lines.contains("file"), "{lines}");
 }
 
+/// A revision moves when an input changes and not when it is set again.
 #[test]
-fn revision_moves_when_an_input_changes_and_not_when_it_is_set_again() {
+fn revision() {
     let mut project = Project::new();
     project
         .files
