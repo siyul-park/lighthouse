@@ -19,22 +19,19 @@ func (m *matching) add(other matching) {
 	m.interfaces = append(m.interfaces, other.interfaces...)
 }
 
-// matchingOf reads what a file shows of the types and interfaces it declares.
-func matchingOf(file *ast.File) matching {
-	m := matching{methods: map[string]bool{}}
-	for _, decl := range file.Decls {
-		switch decl := decl.(type) {
-		case *ast.FuncDecl:
-			if decl.Recv != nil {
-				m.methods[decl.Name.Name] = true
-			}
-		case *ast.GenDecl:
-			if decl.Tok == token.TYPE {
-				m.types(decl)
-			}
+// mayMatch reports whether a type of a directory that declares these methods
+// can implement an interface of other: it does not when no interface of other
+// has all its listed methods among them.
+func (m matching) mayMatch(other matching) bool {
+	if m.open || other.unknown {
+		return true
+	}
+	for _, names := range other.interfaces {
+		if !slices.ContainsFunc(names, func(name string) bool { return !m.methods[name] }) {
+			return true
 		}
 	}
-	return m
+	return false
 }
 
 // types reads the type specs of one declaration.
@@ -58,6 +55,24 @@ func (m *matching) types(decl *ast.GenDecl) {
 	}
 }
 
+// matchingOf reads what a file shows of the types and interfaces it declares.
+func matchingOf(file *ast.File) matching {
+	m := matching{methods: map[string]bool{}}
+	for _, decl := range file.Decls {
+		switch decl := decl.(type) {
+		case *ast.FuncDecl:
+			if decl.Recv != nil {
+				m.methods[decl.Name.Name] = true
+			}
+		case *ast.GenDecl:
+			if decl.Tok == token.TYPE {
+				m.types(decl)
+			}
+		}
+	}
+	return m
+}
+
 // embeds reports whether a struct has an embedded field: its methods are the
 // type's too.
 func embeds(st *ast.StructType) bool {
@@ -74,19 +89,4 @@ func explicit(t *ast.InterfaceType) []string {
 		}
 	}
 	return names
-}
-
-// mayMatch reports whether a type of a directory that declares these methods
-// can implement an interface of other: it does not when no interface of other
-// has all its listed methods among them.
-func (m matching) mayMatch(other matching) bool {
-	if m.open || other.unknown {
-		return true
-	}
-	for _, names := range other.interfaces {
-		if !slices.ContainsFunc(names, func(name string) bool { return !m.methods[name] }) {
-			return true
-		}
-	}
-	return false
 }
