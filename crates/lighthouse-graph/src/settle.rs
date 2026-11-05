@@ -149,8 +149,9 @@ impl Graph {
         node.durability = durability;
         node.verified_at = revision;
         node.value = Some(output.value);
-        node.blob = Some(output.blob);
-        node.value_dirty = true;
+        let kept = !kind.transient();
+        node.blob = kept.then_some(output.blob);
+        node.value_dirty = kept;
         node.cause = cause;
         node.used_at = now();
         self.shared.dirty.mark(slot, &mut node);

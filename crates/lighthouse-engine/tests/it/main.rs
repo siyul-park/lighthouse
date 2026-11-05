@@ -3,7 +3,6 @@
 mod availability;
 mod brief;
 mod cache;
-mod cache_digests;
 mod cache_store;
 mod detect;
 mod engine;

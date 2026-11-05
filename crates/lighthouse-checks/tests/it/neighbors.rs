@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use lighthouse_checks::probe;
-use lighthouse_engine::cache::Digests;
+use lighthouse_engine::cache::{FileKey, Keys};
 use lighthouse_model::ucm::{
     Applicability, EdgeKind, File, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
 };
@@ -54,9 +54,13 @@ fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Context)
     run(&ctx)
 }
 
-fn digests(project: &Project, file: &str) -> (lighthouse_engine::cache::FileDigest, Digests) {
-    let all = Digests::new(project).unwrap();
-    (*all.file(Path::new(file)).unwrap(), all)
+fn digests(world: &World, file: &str) -> FileKey {
+    let fragments: Vec<_> = world
+        .fragments()
+        .into_iter()
+        .map(|(_, fragment)| fragment)
+        .collect();
+    *Keys::of(&fragments).unwrap().file(Path::new(file)).unwrap()
 }
 
 /// A callee `b` in `m/b.ucm` and its caller `a` in `m/a.ucm`.
@@ -168,11 +172,11 @@ fn the_edits_cover_every_field_of_a_node() {
 
 #[test]
 fn every_field_of_a_node_changes_the_neighbors_digest_of_its_caller() {
-    let before = digests(&pair().project(), F1).0;
+    let before = digests(&pair(), F1);
     for (field, edit) in NODE_FIELDS {
         let mut w = pair();
         edit(&mut w);
-        let after = digests(&w.project(), F1).0;
+        let after = digests(&w, F1);
         assert_ne!(before.neighbors, after.neighbors, "{field}");
     }
 }
@@ -316,12 +320,12 @@ fn a_fact_of_the_neighbors_that_changes_with_an_edit_elsewhere_changes_the_neigh
     for case in &cases {
         let mut world = (case.build)();
         let before_project = world.project();
-        let (before, _) = digests(&before_project, case.file);
+        let before = digests(&world, case.file);
         let value_before = read(case, &before_project);
 
         (case.edit)(&mut world);
         let after_project = world.project();
-        let (after, _) = digests(&after_project, case.file);
+        let after = digests(&world, case.file);
         let value_after = read(case, &after_project);
 
         let fact = case.fact;

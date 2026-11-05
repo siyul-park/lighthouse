@@ -1,0 +1,339 @@
+//! The model of the project as queries over what the providers said.
+//!
+//! The host says what it knows of each file (`host`) and which files make the
+//! project (`paths`). From the provider's answers for the units the files are
+//! in, `part` makes the fragments of a file as the host stamps them, `slice`
+//! qualifies them, `symbols` is the table of all declarations, `resolved` the
+//! slice with its targets resolved against it, `edges` the reverse maps of
+//! all edges and `incoming` what the rest of the project says of the symbols
+//! of one file. `project` puts the files together; it is held in memory only.
+//!
+//! Each kind is a function of the kinds it reads: an edit that changes
+//! nothing a node reads, such as a body in `symbols`, leaves it equal and what
+//! read it is not run again.
+
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
+use lighthouse_graph::{Durability, Error, Graph, Input, Query};
+use lighthouse_model::ucm::{
+    Edges, File, Fragment, Incoming, ORDERED, Project, REGIONS, Resolved, Slice, Table, collisions,
+    declared,
+};
+use lighthouse_spec::key;
+use serde::{Deserialize, Serialize};
+
+use super::units::{
+    By, FRAGMENT, PAYLOAD, PROVIDER, Payload, Provider, REGIONS as REGIONS_UNIT, Stored,
+};
+use crate::generated::Markers;
+
+/// What the host says of a file of the project. `Volatile`.
+pub(crate) static HOST: Input<String, Host> = Input::new("host");
+/// The paths of the files of the project, sorted. `Volatile`.
+pub(crate) static PATHS: Input<(), Vec<String>> = Input::new("paths");
+/// The patterns of the markers of generated files. `Stable`.
+pub(crate) static MARKERS: Input<(), Vec<String>> = Input::new("markers");
+
+pub(crate) static PART: Query<String, Vec<Fragment>> = Query::new("part", part);
+pub(crate) static COLLISIONS: Query<(), BTreeSet<String>> = Query::new("collisions", collide);
+pub(crate) static SLICE: Query<String, Slice> = Query::new("slice", slice);
+pub(crate) static SYMBOLS: Query<(), Table> = Query::new("symbols", symbols);
+pub(crate) static RESOLVED: Query<String, Resolved> = Query::new("resolved", resolved);
+pub(crate) static EDGES: Query<(), Edges> = Query::new("edges", edges);
+pub(crate) static INCOMING: Query<String, Incoming> = Query::new("incoming", incoming);
+pub(crate) static PROJECT: Query<(), Project> = Query::new("project", project).transient();
+
+/// How the host stamps the fragments a provider gave for a file.
+struct Stamping<'a> {
+    graph: &'a Graph,
+    host: &'a Host,
+    path: &'a Path,
+}
+
+impl Stamping<'_> {
+    /// The fragments of the unit whose first file is this one, as stored.
+    fn of(&self, language: &str, unit: &str) -> Result<Vec<Fragment>, Error> {
+        let payload = self
+            .graph
+            .input(&PAYLOAD, &(language.to_owned(), unit.to_owned()))?;
+        Ok(payload
+            .iter()
+            .flat_map(|payload| &payload.fragments)
+            .filter(|fragment| fragment.files.first().is_some_and(|f| f.path == self.path))
+            .cloned()
+            .collect())
+    }
+
+    /// What the host says of a file is read again; `generated` also stays where
+    /// the provider said it of a file the host did not.
+    fn restamp(&self, fragment: &mut Fragment) -> Result<(), Error> {
+        for file in &mut fragment.files {
+            let Some(now) = self.graph.input(&HOST, &key(&file.path))? else {
+                continue;
+            };
+            let facts = std::mem::take(&mut file.facts);
+            let added = file.generated;
+            file.clone_from(&now.file);
+            file.generated |= added;
+            file.facts = facts;
+        }
+        Ok(())
+    }
+
+    /// The fact of a language that evaluates its declarations in order.
+    fn ordered(&self, fragment: &mut Fragment, language: &str) -> Result<(), Error> {
+        let ordered = self
+            .graph
+            .input(&PROVIDER, &language.to_owned())?
+            .is_some_and(|provider| provider.ordered);
+        if ordered {
+            for file in &mut fragment.files {
+                file.facts.insert(ORDERED.to_owned(), String::new());
+            }
+        }
+        Ok(())
+    }
+
+    /// What the provider of the host unit left out of its own files: the
+    /// language of the regions, and the regions themselves.
+    fn host(&self, fragments: &mut [Fragment]) {
+        let native = fragments.iter().any(has_content);
+        for file in fragments.iter_mut().flat_map(|f| &mut f.files) {
+            if file.path != self.path {
+                continue;
+            }
+            if let Some(language) = self.host.analysis_language().filter(|_| !native) {
+                file.facts
+                    .insert("analysisLanguage".to_owned(), language.to_owned());
+            }
+            if let Some(regions) = self.host.regions() {
+                file.facts.insert(REGIONS.to_owned(), regions);
+            }
+        }
+    }
+
+    /// States on what the provider of `language` returned for the regions of
+    /// the file what the host knows: the language of the modules they
+    /// declare, whether they are example code, and that example code has no
+    /// tests to own.
+    fn region(&self, fragment: &mut Fragment, language: &str, example: bool) {
+        for module in &mut fragment.modules {
+            module.language = Some(language.to_owned());
+            module.example = example;
+        }
+        if example {
+            fragment.tests.clear();
+        }
+        for file in &mut fragment.files {
+            if let Some(regions) = self.host.regions() {
+                file.facts.insert(REGIONS.to_owned(), regions);
+            }
+        }
+    }
+}
+
+/// What the host says of a file: the record it keeps, the unit the file is
+/// in, and what the injections made of it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Host {
+    pub file: File,
+    /// The id of its unit, in the language of the file.
+    pub unit: String,
+    /// Its unit is a host unit: one that holds files regions are taken from.
+    pub staged: bool,
+    /// The languages its regions were routed to, in the order of the
+    /// providers, each with whether the regions are example code.
+    pub views: Vec<(String, bool)>,
+}
+
+impl Host {
+    /// Sets the inputs of a project that is the given fragments, one unit per
+    /// file, with nothing else known of the files: what the keys of fragments
+    /// made without a run are read from.
+    pub(crate) fn set_units(graph: &mut Graph, fragments: &[Fragment]) -> Result<(), Error> {
+        let mut paths = Vec::new();
+        for fragment in fragments {
+            let Some(file) = fragment.files.first() else {
+                continue;
+            };
+            let (language, path) = (file.lang.clone(), key(&file.path));
+            let provider = Provider {
+                identity: language.clone(),
+                by: By::File,
+                manifest: String::new(),
+                settings: Vec::new(),
+                ordered: false,
+            };
+            graph.set_input(&PROVIDER, &language, provider, Durability::Static)?;
+            let unit = (language, path.clone());
+            let stored = Stored {
+                key: path.clone(),
+                clean: true,
+                ..Stored::default()
+            };
+            let payload = Payload {
+                fragments: vec![fragment.clone()],
+                sources: Vec::new(),
+            };
+            let host = Self {
+                file: file.clone(),
+                unit: path.clone(),
+                staged: false,
+                views: Vec::new(),
+            };
+            graph.set_input(&FRAGMENT, &unit, stored, Durability::Volatile)?;
+            graph.set_input(&PAYLOAD, &unit, payload, Durability::Volatile)?;
+            graph.set_input(&HOST, &path, host, Durability::Volatile)?;
+            paths.push(path);
+        }
+        paths.sort();
+        graph.set_input(&PATHS, &(), paths, Durability::Volatile)?;
+        graph.set_input(&MARKERS, &(), Vec::new(), Durability::Stable)?;
+        Ok(())
+    }
+
+    /// The fact that lists the regions of the file, see `File::regions`.
+    fn regions(&self) -> Option<String> {
+        let mut views: Vec<&(String, bool)> = self.views.iter().collect();
+        views.sort();
+        let listed: Vec<String> = views
+            .iter()
+            .map(|(language, example)| {
+                format!("{language}:{}", if *example { "example" } else { "code" })
+            })
+            .collect();
+        (!listed.is_empty()).then(|| listed.join(","))
+    }
+
+    /// The language a file with no code model of its own is analyzed as: the
+    /// one language of the code it holds. Example code is not the file's
+    /// language, however much of it there is.
+    fn analysis_language(&self) -> Option<&str> {
+        let mut code = self
+            .views
+            .iter()
+            .filter(|(_, example)| !example)
+            .map(|(language, _)| language.as_str());
+        let language = code.next()?;
+        code.next().is_none().then_some(language)
+    }
+}
+
+/// The fragments of a file, as the host stamps them: the ones of its unit,
+/// then the ones of the regions routed to other languages, each stamped with
+/// what the host knows of the file.
+fn part(graph: &Graph, path: &String) -> Result<Vec<Fragment>, Error> {
+    let Some(host) = graph.input(&HOST, path)? else {
+        return Ok(Vec::new());
+    };
+    let stamping = Stamping {
+        graph,
+        host: &host,
+        path: Path::new(path),
+    };
+    let language = &host.file.lang;
+    let mut parts = stamping.of(language, &host.unit)?;
+    for part in &mut parts {
+        stamping.restamp(part)?;
+        stamping.ordered(part, language)?;
+    }
+    if host.staged {
+        stamping.host(&mut parts);
+    }
+    for (view, example) in &host.views {
+        for mut part in stamping.of(view, REGIONS_UNIT)? {
+            stamping.restamp(&mut part)?;
+            stamping.region(&mut part, view, *example);
+            stamping.ordered(&mut part, view)?;
+            parts.push(part);
+        }
+    }
+    let markers = graph.input(&MARKERS, &())?.unwrap_or_default();
+    let markers = Markers::shared(&markers).map_err(|e| Error::Encode(e.to_string()))?;
+    for part in &mut parts {
+        markers.mark(part);
+    }
+    Ok(parts)
+}
+
+/// The module paths declared in several languages, from every part.
+fn collide(graph: &Graph, _: &()) -> Result<BTreeSet<String>, Error> {
+    let parts = each(graph, |graph, path| graph.query(&PART, path))?;
+    Ok(collisions(
+        parts
+            .iter()
+            .flat_map(|parts| parts.iter().flat_map(declared)),
+    ))
+}
+
+fn slice(graph: &Graph, path: &String) -> Result<Slice, Error> {
+    let parts = graph.query(&PART, path)?;
+    let collisions = graph.query(&COLLISIONS, &())?;
+    Ok(Slice::new(
+        PathBuf::from(path),
+        parts.as_ref().clone(),
+        &collisions,
+    ))
+}
+
+/// The table of the symbols of every file.
+fn symbols(graph: &Graph, _: &()) -> Result<Table, Error> {
+    let slices = each(graph, |graph, path| graph.query(&SLICE, path))?;
+    Ok(Table::new(slices.iter().map(Arc::as_ref)))
+}
+
+fn resolved(graph: &Graph, path: &String) -> Result<Resolved, Error> {
+    let slice = graph.query(&SLICE, path)?;
+    let table = graph.query(&SYMBOLS, &())?;
+    Ok(Resolved::new(&slice, &table))
+}
+
+fn edges(graph: &Graph, _: &()) -> Result<Edges, Error> {
+    let table = graph.query(&SYMBOLS, &())?;
+    let resolved = each(graph, |graph, path| graph.query(&RESOLVED, path))?;
+    Ok(Edges::new(&table, resolved.iter().map(Arc::as_ref)))
+}
+
+fn incoming(graph: &Graph, path: &String) -> Result<Incoming, Error> {
+    let resolved = graph.query(&RESOLVED, path)?;
+    let table = graph.query(&SYMBOLS, &())?;
+    let edges = graph.query(&EDGES, &())?;
+    Ok(Incoming::new(&resolved, &table, &edges.reverse))
+}
+
+fn project(graph: &Graph, _: &()) -> Result<Project, Error> {
+    let resolved = each(graph, |graph, path| graph.query(&RESOLVED, path))?;
+    let edges = graph.query(&EDGES, &())?;
+    Ok(Project::assemble(resolved.iter().map(Arc::as_ref), &edges))
+}
+
+/// A query of every path of the project, fanned out.
+fn each<T: Send + 'static>(
+    graph: &Graph,
+    run: fn(&Graph, &String) -> Result<T, Error>,
+) -> Result<Vec<T>, Error> {
+    let paths = paths(graph)?.as_ref().clone();
+    graph.par_map(paths, run).into_iter().collect()
+}
+
+/// The paths of the project.
+fn paths(graph: &Graph) -> Result<Arc<Vec<String>>, Error> {
+    Ok(graph.input(&PATHS, &())?.unwrap_or_default())
+}
+
+/// Whether a fragment says anything of its file besides that it exists.
+fn has_content(fragment: &Fragment) -> bool {
+    !fragment.modules.is_empty()
+        || !fragment.symbols.is_empty()
+        || !fragment.edges.is_empty()
+        || !fragment.functions.is_empty()
+        || !fragment.tests.is_empty()
+        || !fragment.comments.is_empty()
+}
+
+#[cfg(test)]
+mod tests;

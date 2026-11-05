@@ -8,23 +8,18 @@
 //! importers stale for the next round, and rounds go on until none does. No
 //! stale unit means no request, so no provider process.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::Path,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_graph::{Durability, Graph};
-use lighthouse_model::ucm::{File, Fragment, ORDERED};
 use lighthouse_plugin::{Fragments, Indexed, Unit};
 use lighthouse_protocol::hash::Hasher;
-use serde::{Deserialize, Serialize};
 
-use super::{regions::Views, *};
+use super::*;
 use crate::{
     Error as EngineError,
     graph::{
-        API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, REGIONS as REGIONS_UNIT, Read, Stored,
-        UNIT, UNITS,
+        API, CLAIMED, EVERY, FRAGMENT, PAYLOAD, PROVIDER, Payload, Provider,
+        REGIONS as REGIONS_UNIT, Read, Stored, UNIT, UNITS,
     },
 };
 
@@ -59,20 +54,9 @@ struct Pending<'a> {
     sources: Vec<Source<'a>>,
 }
 
-/// What a unit's answer holds, as stored: the fragments, the source trees and
-/// what the provider said of the unit.
-#[derive(Serialize, Deserialize)]
-struct Payload {
-    fragments: Vec<Fragment>,
-    sources: Vec<lighthouse_protocol::Source>,
-    notices: Vec<String>,
-    incomplete: Vec<Incomplete>,
-}
-
-/// What a lane's units give the run.
+/// What a lane's units give the run besides the model of its files.
 #[derive(Default)]
 struct Taken {
-    fragments: Vec<Fragment>,
     sources: Vec<lighthouse_protocol::Source>,
     notices: Vec<String>,
     incomplete: Vec<Incomplete>,
@@ -175,6 +159,7 @@ impl Engine {
             by: manifest.units.by.into(),
             manifest: manifest.units.manifest.clone().unwrap_or_default(),
             settings: manifest.units.settings.clone(),
+            ordered: manifest.ordered_declarations,
         }
     }
 
@@ -185,8 +170,6 @@ impl Engine {
         &self,
         ws: &Workspace,
         calls: BTreeMap<usize, Call<'_>>,
-        views: &Views,
-        parts: &mut Vec<Fragment>,
         mut asts: Option<&mut Vec<lighthouse_protocol::Source>>,
         run: &mut Run,
     ) {
@@ -201,7 +184,10 @@ impl Engine {
                 call,
             })
             .collect();
-        if let Err(e) = self.settle(ws, graph, &mut lanes, run) {
+        let settled = self
+            .settle(ws, graph, &mut lanes, run)
+            .and_then(|()| self.drop_stale(graph, &lanes));
+        if let Err(e) = settled {
             run.incomplete.push(Incomplete {
                 path: None,
                 provider: None,
@@ -210,8 +196,7 @@ impl Engine {
         }
         let started = std::time::Instant::now();
         for lane in &lanes {
-            let taken = self.fetch(graph, lane, views);
-            parts.extend(taken.fragments);
+            let taken = self.fetch(graph, lane);
             run.notices.extend(taken.notices);
             run.incomplete
                 .extend(taken.incomplete.into_iter().map(|gap| Incomplete {
@@ -473,75 +458,72 @@ impl Engine {
                 .collect();
             stored.push((lane.at(&unit.id), stored_of(unit, asked, clean, imports)?));
         }
-        for (unit, value) in stored {
-            graph.set_input(&FRAGMENT, &unit, value, Durability::Volatile)?;
+        for (unit, (meta, payload)) in stored {
+            graph.set_input(&FRAGMENT, &unit, meta, Durability::Volatile)?;
+            graph.set_input(&PAYLOAD, &unit, payload, Durability::Volatile)?;
         }
         Ok(())
     }
 
-    /// The fragments and trees of the lane's units under their current keys,
-    /// from the graph, stamped as the providers' answers are.
-    fn fetch(&self, graph: &Graph, lane: &Lane<'_>, views: &Views) -> Taken {
-        let current = self.files_of(lane);
-        let ids: Vec<&str> = lane.ids().collect();
-        let held: Vec<Option<std::sync::Arc<Stored>>> = ids
-            .iter()
-            .map(|id| {
-                let key = self.key_of(graph, lane, id).ok()?;
-                let stored = graph.input(&FRAGMENT, &lane.at(id)).ok()??;
-                (stored.key == key).then_some(stored)
-            })
-            .collect();
-        let decoded: Vec<Payload> = in_pool(|| {
-            held.par_iter()
-                .flatten()
-                .filter_map(|stored| serde_json::from_slice(&stored.fragment).ok())
-                .collect()
-        });
+    /// What the lane's units say besides their fragments, under their current
+    /// keys, from the graph: the notices, the gaps and the source trees.
+    fn fetch(&self, graph: &Graph, lane: &Lane<'_>) -> Taken {
         let mut taken = Taken::default();
-        for payload in decoded {
-            for mut fragment in payload.fragments {
-                for file in &mut fragment.files {
-                    if let Some(now) = current.get(file.path.as_path()) {
-                        let facts = std::mem::take(&mut file.facts);
-                        // What the host says of a file is read again; `generated` also stays
-                        // where the provider said it of a file the host did not (see `stored_of`).
-                        let added = file.generated;
-                        *file = (*now).clone();
-                        file.generated |= added;
-                        file.facts = facts;
-                    }
-                }
-                taken.fragments.push(fragment);
+        for id in lane.ids() {
+            let Ok(key) = self.key_of(graph, lane, id) else {
+                continue;
+            };
+            let Ok(Some(stored)) = graph.input(&FRAGMENT, &lane.at(id)) else {
+                continue;
+            };
+            if stored.key != key {
+                continue;
             }
-            taken.sources.extend(payload.sources);
-            taken.notices.extend(payload.notices);
-            taken.incomplete.extend(payload.incomplete);
-        }
-        let provider = self.provider(lane.language);
-        views.stamp(&mut taken.fragments, &lane.id);
-        if provider.manifest().ordered_declarations {
-            for file in taken.fragments.iter_mut().flat_map(|f| &mut f.files) {
-                file.facts.insert(ORDERED.to_owned(), String::new());
+            taken.notices.extend(stored.notices.iter().cloned());
+            taken
+                .incomplete
+                .extend(stored.gaps.iter().map(|(path, reason)| Incomplete {
+                    path: path.clone(),
+                    provider: None,
+                    reason: reason.clone(),
+                }));
+            if stored.sources {
+                let payload = graph.input(&PAYLOAD, &lane.at(id));
+                if let Ok(Some(payload)) = payload
+                    && let Ok(found) =
+                        serde_json::from_slice::<Vec<lighthouse_protocol::Source>>(&payload.sources)
+                {
+                    taken.sources.extend(found);
+                }
             }
         }
         taken
     }
 
-    /// The files of the lane's call as the run has them now, by path.
-    fn files_of<'a>(&self, lane: &'a Lane<'_>) -> BTreeMap<&'a Path, &'a File> {
-        let plain = lane
-            .call
-            .units
-            .iter()
-            .flat_map(|unit| &unit.files)
-            .map(|input| (input.file.path.as_path(), &input.file));
-        let regions = lane
-            .call
-            .regions
-            .iter()
-            .map(|file| (file.file.path.as_path(), &file.file));
-        plain.chain(regions).collect()
+    /// Takes the answer of a unit that the provider did not give under the key
+    /// it has now out of the model: an empty one that is not clean stands in
+    /// for it, so that the unit is asked again and no stale fragment is read.
+    fn drop_stale(&self, graph: &mut Graph, lanes: &[Lane<'_>]) -> Result<(), EngineError> {
+        for lane in lanes {
+            for id in lane.ids() {
+                let key = self.key_of(graph, lane, id)?;
+                let unit = lane.at(id);
+                if graph
+                    .input(&FRAGMENT, &unit)?
+                    .is_some_and(|stored| stored.key == key)
+                {
+                    continue;
+                }
+                let empty = Stored {
+                    key,
+                    clean: false,
+                    ..Stored::default()
+                };
+                graph.set_input(&FRAGMENT, &unit, empty, Durability::Volatile)?;
+                graph.set_input(&PAYLOAD, &unit, Payload::default(), Durability::Volatile)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -584,15 +566,16 @@ fn api_now(graph: &Graph, lane: &Lane<'_>, round: &BTreeMap<&str, &str>, import:
     hasher.finalize().to_hex().to_string()
 }
 
-/// A unit as stored: the answer with the key it was asked under.
+/// A unit as stored: the answer with the key it was asked under, as what
+/// the host reads of every unit and the fragments it reads of those it needs.
 fn stored_of(
     unit: &Fragments,
     asked: &Pending<'_>,
     clean: bool,
     imports: Vec<(String, String)>,
-) -> Result<Stored, EngineError> {
-    // What the host says of a file is read again from the run that fetches the
-    // unit; a fragment keeps of `generated` only what the provider added.
+) -> Result<(Stored, Payload), EngineError> {
+    // What the host says of a file is read again from the run that builds the
+    // model; a fragment keeps of `generated` only what the provider added.
     let mut fragments = unit.fragments.clone();
     for file in fragments
         .iter_mut()
@@ -601,13 +584,7 @@ fn stored_of(
         let host = asked.sources.iter().find(|s| s.file.path == file.path);
         file.generated &= host.is_none_or(|s| !s.file.generated);
     }
-    let payload = Payload {
-        fragments,
-        sources: unit.sources.clone(),
-        notices: unit.notices.clone(),
-        incomplete: unit.incomplete.clone(),
-    };
-    Ok(Stored {
+    let meta = Stored {
         key: asked.key.clone(),
         clean,
         imports,
@@ -619,7 +596,18 @@ fn stored_of(
             .map_or(0, |since| {
                 i64::try_from(since.as_nanos()).unwrap_or(i64::MAX)
             }),
-        fragment: serde_json::to_vec(&payload)
+        notices: unit.notices.clone(),
+        gaps: unit
+            .incomplete
+            .iter()
+            .map(|gap| (gap.path.clone(), gap.reason.clone()))
+            .collect(),
+        sources: !unit.sources.is_empty(),
+    };
+    let payload = Payload {
+        fragments,
+        sources: serde_json::to_vec(&unit.sources)
             .map_err(|e| lighthouse_graph::Error::Encode(e.to_string()))?,
-    })
+    };
+    Ok((meta, payload))
 }

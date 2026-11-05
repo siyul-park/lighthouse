@@ -353,3 +353,75 @@ mod persisted {
         assert_eq!(*graph.query(&SEEN, &name).expect("pull"), "two/-");
     }
 }
+
+mod lazy {
+    use lighthouse_graph::{Durability, Graph, Input, Options, Query};
+
+    static BIG: Input<String, String> = Input::new("big").persisted();
+    static LEN: Query<String, usize> = Query::new("len", |graph, name| {
+        Ok(graph.input(&BIG, name)?.map_or(0, |big| big.len()))
+    });
+    static SIZE: Query<String, usize> = Query::new("size", |graph, name| {
+        graph.query(&LEN, name).map(|len| *len + 1)
+    });
+    static TOKEN: Query<String, String> = Query::new("token", |graph, name| {
+        graph.query(&LEN, name).map(|len| format!("{len}"))
+    })
+    .transient();
+    static HASHED: Query<String, usize> = Query::new("hashed", |graph, name| {
+        LEN.hash(graph, name).map(|hash| usize::from(hash[0]))
+    });
+
+    fn reopen(path: &std::path::Path) -> Graph {
+        let options = Options {
+            verify: 0,
+            ..Options::default()
+        };
+        Graph::open(path, options).expect("open")
+    }
+
+    #[test]
+    fn validating_what_reads_a_persisted_input_does_not_load_it() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let name = "a".to_owned();
+        let mut graph = reopen(&path);
+        graph
+            .set_input(&BIG, &name, "four".to_owned(), Durability::Volatile)
+            .expect("set");
+        assert_eq!(*graph.query(&SIZE, &name).expect("pull"), 5);
+        assert_eq!(*graph.query(&TOKEN, &name).expect("pull"), "4");
+        graph.commit().expect("commit");
+        drop(graph);
+
+        let graph = reopen(&path);
+        assert_eq!(*graph.query(&SIZE, &name).expect("pull"), 5);
+        assert!(
+            graph.take_executed().is_empty(),
+            "green without loading or running anything"
+        );
+        // A transient value is not stored, so it is computed again; what it
+        // reads is still green.
+        assert_eq!(*graph.query(&TOKEN, &name).expect("pull"), "4");
+        assert_eq!(graph.take_executed(), ["token(\"a\")"]);
+    }
+
+    #[test]
+    fn a_hash_read_moves_with_the_value_and_is_not_a_value_read() {
+        let mut graph = Graph::in_memory(Options::default()).expect("open");
+        let name = "a".to_owned();
+        graph
+            .set_input(&BIG, &name, "one".to_owned(), Durability::Volatile)
+            .expect("set");
+        let first = LEN.hash(&graph, &name).expect("hash");
+        graph
+            .set_input(&BIG, &name, "three".to_owned(), Durability::Volatile)
+            .expect("set");
+        assert_ne!(LEN.hash(&graph, &name).expect("hash"), first);
+        let after = *graph.query(&HASHED, &name).expect("pull");
+        assert_eq!(
+            after,
+            usize::from(LEN.hash(&graph, &name).expect("hash")[0])
+        );
+    }
+}

@@ -295,6 +295,23 @@ impl Graph {
         Ok(())
     }
 
+    pub(crate) fn hash_of<K: Key, V: Value>(
+        &self,
+        query: &'static Query<K, V>,
+        key: &K,
+    ) -> Result<[u8; 32], Error> {
+        let registered = self.shared.register(query)?;
+        let id = NodeId {
+            kind: registered.name,
+            key: encode(key)?.into(),
+        };
+        let pulled = self.pull(&id, query, false)?;
+        if let Some(frame) = &self.frame {
+            frame.record(&id, pulled.hash, pulled.durability);
+        }
+        Ok(pulled.hash)
+    }
+
     fn read<K: Key, V: Value, Q: Kind + 'static>(
         &self,
         kind: &'static Q,

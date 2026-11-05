@@ -3,12 +3,12 @@
 
 use std::{borrow::Cow, sync::OnceLock};
 
-use lighthouse_model::ucm::{Capability, REGIONS};
+use lighthouse_model::ucm::Capability;
 use lighthouse_plugin::RuleManifest;
 
 use rayon::ThreadPool;
 
-use super::{regions::Views, *};
+use super::{project::Units, regions::Views, *};
 use crate::graph::Detected;
 use lighthouse_spec::{Attributes, Content, Readable};
 
@@ -185,16 +185,9 @@ impl Engine {
         };
         let hosts = self.hosts();
         let (host_calls, mut file_calls) = self.plan_units(&inputs, hosts.as_ref(), run);
-        let mut parts: Vec<Fragment> = Vec::new();
+        let units = Units::of(&host_calls, &file_calls);
         let mut sources = Vec::new();
-        self.index_calls(
-            &ws,
-            host_calls,
-            &Views::default(),
-            &mut parts,
-            Some(&mut sources),
-            run,
-        );
+        self.index_calls(&ws, host_calls, Some(&mut sources), run);
         let named = |name: &str| {
             let id = self.registry.language_named(name)?;
             self.providers
@@ -204,18 +197,15 @@ impl Engine {
         };
         let regions = injections::select(self.config.injections(), sources, &inputs, &named, run);
         let target_files = self.route_embedded(regions, run);
-        let views = self.view_regions(&target_files, &mut parts);
+        let views = self.view_regions(&target_files);
         for (target, files) in target_files {
             file_calls.entry(target).or_default().regions = files.into_values().collect();
         }
-        self.index_calls(&ws, file_calls, &views, &mut parts, None, run);
-        self.commit_index(run);
+        self.index_calls(&ws, file_calls, None, run);
         let started = Instant::now();
-        for part in &mut parts {
-            self.generated.mark(part);
-        }
-        let project = Project::merge(parts);
+        let project = self.assemble(&inputs, (&units, &views), run);
         run.timings.merge = started.elapsed();
+        self.commit_index(run);
         run.notices.extend(project.notices().iter().cloned());
         let kept = inputs
             .into_iter()
@@ -313,43 +303,14 @@ impl Engine {
         target_files
     }
 
-    /// States on the host files what their regions are: the languages they
-    /// are in, and the one language a file of no code model of its own is
-    /// analyzed as. The views are what the providers' answers are stamped by.
-    fn view_regions(&self, target_files: &EmbeddedTargets, parts: &mut [Fragment]) -> Views {
+    /// What the injections made of the host files: the languages their
+    /// regions are in, and whether each is example code.
+    fn view_regions(&self, target_files: &EmbeddedTargets) -> Views {
         let mut views = Views::default();
         for (target, files) in target_files {
             let language = self.provider(*target).manifest().id.clone();
             for (path, file) in files {
                 views.add(path, &language, &file.regions);
-            }
-        }
-        let native_files: BTreeSet<PathBuf> = parts
-            .iter()
-            .filter(|part| {
-                !part.modules.is_empty()
-                    || !part.symbols.is_empty()
-                    || !part.edges.is_empty()
-                    || !part.functions.is_empty()
-                    || !part.tests.is_empty()
-                    || !part.comments.is_empty()
-            })
-            .flat_map(|part| part.files.iter().map(|file| file.path.clone()))
-            .collect();
-        let analysis_language = |path: &Path| {
-            views
-                .analysis_language(path)
-                .filter(|_| !native_files.contains(path))
-                .map(str::to_owned)
-        };
-        for part in parts.iter_mut() {
-            for file in &mut part.files {
-                if let Some(language) = analysis_language(&file.path) {
-                    file.facts.insert("analysisLanguage".to_owned(), language);
-                }
-                if let Some(regions) = views.regions(&file.path) {
-                    file.facts.insert(REGIONS.to_owned(), regions);
-                }
             }
         }
         views

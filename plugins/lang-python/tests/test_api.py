@@ -32,3 +32,12 @@ class ApiTests(unittest.TestCase):
             of("class C:\n    def m(self):\n        return 1\n"),
         )
         self.assertNotEqual(api.digest(None, "def f(:\n"), api.digest(None, "def g(:\n"))
+
+    def test_comments_whitespace_and_docstrings_are_not_the_interface(self):
+        def of(text):
+            return api.digest(ast.parse(text), text)
+
+        plain = "class C:\n    x = 1\n\ndef f(a):\n    return a\n"
+        self.assertEqual(of(plain), of("# about\n" + plain.replace("x = 1", "x = 1  # one").replace("\n\n", "\n\n\n")))
+        self.assertEqual(of(plain), of('"""The module."""\n' + plain.replace("x = 1", '"""The class."""\n    x = 1')))
+        self.assertNotEqual(of(plain), of(plain.replace("x = 1", "x = 2")))

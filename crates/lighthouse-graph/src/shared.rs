@@ -233,8 +233,9 @@ impl Shared {
         slot: &Arc<Slot>,
         node: &mut Node,
         kind: &dyn Kind,
+        want_value: bool,
     ) -> Result<(), Error> {
-        if node.value.is_none() && node.on_disk {
+        if want_value && node.value.is_none() && node.on_disk {
             let bytes = self.store.value(&slot.id.kind, &slot.id.key)?;
             if let Some(bytes) = bytes.filter(|bytes| hash(bytes) == node.hash)
                 && let Some(value) = kind.decode(&bytes)

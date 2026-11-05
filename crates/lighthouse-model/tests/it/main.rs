@@ -18,6 +18,7 @@ mod schema;
 mod scope;
 mod signal;
 mod sites;
+mod slice;
 mod symbol;
 mod text;
 mod time;

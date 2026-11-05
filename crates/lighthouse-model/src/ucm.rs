@@ -1,7 +1,8 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     ops::Deref,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use schemars::JsonSchema;
@@ -14,6 +15,8 @@ mod function;
 mod load_order;
 mod merge;
 mod qualify;
+mod slice;
+mod table;
 
 pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
@@ -21,7 +24,9 @@ pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, Type
 pub use load_order::{LoadNeed, LoadPoint};
 
 use crate::{Document, Span};
-use merge::{dedup_edges, resolve_all, sites_of, sorted_union};
+use merge::{dedup_edges, resolve_all, settle, sites_of, sorted_union};
+pub use slice::{Edges, Incoming, Resolved, Reverse, Slice, Tie, collisions, declared};
+pub use table::{Entry, Table};
 
 /// The fact of a file that lists its regions, see [`File::regions`].
 pub const REGIONS: &str = "regions";
@@ -152,12 +157,19 @@ pub enum FlowKind {
 /// A symbol id declared in several files (build variants, for instance) keeps
 /// the first declaration in file order; the rest are dropped and reported by
 /// [`Project::notices`], as are targets that stayed ambiguous.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Project {
+    inner: Arc<Merged>,
+    #[serde(skip)]
+    documents: Vec<Document>,
+}
+
+/// What a merge made, shared by the copies of a project.
+#[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+struct Merged {
     all: Fragment,
     index: Index,
     notices: Vec<String>,
-    documents: Vec<Document>,
 }
 
 /// UCM contribution of one indexed file; ids are project-stable.
@@ -185,7 +197,7 @@ pub struct File {
     /// What the provider says of the file besides that, by name: the edition
     /// of the crate a Rust file is in, say. A program names one as
     /// `{file.<name>}`.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default)]
     pub facts: BTreeMap<String, String>,
 }
 
@@ -236,20 +248,20 @@ impl File {
 pub struct Module {
     pub path: String,
     /// Name the language gives the module, such as a Go package name.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
     /// The module whose public surface this one tests from outside.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub test_of: Option<String>,
     /// The language of the regions of a host file that declare the module,
     /// stated by the host that routed them; `None` for a module of a file of
     /// its own.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub language: Option<String>,
     /// The module is declared by example code: what documentation shows, not
     /// part of the project. Its calls and references are sites of use, and
     /// nothing is used, owned or tested because of them.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default)]
     pub example: bool,
 }
 
@@ -267,7 +279,7 @@ pub struct Symbol {
     /// annotation to its last token, `None` when the provider does not report
     /// it (capability `extent`). It is what moving or deleting the declaration
     /// takes along.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub extent: Option<Span>,
     pub doc: Option<String>,
     pub name: String,
@@ -385,6 +397,12 @@ impl SymbolId {
     }
 }
 
+impl std::borrow::Borrow<str> for SymbolId {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
 /// A directed relation from `from` to `to`; unresolved targets stay
 /// [`Target::Path`] after [`Project::merge`] when they are unknown or ambiguous.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -396,10 +414,10 @@ pub struct Edge {
     /// Where the reference occurs, when the provider reports it (capability
     /// `reference-sites`). The same relation used at several places is one
     /// edge per place.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub site: Option<Span>,
     /// When the use is evaluated, see [`When`].
-    #[serde(default, skip_serializing_if = "When::is_call")]
+    #[serde(default)]
     pub when: When,
 }
 
@@ -493,34 +511,28 @@ pub struct Comment {
     pub text: String,
     /// The symbol this comment is the documentation of, when the provider
     /// knows.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub attached_to: Option<SymbolId>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 struct Index {
     symbols: BTreeMap<SymbolId, usize>,
     in_file: BTreeMap<PathBuf, Vec<usize>>,
     functions: BTreeMap<SymbolId, usize>,
-    callers: BTreeMap<SymbolId, Vec<SymbolId>>,
-    callees: BTreeMap<SymbolId, Vec<SymbolId>>,
-    references: BTreeMap<SymbolId, Vec<SymbolId>>,
-    uses: BTreeMap<SymbolId, Vec<SymbolId>>,
-    members: BTreeMap<SymbolId, Vec<SymbolId>>,
-    sites: BTreeMap<SymbolId, Vec<Site>>,
+    /// What the edges say, by the symbol at the end that is asked.
+    reverse: Arc<Reverse>,
     /// The file of the fragment of each edge that starts at a module, by
     /// position in `edges`.
     origins: BTreeMap<usize, PathBuf>,
     /// Positions in `edges` of the edges that start at a symbol.
     edges_from: BTreeMap<SymbolId, Vec<usize>>,
-    /// The types that implement an interface, by resolved `implements` edges.
-    implementers: BTreeMap<SymbolId, Vec<SymbolId>>,
     /// Positions in `edges` of the edges evaluated as a file loads, by file.
     loads: BTreeMap<PathBuf, Vec<usize>>,
 }
 
 /// One place that refers to a symbol, from an edge with a `site`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Site {
     pub file: PathBuf,
     pub from: Node,
@@ -533,7 +545,7 @@ impl Deref for Project {
     type Target = Fragment;
 
     fn deref(&self) -> &Fragment {
-        &self.all
+        &self.inner.all
     }
 }
 
@@ -544,20 +556,75 @@ impl Project {
         let (mut all, mut notices, files) = sorted_union(parts);
         let ambiguous = resolve_all(&mut all);
         if ambiguous > 0 {
-            notices.push(format!(
-                "{ambiguous} edge target(s) matched several symbols and stayed unresolved"
-            ));
+            notices.push(ambiguity(ambiguous));
         }
-        let sites = sites_of(&all, &files);
+        let table = Table::of(&all);
+        let sites = sites_of(&all, &table, &files);
         let origins = dedup_edges(&mut all, &files);
+        let mut reverse = Reverse::link(&table, all.edges.iter());
+        reverse.sites = sites;
+        Self::indexed(all, reverse, origins, notices)
+    }
+
+    /// The project of slices resolved against one table, in the order of
+    /// their paths, with the edges of all of them: what `merge` makes of the
+    /// fragments, without resolving or linking anything again.
+    pub fn assemble<'a>(resolved: impl IntoIterator<Item = &'a Resolved>, edges: &Edges) -> Self {
+        let mut all = Fragment::default();
+        let mut ambiguous = 0;
+        let mut origins = BTreeMap::new();
+        for resolved in resolved {
+            ambiguous += resolved.ambiguous;
+            let slice = &resolved.slice;
+            let part = &slice.fragment;
+            all.files.extend(part.files.iter().cloned());
+            all.modules.extend(part.modules.iter().cloned());
+            all.symbols.extend(part.symbols.iter().cloned());
+            all.functions.extend(part.functions.iter().cloned());
+            all.tests.extend(part.tests.iter().cloned());
+            all.comments.extend(part.comments.iter().cloned());
+            let dropped = edges
+                .dropped
+                .get(&slice.path)
+                .map_or(&[][..], Vec::as_slice);
+            let mut files = slice
+                .runs
+                .iter()
+                .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
+            for (at, edge) in part.edges.iter().enumerate() {
+                let file = files.next().flatten();
+                if dropped.binary_search(&(at as u32)).is_ok() {
+                    continue;
+                }
+                if let (Node::Module(_), Some(file)) = (&edge.from, file) {
+                    origins.insert(all.edges.len(), file.clone());
+                }
+                all.edges.push(edge.clone());
+            }
+        }
+        let mut notices: Vec<String> = settle(&mut all).into_iter().collect();
+        if ambiguous > 0 {
+            notices.push(ambiguity(ambiguous));
+        }
+        Self::indexed(all, (*edges.reverse).clone(), origins, notices)
+    }
+
+    fn indexed(
+        all: Fragment,
+        reverse: Reverse,
+        origins: BTreeMap<usize, PathBuf>,
+        notices: Vec<String>,
+    ) -> Self {
         let mut index = Index::new(&all);
-        index.sites = sites;
+        index.reverse = Arc::new(reverse);
         index.origins = origins;
         index.loads = load_order::index(&all, &index);
         Self {
-            all,
-            index,
-            notices,
+            inner: Arc::new(Merged {
+                all,
+                index,
+                notices,
+            }),
             documents: Vec::new(),
         }
     }
@@ -576,28 +643,37 @@ impl Project {
 
     /// Things merging dropped or could not decide, for the user to see.
     pub fn notices(&self) -> &[String] {
-        &self.notices
+        &self.inner.notices
     }
 
     /// The file at this exact project-relative path.
     pub fn file(&self, path: &Path) -> Option<&File> {
         let at = self
+            .inner
             .all
             .files
             .binary_search_by(|f| f.path.as_path().cmp(path))
             .ok()?;
-        self.all.files.get(at)
+        self.inner.all.files.get(at)
     }
 
     /// The symbol with this id, if declared.
     pub fn symbol(&self, id: &SymbolId) -> Option<&Symbol> {
-        self.all.symbols.get(*self.index.symbols.get(id)?)
+        self.inner
+            .all
+            .symbols
+            .get(*self.inner.index.symbols.get(id)?)
     }
 
     /// Symbols declared in `path`, sorted by id.
     pub fn symbols_in<'a>(&'a self, path: &Path) -> impl Iterator<Item = &'a Symbol> + use<'a> {
-        let at = self.index.in_file.get(path).map_or(&[][..], Vec::as_slice);
-        at.iter().map(|&i| &self.all.symbols[i])
+        let at = self
+            .inner
+            .index
+            .in_file
+            .get(path)
+            .map_or(&[][..], Vec::as_slice);
+        at.iter().map(|&i| &self.inner.all.symbols[i])
     }
 
     /// Whether the symbol is test code: declared in a test file, or in a module
@@ -638,53 +714,62 @@ impl Project {
     /// The module with this path.
     pub fn module(&self, path: &str) -> Option<&Module> {
         let at = self
+            .inner
             .all
             .modules
             .binary_search_by(|m| m.path.as_str().cmp(path))
             .ok()?;
-        self.all.modules.get(at)
+        self.inner.all.modules.get(at)
     }
 
     /// The summary of a function or method symbol; `None` for other kinds.
     pub fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
-        self.all.functions.get(*self.index.functions.get(id)?)
+        self.inner
+            .all
+            .functions
+            .get(*self.inner.index.functions.get(id)?)
     }
 
     /// Distinct symbols with a resolved, non-heuristic `calls` edge to `id`,
     /// excluding itself.
     pub fn callers(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.index.callers, id)
+        slice(&self.inner.index.reverse.callers, id)
     }
 
     /// Distinct symbols with a resolved `references` edge to `id`, excluding
     /// itself: every use of `id` as a value rather than a call. Heuristic edges
     /// are included: they say a symbol might be used.
     pub fn references(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.index.references, id)
+        slice(&self.inner.index.reverse.references, id)
     }
 
     /// Distinct symbols `id` calls or references through a resolved,
     /// non-heuristic edge, excluding itself: every use `id` makes of another
     /// symbol, whether as a call or as a value.
     pub fn uses(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.index.uses, id)
+        slice(&self.inner.index.reverse.uses, id)
     }
 
     /// Symbols whose `owner` is `id`: fields, methods, associated items.
     pub fn members(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.index.members, id)
+        slice(&self.inner.index.reverse.members, id)
     }
 
     /// The test case of a test symbol.
     pub fn test(&self, id: &SymbolId) -> Option<&TestCase> {
-        let at = self.all.tests.binary_search_by(|t| t.symbol.cmp(id)).ok()?;
-        self.all.tests.get(at)
+        let at = self
+            .inner
+            .all
+            .tests
+            .binary_search_by(|t| t.symbol.cmp(id))
+            .ok()?;
+        self.inner.all.tests.get(at)
     }
 
     /// Test cases declared in `module`, ordered by id.
     pub fn tests_in(&self, module: &str) -> &[TestCase] {
         let prefix = format!("{module}::");
-        let tests = &self.all.tests;
+        let tests = &self.inner.all.tests;
         let start = tests.partition_point(|t| t.symbol.as_str() < prefix.as_str());
         let len = tests[start..].partition_point(|t| t.symbol.as_str().starts_with(&prefix));
         &tests[start..start + len]
@@ -694,19 +779,19 @@ impl Project {
     /// references and the other relations alike, in file order. Empty when the
     /// provider reports no reference sites.
     pub fn sites(&self, id: &SymbolId) -> &[Site] {
-        slice(&self.index.sites, id)
+        slice(&self.inner.index.reverse.sites, id)
     }
 
     /// The file the edge at position `at` of `edges` comes from, when it starts
     /// at a module and its fragment is about one file; an edge that starts at
     /// a symbol comes from the file of the symbol.
     pub fn origin(&self, at: usize) -> Option<&Path> {
-        self.index.origins.get(&at).map(PathBuf::as_path)
+        self.inner.index.origins.get(&at).map(PathBuf::as_path)
     }
 
     /// Comments of `path`, in source order.
     pub fn comments_in(&self, path: &Path) -> &[Comment] {
-        let comments = &self.all.comments;
+        let comments = &self.inner.all.comments;
         let start = comments.partition_point(|c| c.file.as_path() < path);
         let end = comments.partition_point(|c| c.file.as_path() <= path);
         &comments[start..end]
@@ -714,38 +799,33 @@ impl Project {
 
     /// The edges that start at symbol `id`, in the project's edge order.
     pub fn edges_from(&self, id: &SymbolId) -> impl Iterator<Item = &Edge> + use<'_> {
-        self.index
+        self.inner
+            .index
             .edges_from
             .get(id)
             .into_iter()
             .flatten()
-            .map(|at| &self.all.edges[*at])
+            .map(|at| &self.inner.all.edges[*at])
     }
 
     /// The types that implement the interface `id`, in test files too.
     pub fn implementers(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.index.implementers, id)
+        slice(&self.inner.index.reverse.implementers, id)
     }
 
     /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
     /// excluding itself.
     pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
-        slice(&self.index.callees, id)
+        slice(&self.inner.index.reverse.callees, id)
     }
 }
 
 impl Index {
+    /// The positions of the symbols, functions and edges of `all`.
     fn new(all: &Fragment) -> Self {
         let mut index = Self::default();
         for (at, symbol) in all.symbols.iter().enumerate() {
             index.symbols.insert(symbol.id.clone(), at);
-            if let Some(owner) = &symbol.owner {
-                index
-                    .members
-                    .entry(owner.clone())
-                    .or_default()
-                    .push(symbol.id.clone());
-            }
             index
                 .in_file
                 .entry(symbol.file.clone())
@@ -755,82 +835,17 @@ impl Index {
         for (at, function) in all.functions.iter().enumerate() {
             index.functions.insert(function.symbol.clone(), at);
         }
-        index.link_edges(all);
+        for (at, edge) in all.edges.iter().enumerate() {
+            if let Node::Symbol(from) = &edge.from {
+                index.edges_from.entry(from.clone()).or_default().push(at);
+            }
+        }
         index
     }
+}
 
-    /// Indexes the edges by source, the implementers of interfaces, and the
-    /// calls, uses and references between resolved symbols of project code.
-    fn link_edges(&mut self, all: &Fragment) {
-        let mut calls = BTreeSet::new();
-        let mut references = BTreeSet::new();
-        let mut uses = BTreeSet::new();
-        let examples: BTreeSet<&str> = all
-            .modules
-            .iter()
-            .filter(|m| m.example)
-            .map(|m| m.path.as_str())
-            .collect();
-        let example_files: BTreeSet<&Path> = all
-            .files
-            .iter()
-            .filter(|file| file.is_example())
-            .map(|file| file.path.as_path())
-            .collect();
-        for (at, edge) in all.edges.iter().enumerate() {
-            let Node::Symbol(from) = &edge.from else {
-                continue;
-            };
-            self.edges_from.entry(from.clone()).or_default().push(at);
-            // An example uses nothing: its edges stay as sites of use, and are
-            // not callers, references or implementers of what they name.
-            let in_example_file = self
-                .symbols
-                .get(from)
-                .is_some_and(|&at| example_files.contains(all.symbols[at].file.as_path()));
-            if examples.contains(from.module()) || in_example_file {
-                continue;
-            }
-            let Target::Resolved(Node::Symbol(to)) = &edge.to else {
-                continue;
-            };
-            if edge.kind == EdgeKind::Implements {
-                self.implementers
-                    .entry(to.clone())
-                    .or_default()
-                    .push(from.clone());
-            }
-            let precise = edge.resolution != Resolution::Heuristic;
-            if from != to && precise && matches!(edge.kind, EdgeKind::Calls | EdgeKind::References)
-            {
-                uses.insert((from, to));
-            }
-            match edge.kind {
-                EdgeKind::Calls if from != to && precise => calls.insert((from, to)),
-                EdgeKind::References if from != to => references.insert((from, to)),
-                _ => false,
-            };
-        }
-        for (from, to) in calls {
-            self.callees
-                .entry(from.clone())
-                .or_default()
-                .push(to.clone());
-            self.callers
-                .entry(to.clone())
-                .or_default()
-                .push(from.clone());
-        }
-        for (from, to) in uses {
-            self.uses.entry(from.clone()).or_default().push(to.clone());
-        }
-        for (from, to) in references {
-            self.references
-                .entry(to.clone())
-                .or_default()
-                .push(from.clone());
-        }
-    }
+fn ambiguity(count: usize) -> String {
+    format!("{count} edge target(s) matched several symbols and stayed unresolved")
 }
 
 /// The entries of `map` under `id`, none when it has none.

@@ -305,3 +305,24 @@ fn a_global_rule_that_runs_per_file_keeps_one_row_for_the_project_state() {
     let (plain, _) = engine_with(dir.path(), ROWS);
     assert_eq!(found(&third), found(&plain.check(&[], &[]).unwrap()));
 }
+
+#[test]
+fn documents_digest_follows_their_content() {
+    let document = |name: &str| lighthouse_model::Document {
+        file: "d.yaml".into(),
+        at: Position { line: 1, col: 1 },
+        kind: "Decision".to_owned(),
+        name: name.to_owned(),
+        uid: None,
+        labels: Default::default(),
+    };
+    let one = lighthouse_engine::cache::documents(&[document("a")]).unwrap();
+    assert_eq!(
+        one,
+        lighthouse_engine::cache::documents(&[document("a")]).unwrap()
+    );
+    assert_ne!(
+        one,
+        lighthouse_engine::cache::documents(&[document("b")]).unwrap()
+    );
+}

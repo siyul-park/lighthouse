@@ -13,7 +13,10 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use crate::cache::{Cache, Digest, Digests, KeyBuilder, Stored, tools};
+use crate::{
+    cache::{Cache, Digest, KeyBuilder, Stored, tools},
+    graph::Keys,
+};
 use lighthouse_model::{ExampleScope, Reach, TestScope};
 use lighthouse_plugin::{Models, Pending};
 use serde::{Deserialize, Serialize};
@@ -23,7 +26,7 @@ use super::*;
 /// The cache a run reads and writes, with the digests its keys are built from.
 pub(super) struct RunCache<'c> {
     cache: &'c Cache,
-    digests: Digests,
+    digests: Keys,
     documents_digest: Digest,
     prefixes: HashMap<String, Prefix>,
 }
@@ -103,8 +106,23 @@ impl Engine {
         models: &dyn Models,
         notices: &mut BTreeSet<String>,
     ) -> Option<RunCache<'c>> {
-        let digests = Digests::new(project)
-            .and_then(|digests| Ok((digests, crate::cache::documents(project.documents())?)));
+        let positions = selected.iter().any(|rule| {
+            rule.manifest()
+                .caching
+                .as_ref()
+                .is_some_and(|caching| caching.positions)
+        });
+        let mut guard = self.lock_graph();
+        let graph = self.graph_in(&mut guard, notices);
+        let digests = in_pool(|| Keys::new(graph, project, positions)).map_err(|e| e.to_string());
+        if let Err(e) = graph.commit() {
+            notices.insert(format!("the graph was not saved: {e}"));
+        }
+        let digests = digests.and_then(|digests| {
+            let documents =
+                crate::cache::documents(project.documents()).map_err(|e| e.to_string())?;
+            Ok((digests, documents))
+        });
         match digests {
             Ok((digests, documents)) => Some(RunCache {
                 cache,

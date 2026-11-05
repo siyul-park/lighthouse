@@ -64,6 +64,31 @@ func TestProviderUnits(t *testing.T) {
 		}
 	})
 
+	t.Run("a comment or a change of layout moves the body of its unit and no api", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, unitFixture)
+		before := byID(unitsAt(t, root))
+
+		writeFile(t, root, "a/a.go", "// Package a.\npackage a\n\n// T is a type.\ntype T struct{ N int } // the field\n\n\n// A answers.\nfunc A() int {\n\treturn 1 // one\n}\n")
+		after := byID(unitsAt(t, root))
+
+		require.NotEqual(t, before["a"].Body, after["a"].Body)
+		for id := range before {
+			require.Equal(t, before[id].Api, after[id].Api, id)
+		}
+	})
+
+	t.Run("a build directive moves the api of its package", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, unitFixture)
+		before := byID(unitsAt(t, root))
+
+		writeFile(t, root, "c/c.go", "//go:build linux\n\npackage c\n\nfunc C() int { return 3 }\n")
+		after := byID(unitsAt(t, root))
+
+		require.NotEqual(t, before["c"].Api, after["c"].Api)
+	})
+
 	t.Run("a new exported function moves the api of its package and its importers", func(t *testing.T) {
 		root := t.TempDir()
 		writeTree(t, root, unitFixture)

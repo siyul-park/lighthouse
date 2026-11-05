@@ -5,7 +5,11 @@
 //! listed plugins', then the extended projects' and the project's own; no
 //! marker belongs to a language.
 
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, OnceLock, PoisonError},
+};
 
 use ignore::gitignore::Gitignore;
 use lighthouse_model::ucm::{Comment, File, Fragment, Symbol};
@@ -18,7 +22,15 @@ use crate::Error;
 /// The files and the markers that tell generated code apart.
 pub(crate) struct Generated {
     files: Gitignore,
-    markers: RegexSet,
+    pub markers: Markers,
+}
+
+/// The regular expressions that mark a file generated when a head comment
+/// matches one.
+#[derive(Debug)]
+pub(crate) struct Markers {
+    patterns: Vec<String>,
+    set: RegexSet,
 }
 
 impl Generated {
@@ -35,7 +47,7 @@ impl Generated {
         markers.extend(config.generated_markers().iter().cloned());
         Ok(Self {
             files: ignore_matcher(root, &files)?,
-            markers: generated_markers(&markers)?,
+            markers: Markers::new(markers)?,
         })
     }
 
@@ -45,12 +57,42 @@ impl Generated {
             .matched_path_or_any_parents(path, false)
             .is_ignore()
     }
+}
+
+impl Markers {
+    pub(crate) fn new(patterns: Vec<String>) -> Result<Self, Error> {
+        Ok(Self {
+            set: generated_markers(&patterns)?,
+            patterns,
+        })
+    }
+
+    /// The markers as they were given.
+    pub(crate) fn patterns(&self) -> &[String] {
+        &self.patterns
+    }
+
+    /// The markers of these patterns, compiled once for the process: the same
+    /// patterns are the same markers.
+    pub(crate) fn shared(patterns: &[String]) -> Result<Arc<Self>, Error> {
+        static COMPILED: OnceLock<Mutex<HashMap<Vec<String>, Arc<Markers>>>> = OnceLock::new();
+        let mut compiled = COMPILED
+            .get_or_init(Mutex::default)
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(found) = compiled.get(patterns) {
+            return Ok(found.clone());
+        }
+        let made = Arc::new(Self::new(patterns.to_vec())?);
+        compiled.insert(patterns.to_vec(), made.clone());
+        Ok(made)
+    }
 
     /// Marks the files of `fragment` generated whose head comments carry a
     /// marker. The head of a file is its comments that end before its first
     /// symbol starts, or all of them when it has none.
     pub(crate) fn mark(&self, fragment: &mut Fragment) {
-        if self.markers.is_empty() {
+        if self.set.is_empty() {
             return;
         }
         let marked: Vec<PathBuf> = fragment
@@ -75,7 +117,7 @@ impl Generated {
             .comments
             .iter()
             .filter(|c| c.file == file.path && first.is_none_or(|first| ends_before(c, first)))
-            .any(|c| self.markers.is_match(&c.text))
+            .any(|c| self.set.is_match(&c.text))
     }
 }
 
@@ -146,7 +188,7 @@ mod tests {
     }
 
     fn marked(generated: &Generated, mut fragment: Fragment) -> bool {
-        generated.mark(&mut fragment);
+        generated.markers.mark(&mut fragment);
         fragment.files[0].generated
     }
 

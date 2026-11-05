@@ -3,7 +3,7 @@
 //! derived: it is never committed, a run can bypass it, `clean` deletes it, and
 //! its size is capped, oldest use first. Any doubt is a miss.
 //!
-//! [`Digests`] hash the merged project once, per file and as a whole; a
+//! The graph's `Keys` give the hashes of the model, per file and as a whole; a
 //! [`KeyBuilder`] builds a key from those and from the rule; [`Cache`] stores the
 //! findings under it in `results.db`.
 
@@ -15,15 +15,13 @@ use std::{
 use lighthouse_model::STATE_DIR;
 use thiserror::Error;
 
-mod digest;
 mod key;
-mod neighbors;
 mod store;
 pub(crate) mod tools;
 
-pub(crate) use digest::digest_of;
-pub use digest::{Digest, Digests, FileDigest, documents};
-pub use key::KeyBuilder;
+pub use crate::graph::{FileKey, Keys};
+pub(crate) use key::digest_of;
+pub use key::{Digest, KeyBuilder, documents};
 pub use store::{Cache, DEFAULT_LIMIT, Stats, Stored};
 
 /// Name of the cache directory under `.lighthouse`.

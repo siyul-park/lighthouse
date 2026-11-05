@@ -18,14 +18,15 @@ export function digest(...parts: readonly string[]): string {
 }
 
 /**
- * The text of a file without what an importer cannot see of it: the bodies of
- * functions whose return type is written. A body whose type the compiler infers
- * stays, as it decides the type, and so does the whole of a JavaScript file,
- * where members are made by assignments. An edit inside a removed body leaves
- * the text as it was, which is the early cutoff.
+ * The tokens of a file without what an importer cannot see of it: the bodies of
+ * functions whose return type is written, comments and layout. A body whose
+ * type the compiler infers stays, as it decides the type, and so does the whole
+ * of a JavaScript file, where members are made by assignments. An edit inside a
+ * removed body, a comment (a doc comment is a fact of the fragment) or a change
+ * of layout leaves the text as it was, which is the early cutoff.
  */
 export function skeleton(file: ts.SourceFile): string {
-  if (!/\.[cm]?tsx?$/.test(file.fileName)) return file.text;
+  if (!/\.[cm]?tsx?$/.test(file.fileName)) return tokensOf(file.text);
   const bodies: [number, number][] = [];
   const visit = (node: ts.Node): void => {
     const body = bodyOf(node);
@@ -42,7 +43,44 @@ export function skeleton(file: ts.SourceFile): string {
     text += file.text.slice(at, start);
     at = end;
   }
-  return text + file.text.slice(at);
+  return tokensOf(text + file.text.slice(at));
+}
+
+/** The tokens that end an operand: a `/` after one divides, after any other it starts a regular expression. */
+const OPERAND_END = new Set([
+  ts.SyntaxKind.Identifier,
+  ts.SyntaxKind.PrivateIdentifier,
+  ts.SyntaxKind.NumericLiteral,
+  ts.SyntaxKind.BigIntLiteral,
+  ts.SyntaxKind.StringLiteral,
+  ts.SyntaxKind.RegularExpressionLiteral,
+  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+  ts.SyntaxKind.TemplateTail,
+  ts.SyntaxKind.CloseParenToken,
+  ts.SyntaxKind.CloseBracketToken,
+  ts.SyntaxKind.CloseBraceToken,
+  ts.SyntaxKind.ThisKeyword,
+  ts.SyntaxKind.SuperKeyword,
+  ts.SyntaxKind.TrueKeyword,
+  ts.SyntaxKind.FalseKeyword,
+  ts.SyntaxKind.NullKeyword,
+  ts.SyntaxKind.PlusPlusToken,
+  ts.SyntaxKind.MinusMinusToken,
+]);
+
+/** The kinds and texts of the tokens of `text`, one per line, with no trivia. */
+function tokensOf(text: string): string {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.JSX, text);
+  const out: string[] = [];
+  let previous = ts.SyntaxKind.Unknown;
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+    if ((kind === ts.SyntaxKind.SlashToken || kind === ts.SyntaxKind.SlashEqualsToken) && !OPERAND_END.has(previous)) {
+      kind = scanner.reScanSlashToken();
+    }
+    out.push(`${kind}:${scanner.getTokenText()}`);
+    previous = kind;
+  }
+  return out.join("\n");
 }
 
 /** The block of a function-like node that states its return type, or of a constructor. */

@@ -13,6 +13,7 @@ use std::{
 };
 
 use lighthouse_graph::{Error, Graph, Input, Query};
+use lighthouse_model::ucm::Fragment;
 use lighthouse_plugin::UnitsBy;
 use lighthouse_spec::{CONTENT, FILES, Hash};
 use serde::{Deserialize, Serialize};
@@ -34,9 +35,14 @@ pub(crate) static PROVIDER: Input<String, Provider> = Input::new("provider");
 /// The files of the project a language claims and the engine could read,
 /// sorted: set from the routing, which is the host's configuration.
 pub(crate) static CLAIMED: Input<String, Vec<String>> = Input::new("claimed");
-/// The last answer of a provider for the unit `(language, id)`. Persisted: a
-/// run that finds the unit's key as it was takes it and starts no provider.
+/// What a provider said of the unit `(language, id)` besides its fragments:
+/// the key it was asked under, its `api` and imports, what it noticed. Small,
+/// so the host reads it for every unit of every run. Persisted: a run that
+/// finds the unit's key as it was takes it and starts no provider.
 pub(crate) static FRAGMENT: Input<(String, String), Stored> = Input::new("fragment").persisted();
+/// The fragments and source trees of the same answer. Persisted and read
+/// only by what builds the model of a file, which validates without loading.
+pub(crate) static PAYLOAD: Input<(String, String), Payload> = Input::new("payload").persisted();
 
 pub(crate) static UNITS: Query<String, Vec<Unit>> = Query::new("units", units);
 pub(crate) static SETTINGS: Query<String, Hash> = Query::new("settings", settings);
@@ -53,6 +59,8 @@ pub(crate) struct Provider {
     pub by: By,
     pub manifest: String,
     pub settings: Vec<String>,
+    /// The language evaluates its declarations in the order they are written.
+    pub ordered: bool,
 }
 
 /// How a language's files make units.
@@ -81,7 +89,7 @@ pub(crate) struct Unit {
 }
 
 /// What the provider gave for a unit, and what it was given.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Stored {
     /// The key of the unit it was asked for.
     pub key: String,
@@ -97,8 +105,19 @@ pub(crate) struct Stored {
     /// When it was stored, in nanoseconds since the epoch: a file modified
     /// near that moment cannot be told apart by its stat.
     pub at: i64,
-    /// The fragments and the source trees, as JSON.
-    pub fragment: Vec<u8>,
+    /// Messages about the unit that leave its analysis complete.
+    pub notices: Vec<String>,
+    /// The files that could not be analyzed, by path and reason.
+    pub gaps: Vec<(Option<std::path::PathBuf>, String)>,
+    /// The answer has source trees of host files.
+    pub sources: bool,
+}
+
+/// The fragments of a unit, and its source trees as JSON.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Payload {
+    pub fragments: Vec<Fragment>,
+    pub sources: Vec<u8>,
 }
 
 /// A file outside the project that an answer depended on, with what the host

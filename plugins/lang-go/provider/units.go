@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/scanner"
 	"go/token"
 	"go/types"
 	"os"
@@ -88,7 +89,7 @@ type dirDigest struct {
 type fileFacts struct {
 	// Imports are the import paths of the file.
 	Imports []string
-	// API digests the text of the file without the bodies of its functions and
+	// API digests the tokens of the file without the bodies of its functions and
 	// methods. An edit inside a body leaves it unchanged, and with it the `api`
 	// of every package that depends on this one (early cutoff).
 	API string
@@ -482,24 +483,61 @@ func importsOf(file *ast.File) []string {
 	return out
 }
 
-// apiDigest hashes the text between the function bodies of a file.
+// apiDigest hashes the tokens of a file outside the bodies of its functions:
+// what an importer can see of it. Comments and layout are not in it, except
+// the directives (`//go:build`, `//go:embed`, `// +build`), which change what
+// the file declares; a doc comment is a fact of the fragment.
 func apiDigest(src []byte, file *ast.File, offset func(token.Pos) int) string {
-	h := sha256.New()
-	at := 0
+	type span struct{ start, end int }
+	var bodies []span
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if !ok || fn.Body == nil {
 			continue
 		}
 		start, end := offset(fn.Body.Lbrace), offset(fn.Body.Rbrace)+1
-		if start < at || end > len(src) {
+		if start < 0 || end > len(src) || start > end {
 			return contentHash(src)
 		}
-		h.Write(src[at:start])
-		at = end
+		bodies = append(bodies, span{start, end})
 	}
-	h.Write(src[at:])
+	fset := token.NewFileSet()
+	tf := fset.AddFile("", fset.Base(), len(src))
+	var scan scanner.Scanner
+	scan.Init(tf, src, nil, scanner.ScanComments)
+	h := sha256.New()
+	next := 0
+	for {
+		pos, tok, lit := scan.Scan()
+		if tok == token.EOF {
+			break
+		}
+		at := tf.Offset(pos)
+		for next < len(bodies) && at >= bodies[next].end {
+			next++
+		}
+		if next < len(bodies) && at >= bodies[next].start {
+			continue
+		}
+		if tok == token.COMMENT && !directive(lit) {
+			continue
+		}
+		if lit == "" {
+			lit = tok.String()
+		}
+		fmt.Fprintf(h, "%d:%s\x00", tok, lit)
+	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// directive reports whether a comment is a build or compiler directive.
+func directive(comment string) bool {
+	for _, prefix := range []string{"//go:", "//+build", "// +build", "//line "} {
+		if strings.HasPrefix(comment, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // interfaceDigest hashes the type specs whose type might be an interface:

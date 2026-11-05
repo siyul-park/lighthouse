@@ -71,7 +71,7 @@ impl Graph {
     ) -> Result<Option<Pulled>, Error> {
         if kind.is_input() {
             if kind.persisted() {
-                self.shared.recall(slot, node, kind)?;
+                self.shared.recall(slot, node, kind, want_value)?;
             }
             return Ok(Some(Pulled::input(node, want_value)));
         }
@@ -142,9 +142,12 @@ impl Graph {
 impl Pulled {
     /// An input as this process has it: one that was not set here has no
     /// value, whatever the store remembers of it, and reads as the zero hash.
+    /// A persisted one the store has is known by its hash without its value:
+    /// validating what read it does not load it.
     fn input(node: &Node, want_value: bool) -> Self {
         let mut pulled = Self::of(node, want_value);
-        if node.value.is_none() {
+        let stored = node.persisted && node.on_disk;
+        if node.value.is_none() && !(stored && !want_value) {
             pulled.missing = true;
             pulled.hash = [0; 32];
         }

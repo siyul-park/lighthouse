@@ -68,8 +68,8 @@ impl Project {
             return Vec::new();
         }
         let mut needs: BTreeSet<LoadNeed> = BTreeSet::new();
-        for at in self.index.loads.get(file).into_iter().flatten() {
-            self.needs_of(&self.all.edges[*at], file, &mut needs);
+        for at in self.inner.index.loads.get(file).into_iter().flatten() {
+            self.needs_of(&self.inner.all.edges[*at], file, &mut needs);
         }
         let mut earliest: BTreeMap<&SymbolId, Span> = BTreeMap::new();
         for need in &needs {

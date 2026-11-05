@@ -83,40 +83,57 @@ impl Swap<'_> {
     }
 }
 
-/// Qualifies, in `parts`, the modules whose path is declared by fragments of
-/// more than one language, and everything that names them.
-pub(super) fn qualify(parts: &mut [Fragment]) {
+/// The modules `part` declares as a file of its own, each with the language of
+/// that file: what decides whether a path is declared in several languages.
+pub fn declared(part: &Fragment) -> impl Iterator<Item = (String, String)> + '_ {
+    let language = part
+        .files
+        .first()
+        .map(|f| f.lang.clone())
+        .unwrap_or_default();
     // Only the modules of files of their own: what the regions of a host file
     // declare is stated by the host, and is the project's module when it
     // shares the path.
-    let language_of = |part: &Fragment, _: &super::Module| {
-        part.files
-            .first()
-            .map(|f| f.lang.clone())
-            .unwrap_or_default()
-    };
+    part.modules
+        .iter()
+        .filter(|m| m.language.is_none())
+        .map(move |m| (m.path.clone(), language.clone()))
+}
+
+/// The module paths that are declared in more than one language, from what
+/// every fragment [`declared`].
+pub fn collisions(declared: impl IntoIterator<Item = (String, String)>) -> BTreeSet<String> {
     let mut languages: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for part in parts.iter() {
-        for module in part.modules.iter().filter(|m| m.language.is_none()) {
-            languages
-                .entry(module.path.clone())
-                .or_default()
-                .insert(language_of(part, module));
-        }
+    for (path, language) in declared {
+        languages.entry(path).or_default().insert(language);
     }
-    for part in parts.iter_mut() {
-        let renames: Vec<(String, String)> = part
-            .modules
-            .iter()
-            .filter(|m| m.language.is_none())
-            .filter(|m| languages.get(&m.path).is_some_and(|set| set.len() > 1))
-            .map(|m| {
-                let language = language_of(part, m);
-                (m.path.clone(), format!("{}[{language}]", m.path))
-            })
-            .collect();
-        for (from, to) in &renames {
-            Swap { from, to }.fragment(part);
-        }
+    languages
+        .into_iter()
+        .filter(|(_, set)| set.len() > 1)
+        .map(|(path, _)| path)
+        .collect()
+}
+
+/// Qualifies, in `part`, the modules of `collisions` that it declares, and
+/// everything that names them.
+pub fn qualify_part(part: &mut Fragment, collisions: &BTreeSet<String>) {
+    let renames: Vec<(String, String)> = declared(part)
+        .filter(|(path, _)| collisions.contains(path))
+        .map(|(path, language)| {
+            let to = format!("{path}[{language}]");
+            (path, to)
+        })
+        .collect();
+    for (from, to) in &renames {
+        Swap { from, to }.fragment(part);
+    }
+}
+
+/// Qualifies, in `parts`, the modules whose path is declared by fragments of
+/// more than one language, and everything that names them.
+pub(super) fn qualify(parts: &mut [Fragment]) {
+    let collisions = collisions(parts.iter().flat_map(declared));
+    for part in parts {
+        qualify_part(part, &collisions);
     }
 }

@@ -23,6 +23,10 @@ pub(crate) trait Kind: Send + Sync {
     fn name(&self) -> &'static str;
     fn is_input(&self) -> bool;
     fn persisted(&self) -> bool;
+    /// A query whose value is never stored.
+    fn transient(&self) -> bool {
+        false
+    }
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error>;
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>>;
     fn describe(&self, key: &[u8]) -> String;
@@ -148,12 +152,36 @@ impl<K: Key, V: Value> Kind for Input<K, V> {
 pub struct Query<K, V> {
     name: &'static str,
     run: fn(&Graph, &K) -> Result<V, Error>,
+    transient: bool,
 }
 
 impl<K, V> Query<K, V> {
     /// A query kind named `name` that computes a value with `run`.
     pub const fn new(name: &'static str, run: fn(&Graph, &K) -> Result<V, Error>) -> Self {
-        Self { name, run }
+        Self {
+            name,
+            run,
+            transient: false,
+        }
+    }
+
+    /// Keeps the value in memory only: it is never written to the store, so a
+    /// process that needs it computes it again. Its hash is kept and recorded
+    /// for what reads it, as for any query.
+    pub const fn transient(self) -> Self {
+        Self {
+            transient: true,
+            ..self
+        }
+    }
+}
+
+impl<K: Key, V: Value> Query<K, V> {
+    /// The hash of the value for a key, validated like a pull but without
+    /// loading the value: what a key built from the graph is made of.
+    /// Recorded as read, so the reader runs again when the hash moves.
+    pub fn hash(&'static self, graph: &Graph, key: &K) -> Result<[u8; 32], Error> {
+        graph.hash_of(self, key)
     }
 }
 
@@ -168,6 +196,10 @@ impl<K: Key, V: Value> Kind for Query<K, V> {
 
     fn persisted(&self) -> bool {
         false
+    }
+
+    fn transient(&self) -> bool {
+        self.transient
     }
 
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error> {

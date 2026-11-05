@@ -2,6 +2,8 @@
 //! of their functions. A body edit leaves it as it was, which is the early
 //! cutoff; anything else of a file is in it.
 
+use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
+use quote::ToTokens;
 use sha2::{Digest, Sha256};
 use syn::{ImplItem, Item, TraitItem};
 
@@ -32,50 +34,46 @@ pub(crate) fn digest(parts: &[&str]) -> String {
 }
 
 /// The digest of a file without the bodies of its functions: what the rest of
-/// the project can see of it.
+/// the project can see of it. It is the token stream of the declarations, so
+/// comments and whitespace are not in it, and the doc comments, which are
+/// facts of the fragment, are taken out.
 fn skeleton(file: &SourceFile) -> String {
-    let mut bodies = Vec::new();
-    collect_bodies(file, &file.ast.items, &mut bodies);
-    let mut kept = String::with_capacity(file.text.len());
-    let mut at = 0;
-    for (start, end) in bodies {
-        if start < at
-            || end > file.text.len()
-            || !file.text.is_char_boundary(start)
-            || !file.text.is_char_boundary(end)
-        {
-            return digest(&[&file.text]);
-        }
-        kept.push_str(&file.text[at..start]);
-        at = end;
+    let mut items = file.ast.items.clone();
+    strip_bodies(&mut items);
+    let mut tokens = TokenStream::new();
+    for attr in file.ast.attrs.iter().filter(|a| !a.path().is_ident("doc")) {
+        attr.to_tokens(&mut tokens);
     }
-    kept.push_str(&file.text[at..]);
-    digest(&[&kept])
+    for item in &items {
+        item.to_tokens(&mut tokens);
+    }
+    digest(&[&undocumented(tokens).to_string()])
 }
 
-fn collect_bodies(file: &SourceFile, items: &[Item], out: &mut Vec<(usize, usize)>) {
+/// Empties the bodies of the functions of `items`, nested modules included.
+fn strip_bodies(items: &mut [Item]) {
     for item in items {
         match item {
-            Item::Fn(f) => out.extend(span_of(file, &f.block)),
+            Item::Fn(f) => f.block.stmts.clear(),
             Item::Impl(i) => {
-                for member in &i.items {
+                for member in &mut i.items {
                     if let ImplItem::Fn(f) = member {
-                        out.extend(span_of(file, &f.block));
+                        f.block.stmts.clear();
                     }
                 }
             }
             Item::Trait(t) => {
-                for member in &t.items {
+                for member in &mut t.items {
                     if let TraitItem::Fn(f) = member
-                        && let Some(block) = &f.default
+                        && let Some(block) = &mut f.default
                     {
-                        out.extend(span_of(file, block));
+                        block.stmts.clear();
                     }
                 }
             }
             Item::Mod(m) => {
-                if let Some((_, nested)) = &m.content {
-                    collect_bodies(file, nested, out);
+                if let Some((_, nested)) = &mut m.content {
+                    strip_bodies(nested);
                 }
             }
             _ => {}
@@ -83,16 +81,52 @@ fn collect_bodies(file: &SourceFile, items: &[Item], out: &mut Vec<(usize, usize
     }
 }
 
-/// The byte range of a block, braces included.
-fn span_of(file: &SourceFile, block: &syn::Block) -> Option<(usize, usize)> {
-    let open = block.brace_token.span.open().start();
-    let close = block.brace_token.span.close().end();
-    Some((
-        file.offset(open.line, open.column)?,
-        file.offset(close.line, close.column)?,
-    ))
+/// The tokens without the `#[doc = ...]` and `#![doc = ...]` attributes, which
+/// is what a doc comment is made into.
+fn undocumented(tokens: TokenStream) -> TokenStream {
+    let mut out = Vec::new();
+    let mut iter = tokens.into_iter().peekable();
+    while let Some(token) = iter.next() {
+        let TokenTree::Punct(hash) = &token else {
+            out.push(match token {
+                TokenTree::Group(group) => {
+                    let mut kept = Group::new(group.delimiter(), undocumented(group.stream()));
+                    kept.set_span(group.span());
+                    TokenTree::Group(kept)
+                }
+                other => other,
+            });
+            continue;
+        };
+        if hash.as_char() != '#' {
+            out.push(token);
+            continue;
+        }
+        let mut ahead = iter.clone();
+        let inner = matches!(ahead.peek(), Some(TokenTree::Punct(p)) if p.as_char() == '!');
+        if inner {
+            ahead.next();
+        }
+        let doc = matches!(
+            ahead.peek(),
+            Some(TokenTree::Group(group))
+                if group.delimiter() == Delimiter::Bracket
+                    && matches!(group.stream().into_iter().next(),
+                        Some(TokenTree::Ident(name)) if name == "doc")
+        );
+        if doc {
+            iter = ahead;
+            iter.next();
+        } else {
+            out.push(token);
+        }
+    }
+    out.into_iter().collect()
 }
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
+
+#[cfg(test)]
+mod tests;

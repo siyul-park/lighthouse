@@ -18,7 +18,7 @@ use lighthouse_graph::Graph;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Options, Severity, Suppressed,
-    ucm::{Applicability, File, Fragment, Project},
+    ucm::{Applicability, File, Project},
 };
 use lighthouse_plugin::{
     Context, EmbeddedFile, Facts, LanguageProvider, Memo, Notices, Registry, Rule, Source,
@@ -39,6 +39,7 @@ mod index;
 mod injections;
 mod models;
 mod phases;
+mod project;
 mod regions;
 mod route;
 mod run;

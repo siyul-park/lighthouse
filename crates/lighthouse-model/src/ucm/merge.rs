@@ -3,55 +3,27 @@
 
 use std::{
     cell::Cell,
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, HashSet},
     path::PathBuf,
 };
 
-use super::{EdgeKind, Fragment, Node, Resolution, Site, Symbol, SymbolId, SymbolKind, Target};
+use super::{
+    Edge, EdgeKind, Fragment, Node, Resolution, Site, Symbol, SymbolId, SymbolKind, Table, Target,
+};
 
 /// A run of consecutive edges that came from one fragment: how many, and the
 /// file of the fragment when it is about one.
-type EdgeRun = (usize, Option<PathBuf>);
+pub type EdgeRun = (usize, Option<PathBuf>);
 
 struct Resolver<'a> {
-    symbols: BTreeSet<&'a str>,
-    bare: BTreeMap<&'a str, Vec<(&'a SymbolId, SymbolKind)>>,
-    modules: BTreeSet<&'a str>,
-    /// The symbols of the project's own code by the name they are declared
-    /// under, for the edges that name no more than that.
-    named: BTreeMap<&'a str, Vec<&'a SymbolId>>,
+    table: &'a Table,
     ambiguous: Cell<usize>,
 }
 
 impl<'a> Resolver<'a> {
-    fn new(all: &'a Fragment) -> Self {
-        let mut bare: BTreeMap<&str, Vec<(&SymbolId, SymbolKind)>> = BTreeMap::new();
-        for symbol in &all.symbols {
-            let id = symbol.id.as_str();
-            bare.entry(id.split_once('#').map_or(id, |(head, _)| head))
-                .or_default()
-                .push((&symbol.id, symbol.kind));
-        }
-        let examples: BTreeSet<&str> = all
-            .modules
-            .iter()
-            .filter(|m| m.example)
-            .map(|m| m.path.as_str())
-            .collect();
-        let mut named: BTreeMap<&str, Vec<&SymbolId>> = BTreeMap::new();
-        for symbol in &all.symbols {
-            if !examples.contains(symbol.id.module()) {
-                named
-                    .entry(symbol.name.as_str())
-                    .or_default()
-                    .push(&symbol.id);
-            }
-        }
+    fn new(table: &'a Table) -> Self {
         Self {
-            symbols: all.symbols.iter().map(|s| s.id.as_str()).collect(),
-            bare,
-            modules: all.modules.iter().map(|m| m.path.as_str()).collect(),
-            named,
+            table,
             ambiguous: Cell::new(0),
         }
     }
@@ -63,24 +35,25 @@ impl<'a> Resolver<'a> {
             return target.clone();
         };
         let symbol = |id: &str| Target::Resolved(Node::Symbol(SymbolId(id.to_owned())));
-        if self.symbols.contains(path.as_str()) {
+        if self.table.symbols.contains_key(path.as_str()) {
             return symbol(path);
         }
-        if self.modules.contains(path.as_str()) {
+        if self.table.modules.contains_key(path.as_str()) {
             return Target::Resolved(Node::Module(path.clone()));
         }
-        let Some(found) = self.bare.get(path.as_str()) else {
+        let found = self.table.bare(path);
+        if found.is_empty() {
             // An edge that names a symbol and no module is read by the name
             // alone: it is the symbol of the project that is called so, when
             // one is.
             if by_name
                 && !path.contains("::")
-                && let Some([only]) = self.named.get(path.as_str()).map(Vec::as_slice)
+                && let Some([only]) = self.table.named.get(path.as_str()).map(Vec::as_slice)
             {
                 return symbol(only.as_str());
             }
             return target.clone();
-        };
+        }
         if let [(only, _)] = found.as_slice() {
             return symbol(only.as_str());
         }
@@ -101,7 +74,13 @@ impl<'a> Resolver<'a> {
 /// Resolves edge, test and forwarding targets in place and returns how many
 /// targets stayed ambiguous.
 pub(super) fn resolve_all(all: &mut Fragment) -> usize {
-    let resolver = Resolver::new(all);
+    let table = Table::of(all);
+    resolve_in(all, &table)
+}
+
+/// Resolves the targets of one fragment against the table of the project.
+pub(super) fn resolve_in(all: &mut Fragment, table: &Table) -> usize {
+    let resolver = Resolver::new(table);
     let resolved: Vec<Target> = all
         .edges
         .iter()
@@ -175,42 +154,61 @@ pub(super) fn dedup_edges(all: &mut Fragment, runs: &[EdgeRun]) -> BTreeMap<usiz
     origins
 }
 
+/// The place an edge refers to a symbol from, when it has a site and ends at
+/// a symbol: the symbol, and the place. `run` is the file of the fragment the
+/// edge came from, when it is about one; an edge of another starts at the
+/// symbol, whose file the table knows.
+pub(super) fn site_of(
+    edge: &Edge,
+    run: Option<&PathBuf>,
+    table: &Table,
+) -> Option<(SymbolId, Site)> {
+    let (Target::Resolved(Node::Symbol(to)), Some(span)) = (&edge.to, edge.site) else {
+        return None;
+    };
+    let file = run.cloned().or_else(|| match &edge.from {
+        Node::Symbol(id) => table.symbols.get(id).map(|e| e.file.clone()),
+        Node::Module(_) => None,
+    })?;
+    Some((
+        to.clone(),
+        Site {
+            file,
+            from: edge.from.clone(),
+            kind: edge.kind,
+            resolution: edge.resolution,
+            span,
+        },
+    ))
+}
+
+/// Puts the sites of one target in file and position order, without repeats.
+pub(super) fn order_sites(sites: &mut BTreeMap<SymbolId, Vec<Site>>) {
+    for list in sites.values_mut() {
+        list.sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
+        list.dedup();
+    }
+}
+
 /// The sited edges that end at a symbol, grouped by target, ordered by file
 /// and position. `runs` says how many of `all.edges`, in order, came from the
 /// fragment of which file.
-pub(super) fn sites_of(all: &Fragment, runs: &[EdgeRun]) -> BTreeMap<SymbolId, Vec<Site>> {
-    let file_of = |from: &Node| match from {
-        Node::Symbol(id) => all
-            .symbols
-            .binary_search_by(|s| s.id.cmp(id))
-            .ok()
-            .map(|at| all.symbols[at].file.clone()),
-        Node::Module(_) => None,
-    };
+pub(super) fn sites_of(
+    all: &Fragment,
+    table: &Table,
+    runs: &[EdgeRun],
+) -> BTreeMap<SymbolId, Vec<Site>> {
     let mut files = runs
         .iter()
         .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
     let mut sites: BTreeMap<SymbolId, Vec<Site>> = BTreeMap::new();
     for edge in &all.edges {
         let file = files.next().flatten();
-        let (Target::Resolved(Node::Symbol(to)), Some(span)) = (&edge.to, edge.site) else {
-            continue;
-        };
-        let Some(file) = file.cloned().or_else(|| file_of(&edge.from)) else {
-            continue;
-        };
-        sites.entry(to.clone()).or_default().push(Site {
-            file,
-            from: edge.from.clone(),
-            kind: edge.kind,
-            resolution: edge.resolution,
-            span,
-        });
+        if let Some((to, site)) = site_of(edge, file, table) {
+            sites.entry(to).or_default().push(site);
+        }
     }
-    for list in sites.values_mut() {
-        list.sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
-        list.dedup();
-    }
+    order_sites(&mut sites);
     sites
 }
 
@@ -243,6 +241,13 @@ pub(super) fn sorted_union(
         all.tests.extend(part.tests);
         all.comments.extend(part.comments);
     }
+    let notices = settle(&mut all).into_iter().collect();
+    (all, notices, edge_files)
+}
+
+/// Sorts and deduplicates what was concatenated by identity, and says when a
+/// symbol id is declared in several files.
+pub(super) fn settle(all: &mut Fragment) -> Option<String> {
     all.files.sort_by(|a, b| a.path.cmp(&b.path));
     // What the providers that read the regions of a host file state of it
     // wins over what the host states: they come after it.
@@ -254,20 +259,15 @@ pub(super) fn sorted_union(
         same
     });
     all.modules.sort_by(|a, b| a.path.cmp(&b.path));
-    // A module that a region declares and a file of the project does too is
-    // the project's: example code and a language the host states are not its.
     all.modules.dedup_by(|later, kept| {
         let same = later.path == kept.path;
         if same {
-            kept.example &= later.example;
-            if kept.language != later.language {
-                kept.language = None;
-            }
+            super::table::reconcile(kept, later);
         }
         same
     });
     all.symbols.sort_by(|a, b| a.id.cmp(&b.id));
-    let notices = duplicate_notice(&all.symbols).into_iter().collect();
+    let notice = duplicate_notice(&all.symbols);
     all.symbols.dedup_by(|a, b| a.id == b.id);
     all.functions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
     all.functions.dedup_by(|a, b| a.symbol == b.symbol);
@@ -276,7 +276,7 @@ pub(super) fn sorted_union(
     all.comments
         .sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
     all.comments.dedup();
-    (all, notices, edge_files)
+    notice
 }
 
 fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {
