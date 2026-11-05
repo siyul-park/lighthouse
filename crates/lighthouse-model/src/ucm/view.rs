@@ -7,7 +7,7 @@
 use std::{
     cell::{OnceCell, RefCell},
     collections::HashMap,
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
     sync::Arc,
 };
@@ -26,15 +26,28 @@ pub struct View<'v> {
     graph: &'v Graph,
     held: &'v Held,
     table: &'v Table,
-    resolved: RefCell<HashMap<String, &'v Resolved>>,
-    incoming: RefCell<HashMap<String, &'v Incoming>>,
+    resolved: RefCell<HashMap<PathBuf, &'v Resolved>>,
+    incoming: RefCell<HashMap<PathBuf, &'v Incoming>>,
+    homes: RefCell<HashMap<SymbolId, Rc<Home<'v>>>>,
     files: RefCell<HashMap<String, Option<&'v File>>>,
     declared: RefCell<HashMap<String, Rc<Vec<usize>>>>,
     commented: RefCell<HashMap<String, Rc<Vec<usize>>>>,
     cases: RefCell<HashMap<String, &'v [TestCase]>>,
     sited: OnceCell<&'v Sites>,
+    loaded: OnceCell<()>,
     everything: Everything<'v>,
     failed: RefCell<Option<Error>>,
+}
+
+/// What a view found of one symbol: where it is declared and what is said of
+/// it, each found when first asked for, for the rest of the view.
+struct Home<'v> {
+    resolved: Option<&'v Resolved>,
+    file: Option<PathBuf>,
+    symbol: OnceCell<Option<&'v Symbol>>,
+    function: OnceCell<Option<&'v FunctionSummary>>,
+    test: OnceCell<Option<&'v TestCase>>,
+    tie: OnceCell<Option<&'v Tie>>,
 }
 
 /// What the whole project holds, found when first asked for.
@@ -68,11 +81,13 @@ impl<'v> View<'v> {
             table,
             resolved: RefCell::default(),
             incoming: RefCell::default(),
+            homes: RefCell::default(),
             files: RefCell::default(),
             declared: RefCell::default(),
             commented: RefCell::default(),
             cases: RefCell::default(),
             sited: OnceCell::new(),
+            loaded: OnceCell::new(),
             everything: Everything::default(),
             failed: RefCell::new(None),
         })
@@ -105,10 +120,18 @@ impl<'v> View<'v> {
         })
     }
 
-    /// The paths of the project's files.
+    /// The paths of the project's files, whose parts are pulled on every
+    /// thread the first time they are all asked for: one after the other is
+    /// what a read of the whole project would wait for.
     fn paths(&self) -> Vec<String> {
         let paths = self.keep(self.graph.input(&PATHS, &())).flatten();
-        paths.map_or_else(Vec::new, |paths| paths.as_ref().clone())
+        let paths = paths.map_or_else(Vec::new, |paths| paths.as_ref().clone());
+        self.loaded.get_or_init(|| {
+            self.graph.par_map(paths.clone(), |graph, path| {
+                let _ = graph.query(&RESOLVED, path);
+            });
+        });
+        paths
     }
 
     /// The positions among the symbols of `path`'s slice of those it declares
@@ -181,37 +204,50 @@ impl<'v> View<'v> {
         merged
     }
 
-    /// The part of the project that `id` is declared in.
-    fn home(&self, id: &SymbolId) -> Option<&'v Resolved> {
-        self.resolved(&self.table.entry(id)?.file)
-    }
-
     /// What the rest of the project says of `id`.
     fn tie(&self, id: &SymbolId) -> Option<&'v Tie> {
-        self.incoming(&self.table.entry(id)?.file)?
-            .by_symbol
-            .get(id)
+        let home = self.home(id);
+        *home.tie.get_or_init(|| {
+            let file = home.file.as_deref()?;
+            self.incoming(file)?.by_symbol.get(id)
+        })
+    }
+
+    /// What the view found of `id`.
+    fn home(&self, id: &SymbolId) -> Rc<Home<'v>> {
+        if let Some(found) = self.homes.borrow().get(id) {
+            return Rc::clone(found);
+        }
+        let file = self.table.entry(id).map(|entry| entry.file.clone());
+        let home = Rc::new(Home {
+            resolved: file.as_deref().and_then(|file| self.resolved(file)),
+            file,
+            symbol: OnceCell::new(),
+            function: OnceCell::new(),
+            test: OnceCell::new(),
+            tie: OnceCell::new(),
+        });
+        self.homes.borrow_mut().insert(id.clone(), Rc::clone(&home));
+        home
     }
 
     fn resolved(&self, path: &Path) -> Option<&'v Resolved> {
-        let key = key(path);
-        if let Some(found) = self.resolved.borrow().get(&key) {
+        if let Some(found) = self.resolved.borrow().get(path) {
             return Some(found);
         }
-        let resolved = self.keep(self.graph.query(&RESOLVED, &key))?;
+        let resolved = self.keep(self.graph.query(&RESOLVED, &key(path)))?;
         let resolved = &**self.held.resolved.alloc(resolved);
-        self.resolved.borrow_mut().insert(key, resolved);
+        self.resolved.borrow_mut().insert(path.to_owned(), resolved);
         Some(resolved)
     }
 
     fn incoming(&self, path: &Path) -> Option<&'v Incoming> {
-        let key = key(path);
-        if let Some(found) = self.incoming.borrow().get(&key) {
+        if let Some(found) = self.incoming.borrow().get(path) {
             return Some(found);
         }
-        let incoming = self.keep(self.graph.query(&INCOMING, &key))?;
+        let incoming = self.keep(self.graph.query(&INCOMING, &key(path)))?;
         let incoming = &**self.held.incoming.alloc(incoming);
-        self.incoming.borrow_mut().insert(key, incoming);
+        self.incoming.borrow_mut().insert(path.to_owned(), incoming);
         Some(incoming)
     }
 
@@ -232,12 +268,15 @@ impl<'v> Model for View<'v> {
     }
 
     fn symbol(&self, id: &SymbolId) -> Option<&Symbol> {
-        self.home(id)?
-            .slice
-            .fragment
-            .symbols
-            .iter()
-            .find(|symbol| symbol.id == *id)
+        let home = self.home(id);
+        *home.symbol.get_or_init(|| {
+            home.resolved?
+                .slice
+                .fragment
+                .symbols
+                .iter()
+                .find(|symbol| symbol.id == *id)
+        })
     }
 
     fn symbols_in(&self, path: &Path) -> Boxed<'_, Symbol> {
@@ -253,12 +292,15 @@ impl<'v> Model for View<'v> {
     }
 
     fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
-        self.home(id)?
-            .slice
-            .fragment
-            .functions
-            .iter()
-            .find(|function| function.symbol == *id)
+        let home = self.home(id);
+        *home.function.get_or_init(|| {
+            home.resolved?
+                .slice
+                .fragment
+                .functions
+                .iter()
+                .find(|function| function.symbol == *id)
+        })
     }
 
     fn callers(&self, id: &SymbolId) -> &[SymbolId] {
@@ -278,12 +320,15 @@ impl<'v> Model for View<'v> {
     }
 
     fn test(&self, id: &SymbolId) -> Option<&TestCase> {
-        self.home(id)?
-            .slice
-            .fragment
-            .tests
-            .iter()
-            .find(|test| test.symbol == *id)
+        let home = self.home(id);
+        *home.test.get_or_init(|| {
+            home.resolved?
+                .slice
+                .fragment
+                .tests
+                .iter()
+                .find(|test| test.symbol == *id)
+        })
     }
 
     fn tests_in(&self, module: &str) -> Boxed<'_, TestCase> {
@@ -319,7 +364,7 @@ impl<'v> Model for View<'v> {
     }
 
     fn edges_from(&self, id: &SymbolId) -> Boxed<'_, Edge> {
-        let Some(resolved) = self.home(id) else {
+        let Some(resolved) = self.home(id).resolved else {
             return Box::new(std::iter::empty());
         };
         let id = id.clone();

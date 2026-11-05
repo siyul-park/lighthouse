@@ -1,19 +1,22 @@
 //! The facts of the code model as queries of the graph: `aggregate` is an
 //! index over the whole project, `index` its projection onto one key (what a
 //! fact reads of it, so that an edit that leaves the entry as it was leaves the
-//! fact green), and `fact` the values of one subject for what the rules read.
-//! `reads` and `conventions` are the inputs they are made with, `Stable`.
+//! fact green), and `fact` the values of the subjects of one sort in one file
+//! for what one class of rules read: the class is what a rule's expressions
+//! read of the subject, so that a rule sees only what it asks for, and the
+//! file is what an edit reaches. `reads` is what each class reads and
+//! `conventions` how the languages name, both inputs, `Stable`.
 
 use std::{
     any::Any,
     collections::{BTreeMap, BTreeSet},
+    path::Path,
     sync::Arc,
 };
 
 use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use lighthouse_model::ucm::{Held, Model, SymbolId, View};
-use lighthouse_plugin::{ANALYSIS, Pulling, Queries, Reads, Rule, TestNaming, Workspace, reads_of};
-use lighthouse_spec::TEXT;
+use lighthouse_plugin::{ANALYSIS, Pulling, Queries, Reads, Rule, TestNaming, Workspace};
 use serde::{Deserialize, Serialize};
 
 use crate::layout::contains;
@@ -29,9 +32,9 @@ use crate::{
         owned::owned,
         parent::{Used, Uses, parents},
         split::splits,
-        subject, tested,
+        subjects, tested,
     },
-    fact::{Built, COMMENT, FACT, FUNCTION, Fact, SYMBOL, TEST, comment_of, subject_of},
+    fact::{Built, COMMENT, FACT, Fact, Facts, class_of, fact_of, subject_of},
     indexes::{
         CREDITED, CYCLES, IMPORTS, NAMES, OWNED, PARENTS, Queried, REACH, Reached, SPLIT,
         STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
@@ -40,14 +43,15 @@ use crate::{
     naming::{Credited, credited},
 };
 
-/// What the rules of a run read of the subjects of one sort. `Stable`.
+/// What the rules of a class read of the subjects of a sort, by the class.
+/// `Stable`.
 pub static READS: Input<String, Reads> = Input::new("reads");
 /// How the languages name their tests and constructors. `Stable`.
 pub static CONVENTIONS: Input<(), Conventions> = Input::new("conventions");
 
 pub static AGGREGATE: Query<Sort, Aggregate> = Query::new("aggregate", aggregate).transient();
 pub static INDEX: Query<(String, String), Entry> = Query::new("index", index).transient();
-pub static SUBJECT: Query<(String, String), Built> = Query::new("fact", fact).transient();
+pub static SUBJECT: Query<(String, String, String), Facts> = Query::new("fact", fact).transient();
 
 /// The conventions of the languages the facts follow.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -141,10 +145,13 @@ impl Queries for Pull<'_> {
     ) -> Result<Arc<dyn Any + Send + Sync>, lighthouse_plugin::Error> {
         let broken = |e: Error| lighthouse_plugin::Error::Failed(e.to_string());
         if kind == FACT {
-            let (sort, id) = subject_of(key);
+            let (sort, class, id) = fact_of(key);
             let built = self
                 .graph
-                .query(&SUBJECT, &(sort.to_owned(), id.to_owned()))
+                .query(
+                    &SUBJECT,
+                    &(sort.to_owned(), class.to_owned(), id.to_owned()),
+                )
                 .map_err(broken)?;
             return Ok(built);
         }
@@ -180,10 +187,13 @@ pub struct Pulls;
 
 impl Pulling for Pulls {
     fn inputs(&self, graph: &mut Graph, rules: &[&dyn Rule], ws: &Workspace) -> Result<(), Error> {
-        let reads = reads_of(rules.iter().copied());
-        for kind in [SYMBOL, FUNCTION, TEST] {
-            let reads = reads.get(kind).cloned().unwrap_or_default();
-            graph.set_input(&READS, &kind.to_owned(), reads, Durability::Stable)?;
+        let classes: BTreeMap<String, Reads> = rules
+            .iter()
+            .filter_map(|rule| rule.reads())
+            .map(|(_, reads)| (class_of(&reads), reads))
+            .collect();
+        for (class, reads) in classes {
+            graph.set_input(&READS, &class, reads, Durability::Stable)?;
         }
         let conventions = Conventions {
             test_naming: ws.test_naming.clone(),
@@ -261,9 +271,9 @@ fn index(graph: &Graph, (name, key): &(String, String)) -> Result<Entry, Error> 
     })
 }
 
-fn fact(graph: &Graph, (kind, id): &(String, String)) -> Result<Built, Error> {
+fn fact(graph: &Graph, (kind, class, file): &(String, String, String)) -> Result<Facts, Error> {
     let reads = graph
-        .input(&READS, kind)?
+        .input(&READS, class)?
         .map(|reads| reads.as_ref().clone())
         .unwrap_or_default();
     let ws = workspace(graph)?;
@@ -271,51 +281,30 @@ fn fact(graph: &Graph, (kind, id): &(String, String)) -> Result<Built, Error> {
     let view = View::new(graph, &held)?;
     let pull = Pull::new(graph);
     let indexes = Queried::new(&pull);
-    if kind == COMMENT {
-        return comment(graph, &view, &indexes, &ws, id);
-    }
-    let found = SymbolId::parse(id).and_then(|id| view.symbol(&id));
-    let fact = match found {
-        Some(symbol) => {
-            let over = Over {
-                model: &view,
-                indexes: &indexes,
-                ws: &ws,
-            };
-            subject(kind, over, &reads, symbol).map_err(failed)?
-        }
-        None => None,
-    };
-    if let Some(error) = view.failure() {
-        return Err(error);
-    }
-    Ok(Built::of(fact))
-}
-
-/// The facts of one comment, made of the model and the text of its file; none
-/// when the file has no such comment.
-fn comment(
-    graph: &Graph,
-    view: &View<'_>,
-    indexes: &Queried<'_>,
-    ws: &Workspace,
-    id: &str,
-) -> Result<Built, Error> {
-    let Some((file, at)) = comment_of(id) else {
-        return Ok(Built::of(None));
-    };
-    let path = std::path::Path::new(file);
-    let Some(comment) = view.comments_in(path).nth(at) else {
-        return Ok(Built::of(None));
-    };
-    let text = graph.query(&TEXT, &file.to_owned())?;
     let over = Over {
-        model: view,
-        indexes,
-        ws,
+        model: &view,
+        indexes: &indexes,
+        ws: &ws,
     };
-    let fact = comment_subject(over, comment, text.as_deref().unwrap_or("")).map_err(failed)?;
-    view.failure().map_or(Ok(Built::of(Some(fact))), Err)
+    let path = Path::new(file);
+    let facts = if kind == COMMENT {
+        let text = lighthouse_spec::text(graph, file)?.unwrap_or_default();
+        let text = text.as_str();
+        view.comments_in(path)
+            .enumerate()
+            .map(|(at, comment)| {
+                let fact = comment_subject(over, comment, text).map_err(failed)?;
+                Ok((format!("{at:08}"), Built::of(Some(fact))))
+            })
+            .collect::<Result<Vec<_>, Error>>()?
+    } else {
+        subjects(kind, over, &reads, path)
+            .map_err(failed)?
+            .into_iter()
+            .map(|(id, fact)| (id, Built::of(fact)))
+            .collect()
+    };
+    view.failure().map_or(Ok(Facts::of(facts)), Err)
 }
 
 fn workspace(graph: &Graph) -> Result<Workspace, Error> {

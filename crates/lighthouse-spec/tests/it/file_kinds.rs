@@ -104,3 +104,27 @@ fn key() {
     assert_eq!(lighthouse_spec::key(Path::new("a/b.txt")), "a/b.txt");
     assert_eq!(lighthouse_spec::key(Path::new("")), "");
 }
+
+#[test]
+fn text() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("a.txt"), "hello").unwrap();
+    fs::write(dir.path().join("b.bin"), [0xff, 0xfe, 0x00]).unwrap();
+    let mut graph = graph_over(dir.path(), &["a.txt", "b.bin"]);
+
+    let read = lighthouse_spec::text(&graph, "a.txt").unwrap();
+    let binary = lighthouse_spec::text(&graph, "b.bin").unwrap();
+    graph
+        .set_input(
+            &OVERLAY,
+            &"a.txt".to_owned(),
+            Some(Content::of_text("edited")),
+            Durability::Volatile,
+        )
+        .unwrap();
+    let overlaid = lighthouse_spec::text(&graph, "a.txt").unwrap();
+
+    assert_eq!(read.as_deref(), Some("hello"));
+    assert_eq!(binary, None);
+    assert_eq!(overlaid.as_deref(), Some("edited"));
+}

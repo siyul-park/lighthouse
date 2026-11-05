@@ -1887,6 +1887,7 @@ dependencies = [
 name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "cel",
  "lighthouse-engine",
  "lighthouse-graph",

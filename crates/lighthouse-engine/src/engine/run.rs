@@ -54,6 +54,9 @@ impl Engine {
             pulling.inputs(graph, &selected, &workspace)?;
         }
         let facts = self.analyze(graph, (&selected, &inputs), &mut run.timings)?;
+        if let Err(e) = graph.commit() {
+            run.notices.insert(format!("the graph was not saved: {e}"));
+        }
         let queries: Box<dyn Queries + '_> = match (self.registry.pulling(), guard.as_ref()) {
             (Some(pulling), Some(graph)) => pulling.queries(graph),
             _ => Box::new(NoQueries),

@@ -57,10 +57,11 @@ pub enum Readable {
 
 /// The text of a file, read when this runs and not kept: what the graph
 /// remembers of it is its hash, which reading `content` records, so that what
-/// reads the text is run again when the bytes change. `None` for a file that
-/// is no text.
-pub(super) fn text(graph: &Graph, path: &String) -> Result<Option<String>, Error> {
-    let content = graph.query(&CONTENT, path)?;
+/// reads the text is run again when the bytes change. It is no query: a node
+/// of its own would be held in memory only, and what read it would be run
+/// again by every process. `None` for a file that is no text.
+pub fn text(graph: &Graph, path: &str) -> Result<Option<String>, Error> {
+    let content = graph.query(&CONTENT, &path.to_owned())?;
     if content.readable != Readable::Text {
         return Ok(None);
     }

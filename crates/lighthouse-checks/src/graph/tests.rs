@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use super::kinds::{CONVENTIONS, Conventions, Pull, READS};
 use crate::{
-    fact::{Built, COMMENT, FACT, FUNCTION, Fact, SYMBOL, TEST, comment_id, subject_key},
+    fact::{COMMENT, FACT, FUNCTION, Fact, Facts, SYMBOL, TEST, class_of, fact_key},
     local::Local,
 };
 use lighthouse_graph::{Durability, Graph, Options};
@@ -55,6 +55,7 @@ struct Spec {
     calls: Vec<(String, String)>,
     imports: Vec<String>,
     shift: u32,
+    bulk: u32,
 }
 
 impl Spec {
@@ -165,7 +166,13 @@ impl Spec {
                 example: false,
             }],
             symbols,
-            functions,
+            functions: functions
+                .into_iter()
+                .map(|f| FunctionSummary {
+                    statements: f.statements + self.bulk,
+                    ..f
+                })
+                .collect(),
             tests,
             edges,
             ..Fragment::default()
@@ -294,11 +301,14 @@ fn the_fact_of_a_subject_is_what_the_builder_makes_of_a_merge_after_every_edit()
         specs[0].calls.push(("x".to_owned(), "m1::y".to_owned()));
         specs[2].calls.push(("y".to_owned(), "x".to_owned()));
         let mut graph = Graph::in_memory(Options::default().data(analyzers())).unwrap();
-        for kind in [SYMBOL, FUNCTION, TEST] {
-            graph
-                .set_input(&READS, &kind.to_owned(), everything(), Durability::Stable)
-                .unwrap();
-        }
+        graph
+            .set_input(
+                &READS,
+                &class_of(&everything()),
+                everything(),
+                Durability::Stable,
+            )
+            .unwrap();
         graph
             .set_input(
                 &CONVENTIONS,
@@ -322,23 +332,30 @@ fn the_fact_of_a_subject_is_what_the_builder_makes_of_a_merge_after_every_edit()
                 ],
             );
             let pull = Pull::new(&graph);
-            let ids: BTreeSet<&SymbolId> = project.symbols().map(|s| &s.id).collect();
-            for id in ids {
+            let files: BTreeSet<String> = project
+                .files()
+                .map(|f| f.path.to_string_lossy().into_owned())
+                .collect();
+            for file in files {
                 for kind in [SYMBOL, FUNCTION, TEST] {
-                    let key = subject_key(kind, id.as_str());
+                    let key = fact_key(kind, &class_of(&everything()), &file);
                     let want = local.pull(FACT, &key).unwrap();
                     let got = pull.pull(FACT, &key).unwrap();
                     let (want, got) = (
-                        want.downcast::<Built>().unwrap(),
-                        got.downcast::<Built>().unwrap(),
+                        want.downcast::<Facts>().unwrap(),
+                        got.downcast::<Facts>().unwrap(),
                     );
-                    assert_eq!(
-                        got.fact(),
-                        want.fact(),
-                        "seed {seed} step {step} {kind} {id:?}"
-                    );
-                    compared += 1;
-                    present += usize::from(got.fact().is_some());
+                    for symbol in project.symbols_in(file.as_ref()) {
+                        let id = symbol.id.as_str();
+                        let (want, got) = (want.get(id).unwrap(), got.get(id).unwrap());
+                        assert_eq!(
+                            got.fact(),
+                            want.fact(),
+                            "seed {seed} step {step} {kind} {id:?}"
+                        );
+                        compared += 1;
+                        present += usize::from(got.fact().is_some());
+                    }
                 }
             }
         }
@@ -360,14 +377,24 @@ fn a_rule_sees_the_same_fields_when_another_rule_asks_for_more() {
     let mut seen = 0;
 
     for symbol in project.symbols() {
-        let key = subject_key(SYMBOL, symbol.id.as_str());
+        let file = symbol.file.to_string_lossy();
+        let narrow_key = fact_key(SYMBOL, &class_of(&few), &file);
+        let wide_key = fact_key(SYMBOL, &class_of(&everything()), &file);
         let narrow = narrow
-            .pull(FACT, &key)
+            .pull(FACT, &narrow_key)
             .unwrap()
-            .downcast::<Built>()
+            .downcast::<Facts>()
             .unwrap();
-        let wide = wide.pull(FACT, &key).unwrap().downcast::<Built>().unwrap();
-        let (Some(Fact::Map(narrow)), Some(Fact::Map(wide))) = (narrow.fact(), wide.fact()) else {
+        let wide = wide
+            .pull(FACT, &wide_key)
+            .unwrap()
+            .downcast::<Facts>()
+            .unwrap();
+        let id = symbol.id.as_str();
+        let (Some(Fact::Map(narrow)), Some(Fact::Map(wide))) = (
+            narrow.get(id).and_then(|built| built.fact()),
+            wide.get(id).and_then(|built| built.fact()),
+        ) else {
             panic!("{symbol:?} has no fact");
         };
         for (field, value) in narrow {
@@ -435,10 +462,10 @@ fn the_facts_of_a_comment_follow_the_text_of_its_file() {
             .unwrap();
     };
     let field = |graph: &Graph, name: &str| {
-        let key = subject_key(COMMENT, &comment_id("p0.rs".as_ref(), 0));
-        let built = Pull::new(graph).pull(FACT, &key).unwrap();
-        let built = built.downcast::<Built>().unwrap();
-        let Some(Fact::Map(map)) = built.fact() else {
+        let key = fact_key(COMMENT, "", "p0.rs");
+        let facts = Pull::new(graph).pull(FACT, &key).unwrap();
+        let facts = facts.downcast::<Facts>().unwrap();
+        let Some(Fact::Map(map)) = facts.get("00000000").and_then(|built| built.fact()) else {
             panic!("no fact");
         };
         map[name].clone()
@@ -450,6 +477,62 @@ fn the_facts_of_a_comment_follow_the_text_of_its_file() {
 
     text(&mut graph, "// hi\n\nfn x() {}\n");
     assert_eq!(field(&graph, "gap"), Fact::Int(1));
+}
+
+#[test]
+fn a_body_edit_runs_the_facts_of_the_files_it_reaches_and_of_no_other() {
+    let mut specs: Vec<Spec> = (0..5)
+        .map(|n| {
+            let mut s = spec(&format!("m{n}"), &["x", "y"]);
+            s.methods = vec!["x".to_owned(), "y".to_owned()];
+            s
+        })
+        .collect();
+    specs[0].calls.push(("x".to_owned(), "m1::y".to_owned()));
+    let mut graph = Graph::in_memory(Options::default().data(analyzers())).unwrap();
+    let class = class_of(&everything());
+    graph
+        .set_input(&READS, &class, everything(), Durability::Stable)
+        .unwrap();
+    graph
+        .set_input(
+            &CONVENTIONS,
+            &(),
+            Conventions::default(),
+            Durability::Stable,
+        )
+        .unwrap();
+    let pull_all = |graph: &Graph| {
+        let pull = Pull::new(graph);
+        for at in 0..5 {
+            for kind in [SYMBOL, FUNCTION, TEST] {
+                let key = fact_key(kind, &class, &specs_path(at));
+                pull.pull(FACT, &key).unwrap();
+            }
+        }
+    };
+    Host::set_units(&mut graph, &fragments(&specs)).unwrap();
+    pull_all(&graph);
+    graph.take_executed();
+
+    specs[1].bulk = 1;
+    Host::set_units(&mut graph, &fragments(&specs)).unwrap();
+    pull_all(&graph);
+    let ran = graph.take_executed();
+
+    let facts: Vec<&String> = ran
+        .iter()
+        .filter(|label| label.starts_with("fact"))
+        .collect();
+    assert!(!facts.is_empty(), "{ran:?}");
+    for label in facts {
+        let reached = label.contains("p0.rs") || label.contains("p1.rs");
+        assert!(reached, "{label}");
+    }
+    assert!(
+        !ran.iter().any(|label| label.starts_with("symbols")),
+        "{ran:?}"
+    );
 }
 
 fn specs_path(at: usize) -> String {

@@ -729,7 +729,8 @@ impl<'a> Builder<'a> {
 
 /// The facts of `symbol` as a subject of the sort `kind` (`symbol`,
 /// `function` or `test`) for the fields `reads` asks for; `None` when it has
-/// none of that sort.
+/// none of that sort. It is what `subjects` is held to.
+#[cfg(test)]
 pub fn subject(
     kind: &str,
     over: Over<'_>,
@@ -742,14 +743,41 @@ pub fn subject(
         .file(&symbol.file)
         .map_or("", |file| file.analysis_language());
     let builder = Builder::over(over, &needs, language);
-    let value = match kind {
-        FUNCTION => builder.function(symbol),
-        TEST => builder.test(symbol),
-        _ => Some(builder.symbol_value(symbol)),
-    };
+    let found = subject_fact(&builder, kind, symbol);
     match builder.failure() {
         Some(error) => Err(error),
-        None => Ok(value.map(|value| Fact::from(&value))),
+        None => Ok(found),
+    }
+}
+
+/// The facts of the symbols `file` declares as subjects of the sort `kind`,
+/// by id, for the fields `reads` asks for: what each of them is as `subject`
+/// makes it, built with what the file shares.
+pub fn subjects(
+    kind: &str,
+    over: Over<'_>,
+    reads: &Reads,
+    file: &Path,
+) -> Result<Vec<(String, Option<Fact>)>, Error> {
+    let needs = Needs::reading_fields(reads);
+    let language = over
+        .model
+        .file(file)
+        .map_or("", |file| file.analysis_language());
+    let model = over.model;
+    let builder = Builder::over(over, &needs, language);
+    let found = model
+        .symbols_in(file)
+        .map(|symbol| {
+            (
+                symbol.id.as_str().to_owned(),
+                subject_fact(&builder, kind, symbol),
+            )
+        })
+        .collect();
+    match builder.failure() {
+        Some(error) => Err(error),
+        None => Ok(found),
     }
 }
 
@@ -785,6 +813,15 @@ pub fn tested(project: &dyn Model) -> BTreeSet<String> {
         .filter(|m| project.tests_in(&m.path).next().is_some())
         .map(|m| m.test_of.clone().unwrap_or_else(|| m.path.clone()))
         .collect()
+}
+
+fn subject_fact(builder: &Builder<'_>, kind: &str, symbol: &Symbol) -> Option<Fact> {
+    let value = match kind {
+        FUNCTION => builder.function(symbol),
+        TEST => builder.test(symbol),
+        _ => Some(builder.symbol_value(symbol)),
+    };
+    value.map(|value| Fact::from(&value))
 }
 
 /// The number of blank lines between line `after` and line `before` (1-based,

@@ -16,6 +16,9 @@ use crate::{
     store::{Meta, Row, Store, Write},
 };
 
+/// How many nodes one task frees when the graph is dropped.
+const FREED_TOGETHER: usize = 4096;
+
 /// What every handle shares.
 pub(crate) struct Shared {
     pub revision: AtomicU64,
@@ -39,31 +42,25 @@ pub(crate) struct Shared {
     pub data: Option<Arc<dyn Any + Send + Sync>>,
 }
 
-pub(crate) struct Registered {
-    pub kind: &'static dyn Kind,
-    pub name: Arc<str>,
-}
-
-impl Registered {
-    /// This registration as the one of `kind`, which must stand for the same
-    /// types.
-    fn agree(&self, kind: &'static dyn Kind) -> Result<Self, Error> {
-        let (had, now) = (self.kind.signature(), kind.signature());
-        if !had.same(&now) {
-            return Err(Error::Kind {
-                name: self.name.to_string(),
-                had: had.text().to_owned(),
-                now: now.text().to_owned(),
-            });
-        }
-        Ok(Self {
-            kind: self.kind,
-            name: self.name.clone(),
-        })
+impl Drop for Shared {
+    /// Frees the nodes on the threads of the pool: a graph holds what a run
+    /// read, and one thread freeing all of it is what the process waits for
+    /// at its exit.
+    fn drop(&mut self) {
+        let slots = std::mem::take(
+            self.slots
+                .get_mut()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        let mut all: Vec<Arc<Slot>> = slots.into_values().collect();
+        rayon::scope(|scope| {
+            while !all.is_empty() {
+                let rest = all.split_off(all.len().saturating_sub(FREED_TOGETHER));
+                scope.spawn(move |_| drop(rest));
+            }
+        });
     }
 }
-
-pub(crate) type Versions = BTreeMap<String, String>;
 
 impl Shared {
     pub(crate) fn register(&self, kind: &'static dyn Kind) -> Result<Registered, Error> {
@@ -280,6 +277,32 @@ impl Shared {
                 drop_value(&mut slot.node.locked());
             }
         }
+    }
+}
+
+pub(crate) type Versions = BTreeMap<String, String>;
+
+pub(crate) struct Registered {
+    pub kind: &'static dyn Kind,
+    pub name: Arc<str>,
+}
+
+impl Registered {
+    /// This registration as the one of `kind`, which must stand for the same
+    /// types.
+    fn agree(&self, kind: &'static dyn Kind) -> Result<Self, Error> {
+        let (had, now) = (self.kind.signature(), kind.signature());
+        if !had.same(&now) {
+            return Err(Error::Kind {
+                name: self.name.to_string(),
+                had: had.text().to_owned(),
+                now: now.text().to_owned(),
+            });
+        }
+        Ok(Self {
+            kind: self.kind,
+            name: self.name.clone(),
+        })
     }
 }
 

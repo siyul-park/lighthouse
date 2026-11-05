@@ -4,7 +4,6 @@ use std::sync::{Arc, PoisonError};
 
 use lighthouse_graph::{Graph, Options};
 use lighthouse_plugin::Analyzers;
-use lighthouse_spec::TEXT;
 
 use crate::{cache, engine::Engine};
 
@@ -47,7 +46,7 @@ impl Engine {
     }
 }
 
-/// The text of a file as a query of the graph.
+/// The text of a file, read through the graph.
 fn text(graph: &Graph, path: &str) -> Result<Arc<Option<String>>, lighthouse_graph::Error> {
-    graph.query(&TEXT, &path.to_owned())
+    lighthouse_spec::text(graph, path).map(Arc::new)
 }

@@ -22,7 +22,7 @@ use crate::{Analyzer, Facts};
 
 /// The fact of the analyzer `id` for a file, or for the project when the key
 /// is empty, as JSON.
-pub static ANALYSIS: Query<(String, String), String> = Query::new("analysis", analysis).transient();
+pub static ANALYSIS: Query<(String, String), String> = Query::new("analysis", analysis);
 
 /// What an analyzer reads: the model through the graph's view, the file it is
 /// run for with its text, and the facts of the analyzers it requires.

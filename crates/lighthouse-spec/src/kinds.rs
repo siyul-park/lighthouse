@@ -42,8 +42,7 @@ pub static OVERLAY: Input<String, Option<Content>> = Input::new("overlay");
 pub static ENTRIES: Query<String, Entries> = Query::new("entries", entries);
 /// What a file holds, hashed once; an overlay stands in for the file.
 pub static CONTENT: Query<String, Content> = Query::new("content", content::content);
-/// What a file holds as text, in memory only.
-pub static TEXT: Query<String, Option<String>> = Query::new("text", content::text).transient();
+pub use content::text;
 /// The Merkle hash of a directory.
 pub static TREE: Query<String, Hash> = Query::new("tree", tree);
 /// The files of the project, sorted.

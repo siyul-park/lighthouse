@@ -49,6 +49,15 @@ impl Evaluation<'_> {
     /// The symbols of `file` that are subjects of the decision's scope.
     fn check_symbols(&self, ctx: &Context, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
+        let kind = match self.rule.select {
+            Select::Function => FUNCTION,
+            Select::Test => TEST,
+            _ => SYMBOL,
+        };
+        let facts = match self.rule.select {
+            Select::Event => None,
+            _ => Some(self.facts(kind, &file.path)?),
+        };
         let mut found = Vec::new();
         for symbol in project
             .symbols_in(&file.path)
@@ -58,32 +67,30 @@ impl Evaluation<'_> {
                     .is_none_or(|language| project.language_of(s) == Some(language))
             })
         {
-            if self.rule.select == Select::Event {
+            let Some(facts) = &facts else {
                 found.extend(self.judge_events(symbol)?);
                 continue;
-            }
-            let kind = match self.rule.select {
-                Select::Function => FUNCTION,
-                Select::Test => TEST,
-                _ => SYMBOL,
             };
-            if let Some(value) = self.subject(kind, symbol)? {
-                found.extend(self.judge_symbol(symbol, value)?);
+            let place = facts.position(symbol.id.as_str());
+            if let Some(subject) = place.and_then(|at| held(facts, at)) {
+                found.extend(self.judge_symbol(symbol, subject)?);
             }
         }
         Ok(found)
     }
 
-    /// The facts of `symbol` as the sort of subject `kind` the graph holds
-    /// them, with the measures of this run; `None` when it has none of that
-    /// sort.
-    fn subject(&self, kind: &str, symbol: &Symbol) -> Result<Option<Var>, PluginError> {
-        let built = self
-            .queries
-            .pull(FACT, &subject_key(kind, symbol.id.as_str()))?
-            .downcast::<Built>()
-            .map_err(|_| PluginError::Failed(format!("`{FACT}` has an unexpected value")))?;
-        Ok(built.var())
+    /// The facts of the subjects of the sort `kind` in `file` as the graph
+    /// holds them.
+    fn facts(&self, kind: &str, file: &Path) -> Result<Arc<Facts>, PluginError> {
+        let class = if kind == COMMENT {
+            ""
+        } else {
+            &self.rule.class
+        };
+        self.queries
+            .pull(FACT, &fact_key(kind, class, &file.to_string_lossy()))?
+            .downcast::<Facts>()
+            .map_err(|_| PluginError::Failed(format!("`{FACT}` has an unexpected value")))
     }
 
     /// One finding per event of the function, at the event.
@@ -103,12 +110,18 @@ impl Evaluation<'_> {
     /// The comments of `file` that are subjects of the decision's scope.
     fn check_comments(&self, ctx: &Context, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
+        let facts = self.facts(COMMENT, &file.path)?;
         let mut found = Vec::new();
         for (at, comment) in project.comments_in(&file.path).enumerate() {
             if !ctx.applies.admits_comment(project.file(&comment.file)) {
                 continue;
             }
-            let value = self.comment(&file.path, at)?;
+            let Some(value) = held(&facts, at) else {
+                return Err(PluginError::Failed(format!(
+                    "{}: a comment has no facts",
+                    file.path.display()
+                )));
+            };
             let place = Anchor {
                 file: file.path.clone(),
                 span: comment.span,
@@ -117,18 +130,6 @@ impl Evaluation<'_> {
             found.extend(self.judge(value, place, &comment.text)?);
         }
         Ok(found)
-    }
-
-    /// The facts of comment number `at` of `file` as the graph holds them.
-    fn comment(&self, file: &Path, at: usize) -> Result<Var, PluginError> {
-        let built = self
-            .queries
-            .pull(FACT, &subject_key(COMMENT, &comment_id(file, at)))?
-            .downcast::<Built>()
-            .map_err(|_| PluginError::Failed(format!("`{FACT}` has an unexpected value")))?;
-        built.var().ok_or_else(|| {
-            PluginError::Failed(format!("{}: a comment has no facts", file.display()))
-        })
     }
 
     /// The directives of `file`, one subject per rule each names, as the
@@ -217,7 +218,11 @@ impl Evaluation<'_> {
         Ok(found)
     }
 
-    fn judge_symbol(&self, symbol: &Symbol, value: Var) -> Result<Option<Diagnostic>, PluginError> {
+    fn judge_symbol(
+        &self,
+        symbol: &Symbol,
+        value: Subject,
+    ) -> Result<Option<Diagnostic>, PluginError> {
         let place = Anchor {
             file: symbol.file.clone(),
             span: symbol.span,
@@ -231,11 +236,11 @@ impl Evaluation<'_> {
     /// could not be found is the failure, not the expression that read it.
     fn judge(
         &self,
-        value: Var,
+        value: impl Into<Subject>,
         place: Anchor,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
-        self.judge_value(value, place, key).map_err(|error| {
+        self.judge_value(value.into(), place, key).map_err(|error| {
             self.shared.failed.get().map_or(error, |message| {
                 PluginError::Incomplete(format!("{}: execution error: {message}", self.meta.id))
             })
@@ -244,7 +249,7 @@ impl Evaluation<'_> {
 
     fn judge_value(
         &self,
-        value: Var,
+        value: Subject,
         place: Anchor,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
@@ -354,4 +359,10 @@ impl Evaluation<'_> {
         };
         Ok(Anchor { span, ..default })
     }
+}
+
+/// The subject at `place` of `facts`, if it has a fact.
+fn held(facts: &Arc<Facts>, place: usize) -> Option<Subject> {
+    facts.at(place)?.val()?;
+    Some(Subject::Held(Arc::clone(facts), place))
 }

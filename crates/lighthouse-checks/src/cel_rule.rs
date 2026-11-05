@@ -22,7 +22,7 @@ use crate::{
     builder::Builder,
     caching,
     eval::{Frame, Template, Var, cel_fact, compile, compile_all, compile_shared},
-    fact::{Built, COMMENT, FACT, FUNCTION, SYMBOL, TEST, comment_id, subject_key},
+    fact::{COMMENT, FACT, FUNCTION, Facts, SYMBOL, Subject, TEST, class_of, fact_key},
     facts,
     indexes::Queried,
     library::{self, Needs},
@@ -125,6 +125,7 @@ impl CelRule {
             select,
             file_level: level,
             used,
+            class: class_of(&needs.reads()),
             needs,
             abstain,
             variables,
@@ -248,6 +249,8 @@ pub(crate) struct CelRule {
     identity: Option<Identity>,
     abstain: Option<Abstain>,
     needs: Needs,
+    /// The class of what the expressions read of the selected value.
+    class: String,
     /// Per variable: whether it reads nothing of the selected value (only the
     /// file, the options and variables like it), so a file has one value of it.
     file_level: Vec<bool>,
@@ -297,14 +300,14 @@ impl At {
 struct Judged<'a> {
     shared: &'a Shared<'a>,
     /// The selected value, under the name the check gives it.
-    value: Var,
+    value: Subject,
     /// Per variable of the check, its value for this subject; unused by one
     /// that reads nothing of the subject, which the file holds.
     values: Vec<OnceLock<Option<Var>>>,
 }
 
 impl<'a> Judged<'a> {
-    fn new(shared: &'a Shared<'a>, value: Var) -> Self {
+    fn new(shared: &'a Shared<'a>, value: Subject) -> Self {
         Self {
             shared,
             value,
@@ -344,7 +347,7 @@ impl VariableResolver for Judged<'_> {
     fn resolve<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
         let rule = self.shared.rule;
         if variable == rule.select.variable() {
-            return Some(CowVal::Borrowed(self.value.as_ref()));
+            return Some(CowVal::Borrowed(self.value.val()));
         }
         let at = rule
             .variables
