@@ -1,4 +1,4 @@
-//! Fan-out safety: queries that fan out with `Db::par_map` over heavily shared
+//! Fan-out safety: queries that fan out with `Graph::par_map` over heavily shared
 //! dependencies on a pool of two threads neither deadlock nor run a node
 //! twice, and a cycle through fanned-out branches is an error.
 
@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_graph::{Db, Error, Query, par_map};
+use lighthouse_graph::{Error, Graph, Options, Query};
 use rayon::ThreadPoolBuilder;
 
 const LAYERS: u32 = 50;
@@ -21,15 +21,15 @@ const DEADLINE: Duration = Duration::from_secs(120);
 
 type At = (u32, u32);
 
-static NODE: Query<At, u64> = Query::new("node", |db, at| fan(db, *at, &NODE));
+static NODE: Query<At, u64> = Query::new("node", |graph, at| fan(graph, *at, &NODE));
 /// A small layered graph with a back edge from the node (2, 0) to (6, 0): a
 /// cycle, entered from above. A failed node is not kept, so the graph is small
 /// enough for every path through it to be run.
 static BACK: Query<At, u64> = Query::new("back", back);
 static TOP: Query<u32, u64> = Query::new("top", top_of);
-static RING: Query<u32, u64> = Query::new("ring", |db, at| {
+static RING: Query<u32, u64> = Query::new("ring", |graph, at| {
     let next = vec![(at + 1) % 6, (at + 3) % 6];
-    all(par_map(db, next, |db, to| db.query(&RING, to).map(|v| *v)))
+    all(graph.par_map(next, |graph, to| graph.query(&RING, to).map(|v| *v)))
 });
 
 /// The dependencies of a node: shared by construction, as many nodes of a
@@ -56,20 +56,20 @@ fn all(results: Vec<Result<u64, Error>>) -> Result<u64, Error> {
     Ok(sum)
 }
 
-fn fan(db: &Db, at: At, query: &'static Query<At, u64>) -> Result<u64, Error> {
+fn fan(graph: &Graph, at: At, query: &'static Query<At, u64>) -> Result<u64, Error> {
     if at.0 == 0 {
         return Ok(u64::from(at.1) + 1);
     }
     let mut values = Vec::new();
-    for result in par_map(db, deps(at), move |db, dep| {
-        db.query(query, dep).map(|v| *v)
+    for result in graph.par_map(deps(at), move |graph, dep| {
+        graph.query(query, dep).map(|v| *v)
     }) {
         values.push(result?);
     }
     Ok(mix(&values, at))
 }
 
-fn back(db: &Db, at: &At) -> Result<u64, Error> {
+fn back(graph: &Graph, at: &At) -> Result<u64, Error> {
     let (layer, i) = *at;
     if layer == 0 {
         return Ok(1);
@@ -83,7 +83,7 @@ fn back(db: &Db, at: &At) -> Result<u64, Error> {
         wanted.push((6, 0));
     }
     let mut sum = 0u64;
-    for result in par_map(db, wanted, |db, dep| db.query(&BACK, dep).map(|v| *v)) {
+    for result in graph.par_map(wanted, |graph, dep| graph.query(&BACK, dep).map(|v| *v)) {
         sum = sum.wrapping_add(result?);
     }
     Ok(sum)
@@ -95,10 +95,8 @@ fn tops(top: u32) -> Vec<At> {
         .collect()
 }
 
-fn top_of(db: &Db, top: &u32) -> Result<u64, Error> {
-    all(par_map(db, tops(*top), |db, at| {
-        db.query(&NODE, at).map(|v| *v)
-    }))
+fn top_of(graph: &Graph, top: &u32) -> Result<u64, Error> {
+    all(graph.par_map(tops(*top), |graph, at| graph.query(&NODE, at).map(|v| *v)))
 }
 
 /// What the graph must give, by plain recursion, and the nodes it reaches.
@@ -135,24 +133,28 @@ fn within_deadline<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static)
         .expect("the pulls finished: no deadlock")
 }
 
-fn graph() -> Arc<Db> {
-    let mut db = Db::in_memory(&Default::default()).expect("open");
-    db.set_verify(0);
-    Arc::new(db)
+fn graph() -> Arc<Graph> {
+    Arc::new(
+        Graph::in_memory(Options {
+            verify: 0,
+            ..Options::default()
+        })
+        .expect("open"),
+    )
 }
 
 #[test]
 fn fan_out_over_shared_dependencies_on_two_threads_runs_each_node_once() {
-    let db = graph();
+    let graph = graph();
     let pool = Arc::new(small_pool());
 
     let values = within_deadline({
-        let (db, pool) = (db.clone(), pool.clone());
+        let (graph, pool) = (graph.clone(), pool.clone());
         move || {
             let pulls: Vec<_> = (0..TOPS)
                 .map(|top| {
-                    let (db, pool) = (db.clone(), pool.clone());
-                    thread::spawn(move || pool.install(|| *db.query(&TOP, &top).expect("top")))
+                    let (graph, pool) = (graph.clone(), pool.clone());
+                    thread::spawn(move || pool.install(|| *graph.query(&TOP, &top).expect("top")))
                 })
                 .collect();
             pulls
@@ -169,7 +171,7 @@ fn fan_out_over_shared_dependencies_on_two_threads_runs_each_node_once() {
             .fold(0u64, |sum, at| sum.wrapping_add(reference(at, &mut memo)));
         assert_eq!(values[top as usize], expected, "top {top}");
     }
-    let ran = db.take_executed();
+    let ran = graph.take_executed();
     let nodes: Vec<&String> = ran
         .iter()
         .filter(|label| label.starts_with("node("))
@@ -181,17 +183,17 @@ fn fan_out_over_shared_dependencies_on_two_threads_runs_each_node_once() {
 
 #[test]
 fn a_cycle_through_fanned_out_branches_is_an_error() {
-    let db = graph();
+    let graph = graph();
     let pool = Arc::new(small_pool());
 
     let results = within_deadline({
-        let (db, pool) = (db.clone(), pool.clone());
+        let (graph, pool) = (graph.clone(), pool.clone());
         move || {
             let pulls: Vec<_> = (0..12)
                 .map(|n| {
-                    let (db, pool) = (db.clone(), pool.clone());
+                    let (graph, pool) = (graph.clone(), pool.clone());
                     let top = [(7, 0), (7, 15), (7, 11)][n % 3];
-                    thread::spawn(move || pool.install(|| db.query(&BACK, &top).map(|v| *v)))
+                    thread::spawn(move || pool.install(|| graph.query(&BACK, &top).map(|v| *v)))
                 })
                 .collect();
             pulls
@@ -212,16 +214,16 @@ fn a_cycle_through_fanned_out_branches_is_an_error() {
 
 #[test]
 fn a_ring_of_fanned_out_queries_is_a_cycle_from_every_entry() {
-    let db = graph();
+    let graph = graph();
     let pool = Arc::new(small_pool());
 
     let results = within_deadline({
-        let (db, pool) = (db.clone(), pool.clone());
+        let (graph, pool) = (graph.clone(), pool.clone());
         move || {
             let pulls: Vec<_> = (0..6)
                 .map(|at| {
-                    let (db, pool) = (db.clone(), pool.clone());
-                    thread::spawn(move || pool.install(|| db.query(&RING, &at).map(|v| *v)))
+                    let (graph, pool) = (graph.clone(), pool.clone());
+                    thread::spawn(move || pool.install(|| graph.query(&RING, &at).map(|v| *v)))
                 })
                 .collect();
             pulls

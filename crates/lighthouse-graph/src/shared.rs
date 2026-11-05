@@ -29,8 +29,8 @@ pub(crate) struct Shared {
     pub verify_count: AtomicU64,
     pub limit: AtomicU64,
     pub versions: Mutex<Versions>,
-    /// Blobs set since the last commit.
-    pub states: Mutex<BTreeMap<String, Vec<u8>>>,
+    /// How many revisions a row that nothing verified is kept.
+    pub retain: u64,
 }
 
 pub(crate) struct Registered {
@@ -219,7 +219,7 @@ pub(crate) fn drop_value(node: &mut Node) {
     node.on_disk = false;
 }
 
-pub(crate) fn write_of(slot: &Arc<Slot>) -> Write {
+pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
     let node = slot.node.locked();
     let deps: Vec<(&str, &[u8], Hash)> = node
         .deps
@@ -230,7 +230,12 @@ pub(crate) fn write_of(slot: &Arc<Slot>) -> Write {
         hash: node.hash,
         deps: encode(&deps).unwrap_or_default(),
         changed_at: node.changed_at,
-        verified_at: node.verified_at,
+        // An input is confirmed by being set: what is written is as of now.
+        verified_at: if node.input {
+            node.verified_at.max(revision)
+        } else {
+            node.verified_at
+        },
         durability: node.durability,
         input: node.input,
         used_at: node.used_at,

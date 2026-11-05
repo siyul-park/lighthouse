@@ -1,7 +1,7 @@
 //! The same edits across reopen boundaries give the same results and the
 //! same executed nodes as one long-lived graph.
 
-use lighthouse_graph::{set_state, state};
+use lighthouse_graph::Options;
 
 use crate::{differential::*, toy::*};
 
@@ -14,30 +14,28 @@ fn run(seed: u64, steps: usize, reopen: usize) -> Trace {
     let path = dir.path().join("cache/graph.db");
     let mut rng = Rng::new(seed);
     let mut sim = Sim::new();
-    let mut db = open(Some(&path), &sim.project);
-    db.set_verify(0);
-    apply(&mut db, &sim.project, &sim.known);
-    pull(&db);
-    db.commit().expect("commit");
-    db.take_executed();
+    let mut graph = open(Some(&path), &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
+    pull(&graph);
+    graph.commit().expect("commit");
+    graph.take_executed();
     let mut trace = Vec::new();
     for step in 1..=steps {
         let edit = sim.step(&mut rng);
         if reopen != 0 && step % reopen == 0 {
-            drop(db);
-            db = open(Some(&path), &sim.project);
-            db.set_verify(0);
+            drop(graph);
+            graph = open(Some(&path), &sim.project);
         }
         if matches!(edit, Edit::Evict) {
             for file in sim.project.files.keys() {
-                db.evict(&FACTS, file).expect("evict");
+                graph.evict(&FACTS, file).expect("evict");
             }
         }
-        apply(&mut db, &sim.project, &sim.known);
-        let report = pull(&db);
-        let mut ran = db.take_executed();
+        apply(&mut graph, &sim.project, &sim.known);
+        let report = pull(&graph);
+        let mut ran = graph.take_executed();
         ran.sort();
-        db.commit().expect("commit");
+        graph.commit().expect("commit");
         trace.push((report, ran));
     }
     trace
@@ -66,17 +64,17 @@ fn a_new_process_finds_everything_green() {
     let path = dir.path().join("graph.db");
     let mut sim = Sim::new();
     sim.step(&mut Rng::new(3));
-    let mut db = open(Some(&path), &sim.project);
-    apply(&mut db, &sim.project, &sim.known);
-    let first = pull(&db);
-    db.commit().expect("commit");
-    drop(db);
+    let mut graph = open(Some(&path), &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
+    let first = pull(&graph);
+    graph.commit().expect("commit");
+    drop(graph);
 
-    let mut db = open(Some(&path), &sim.project);
-    apply(&mut db, &sim.project, &sim.known);
+    let mut graph = open(Some(&path), &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
 
-    assert_eq!(pull(&db), first);
-    assert!(db.take_executed().is_empty());
+    assert_eq!(pull(&graph), first);
+    assert!(graph.take_executed().is_empty());
 }
 
 #[test]
@@ -84,19 +82,19 @@ fn a_changed_version_runs_its_readers_in_a_new_process() {
     let dir = tempfile::tempdir().expect("dir");
     let path = dir.path().join("graph.db");
     let sim = Sim::new();
-    let mut db = open(Some(&path), &sim.project);
-    apply(&mut db, &sim.project, &sim.known);
-    pull(&db);
-    db.commit().expect("commit");
-    drop(db);
+    let mut graph = open(Some(&path), &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
+    pull(&graph);
+    graph.commit().expect("commit");
+    drop(graph);
     let mut project = sim.project.clone();
     project.versions.insert("parser".into(), "p2".into());
 
-    let mut db = open(Some(&path), &project);
-    apply(&mut db, &project, &sim.known);
-    pull(&db);
+    let mut graph = open(Some(&path), &project);
+    apply(&mut graph, &project, &sim.known);
+    pull(&graph);
 
-    let ran = db.take_executed();
+    let ran = graph.take_executed();
     assert_eq!(
         ran.iter().filter(|label| kind_of(label) == "parse").count(),
         sim.known.len()
@@ -114,10 +112,10 @@ fn a_damaged_store_is_replaced() {
     .expect("write");
     let sim = Sim::new();
 
-    let mut db = open(Some(&path), &sim.project);
-    apply(&mut db, &sim.project, &sim.known);
+    let mut graph = open(Some(&path), &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
 
-    assert_eq!(pull(&db), from_scratch(&sim.project, &sim.known));
+    assert_eq!(pull(&graph), from_scratch(&sim.project, &sim.known));
 }
 
 #[test]
@@ -125,33 +123,43 @@ fn the_byte_limit_drops_values_and_keeps_results() {
     let dir = tempfile::tempdir().expect("dir");
     let path = dir.path().join("graph.db");
     let sim = Sim::new();
-    let mut db = open(Some(&path), &sim.project);
-    db.set_verify(0);
-    db.set_limit(1);
-    apply(&mut db, &sim.project, &sim.known);
-    let first = pull(&db);
-    db.commit().expect("commit");
+    let options = Options {
+        limit: 1,
+        ..options(&sim.project)
+    };
+    let mut graph = open_with(Some(&path), options);
+    apply(&mut graph, &sim.project, &sim.known);
+    let first = pull(&graph);
+    graph.commit().expect("commit");
 
-    assert_eq!(pull(&db), first);
-    db.take_executed();
-    assert_eq!(pull(&db), first);
-    assert!(db.take_executed().is_empty());
+    assert_eq!(pull(&graph), first);
+    graph.take_executed();
+    assert_eq!(pull(&graph), first);
+    assert!(graph.take_executed().is_empty());
 }
 
 mod eviction_order {
-    use lighthouse_graph::{Db, Durability, Error, Input, Query};
+    use lighthouse_graph::{Durability, Error, Graph, Input, Options, Query, VERSION};
 
     static SEED: Input<(), u8> = Input::new("seed");
-    static STATIC_BIG: Query<(), String> = Query::new("static-big", |db, _| {
-        Ok(format!("{}{}", db.version("v")?, "s".repeat(1000)))
+    static STATIC_BIG: Query<(), String> = Query::new("static-big", |graph, _| {
+        Ok(format!(
+            "{}{}",
+            graph.input(&VERSION, &"v".to_owned())?.unwrap_or_default(),
+            "s".repeat(1000)
+        ))
     });
-    static VOLATILE_BIG: Query<(), String> = Query::new("volatile-big", |db, _| {
-        Ok(format!("{}{}", db.input(&SEED, &())?, "v".repeat(1000)))
+    static VOLATILE_BIG: Query<(), String> = Query::new("volatile-big", |graph, _| {
+        Ok(format!(
+            "{}{}",
+            graph.input(&SEED, &())?.unwrap_or_default(),
+            "v".repeat(1000)
+        ))
     });
 
-    fn pull(db: &Db) -> Result<(), Error> {
-        db.query(&STATIC_BIG, &())?;
-        db.query(&VOLATILE_BIG, &())?;
+    fn pull(graph: &Graph) -> Result<(), Error> {
+        graph.query(&STATIC_BIG, &())?;
+        graph.query(&VOLATILE_BIG, &())?;
         Ok(())
     }
 
@@ -159,49 +167,127 @@ mod eviction_order {
     fn volatile_values_go_before_static_ones() {
         let dir = tempfile::tempdir().expect("dir");
         let path = dir.path().join("graph.db");
-        let versions = [("v".to_owned(), "1".to_owned())].into();
-        let mut db = Db::open(&path, &versions).expect("open");
-        db.set_verify(0);
-        db.register_query(&STATIC_BIG);
-        db.register_query(&VOLATILE_BIG);
-        db.set_input(&SEED, &(), 1, Durability::Volatile)
+        let options = Options {
+            versions: [("v".to_owned(), "1".to_owned())].into(),
+            limit: 1500,
+            verify: 0,
+            ..Options::default()
+        };
+        let mut graph = Graph::open(&path, options.clone()).expect("open");
+        graph
+            .set_input(&SEED, &(), 1, Durability::Volatile)
             .expect("set");
-        db.set_limit(1500);
-        pull(&db).expect("pull");
-        db.commit().expect("commit");
-        db.take_executed();
+        pull(&graph).expect("pull");
+        graph.commit().expect("commit");
+        graph.take_executed();
 
-        drop(db);
-        let mut db = Db::open(&path, &versions).expect("open");
-        db.set_verify(0);
-        db.register_query(&STATIC_BIG);
-        db.register_query(&VOLATILE_BIG);
-        db.set_input(&SEED, &(), 1, Durability::Volatile)
+        drop(graph);
+        let mut graph = Graph::open(&path, options).expect("open");
+        graph
+            .set_input(&SEED, &(), 1, Durability::Volatile)
             .expect("set");
-        pull(&db).expect("pull");
+        pull(&graph).expect("pull");
 
-        assert_eq!(db.take_executed(), ["volatile-big(())"]);
+        assert_eq!(graph.take_executed(), ["volatile-big(())"]);
     }
 }
 
+/// How many revisions a row is kept in this test: small, so that the file is
+/// seen to stop growing within a few cycles.
+const RETAIN: u64 = 8;
+
+fn rows(path: &std::path::Path) -> i64 {
+    let conn = rusqlite::Connection::open(path).expect("open the file");
+    conn.query_row("SELECT count(*) FROM node", [], |row| row.get(0))
+        .expect("count")
+}
+
 #[test]
-fn a_state_blob_is_read_back_after_commit_and_reopen() {
+fn rows_of_files_that_are_gone_are_deleted_so_the_file_does_not_grow() {
     let dir = tempfile::tempdir().expect("dir");
     let path = dir.path().join("graph.db");
-    let project = Project::new();
-    let mut db = open(Some(&path), &project);
-    assert_eq!(state(&db, "walk").expect("state"), None);
+    let mut project = Project::new();
+    let options = Options {
+        retain: RETAIN,
+        ..options(&project)
+    };
+    let mut graph = open_with(Some(&path), options);
+    let mut counts = Vec::new();
+    for cycle in 0..60 {
+        let name = format!("f{cycle}");
+        project
+            .files
+            .insert(name.clone(), format!("api=A{cycle};body=B;uses="));
+        if cycle > 0 {
+            project.files.remove(&format!("f{}", cycle - 1));
+        }
+        let known: Vec<String> = project.files.keys().cloned().collect();
+        apply(&mut graph, &project, &known);
+        pull(&graph);
+        graph.commit().expect("commit");
+        counts.push(rows(&path));
+    }
 
-    set_state(&mut db, "walk", b"one".to_vec());
-    assert_eq!(state(&db, "walk").expect("state"), Some(b"one".to_vec()));
-    drop(db);
-    let db = open(Some(&path), &project);
-    assert_eq!(state(&db, "walk").expect("state"), None, "never committed");
+    let (middle, last) = (counts[30], counts[59]);
+    assert!(
+        last <= middle,
+        "{middle} rows at 30, {last} at 59: {counts:?}"
+    );
+    assert!(
+        last < 60 * 5,
+        "the rows of 60 files are not all kept: {last}"
+    );
+    assert_eq!(
+        pull(&graph),
+        from_scratch(&project, &project.files.keys().cloned().collect::<Vec<_>>())
+    );
+}
 
-    let mut db = db;
-    set_state(&mut db, "walk", b"two".to_vec());
-    db.commit().expect("commit");
-    drop(db);
-    let db = open(Some(&path), &project);
-    assert_eq!(state(&db, "walk").expect("state"), Some(b"two".to_vec()));
+mod registration {
+    use lighthouse_graph::{Durability, Graph, Input, Options, Query};
+
+    static SEED: Input<(), u8> = Input::new("seed");
+    static OTHER: Input<(), u8> = Input::new("other");
+    static LOW: Query<(), u8> = Query::new("low", |graph, _| {
+        Ok(graph.input(&SEED, &())?.map_or(0, |seed| *seed) + 1)
+    });
+    static HIGH: Query<(), u8> = Query::new("high", |graph, _| Ok(*graph.query(&LOW, &())? + 1));
+
+    /// Opens the file with `other` set, a revision of its own when it differs.
+    fn reopen(path: &std::path::Path, other: u8) -> Graph {
+        let options = Options {
+            verify: 0,
+            ..Options::default()
+        };
+        let mut graph = Graph::open(path, options).expect("open");
+        graph
+            .set_input(&SEED, &(), 1, Durability::Volatile)
+            .expect("set");
+        graph
+            .set_input(&OTHER, &(), other, Durability::Volatile)
+            .expect("set");
+        graph
+    }
+
+    #[test]
+    fn a_stored_dependency_of_a_kind_not_used_yet_is_changed_never_green() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let mut graph = reopen(&path, 1);
+        graph.query(&HIGH, &()).expect("pull");
+        graph.commit().expect("commit");
+        drop(graph);
+
+        let mut graph = reopen(&path, 2);
+        graph.query(&HIGH, &()).expect("pull");
+        assert_eq!(graph.take_executed(), ["high(())"], "low was not used yet");
+        graph.commit().expect("commit");
+        drop(graph);
+
+        let mut graph = reopen(&path, 3);
+        graph.query(&LOW, &()).expect("pull");
+        graph.query(&HIGH, &()).expect("pull");
+        assert!(graph.take_executed().is_empty(), "low was used first");
+        graph.commit().expect("commit");
+    }
 }

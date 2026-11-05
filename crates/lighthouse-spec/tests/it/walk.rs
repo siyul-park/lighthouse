@@ -1,13 +1,12 @@
 //! The incremental walk gives what the `ignore` crate's walker gives, over
-//! random edits of a file system, reading only the directories that changed.
+//! random edits of a file system.
 
 use std::{
     fs,
     path::{Path, PathBuf},
-    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use lighthouse_spec::{Dirs, ProjectFiles};
+use lighthouse_spec::{Disk, ProjectFiles};
 
 /// A seeded generator: the sequences are the same on every run.
 struct Rng(u64);
@@ -106,13 +105,6 @@ fn edit(rng: &mut Rng, root: &Path, counter: u64) {
     }
 }
 
-fn now_ns() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_nanos() as i64
-}
-
 #[test]
 fn the_walk_equals_the_reference_walker_over_random_edits() {
     for seed in 1..=12u64 {
@@ -121,14 +113,11 @@ fn the_walk_equals_the_reference_walker_over_random_edits() {
         let project =
             ProjectFiles::new(&root, &["*.log".to_owned(), "/a/skip/".to_owned()]).unwrap();
         let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
-        let mut previous = Dirs::new();
-        let mut since = None;
         for step in 0..60 {
             for _ in 0..1 + rng.below(3) {
                 edit(&mut rng, &root, step);
             }
-            let started = now_ns();
-            let walked = project.walk(&previous, since);
+            let walked = project.walk(&mut Disk(&root));
             let reference = project.walker_list();
             assert_eq!(
                 walked.listing.files, reference.files,
@@ -142,33 +131,24 @@ fn the_walk_equals_the_reference_walker_over_random_edits() {
                 assert!(walked.stats.contains_key(file), "{file:?} has a stat");
             }
             assert_eq!(walked.stats.len(), walked.listing.files.len());
-            previous = walked.dirs;
-            since = Some(started);
         }
     }
 }
 
 #[test]
-fn a_directory_that_did_not_change_is_not_read_again() {
-    let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().canonicalize().unwrap();
-    for sub in ["a", "b", "c/d"] {
-        fs::create_dir_all(root.join(sub)).unwrap();
-        fs::write(root.join(sub).join("f.txt"), "x").unwrap();
-    }
-    let project = ProjectFiles::new(&root, &[]).unwrap();
-    let first = project.walk(&Dirs::new(), None);
-    assert_eq!(first.relisted, 5, "root, a, b, c, c/d");
-    // Walks are racy for a moment after the files were written.
-    std::thread::sleep(Duration::from_millis(2200));
-    let second = project.walk(&first.dirs, Some(now_ns()));
-    assert_eq!(second.relisted, 0);
-    assert_eq!(second.listing.files, first.listing.files);
+fn a_stat_is_racy_within_the_clock_tick_of_the_walk() {
+    let stat = |mtime_ns| lighthouse_spec::Stat {
+        mtime_ns,
+        ctime_ns: 0,
+        size: 0,
+        inode: 0,
+        mode: 0,
+    };
+    let started = 10 * lighthouse_spec::RACY_NS;
 
-    fs::write(root.join("b/g.txt"), "y").unwrap();
-    let third = project.walk(&second.dirs, Some(now_ns()));
-    assert_eq!(third.relisted, 1, "only b changed");
-    assert!(third.listing.files.contains(&PathBuf::from("b/g.txt")));
+    assert!(stat(started).racy(started));
+    assert!(stat(started - lighthouse_spec::RACY_NS).racy(started));
+    assert!(!stat(started - lighthouse_spec::RACY_NS - 1).racy(started));
 }
 
 #[test]
@@ -184,4 +164,25 @@ fn stat_tells_a_file_that_was_rewritten_from_one_that_was_not() {
 
     assert_ne!(before, stat(&file));
     assert_eq!(stat(&file).size, 5);
+}
+
+#[test]
+fn read_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir(dir.path().join("sub")).unwrap();
+    fs::write(dir.path().join("b.txt"), "x").unwrap();
+    fs::write(dir.path().join("a.txt"), "x").unwrap();
+
+    let entries = lighthouse_spec::read_entries(dir.path());
+    let names: Vec<_> = entries
+        .raw
+        .iter()
+        .map(|raw| raw.name.to_str().unwrap())
+        .collect();
+    let missing = lighthouse_spec::read_entries(&dir.path().join("none"));
+
+    assert_eq!(names, ["a.txt", "b.txt", "sub"], "sorted by name");
+    assert_eq!(entries.raw[2].kind, lighthouse_spec::Kind::Dir);
+    assert!(entries.errors.is_empty());
+    assert!(missing.raw.is_empty() && !missing.errors.is_empty());
 }

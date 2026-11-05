@@ -144,10 +144,13 @@ fn nested_gitattributes_are_relative_to_their_directory_and_deeper_files_win_per
         "sub/.gitattributes",
         "lib/inner/.gitattributes",
     ]
-    .map(Into::into)
+    .map(|file| {
+        let text = std::fs::read_to_string(dir.path().join(file)).ok();
+        (file.into(), text)
+    })
     .to_vec();
 
-    let (attributes, notices) = Attributes::new(dir.path(), &files);
+    let (attributes, notices) = Attributes::from_texts(files);
 
     assert!(notices.is_empty());
     assert!(attributes.is_generated(Path::new("a.pb.go")));

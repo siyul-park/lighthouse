@@ -10,7 +10,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::{Attributes, Dirs, Error, ignores::matcher as ignore_matcher};
+use crate::{Attributes, Disk, Error, Source, Walked, ignores::matcher as ignore_matcher};
 use ignore::{WalkBuilder, gitignore::Gitignore};
 use lighthouse_model::STATE_DIR;
 
@@ -59,9 +59,15 @@ impl ProjectFiles {
         &self.root
     }
 
-    /// Every file of the project, sorted: a walk with no history.
+    /// Every file of the project and its `lstat`, from what `source` holds:
+    /// the directories it lists and the text of the ignore files it gives.
+    pub fn walk(&self, source: &mut impl Source) -> Walked {
+        crate::walk::walk(self, source)
+    }
+
+    /// Every file of the project, sorted: a walk of the disk.
     pub fn list(&self) -> Listing {
-        self.walk(&Dirs::new(), None).listing
+        self.walk(&mut Disk(&self.root)).listing
     }
 
     /// Whether the walk enters the entry at `rel`, a project-relative path.
@@ -144,7 +150,13 @@ impl ProjectFiles {
             }
         }
         listing.files.sort();
-        let (attributes, notices) = Attributes::new(&self.root, &listing.files);
+        let texts = listing
+            .files
+            .iter()
+            .filter(|f| Attributes::is_file(f))
+            .map(|f| (f.clone(), std::fs::read_to_string(self.root.join(f)).ok()))
+            .collect();
+        let (attributes, notices) = Attributes::from_texts(texts);
         listing.notices = notices;
         listing.files.retain(|f| !attributes.is_vendored(f));
         listing.attributes = attributes;

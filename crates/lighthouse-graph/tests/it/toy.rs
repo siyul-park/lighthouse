@@ -5,7 +5,7 @@
 
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_graph::{Db, Durability, Error, Input, Query, par_map};
+use lighthouse_graph::{Durability, Error, Graph, Input, Options, Query, VERSION};
 use serde::{Deserialize, Serialize};
 
 pub static FILE: Input<String, Option<String>> = Input::new("file");
@@ -37,9 +37,14 @@ pub struct Facts {
 
 /// A file is `api=<text>;body=<text>;uses=<a,b>`; a removed file parses to
 /// nothing.
-fn parse(db: &Db, path: &String) -> Result<Parsed, Error> {
-    let version = db.version("parser")?;
-    let Some(text) = db.input(&FILE, path)?.as_ref().clone() else {
+fn parse(graph: &Graph, path: &String) -> Result<Parsed, Error> {
+    let version = graph
+        .input(&VERSION, &"parser".to_owned())?
+        .unwrap_or_default();
+    let Some(text) = graph
+        .input(&FILE, path)?
+        .and_then(|file| file.as_ref().clone())
+    else {
         return Ok(Parsed::default());
     };
     let mut parsed = Parsed {
@@ -63,48 +68,58 @@ fn parse(db: &Db, path: &String) -> Result<Parsed, Error> {
     Ok(parsed)
 }
 
-fn api(db: &Db, path: &String) -> Result<String, Error> {
-    Ok(db.query(&PARSE, path)?.api.clone())
+fn api(graph: &Graph, path: &String) -> Result<String, Error> {
+    Ok(graph.query(&PARSE, path)?.api.clone())
 }
 
-fn uses(db: &Db, path: &String) -> Result<Vec<String>, Error> {
-    Ok(db.query(&PARSE, path)?.uses.clone())
+fn uses(graph: &Graph, path: &String) -> Result<Vec<String>, Error> {
+    Ok(graph.query(&PARSE, path)?.uses.clone())
 }
 
-fn deps(db: &Db, path: &String) -> Result<Vec<(String, String)>, Error> {
+fn deps(graph: &Graph, path: &String) -> Result<Vec<(String, String)>, Error> {
     let mut deps = Vec::new();
-    for used in db.query(&USES, path)?.iter() {
-        deps.push((used.clone(), db.query(&API, used)?.as_ref().clone()));
+    for used in graph.query(&USES, path)?.iter() {
+        deps.push((used.clone(), graph.query(&API, used)?.as_ref().clone()));
     }
     Ok(deps)
 }
 
-fn facts(db: &Db, path: &String) -> Result<Facts, Error> {
-    let version = db.version("facts")?;
-    let body = format!("{version}:{}", db.query(&PARSE, path)?.body);
-    let deps = db.query(&DEPS, path)?.as_ref().clone();
+fn facts(graph: &Graph, path: &String) -> Result<Facts, Error> {
+    let version = graph
+        .input(&VERSION, &"facts".to_owned())?
+        .unwrap_or_default();
+    let body = format!("{version}:{}", graph.query(&PARSE, path)?.body);
+    let deps = graph.query(&DEPS, path)?.as_ref().clone();
     Ok(Facts {
         body,
         deps,
-        config: db.input(&CONFIG, &())?.as_ref().clone(),
+        config: graph
+            .input(&CONFIG, &())?
+            .map(|c| c.as_ref().clone())
+            .unwrap_or_default(),
     })
 }
 
-fn report(db: &Db, _: &()) -> Result<Vec<(String, Facts)>, Error> {
+fn report(graph: &Graph, _: &()) -> Result<Vec<(String, Facts)>, Error> {
     let mut all = Vec::new();
-    for path in db.input(&FILES, &())?.iter() {
-        all.push((path.clone(), db.query(&FACTS, path)?.as_ref().clone()));
+    for path in graph.input(&FILES, &())?.unwrap_or_default().iter() {
+        all.push((path.clone(), graph.query(&FACTS, path)?.as_ref().clone()));
     }
     Ok(all)
 }
 
-fn par_report(db: &Db, _: &()) -> Result<Vec<(String, Facts)>, Error> {
-    let files = db.input(&FILES, &())?.as_ref().clone();
-    par_map(db, files, |db, path| {
-        Ok((path.clone(), db.query(&FACTS, path)?.as_ref().clone()))
-    })
-    .into_iter()
-    .collect()
+fn par_report(graph: &Graph, _: &()) -> Result<Vec<(String, Facts)>, Error> {
+    let files = graph
+        .input(&FILES, &())?
+        .unwrap_or_default()
+        .as_ref()
+        .clone();
+    graph
+        .par_map(files, |graph, path| {
+            Ok((path.clone(), graph.query(&FACTS, path)?.as_ref().clone()))
+        })
+        .into_iter()
+        .collect()
 }
 
 /// The inputs of a toy project.
@@ -128,68 +143,89 @@ impl Project {
     }
 }
 
-pub fn register(db: &Db) {
-    db.register_input(&FILE);
-    db.register_input(&FILES);
-    db.register_input(&CONFIG);
-    db.register_query(&PARSE);
-    db.register_query(&API);
-    db.register_query(&USES);
-    db.register_query(&DEPS);
-    db.register_query(&FACTS);
-    db.register_query(&REPORT);
-    db.register_query(&PAR_REPORT);
+/// Opens a graph on disk, or in memory without a path, .
+pub fn options(project: &Project) -> Options {
+    Options {
+        versions: project.versions.clone(),
+        verify: 0,
+        ..Options::default()
+    }
 }
 
-/// Opens a graph on disk, or in memory without a path, with all queries known.
-pub fn open(path: Option<&Path>, project: &Project) -> Db {
-    let db = match path {
-        Some(path) => Db::open(path, &project.versions),
-        None => Db::in_memory(&project.versions),
+/// Opens a graph with the project's versions and no verify mode.
+pub fn open(path: Option<&Path>, project: &Project) -> Graph {
+    open_with(path, options(project))
+}
+
+pub fn open_with(path: Option<&Path>, options: Options) -> Graph {
+    match path {
+        Some(path) => Graph::open(path, options),
+        None => Graph::in_memory(options),
     }
-    .expect("open");
-    register(&db);
-    db
+    .expect("open")
 }
 
 /// Sets every input to the project's: `known` are the paths ever seen, so
 /// that a removed file is set to nothing.
-pub fn apply(db: &mut Db, project: &Project, known: &[String]) {
+pub fn apply(graph: &mut Graph, project: &Project, known: &[String]) {
     for path in known {
-        db.set_input(
-            &FILE,
-            path,
-            project.files.get(path).cloned(),
-            Durability::Volatile,
-        )
-        .expect("set file");
+        graph
+            .set_input(
+                &FILE,
+                path,
+                project.files.get(path).cloned(),
+                Durability::Volatile,
+            )
+            .expect("set file");
     }
     let list: Vec<String> = project.files.keys().cloned().collect();
-    db.set_input(&FILES, &(), list, Durability::Volatile)
+    graph
+        .set_input(&FILES, &(), list, Durability::Volatile)
         .expect("set files");
-    db.set_input(&CONFIG, &(), project.config.clone(), Durability::Stable)
+    graph
+        .set_input(&CONFIG, &(), project.config.clone(), Durability::Stable)
         .expect("set config");
     for (name, version) in &project.versions {
-        db.set_version(name, version).expect("set version");
+        graph
+            .set_input(&VERSION, name, version.clone(), Durability::Static)
+            .expect("set version");
     }
 }
 
-pub fn pull_par(db: &Db) -> Vec<(String, Facts)> {
-    db.query(&PAR_REPORT, &())
+/// Pulls the layers from the bottom up: a stored node whose dependency is of
+/// a kind this process has not used yet counts as moved, so each kind is
+/// used before anything above it is validated, as the report would.
+fn bottom_up(graph: &Graph) {
+    let files = graph.input(&FILES, &()).expect("files").unwrap_or_default();
+    for path in files.iter() {
+        graph.query(&PARSE, path).expect("parse");
+        for used in graph.query(&USES, path).expect("uses").iter() {
+            graph.query(&API, used).expect("api");
+        }
+        graph.query(&DEPS, path).expect("deps");
+        graph.query(&FACTS, path).expect("facts");
+    }
+}
+
+pub fn pull_par(graph: &Graph) -> Vec<(String, Facts)> {
+    bottom_up(graph);
+    graph
+        .query(&PAR_REPORT, &())
         .expect("par report")
         .as_ref()
         .clone()
 }
 
-pub fn pull(db: &Db) -> Vec<(String, Facts)> {
-    db.query(&REPORT, &()).expect("report").as_ref().clone()
+pub fn pull(graph: &Graph) -> Vec<(String, Facts)> {
+    bottom_up(graph);
+    graph.query(&REPORT, &()).expect("report").as_ref().clone()
 }
 
 /// The report from a graph that has never run.
 pub fn from_scratch(project: &Project, known: &[String]) -> Vec<(String, Facts)> {
-    let mut db = open(None, project);
-    apply(&mut db, project, known);
-    pull(&db)
+    let mut graph = open(None, project);
+    apply(&mut graph, project, known);
+    pull(&graph)
 }
 
 /// The path inside `kind("path")`, or empty for `report(())`.

@@ -2,7 +2,7 @@ use std::{any::Any, fmt::Debug, marker::PhantomData, sync::Arc};
 
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{Db, Error, node::Hash};
+use crate::{Error, Graph, node::Hash};
 
 /// What a key is: encoded to identify a node, decoded to run its query.
 pub trait Key: Serialize + DeserializeOwned + Debug + 'static {}
@@ -17,7 +17,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync + 'static> Value for T {}
 pub(crate) trait Kind: Send + Sync {
     fn name(&self) -> &'static str;
     fn is_input(&self) -> bool;
-    fn execute(&self, db: &Db, key: &[u8]) -> Result<Output, Error>;
+    fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error>;
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>>;
     fn describe(&self, key: &[u8]) -> String;
 }
@@ -64,8 +64,11 @@ impl<K: Key, V: Value> Kind for Input<K, V> {
         true
     }
 
-    fn execute(&self, _: &Db, key: &[u8]) -> Result<Output, Error> {
-        Err(Error::MissingInput(describe::<K>(self.name, key)))
+    fn execute(&self, _: &Graph, key: &[u8]) -> Result<Output, Error> {
+        Err(Error::Encode(format!(
+            "{} is an input: it is set, not run",
+            describe::<K>(self.name, key)
+        )))
     }
 
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>> {
@@ -78,17 +81,17 @@ impl<K: Key, V: Value> Kind for Input<K, V> {
 }
 
 /// A value derived by a pure function of its key and of what it reads
-/// through the [`Db`]. Declare it as a `static`. A cycle among queries is
+/// through the [`Graph`]. Declare it as a `static`. A cycle among queries is
 /// reported as [`Error::Cycle`], so a query passes the errors of what it
 /// reads up with `?`.
 pub struct Query<K, V> {
     name: &'static str,
-    run: fn(&Db, &K) -> Result<V, Error>,
+    run: fn(&Graph, &K) -> Result<V, Error>,
 }
 
 impl<K, V> Query<K, V> {
     /// A query kind named `name` that computes a value with `run`.
-    pub const fn new(name: &'static str, run: fn(&Db, &K) -> Result<V, Error>) -> Self {
+    pub const fn new(name: &'static str, run: fn(&Graph, &K) -> Result<V, Error>) -> Self {
         Self { name, run }
     }
 }
@@ -102,9 +105,9 @@ impl<K: Key, V: Value> Kind for Query<K, V> {
         false
     }
 
-    fn execute(&self, db: &Db, key: &[u8]) -> Result<Output, Error> {
+    fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error> {
         let key: K = decode(key)?;
-        Output::new((self.run)(db, &key)?)
+        Output::new((self.run)(graph, &key)?)
     }
 
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>> {

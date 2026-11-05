@@ -9,7 +9,7 @@ mod error;
 mod facts;
 mod fix;
 mod generated;
-mod queries;
+mod graph;
 mod tester;
 mod timings;
 

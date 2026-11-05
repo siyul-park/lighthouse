@@ -3,7 +3,7 @@
 use std::sync::{Arc, atomic::Ordering};
 
 use crate::{
-    Db, Durability, Error,
+    Durability, Error, Graph,
     frame::Frame,
     node::{Cause, Dep, Hash, Locked, Node, NodeId, Slot},
     query::{Kind, hash},
@@ -18,7 +18,7 @@ struct Snapshot {
     deps: Arc<[Dep]>,
 }
 
-impl Db {
+impl Graph {
     /// Runs with the claim held, `self` being the handle of the frame.
     pub(crate) fn settle(
         &self,
@@ -54,6 +54,10 @@ impl Db {
             let moved = match pulled {
                 // An input that was unset when read and still is.
                 Some(pulled) if pulled.missing && dep.hash == [0; 32] => None,
+                // Read as unset, set since: whatever it is set to is news.
+                Some(pulled) if !pulled.missing && dep.hash == [0; 32] => {
+                    Some(Cause::DepMoved(dep.id.clone()))
+                }
                 Some(pulled) if !pulled.missing => (pulled.changed_at > snapshot.verified_at)
                     .then(|| Cause::DepMoved(dep.id.clone())),
                 _ => Some(Cause::UnknownDep(dep.id.clone())),

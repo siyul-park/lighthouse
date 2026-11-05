@@ -1,4 +1,4 @@
-//! Fan-out inside a query: [`Db::par_map`].
+//! Fan-out inside a query: [`Graph::par_map`].
 //!
 //! # Why the fan-out drains itself and waits do not help
 //!
@@ -33,7 +33,7 @@ use std::{
     thread::Result as Joined,
 };
 
-use crate::{Db, node::Locked};
+use crate::{Graph, node::Locked};
 
 struct Fan<I, R> {
     items: Vec<I>,
@@ -44,17 +44,17 @@ struct Fan<I, R> {
     run: Run<I, R>,
 }
 
-type Run<I, R> = Box<dyn Fn(&Db, &I) -> R + Send + Sync>;
+type Run<I, R> = Box<dyn Fn(&Graph, &I) -> R + Send + Sync>;
 
 impl<I, R> Fan<I, R> {
     /// Runs items until none is left to take.
-    fn drain(&self, db: &Db) {
+    fn drain(&self, graph: &Graph) {
         loop {
             let at = self.next.fetch_add(1, Ordering::AcqRel);
             let Some(item) = self.items.get(at) else {
                 return;
             };
-            let result = catch_unwind(AssertUnwindSafe(|| (self.run)(db, item)));
+            let result = catch_unwind(AssertUnwindSafe(|| (self.run)(graph, item)));
             self.results.locked()[at] = Some(result);
             let mut left = self.left.locked();
             *left -= 1;
@@ -75,19 +75,11 @@ impl<I, R> Fan<I, R> {
     }
 }
 
-/// Runs `run` on every item, on the calling thread and on the threads of
-/// the current `rayon` pool that are free, and returns the results in
-/// the order of the items. What `run` reads through the handle it is
-/// given is read by the query that called `par_map`.
-///
-/// A claimed node that an item waits for is run by its owner, and a cycle
-/// that runs through items is an [`Error::Cycle`](crate::Error::Cycle)
-/// like any other. See the module docs for why this is the way to fan
-/// out. A panic in `run` is raised again here.
-pub fn par_map<I, R>(
-    db: &Db,
+/// The body of [`Graph::par_map`]: see there.
+pub(crate) fn map<I, R>(
+    graph: &Graph,
     items: Vec<I>,
-    run: impl Fn(&Db, &I) -> R + Send + Sync + 'static,
+    run: impl Fn(&Graph, &I) -> R + Send + Sync + 'static,
 ) -> Vec<R>
 where
     I: Send + Sync + 'static,
@@ -104,16 +96,16 @@ where
     });
     let helpers = count.saturating_sub(1).min(rayon::current_num_threads());
     for _ in 0..helpers {
-        let (fan, db) = (
+        let (fan, helper) = (
             fan.clone(),
-            Db {
-                shared: db.shared.clone(),
-                frame: db.frame.clone(),
+            Graph {
+                shared: graph.shared.clone(),
+                frame: graph.frame.clone(),
             },
         );
-        rayon::spawn(move || fan.drain(&db));
+        rayon::spawn(move || fan.drain(&helper));
     }
-    fan.drain(db);
+    fan.drain(graph);
     fan.wait();
     let results = std::mem::take(&mut *fan.results.locked());
     results

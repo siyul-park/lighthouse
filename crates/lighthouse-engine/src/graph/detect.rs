@@ -1,7 +1,7 @@
 //! The detect stage: walk, set the inputs, pull what the run needs.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     path::{Path, PathBuf},
     sync::PoisonError,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -9,12 +9,9 @@ use std::{
 
 use lighthouse_spec::Listing;
 
-use lighthouse_graph::{set_state, state};
-
 use super::{
-    Content, Walked,
-    inputs::set_overlays,
-    key,
+    Content,
+    inputs::{Reading, set_overlays, set_root, set_stats},
     pull::{Pulled, pull},
 };
 use crate::{
@@ -22,9 +19,6 @@ use crate::{
     engine::{Engine, in_pool},
     timings::Detect,
 };
-
-/// Where the last walk is kept in the graph's store.
-pub(super) const WALK: &str = "walk";
 
 /// What detect found: the listing, the content of the files `wanted`, and
 /// where the time went.
@@ -44,38 +38,47 @@ impl Engine {
         wanted: impl Fn(&Path) -> bool + Sync,
     ) -> Result<Detected, Error> {
         let mut guard = self.graph.lock().unwrap_or_else(PoisonError::into_inner);
-        let graph = guard.get_or_insert_with(|| self.open_graph());
-        let mut notices: Vec<String> = graph.notice.take().into_iter().collect();
-        let db = &mut graph.db;
-        db.take_executed();
-
-        let state: Walked = state(db, WALK)?
-            .and_then(|bytes| postcard::from_bytes(&bytes).ok())
-            .unwrap_or_default();
+        let opened = guard.get_or_insert_with(|| self.open_graph());
+        let mut notices: Vec<String> = opened.notice.take().into_iter().collect();
         let started = now_ns();
-        let walks = state.walks + 1;
-        let walk = self.files.walk(&state.dirs, state.started);
+        opened.graph.take_executed();
 
-        let salts = self.set_inputs(db, &state, &walk)?;
-        set_overlays(db, &state.overlaid, overlays)?;
-        let overlaid: BTreeSet<String> = overlays.keys().map(|p| key(p)).collect();
+        set_root(&mut opened.graph, &self.ws.root, &self.ws.ignores)?;
+        opened.overlaid = set_overlays(&mut opened.graph, &opened.overlaid, overlays)?;
+        let mut reading = Reading {
+            graph: &mut opened.graph,
+            root: self.ws.root.clone(),
+            started,
+            dirs: Default::default(),
+            texts: Default::default(),
+        };
+        let walk = self.files.walk(&mut reading);
+        let seen = (reading.dirs, reading.texts);
+        opened.statted = set_stats(
+            &mut opened.graph,
+            started,
+            &opened.statted,
+            seen,
+            &walk.stats,
+        )?;
+
         let Pulled {
             files,
-            root: root_hash,
+            tree,
             contents,
-        } = in_pool(|| pull(db, &wanted))?;
+        } = in_pool(|| pull(&opened.graph, &wanted))?;
 
-        let db = &*db;
-        let executed = db.take_executed();
-        let read = executed
-            .iter()
-            .filter(|label| label.starts_with("content("))
+        let executed = opened.graph.take_executed();
+        let ran = |kind: &'static str| executed.iter().filter(move |label| label.starts_with(kind));
+        let read = ran("content(")
             .filter(|label| {
-                !overlaid
+                !opened
+                    .overlaid
                     .iter()
                     .any(|p| **label == format!("content({p:?})"))
             })
             .count();
+        let entries = ran("entries(").count();
         let mut listing = walk.listing;
         debug_assert_eq!(
             listing.files,
@@ -83,24 +86,15 @@ impl Engine {
         );
         listing.files = files.iter().map(PathBuf::from).collect();
 
-        let walked = Walked {
-            started: Some(started),
-            walks,
-            salts,
-            dirs: walk.dirs,
-            overlaid: overlaid.into_iter().collect(),
-        };
         let committing = Instant::now();
-        let bytes = postcard::to_stdvec(&walked).map_err(|e| Error::Fix(e.to_string()))?;
-        set_state(&mut graph.db, WALK, bytes);
-        if let Err(e) = graph.db.commit() {
+        if let Err(e) = opened.graph.commit() {
             notices.push(format!("the graph was not saved: {e}"));
         }
         let timing = Detect {
             stat: walk.stats.len(),
             read,
-            relisted: walk.relisted,
-            root: root_hash.iter().map(|b| format!("{b:02x}")).collect(),
+            entries,
+            tree: tree.iter().map(|b| format!("{b:02x}")).collect(),
             commit: committing.elapsed(),
         };
         Ok(Detected {

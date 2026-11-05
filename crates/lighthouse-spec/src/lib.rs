@@ -65,7 +65,7 @@ pub use project::{
 };
 pub use scope::{Scope, Subject};
 pub(crate) use sources::SourceMapSpec;
-pub use walk::{Dir, Dirs, Kind, Listed, RACY_NS, Raw, Stat, Walked};
+pub use walk::{Disk, Entries, Kind, RACY_NS, Raw, Source, Stat, Walked, read_entries};
 
 /// The JSON Schema of every kind this crate defines.
 pub fn descriptors() -> Vec<Schema> {

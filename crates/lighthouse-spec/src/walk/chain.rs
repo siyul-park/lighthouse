@@ -12,7 +12,7 @@ use ignore::{
     gitignore::{Gitignore, GitignoreBuilder},
 };
 
-use super::Raw;
+use super::{Raw, Source};
 
 /// The ignore files of one directory.
 pub(super) struct Level {
@@ -21,14 +21,31 @@ pub(super) struct Level {
 }
 
 impl Level {
-    /// The ignore files of the directory at `abs` that holds `entries`; what
-    /// cannot be read or parsed is pushed to `errors`.
-    pub(super) fn of(abs: &Path, entries: &[Raw], errors: &mut Vec<String>) -> Self {
+    /// The ignore files of the directory at `rel` (`abs` on disk) that holds
+    /// `entries`: the text of `.gitignore` comes from `source`, the
+    /// `info/exclude` of a repository from disk. What cannot be parsed is
+    /// pushed to `errors`.
+    pub(super) fn of(
+        rel: &Path,
+        abs: &Path,
+        entries: &[Raw],
+        source: &mut impl Source,
+        errors: &mut Vec<String>,
+    ) -> Self {
         let has = |name: &str| entries.iter().any(|raw| raw.name == name);
-        let mut compile = |file: &Path| {
+        let mut compile = |file: &Path, text: Option<String>| {
             let mut builder = GitignoreBuilder::new(abs);
-            if file.exists() {
-                errors.extend(builder.add(file).map(|e| e.to_string()));
+            if let Some(text) = text {
+                for (i, line) in text.lines().enumerate() {
+                    let line = if i == 0 {
+                        line.trim_start_matches('\u{feff}')
+                    } else {
+                        line
+                    };
+                    if let Err(e) = builder.add_line(Some(file.to_owned()), line) {
+                        errors.push(e.to_string());
+                    }
+                }
             }
             builder.build().unwrap_or_else(|e| {
                 errors.push(e.to_string());
@@ -36,12 +53,17 @@ impl Level {
             })
         };
         let gitignore = if has(".gitignore") {
-            compile(&abs.join(".gitignore"))
+            let at = rel.join(".gitignore");
+            compile(&abs.join(".gitignore"), source.text(&at))
         } else {
             Gitignore::empty()
         };
         let exclude = match has(".git").then(|| git_dir(&abs.join(".git"))).flatten() {
-            Some(dir) => compile(&dir.join("info/exclude")),
+            Some(dir) => {
+                let file = dir.join("info/exclude");
+                let text = fs::read_to_string(&file).ok();
+                compile(&file, text)
+            }
             None => Gitignore::empty(),
         };
         Self { gitignore, exclude }

@@ -5,10 +5,7 @@
 //! the project's, but decisions skip it. A provider's own marker (Go's `// Code
 //! generated ... DO NOT EDIT.`, `@generated`) arrives with its fragment.
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobBuilder, GlobMatcher};
 
@@ -43,26 +40,24 @@ pub struct Attributes {
 }
 
 impl Attributes {
-    /// The attributes of the project at `root`, read from the files at the
-    /// project-relative paths `files` (each a `.gitattributes`), and what the
-    /// user should know about them. A file that cannot be read and a pattern
-    /// that is not a glob are notices: the attribute is not applied.
-    pub fn new(root: &Path, files: &[PathBuf]) -> (Self, Vec<String>) {
-        let mut files: Vec<&PathBuf> = files
-            .iter()
-            .filter(|f| f.file_name().is_some_and(|n| n == ATTRIBUTES_FILE))
-            .collect();
-        files.sort_by_key(|f| (f.components().count(), (*f).clone()));
+    /// Whether the project-relative `file` is a `.gitattributes`.
+    pub fn is_file(file: &Path) -> bool {
+        file.file_name().is_some_and(|name| name == ATTRIBUTES_FILE)
+    }
+
+    /// The attributes of the `.gitattributes` files at the project-relative
+    /// paths, each with its text (`None` when it cannot be read), and what
+    /// the user should know about them. A file that cannot be read and a
+    /// pattern that is not a glob are notices: the attribute is not applied.
+    pub fn from_texts(mut files: Vec<(PathBuf, Option<String>)>) -> (Self, Vec<String>) {
+        files.sort_by_key(|(f, _)| (f.components().count(), f.clone()));
         let mut rules = Vec::new();
         let mut notices = Vec::new();
-        for file in files {
+        for (file, text) in files {
             let base = file.parent().unwrap_or(Path::new("")).to_owned();
-            let text = match fs::read_to_string(root.join(file)) {
-                Ok(text) => text,
-                Err(e) => {
-                    notices.push(format!("{}: not read, {e}", file.display()));
-                    continue;
-                }
+            let Some(text) = text else {
+                notices.push(format!("{}: not read", file.display()));
+                continue;
             };
             for line in text.lines() {
                 let mut parts = line.split_whitespace();

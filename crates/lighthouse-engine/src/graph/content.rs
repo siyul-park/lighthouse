@@ -2,13 +2,16 @@
 
 use std::{fs::File, io::Read, path::Path};
 
-use lighthouse_graph::{Db, Error, try_input};
+use lighthouse_graph::{Error, Graph};
 use lighthouse_protocol::hash;
 use serde::{Deserialize, Serialize};
 
 use super::{Hash, OVERLAY, ROOT, STAT};
 
 const CHUNK: usize = 256 << 10;
+
+/// The files the walk reads the text of through the graph.
+const IGNORE_FILES: [&str; 2] = [".gitignore", ".gitattributes"];
 
 /// The identity of a file's bytes: BLAKE3 for the graph, SHA-256 (hex) for the
 /// hash the providers are given, which the host's own checks compare with the
@@ -18,6 +21,8 @@ pub(crate) struct Content {
     pub blake3: Hash,
     pub sha256: String,
     pub readable: Readable,
+    /// The text of an ignore file, which the walk parses, or of an overlay.
+    pub text: Option<String>,
 }
 
 impl Content {
@@ -27,6 +32,7 @@ impl Content {
             blake3: blake3::hash(text.as_bytes()).into(),
             sha256: hash::sha256(text),
             readable: Readable::Text,
+            text: Some(text.to_owned()),
         }
     }
 
@@ -35,6 +41,7 @@ impl Content {
             blake3: blake3::hash(why.as_bytes()).into(),
             sha256: String::new(),
             readable,
+            text: None,
         }
     }
 }
@@ -48,19 +55,26 @@ pub(crate) enum Readable {
     Missing,
 }
 
-pub(super) fn content(db: &Db, path: &String) -> Result<Content, Error> {
-    if let Some(overlaid) = overlay(db, path)? {
+pub(super) fn content(graph: &Graph, path: &String) -> Result<Content, Error> {
+    if let Some(overlaid) = overlay(graph, path)? {
         return Ok(overlaid);
     }
-    let (_stat, _salt) = *db.input(&STAT, path)?;
-    let root = db.input(&ROOT, &())?;
-    Ok(read(&Path::new(root.as_str()).join(path)))
+    graph.input(&STAT, path)?;
+    let root = graph.input(&ROOT, &())?.unwrap_or_default();
+    let file = Path::new(root.as_str()).join(path);
+    let mut content = read(&file);
+    if content.readable == Readable::Text && IGNORE_FILES.iter().any(|name| file.ends_with(name)) {
+        content.text = std::fs::read_to_string(&file).ok();
+    }
+    Ok(content)
 }
 
 /// The overlay of a path, if one is set: an input that is never set for most
 /// paths reads as none, and the read is recorded all the same.
-fn overlay(db: &Db, path: &String) -> Result<Option<Content>, Error> {
-    Ok(try_input(db, &OVERLAY, path)?.and_then(|content| content.as_ref().clone()))
+fn overlay(graph: &Graph, path: &String) -> Result<Option<Content>, Error> {
+    Ok(graph
+        .input(&OVERLAY, path)?
+        .and_then(|content| content.as_ref().clone()))
 }
 
 /// Reads the file once, in chunks, for both hashes and for whether it is
@@ -105,5 +119,6 @@ fn read(path: &Path) -> Content {
         } else {
             Readable::NotUtf8
         },
+        text: None,
     }
 }

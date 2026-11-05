@@ -285,7 +285,7 @@ pub struct Engine {
     /// The result cache; `None` runs every rule every time.
     pub(crate) cache: Option<CacheSettings>,
     /// The graph of what is known of the files, opened by the first run.
-    pub(crate) graph: std::sync::Mutex<Option<crate::queries::Graph>>,
+    pub(crate) graph: std::sync::Mutex<Option<crate::graph::Opened>>,
     /// What the run may do with models.
     models: ModelOptions,
 }

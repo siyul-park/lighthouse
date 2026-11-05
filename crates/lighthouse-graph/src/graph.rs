@@ -7,9 +7,9 @@ use std::{
 };
 
 use crate::{
-    Durability, Error, Explanation, Input, Key, Query, Revision, Value,
+    Durability, Error, Explanation, Input, Key, Query, Value,
     dirty::Dirty,
-    explain,
+    explain, fan,
     frame::Frame,
     node::{Locked, NodeId},
     query::{Kind, encode, hash},
@@ -18,42 +18,81 @@ use crate::{
 };
 
 /// The size, in bytes of stored values, past which the least recently used
-/// are dropped at [`Db::commit`]: 256 MB.
+/// are dropped at [`Graph::commit`]: 256 MB.
 pub const DEFAULT_LIMIT: u64 = 256 << 20;
+
+/// Revisions a row is kept without being verified: about a million, which is
+/// some ten cold runs over a hundred thousand files.
+pub const DEFAULT_RETAIN: u64 = 1 << 20;
 
 /// Verify mode samples one green node in this many when on by default.
 const VERIFY_PERIOD: u64 = 64;
 
-const VERSION: Input<String, String> = Input::new("version");
+/// The versions given in [`Options`], as `Static` inputs by name: a query that
+/// reads one is run again when it changes.
+pub static VERSION: Input<String, String> = Input::new("version");
 
-/// The handle that queries read through. The one from [`Db::open`] is the
+/// How the graph is opened.
+#[derive(Debug, Clone)]
+pub struct Options {
+    /// The binary's, each plugin's, ...: set as the `VERSION` inputs. One that
+    /// changed since the last open invalidates exactly what read it.
+    pub versions: Versions,
+    /// The most bytes of stored values kept at a [`Graph::commit`].
+    pub limit: u64,
+    /// Verify mode: run one green node in this many again and fail with
+    /// [`Error::Impure`] if its value differs, `0` for none. On by default in
+    /// debug builds.
+    ///
+    /// It catches a query that reads outside the graph (a file, the clock,
+    /// the environment, a global) whenever that read changed since the node
+    /// was computed and the node is sampled. It cannot catch an outside read
+    /// that did not change, nor one that is missed on a node that is never
+    /// sampled. That values are produced only through the `Graph` is held by the
+    /// types: a query gets a `Graph` and nothing else of the graph.
+    pub verify: u64,
+    /// How many revisions a row that nothing set, validated or ran is kept:
+    /// past that a commit deletes it, so that the rows of files that are gone
+    /// go too. A revision starts with each input that changes.
+    pub retain: u64,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            versions: Versions::new(),
+            limit: DEFAULT_LIMIT,
+            verify: if cfg!(debug_assertions) {
+                VERIFY_PERIOD
+            } else {
+                0
+            },
+            retain: DEFAULT_RETAIN,
+        }
+    }
+}
+
+/// The handle that queries read through. The one from [`Graph::open`] is the
 /// owner: it sets inputs and commits. The one a query is given records what
 /// the query reads, and may be shared with threads that query spawns.
-pub struct Db {
+pub struct Graph {
     pub(crate) shared: Arc<Shared>,
     pub(crate) frame: Option<Arc<Frame>>,
 }
 
-impl Db {
-    /// Opens `graph.db` at `path`, creating it. Each version (the binary,
-    /// each plugin, ...) is a `Static` input: one that changed since the last
-    /// open invalidates exactly the queries that read it.
-    pub fn open(path: &Path, versions: &Versions) -> Result<Self, Error> {
-        Self::with_store(Store::open(path)?, versions)
+impl Graph {
+    /// Opens `graph.db` at `path`, creating it.
+    pub fn open(path: &Path, options: Options) -> Result<Self, Error> {
+        Self::with_store(Store::open(path)?, options)
     }
 
     /// A graph that is never written to disk (`--no-cache`).
-    pub fn in_memory(versions: &Versions) -> Result<Self, Error> {
-        Self::with_store(Store::in_memory()?, versions)
+    pub fn in_memory(options: Options) -> Result<Self, Error> {
+        Self::with_store(Store::in_memory()?, options)
     }
 
-    fn with_store(store: Store, versions: &Versions) -> Result<Self, Error> {
+    fn with_store(store: Store, options: Options) -> Result<Self, Error> {
         let meta = store.meta()?;
-        let verify = if cfg!(debug_assertions) {
-            VERIFY_PERIOD
-        } else {
-            0
-        };
         let shared = Shared {
             revision: AtomicU64::new(meta.revision),
             changed: meta.changed.map(AtomicU64::new),
@@ -63,36 +102,21 @@ impl Db {
             dirty: Dirty::default(),
             executed: Mutex::default(),
             waits: Mutex::default(),
-            verify_period: AtomicU64::new(verify),
+            verify_period: AtomicU64::new(options.verify),
             verify_count: AtomicU64::new(0),
-            limit: AtomicU64::new(DEFAULT_LIMIT),
+            limit: AtomicU64::new(options.limit),
             versions: Mutex::default(),
-            states: Mutex::default(),
+            retain: options.retain,
         };
-        let mut db = Self {
+        let mut graph = Self {
             shared: Arc::new(shared),
             frame: None,
         };
-        db.set_versions(versions)?;
-        Ok(db)
-    }
-
-    /// Makes the kind known so that stored nodes of it can be validated and
-    /// run. Pulling or setting it does this too; registering up front is
-    /// what lets a node whose dependencies are not pulled yet, in a process
-    /// that just opened the store, be validated without running.
-    pub fn register_query<K: Key, V: Value>(&self, query: &'static Query<K, V>) {
-        self.shared.register(query);
-    }
-
-    /// Makes an input kind known; see [`Db::register_query`].
-    pub fn register_input<K: Key, V: Value>(&self, input: &'static Input<K, V>) {
-        self.shared.register(input);
-    }
-
-    /// The revision the inputs are at.
-    pub fn revision(&self) -> Revision {
-        Revision(self.shared.revision.load(Ordering::Acquire))
+        for (name, version) in options.versions {
+            graph.set_input(&VERSION, &name, version.clone(), Durability::Static)?;
+            graph.shared.versions.locked().insert(name, version);
+        }
+        Ok(graph)
     }
 
     /// Sets an input. A new revision starts only when the value's hash or the
@@ -125,17 +149,39 @@ impl Db {
             let revision = self.shared.start_revision(reach);
             node.become_input(new_hash, durability, revision);
             self.shared.dirty.mark(&slot, &mut node);
+        } else {
+            let revision = self.shared.revision.load(Ordering::Acquire);
+            if revision.saturating_sub(node.verified_at) > self.shared.retain / 2 {
+                node.verified_at = revision;
+                self.shared.dirty.mark(&slot, &mut node);
+            }
         }
         Ok(())
     }
 
-    /// The value of an input, recorded as read by the running query.
+    /// The value of an input, or `None` when it is not set in this process.
+    /// The read is recorded either way: a query that found it unset runs
+    /// again when it is set, so an unset input counts as `Volatile`.
     pub fn input<K: Key, V: Value>(
         &self,
         input: &'static Input<K, V>,
         key: &K,
-    ) -> Result<Arc<V>, Error> {
-        self.read(input, key)
+    ) -> Result<Option<Arc<V>>, Error> {
+        let registered = self.shared.register(input);
+        let id = NodeId {
+            kind: registered.name,
+            key: encode(key)?.into(),
+        };
+        let pulled = self.pull(&id, input, true)?;
+        if let Some(frame) = &self.frame {
+            let durability = if pulled.missing {
+                Durability::Volatile
+            } else {
+                pulled.durability
+            };
+            frame.record(&id, pulled.hash, durability);
+        }
+        Ok(pulled.value.and_then(|value| value.downcast::<V>().ok()))
     }
 
     /// The value of a query for a key: from memory, from the store if it is
@@ -146,30 +192,6 @@ impl Db {
         key: &K,
     ) -> Result<Arc<V>, Error> {
         self.read(query, key)
-    }
-
-    /// The version set for `name` at open, as read by the running query.
-    pub fn version(&self, name: &str) -> Result<Arc<String>, Error> {
-        self.read(&VERSION, &name.to_owned())
-    }
-
-    /// The most bytes of stored values kept at the next [`Db::commit`].
-    pub fn set_limit(&mut self, bytes: u64) {
-        self.shared.limit.store(bytes, Ordering::Release);
-    }
-
-    /// Verify mode: run one green node in `period` again and fail with
-    /// [`Error::Impure`] if its value differs, `0` for none. On by default in
-    /// debug builds.
-    ///
-    /// It catches a query that reads outside the graph (a file, the clock,
-    /// the environment, a global) whenever that read changed since the node
-    /// was computed and the node is sampled. It cannot catch an outside read
-    /// that did not change, nor one that is missed on a node that is never
-    /// sampled. That values are produced only through the `Db` is held by the
-    /// types: a query gets a `Db` and nothing else of the graph.
-    pub fn set_verify(&mut self, period: u64) {
-        self.shared.verify_period.store(period, Ordering::Release);
     }
 
     /// Drops the stored value of a node, memory and disk, keeping its hash,
@@ -219,28 +241,44 @@ impl Db {
         ids.iter().map(|id| self.shared.label(id)).collect()
     }
 
-    /// Writes what changed since the last commit in one transaction, and
-    /// prunes values over the limit. Call it with no pull running.
+    /// Runs `run` on every item, on the calling thread and on the threads of
+    /// the current `rayon` pool that are free, and returns the results in
+    /// the order of the items. What `run` reads through the handle it is
+    /// given is read by the query that called `par_map`.
+    ///
+    /// A claimed node that an item waits for is run by its owner, and a cycle
+    /// that runs through items is an [`Error::Cycle`](crate::Error::Cycle)
+    /// like any other. See the module docs for why this is the way to fan
+    /// out. A panic in `run` is raised again here.
+    pub fn par_map<I, R>(
+        &self,
+        items: Vec<I>,
+        run: impl Fn(&Graph, &I) -> R + Send + Sync + 'static,
+    ) -> Vec<R>
+    where
+        I: Send + Sync + 'static,
+        R: Send + 'static,
+    {
+        fan::map(self, items, run)
+    }
+
+    /// Writes what changed since the last commit in one transaction, deletes
+    /// the rows nothing verified for [`Options::retain`] revisions and prunes
+    /// values over the limit. Call it with no pull running.
     pub fn commit(&mut self) -> Result<(), Error> {
         let slots = self.shared.dirty.take();
-        let writes: Vec<Write> = slots.iter().map(write_of).collect();
+        let revision = self.shared.revision.load(Ordering::Acquire);
+        let writes: Vec<Write> = slots.iter().map(|slot| write_of(slot, revision)).collect();
         let meta = self.shared.meta()?;
         let limit = self.shared.limit.load(Ordering::Acquire);
-        let states: Vec<(String, Vec<u8>)> = self
-            .shared
-            .states
-            .locked()
-            .iter()
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let pruned = match self.shared.store.commit(&writes, &states, &meta, limit) {
+        let forget = revision.saturating_sub(self.shared.retain);
+        let pruned = match self.shared.store.commit(&writes, &meta, limit, forget) {
             Ok(pruned) => pruned,
             Err(err) => {
                 self.shared.dirty.restore(slots);
                 return Err(err);
             }
         };
-        self.shared.states.locked().clear();
         for slot in &slots {
             settle_clean(slot);
         }
@@ -264,31 +302,9 @@ impl Db {
         }
         let value = pulled
             .value
-            .ok_or_else(|| Error::MissingInput(self.shared.label(&id)))?;
+            .ok_or_else(|| Error::Encode(format!("{} has no value", self.shared.label(&id))))?;
         value
             .downcast::<V>()
             .map_err(|_| Error::Encode(format!("{} holds another type", id.kind)))
-    }
-
-    /// Sets one version after open: the same as having opened with it.
-    pub fn set_version(&mut self, name: &str, version: &str) -> Result<(), Error> {
-        self.set_input(
-            &VERSION,
-            &name.to_owned(),
-            version.to_owned(),
-            Durability::Static,
-        )?;
-        self.shared
-            .versions
-            .locked()
-            .insert(name.to_owned(), version.to_owned());
-        Ok(())
-    }
-
-    fn set_versions(&mut self, versions: &Versions) -> Result<(), Error> {
-        for (name, version) in versions {
-            self.set_version(name, version)?;
-        }
-        Ok(())
     }
 }

@@ -46,14 +46,14 @@ pub struct Timings {
 }
 
 /// What detecting the files cost: how many were `lstat`ed, how many read for
-/// their content, how many directories listed again, the Merkle hash of the
+/// their content, how many directories read again, the Merkle hash of the
 /// root and the time the graph took to commit.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Detect {
     pub stat: usize,
     pub read: usize,
-    pub relisted: usize,
-    pub root: String,
+    pub entries: usize,
+    pub tree: String,
     pub commit: Duration,
 }
 
@@ -63,11 +63,11 @@ impl Timings {
     pub fn lines(&self, report: Duration, total: Duration) -> Vec<String> {
         let mut out = vec![line("setup", self.setup), line("read", self.read)];
         out.push(format!(
-            "files: {} stat, {} read, {} dir(s) listed, root {}, graph commit {:.1}ms",
+            "files: {} stat, {} read, {} entries, tree {}, commit {:.1}ms",
             self.files.stat,
             self.files.read,
-            self.files.relisted,
-            self.files.root.chars().take(8).collect::<String>(),
+            self.files.entries,
+            self.files.tree.chars().take(8).collect::<String>(),
             self.files.commit.as_secs_f64() * 1000.0
         ));
         for (language, spent) in &self.index {

@@ -9,7 +9,7 @@ use lighthouse_plugin::RuleManifest;
 use rayon::ThreadPool;
 
 use super::{regions::Views, *};
-use crate::queries::{Content, Detected, Readable};
+use crate::graph::{Content, Detected, Readable};
 use lighthouse_spec::Attributes;
 
 /// Why a file the languages claim is not an input: a notice for binary data a

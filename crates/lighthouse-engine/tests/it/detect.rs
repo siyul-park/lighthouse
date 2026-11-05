@@ -196,13 +196,13 @@ fn a_run_with_nothing_changed_reads_no_file_and_has_the_same_root_hash() {
 
     assert_eq!(second.timings.files.read, 3, "{:?}", second.timings.files);
     assert_eq!(third.timings.files.read, 0, "{:?}", third.timings.files);
-    assert_eq!(third.timings.files.relisted, 0);
-    assert_eq!(first.timings.files.root, third.timings.files.root);
+    assert_eq!(third.timings.files.entries, 0);
+    assert_eq!(first.timings.files.tree, third.timings.files.tree);
 
     write(&root, "a/y.txt", "changed");
     let fourth = run_with(&root, Some(cache.path()), "");
     assert_eq!(fourth.timings.files.read, 1);
-    assert_ne!(fourth.timings.files.root, third.timings.files.root);
+    assert_ne!(fourth.timings.files.tree, third.timings.files.tree);
 }
 
 #[test]

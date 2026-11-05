@@ -236,40 +236,39 @@ fn check_executed(
 pub fn run(seed: u64, steps: usize) {
     let mut rng = Rng::new(seed);
     let mut sim = Sim::new();
-    let mut db = open(None, &sim.project);
-    db.set_verify(0);
-    apply(&mut db, &sim.project, &sim.known);
-    pull(&db);
-    pull_par(&db);
-    db.take_executed();
+    let mut graph = open(None, &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
+    pull(&graph);
+    pull_par(&graph);
+    graph.take_executed();
     let mut tainted = BTreeSet::new();
     for step in 0..steps {
         let before = sim.project.clone();
         let edit = sim.step(&mut rng);
         if matches!(edit, Edit::Evict) {
-            evict_some(&mut db, &sim, &mut rng);
+            evict_some(&mut graph, &sim, &mut rng);
             tainted.extend(sim.project.files.keys().cloned());
         }
-        apply(&mut db, &sim.project, &sim.known);
-        let graph = pull(&db);
-        let fanned = pull_par(&db);
-        let ran = db.take_executed();
+        apply(&mut graph, &sim.project, &sim.known);
+        let report = pull(&graph);
+        let fanned = pull_par(&graph);
+        let ran = graph.take_executed();
         assert_eq!(
-            graph,
+            report,
             from_scratch(&sim.project, &sim.known),
             "seed {seed} step {step} after {edit:?}"
         );
-        assert_eq!(fanned, graph, "seed {seed} step {step}: fan-out report");
+        assert_eq!(fanned, report, "seed {seed} step {step}: fan-out report");
         check_executed(&sim, &before, &edit, &tainted, &ran);
     }
 }
 
-fn evict_some(db: &mut lighthouse_graph::Db, sim: &Sim, rng: &mut Rng) {
+fn evict_some(graph: &mut lighthouse_graph::Graph, sim: &Sim, rng: &mut Rng) {
     for path in sim.project.files.keys() {
         match rng.below(4) {
-            0 => db.evict(&PARSE, path).expect("evict"),
-            1 => db.evict(&FACTS, path).expect("evict"),
-            2 => db.evict(&DEPS, path).expect("evict"),
+            0 => graph.evict(&PARSE, path).expect("evict"),
+            1 => graph.evict(&FACTS, path).expect("evict"),
+            2 => graph.evict(&DEPS, path).expect("evict"),
             _ => {}
         }
     }
@@ -286,13 +285,12 @@ fn graph_equals_from_scratch_over_random_edits() {
 fn verify_mode_on_every_green_node_finds_no_impure_query() {
     let mut rng = Rng::new(7);
     let mut sim = Sim::new();
-    let mut db = open(None, &sim.project);
-    db.set_verify(1);
-    apply(&mut db, &sim.project, &sim.known);
-    pull(&db);
+    let mut graph = open(None, &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
+    pull(&graph);
     for _ in 0..80 {
         sim.step(&mut rng);
-        apply(&mut db, &sim.project, &sim.known);
-        assert_eq!(pull(&db), from_scratch(&sim.project, &sim.known));
+        apply(&mut graph, &sim.project, &sim.known);
+        assert_eq!(pull(&graph), from_scratch(&sim.project, &sim.known));
     }
 }

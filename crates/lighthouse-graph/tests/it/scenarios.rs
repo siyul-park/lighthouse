@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_graph::{Durability, Error, Input, Query, Reason, try_input};
+use lighthouse_graph::{Durability, Error, Graph, Input, Options, Query, Reason, Revision};
 
 use crate::toy::*;
 
@@ -23,49 +23,46 @@ fn known(project: &Project) -> Vec<String> {
     project.files.keys().cloned().collect()
 }
 
-fn executed(db: &lighthouse_graph::Db) -> BTreeSet<String> {
-    db.take_executed().into_iter().collect()
+fn executed(graph: &Graph) -> BTreeSet<String> {
+    graph.take_executed().into_iter().collect()
 }
 
 fn set(of: &[&str]) -> BTreeSet<String> {
     of.iter().map(|label| (*label).to_owned()).collect()
 }
 
-fn graph(project: &Project) -> lighthouse_graph::Db {
-    let mut db = open(None, project);
-    db.set_verify(0);
-    apply(&mut db, project, &known(project));
-    pull(&db);
-    db.take_executed();
-    db
+fn graph(project: &Project) -> Graph {
+    let mut graph = open(None, project);
+    apply(&mut graph, project, &known(project));
+    pull(&graph);
+    graph.take_executed();
+    graph
 }
 
 #[test]
-fn setting_an_equal_input_moves_no_revision() {
+fn setting_an_equal_input_runs_nothing() {
     let project = project();
-    let mut db = graph(&project);
-    let before = db.revision();
+    let mut graph = graph(&project);
 
-    apply(&mut db, &project, &known(&project));
+    apply(&mut graph, &project, &known(&project));
 
-    assert_eq!(db.revision(), before);
-    pull(&db);
-    assert!(db.take_executed().is_empty());
+    pull(&graph);
+    assert!(graph.take_executed().is_empty());
 }
 
 #[test]
 fn a_body_edit_runs_that_file_and_backdates_its_api() {
     let mut project = project();
-    let mut db = graph(&project);
+    let mut graph = graph(&project);
     project
         .files
         .insert("b".into(), "api=B1;body=b1;uses=c".into());
 
-    apply(&mut db, &project, &known(&project));
-    pull(&db);
+    apply(&mut graph, &project, &known(&project));
+    pull(&graph);
 
     assert_eq!(
-        executed(&db),
+        executed(&graph),
         set(&[
             "parse(\"b\")",
             "api(\"b\")",
@@ -79,15 +76,15 @@ fn a_body_edit_runs_that_file_and_backdates_its_api() {
 #[test]
 fn an_api_edit_reaches_the_files_that_use_it_and_no_further() {
     let mut project = project();
-    let mut db = graph(&project);
+    let mut graph = graph(&project);
     project
         .files
         .insert("b".into(), "api=B2;body=b0;uses=c".into());
 
-    apply(&mut db, &project, &known(&project));
-    pull(&db);
+    apply(&mut graph, &project, &known(&project));
+    pull(&graph);
 
-    let ran = executed(&db);
+    let ran = executed(&graph);
     assert!(ran.contains("deps(\"a\")") && ran.contains("facts(\"a\")"));
     assert!(
         !ran.iter()
@@ -99,13 +96,13 @@ fn an_api_edit_reaches_the_files_that_use_it_and_no_further() {
 #[test]
 fn a_static_version_invalidates_exactly_its_readers() {
     let mut project = project();
-    let mut db = graph(&project);
+    let mut graph = graph(&project);
     project.versions.insert("facts".into(), "f2".into());
 
-    apply(&mut db, &project, &known(&project));
-    pull(&db);
+    apply(&mut graph, &project, &known(&project));
+    pull(&graph);
 
-    let ran = executed(&db);
+    let ran = executed(&graph);
     assert!(
         ran.iter()
             .all(|label| matches!(kind_of(label), "facts" | "report")),
@@ -120,16 +117,16 @@ fn a_static_version_invalidates_exactly_its_readers() {
 #[test]
 fn a_body_edit_of_an_unused_file_runs_only_that_file() {
     let mut project = project();
-    let mut db = graph(&project);
+    let mut graph = graph(&project);
     project
         .files
         .insert("d".into(), "api=D1;body=d1;uses=".into());
 
-    apply(&mut db, &project, &known(&project));
-    pull(&db);
+    apply(&mut graph, &project, &known(&project));
+    pull(&graph);
 
     assert_eq!(
-        executed(&db),
+        executed(&graph),
         set(&["parse(\"d\")", "uses(\"d\")", "facts(\"d\")", "report(())"])
     );
 }
@@ -137,31 +134,34 @@ fn a_body_edit_of_an_unused_file_runs_only_that_file() {
 #[test]
 fn an_evicted_node_is_run_again_only_when_pulled() {
     let project = project();
-    let mut db = graph(&project);
-    db.evict(&FACTS, &"c".to_owned()).expect("evict");
-    db.evict(&API, &"c".to_owned()).expect("evict");
+    let mut graph = graph(&project);
+    graph.evict(&FACTS, &"c".to_owned()).expect("evict");
+    graph.evict(&API, &"c".to_owned()).expect("evict");
 
-    pull(&db);
+    graph.query(&REPORT, &()).expect("report");
 
-    assert_eq!(executed(&db), set(&[]));
+    assert_eq!(executed(&graph), set(&[]));
 
-    db.evict(&REPORT, &()).expect("evict");
-    pull(&db);
+    graph.evict(&REPORT, &()).expect("evict");
+    graph.query(&REPORT, &()).expect("report");
 
-    assert_eq!(executed(&db), set(&["report(())", "facts(\"c\")"]));
+    assert_eq!(executed(&graph), set(&["report(())", "facts(\"c\")"]));
 }
 
 #[test]
 fn explain_walks_down_to_the_input() {
     let mut project = project();
-    let mut db = graph(&project);
+    let mut graph = graph(&project);
     project
         .files
         .insert("b".into(), "api=B2;body=b0;uses=c".into());
-    apply(&mut db, &project, &known(&project));
-    pull(&db);
+    apply(&mut graph, &project, &known(&project));
+    pull(&graph);
 
-    let why = db.explain(&REPORT, &()).expect("explain").expect("known");
+    let why = graph
+        .explain(&REPORT, &())
+        .expect("explain")
+        .expect("known");
 
     let nodes: Vec<&str> = why.0.iter().map(|step| step.node.as_str()).collect();
     assert_eq!(nodes.first(), Some(&"report(())"));
@@ -176,75 +176,82 @@ fn explain_walks_down_to_the_input() {
 fn verify_mode_reports_a_query_that_reads_outside_the_graph() {
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use lighthouse_graph::{Db, Query};
+    use lighthouse_graph::{Graph, Query};
 
     static OUTSIDE: AtomicU64 = AtomicU64::new(0);
-    static IMPURE: Query<(), u64> =
-        Query::new(
-            "impure",
-            |_: &Db, _: &()| Ok(OUTSIDE.load(Ordering::SeqCst)),
-        );
-    let mut db = Db::in_memory(&Default::default()).expect("open");
-    db.set_verify(1);
-    assert_eq!(*db.query(&IMPURE, &()).expect("first"), 0);
+    static IMPURE: Query<(), u64> = Query::new("impure", |_: &Graph, _: &()| {
+        Ok(OUTSIDE.load(Ordering::SeqCst))
+    });
+    let options = Options {
+        verify: 1,
+        ..Options::default()
+    };
+    let mut graph = Graph::in_memory(options).expect("open");
+    assert_eq!(*graph.query(&IMPURE, &()).expect("first"), 0);
     OUTSIDE.store(1, Ordering::SeqCst);
-    db.set_input(&FILES, &(), vec![], Durability::Volatile)
+    graph
+        .set_input(&FILES, &(), vec![], Durability::Volatile)
         .expect("set");
 
-    let pulled = db.query(&IMPURE, &());
+    let pulled = graph.query(&IMPURE, &());
 
     assert!(matches!(pulled, Err(Error::Impure(_))), "{pulled:?}");
 }
 
 static MAYBE: Input<u32, u32> = Input::new("maybe");
-static READS_MAYBE: Query<u32, u32> = Query::new("reads-maybe", |db, key| {
-    Ok(try_input(db, &MAYBE, key)?.map_or(0, |value| *value + 1))
+static READS_MAYBE: Query<u32, u32> = Query::new("reads-maybe", |graph, key| {
+    Ok(graph.input(&MAYBE, key)?.map_or(0, |value| *value + 1))
 });
+
+fn in_memory() -> Graph {
+    let options = Options {
+        verify: 0,
+        ..Options::default()
+    };
+    Graph::in_memory(options).expect("open")
+}
 
 #[test]
 fn a_query_that_found_an_input_unset_runs_again_when_it_is_set() {
-    let mut db = lighthouse_graph::Db::in_memory(&Default::default()).expect("open");
-    db.set_verify(0);
-    db.register_input(&MAYBE);
-    db.register_query(&READS_MAYBE);
-    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 0);
+    let mut graph = in_memory();
+    assert_eq!(*graph.query(&READS_MAYBE, &1).expect("pull"), 0);
 
-    db.set_input(&MAYBE, &1, 41, lighthouse_graph::Durability::Volatile)
+    graph
+        .set_input(&MAYBE, &1, 41, Durability::Volatile)
         .expect("set");
-    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 42);
+    assert_eq!(*graph.query(&READS_MAYBE, &1).expect("pull"), 42);
 
-    db.set_input(&MAYBE, &1, 41, lighthouse_graph::Durability::Volatile)
+    graph
+        .set_input(&MAYBE, &1, 41, Durability::Volatile)
         .expect("set");
-    db.take_executed();
-    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 42);
+    graph.take_executed();
+    assert_eq!(*graph.query(&READS_MAYBE, &1).expect("pull"), 42);
     assert!(
-        db.take_executed().is_empty(),
+        graph.take_executed().is_empty(),
         "an equal input moves nothing"
     );
 }
 
 #[test]
 fn a_query_that_found_an_input_unset_stays_green_while_it_is_unset() {
-    let mut db = lighthouse_graph::Db::in_memory(&Default::default()).expect("open");
-    db.set_verify(0);
-    db.register_input(&MAYBE);
-    db.register_input(&FILE);
-    db.register_query(&READS_MAYBE);
-    db.set_input(&FILE, &"other".to_owned(), None, Durability::Volatile)
+    let mut graph = in_memory();
+    graph
+        .set_input(&FILE, &"other".to_owned(), None, Durability::Volatile)
         .expect("set");
-    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 0);
-    db.take_executed();
+    assert_eq!(*graph.query(&READS_MAYBE, &1).expect("pull"), 0);
+    graph.take_executed();
 
-    db.set_input(
-        &FILE,
-        &"other".to_owned(),
-        Some("x".into()),
-        Durability::Volatile,
-    )
-    .expect("set");
+    graph
+        .set_input(
+            &FILE,
+            &"other".to_owned(),
+            Some("x".into()),
+            Durability::Volatile,
+        )
+        .expect("set");
 
-    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 0);
-    assert!(db.take_executed().is_empty(), "nothing it read moved");
+    assert_eq!(*graph.query(&READS_MAYBE, &1).expect("pull"), 0);
+    assert!(graph.take_executed().is_empty(), "nothing it read moved");
 }
 
 /// An explanation has a line for each step from the node to the input.
@@ -254,16 +261,16 @@ fn explanation() {
     project
         .files
         .insert("a".into(), "api=A1;body=B1;uses=".into());
-    let mut db = open(None, &project);
-    apply(&mut db, &project, &["a".to_owned()]);
-    pull(&db);
+    let mut graph = open(None, &project);
+    apply(&mut graph, &project, &["a".to_owned()]);
+    pull(&graph);
     project
         .files
         .insert("a".into(), "api=A1;body=B2;uses=".into());
-    apply(&mut db, &project, &["a".to_owned()]);
-    pull(&db);
+    apply(&mut graph, &project, &["a".to_owned()]);
+    pull(&graph);
 
-    let explanation = db
+    let explanation = graph
         .explain(&FACTS, &"a".to_owned())
         .expect("explain")
         .expect("it ran");
@@ -273,25 +280,8 @@ fn explanation() {
     assert!(lines.contains("file"), "{lines}");
 }
 
-/// A revision moves when an input changes and not when it is set again.
+/// A revision prints as `r` and its number.
 #[test]
 fn revision() {
-    let mut project = Project::new();
-    project
-        .files
-        .insert("a".into(), "api=A1;body=B1;uses=".into());
-    let mut db = open(None, &project);
-    apply(&mut db, &project, &["a".to_owned()]);
-    let first = db.revision();
-
-    apply(&mut db, &project, &["a".to_owned()]);
-    assert_eq!(db.revision(), first);
-
-    project.config = "c2".into();
-    apply(&mut db, &project, &["a".to_owned()]);
-    assert!(db.revision() > first);
-    assert_eq!(
-        format!("{}", db.revision()),
-        format!("r{}", db.revision().0)
-    );
+    assert_eq!(Revision(3).to_string(), "r3");
 }

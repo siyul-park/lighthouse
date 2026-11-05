@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    Db, Durability, Error,
+    Durability, Error, Graph,
     frame::{Frame, cycle},
     node::{Hash, Locked, Node, NodeId, Slot, State},
     query::Kind,
@@ -33,7 +33,7 @@ impl Drop for Claim<'_> {
     }
 }
 
-impl Db {
+impl Graph {
     /// Brings the node to the current revision and returns what it is. With
     /// `want_value` the value is loaded or computed too; a validation does
     /// not need it.
@@ -47,7 +47,7 @@ impl Db {
         loop {
             let mut node = slot.node.locked();
             self.shared.load(&mut node, id)?;
-            if let Some(pulled) = self.current(&slot, &mut node, id, kind, want_value)? {
+            if let Some(pulled) = self.current(&slot, &mut node, kind, want_value)? {
                 return Ok(pulled);
             }
             if let State::Running(owner) = &node.state {
@@ -66,15 +66,11 @@ impl Db {
         &self,
         slot: &Arc<Slot>,
         node: &mut Node,
-        id: &NodeId,
         kind: &dyn Kind,
         want_value: bool,
     ) -> Result<Option<Pulled>, Error> {
         if kind.is_input() {
-            if want_value && node.value.is_none() {
-                return Err(Error::MissingInput(self.shared.label(id)));
-            }
-            return Ok(Some(Pulled::of(node, want_value)));
+            return Ok(Some(Pulled::input(node, want_value)));
         }
         let revision = self.shared.revision.load(Ordering::Acquire);
         if !node.present || node.verified_at != revision || (want_value && node.value.is_none()) {
@@ -103,15 +99,15 @@ impl Db {
     }
 
     /// The handle of a query running in `frame`.
-    pub(crate) fn within(&self, frame: &Arc<Frame>) -> Db {
-        Db {
+    pub(crate) fn within(&self, frame: &Arc<Frame>) -> Graph {
+        Graph {
             shared: self.shared.clone(),
             frame: Some(frame.clone()),
         }
     }
 
     /// Waits for the claim on a node to be released, unless that would close
-    /// a cycle. The wait parks the thread: see [`Db::par_map`] for why that
+    /// a cycle. The wait parks the thread: see [`Graph::par_map`] for why that
     /// cannot starve the pool, and why helping with other work could.
     fn block(
         &self,
@@ -141,6 +137,17 @@ impl Db {
 }
 
 impl Pulled {
+    /// An input as this process has it: one that was not set here has no
+    /// value, whatever the store remembers of it, and reads as the zero hash.
+    fn input(node: &Node, want_value: bool) -> Self {
+        let mut pulled = Self::of(node, want_value);
+        if node.value.is_none() {
+            pulled.missing = true;
+            pulled.hash = [0; 32];
+        }
+        pulled
+    }
+
     fn of(node: &Node, want_value: bool) -> Self {
         Self {
             hash: node.hash,
