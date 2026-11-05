@@ -21,7 +21,6 @@ serde_norway.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 toml.workspace = true
-typed-arena.workspace = true
 
 [dev-dependencies]
 lighthouse-engine.workspace = true

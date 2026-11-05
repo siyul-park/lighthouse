@@ -5,6 +5,5 @@
 mod kinds;
 #[cfg(test)]
 mod tests;
-mod view;
 
 pub(crate) use kinds::Pulls;

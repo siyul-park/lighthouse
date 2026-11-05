@@ -13,15 +13,13 @@ use std::{
 };
 
 use lighthouse_graph::{Error, Graph};
-use lighthouse_model::ucm::{
-    Boxed, Comment, Edge, Edges, File, FunctionSummary, Incoming, LoadNeed, Model, Module, Node,
-    Resolved, Site, Sites, Symbol, SymbolId, Table, TestCase, When, load_needs,
-};
-use lighthouse_model::ucm::{EDGES, INCOMING, PATHS, RESOLVED, SITES, SYMBOLS};
-use lighthouse_spec::key;
 use typed_arena::Arena;
 
-use super::kinds::{CASES, Entry, INDEX};
+use super::{
+    Boxed, Comment, EDGES, Edge, Edges, File, FunctionSummary, INCOMING, Incoming, LoadNeed,
+    MODULE_CASES, Model, Module, Node, PATHS, RESOLVED, Resolved, SITES, SYMBOLS, Site, Sites,
+    Symbol, SymbolId, Table, TestCase, Tie, When, key, load_needs,
+};
 
 /// The model of the project as the graph holds it.
 pub struct View<'v> {
@@ -56,7 +54,7 @@ pub struct Held {
     tables: Arena<Arc<Table>>,
     sites: Arena<Arc<Sites>>,
     edges: Arena<Arc<Edges>>,
-    entries: Arena<Arc<Entry>>,
+    cases: Arena<Arc<Vec<TestCase>>>,
     files: Arena<File>,
 }
 
@@ -84,19 +82,6 @@ impl<'v> View<'v> {
     /// read reads as empty.
     pub fn failure(&self) -> Option<Error> {
         self.failed.borrow_mut().take()
-    }
-
-    /// The tests of every file, one per symbol, sorted by symbol.
-    pub fn tests(&self) -> Vec<&'v TestCase> {
-        let mut all: Vec<&TestCase> = self
-            .paths()
-            .iter()
-            .filter_map(|path| self.resolved(Path::new(path)))
-            .flat_map(|resolved| &resolved.slice.fragment.tests)
-            .collect();
-        all.sort_by(|a, b| a.symbol.cmp(&b.symbol));
-        all.dedup_by(|a, b| a.symbol == b.symbol);
-        all
     }
 
     /// The symbols of every file, one per id, sorted by id.
@@ -202,7 +187,7 @@ impl<'v> View<'v> {
     }
 
     /// What the rest of the project says of `id`.
-    fn tie(&self, id: &SymbolId) -> Option<&'v lighthouse_model::ucm::Tie> {
+    fn tie(&self, id: &SymbolId) -> Option<&'v Tie> {
         self.incoming(&self.table.entry(id)?.file)?
             .by_symbol
             .get(id)
@@ -228,11 +213,6 @@ impl<'v> View<'v> {
         let incoming = &**self.held.incoming.alloc(incoming);
         self.incoming.borrow_mut().insert(key, incoming);
         Some(incoming)
-    }
-
-    fn entry(&self, name: &str, key: &str) -> Option<&'v Entry> {
-        let entry = self.keep(self.graph.query(&INDEX, &(name.to_owned(), key.to_owned())))?;
-        Some(&**self.held.entries.alloc(entry))
     }
 
     fn keep<T>(&self, found: Result<T, Error>) -> Option<T> {
@@ -311,10 +291,9 @@ impl<'v> Model for View<'v> {
         let cases = match found {
             Some(cases) => cases,
             None => {
-                let cases: &'v [TestCase] = match self.entry(CASES, module) {
-                    Some(Entry::Cases(cases)) => cases,
-                    _ => &[],
-                };
+                let cases: &'v [TestCase] = self
+                    .keep(self.graph.query(&MODULE_CASES, &module.to_owned()))
+                    .map_or(&[], |cases| &**self.held.cases.alloc(cases));
                 self.cases.borrow_mut().insert(module.to_owned(), cases);
                 cases
             }

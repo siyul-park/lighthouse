@@ -16,9 +16,9 @@ use lighthouse_model::{
 };
 use lighthouse_model::{RunScope, TestScope, ucm::Applicability};
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Context, Conventions, Error as PluginError, Fragments, Indexed,
-    LanguageManifest, LanguageProvider, Plugin, PluginManifest, Registry, Rule, RuleManifest,
-    Source, Unit, Workspace,
+    Analyzer, AnalyzerContext, AnalyzerManifest, Context, Conventions, Error as PluginError,
+    Fragments, Indexed, LanguageManifest, LanguageProvider, Plugin, PluginManifest, Registry, Rule,
+    RuleManifest, Source, Unit, Workspace,
 };
 use lighthouse_spec::Catalog;
 use lighthouse_spec::Config;
@@ -78,8 +78,8 @@ impl Analyzer for CountFiles {
     fn manifest(&self) -> &AnalyzerManifest {
         &self.0
     }
-    fn run(&self, ctx: &Context) -> Result<Value, PluginError> {
-        Ok(json!(ctx.project.files.len()))
+    fn run(&self, ctx: &AnalyzerContext) -> Result<Value, PluginError> {
+        Ok(json!(ctx.model.files().count()))
     }
 }
 

@@ -19,13 +19,14 @@ mod model;
 mod qualify;
 mod slice;
 mod table;
+mod view;
 
 pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
 pub use kinds::{
-    EDGES, HOST, Host, INCOMING, MARKERS, ORDERED_BY, OUTLINE, PATHS, PAYLOAD, PROJECT, Payload,
-    REGIONS_UNIT, RESOLVED, SITES, SLICE, SYMBOLS, key,
+    CASES, EDGES, HOST, Host, INCOMING, MARKERS, MODULE_CASES, ORDERED_BY, OUTLINE, PATHS, PAYLOAD,
+    PROJECT, Payload, REGIONS_UNIT, RESOLVED, SITES, SLICE, SYMBOLS, key,
 };
 pub use load_order::{LoadNeed, LoadPoint, load_needs};
 pub use markers::Markers;
@@ -35,6 +36,7 @@ use crate::{Document, Span};
 use merge::{dedup_edges, resolve_all, settle, sites_of, sorted_union};
 pub use slice::{Edges, Incoming, Resolved, Reverse, Sites, Slice, Tie, collisions, declared};
 pub use table::{Entry, Outline, Table};
+pub use view::{Held, View};
 
 /// The fact of a file that lists its regions, see [`File::regions`].
 pub const REGIONS: &str = "regions";

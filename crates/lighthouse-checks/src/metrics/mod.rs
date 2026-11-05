@@ -6,7 +6,9 @@ use lighthouse_model::{
     RunScope,
     ucm::{FlowKind, FunctionSummary, Model, Symbol, SymbolId, SymbolKind},
 };
-use lighthouse_plugin::{Analyzer, AnalyzerManifest, Context, Error, Plugin, PluginManifest};
+use lighthouse_plugin::{
+    Analyzer, AnalyzerContext, AnalyzerManifest, Error, Plugin, PluginManifest,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -121,12 +123,12 @@ impl Analyzer for Metrics {
         &MANIFEST
     }
 
-    fn run(&self, ctx: &Context) -> Result<Value, Error> {
+    fn run(&self, ctx: &AnalyzerContext) -> Result<Value, Error> {
         let (file, _) = ctx
             .file
             .ok_or_else(|| Error::Failed(format!("{MEASURES} needs a file")))?;
         let measures: BTreeMap<&SymbolId, Measures> = ctx
-            .project
+            .model
             .symbols_in(&file.path)
             .filter(|symbol| {
                 matches!(
@@ -135,8 +137,8 @@ impl Analyzer for Metrics {
                 )
             })
             .filter_map(|symbol| {
-                let summary = ctx.project.function(&symbol.id)?;
-                Some((&symbol.id, Measures::of(ctx.project, symbol, summary)))
+                let summary = ctx.model.function(&symbol.id)?;
+                Some((&symbol.id, Measures::of(ctx.model, symbol, summary)))
             })
             .collect();
         serde_json::to_value(measures).map_err(|e| Error::Failed(e.to_string()))

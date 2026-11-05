@@ -11,6 +11,7 @@ use rayon::ThreadPool;
 
 use super::{project::Units, regions::Views, *};
 use crate::graph::Detected;
+use lighthouse_plugin::ANALYSIS;
 use lighthouse_spec::{Attributes, Content, Readable};
 
 /// Why a file the languages claim is not an input: a notice for binary data a
@@ -318,50 +319,40 @@ impl Engine {
     }
 
     /// Computes the facts the rules read, analyzer by analyzer in dependency
-    /// order. The files of a file-scope analyzer are analyzed side by side:
-    /// an analyzer reads the facts of those it requires, never its own.
+    /// order, as the queries of `graph`: an analyzer is run again only for
+    /// the files whose model, text or required facts changed. The files of a
+    /// file-scope analyzer are pulled side by side.
     pub(super) fn analyze(
         &self,
-        ws: &Workspace,
-        (rules, inputs, project): (&[&dyn Rule], &[Input], &Project),
-        memo: &Memo,
+        graph: &Graph,
+        (rules, inputs): (&[&dyn Rule], &[Input]),
         timings: &mut Timings,
     ) -> Result<Facts, Error> {
         let wanted = rules
             .iter()
             .flat_map(|r| r.manifest().analyzers.iter().map(String::as_str));
+        let pull = |id: &str, key: String| -> Result<Value, Error> {
+            let json = graph.query(&ANALYSIS, &(id.to_owned(), key))?;
+            serde_json::from_str(&json)
+                .map_err(|e| Error::Graph(lighthouse_graph::Error::Encode(e.to_string())))
+        };
         let mut facts = Facts::new();
         for analyzer in self.registry.order(wanted)? {
             let started = Instant::now();
             let id = &analyzer.manifest().id;
-            let run = |input: Option<&Input>, facts: &Facts| {
-                analyzer.run(&Context {
-                    workspace: ws,
-                    project,
-                    file: input.map(|i| (&i.file, i.text.as_str())),
-                    facts,
-                    trusted: self.trusted,
-                    memo,
-                    notices: &Notices::default(),
-                    applies: Applicability::default(),
-                    models: &lighthouse_plugin::NoModels,
-                    queries: &lighthouse_plugin::NoQueries,
-                })
-            };
             match analyzer.manifest().scope {
                 RunScope::Project => {
-                    let fact = run(None, &facts)?;
-                    facts.insert(id, String::new(), fact);
+                    facts.insert(id, String::new(), pull(id, String::new())?);
                 }
                 RunScope::File => {
-                    let found: Vec<_> = in_pool(|| {
-                        inputs
-                            .par_iter()
-                            .map(|input| run(Some(input), &facts))
-                            .collect()
-                    });
-                    for (input, fact) in inputs.iter().zip(found) {
-                        facts.insert(id, input.file.path.to_string_lossy().into_owned(), fact?);
+                    let keys: Vec<String> = inputs
+                        .iter()
+                        .map(|input| input.file.path.to_string_lossy().into_owned())
+                        .collect();
+                    let found: Vec<_> =
+                        in_pool(|| keys.par_iter().map(|key| pull(id, key.clone())).collect());
+                    for (key, fact) in keys.into_iter().zip(found) {
+                        facts.insert(id, key, fact?);
                     }
                 }
             }

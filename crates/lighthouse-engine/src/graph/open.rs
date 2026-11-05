@@ -1,8 +1,10 @@
 //! The graph of an engine: opened by the first use, beside the result cache.
 
-use std::sync::PoisonError;
+use std::sync::{Arc, PoisonError};
 
 use lighthouse_graph::{Graph, Options};
+use lighthouse_plugin::Analyzers;
+use lighthouse_spec::TEXT;
 
 use crate::{cache, engine::Engine};
 
@@ -19,10 +21,13 @@ impl Engine {
         notices: &mut impl Extend<String>,
     ) -> &'g mut Graph {
         slot.get_or_insert_with(|| {
-            let options = |limit| Options {
-                versions: [("binary".to_owned(), cache::build_identity())].into(),
-                limit,
-                ..Options::default()
+            let options = |limit| {
+                Options {
+                    versions: [("binary".to_owned(), cache::build_identity())].into(),
+                    limit,
+                    ..Options::default()
+                }
+                .data(Arc::new(Analyzers::new(self.registry.analyzers(), text)))
             };
             let opened = match &self.cache {
                 Some(cache) => Graph::open(&cache.dir.join(FILE), options(cache.limit)),
@@ -40,4 +45,9 @@ impl Engine {
     pub(crate) fn lock_graph(&self) -> std::sync::MutexGuard<'_, Option<Graph>> {
         self.graph.lock().unwrap_or_else(PoisonError::into_inner)
     }
+}
+
+/// The text of a file as a query of the graph.
+fn text(graph: &Graph, path: &str) -> Result<Arc<Option<String>>, lighthouse_graph::Error> {
+    graph.query(&TEXT, &path.to_owned())
 }

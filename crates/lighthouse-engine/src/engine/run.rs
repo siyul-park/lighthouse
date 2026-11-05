@@ -43,16 +43,16 @@ impl Engine {
             overlays: overlays.clone(),
             ..self.ws.clone()
         };
-        let facts = self.analyze(
-            &workspace,
-            (&selected, &inputs, &project),
-            &memo,
-            &mut run.timings,
-        )?;
         let mut guard = self.lock_graph();
-        if let (Some(pulling), Some(graph)) = (self.registry.pulling(), guard.as_mut()) {
+        let Some(graph) = guard.as_mut() else {
+            return Err(Error::Graph(lighthouse_graph::Error::Encode(
+                "the graph is not open".to_owned(),
+            )));
+        };
+        if let Some(pulling) = self.registry.pulling() {
             pulling.inputs(graph, &selected, &workspace)?;
         }
+        let facts = self.analyze(graph, (&selected, &inputs), &mut run.timings)?;
         let queries: Box<dyn Queries + '_> = match (self.registry.pulling(), guard.as_ref()) {
             (Some(pulling), Some(graph)) => pulling.queries(graph),
             _ => Box::new(NoQueries),

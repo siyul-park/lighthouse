@@ -8,7 +8,7 @@ use lighthouse_model::{
         Symbol, SymbolId, SymbolKind, Target, Visibility,
     },
 };
-use lighthouse_plugin::{Context, Facts, Plugin, Workspace};
+use lighthouse_plugin::{AnalyzerContext, Facts, Plugin};
 
 const FILE: &str = "m/m.go";
 
@@ -81,20 +81,12 @@ fn run(project: &Project, path: &str) -> BTreeMap<SymbolId, Measures> {
         .iter()
         .find(|a| a.manifest().id == MEASURES)
         .unwrap();
-    let ws = Workspace::new(".");
     let file = file(path, false);
     let facts = Facts::new();
-    let ctx = Context {
-        workspace: &ws,
-        project,
+    let ctx = AnalyzerContext {
+        model: project,
         file: Some((&file, "")),
         facts: &facts,
-        trusted: false,
-        memo: &lighthouse_plugin::Memo::default(),
-        notices: &lighthouse_plugin::Notices::default(),
-        applies: lighthouse_model::ucm::Applicability::default(),
-        models: &lighthouse_plugin::NoModels,
-        queries: &lighthouse_plugin::NoQueries,
     };
     serde_json::from_value(analyzer.run(&ctx).unwrap()).unwrap()
 }

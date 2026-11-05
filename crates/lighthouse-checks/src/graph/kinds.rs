@@ -11,11 +11,10 @@ use std::{
 };
 
 use lighthouse_graph::{Durability, Error, Graph, Input, Query};
-use lighthouse_model::ucm::{Model, SymbolId, TestCase};
+use lighthouse_model::ucm::{Held, Model, SymbolId, View};
 use lighthouse_plugin::{Pulling, Queries, Reads, Rule, TestNaming, Workspace, reads_of};
 use serde::{Deserialize, Serialize};
 
-use super::view::{Held, View};
 use crate::layout::contains;
 use crate::{
     builder::{
@@ -38,9 +37,6 @@ use crate::{
     metrics::propagation,
     naming::{Credited, credited},
 };
-
-/// The tests of a module, an index that no fact reads whole.
-pub const CASES: &str = "cases";
 
 /// What the rules of a run read of the subjects of one sort. `Stable`.
 pub static READS: Input<String, Reads> = Input::new("reads");
@@ -72,7 +68,6 @@ pub enum Aggregate {
     Modules(propagation::System),
     Symbols(propagation::System),
     Tested(BTreeSet<String>),
-    Cases(BTreeMap<String, Vec<TestCase>>),
 }
 
 /// What an index says of one key.
@@ -86,7 +81,6 @@ pub enum Entry {
     Reached(Option<Reached>),
     Bool(bool),
     Credited(Credited),
-    Cases(Vec<TestCase>),
 }
 
 /// The sorts of aggregate.
@@ -103,7 +97,6 @@ pub enum Sort {
     Modules,
     Symbols,
     Tested,
-    Cases,
 }
 
 impl Sort {
@@ -121,7 +114,6 @@ impl Sort {
             STABILITY => Self::Modules,
             REACH => Self::Symbols,
             TESTED => Self::Tested,
-            CASES => Self::Cases,
             _ => return None,
         })
     }
@@ -167,7 +159,6 @@ impl Queries for Pull<'_> {
             Entry::Reached(v) => Arc::new(v.clone()),
             Entry::Bool(v) => Arc::new(*v),
             Entry::Credited(v) => Arc::new(v.clone()),
-            Entry::Cases(v) => Arc::new(v.clone()),
         })
     }
 }
@@ -210,16 +201,6 @@ fn aggregate(graph: &Graph, sort: &Sort) -> Result<Aggregate, Error> {
         Sort::Modules => Aggregate::Modules(propagation::modules(model)),
         Sort::Symbols => Aggregate::Symbols(propagation::symbols(model)),
         Sort::Tested => Aggregate::Tested(tested(model)),
-        Sort::Cases => {
-            let mut cases: BTreeMap<String, Vec<TestCase>> = BTreeMap::new();
-            for case in view.tests() {
-                cases
-                    .entry(case.symbol.module().to_owned())
-                    .or_default()
-                    .push(case.clone());
-            }
-            Aggregate::Cases(cases)
-        }
     };
     view.failure().map_or(Ok(found), Err)
 }
@@ -263,9 +244,6 @@ fn index(graph: &Graph, (name, key): &(String, String)) -> Result<Entry, Error> 
         (REACH, Aggregate::Symbols(system)) => Entry::Reached(Reached::of(system, key)),
         (TESTED, Aggregate::Tested(roots)) => {
             Entry::Bool(roots.iter().any(|root| contains(root, key)))
-        }
-        (CASES, Aggregate::Cases(map)) => {
-            Entry::Cases(map.get(key.as_str()).cloned().unwrap_or_default())
         }
         _ => return Err(failed(format!("`{name}` is no index"))),
     })

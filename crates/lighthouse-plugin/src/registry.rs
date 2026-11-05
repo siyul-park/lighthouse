@@ -33,7 +33,7 @@ pub struct Registry {
     ignores: Vec<(String, Vec<String>)>,
     generated: Vec<(String, GeneratedSpec)>,
     languages: Vec<Language>,
-    analyzers: BTreeMap<String, Box<dyn Analyzer>>,
+    analyzers: BTreeMap<String, Arc<dyn Analyzer>>,
     rules: BTreeMap<String, Box<dyn Rule>>,
     fixers: BTreeMap<String, Box<dyn Fixer>>,
     models: BTreeMap<String, Box<dyn ModelClient>>,
@@ -115,8 +115,11 @@ impl Registry {
                 }),
             )
         });
-        self.analyzers
-            .extend(analyzers.into_iter().map(|a| (a.manifest().id.clone(), a)));
+        self.analyzers.extend(
+            analyzers
+                .into_iter()
+                .map(|a| (a.manifest().id.clone(), Arc::from(a))),
+        );
         self.rules
             .extend(rules.into_iter().map(|r| (r.manifest().id.clone(), r)));
         self.fixers
@@ -310,6 +313,12 @@ impl Registry {
             walk.visit(id, "requested")?;
         }
         Ok(walk.out)
+    }
+
+    /// Every registered analyzer by id: what a graph that runs them is opened
+    /// with.
+    pub fn analyzers(&self) -> BTreeMap<String, Arc<dyn Analyzer>> {
+        self.analyzers.clone()
     }
 
     /// Checks every registered analyzer for missing requirements and cycles.

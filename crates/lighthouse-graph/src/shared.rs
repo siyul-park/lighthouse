@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     collections::{BTreeMap, HashMap},
     sync::{
         Arc, Mutex, RwLock,
@@ -34,6 +35,8 @@ pub(crate) struct Shared {
     pub versions: Mutex<Versions>,
     /// How many commits a row that nothing verified is kept.
     pub retain: u64,
+    /// The graph's user data, fixed at open.
+    pub data: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 pub(crate) struct Registered {

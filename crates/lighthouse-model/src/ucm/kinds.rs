@@ -15,7 +15,7 @@
 //! read it is not run again.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     Edges, File, Fragment, Incoming, Markers, ORDERED, Outline, Project, REGIONS, Resolved, Sites,
-    Slice, Table, collisions, declared,
+    Slice, Table, TestCase, collisions, declared,
 };
 
 /// The id of the unit that holds the regions selected in the project's files.
@@ -62,6 +62,14 @@ pub static EDGES: Query<(), Edges> = Query::new("edges", edges);
 pub static SITES: Query<(), Sites> = Query::new("sites", sites);
 /// What the rest of the project says of the symbols of one file.
 pub static INCOMING: Query<String, Incoming> = Query::new("incoming", incoming);
+/// The tests of every module, by module path, one per symbol; held in memory
+/// only.
+pub static CASES: Query<(), BTreeMap<String, Vec<TestCase>>> =
+    Query::new("cases", cases).transient();
+/// The tests of one module: a projection of `cases`, so that an edit that
+/// leaves them as they were leaves what read them green; held in memory only.
+pub static MODULE_CASES: Query<String, Vec<TestCase>> =
+    Query::new("module_cases", module_cases).transient();
 /// The files put together; held in memory only.
 pub static PROJECT: Query<(), Project> = Query::new("project", project).transient();
 
@@ -344,6 +352,29 @@ fn project(graph: &Graph, _: &()) -> Result<Project, Error> {
         resolved.iter().map(Arc::as_ref),
         (&edges, &sites),
     ))
+}
+
+fn cases(graph: &Graph, _: &()) -> Result<BTreeMap<String, Vec<TestCase>>, Error> {
+    let resolved = each(graph, |graph, path| graph.query(&RESOLVED, path))?;
+    let mut all: Vec<&TestCase> = resolved
+        .iter()
+        .flat_map(|resolved| &resolved.slice.fragment.tests)
+        .collect();
+    all.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+    all.dedup_by(|a, b| a.symbol == b.symbol);
+    let mut by_module: BTreeMap<String, Vec<TestCase>> = BTreeMap::new();
+    for case in all {
+        by_module
+            .entry(case.symbol.module().to_owned())
+            .or_default()
+            .push(case.clone());
+    }
+    Ok(by_module)
+}
+
+fn module_cases(graph: &Graph, module: &String) -> Result<Vec<TestCase>, Error> {
+    let cases = graph.query(&CASES, &())?;
+    Ok(cases.get(module).cloned().unwrap_or_default())
 }
 
 /// A query of every path of the project, fanned out.

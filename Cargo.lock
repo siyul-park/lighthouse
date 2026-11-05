@@ -1903,7 +1903,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "toml",
- "typed-arena",
 ]
 
 [[package]]
@@ -2009,6 +2008,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "toml",
+ "typed-arena",
  "uuid",
 ]
 

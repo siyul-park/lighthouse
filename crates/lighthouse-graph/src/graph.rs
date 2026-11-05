@@ -1,4 +1,6 @@
 use std::{
+    any::Any,
+    fmt,
     path::Path,
     sync::{
         Arc, Mutex, RwLock,
@@ -13,7 +15,7 @@ use crate::{
     frame::Frame,
     node::{Locked, NodeId},
     query::{Kind, decode, encode, hash},
-    shared::{Shared, Versions, drop_value, settle_clean, write_of},
+    shared::{Shared, Versions, settle_clean, write_of},
     store::{Store, Write},
 };
 
@@ -36,7 +38,7 @@ const VERIFY_PERIOD: u64 = 64;
 pub static VERSION: Input<String, String> = Input::new("version");
 
 /// How the graph is opened.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Options {
     /// The binary's, each plugin's, ...: set as the `VERSION` inputs. One that
     /// changed since the last open invalidates exactly what read it.
@@ -58,6 +60,37 @@ pub struct Options {
     /// past that a commit deletes it, so that the rows of files that are gone
     /// go too.
     pub retain: u64,
+    /// What the queries of this graph read besides the graph, see
+    /// [`Options::data`].
+    pub data: Option<Arc<dyn Any + Send + Sync>>,
+}
+
+impl Options {
+    /// Gives the queries `data` to read with [`Graph::data`]: the per-graph
+    /// user data of Buck2's DICE and the fields of the user's database in
+    /// Salsa. What a query reads there is not recorded, so it must be fixed
+    /// for the life of the graph: the code a query calls through (analyzers,
+    /// providers), never what changes from run to run, which is an input. A
+    /// value that moves would reach a query without moving its hash, and
+    /// what read it would stay green on a stale value.
+    pub fn data(self, data: Arc<dyn Any + Send + Sync>) -> Self {
+        Self {
+            data: Some(data),
+            ..self
+        }
+    }
+}
+
+impl fmt::Debug for Options {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Options")
+            .field("versions", &self.versions)
+            .field("limit", &self.limit)
+            .field("verify", &self.verify)
+            .field("retain", &self.retain)
+            .field("data", &self.data.is_some())
+            .finish()
+    }
 }
 
 impl Default for Options {
@@ -71,6 +104,7 @@ impl Default for Options {
                 0
             },
             retain: DEFAULT_RETAIN,
+            data: None,
         }
     }
 }
@@ -111,6 +145,7 @@ impl Graph {
             limit: AtomicU64::new(options.limit),
             versions: Mutex::default(),
             retain: options.retain,
+            data: options.data,
         };
         let mut graph = Self {
             shared: Arc::new(shared),
@@ -201,28 +236,11 @@ impl Graph {
         self.read(query, key)
     }
 
-    /// Drops the stored value of a node, memory and disk, keeping its hash,
-    /// its dependencies and its revisions: dependents still validate, and
-    /// pulling it runs it again.
-    pub fn evict<K: Key, V: Value>(
-        &mut self,
-        query: &'static Query<K, V>,
-        key: &K,
-    ) -> Result<(), Error> {
-        let registered = self.shared.register(query)?;
-        let id = NodeId {
-            kind: registered.name,
-            key: encode(key)?.into(),
-        };
-        let slot = self.shared.slot(&id);
-        let mut node = slot.node.locked();
-        self.shared.load(&mut node, &id)?;
-        if node.present && (node.on_disk || node.value.is_some()) {
-            drop_value(&mut node);
-            node.value_dirty = true;
-            self.shared.dirty.mark(&slot, &mut node);
-        }
-        Ok(())
+    /// The data the graph was opened with, if it is a `T`: what a query
+    /// calls through that is fixed for the life of the graph, see
+    /// [`Options::data`].
+    pub fn data<T: Any + Send + Sync>(&self) -> Option<&T> {
+        self.shared.data.as_deref()?.downcast_ref()
     }
 
     /// Why the query last ran for this key: the first dependency whose hash

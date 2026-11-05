@@ -1,7 +1,7 @@
 use lighthouse_model::RunScope;
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Context, Error, Indexed, LanguageManifest, LanguageProvider,
-    Plugin, PluginManifest, Registry, Unit, Workspace, options,
+    Analyzer, AnalyzerContext, AnalyzerManifest, Error, Indexed, LanguageManifest,
+    LanguageProvider, Plugin, PluginManifest, Registry, Unit, Workspace, options,
 };
 use serde_json::Value;
 
@@ -11,7 +11,7 @@ impl Analyzer for Node {
     fn manifest(&self) -> &AnalyzerManifest {
         &self.0
     }
-    fn run(&self, _: &Context) -> Result<Value, Error> {
+    fn run(&self, _: &AnalyzerContext) -> Result<Value, Error> {
         Ok(Value::Null)
     }
 }

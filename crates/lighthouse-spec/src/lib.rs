@@ -51,7 +51,7 @@ pub use generated::markers as generated_markers;
 pub use ignores::matcher as ignore_matcher;
 pub use kinds::{
     CONFIG, CONTENT, Content, ENTRIES, FILES, Hash, Held, OVERLAY, ROOT, Readable, STAT, Stamped,
-    TREE, key,
+    TEXT, TREE, key,
 };
 pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};

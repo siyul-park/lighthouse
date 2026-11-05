@@ -27,9 +27,14 @@ fn run(seed: u64, steps: usize, reopen: usize) -> Trace {
             graph = open(Some(&path), &sim.project);
         }
         if matches!(edit, Edit::Evict) {
-            for file in sim.project.files.keys() {
-                graph.evict(&FACTS, file).expect("evict");
-            }
+            graph.commit().expect("commit");
+            drop(graph);
+            let mut options = options(&sim.project);
+            options.limit = 0;
+            let mut evicting = open_with(Some(&path), options);
+            evicting.commit().expect("commit");
+            drop(evicting);
+            graph = open(Some(&path), &sim.project);
         }
         apply(&mut graph, &sim.project, &sim.known);
         let report = pull(&graph);

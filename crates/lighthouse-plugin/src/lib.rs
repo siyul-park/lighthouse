@@ -1,6 +1,7 @@
 //! The plugin SPI: the traits and manifests every plugin kind implements, and
 //! the `Registry` that holds them. It knows no specs and no configuration.
 
+mod analysis;
 mod annotations;
 mod cel;
 mod error;
@@ -28,6 +29,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
 
+pub use analysis::{ANALYSIS, AnalyzerContext, Analyzers, TextOf};
 pub use annotations::Annotations;
 pub use cel::{
     CatalogFunction, CelCatalog, CelLibrary, CelLibraryManifest, Function, Overload, Precedence,
@@ -358,7 +360,7 @@ pub trait LanguageProvider: Send + Sync {
 /// `run` must be deterministic for equal inputs; the engine runs it once per `scope`.
 pub trait Analyzer: Send + Sync {
     fn manifest(&self) -> &AnalyzerManifest;
-    fn run(&self, ctx: &Context) -> Result<Value, Error>;
+    fn run(&self, ctx: &AnalyzerContext) -> Result<Value, Error>;
 }
 
 /// What an analyzer declares: the fact it computes, what that fact is

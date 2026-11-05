@@ -134,18 +134,27 @@ fn a_body_edit_of_an_unused_file_runs_only_that_file() {
 #[test]
 fn an_evicted_node_is_run_again_only_when_pulled() {
     let project = project();
-    let mut graph = graph(&project);
-    graph.evict(&FACTS, &"c".to_owned()).expect("evict");
-    graph.evict(&API, &"c".to_owned()).expect("evict");
+    let mut graph = open_with(
+        None,
+        Options {
+            limit: 0,
+            ..options(&project)
+        },
+    );
+    apply(&mut graph, &project, &known(&project));
+    pull(&graph);
+    graph.commit().expect("commit");
+    graph.take_executed();
+
+    assert_eq!(executed(&graph), set(&[]));
+
+    graph.query(&REPORT, &()).expect("report");
+
+    assert!(executed(&graph).contains("report(())"));
 
     graph.query(&REPORT, &()).expect("report");
 
     assert_eq!(executed(&graph), set(&[]));
-
-    graph.evict(&REPORT, &()).expect("evict");
-    graph.query(&REPORT, &()).expect("report");
-
-    assert_eq!(executed(&graph), set(&["report(())", "facts(\"c\")"]));
 }
 
 #[test]
@@ -320,4 +329,23 @@ fn a_kind_name_registered_with_another_type_is_an_error() {
         graph.input(&FILE, &"a".to_owned()).is_ok(),
         "the first stays"
     );
+}
+
+#[test]
+fn the_data_a_graph_was_opened_with_is_the_same_in_memory_and_after_a_reopen() {
+    let project = project();
+    let data = || options(&project).data(std::sync::Arc::new("runner".to_owned()));
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().join("graph.db");
+
+    let memory = open_with(None, data());
+    let first = open_with(Some(&path), data());
+    drop(first);
+    let reopened = open_with(Some(&path), data());
+
+    for graph in [&memory, &reopened] {
+        assert_eq!(graph.data::<String>().map(String::as_str), Some("runner"));
+        assert!(graph.data::<u32>().is_none(), "another type is no data");
+    }
+    assert!(open(None, &project).data::<String>().is_none());
 }

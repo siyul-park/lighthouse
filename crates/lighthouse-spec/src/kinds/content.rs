@@ -6,7 +6,7 @@ use lighthouse_graph::{Error, Graph};
 use lighthouse_protocol::hash;
 use serde::{Deserialize, Serialize};
 
-use super::{Hash, OVERLAY, ROOT, STAT};
+use super::{CONTENT, Hash, OVERLAY, ROOT, STAT};
 
 const CHUNK: usize = 256 << 10;
 
@@ -53,6 +53,22 @@ pub enum Readable {
     NotUtf8,
     Unreadable(String),
     Missing,
+}
+
+/// The text of a file, read when this runs and not kept: what the graph
+/// remembers of it is its hash, which reading `content` records, so that what
+/// reads the text is run again when the bytes change. `None` for a file that
+/// is no text.
+pub(super) fn text(graph: &Graph, path: &String) -> Result<Option<String>, Error> {
+    let content = graph.query(&CONTENT, path)?;
+    if content.readable != Readable::Text {
+        return Ok(None);
+    }
+    if let Some(text) = &content.text {
+        return Ok(Some(text.clone()));
+    }
+    let root = graph.input(&ROOT, &())?.unwrap_or_default();
+    Ok(std::fs::read_to_string(Path::new(root.as_str()).join(path)).ok())
 }
 
 pub(super) fn content(graph: &Graph, path: &String) -> Result<Content, Error> {
