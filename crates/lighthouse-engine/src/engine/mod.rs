@@ -14,6 +14,7 @@ use crate::{
     timings::Timings,
 };
 use ignore::gitignore::Gitignore;
+use lighthouse_graph::Graph;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Options, Severity, Suppressed,
@@ -24,8 +25,8 @@ use lighthouse_plugin::{
     Workspace,
 };
 use lighthouse_spec::{
-    Catalog, Config, GlobSet, Models as BoundModels, ProjectFiles, Projects, Routing, RuleConfig,
-    Subject as DecisionSubject,
+    Catalog, Config, GlobSet, Held, Models as BoundModels, ProjectFiles, Projects, Routing,
+    RuleConfig, Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
@@ -286,7 +287,9 @@ pub struct Engine {
     /// The result cache; `None` runs every rule every time.
     pub(crate) cache: Option<CacheSettings>,
     /// The graph of what is known of the files, opened by the first run.
-    pub(crate) graph: std::sync::Mutex<Option<crate::graph::Opened>>,
+    pub(crate) graph: std::sync::Mutex<Option<Graph>>,
+    /// What the last walk set in it, locked after it.
+    pub(crate) held: std::sync::Mutex<Held>,
     /// What the run may do with models.
     models: ModelOptions,
 }
@@ -406,6 +409,7 @@ impl Engine {
             commands: None,
             cache: None,
             graph: std::sync::Mutex::new(None),
+            held: std::sync::Mutex::new(Held::default()),
             models: ModelOptions::default(),
         })
     }

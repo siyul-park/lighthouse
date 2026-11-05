@@ -14,9 +14,8 @@ use std::{
 
 use lighthouse_graph::{Error, Graph, Input, Query};
 use lighthouse_plugin::UnitsBy;
+use lighthouse_spec::{CONTENT, FILES, Hash};
 use serde::{Deserialize, Serialize};
-
-use super::{CONTENT, FILES, Hash};
 
 /// The id of the unit that holds the regions selected in the project's files.
 pub(crate) const REGIONS: &str = "#regions";

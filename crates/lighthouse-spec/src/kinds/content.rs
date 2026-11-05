@@ -17,7 +17,7 @@ const IGNORE_FILES: [&str; 2] = [".gitignore", ".gitattributes"];
 /// hash the providers are given, which the host's own checks compare with the
 /// SHA-256 of text in memory.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Content {
+pub struct Content {
     pub blake3: Hash,
     pub sha256: String,
     pub readable: Readable,
@@ -27,7 +27,7 @@ pub(crate) struct Content {
 
 impl Content {
     /// The content of text held in memory, as an overlay.
-    pub(crate) fn of_text(text: &str) -> Self {
+    pub fn of_text(text: &str) -> Self {
         Self {
             blake3: blake3::hash(text.as_bytes()).into(),
             sha256: hash::sha256(text),
@@ -48,7 +48,7 @@ impl Content {
 
 /// Whether the bytes are text a language can take.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum Readable {
+pub enum Readable {
     Text,
     NotUtf8,
     Unreadable(String),

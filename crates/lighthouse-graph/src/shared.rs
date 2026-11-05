@@ -41,10 +41,29 @@ pub(crate) struct Registered {
     pub name: Arc<str>,
 }
 
+impl Registered {
+    /// This registration as the one of `kind`, which must stand for the same
+    /// types.
+    fn agree(&self, kind: &'static dyn Kind) -> Result<Self, Error> {
+        let (had, now) = (self.kind.signature(), kind.signature());
+        if !had.same(&now) {
+            return Err(Error::Kind {
+                name: self.name.to_string(),
+                had: had.text().to_owned(),
+                now: now.text().to_owned(),
+            });
+        }
+        Ok(Self {
+            kind: self.kind,
+            name: self.name.clone(),
+        })
+    }
+}
+
 pub(crate) type Versions = BTreeMap<String, String>;
 
 impl Shared {
-    pub(crate) fn register(&self, kind: &'static dyn Kind) -> Registered {
+    pub(crate) fn register(&self, kind: &'static dyn Kind) -> Result<Registered, Error> {
         let name = kind.name();
         if let Some(found) = self
             .kinds
@@ -52,23 +71,19 @@ impl Shared {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(name)
         {
-            return Registered {
-                kind: found.kind,
-                name: found.name.clone(),
-            };
+            return found.agree(kind);
         }
         let mut kinds = self
             .kinds
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let found = kinds.entry(name).or_insert_with(|| Registered {
-            kind,
-            name: Arc::from(name),
-        });
-        Registered {
-            kind: found.kind,
-            name: found.name.clone(),
-        }
+        kinds
+            .entry(name)
+            .or_insert_with(|| Registered {
+                kind,
+                name: Arc::from(name),
+            })
+            .agree(kind)
     }
 
     pub(crate) fn registered(&self, name: &str) -> Option<&'static dyn Kind> {

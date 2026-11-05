@@ -5,56 +5,35 @@
 //! ([`ProjectFiles::walker_list`]): `.gitignore` files from the root down
 //! (the deepest match wins), the `info/exclude` of each repository found,
 //! then [`ProjectFiles::enters`] and `.gitattributes`. What a directory holds
-//! and the text of the ignore files come from a [`Source`], so that a caller
-//! with a cache (the engine's graph) reads a directory again only when it
-//! changed.
+//! and the text of the ignore files are the `entries` and `content` of the
+//! [`Graph`], so that a directory is read again only when it changed.
 
 use std::{
     collections::BTreeMap,
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
+use lighthouse_graph::{Error, Graph};
 use serde::{Deserialize, Serialize};
 
 mod chain;
+mod reading;
 
-use crate::{Attributes, Listing, ProjectFiles};
+use crate::{Attributes, Held, Listing, ProjectFiles, Stamped};
 use chain::{Level, ignored};
+use reading::Reading;
 
 /// How close to the start of a walk a modification time is for the `lstat` not
 /// to be trusted: see [`Stat::racy`].
 pub const RACY_NS: i64 = 2_000_000_000;
 
-/// Where a walk gets what a directory holds and the text of the ignore files.
-pub trait Source {
-    /// What the directory at the project-relative `rel`, whose `lstat` is
-    /// `stat`, holds.
-    fn entries(&mut self, rel: &Path, stat: Stat) -> Entries;
-
-    /// The text of the ignore file at the project-relative `rel`, if it can
-    /// be read as text.
-    fn text(&mut self, rel: &Path) -> Option<String>;
-}
-
-/// The project on disk: every directory is read, every file opened.
-pub struct Disk<'a>(pub &'a Path);
-
-impl Source for Disk<'_> {
-    fn entries(&mut self, rel: &Path, _: Stat) -> Entries {
-        read_entries(&self.0.join(rel))
-    }
-
-    fn text(&mut self, rel: &Path) -> Option<String> {
-        fs::read_to_string(self.0.join(rel)).ok()
-    }
-}
-
-struct Walk<'a, S> {
+struct Walk<'a> {
     project: &'a ProjectFiles,
     root: PathBuf,
-    source: &'a mut S,
+    reading: Reading<'a>,
     out: Walked,
     files: Vec<PathBuf>,
 }
@@ -110,6 +89,11 @@ impl Stat {
         self.mtime_ns >= started.saturating_sub(RACY_NS)
     }
 
+    /// This `lstat` as the input of a walk that started at `started`.
+    pub(crate) fn stamped(self, started: i64) -> Stamped {
+        Some((self, self.racy(started).then_some(started)))
+    }
+
     /// The stat of what `meta` describes.
     pub fn of(meta: &fs::Metadata) -> Self {
         #[cfg(unix)]
@@ -143,7 +127,7 @@ impl Stat {
     }
 }
 
-impl<S: Source> Walk<'_, S> {
+impl Walk<'_> {
     fn visit(&mut self, rel: &Path, chain: &mut Vec<Level>) {
         let abs = self.root.join(rel);
         let stat = match fs::symlink_metadata(&abs) {
@@ -156,7 +140,7 @@ impl<S: Source> Walk<'_, S> {
                 return;
             }
         };
-        let entries = self.source.entries(rel, stat);
+        let entries = self.reading.entries(rel, stat);
         let unread = entries.raw.is_empty() && !entries.errors.is_empty();
         self.out.listing.errors.extend(entries.errors);
         if unread {
@@ -166,7 +150,7 @@ impl<S: Source> Walk<'_, S> {
             rel,
             &abs,
             &entries.raw,
-            self.source,
+            &mut self.reading,
             &mut self.out.listing.errors,
         );
         chain.push(level);
@@ -189,7 +173,7 @@ impl<S: Source> Walk<'_, S> {
         chain.pop();
     }
 
-    fn finish(mut self) -> Walked {
+    fn finish(mut self) -> Result<Walked, Error> {
         let root = self.root.clone();
         let stats = stat_all(&root, &self.files);
         let mut files: Vec<PathBuf> = Vec::with_capacity(stats.len());
@@ -203,7 +187,7 @@ impl<S: Source> Walk<'_, S> {
         let texts = files
             .iter()
             .filter(|f| Attributes::is_file(f))
-            .map(|f| (f.clone(), self.source.text(f)))
+            .map(|f| (f.clone(), self.reading.text(f)))
             .collect();
         let (attributes, notices) = Attributes::from_texts(texts);
         let (kept, vendored): (Vec<PathBuf>, Vec<PathBuf>) =
@@ -214,16 +198,24 @@ impl<S: Source> Walk<'_, S> {
         self.out.listing.files = kept;
         self.out.listing.notices = notices;
         self.out.listing.attributes = attributes;
-        self.out
+        self.reading.settle(&self.out.stats)?;
+        Ok(self.out)
     }
 }
 
-/// The walk of `project` over what `source` holds: [`ProjectFiles::walk`].
-pub(crate) fn walk(project: &ProjectFiles, source: &mut impl Source) -> Walked {
+/// The walk of `project` over what `graph` holds: [`ProjectFiles::walk`].
+pub(crate) fn walk(
+    project: &ProjectFiles,
+    graph: &mut Graph,
+    held: &mut Held,
+) -> Result<Walked, Error> {
+    let started = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_nanos() as i64);
     let mut walk = Walk {
         project,
         root: project.root().to_owned(),
-        source,
+        reading: Reading::new(graph, held, project.root(), started),
         out: Walked::default(),
         files: Vec::new(),
     };

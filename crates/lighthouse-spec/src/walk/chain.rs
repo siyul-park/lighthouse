@@ -12,7 +12,7 @@ use ignore::{
     gitignore::{Gitignore, GitignoreBuilder},
 };
 
-use super::{Raw, Source};
+use super::{Raw, Reading};
 
 /// The ignore files of one directory.
 pub(super) struct Level {
@@ -22,14 +22,14 @@ pub(super) struct Level {
 
 impl Level {
     /// The ignore files of the directory at `rel` (`abs` on disk) that holds
-    /// `entries`: the text of `.gitignore` comes from `source`, the
+    /// `entries`: the text of `.gitignore` comes from `reading`, the
     /// `info/exclude` of a repository from disk. What cannot be parsed is
     /// pushed to `errors`.
     pub(super) fn of(
         rel: &Path,
         abs: &Path,
         entries: &[Raw],
-        source: &mut impl Source,
+        reading: &mut Reading,
         errors: &mut Vec<String>,
     ) -> Self {
         let has = |name: &str| entries.iter().any(|raw| raw.name == name);
@@ -54,7 +54,7 @@ impl Level {
         };
         let gitignore = if has(".gitignore") {
             let at = rel.join(".gitignore");
-            compile(&abs.join(".gitignore"), source.text(&at))
+            compile(&abs.join(".gitignore"), reading.text(&at))
         } else {
             Gitignore::empty()
         };

@@ -16,6 +16,7 @@ mod files;
 mod fix;
 mod generated;
 mod ignores;
+mod kinds;
 mod model_check;
 mod options;
 mod pack;
@@ -48,6 +49,10 @@ pub use files::{Listing, ProjectFiles};
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};
 pub use generated::markers as generated_markers;
 pub use ignores::matcher as ignore_matcher;
+pub use kinds::{
+    CONFIG, CONTENT, Content, ENTRIES, FILES, Hash, Held, OVERLAY, ROOT, Readable, STAT, Stamped,
+    TREE, key,
+};
 pub use model_check::ModelCheck;
 pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, limit};
 pub use pack::{Pack, Section};
@@ -65,7 +70,7 @@ pub use project::{
 };
 pub use scope::{Scope, Subject};
 pub(crate) use sources::SourceMapSpec;
-pub use walk::{Disk, Entries, Kind, RACY_NS, Raw, Source, Stat, Walked, read_entries};
+pub use walk::{Entries, Kind, RACY_NS, Raw, Stat, Walked, read_entries};
 
 /// The JSON Schema of every kind this crate defines.
 pub fn descriptors() -> Vec<Schema> {

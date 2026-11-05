@@ -6,8 +6,8 @@ use std::{
 };
 
 use lighthouse_graph::Graph;
+use lighthouse_spec::{CONTENT, Content, FILES, Hash, TREE, key};
 
-use super::{CONTENT, Content, FILES, Hash, TREE, key};
 use crate::Error;
 
 /// What a pull of the files gives.

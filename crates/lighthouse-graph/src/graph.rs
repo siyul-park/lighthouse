@@ -133,7 +133,7 @@ impl Graph {
         value: V,
         durability: Durability,
     ) -> Result<(), Error> {
-        let registered = self.shared.register(input);
+        let registered = self.shared.register(input)?;
         let persisted = registered.kind.persisted();
         let id = NodeId {
             kind: registered.name,
@@ -174,7 +174,7 @@ impl Graph {
         input: &'static Input<K, V>,
         key: &K,
     ) -> Result<Option<Arc<V>>, Error> {
-        let registered = self.shared.register(input);
+        let registered = self.shared.register(input)?;
         let id = NodeId {
             kind: registered.name,
             key: encode(key)?.into(),
@@ -209,7 +209,7 @@ impl Graph {
         query: &'static Query<K, V>,
         key: &K,
     ) -> Result<(), Error> {
-        let registered = self.shared.register(query);
+        let registered = self.shared.register(query)?;
         let id = NodeId {
             kind: registered.name,
             key: encode(key)?.into(),
@@ -233,7 +233,7 @@ impl Graph {
         query: &'static Query<K, V>,
         key: &K,
     ) -> Result<Option<Explanation>, Error> {
-        let registered = self.shared.register(query);
+        let registered = self.shared.register(query)?;
         let id = NodeId {
             kind: registered.name,
             key: encode(key)?.into(),
@@ -300,7 +300,7 @@ impl Graph {
         kind: &'static Q,
         key: &K,
     ) -> Result<Arc<V>, Error> {
-        let registered = self.shared.register(kind);
+        let registered = self.shared.register(kind)?;
         let id = NodeId {
             kind: registered.name,
             key: encode(key)?.into(),

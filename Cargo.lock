@@ -2109,11 +2109,13 @@ dependencies = [
 name = "lighthouse-spec"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "cel",
  "globset",
  "ignore",
  "include_dir",
  "insta",
+ "lighthouse-graph",
  "lighthouse-model",
  "lighthouse-process",
  "lighthouse-protocol",

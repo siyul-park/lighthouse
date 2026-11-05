@@ -12,6 +12,14 @@ pub enum Error {
     /// A key or a value that cannot be encoded.
     #[error("cannot encode: {0}")]
     Encode(String),
+    /// A kind name registered as one thing and again as another: the name
+    /// identifies the nodes of the kind in the store.
+    #[error("kind `{name}` is registered as {had} and as {now}")]
+    Kind {
+        name: String,
+        had: String,
+        now: String,
+    },
     /// The store failed.
     #[error("store: {0}")]
     Store(#[from] rusqlite::Error),

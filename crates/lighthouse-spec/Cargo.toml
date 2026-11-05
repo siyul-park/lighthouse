@@ -9,11 +9,13 @@ test = false
 doctest = false
 
 [dependencies]
+blake3.workspace = true
 cel.workspace = true
 globset.workspace = true
 ignore.workspace = true
 regex.workspace = true
 include_dir.workspace = true
+lighthouse-graph.workspace = true
 lighthouse-model.workspace = true
 lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true

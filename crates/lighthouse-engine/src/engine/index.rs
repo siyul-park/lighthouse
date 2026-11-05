@@ -11,7 +11,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
-    sync::PoisonError,
 };
 
 use lighthouse_graph::{Durability, Graph};
@@ -90,9 +89,8 @@ impl Engine {
         run: &mut Run,
     ) -> (BTreeMap<usize, Call<'a>>, BTreeMap<usize, Call<'a>>) {
         let (mut host, mut plain) = (BTreeMap::new(), BTreeMap::new());
-        let mut guard = self.graph.lock().unwrap_or_else(PoisonError::into_inner);
-        let opened = guard.get_or_insert_with(|| self.open_graph());
-        let graph = &mut opened.graph;
+        let mut guard = self.lock_graph();
+        let graph = self.graph_in(&mut guard, &mut run.notices);
         for &language in &self.providers {
             let units = match self.group(graph, language, inputs) {
                 Ok(units) => units,
@@ -129,7 +127,7 @@ impl Engine {
         let by_path: BTreeMap<String, &Input> = inputs
             .iter()
             .filter(|input| input.language == language)
-            .map(|input| (crate::graph::key(&input.file.path), input))
+            .map(|input| (lighthouse_spec::key(&input.file.path), input))
             .collect();
         let id = manifest.id.clone();
         graph.set_input(
@@ -192,9 +190,8 @@ impl Engine {
         mut asts: Option<&mut Vec<lighthouse_protocol::Source>>,
         run: &mut Run,
     ) {
-        let mut guard = self.graph.lock().unwrap_or_else(PoisonError::into_inner);
-        let opened = guard.get_or_insert_with(|| self.open_graph());
-        let graph = &mut opened.graph;
+        let mut guard = self.lock_graph();
+        let graph = self.graph_in(&mut guard, &mut run.notices);
         let mut lanes: Vec<Lane> = calls
             .into_iter()
             .map(|(language, call)| Lane {
@@ -238,9 +235,9 @@ impl Engine {
 
     /// Writes what the step set: the answers of the units, under their keys.
     pub(super) fn commit_index(&self, run: &mut Run) {
-        let mut guard = self.graph.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(opened) = guard.as_mut()
-            && let Err(e) = opened.graph.commit()
+        let mut guard = self.lock_graph();
+        if let Some(graph) = guard.as_mut()
+            && let Err(e) = graph.commit()
         {
             run.notices.insert(format!("the graph was not saved: {e}"));
         }

@@ -5,6 +5,7 @@ mod checks;
 mod clean_code;
 mod environment;
 mod events;
+mod file_kinds;
 mod files;
 mod fixes;
 mod harness_free;

@@ -6,7 +6,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_spec::{Disk, ProjectFiles};
+use lighthouse_graph::{Graph, Options};
+use lighthouse_spec::{Held, ProjectFiles};
 
 /// A seeded generator: the sequences are the same on every run.
 struct Rng(u64);
@@ -117,7 +118,10 @@ fn the_walk_equals_the_reference_walker_over_random_edits() {
             for _ in 0..1 + rng.below(3) {
                 edit(&mut rng, &root, step);
             }
-            let walked = project.walk(&mut Disk(&root));
+            let mut graph = Graph::in_memory(Options::default()).unwrap();
+            let walked = project
+                .walk(&mut graph, &mut Held::default(), &Default::default())
+                .unwrap();
             let reference = project.walker_list();
             assert_eq!(
                 walked.listing.files, reference.files,

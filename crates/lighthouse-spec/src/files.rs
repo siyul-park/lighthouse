@@ -8,10 +8,16 @@
 //! `.gitattributes` marks it `linguist-vendored`. Nothing else is special:
 //! hidden directories are walked.
 
-use std::path::{Component, Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Component, Path, PathBuf},
+};
 
-use crate::{Attributes, Disk, Error, Source, Walked, ignores::matcher as ignore_matcher};
+use crate::{
+    Attributes, CONFIG, Error, Held, ROOT, Walked, ignores::matcher as ignore_matcher, key,
+};
 use ignore::{WalkBuilder, gitignore::Gitignore};
+use lighthouse_graph::{Durability, Graph, Options};
 use lighthouse_model::STATE_DIR;
 
 /// The directory of a repository, which is no part of a project.
@@ -59,15 +65,41 @@ impl ProjectFiles {
         &self.root
     }
 
-    /// Every file of the project and its `lstat`, from what `source` holds:
-    /// the directories it lists and the text of the ignore files it gives.
-    pub fn walk(&self, source: &mut impl Source) -> Walked {
-        crate::walk::walk(self, source)
+    /// Every file of the project and its `lstat`, from what `graph` holds:
+    /// the walk sets the inputs of the kinds it reads, and `held` is what the
+    /// last walk of this graph set, so that what the project no longer has is
+    /// unset. `overlays` stand in for the files of the same path.
+    pub fn walk(
+        &self,
+        graph: &mut Graph,
+        held: &mut Held,
+        overlays: &BTreeMap<PathBuf, String>,
+    ) -> Result<Walked, lighthouse_graph::Error> {
+        self.set_root(graph)?;
+        held.set_overlays(graph, overlays)?;
+        crate::walk::walk(self, graph, held)
     }
 
-    /// Every file of the project, sorted: a walk of the disk.
+    /// Every file of the project, sorted: a walk on a graph in memory.
     pub fn list(&self) -> Listing {
-        self.walk(&mut Disk(&self.root)).listing
+        let walked = Graph::in_memory(Options::default())
+            .and_then(|mut graph| self.walk(&mut graph, &mut Held::default(), &BTreeMap::new()));
+        match walked {
+            Ok(walked) => walked.listing,
+            Err(e) => Listing {
+                errors: vec![e.to_string()],
+                ..Listing::default()
+            },
+        }
+    }
+
+    /// Sets the root and the ignore configuration.
+    fn set_root(&self, graph: &mut Graph) -> Result<(), lighthouse_graph::Error> {
+        graph.set_input(&ROOT, &(), key(&self.root), Durability::Static)?;
+        let ignores = blake3::hash(self.patterns.join("\n").as_bytes())
+            .to_hex()
+            .to_string();
+        graph.set_input(&CONFIG, &(), ignores, Durability::Stable)
     }
 
     /// Whether the walk enters the entry at `rel`, a project-relative path.

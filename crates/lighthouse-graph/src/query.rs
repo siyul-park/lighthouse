@@ -1,4 +1,9 @@
-use std::{any::Any, fmt::Debug, marker::PhantomData, sync::Arc};
+use std::{
+    any::{Any, TypeId, type_name},
+    fmt::Debug,
+    marker::PhantomData,
+    sync::Arc,
+};
 
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -21,6 +26,41 @@ pub(crate) trait Kind: Send + Sync {
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error>;
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>>;
     fn describe(&self, key: &[u8]) -> String;
+    /// What the name stands for: input or query, and the key and value types.
+    fn signature(&self) -> Signature;
+}
+
+/// What a kind name stands for. A name is global to a graph: it identifies
+/// the nodes of the kind in the store, so two kinds of one name must agree.
+pub(crate) struct Signature {
+    input: bool,
+    key: TypeId,
+    value: TypeId,
+    text: String,
+}
+
+impl Signature {
+    fn of<K: Key, V: Value>(input: bool, name: &str) -> Self {
+        Self {
+            input,
+            key: TypeId::of::<K>(),
+            value: TypeId::of::<V>(),
+            text: format!(
+                "{} {name}<{}, {}>",
+                if input { "input" } else { "query" },
+                type_name::<K>(),
+                type_name::<V>()
+            ),
+        }
+    }
+
+    pub(crate) fn same(&self, other: &Self) -> bool {
+        (self.input, self.key, self.value) == (other.input, other.key, other.value)
+    }
+
+    pub(crate) fn text(&self) -> &str {
+        &self.text
+    }
 }
 
 /// A value as computed: itself, and the bytes it hashes and is stored as.
@@ -95,6 +135,10 @@ impl<K: Key, V: Value> Kind for Input<K, V> {
     fn describe(&self, key: &[u8]) -> String {
         describe::<K>(self.name, key)
     }
+
+    fn signature(&self) -> Signature {
+        Signature::of::<K, V>(true, self.name)
+    }
 }
 
 /// A value derived by a pure function of its key and of what it reads
@@ -137,6 +181,10 @@ impl<K: Key, V: Value> Kind for Query<K, V> {
 
     fn describe(&self, key: &[u8]) -> String {
         describe::<K>(self.name, key)
+    }
+
+    fn signature(&self) -> Signature {
+        Signature::of::<K, V>(false, self.name)
     }
 }
 

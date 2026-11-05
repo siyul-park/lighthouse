@@ -285,3 +285,39 @@ fn explanation() {
 fn revision() {
     assert_eq!(Revision(3).to_string(), "r3");
 }
+
+static FILE_TEXT: Input<String, String> = Input::new("file");
+static FILE_FLAG: Input<String, bool> = Input::new("file");
+static FILE_QUERY: Query<String, Option<String>> = Query::new("file", |_, _| Ok(None));
+
+/// A name is global: another key or value type, or an input registered as a
+/// query, is an error that names both.
+#[test]
+fn a_kind_name_registered_with_another_type_is_an_error() {
+    let mut graph = Graph::in_memory(Options::default()).expect("open");
+    graph
+        .set_input(
+            &FILE,
+            &"a".to_owned(),
+            Some("x".to_owned()),
+            Durability::Volatile,
+        )
+        .expect("first registration");
+
+    let value = graph.set_input(&FILE_FLAG, &"a".to_owned(), true, Durability::Volatile);
+    let key = graph.input(&FILE_TEXT, &"a".to_owned());
+    let kind = graph.query(&FILE_QUERY, &"a".to_owned());
+
+    for found in [value.err(), key.err(), kind.err()] {
+        let Some(Error::Kind { name, had, now }) = found else {
+            panic!("expected a kind conflict, got {found:?}");
+        };
+        assert_eq!(name, "file");
+        assert!(had.contains("Option<alloc::string::String>"), "{had}");
+        assert_ne!(had, now);
+    }
+    assert!(
+        graph.input(&FILE, &"a".to_owned()).is_ok(),
+        "the first stays"
+    );
+}

@@ -9,8 +9,8 @@ use lighthouse_plugin::RuleManifest;
 use rayon::ThreadPool;
 
 use super::{regions::Views, *};
-use crate::graph::{Content, Detected, Readable};
-use lighthouse_spec::Attributes;
+use crate::graph::Detected;
+use lighthouse_spec::{Attributes, Content, Readable};
 
 /// Why a file the languages claim is not an input: a notice for binary data a
 /// fallback provider claims, otherwise a gap in the analysis.
