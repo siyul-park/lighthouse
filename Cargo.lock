@@ -1941,14 +1941,17 @@ dependencies = [
 name = "lighthouse-engine"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "globset",
  "ignore",
+ "lighthouse-graph",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-spec",
  "lighthouse-test-support",
+ "postcard",
  "rayon",
  "regex",
  "rusqlite",
@@ -2115,6 +2118,7 @@ dependencies = [
  "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-test-support",
+ "rayon",
  "regex",
  "schemars",
  "serde",

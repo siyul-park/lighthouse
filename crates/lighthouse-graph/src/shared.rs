@@ -29,6 +29,8 @@ pub(crate) struct Shared {
     pub verify_count: AtomicU64,
     pub limit: AtomicU64,
     pub versions: Mutex<Versions>,
+    /// Blobs set since the last commit.
+    pub states: Mutex<BTreeMap<String, Vec<u8>>>,
 }
 
 pub(crate) struct Registered {

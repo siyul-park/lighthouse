@@ -8,9 +8,12 @@ publish.workspace = true
 doctest = false
 
 [dependencies]
+blake3.workspace = true
 globset.workspace = true
 ignore.workspace = true
+postcard.workspace = true
 regex.workspace = true
+lighthouse-graph.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-process.workspace = true

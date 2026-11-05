@@ -9,6 +9,7 @@ mod error;
 mod facts;
 mod fix;
 mod generated;
+mod queries;
 mod tester;
 mod timings;
 
@@ -24,4 +25,4 @@ pub use fix::{
     FixRun, FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, ToolCounts, brief, unified_diff,
 };
 pub use tester::{ExampleRun, RuleTester, Spent, Tested};
-pub use timings::{FixTimings, Timings};
+pub use timings::{Detect, FixTimings, Timings};

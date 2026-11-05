@@ -82,8 +82,8 @@ impl Rule for Counting {
 }
 
 /// The rules of the plugin and the counters of their runs.
-struct Counted {
-    local: Arc<AtomicUsize>,
+pub(crate) struct Counted {
+    pub(crate) local: Arc<AtomicUsize>,
     global: Arc<AtomicUsize>,
     rows: Arc<AtomicUsize>,
 }
@@ -142,7 +142,7 @@ fn engine(root: &Path) -> (Engine, Counted) {
     engine_with(root, CONFIG)
 }
 
-fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
+pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
     let counted = Counted {
         local: Arc::default(),
         global: Arc::default(),

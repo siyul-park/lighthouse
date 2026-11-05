@@ -34,6 +34,9 @@ pub enum Error {
     /// file changed under it, a formatter that cannot run, an unknown fixer.
     #[error("{0}")]
     Fix(String),
+    /// The query graph that holds what is known of the files failed.
+    #[error("graph: {0}")]
+    Graph(#[from] lighthouse_graph::Error),
 }
 
 /// Where a plugin that is not installed was asked for, when an extended

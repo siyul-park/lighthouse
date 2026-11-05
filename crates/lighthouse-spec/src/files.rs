@@ -10,7 +10,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::{Attributes, Error, ignores::matcher as ignore_matcher};
+use crate::{Attributes, Dirs, Error, ignores::matcher as ignore_matcher};
 use ignore::{WalkBuilder, gitignore::Gitignore};
 use lighthouse_model::STATE_DIR;
 
@@ -20,7 +20,7 @@ const REPOSITORY: &str = ".git";
 /// How to list the files of one project root.
 #[derive(Clone)]
 pub struct ProjectFiles {
-    root: PathBuf,
+    pub(crate) root: PathBuf,
     patterns: Vec<String>,
     ignores: Gitignore,
 }
@@ -59,8 +59,13 @@ impl ProjectFiles {
         &self.root
     }
 
+    /// Every file of the project, sorted: a walk with no history.
+    pub fn list(&self) -> Listing {
+        self.walk(&Dirs::new(), None).listing
+    }
+
     /// Whether the walk enters the entry at `rel`, a project-relative path.
-    fn enters(&self, rel: &Path, is_dir: bool) -> bool {
+    pub(crate) fn enters(&self, rel: &Path, is_dir: bool) -> bool {
         if rel.as_os_str().is_empty() {
             return true;
         }
@@ -105,8 +110,11 @@ impl ProjectFiles {
         true
     }
 
-    /// Every file of the project, sorted.
-    pub fn list(&self) -> Listing {
+    /// Every file of the project, sorted, by the `ignore` crate's own walker:
+    /// the reference that [`ProjectFiles::walk`] is tested against, which is
+    /// what a run uses.
+    #[doc(hidden)]
+    pub fn walker_list(&self) -> Listing {
         let this = self.clone();
         let root = self.root.clone();
         let walk = WalkBuilder::new(&self.root)

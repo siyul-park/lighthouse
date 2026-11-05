@@ -1,6 +1,5 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs, io,
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, Instant},
@@ -42,6 +41,7 @@ mod regions;
 mod route;
 mod run;
 mod scopes;
+mod text;
 
 pub use availability::{Availability, Needs};
 use cached::RunCache;
@@ -52,8 +52,10 @@ use config::{
     validate_config,
 };
 use models::RunModels;
+pub(crate) use phases::in_pool;
 pub(crate) use route::{Member, Refusal, Route, Usage};
 pub(crate) use scopes::Scopes;
+pub(crate) use text::Text;
 
 /// Process exit code of a run whose analysis was incomplete.
 pub const EXIT_INCOMPLETE: u8 = 3;
@@ -208,7 +210,7 @@ impl<'a> Scene<'a> {
 
 pub(crate) struct Input {
     pub(crate) file: File,
-    pub(crate) text: String,
+    pub(crate) text: Text,
     language: usize,
 }
 
@@ -281,15 +283,17 @@ pub struct Engine {
     /// How a `command` model provider is run, when the host knows.
     commands: Option<CommandModels>,
     /// The result cache; `None` runs every rule every time.
-    cache: Option<CacheSettings>,
+    pub(crate) cache: Option<CacheSettings>,
+    /// The graph of what is known of the files, opened by the first run.
+    pub(crate) graph: std::sync::Mutex<Option<crate::queries::Graph>>,
     /// What the run may do with models.
     models: ModelOptions,
 }
 
 /// Where the engine keeps the findings of its runs, and how much.
-struct CacheSettings {
-    dir: PathBuf,
-    limit: u64,
+pub(crate) struct CacheSettings {
+    pub(crate) dir: PathBuf,
+    pub(crate) limit: u64,
 }
 
 struct Language {
@@ -401,6 +405,7 @@ impl Engine {
             trusted: false,
             commands: None,
             cache: None,
+            graph: std::sync::Mutex::new(None),
             models: ModelOptions::default(),
         })
     }

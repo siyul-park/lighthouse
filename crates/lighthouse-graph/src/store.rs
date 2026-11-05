@@ -13,7 +13,7 @@ use crate::{
 
 /// Bumped whenever a table or what a value means changes: a database of
 /// another version is replaced.
-const SCHEMA: i64 = 1;
+const SCHEMA: i64 = 2;
 
 /// Pruning goes down to this part of the limit, so that a run that is just
 /// over does not prune every time.
@@ -32,6 +32,10 @@ CREATE TABLE node(
     used_at INTEGER NOT NULL,
     value BLOB,
     PRIMARY KEY(kind, key)
+) WITHOUT ROWID;
+CREATE TABLE state(
+    name TEXT PRIMARY KEY,
+    value BLOB NOT NULL
 ) WITHOUT ROWID;
 CREATE TABLE meta(
     id INTEGER PRIMARY KEY CHECK(id = 0),
@@ -165,6 +169,17 @@ impl Store {
         Ok(row.flatten())
     }
 
+    /// A blob kept by name outside the nodes.
+    pub(crate) fn state(&self, name: &str) -> Result<Option<Vec<u8>>, Error> {
+        let conn = self.conn.locked();
+        let value = conn
+            .query_row("SELECT value FROM state WHERE name = ?1", [name], |row| {
+                row.get(0)
+            })
+            .optional()?;
+        Ok(value)
+    }
+
     /// The stored value of a node.
     pub(crate) fn value(&self, kind: &str, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let conn = self.conn.locked();
@@ -182,6 +197,7 @@ impl Store {
     pub(crate) fn commit(
         &self,
         writes: &[Write],
+        states: &[(String, Vec<u8>)],
         meta: &Meta,
         limit: u64,
     ) -> Result<Vec<(String, Vec<u8>)>, Error> {
@@ -189,6 +205,13 @@ impl Store {
         let tx = conn.transaction()?;
         for write in writes {
             put(&tx, write)?;
+        }
+        for (name, value) in states {
+            tx.prepare_cached(
+                "INSERT INTO state(name, value) VALUES (?1, ?2)
+                 ON CONFLICT(name) DO UPDATE SET value = ?2",
+            )?
+            .execute(params![name, value])?;
         }
         put_meta(&tx, meta)?;
         let pruned = prune(&tx, limit)?;

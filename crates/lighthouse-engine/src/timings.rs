@@ -15,6 +15,8 @@ pub struct Timings {
     pub setup: Duration,
     /// Walking the root and reading the files a language claims.
     pub read: Duration,
+    /// What the walk and the graph did of that.
+    pub files: Detect,
     /// Indexing by each language provider, by language id; the providers run
     /// side by side.
     pub index: Vec<(String, Duration)>,
@@ -43,11 +45,31 @@ pub struct Timings {
     pub store: Duration,
 }
 
+/// What detecting the files cost: how many were `lstat`ed, how many read for
+/// their content, how many directories listed again, the Merkle hash of the
+/// root and the time the graph took to commit.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Detect {
+    pub stat: usize,
+    pub read: usize,
+    pub relisted: usize,
+    pub root: String,
+    pub commit: Duration,
+}
+
 impl Timings {
     /// The lines of the breakdown. `report` is the time spent printing the
     /// findings and `total` the time of the whole run.
     pub fn lines(&self, report: Duration, total: Duration) -> Vec<String> {
         let mut out = vec![line("setup", self.setup), line("read", self.read)];
+        out.push(format!(
+            "files: {} stat, {} read, {} dir(s) listed, root {}, graph commit {:.1}ms",
+            self.files.stat,
+            self.files.read,
+            self.files.relisted,
+            self.files.root.chars().take(8).collect::<String>(),
+            self.files.commit.as_secs_f64() * 1000.0
+        ));
         for (language, spent) in &self.index {
             out.push(line(&format!("index {language}"), *spent));
             if let Some(phases) = self.phases_of(language) {

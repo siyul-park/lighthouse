@@ -6,11 +6,11 @@ use std::{borrow::Cow, sync::OnceLock};
 use lighthouse_model::ucm::{Capability, ORDERED, REGIONS};
 use lighthouse_plugin::RuleManifest;
 
-use lighthouse_protocol::hash;
 use rayon::ThreadPool;
 
 use super::{regions::Views, *};
-use lighthouse_spec::{Attributes, Listing};
+use crate::queries::{Content, Detected, Readable};
+use lighthouse_spec::Attributes;
 
 /// Why a file the languages claim is not an input: a notice for binary data a
 /// fallback provider claims, otherwise a gap in the analysis.
@@ -33,7 +33,7 @@ enum Skipped {
 /// worker gets the stack the main thread has, as the expressions of a check
 /// recurse deeply. If such workers cannot start, workers with the default
 /// stack do, and failing that `op` runs on the global pool.
-pub(super) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
+pub(crate) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
     const STACK: usize = 8 << 20;
     static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
     let pool = POOL.get_or_init(|| {
@@ -52,9 +52,15 @@ pub(super) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
 }
 
 impl Engine {
-    /// Reads every file under the root that a listed language claims, side by
-    /// side.
-    pub(super) fn read(&self, listing: &Listing, overlays: &Overlays, run: &mut Run) -> Vec<Input> {
+    /// Makes an input of every file a listed language claims, with the hash
+    /// the graph has of it, side by side. The text is read when first used.
+    pub(super) fn read(
+        &self,
+        detected: &Detected,
+        overlays: &Overlays,
+        run: &mut Run,
+    ) -> Vec<Input> {
+        let listing = &detected.listing;
         for e in &listing.errors {
             run.incomplete.push(Incomplete {
                 path: None,
@@ -62,11 +68,14 @@ impl Engine {
                 reason: format!("walk: {e}"),
             });
         }
-        let files = &listing.files;
         let read: Vec<Result<Input, Skipped>> = in_pool(|| {
-            files
+            listing
+                .files
                 .par_iter()
-                .filter_map(|rel| self.read_input(rel, &listing.attributes, overlays))
+                .filter_map(|rel| {
+                    let content = detected.contents.get(rel)?;
+                    self.read_input(rel, content, &listing.attributes, overlays)
+                })
                 .collect()
         });
         let mut inputs = Vec::new();
@@ -83,11 +92,19 @@ impl Engine {
         inputs
     }
 
-    /// Reads one file if a listed language claims it, from its overlay when
-    /// it has one; a file that cannot be read is not an input.
+    /// Whether a listed language claims the file at `rel`.
+    pub(super) fn claimed(&self, rel: &Path) -> bool {
+        self.providers
+            .iter()
+            .any(|&i| self.languages[i].claims(rel))
+    }
+
+    /// The input of one file if a listed language claims it, from its overlay
+    /// when it has one; a file that cannot be read is not an input.
     fn read_input(
         &self,
         rel: &Path,
+        content: &Content,
         attributes: &Attributes,
         overlays: &Overlays,
     ) -> Option<Result<Input, Skipped>> {
@@ -95,34 +112,39 @@ impl Engine {
             .providers
             .iter()
             .find(|&&i| self.languages[i].claims(rel))?;
-        let text = match overlays.get(rel) {
-            Some(text) => text.clone(),
-            None => match fs::read_to_string(self.ws.root.join(rel)) {
-                Ok(text) => text,
-                Err(e) if e.kind() == io::ErrorKind::InvalidData => {
-                    return Some(Err(if self.provider(language).manifest().fallback {
-                        Skipped::Notice(format!("{}: skipped, not valid UTF-8", rel.display()))
-                    } else {
-                        Skipped::Incomplete(Incomplete {
-                            path: Some(rel.to_owned()),
-                            provider: None,
-                            reason: "not valid UTF-8".to_owned(),
-                        })
-                    }));
-                }
-                Err(e) => {
-                    return Some(Err(Skipped::Incomplete(Incomplete {
+        let text = match (overlays.get(rel), &content.readable) {
+            (Some(text), _) => Text::held(text.clone()),
+            (None, Readable::Text) => Text::at(self.ws.root.join(rel)),
+            (None, Readable::NotUtf8) => {
+                return Some(Err(if self.provider(language).manifest().fallback {
+                    Skipped::Notice(format!("{}: skipped, not valid UTF-8", rel.display()))
+                } else {
+                    Skipped::Incomplete(Incomplete {
                         path: Some(rel.to_owned()),
                         provider: None,
-                        reason: format!("unreadable: {e}"),
-                    })));
-                }
-            },
+                        reason: "not valid UTF-8".to_owned(),
+                    })
+                }));
+            }
+            (None, Readable::Unreadable(why)) => {
+                return Some(Err(Skipped::Incomplete(Incomplete {
+                    path: Some(rel.to_owned()),
+                    provider: None,
+                    reason: format!("unreadable: {why}"),
+                })));
+            }
+            (None, Readable::Missing) => {
+                return Some(Err(Skipped::Incomplete(Incomplete {
+                    path: Some(rel.to_owned()),
+                    provider: None,
+                    reason: "unreadable: the file is gone".to_owned(),
+                })));
+            }
         };
         let file = File {
             path: rel.to_owned(),
             lang: self.provider(language).manifest().id.clone(),
-            hash: hash::sha256(&text),
+            hash: content.sha256.clone(),
             generated: self.generated.names(rel) || attributes.is_generated(rel),
             test: self.languages[language].tests.is_match(rel),
             facts: Default::default(),

@@ -1,0 +1,370 @@
+//! The walk of a project that remembers: the listing [`ProjectFiles`] gives,
+//! with the `lstat` of every file, from a walk that reads a directory again
+//! only when its own `lstat` moved.
+//!
+//! The rules are the `ignore` crate walker's, which this is tested against
+//! ([`ProjectFiles::walker_list`]): `.gitignore` files from the root down
+//! (the deepest match wins), the `info/exclude` of each repository found,
+//! then [`ProjectFiles::enters`] and `.gitattributes`. They are applied to
+//! what a directory holds on every walk; only the `readdir` is skipped. A
+//! directory that did not change is one whose `lstat` is the same as at the
+//! last walk and is not racy: git's untracked cache, and its racy rule.
+
+use std::{
+    collections::BTreeMap,
+    ffi::OsString,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use ignore::{
+    Match,
+    gitignore::{Gitignore, GitignoreBuilder},
+};
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+
+use crate::{Attributes, Listing, ProjectFiles};
+
+/// A directory whose modification time is this close to the start of the last
+/// walk, or later, is read again: the file system's clock may be as coarse as
+/// two seconds (FAT) and a change in the same tick is not told by the time.
+pub const RACY_NS: i64 = 2_000_000_000;
+
+/// What one `lstat` says of a file or a directory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Stat {
+    pub mtime_ns: i64,
+    pub ctime_ns: i64,
+    pub size: u64,
+    pub inode: u64,
+    pub mode: u32,
+}
+
+impl Stat {
+    fn of(meta: &fs::Metadata) -> Self {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let ns =
+                |secs: i64, nanos: i64| secs.saturating_mul(1_000_000_000).saturating_add(nanos);
+            Self {
+                mtime_ns: ns(meta.mtime(), meta.mtime_nsec()),
+                ctime_ns: ns(meta.ctime(), meta.ctime_nsec()),
+                size: meta.size(),
+                inode: meta.ino(),
+                mode: meta.mode(),
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let mtime_ns = meta
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |since| since.as_nanos() as i64);
+            Self {
+                mtime_ns,
+                ctime_ns: 0,
+                size: meta.len(),
+                inode: 0,
+                mode: 0,
+            }
+        }
+    }
+}
+
+/// What kind of entry a directory holds, as its listing says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Kind {
+    File,
+    Dir,
+    /// A symbolic link or anything else: never listed, never entered.
+    Other,
+}
+
+/// One entry of a directory as `readdir` gave it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Raw {
+    pub name: OsString,
+    pub kind: Kind,
+}
+
+/// A directory as it was read: its `lstat` and everything it holds, ignored
+/// or not. Sorted by name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Dir {
+    pub stat: Stat,
+    pub entries: Vec<Raw>,
+}
+
+/// The directories a walk entered, by project-relative path (the root is the
+/// empty path).
+pub type Dirs = BTreeMap<PathBuf, Dir>;
+
+/// An entry of the project: what a directory lists once ignored files are
+/// out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Listed {
+    pub name: OsString,
+    pub is_dir: bool,
+}
+
+/// What a walk found.
+#[derive(Default)]
+pub struct Walked {
+    pub listing: Listing,
+    /// The `lstat` of each listed file.
+    pub stats: BTreeMap<PathBuf, Stat>,
+    /// For each directory entered, what it lists, sorted by name.
+    pub listed: BTreeMap<PathBuf, Vec<Listed>>,
+    /// What was read of each directory, to give the next walk.
+    pub dirs: Dirs,
+    /// How many directories were read: the others were as the last walk
+    /// found them.
+    pub relisted: usize,
+}
+
+/// The ignore files of one directory.
+struct Level {
+    gitignore: Gitignore,
+    exclude: Gitignore,
+}
+
+impl ProjectFiles {
+    /// Every file of the project and its `lstat`. `previous` is what the last
+    /// walk read and `since` when that walk started, in nanoseconds since the
+    /// epoch: without it every directory is read.
+    pub fn walk(&self, previous: &Dirs, since: Option<i64>) -> Walked {
+        let mut walk = Walk {
+            project: self,
+            previous,
+            since,
+            out: Walked::default(),
+            files: Vec::new(),
+        };
+        walk.visit(Path::new(""), &mut Vec::new());
+        walk.finish()
+    }
+}
+
+struct Walk<'a> {
+    project: &'a ProjectFiles,
+    previous: &'a Dirs,
+    since: Option<i64>,
+    out: Walked,
+    files: Vec<PathBuf>,
+}
+
+impl Walk<'_> {
+    fn visit(&mut self, rel: &Path, chain: &mut Vec<Level>) {
+        let abs = self.project.root.join(rel);
+        let stat = match fs::symlink_metadata(&abs) {
+            Ok(meta) => Stat::of(&meta),
+            Err(e) => {
+                self.out
+                    .listing
+                    .errors
+                    .push(format!("{}: {e}", abs.display()));
+                return;
+            }
+        };
+        let Some(dir) = self.read(rel, &abs, stat) else {
+            return;
+        };
+        let has = |name: &str| dir.entries.iter().any(|raw| raw.name == name);
+        chain.push(Level {
+            gitignore: if has(".gitignore") {
+                self.gitignore(&abs)
+            } else {
+                Gitignore::empty()
+            },
+            exclude: if has(".git") {
+                self.exclude(&abs)
+            } else {
+                Gitignore::empty()
+            },
+        });
+        let mut listed = Vec::new();
+        let mut below = Vec::new();
+        for raw in &dir.entries {
+            let at = rel.join(&raw.name);
+            let is_dir = raw.kind == Kind::Dir;
+            if !self.project.enters(&at, is_dir) || ignored(chain, &abs.join(&raw.name), is_dir) {
+                continue;
+            }
+            match raw.kind {
+                Kind::Dir => {
+                    listed.push(Listed {
+                        name: raw.name.clone(),
+                        is_dir: true,
+                    });
+                    below.push(at);
+                }
+                Kind::File => {
+                    listed.push(Listed {
+                        name: raw.name.clone(),
+                        is_dir: false,
+                    });
+                    self.files.push(at);
+                }
+                Kind::Other => {}
+            }
+        }
+        self.out.listed.insert(rel.to_owned(), listed);
+        self.out.dirs.insert(rel.to_owned(), dir);
+        for at in below {
+            self.visit(&at, chain);
+        }
+        chain.pop();
+    }
+
+    /// The directory as the last walk read it when its `lstat` is the same
+    /// and not racy, else as `readdir` gives it now.
+    fn read(&mut self, rel: &Path, abs: &Path, stat: Stat) -> Option<Dir> {
+        let quiet = self
+            .since
+            .is_some_and(|since| stat.mtime_ns < since.saturating_sub(RACY_NS));
+        if let Some(known) = self
+            .previous
+            .get(rel)
+            .filter(|known| quiet && known.stat == stat)
+        {
+            return Some(known.clone());
+        }
+        let read = match fs::read_dir(abs) {
+            Ok(read) => read,
+            Err(e) => {
+                self.out
+                    .listing
+                    .errors
+                    .push(format!("{}: {e}", abs.display()));
+                return None;
+            }
+        };
+        self.out.relisted += 1;
+        let mut entries = Vec::new();
+        for entry in read {
+            match entry {
+                Ok(entry) => entries.push(Raw {
+                    kind: match entry.file_type() {
+                        Ok(kind) if kind.is_dir() => Kind::Dir,
+                        Ok(kind) if kind.is_file() => Kind::File,
+                        _ => Kind::Other,
+                    },
+                    name: entry.file_name(),
+                }),
+                Err(e) => self
+                    .out
+                    .listing
+                    .errors
+                    .push(format!("{}: {e}", abs.display())),
+            }
+        }
+        entries.sort_by(|a, b| a.name.cmp(&b.name));
+        Some(Dir { stat, entries })
+    }
+
+    fn gitignore(&mut self, abs: &Path) -> Gitignore {
+        let (gitignore, error) = Gitignore::new(abs.join(".gitignore"));
+        self.out.listing.errors.extend(error.map(|e| e.to_string()));
+        gitignore
+    }
+
+    /// `info/exclude` of the repository the directory is the root of: of the
+    /// common directory when `.git` is a file of a worktree.
+    fn exclude(&mut self, abs: &Path) -> Gitignore {
+        let git = abs.join(".git");
+        let Some(dir) = git_dir(&git, fs::metadata(&git).ok().is_some_and(|m| m.is_file())) else {
+            return Gitignore::empty();
+        };
+        let file = dir.join("info/exclude");
+        let mut builder = GitignoreBuilder::new(abs);
+        if file.exists() {
+            self.out
+                .listing
+                .errors
+                .extend(builder.add(&file).map(|e| e.to_string()));
+        }
+        builder.build().unwrap_or_else(|e| {
+            self.out.listing.errors.push(e.to_string());
+            Gitignore::empty()
+        })
+    }
+
+    fn finish(mut self) -> Walked {
+        let root = self.project.root.clone();
+        let stats: Vec<(PathBuf, Option<Stat>)> = self
+            .files
+            .par_iter()
+            .map(|rel| {
+                let stat = fs::symlink_metadata(root.join(rel))
+                    .ok()
+                    .map(|m| Stat::of(&m));
+                (rel.clone(), stat)
+            })
+            .collect();
+        let mut files: Vec<PathBuf> = Vec::with_capacity(stats.len());
+        for (rel, stat) in stats {
+            if let Some(stat) = stat {
+                self.out.stats.insert(rel.clone(), stat);
+                files.push(rel);
+            }
+        }
+        files.sort();
+        let (attributes, notices) = Attributes::new(&root, &files);
+        let (kept, vendored): (Vec<PathBuf>, Vec<PathBuf>) =
+            files.into_iter().partition(|f| !attributes.is_vendored(f));
+        for gone in &vendored {
+            self.out.stats.remove(gone);
+        }
+        let listed = &mut self.out.listed;
+        let gone = |dir: &Path, name: &OsString| {
+            let at = dir.join(name);
+            vendored.binary_search(&at).is_ok() || !self.out.stats.contains_key(&at)
+        };
+        for (dir, children) in listed.iter_mut() {
+            children.retain(|child| child.is_dir || !gone(dir, &child.name));
+        }
+        self.out.listing.files = kept;
+        self.out.listing.notices = notices;
+        self.out.listing.attributes = attributes;
+        self.out
+    }
+}
+
+/// Whether the deepest `.gitignore`, then the deepest `info/exclude`, that
+/// has a say ignores the path.
+fn ignored(chain: &[Level], path: &Path, is_dir: bool) -> bool {
+    let mut found = Match::None;
+    for level in chain.iter().rev() {
+        found = level.gitignore.matched(path, is_dir);
+        if !found.is_none() {
+            return found.is_ignore();
+        }
+    }
+    for level in chain.iter().rev() {
+        found = level.exclude.matched(path, is_dir);
+        if !found.is_none() {
+            break;
+        }
+    }
+    found.is_ignore()
+}
+
+/// Where `info/exclude` is for the `.git` at `git`: the directory itself, or
+/// for the file of a worktree the common directory of the one it names.
+fn git_dir(git: &Path, is_file: bool) -> Option<PathBuf> {
+    if !is_file {
+        return Some(git.to_owned());
+    }
+    let text = fs::read_to_string(git).ok()?;
+    let real = PathBuf::from(text.lines().next()?.strip_prefix("gitdir: ")?);
+    let common = fs::read_to_string(real.join("commondir")).ok()?;
+    let common = common.lines().next()?;
+    Some(if common.starts_with('.') {
+        real.join(common)
+    } else {
+        PathBuf::from(common)
+    })
+}

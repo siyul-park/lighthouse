@@ -28,7 +28,7 @@ impl Engine {
                 .ok()
         });
         let models = RunModels::new(self, &scopes, cache.as_ref());
-        let (inputs, project) = self.load(&selected, overlays, &mut run);
+        let (inputs, project) = self.load(&selected, overlays, &mut run)?;
         let started = Instant::now();
         let run_cache = cache.as_ref().and_then(|cache| {
             self.run_cache(cache, &project, &selected, &models, &mut run.notices)
@@ -121,22 +121,25 @@ impl Engine {
         selected: &[&dyn Rule],
         overlays: &Overlays,
         run: &mut Run,
-    ) -> (Vec<Input>, Project) {
+    ) -> Result<(Vec<Input>, Project), Error> {
         let started = Instant::now();
-        let listing = self.files.list();
-        run.notices.extend(listing.notices.iter().cloned());
-        let inputs = self.read(&listing, overlays, run);
+        let detected = self.detect(overlays, |rel| self.claimed(rel))?;
+        run.notices.extend(detected.listing.notices.iter().cloned());
+        run.notices.extend(detected.notices.iter().cloned());
+        let listing = &detected.listing;
+        let inputs = self.read(&detected, overlays, run);
         run.timings.read = started.elapsed();
+        run.timings.files = detected.timing.clone();
         let (inputs, project) = self.build_project(inputs, overlays, run);
         let documented = selected
             .iter()
             .any(|rule| self.documented.contains(&rule.manifest().id));
         if !documented {
-            return (inputs, project);
+            return Ok((inputs, project));
         }
         let found = Documents::scan(&self.ws.root, &listing.files, overlays);
         run.notices.extend(found.notices);
-        (inputs, project.with_documents(found.documents))
+        Ok((inputs, project.with_documents(found.documents)))
     }
 
     /// Applies the rules and keeps what they found, noticed and could not

@@ -428,7 +428,7 @@ fn repository_regions(injections: &[InjectionSpec], asts: &[Source], root: &Path
                 test: false,
                 facts: BTreeMap::new(),
             },
-            text: std::fs::read_to_string(root.join(&ast.path)).unwrap(),
+            text: crate::engine::Text::held(std::fs::read_to_string(root.join(&ast.path)).unwrap()),
             language: 0,
         })
         .collect();

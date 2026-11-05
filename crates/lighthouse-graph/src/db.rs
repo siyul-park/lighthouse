@@ -67,6 +67,7 @@ impl Db {
             verify_count: AtomicU64::new(0),
             limit: AtomicU64::new(DEFAULT_LIMIT),
             versions: Mutex::default(),
+            states: Mutex::default(),
         };
         let mut db = Self {
             shared: Arc::new(shared),
@@ -152,6 +153,21 @@ impl Db {
         self.read(&VERSION, &name.to_owned())
     }
 
+    /// A blob kept under `name` in the store: what a run knows about the
+    /// outside world that is no input or query, such as when the files were
+    /// last walked. It is written at [`Db::commit`] and read back whole.
+    pub fn state(&self, name: &str) -> Result<Option<Vec<u8>>, Error> {
+        if let Some(value) = self.shared.states.locked().get(name) {
+            return Ok(Some(value.clone()));
+        }
+        self.shared.store.state(name)
+    }
+
+    /// Sets the blob [`Db::state`] gives for `name`.
+    pub fn set_state(&mut self, name: &str, value: Vec<u8>) {
+        self.shared.states.locked().insert(name.to_owned(), value);
+    }
+
     /// The most bytes of stored values kept at the next [`Db::commit`].
     pub fn set_limit(&mut self, bytes: u64) {
         self.shared.limit.store(bytes, Ordering::Release);
@@ -225,13 +241,21 @@ impl Db {
         let writes: Vec<Write> = slots.iter().map(write_of).collect();
         let meta = self.shared.meta()?;
         let limit = self.shared.limit.load(Ordering::Acquire);
-        let pruned = match self.shared.store.commit(&writes, &meta, limit) {
+        let states: Vec<(String, Vec<u8>)> = self
+            .shared
+            .states
+            .locked()
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let pruned = match self.shared.store.commit(&writes, &states, &meta, limit) {
             Ok(pruned) => pruned,
             Err(err) => {
                 self.shared.dirty.restore(slots);
                 return Err(err);
             }
         };
+        self.shared.states.locked().clear();
         for slot in &slots {
             settle_clean(slot);
         }

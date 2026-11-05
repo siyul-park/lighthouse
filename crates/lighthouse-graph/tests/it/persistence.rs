@@ -181,3 +181,25 @@ mod eviction_order {
         assert_eq!(db.take_executed(), ["volatile-big(())"]);
     }
 }
+
+#[test]
+fn a_state_blob_is_read_back_after_commit_and_reopen() {
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().join("graph.db");
+    let project = Project::new();
+    let mut db = open(Some(&path), &project);
+    assert_eq!(db.state("walk").expect("state"), None);
+
+    db.set_state("walk", b"one".to_vec());
+    assert_eq!(db.state("walk").expect("state"), Some(b"one".to_vec()));
+    drop(db);
+    let db = open(Some(&path), &project);
+    assert_eq!(db.state("walk").expect("state"), None, "never committed");
+
+    let mut db = db;
+    db.set_state("walk", b"two".to_vec());
+    db.commit().expect("commit");
+    drop(db);
+    let db = open(Some(&path), &project);
+    assert_eq!(db.state("walk").expect("state"), Some(b"two".to_vec()));
+}

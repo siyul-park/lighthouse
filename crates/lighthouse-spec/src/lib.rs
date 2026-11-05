@@ -25,6 +25,7 @@ mod scope;
 mod sources;
 mod union;
 mod validate;
+mod walk;
 
 use lighthouse_model::Schema;
 
@@ -64,6 +65,7 @@ pub use project::{
 };
 pub use scope::{Scope, Subject};
 pub(crate) use sources::SourceMapSpec;
+pub use walk::{Dir, Dirs, Kind, Listed, RACY_NS, Raw, Stat, Walked};
 
 /// The JSON Schema of every kind this crate defines.
 pub fn descriptors() -> Vec<Schema> {
