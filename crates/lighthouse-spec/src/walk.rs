@@ -21,7 +21,6 @@ use ignore::{
     Match,
     gitignore::{Gitignore, GitignoreBuilder},
 };
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{Attributes, Listing, ProjectFiles};
@@ -294,16 +293,7 @@ impl Walk<'_> {
 
     fn finish(mut self) -> Walked {
         let root = self.project.root.clone();
-        let stats: Vec<(PathBuf, Option<Stat>)> = self
-            .files
-            .par_iter()
-            .map(|rel| {
-                let stat = fs::symlink_metadata(root.join(rel))
-                    .ok()
-                    .map(|m| Stat::of(&m));
-                (rel.clone(), stat)
-            })
-            .collect();
+        let stats = stat_all(&root, &self.files);
         let mut files: Vec<PathBuf> = Vec::with_capacity(stats.len());
         for (rel, stat) in stats {
             if let Some(stat) = stat {
@@ -366,5 +356,28 @@ fn git_dir(git: &Path, is_file: bool) -> Option<PathBuf> {
         real.join(common)
     } else {
         PathBuf::from(common)
+    })
+}
+
+/// The `lstat` of each file, on as many threads as the machine has: threads
+/// of its own, since a caller may hold a lock that a work-stealing pool would
+/// have it wait for from inside.
+fn stat_all(root: &Path, files: &[PathBuf]) -> Vec<(PathBuf, Option<Stat>)> {
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let chunk = files.len().div_ceil(threads).max(256);
+    let one = |rel: &PathBuf| {
+        let stat = fs::symlink_metadata(root.join(rel))
+            .ok()
+            .map(|m| Stat::of(&m));
+        (rel.clone(), stat)
+    };
+    std::thread::scope(|scope| {
+        let jobs: Vec<_> = files
+            .chunks(chunk)
+            .map(|part| scope.spawn(move || part.iter().map(one).collect::<Vec<_>>()))
+            .collect();
+        jobs.into_iter()
+            .flat_map(|job| job.join().expect("stat thread"))
+            .collect()
     })
 }

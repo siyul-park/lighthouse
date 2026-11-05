@@ -9,7 +9,6 @@ use std::{
 
 use lighthouse_graph::{Db, Durability};
 use lighthouse_spec::Listing;
-use rayon::prelude::*;
 
 use super::{
     CONFIG, CONTENT, Content, DIR, ENTRIES, FILES, OVERLAY, ROOT, STAT, Walked, racy, register,
@@ -98,14 +97,19 @@ impl Engine {
         let (files, root_hash, contents) = in_pool(|| -> Result<_, Error> {
             let files = db.query(&FILES, &())?;
             let root_hash = *db.query(&DIR, &String::new())?;
-            let contents: Result<BTreeMap<PathBuf, Content>, Error> = files
-                .par_iter()
+            let claimed: Vec<PathBuf> = files
+                .iter()
                 .map(PathBuf::from)
                 .filter(|rel| wanted(rel))
-                .map(|rel| {
-                    let content = db.query(&CONTENT, &key(&rel))?;
-                    Ok((rel, content.as_ref().clone()))
-                })
+                .collect();
+            let pulled = db.par_map(claimed.clone(), |db, rel| {
+                db.query(&CONTENT, &key(rel))
+                    .map(|content| content.as_ref().clone())
+            });
+            let contents: Result<BTreeMap<PathBuf, Content>, Error> = claimed
+                .into_iter()
+                .zip(pulled)
+                .map(|(rel, content)| Ok((rel, content?)))
                 .collect();
             Ok((files, root_hash, contents?))
         })?;

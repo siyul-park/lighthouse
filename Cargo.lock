@@ -2118,7 +2118,6 @@ dependencies = [
  "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-test-support",
- "rayon",
  "regex",
  "schemars",
  "serde",

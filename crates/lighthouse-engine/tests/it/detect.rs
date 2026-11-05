@@ -221,3 +221,66 @@ fn an_edit_in_the_same_second_as_the_last_run_is_seen() {
         hash::sha256("same-2")
     );
 }
+
+#[test]
+fn an_overlay_stands_in_for_the_file_and_gives_way_when_it_is_dropped() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    write(&root, "x.txt", "on disk");
+    write(&root, "y.txt", "other");
+    let (engine, _) = engine_with(&root, &config(""));
+    let engine = engine.with_cache(cache.path().to_owned(), LIMIT);
+    let hash_of = |run: &Run, name: &str| run.project.file(Path::new(name)).unwrap().hash.clone();
+    let overlaid = |text: &str| -> lighthouse_engine::Overlays {
+        [(PathBuf::from("x.txt"), text.to_owned())].into()
+    };
+
+    // Files this new are read again at the next run; two runs settle them.
+    engine.check(&[], &[]).unwrap();
+    std::thread::sleep(Duration::from_millis(2200));
+    engine.check(&[], &[]).unwrap();
+    let plain = engine.check(&[], &[]).unwrap();
+    let first = engine.check_overlaid(&[], &[], &overlaid("one")).unwrap();
+    let second = engine.check_overlaid(&[], &[], &overlaid("two")).unwrap();
+    let again = engine.check_overlaid(&[], &[], &overlaid("one")).unwrap();
+    let dropped = engine.check(&[], &[]).unwrap();
+
+    assert_eq!(hash_of(&plain, "x.txt"), hash::sha256("on disk"));
+    assert_eq!(hash_of(&first, "x.txt"), hash::sha256("one"));
+    assert_eq!(hash_of(&second, "x.txt"), hash::sha256("two"));
+    assert_eq!(hash_of(&again, "x.txt"), hash::sha256("one"));
+    assert_eq!(hash_of(&dropped, "x.txt"), hash::sha256("on disk"));
+    assert_eq!(hash_of(&first, "y.txt"), hash::sha256("other"));
+}
+
+#[test]
+fn runs_from_several_threads_each_see_their_own_overlays() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    for name in ["x.txt", "y.txt", "z.txt"] {
+        write(&root, name, name);
+    }
+    let (engine, _) = engine_with(&root, &config(""));
+    let engine = engine.with_cache(cache.path().to_owned(), LIMIT);
+    std::thread::scope(|scope| {
+        for n in 0..8 {
+            let engine = &engine;
+            scope.spawn(move || {
+                for round in 0..10 {
+                    let text = format!("t{n}-{round}");
+                    let overlays: lighthouse_engine::Overlays = [(
+                        PathBuf::from(["x.txt", "y.txt", "z.txt"][(n + round) % 3]),
+                        text.clone(),
+                    )]
+                    .into();
+                    let run = engine.check_overlaid(&[], &[], &overlays).unwrap();
+                    let (path, text) = overlays.iter().next().unwrap();
+                    let seen = run.project.file(path).unwrap().hash.clone();
+                    assert_eq!(seen, hash::sha256(text), "thread {n} round {round}");
+                }
+            });
+        }
+    });
+}

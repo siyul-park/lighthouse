@@ -49,13 +49,11 @@ impl Content {
 }
 
 /// The overlay of a path, if one is set: an input that is never set for most
-/// paths reads as none.
+/// paths reads as none, and the read is recorded all the same.
 fn overlay(db: &Db, path: &String) -> Result<Option<Content>, Error> {
-    match db.input(&OVERLAY, path) {
-        Ok(content) => Ok(content.as_ref().clone()),
-        Err(Error::MissingInput(_)) => Ok(None),
-        Err(other) => Err(other),
-    }
+    Ok(db
+        .try_input(&OVERLAY, path)?
+        .and_then(|content| content.as_ref().clone()))
 }
 
 pub(super) fn content(db: &Db, path: &String) -> Result<Content, Error> {

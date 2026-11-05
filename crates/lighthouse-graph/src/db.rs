@@ -138,6 +138,37 @@ impl Db {
         self.read(input, key)
     }
 
+    /// The value of an input, or `None` when it is not set in this process.
+    /// The read is recorded either way: the query that read nothing depends
+    /// on the input being set later.
+    pub fn try_input<K: Key, V: Value>(
+        &self,
+        input: &'static Input<K, V>,
+        key: &K,
+    ) -> Result<Option<Arc<V>>, Error> {
+        let registered = self.shared.register(input);
+        let id = NodeId {
+            kind: registered.name,
+            key: encode(key)?.into(),
+        };
+        let seen = self.pull(&id, input, false)?;
+        if let Some(frame) = &self.frame {
+            // An input not set yet may be set with any durability: assume the
+            // lowest, so that what read it is not skipped as unaffected.
+            let durability = if seen.missing {
+                Durability::Volatile
+            } else {
+                seen.durability
+            };
+            frame.record(&id, seen.hash, durability);
+        }
+        match self.pull(&id, input, true) {
+            Ok(pulled) => Ok(pulled.value.and_then(|value| value.downcast::<V>().ok())),
+            Err(Error::MissingInput(_)) => Ok(None),
+            Err(other) => Err(other),
+        }
+    }
+
     /// The value of a query for a key: from memory, from the store if it is
     /// valid, or by running it, and recorded as read by the running query.
     pub fn query<K: Key, V: Value>(

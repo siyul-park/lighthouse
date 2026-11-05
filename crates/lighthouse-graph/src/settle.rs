@@ -52,6 +52,8 @@ impl Db {
                 .map(|kind| self.pull(&dep.id, kind, false))
                 .transpose()?;
             let moved = match pulled {
+                // An input that was unset when read and still is.
+                Some(pulled) if pulled.missing && dep.hash == [0; 32] => None,
                 Some(pulled) if !pulled.missing => (pulled.changed_at > snapshot.verified_at)
                     .then(|| Cause::DepMoved(dep.id.clone())),
                 _ => Some(Cause::UnknownDep(dep.id.clone())),

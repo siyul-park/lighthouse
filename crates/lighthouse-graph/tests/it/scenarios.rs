@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_graph::{Durability, Error, Reason};
+use lighthouse_graph::{Durability, Error, Input, Query, Reason};
 
 use crate::toy::*;
 
@@ -194,4 +194,55 @@ fn verify_mode_reports_a_query_that_reads_outside_the_graph() {
     let pulled = db.query(&IMPURE, &());
 
     assert!(matches!(pulled, Err(Error::Impure(_))), "{pulled:?}");
+}
+
+static MAYBE: Input<u32, u32> = Input::new("maybe");
+static READS_MAYBE: Query<u32, u32> = Query::new("reads-maybe", |db, key| {
+    Ok(db.try_input(&MAYBE, key)?.map_or(0, |value| *value + 1))
+});
+
+#[test]
+fn a_query_that_found_an_input_unset_runs_again_when_it_is_set() {
+    let mut db = lighthouse_graph::Db::in_memory(&Default::default()).expect("open");
+    db.set_verify(0);
+    db.register_input(&MAYBE);
+    db.register_query(&READS_MAYBE);
+    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 0);
+
+    db.set_input(&MAYBE, &1, 41, lighthouse_graph::Durability::Volatile)
+        .expect("set");
+    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 42);
+
+    db.set_input(&MAYBE, &1, 41, lighthouse_graph::Durability::Volatile)
+        .expect("set");
+    db.take_executed();
+    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 42);
+    assert!(
+        db.take_executed().is_empty(),
+        "an equal input moves nothing"
+    );
+}
+
+#[test]
+fn a_query_that_found_an_input_unset_stays_green_while_it_is_unset() {
+    let mut db = lighthouse_graph::Db::in_memory(&Default::default()).expect("open");
+    db.set_verify(0);
+    db.register_input(&MAYBE);
+    db.register_input(&FILE);
+    db.register_query(&READS_MAYBE);
+    db.set_input(&FILE, &"other".to_owned(), None, Durability::Volatile)
+        .expect("set");
+    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 0);
+    db.take_executed();
+
+    db.set_input(
+        &FILE,
+        &"other".to_owned(),
+        Some("x".into()),
+        Durability::Volatile,
+    )
+    .expect("set");
+
+    assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 0);
+    assert!(db.take_executed().is_empty(), "nothing it read moved");
 }
