@@ -2,7 +2,7 @@ import path from "node:path";
 import type ts from "typescript";
 import { Model } from "./model.ts";
 import { slashed } from "./project/paths.ts";
-import { Workspace } from "./project.ts";
+import { type Built, Workspace } from "./project.ts";
 import { syntaxProblem } from "./index/diagnostics.ts";
 import { Remap, type Snippet } from "./regions.ts";
 import { Types } from "./functions/signature.ts";
@@ -104,7 +104,7 @@ class Analysis {
     const reach = new Reach(model, this.request.root);
     const services: Services = { model, reach, types: new Types(model, reach) };
     for (const [file, rel] of members.files) {
-      this.indexFile(built.program, this.unitOf(services, file, rel), rel, built.notices);
+      this.indexFile(built, this.unitOf(services, file, rel), rel);
     }
     for (const snippet of members.snippets) {
       const unit = this.unitOf(services, this.absolute(snippet.rel), snippet.rel);
@@ -119,17 +119,17 @@ class Analysis {
       : new Unit(services, source, rel);
   }
 
-  private indexFile(program: ts.Program, unit: Unit | undefined, rel: string, notices: readonly string[]): void {
+  private indexFile(built: Built, unit: Unit | undefined, rel: string): void {
     const { result } = this.request;
     if (unit === undefined) {
       result.incomplete.push({ path: rel, reason: "the program does not contain the file" });
       return;
     }
-    const problem = syntaxProblem(program, unit.file);
+    const problem = syntaxProblem(built.program, unit.file);
     if (problem !== undefined) result.incomplete.push({ path: rel, reason: problem });
     const indexed = unit.index();
     const shape = this.shapes!.of(unit.file);
-    const own = [...notices];
+    const own = [...built.notices];
     if (indexed.unresolved > 0) own.push(unresolvedNotice(indexed.unresolved));
     result.shapes.set(rel, { ...shape, notices: own });
     result.fragments.push(indexed.fragment);

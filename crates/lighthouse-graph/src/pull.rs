@@ -10,7 +10,7 @@ use crate::{
     Durability, Error, Graph,
     frame::{Frame, cycle},
     node::{Hash, Locked, Node, NodeId, Slot, State},
-    query::{Kind, hash},
+    query::Kind,
 };
 
 /// What a pull tells its caller about the node.
@@ -71,7 +71,7 @@ impl Graph {
     ) -> Result<Option<Pulled>, Error> {
         if kind.is_input() {
             if kind.persisted() {
-                self.recall(slot, node, kind)?;
+                self.shared.recall(slot, node, kind)?;
             }
             return Ok(Some(Pulled::input(node, want_value)));
         }
@@ -81,25 +81,6 @@ impl Graph {
         }
         self.shared.dirty.touch(slot, node);
         Ok(Some(Pulled::of(node, want_value)))
-    }
-
-    /// Gives a persisted input the value the store has of it, if that is the
-    /// value its hash is of, and keeps its row from aging out while it is read.
-    fn recall(&self, slot: &Arc<Slot>, node: &mut Node, kind: &dyn Kind) -> Result<(), Error> {
-        if node.value.is_none() && node.on_disk {
-            let bytes = self.shared.store.value(&slot.id.kind, &slot.id.key)?;
-            if let Some(bytes) = bytes.filter(|bytes| hash(bytes) == node.hash)
-                && let Some(value) = kind.decode(&bytes)
-            {
-                node.value = Some(value);
-                node.blob = Some(bytes.into());
-            }
-        }
-        node.persisted = true;
-        if node.present && node.verified_at < self.shared.horizon(self.shared.retain / 2) {
-            self.shared.dirty.mark(slot, node);
-        }
-        Ok(())
     }
 
     fn run_claimed(

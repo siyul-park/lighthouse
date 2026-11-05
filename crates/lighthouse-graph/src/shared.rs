@@ -11,7 +11,7 @@ use crate::{
     Durability, Error,
     dirty::Dirty,
     node::{Dep, Hash, Locked, Node, NodeId, Slot},
-    query::{Kind, decode, encode},
+    query::{Kind, decode, encode, hash},
     store::{Meta, Row, Store, Write},
 };
 
@@ -209,6 +209,30 @@ impl Shared {
             true => marks.first().copied().unwrap_or(0),
             false => 0,
         }
+    }
+
+    /// Gives a persisted input the value the store has of it, if that is the
+    /// value its hash is of, and keeps its row from aging out while it is read.
+    pub(crate) fn recall(
+        &self,
+        slot: &Arc<Slot>,
+        node: &mut Node,
+        kind: &dyn Kind,
+    ) -> Result<(), Error> {
+        if node.value.is_none() && node.on_disk {
+            let bytes = self.store.value(&slot.id.kind, &slot.id.key)?;
+            if let Some(bytes) = bytes.filter(|bytes| hash(bytes) == node.hash)
+                && let Some(value) = kind.decode(&bytes)
+            {
+                node.value = Some(value);
+                node.blob = Some(bytes.into());
+            }
+        }
+        node.persisted = true;
+        if node.present && node.verified_at < self.horizon(self.retain / 2) {
+            self.dirty.mark(slot, node);
+        }
+        Ok(())
     }
 
     pub(crate) fn meta(&self, marks: &[u64]) -> Result<Meta, Error> {

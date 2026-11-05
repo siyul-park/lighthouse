@@ -84,7 +84,10 @@ describe("fences of a host file", () => {
     assert.equal(imported?.to, "src/index");
     assert.deepEqual(imported?.site?.start, { line: 4, col: 1 });
     assert.equal(fragment.file.path, "README.md");
-    assert.deepEqual(result.units.flatMap((unit) => unit.incomplete ?? []), []);
+    assert.deepEqual(
+      result.units.flatMap((unit) => unit.incomplete ?? []),
+      [],
+    );
   });
 
   it("are modules of their own that the host does not see a wrapper of", () => {
@@ -123,8 +126,13 @@ describe("fences of a host file", () => {
 
     const edge = fragmentOf(result).edges!.find((candidate) => candidate.to === "greet");
     assert.equal(edge?.resolution, "syntactic");
-    assert.ok(result.units.flatMap((unit) => unit.notices ?? []).some((notice) => notice.includes("do not type-check")));
-    assert.deepEqual(result.units.flatMap((unit) => unit.incomplete ?? []), []);
+    assert.ok(
+      result.units.flatMap((unit) => unit.notices ?? []).some((notice) => notice.includes("do not type-check")),
+    );
+    assert.deepEqual(
+      result.units.flatMap((unit) => unit.incomplete ?? []),
+      [],
+    );
   });
 
   it("that are not valid code are a notice, not a gap", () => {
@@ -132,8 +140,13 @@ describe("fences of a host file", () => {
 
     const result = index(root, markdown([{ body: "this is { not code\n" }]));
 
-    assert.deepEqual(result.units.flatMap((unit) => unit.incomplete ?? []), []);
-    assert.ok(result.units.flatMap((unit) => unit.notices ?? []).some((notice) => notice.includes("is not valid TypeScript")));
+    assert.deepEqual(
+      result.units.flatMap((unit) => unit.incomplete ?? []),
+      [],
+    );
+    assert.ok(
+      result.units.flatMap((unit) => unit.notices ?? []).some((notice) => notice.includes("is not valid TypeScript")),
+    );
     assert.deepEqual(fragmentOf(result).symbols, []);
   });
 

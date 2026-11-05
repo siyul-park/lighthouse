@@ -61,7 +61,14 @@ export class Provider implements sdk.Provider {
     const requested = run.admit(files);
     const snippets = planSnippets(hosts);
     const { root, overlays, found } = run;
-    const regionFragments = index({ root, overlays, requested, listed: params.files ?? files, snippets, result: found });
+    const regionFragments = index({
+      root,
+      overlays,
+      requested,
+      listed: params.files ?? files,
+      snippets,
+      result: found,
+    });
     const fenced = run.merge(hosts, snippets, regionFragments);
     return { units: params.units.map((unit) => run.unit(unit, fenced)), notices: [], incomplete: [] };
   }

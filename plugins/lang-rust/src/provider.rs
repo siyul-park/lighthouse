@@ -32,6 +32,15 @@ pub struct Provider {
     version: String,
 }
 
+impl Provider {
+    pub fn new(id: &str, version: &str) -> Self {
+        Self {
+            id: id.to_owned(),
+            version: version.to_owned(),
+        }
+    }
+}
+
 impl language::Provider for Provider {
     fn name(&self) -> &str {
         &self.id
@@ -132,59 +141,6 @@ impl language::Provider for Provider {
     }
 }
 
-/// What the analysis of a unit found.
-#[derive(Default)]
-pub(crate) struct Found {
-    pub fragments: Vec<Fragment>,
-    pub sources: Vec<Source>,
-    pub notices: Vec<String>,
-    pub incomplete: Vec<Incomplete>,
-}
-
-/// The fences of the host files of a unit of regions.
-fn regions_of(params: &IndexParams, unit: &UnitRef, options: &Options) -> Found {
-    let hosts: Vec<_> = unit.regions.iter().collect();
-    regions::index(params, &hosts, options)
-}
-
-/// The wire result of a unit. A unit of files has the `api` of its skeletons; a
-/// unit of regions is imported by none, and what it holds is all its `api`
-/// says.
-fn result_of(unit: &UnitRef, found: Found, api: Option<String>) -> UnitResult {
-    let hashes: Vec<&str> = unit
-        .files
-        .iter()
-        .map(|file| file.hash.as_str())
-        .chain(unit.regions.iter().map(|file| file.hash.as_str()))
-        .collect();
-    let body = api::digest(&hashes);
-    UnitResult {
-        id: unit.id.clone(),
-        fragments: found.fragments,
-        sources: found.sources,
-        api: api.unwrap_or_else(|| body.clone()),
-        body,
-        // A fragment reads what the other crates declare, as a module tree of
-        // all of them resolves a path: every unit is imported.
-        imports: match unit.regions.is_empty() {
-            true => vec![EVERY.to_owned()],
-            false => Vec::new(),
-        },
-        reads: Vec::new(),
-        notices: found.notices,
-        incomplete: found.incomplete,
-    }
-}
-
-impl Provider {
-    pub fn new(id: &str, version: &str) -> Self {
-        Self {
-            id: id.to_owned(),
-            version: version.to_owned(),
-        }
-    }
-}
-
 /// `[languages.rust]`; unknown keys are rejected.
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -204,12 +160,6 @@ pub(crate) enum Unpublished {
     Auto,
     Public,
     Internal,
-}
-
-struct Packages {
-    list: Vec<Package>,
-    /// Requested file to its package, or why it has none.
-    of: BTreeMap<String, Result<usize, String>>,
 }
 
 /// Who governs a file.
@@ -244,21 +194,6 @@ impl MacroSummary {
             self.defining, self.unread
         ))
     }
-}
-
-/// Collapses `.` and `..` so one file has one path however it was reached.
-pub fn normalize(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::ParentDir => {
-                out.pop();
-            }
-            Component::CurDir => {}
-            other => out.push(other),
-        }
-    }
-    out
 }
 
 /// The module tree and the name index of every file of the project, which a
@@ -341,6 +276,142 @@ impl Analysis<'_> {
     }
 }
 
+struct Packages {
+    list: Vec<Package>,
+    /// Requested file to its package, or why it has none.
+    of: BTreeMap<String, Result<usize, String>>,
+}
+
+/// What the analysis of a unit found.
+#[derive(Default)]
+pub(crate) struct Found {
+    pub fragments: Vec<Fragment>,
+    pub sources: Vec<Source>,
+    pub notices: Vec<String>,
+    pub incomplete: Vec<Incomplete>,
+}
+
+/// Collapses `.` and `..` so one file has one path however it was reached.
+pub fn normalize(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// The manifest nearest above `rel` within `root`, loading each directory once.
+pub(crate) fn governor(
+    root: &Path,
+    rel: &str,
+    by_dir: &mut BTreeMap<PathBuf, Result<Option<Package>, String>>,
+) -> Governor {
+    let mut dir = root.join(rel).parent().map(Path::to_owned);
+    while let Some(current) = dir.filter(|d| d.starts_with(root)) {
+        let loaded = by_dir
+            .entry(current.clone())
+            .or_insert_with(|| cargo::load(&current));
+        match loaded {
+            Ok(Some(_)) => return Governor::Manifest(current),
+            Err(reason) => return Governor::Failed(reason.clone()),
+            Ok(None) => dir = current.parent().map(Path::to_owned),
+        }
+    }
+    Governor::Nobody
+}
+
+/// The texts that stand in for files, by absolute path.
+pub(crate) fn overlays(params: &IndexParams, root: &Path) -> HashMap<PathBuf, String> {
+    params
+        .context
+        .overlays
+        .iter()
+        .flatten()
+        .map(|o| (normalize(&root.join(&o.path)), o.text.clone()))
+        .collect()
+}
+
+pub(crate) fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
+    let used = depended_on(packages);
+    let shipped = shipped(packages);
+    let mut roots = Vec::new();
+    for (at, package) in packages.iter().enumerate() {
+        let mut targets: Vec<&Target> = package.targets.iter().collect();
+        targets.sort_by(|a, b| (a.kind, &a.name).cmp(&(b.kind, &b.name)));
+        let has_lib = targets.iter().any(|t| t.kind == TargetKind::Lib);
+        let base = cargo::crate_name(&package.name);
+        // A library only tests link in, and that ships nowhere, is test code.
+        let support = !package.publishable
+            && used.contains(package.name.as_str())
+            && !shipped.contains(package.name.as_str())
+            && !targets.iter().any(|t| t.kind == TargetKind::Bin);
+        let exported = package.publishable
+            || match mode {
+                Unpublished::Public => true,
+                Unpublished::Internal => false,
+                Unpublished::Auto => used.contains(package.name.as_str()),
+            };
+        for target in targets {
+            let label = match target.kind {
+                TargetKind::Lib => base.clone(),
+                kind => format!("{base}[{}:{}]", kind.label(), target.name),
+            };
+            roots.push(Root {
+                test_of: ((target.kind == TargetKind::Test && has_lib)
+                    || (target.kind == TargetKind::Lib && support))
+                    .then(|| base.clone()),
+                label,
+                package: at,
+                kind: target.kind,
+                exported,
+                file: normalize(&target.root),
+            });
+        }
+    }
+    roots
+}
+
+/// The fences of the host files of a unit of regions.
+fn regions_of(params: &IndexParams, unit: &UnitRef, options: &Options) -> Found {
+    let hosts: Vec<_> = unit.regions.iter().collect();
+    regions::index(params, &hosts, options)
+}
+
+/// The wire result of a unit. A unit of files has the `api` of its skeletons; a
+/// unit of regions is imported by none, and what it holds is all its `api`
+/// says.
+fn result_of(unit: &UnitRef, found: Found, api: Option<String>) -> UnitResult {
+    let hashes: Vec<&str> = unit
+        .files
+        .iter()
+        .map(|file| file.hash.as_str())
+        .chain(unit.regions.iter().map(|file| file.hash.as_str()))
+        .collect();
+    let body = api::digest(&hashes);
+    UnitResult {
+        id: unit.id.clone(),
+        fragments: found.fragments,
+        sources: found.sources,
+        api: api.unwrap_or_else(|| body.clone()),
+        body,
+        // A fragment reads what the other crates declare, as a module tree of
+        // all of them resolves a path: every unit is imported.
+        imports: match unit.regions.is_empty() {
+            true => vec![EVERY.to_owned()],
+            false => Vec::new(),
+        },
+        reads: Vec::new(),
+        notices: found.notices,
+        incomplete: found.incomplete,
+    }
+}
+
 /// The fact `edition` of the file `fragment` describes: the edition of the
 /// crate that holds it, which a formatter needs and cannot read for itself. A
 /// file whose edition cannot be settled is a gap, not a guess.
@@ -418,37 +489,6 @@ fn packages(root: &Path, files: &[String]) -> Packages {
     Packages { list, of }
 }
 
-/// The manifest nearest above `rel` within `root`, loading each directory once.
-pub(crate) fn governor(
-    root: &Path,
-    rel: &str,
-    by_dir: &mut BTreeMap<PathBuf, Result<Option<Package>, String>>,
-) -> Governor {
-    let mut dir = root.join(rel).parent().map(Path::to_owned);
-    while let Some(current) = dir.filter(|d| d.starts_with(root)) {
-        let loaded = by_dir
-            .entry(current.clone())
-            .or_insert_with(|| cargo::load(&current));
-        match loaded {
-            Ok(Some(_)) => return Governor::Manifest(current),
-            Err(reason) => return Governor::Failed(reason.clone()),
-            Ok(None) => dir = current.parent().map(Path::to_owned),
-        }
-    }
-    Governor::Nobody
-}
-
-/// The texts that stand in for files, by absolute path.
-pub(crate) fn overlays(params: &IndexParams, root: &Path) -> HashMap<PathBuf, String> {
-    params
-        .context
-        .overlays
-        .iter()
-        .flatten()
-        .map(|o| (normalize(&root.join(&o.path)), o.text.clone()))
-        .collect()
-}
-
 fn module_tree(
     root: &Path,
     packages: &[Package],
@@ -461,46 +501,6 @@ fn module_tree(
         tree.add_crate(r);
     }
     tree
-}
-
-pub(crate) fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
-    let used = depended_on(packages);
-    let shipped = shipped(packages);
-    let mut roots = Vec::new();
-    for (at, package) in packages.iter().enumerate() {
-        let mut targets: Vec<&Target> = package.targets.iter().collect();
-        targets.sort_by(|a, b| (a.kind, &a.name).cmp(&(b.kind, &b.name)));
-        let has_lib = targets.iter().any(|t| t.kind == TargetKind::Lib);
-        let base = cargo::crate_name(&package.name);
-        // A library only tests link in, and that ships nowhere, is test code.
-        let support = !package.publishable
-            && used.contains(package.name.as_str())
-            && !shipped.contains(package.name.as_str())
-            && !targets.iter().any(|t| t.kind == TargetKind::Bin);
-        let exported = package.publishable
-            || match mode {
-                Unpublished::Public => true,
-                Unpublished::Internal => false,
-                Unpublished::Auto => used.contains(package.name.as_str()),
-            };
-        for target in targets {
-            let label = match target.kind {
-                TargetKind::Lib => base.clone(),
-                kind => format!("{base}[{}:{}]", kind.label(), target.name),
-            };
-            roots.push(Root {
-                test_of: ((target.kind == TargetKind::Test && has_lib)
-                    || (target.kind == TargetKind::Lib && support))
-                    .then(|| base.clone()),
-                label,
-                package: at,
-                kind: target.kind,
-                exported,
-                file: normalize(&target.root),
-            });
-        }
-    }
-    roots
 }
 
 /// Packages another package of the project links into what it ships.

@@ -29,6 +29,15 @@ use crate::{
     },
 };
 
+/// One language of the step: its call and what is known of it.
+struct Lane<'a> {
+    language: usize,
+    id: String,
+    call: Call<'a>,
+    /// The key of the unit of regions, none without regions.
+    regions: Option<String>,
+}
+
 /// What one provider is asked in a run: its units, and the regions of the host
 /// files that selected it.
 #[derive(Default)]
@@ -70,30 +79,6 @@ struct Taken {
     incomplete: Vec<Incomplete>,
 }
 
-/// One language of the step: its call and what is known of it.
-struct Lane<'a> {
-    language: usize,
-    id: String,
-    call: Call<'a>,
-    /// The key of the unit of regions, none without regions.
-    regions: Option<String>,
-}
-
-impl Lane<'_> {
-    /// The ids of the units of the call, the unit of regions last.
-    fn ids(&self) -> impl Iterator<Item = &str> {
-        self.call
-            .units
-            .iter()
-            .map(|unit| unit.id.as_str())
-            .chain(self.regions.iter().map(|_| REGIONS_UNIT))
-    }
-
-    fn at(&self, id: &str) -> (String, String) {
-        (self.id.clone(), id.to_owned())
-    }
-}
-
 impl Engine {
     /// Sets what the units of each language are made of and groups the inputs
     /// by the unit they are in, languages side by side. A host file's whole
@@ -109,25 +94,26 @@ impl Engine {
         let opened = guard.get_or_insert_with(|| self.open_graph());
         let graph = &mut opened.graph;
         for &language in &self.providers {
-            match self.group(graph, language, inputs) {
-                Ok(units) => {
-                    for unit in units {
-                        let is_host = hosts.is_some_and(|hosts| {
-                            unit.files.iter().any(|i| hosts.is_match(&i.file.path))
-                        });
-                        let calls = if is_host { &mut host } else { &mut plain };
-                        calls
-                            .entry(language)
-                            .or_insert_with(Call::default)
-                            .units
-                            .push(unit);
-                    }
+            let units = match self.group(graph, language, inputs) {
+                Ok(units) => units,
+                Err(e) => {
+                    run.incomplete.push(Incomplete {
+                        path: None,
+                        provider: Some(self.provider(language).manifest().id.clone()),
+                        reason: format!("the units of the language cannot be listed: {e}"),
+                    });
+                    continue;
                 }
-                Err(e) => run.incomplete.push(Incomplete {
-                    path: None,
-                    provider: Some(self.provider(language).manifest().id.clone()),
-                    reason: format!("the units of the language cannot be listed: {e}"),
-                }),
+            };
+            for unit in units {
+                let is_host = hosts
+                    .is_some_and(|hosts| unit.files.iter().any(|i| hosts.is_match(&i.file.path)));
+                let calls = if is_host { &mut host } else { &mut plain };
+                calls
+                    .entry(language)
+                    .or_insert_with(Call::default)
+                    .units
+                    .push(unit);
             }
         }
         (host, plain)
@@ -559,6 +545,21 @@ impl Engine {
             .iter()
             .map(|file| (file.file.path.as_path(), &file.file));
         plain.chain(regions).collect()
+    }
+}
+
+impl Lane<'_> {
+    /// The ids of the units of the call, the unit of regions last.
+    fn ids(&self) -> impl Iterator<Item = &str> {
+        self.call
+            .units
+            .iter()
+            .map(|unit| unit.id.as_str())
+            .chain(self.regions.iter().map(|_| REGIONS_UNIT))
+    }
+
+    fn at(&self, id: &str) -> (String, String) {
+        (self.id.clone(), id.to_owned())
     }
 }
 

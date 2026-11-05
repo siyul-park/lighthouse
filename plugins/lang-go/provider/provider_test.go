@@ -17,14 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testModule is the go.mod of the projects the tests write.
-const testModule = "module example.com/m\n\ngo 1.22\n"
-
-const (
-	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.7.json"
-	casesGlob  = "../../../crates/lighthouse-rpc/tests/conformance/go/*"
-)
-
 // answer is what one request answered, its units together.
 type answer struct {
 	Units      []sdk.UnitResult `json:"units"`
@@ -33,6 +25,14 @@ type answer struct {
 	Notices    []string         `json:"notices"`
 	Incomplete []sdk.Incomplete `json:"incomplete"`
 }
+
+// testModule is the go.mod of the projects the tests write.
+const testModule = "module example.com/m\n\ngo 1.22\n"
+
+const (
+	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.7.json"
+	casesGlob  = "../../../crates/lighthouse-rpc/tests/conformance/go/*"
+)
 
 func together(result sdk.IndexResult) answer {
 	got := answer{Units: result.Units, Notices: result.Notices, Incomplete: result.Incomplete}
@@ -313,21 +313,6 @@ func assertValid(t *testing.T, s *jsonschema.Schema, value any, what string) {
 	require.NoError(t, s.Validate(instance), "%s violates the schema", what)
 }
 
-func goFiles(t *testing.T, root string) []sdk.FileRef {
-	t.Helper()
-	var files []sdk.FileRef
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && strings.HasSuffix(path, ".go") {
-			rel, _ := filepath.Rel(root, path)
-			files = append(files, sdk.FileRef{Path: filepath.ToSlash(rel), Hash: "unused"})
-		}
-		return err
-	})
-	require.NoError(t, err)
-	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
-	return files
-}
-
 // variants maps each `options[.name].json` of a case to its options; a case
 // without options.json runs once with none.
 func variants(t *testing.T, dir string) map[string]map[string]json.RawMessage {
@@ -379,5 +364,20 @@ func hashedGoFiles(t *testing.T, root string) []sdk.FileRef {
 		sum := sha256.Sum256(text)
 		files[i].Hash = hex.EncodeToString(sum[:])
 	}
+	return files
+}
+
+func goFiles(t *testing.T, root string) []sdk.FileRef {
+	t.Helper()
+	var files []sdk.FileRef
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(path, ".go") {
+			rel, _ := filepath.Rel(root, path)
+			files = append(files, sdk.FileRef{Path: filepath.ToSlash(rel), Hash: "unused"})
+		}
+		return err
+	})
+	require.NoError(t, err)
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	return files
 }

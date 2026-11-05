@@ -102,12 +102,21 @@ pub(super) fn trait_item(
     source_map: &mut BTreeMap<String, Mapping>,
 ) -> Result<Value, String> {
     let mut fields = Map::new();
+    let attrs = match value {
+        syn::TraitItem::Const(value) => Some(&value.attrs),
+        syn::TraitItem::Fn(value) => Some(&value.attrs),
+        syn::TraitItem::Type(value) => Some(&value.attrs),
+        syn::TraitItem::Macro(value) => Some(&value.attrs),
+        _ => None,
+    };
+    if let Some(attrs) = attrs {
+        fields.insert(
+            "attrs".into(),
+            attributes(file, &child(pointer, "attrs"), attrs, source_map)?,
+        );
+    }
     let kind = match value {
         syn::TraitItem::Const(value) => {
-            fields.insert(
-                "attrs".into(),
-                attributes(file, &child(pointer, "attrs"), &value.attrs, source_map)?,
-            );
             fields.insert(
                 "ident".into(),
                 ident(file, &child(pointer, "ident"), &value.ident, source_map)?,
@@ -129,10 +138,6 @@ pub(super) fn trait_item(
         }
         syn::TraitItem::Fn(value) => {
             fields.insert(
-                "attrs".into(),
-                attributes(file, &child(pointer, "attrs"), &value.attrs, source_map)?,
-            );
-            fields.insert(
                 "sig".into(),
                 signature(file, &child(pointer, "sig"), &value.sig, source_map)?,
             );
@@ -145,10 +150,6 @@ pub(super) fn trait_item(
             "TraitItemFn"
         }
         syn::TraitItem::Type(value) => {
-            fields.insert(
-                "attrs".into(),
-                attributes(file, &child(pointer, "attrs"), &value.attrs, source_map)?,
-            );
             fields.insert(
                 "ident".into(),
                 ident(file, &child(pointer, "ident"), &value.ident, source_map)?,
@@ -166,10 +167,6 @@ pub(super) fn trait_item(
             "TraitItemType"
         }
         syn::TraitItem::Macro(value) => {
-            fields.insert(
-                "attrs".into(),
-                attributes(file, &child(pointer, "attrs"), &value.attrs, source_map)?,
-            );
             fields.insert(
                 "mac".into(),
                 macro_ast(file, &child(pointer, "mac"), &value.mac, source_map)?,

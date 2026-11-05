@@ -307,6 +307,12 @@ impl Provider {
     }
 }
 
+/// The workspace folder of a project root, which may be relative.
+pub(crate) fn folder(root: &Path) -> Result<wire::WorkspaceFolder, String> {
+    let root = std::path::absolute(root).map_err(|e| format!("cannot absolutize the root: {e}"))?;
+    wire::WorkspaceFolder::at(&root)
+}
+
 /// The unit as the wire has it: its files, or the host files whose regions it
 /// holds.
 fn unit_ref(unit: &Unit, source_globs: Option<&globset::GlobSet>) -> wire::UnitRef {
@@ -331,12 +337,6 @@ fn unit_ref(unit: &Unit, source_globs: Option<&globset::GlobSet>) -> wire::UnitR
         key: unit.key.to_owned(),
         imports: unit.imports.clone(),
     }
-}
-
-/// The workspace folder of a project root, which may be relative.
-pub(crate) fn folder(root: &Path) -> Result<wire::WorkspaceFolder, String> {
-    let root = std::path::absolute(root).map_err(|e| format!("cannot absolutize the root: {e}"))?;
-    wire::WorkspaceFolder::at(&root)
 }
 
 /// Checks what a manifest promised against what the process reported; a

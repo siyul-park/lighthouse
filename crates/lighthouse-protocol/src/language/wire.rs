@@ -273,18 +273,6 @@ impl Default for TestNaming {
     }
 }
 
-/// A file to index; the plugin reads its content from disk.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct FileRef {
-    /// Project-relative, `/`-separated.
-    pub path: String,
-    /// SHA-256 of the file content, lowercase hex.
-    pub hash: String,
-    /// Return the parsed tree of this file to the common source selector.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub source_ast: bool,
-}
-
 /// Index request: the units whose result the host does not have.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct IndexParams {
@@ -325,6 +313,18 @@ pub struct UnitRef {
     /// from instead of reading the imports again.
     #[serde(default)]
     pub imports: BTreeMap<String, String>,
+}
+
+/// A file to index; the plugin reads its content from disk.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FileRef {
+    /// Project-relative, `/`-separated.
+    pub path: String,
+    /// SHA-256 of the file content, lowercase hex.
+    pub hash: String,
+    /// Return the parsed tree of this file to the common source selector.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub source_ast: bool,
 }
 
 /// Host-side settings that accompany an index request.

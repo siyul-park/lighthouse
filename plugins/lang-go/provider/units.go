@@ -18,6 +18,16 @@ import (
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 )
 
+// shape is how a request is analyzed: which directories are asked for, which
+// are loaded with them, and the `api` of each of those asked for.
+type shape struct {
+	pl *planner
+	// asked are the directories of the units of files, by the host's id.
+	asked map[string]*directory
+	// interfaces are the directories that declare interfaces.
+	interfaces []*directory
+}
+
 // planner reads the directories of the project and tells what the host needs
 // to know of each: its `api`, the directories it imports, and whether it
 // declares interfaces.
@@ -73,159 +83,6 @@ type fileFacts struct {
 var goEnvVars = []string{
 	"GOROOT", "GOOS", "GOARCH", "GOFLAGS", "GOEXPERIMENT", "CGO_ENABLED", "GOWORK",
 	"GOTOOLCHAIN", "GOAMD64", "GOARM", "GOARM64", "GO386", "GOMIPS", "GOMIPS64", "GOPPC64", "GORISCV64", "GOFIPS140",
-}
-
-// shape is how a request is analyzed: which directories are asked for, which
-// are loaded with them, and the `api` of each of those asked for.
-type shape struct {
-	pl *planner
-	// asked are the directories of the units of files, by the host's id.
-	asked map[string]*directory
-	// interfaces are the directories that declare interfaces.
-	interfaces []*directory
-}
-
-// plan reads every directory of the project and has the run load, besides the
-// units asked for, the directories that declare interfaces: a method is an
-// implementation of any interface of the project, so types are matched against
-// all of them.
-func (r *run) plan(params sdk.IndexParams) *shape {
-	pl := &planner{r: r, dirs: map[string]*directory{}}
-	files := map[string][]string{}
-	for _, rel := range params.Files {
-		abs := filepath.Dir(filepath.Join(r.root, filepath.FromSlash(rel)))
-		files[abs] = append(files[abs], rel)
-	}
-	s := &shape{pl: pl, asked: map[string]*directory{}}
-	batches := r.batches(params.Files)
-	if !pl.moduleRoots(batches) {
-		return s
-	}
-	pl.outside(batches)
-	dirs := make([]string, 0, len(files))
-	for abs := range files {
-		dirs = append(dirs, abs)
-	}
-	sort.Strings(dirs)
-	for _, abs := range dirs {
-		d := pl.unit(abs)
-		if d == nil || d.ifaces == "" {
-			continue
-		}
-		s.interfaces = append(s.interfaces, d)
-		for _, rel := range files[abs] {
-			if _, asked := r.requested[rel]; !asked {
-				r.requested[rel] = sdk.FileRef{Path: rel}
-			}
-		}
-	}
-	for _, u := range params.Units {
-		if len(u.Files) > 0 {
-			s.asked[u.ID] = pl.unit(filepath.Join(r.root, filepath.FromSlash(u.ID)))
-		}
-	}
-	return s
-}
-
-// unitResults splits what the run found into the answers of the units asked
-// for: the files of a directory and the regions of the host files.
-func (r *run) unitResults(s *shape, params sdk.IndexParams, snippets []*snippet, found answer) []sdk.UnitResult {
-	var out []sdk.UnitResult
-	for _, u := range params.Units {
-		if len(u.Files) > 0 {
-			out = append(out, r.directoryResult(s, u, found))
-		}
-	}
-	for _, u := range params.Units {
-		if len(u.Regions) > 0 {
-			out = append(out, r.regionsResult(s, u, snippets))
-		}
-	}
-	return out
-}
-
-// directoryResult is the answer for one directory: its fragments, trees and
-// gaps, and the build-constraint notice of its files.
-func (r *run) directoryResult(s *shape, u sdk.UnitRef, found answer) sdk.UnitResult {
-	own := map[string]bool{}
-	hashes := make([]string, 0, len(u.Files))
-	for _, f := range u.Files {
-		own[f.Path] = true
-		hashes = append(hashes, f.Path, f.Hash)
-	}
-	res := sdk.UnitResult{ID: u.ID, Fragments: []sdk.Fragment{}, Notices: []string{}, Incomplete: []sdk.Incomplete{}, Imports: []string{}}
-	for _, f := range found.Fragments {
-		if own[f.File.Path] {
-			res.Fragments = append(res.Fragments, f)
-		}
-	}
-	for _, src := range found.Sources {
-		if own[src.Path] {
-			res.Sources = append(res.Sources, src)
-		}
-	}
-	for _, gap := range found.Incomplete {
-		if own[gap.Path] {
-			res.Incomplete = append(res.Incomplete, gap)
-		}
-	}
-	excluded, example := 0, ""
-	for _, f := range u.Files {
-		if r.excludedClaimed[f.Path] {
-			excluded++
-			if example == "" {
-				example = f.Path
-			}
-		}
-	}
-	if excluded > 0 {
-		res.Notices = append(res.Notices, fmt.Sprintf(
-			"%d file(s) excluded by build constraints, e.g. %s; select another context with [languages.go] tags or env",
-			excluded, example))
-	}
-	res.Body = digest(hashes...)
-	res.Api = res.Body
-	if d := s.asked[u.ID]; d != nil {
-		res.Body, res.Api = d.content, apiOf(d)
-		res.Imports = s.importsOf(d)
-		res.Reads = s.pl.reads
-	}
-	return res
-}
-
-// regionsResult is the answer for the fences of the host files: it reads the
-// project's packages as an importer does, so it imports them all.
-func (r *run) regionsResult(s *shape, u sdk.UnitRef, snippets []*snippet) sdk.UnitResult {
-	found := r.regionResult(answer{}, snippets)
-	hashes := make([]string, 0, len(u.Regions))
-	for _, host := range u.Regions {
-		hashes = append(hashes, host.Path, host.Hash)
-	}
-	res := sdk.UnitResult{
-		ID:         u.ID,
-		Fragments:  found.Fragments,
-		Notices:    found.Notices,
-		Incomplete: found.Incomplete,
-		Body:       digest(hashes...),
-		Imports:    []string{},
-	}
-	res.Api = res.Body
-	if res.Fragments == nil {
-		res.Fragments = []sdk.Fragment{}
-	}
-	if res.Notices == nil {
-		res.Notices = []string{}
-	}
-	if res.Incomplete == nil {
-		res.Incomplete = []sdk.Incomplete{}
-	}
-	for _, d := range s.pl.dirs {
-		if d != nil && !filepath.IsAbs(d.rel) {
-			res.Imports = append(res.Imports, d.rel)
-		}
-	}
-	sort.Strings(res.Imports)
-	return res
 }
 
 // importsOf are the directories d imports and the ones that declare
@@ -385,22 +242,147 @@ func (d *dirDigest) seal(u *directory) {
 	}
 }
 
-// closure is every unit u imports, directly or not.
-func closure(u *directory) []*directory {
-	seen := map[*directory]bool{u: true}
-	var out []*directory
-	for stack := slices.Clone(u.deps); len(stack) > 0; {
-		d := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		if seen[d] {
+// plan reads every directory of the project and has the run load, besides the
+// units asked for, the directories that declare interfaces: a method is an
+// implementation of any interface of the project, so types are matched against
+// all of them.
+func (r *run) plan(params sdk.IndexParams) *shape {
+	pl := &planner{r: r, dirs: map[string]*directory{}}
+	files := map[string][]string{}
+	for _, rel := range params.Files {
+		abs := filepath.Dir(filepath.Join(r.root, filepath.FromSlash(rel)))
+		files[abs] = append(files[abs], rel)
+	}
+	s := &shape{pl: pl, asked: map[string]*directory{}}
+	batches := r.batches(params.Files)
+	if !pl.moduleRoots(batches) {
+		return s
+	}
+	pl.outside(batches)
+	dirs := make([]string, 0, len(files))
+	for abs := range files {
+		dirs = append(dirs, abs)
+	}
+	sort.Strings(dirs)
+	for _, abs := range dirs {
+		d := pl.unit(abs)
+		if d == nil || d.ifaces == "" {
 			continue
 		}
-		seen[d] = true
-		out = append(out, d)
-		stack = append(stack, d.deps...)
+		s.interfaces = append(s.interfaces, d)
+		for _, rel := range files[abs] {
+			if _, asked := r.requested[rel]; !asked {
+				r.requested[rel] = sdk.FileRef{Path: rel}
+			}
+		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].abs < out[j].abs })
+	for _, u := range params.Units {
+		if len(u.Files) > 0 {
+			s.asked[u.ID] = pl.unit(filepath.Join(r.root, filepath.FromSlash(u.ID)))
+		}
+	}
+	return s
+}
+
+// unitResults splits what the run found into the answers of the units asked
+// for: the files of a directory and the regions of the host files.
+func (r *run) unitResults(s *shape, params sdk.IndexParams, snippets []*snippet, found answer) []sdk.UnitResult {
+	var out []sdk.UnitResult
+	for _, u := range params.Units {
+		if len(u.Files) > 0 {
+			out = append(out, r.directoryResult(s, u, found))
+		}
+	}
+	for _, u := range params.Units {
+		if len(u.Regions) > 0 {
+			out = append(out, r.regionsResult(s, u, snippets))
+		}
+	}
 	return out
+}
+
+// directoryResult is the answer for one directory: its fragments, trees and
+// gaps, and the build-constraint notice of its files.
+func (r *run) directoryResult(s *shape, u sdk.UnitRef, found answer) sdk.UnitResult {
+	own := map[string]bool{}
+	hashes := make([]string, 0, len(u.Files))
+	for _, f := range u.Files {
+		own[f.Path] = true
+		hashes = append(hashes, f.Path, f.Hash)
+	}
+	res := sdk.UnitResult{ID: u.ID, Fragments: []sdk.Fragment{}, Notices: []string{}, Incomplete: []sdk.Incomplete{}, Imports: []string{}}
+	for _, f := range found.Fragments {
+		if own[f.File.Path] {
+			res.Fragments = append(res.Fragments, f)
+		}
+	}
+	for _, src := range found.Sources {
+		if own[src.Path] {
+			res.Sources = append(res.Sources, src)
+		}
+	}
+	for _, gap := range found.Incomplete {
+		if own[gap.Path] {
+			res.Incomplete = append(res.Incomplete, gap)
+		}
+	}
+	excluded, example := 0, ""
+	for _, f := range u.Files {
+		if r.excludedClaimed[f.Path] {
+			excluded++
+			if example == "" {
+				example = f.Path
+			}
+		}
+	}
+	if excluded > 0 {
+		res.Notices = append(res.Notices, fmt.Sprintf(
+			"%d file(s) excluded by build constraints, e.g. %s; select another context with [languages.go] tags or env",
+			excluded, example))
+	}
+	res.Body = digest(hashes...)
+	res.Api = res.Body
+	if d := s.asked[u.ID]; d != nil {
+		res.Body, res.Api = d.content, apiOf(d)
+		res.Imports = s.importsOf(d)
+		res.Reads = s.pl.reads
+	}
+	return res
+}
+
+// regionsResult is the answer for the fences of the host files: it reads the
+// project's packages as an importer does, so it imports them all.
+func (r *run) regionsResult(s *shape, u sdk.UnitRef, snippets []*snippet) sdk.UnitResult {
+	found := r.regionResult(answer{}, snippets)
+	hashes := make([]string, 0, len(u.Regions))
+	for _, host := range u.Regions {
+		hashes = append(hashes, host.Path, host.Hash)
+	}
+	res := sdk.UnitResult{
+		ID:         u.ID,
+		Fragments:  found.Fragments,
+		Notices:    found.Notices,
+		Incomplete: found.Incomplete,
+		Body:       digest(hashes...),
+		Imports:    []string{},
+	}
+	res.Api = res.Body
+	if res.Fragments == nil {
+		res.Fragments = []sdk.Fragment{}
+	}
+	if res.Notices == nil {
+		res.Notices = []string{}
+	}
+	if res.Incomplete == nil {
+		res.Incomplete = []sdk.Incomplete{}
+	}
+	for _, d := range s.pl.dirs {
+		if d != nil && !filepath.IsAbs(d.rel) {
+			res.Imports = append(res.Imports, d.rel)
+		}
+	}
+	sort.Strings(res.Imports)
+	return res
 }
 
 func joinRel(dir, name string) string {
@@ -537,4 +519,22 @@ func apiOf(d *directory) string {
 		parts = append(parts, dep.rel, dep.api)
 	}
 	return digest(parts...)
+}
+
+// closure is every unit u imports, directly or not.
+func closure(u *directory) []*directory {
+	seen := map[*directory]bool{u: true}
+	var out []*directory
+	for stack := slices.Clone(u.deps); len(stack) > 0; {
+		d := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if seen[d] {
+			continue
+		}
+		seen[d] = true
+		out = append(out, d)
+		stack = append(stack, d.deps...)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].abs < out[j].abs })
+	return out
 }

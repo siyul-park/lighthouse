@@ -27,6 +27,14 @@ var unitFixture = map[string]string{
 	"e/e.go": "package e\n\ntype E struct{}\n\nfunc (E) M() int { return 1 }\n\nfunc (E) N() int { return 2 }\n",
 }
 
+func byID(units []sdk.UnitResult) map[string]sdk.UnitResult {
+	out := map[string]sdk.UnitResult{}
+	for _, unit := range units {
+		out[unit.ID] = unit
+	}
+	return out
+}
+
 func TestProviderUnits(t *testing.T) {
 	t.Run("a unit per directory, with the api and the imports of its package", func(t *testing.T) {
 		root := t.TempDir()
@@ -139,30 +147,6 @@ func unitsAt(t *testing.T, root string) []sdk.UnitResult {
 	return result.Units
 }
 
-func byID(units []sdk.UnitResult) map[string]sdk.UnitResult {
-	out := map[string]sdk.UnitResult{}
-	for _, unit := range units {
-		out[unit.ID] = unit
-	}
-	return out
-}
-
-// projectFiles are the Go files of the project, as the host lists them.
-func projectFiles(t *testing.T, root string) []string {
-	t.Helper()
-	var files []string
-	require.NoError(t, filepath.WalkDir(root, func(p string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || !strings.HasSuffix(p, ".go") {
-			return err
-		}
-		rel, err := filepath.Rel(root, p)
-		files = append(files, filepath.ToSlash(rel))
-		return err
-	}))
-	sort.Strings(files)
-	return files
-}
-
 // unitRefs groups the files of the project by directory, as the host does.
 func unitRefs(t *testing.T, root string) []sdk.UnitRef {
 	t.Helper()
@@ -184,6 +168,22 @@ func unitRefs(t *testing.T, root string) []sdk.UnitRef {
 		units = append(units, sdk.UnitRef{ID: id, Files: groups[id]})
 	}
 	return units
+}
+
+// projectFiles are the Go files of the project, as the host lists them.
+func projectFiles(t *testing.T, root string) []string {
+	t.Helper()
+	var files []string
+	require.NoError(t, filepath.WalkDir(root, func(p string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(p, ".go") {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		files = append(files, filepath.ToSlash(rel))
+		return err
+	}))
+	sort.Strings(files)
+	return files
 }
 
 func writeTree(t *testing.T, root string, files map[string]string) {

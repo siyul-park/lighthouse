@@ -27,6 +27,23 @@ pub(crate) const REGIONS: &str = "#regions";
 /// stale when the `api` of any other unit moved.
 pub(crate) const EVERY: &str = "*";
 
+/// Two seconds, the coarsest granularity of a file system's timestamps.
+const RACY_NS: i64 = 2_000_000_000;
+
+/// The language of a provider, by id: its [`Provider`].
+pub(crate) static PROVIDER: Input<String, Provider> = Input::new("provider");
+/// The files of the project a language claims and the engine could read,
+/// sorted: set from the routing, which is the host's configuration.
+pub(crate) static CLAIMED: Input<String, Vec<String>> = Input::new("claimed");
+/// The last answer of a provider for the unit `(language, id)`. Persisted: a
+/// run that finds the unit's key as it was takes it and starts no provider.
+pub(crate) static FRAGMENT: Input<(String, String), Stored> = Input::new("fragment").persisted();
+
+pub(crate) static UNITS: Query<String, Vec<Unit>> = Query::new("units", units);
+pub(crate) static SETTINGS: Query<String, Hash> = Query::new("settings", settings);
+pub(crate) static UNIT: Query<(String, String), Hash> = Query::new("unit", unit);
+pub(crate) static API: Query<(String, String), String> = Query::new("api", api);
+
 /// What decides the answers of a language's provider besides the files, and
 /// how its files make units. `Static`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,9 +112,6 @@ pub(crate) struct Read {
     pub hash: String,
 }
 
-/// Two seconds, the coarsest granularity of a file system's timestamps.
-const RACY_NS: i64 = 2_000_000_000;
-
 impl Read {
     /// What the host sees of the file at `path` now.
     pub fn of(path: &str) -> Self {
@@ -125,46 +139,6 @@ impl Read {
     }
 }
 
-fn stat_of(path: &str) -> Option<(u64, i64)> {
-    let meta = std::fs::metadata(path).ok()?;
-    let nanos = meta
-        .modified()
-        .ok()?
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()?
-        .as_nanos();
-    Some((meta.len(), i64::try_from(nanos).ok()?))
-}
-
-fn hash_of(path: &str) -> String {
-    std::fs::read(path).map_or_else(
-        |_| String::new(),
-        |data| blake3::hash(&data).to_hex().to_string(),
-    )
-}
-
-/// The language of a provider, by id: its [`Provider`].
-pub(crate) static PROVIDER: Input<String, Provider> = Input::new("provider");
-/// The files of the project a language claims and the engine could read,
-/// sorted: set from the routing, which is the host's configuration.
-pub(crate) static CLAIMED: Input<String, Vec<String>> = Input::new("claimed");
-/// The last answer of a provider for the unit `(language, id)`. Persisted: a
-/// run that finds the unit's key as it was takes it and starts no provider.
-pub(crate) static FRAGMENT: Input<(String, String), Stored> = Input::new("fragment").persisted();
-
-pub(crate) static UNITS: Query<String, Vec<Unit>> = Query::new("units", units);
-pub(crate) static SETTINGS: Query<String, Hash> = Query::new("settings", settings);
-pub(crate) static UNIT: Query<(String, String), Hash> = Query::new("unit", unit);
-pub(crate) static API: Query<(String, String), String> = Query::new("api", api);
-
-/// The root directory is `.`.
-fn parent(path: &str) -> String {
-    match Path::new(path).parent() {
-        Some(dir) if !dir.as_os_str().is_empty() => dir.to_string_lossy().into_owned(),
-        _ => ".".to_owned(),
-    }
-}
-
 /// The units of a language, sorted by id: it reads the paths of the files and
 /// nothing else, so a body edit never moves it.
 fn units(graph: &Graph, language: &String) -> Result<Vec<Unit>, Error> {
@@ -189,6 +163,14 @@ fn units(graph: &Graph, language: &String) -> Result<Vec<Unit>, Error> {
         .into_iter()
         .map(|(id, files)| Unit { id, files })
         .collect())
+}
+
+/// The root directory is `.`.
+fn parent(path: &str) -> String {
+    match Path::new(path).parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir.to_string_lossy().into_owned(),
+        _ => ".".to_owned(),
+    }
 }
 
 /// The directories that hold a file named `manifest`.
@@ -285,4 +267,22 @@ fn every(graph: &Graph, language: &String) -> Result<String, Error> {
         }
     }
     Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn stat_of(path: &str) -> Option<(u64, i64)> {
+    let meta = std::fs::metadata(path).ok()?;
+    let nanos = meta
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    Some((meta.len(), i64::try_from(nanos).ok()?))
+}
+
+fn hash_of(path: &str) -> String {
+    std::fs::read(path).map_or_else(
+        |_| String::new(),
+        |data| blake3::hash(&data).to_hex().to_string(),
+    )
 }

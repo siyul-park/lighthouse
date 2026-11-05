@@ -66,31 +66,6 @@ impl<P: HostParser> HostProvider<P> {
         }
     }
 
-    /// The tree of the file at `path` with `text`, or what is missing of it.
-    fn tree(&self, path: &str, text: &str) -> Result<(Source, Vec<Comment>), Incomplete> {
-        let name = self.language.title;
-        let gap = |reason: String| Incomplete {
-            path: Some(path.to_owned()),
-            reason,
-        };
-        match self.parser.parse(text) {
-            Ok(tree) => Ok((
-                Source {
-                    path: path.to_owned(),
-                    ast: tree.ast,
-                    mapping: tree.mapping,
-                },
-                tree.comments,
-            )),
-            Err(HostError::Syntax(error)) => Err(gap(format!("invalid {name}: {error}"))),
-            Err(HostError::Tree(reason)) => {
-                Err(gap(format!("cannot expose {name} syntax tree: {reason}")))
-            }
-        }
-    }
-}
-
-impl<P: HostParser> HostProvider<P> {
     /// Reads the regions that other files embed as documents of the language.
     /// The provider has no code model to give them, so a region is read as far
     /// as there is anything to say: one that is not a document is a notice,
@@ -166,7 +141,32 @@ impl<P: HostParser> HostProvider<P> {
             }
         }
     }
+
+    /// The tree of the file at `path` with `text`, or what is missing of it.
+    fn tree(&self, path: &str, text: &str) -> Result<(Source, Vec<Comment>), Incomplete> {
+        let name = self.language.title;
+        let gap = |reason: String| Incomplete {
+            path: Some(path.to_owned()),
+            reason,
+        };
+        match self.parser.parse(text) {
+            Ok(tree) => Ok((
+                Source {
+                    path: path.to_owned(),
+                    ast: tree.ast,
+                    mapping: tree.mapping,
+                },
+                tree.comments,
+            )),
+            Err(HostError::Syntax(error)) => Err(gap(format!("invalid {name}: {error}"))),
+            Err(HostError::Tree(reason)) => {
+                Err(gap(format!("cannot expose {name} syntax tree: {reason}")))
+            }
+        }
+    }
 }
+
+impl<P: HostParser> HostProvider<P> {}
 
 impl<P: HostParser> Provider for HostProvider<P> {
     fn name(&self) -> &str {

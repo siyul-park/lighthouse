@@ -87,6 +87,15 @@ type loaded struct {
 	err  error
 }
 
+// answer is what the analysis of a request found, before it is split into the
+// answers of the units.
+type answer struct {
+	Fragments  []sdk.Fragment
+	Sources    []sdk.Source
+	Notices    []string
+	Incomplete []sdk.Incomplete
+}
+
 const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 	packages.NeedImports | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo
 
@@ -570,15 +579,6 @@ func positionFile(pos string) string {
 		pos = pos[:at]
 	}
 	return pos
-}
-
-// answer is what the analysis of a request found, before it is split into the
-// answers of the units.
-type answer struct {
-	Fragments  []sdk.Fragment
-	Sources    []sdk.Source
-	Notices    []string
-	Incomplete []sdk.Incomplete
 }
 
 func emptyResult() sdk.IndexResult {
