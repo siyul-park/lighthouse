@@ -74,7 +74,7 @@ impl Frame {
     }
 
     pub(crate) fn remove_child(&self, child: &Arc<Frame>) {
-        remove(&mut self.link.locked().children, child);
+        Self::forget(&mut self.link.locked().children, child);
     }
 
     pub(crate) fn add_waiting(&self, owner: &Arc<Frame>) {
@@ -82,7 +82,7 @@ impl Frame {
     }
 
     pub(crate) fn remove_waiting(&self, owner: &Arc<Frame>) {
-        remove(&mut self.link.locked().waiting, owner);
+        Self::forget(&mut self.link.locked().waiting, owner);
     }
 
     /// What this frame depends on: the frames it runs and the owners of the
@@ -92,6 +92,12 @@ impl Frame {
         link.children.iter().chain(&link.waiting).cloned().collect()
     }
 
+    fn forget(list: &mut Vec<Arc<Frame>>, frame: &Arc<Frame>) {
+        if let Some(at) = list.iter().position(|found| Arc::ptr_eq(found, frame)) {
+            list.swap_remove(at);
+        }
+    }
+
     fn chain(self: &Arc<Self>) -> Vec<Arc<Frame>> {
         let mut chain = vec![self.clone()];
         while let Some(parent) = chain.last().and_then(|frame| frame.parent.clone()) {
@@ -99,12 +105,6 @@ impl Frame {
         }
         chain.reverse();
         chain
-    }
-}
-
-fn remove(list: &mut Vec<Arc<Frame>>, frame: &Arc<Frame>) {
-    if let Some(at) = list.iter().position(|found| Arc::ptr_eq(found, frame)) {
-        list.swap_remove(at);
     }
 }
 

@@ -246,3 +246,50 @@ fn a_query_that_found_an_input_unset_stays_green_while_it_is_unset() {
     assert_eq!(*db.query(&READS_MAYBE, &1).expect("pull"), 0);
     assert!(db.take_executed().is_empty(), "nothing it read moved");
 }
+
+#[test]
+fn explanation_has_a_line_for_each_step_from_the_node_to_the_input() {
+    let mut project = Project::new();
+    project
+        .files
+        .insert("a".into(), "api=A1;body=B1;uses=".into());
+    let mut db = open(None, &project);
+    apply(&mut db, &project, &["a".to_owned()]);
+    pull(&db);
+    project
+        .files
+        .insert("a".into(), "api=A1;body=B2;uses=".into());
+    apply(&mut db, &project, &["a".to_owned()]);
+    pull(&db);
+
+    let explanation = db
+        .explain(&FACTS, &"a".to_owned())
+        .expect("explain")
+        .expect("it ran");
+
+    let lines = explanation.to_string();
+    assert_eq!(lines.lines().count(), explanation.0.len());
+    assert!(lines.contains("file"), "{lines}");
+}
+
+#[test]
+fn revision_moves_when_an_input_changes_and_not_when_it_is_set_again() {
+    let mut project = Project::new();
+    project
+        .files
+        .insert("a".into(), "api=A1;body=B1;uses=".into());
+    let mut db = open(None, &project);
+    apply(&mut db, &project, &["a".to_owned()]);
+    let first = db.revision();
+
+    apply(&mut db, &project, &["a".to_owned()]);
+    assert_eq!(db.revision(), first);
+
+    project.config = "c2".into();
+    apply(&mut db, &project, &["a".to_owned()]);
+    assert!(db.revision() > first);
+    assert_eq!(
+        format!("{}", db.revision()),
+        format!("r{}", db.revision().0)
+    );
+}

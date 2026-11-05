@@ -30,6 +30,57 @@ use crate::{Attributes, Listing, ProjectFiles};
 /// two seconds (FAT) and a change in the same tick is not told by the time.
 pub const RACY_NS: i64 = 2_000_000_000;
 
+/// What a walk found.
+#[derive(Default)]
+pub struct Walked {
+    pub listing: Listing,
+    /// The `lstat` of each listed file.
+    pub stats: BTreeMap<PathBuf, Stat>,
+    /// For each directory entered, what it lists, sorted by name.
+    pub listed: BTreeMap<PathBuf, Vec<Listed>>,
+    /// What was read of each directory, to give the next walk.
+    pub dirs: Dirs,
+    /// How many directories were read: the others were as the last walk
+    /// found them.
+    pub relisted: usize,
+}
+
+/// An entry of the project: what a directory lists once ignored files are
+/// out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Listed {
+    pub name: OsString,
+    pub is_dir: bool,
+}
+
+/// The directories a walk entered, by project-relative path (the root is the
+/// empty path).
+pub type Dirs = BTreeMap<PathBuf, Dir>;
+
+/// A directory as it was read: its `lstat` and everything it holds, ignored
+/// or not. Sorted by name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Dir {
+    pub stat: Stat,
+    pub entries: Vec<Raw>,
+}
+
+/// One entry of a directory as `readdir` gave it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Raw {
+    pub name: OsString,
+    pub kind: Kind,
+}
+
+/// What kind of entry a directory holds, as its listing says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Kind {
+    File,
+    Dir,
+    /// A symbolic link or anything else: never listed, never entered.
+    Other,
+}
+
 /// What one `lstat` says of a file or a directory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Stat {
@@ -41,7 +92,7 @@ pub struct Stat {
 }
 
 impl Stat {
-    fn of(meta: &fs::Metadata) -> Self {
+    pub fn of(meta: &fs::Metadata) -> Self {
         #[cfg(unix)]
         {
             use std::os::unix::fs::MetadataExt;
@@ -71,57 +122,6 @@ impl Stat {
             }
         }
     }
-}
-
-/// What kind of entry a directory holds, as its listing says.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Kind {
-    File,
-    Dir,
-    /// A symbolic link or anything else: never listed, never entered.
-    Other,
-}
-
-/// One entry of a directory as `readdir` gave it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Raw {
-    pub name: OsString,
-    pub kind: Kind,
-}
-
-/// A directory as it was read: its `lstat` and everything it holds, ignored
-/// or not. Sorted by name.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Dir {
-    pub stat: Stat,
-    pub entries: Vec<Raw>,
-}
-
-/// The directories a walk entered, by project-relative path (the root is the
-/// empty path).
-pub type Dirs = BTreeMap<PathBuf, Dir>;
-
-/// An entry of the project: what a directory lists once ignored files are
-/// out.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Listed {
-    pub name: OsString,
-    pub is_dir: bool,
-}
-
-/// What a walk found.
-#[derive(Default)]
-pub struct Walked {
-    pub listing: Listing,
-    /// The `lstat` of each listed file.
-    pub stats: BTreeMap<PathBuf, Stat>,
-    /// For each directory entered, what it lists, sorted by name.
-    pub listed: BTreeMap<PathBuf, Vec<Listed>>,
-    /// What was read of each directory, to give the next walk.
-    pub dirs: Dirs,
-    /// How many directories were read: the others were as the last walk
-    /// found them.
-    pub relisted: usize,
 }
 
 /// The ignore files of one directory.

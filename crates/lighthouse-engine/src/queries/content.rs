@@ -10,15 +10,6 @@ use super::{Hash, OVERLAY, ROOT, STAT};
 
 const CHUNK: usize = 256 << 10;
 
-/// Whether the bytes are text a language can take.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum Readable {
-    Text,
-    NotUtf8,
-    Unreadable(String),
-    Missing,
-}
-
 /// The identity of a file's bytes: BLAKE3 for the graph, SHA-256 (hex) for the
 /// hash the providers are given, which the host's own checks compare with the
 /// SHA-256 of text in memory.
@@ -39,7 +30,7 @@ impl Content {
         }
     }
 
-    fn failed(readable: Readable, why: &str) -> Self {
+    pub(super) fn failed(readable: Readable, why: &str) -> Self {
         Self {
             blake3: blake3::hash(why.as_bytes()).into(),
             sha256: String::new(),
@@ -48,12 +39,13 @@ impl Content {
     }
 }
 
-/// The overlay of a path, if one is set: an input that is never set for most
-/// paths reads as none, and the read is recorded all the same.
-fn overlay(db: &Db, path: &String) -> Result<Option<Content>, Error> {
-    Ok(db
-        .try_input(&OVERLAY, path)?
-        .and_then(|content| content.as_ref().clone()))
+/// Whether the bytes are text a language can take.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum Readable {
+    Text,
+    NotUtf8,
+    Unreadable(String),
+    Missing,
 }
 
 pub(super) fn content(db: &Db, path: &String) -> Result<Content, Error> {
@@ -63,6 +55,14 @@ pub(super) fn content(db: &Db, path: &String) -> Result<Content, Error> {
     let (_stat, _salt) = *db.input(&STAT, path)?;
     let root = db.input(&ROOT, &())?;
     Ok(read(&Path::new(root.as_str()).join(path)))
+}
+
+/// The overlay of a path, if one is set: an input that is never set for most
+/// paths reads as none, and the read is recorded all the same.
+fn overlay(db: &Db, path: &String) -> Result<Option<Content>, Error> {
+    Ok(db
+        .try_input(&OVERLAY, path)?
+        .and_then(|content| content.as_ref().clone()))
 }
 
 /// Reads the file once, in chunks, for both hashes and for whether it is

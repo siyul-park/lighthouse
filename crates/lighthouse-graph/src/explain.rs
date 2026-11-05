@@ -17,6 +17,7 @@ pub struct Step {
     pub reason: Reason,
 }
 
+/// What happened to a node on its last pull.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reason {
     /// There was nothing stored of it.

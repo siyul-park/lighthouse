@@ -46,6 +46,7 @@ pub struct Input<K, V> {
 }
 
 impl<K, V> Input<K, V> {
+    /// An input kind named `name`, which identifies its nodes in the store.
     pub const fn new(name: &'static str) -> Self {
         Self {
             name,
@@ -86,6 +87,7 @@ pub struct Query<K, V> {
 }
 
 impl<K, V> Query<K, V> {
+    /// A query kind named `name` that computes a value with `run`.
     pub const fn new(name: &'static str, run: fn(&Db, &K) -> Result<V, Error>) -> Self {
         Self { name, run }
     }

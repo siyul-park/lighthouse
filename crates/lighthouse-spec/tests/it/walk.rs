@@ -170,3 +170,18 @@ fn a_directory_that_did_not_change_is_not_read_again() {
     assert_eq!(third.relisted, 1, "only b changed");
     assert!(third.listing.files.contains(&PathBuf::from("b/g.txt")));
 }
+
+#[test]
+fn stat_tells_a_file_that_was_rewritten_from_one_that_was_not() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("f");
+    fs::write(&file, "one").unwrap();
+    let stat = |path: &Path| lighthouse_spec::Stat::of(&fs::symlink_metadata(path).unwrap());
+    let before = stat(&file);
+    assert_eq!(before, stat(&file));
+
+    fs::write(&file, "three").unwrap();
+
+    assert_ne!(before, stat(&file));
+    assert_eq!(stat(&file).size, 5);
+}

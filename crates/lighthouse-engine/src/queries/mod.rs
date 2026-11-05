@@ -21,8 +21,6 @@ use serde::{Deserialize, Serialize};
 pub(crate) use content::{Content, Readable};
 pub(crate) use detect::{Detected, Graph};
 
-pub(crate) type Hash = [u8; 32];
-
 /// The root of the project: what a path is relative to.
 pub(crate) static ROOT: Input<(), String> = Input::new("root");
 /// What decides the file list besides the file system: a hash of the
@@ -42,6 +40,22 @@ pub(crate) static CONTENT: Query<String, Content> = Query::new("content", conten
 pub(crate) static DIR: Query<String, Hash> = Query::new("dir", dir);
 pub(crate) static FILES: Query<(), Vec<String>> = Query::new("files", files);
 
+/// A directory with fewer entries than this is hashed on one thread.
+const FAN_OUT: usize = 4;
+
+pub(crate) type Hash = [u8; 32];
+
+/// The state of the last walk, kept beside the graph.
+#[derive(Default, Serialize, Deserialize)]
+pub(crate) struct Walked {
+    pub started: Option<i64>,
+    pub walks: u64,
+    /// The salt of each file that was racy, by path.
+    pub salts: std::collections::BTreeMap<String, u64>,
+    pub dirs: lighthouse_spec::Dirs,
+    pub overlaid: Vec<String>,
+}
+
 /// Makes every kind known to the graph.
 pub(crate) fn register(db: &Db) {
     db.register_input(&ROOT);
@@ -54,8 +68,15 @@ pub(crate) fn register(db: &Db) {
     db.register_query(&FILES);
 }
 
-/// A directory with fewer entries than this is hashed on one thread.
-const FAN_OUT: usize = 4;
+/// Whether a file is too new to trust the `stat` that was taken of it at the
+/// last walk, which started at `since`: a change within the clock's tick of
+/// the walk that hashed it does not show in its `stat`. The file is then
+/// given a salt, a number of this walk, so that its input is a new value and
+/// the file is read again; the salt stays while the file does, so that a
+/// file read late enough to be sure is not read once more.
+pub(crate) fn racy(mtime_ns: i64, since: Option<i64>) -> bool {
+    since.is_some_and(|since| mtime_ns >= since.saturating_sub(lighthouse_spec::RACY_NS))
+}
 
 /// The Merkle hash of a directory: BLAKE3 over its listed children, sorted by
 /// name, each as (name, kind, hash): the content of a file, the `dir` of a
@@ -111,25 +132,4 @@ fn files(db: &Db, _: &()) -> Result<Vec<String>, Error> {
     // In the order of paths, which compares by component, as the listing does.
     files.sort_by(|a, b| Path::new(a).cmp(Path::new(b)));
     Ok(files)
-}
-
-/// Whether a file is too new to trust the `stat` that was taken of it at the
-/// last walk, which started at `since`: a change within the clock's tick of
-/// the walk that hashed it does not show in its `stat`. The file is then
-/// given a salt, a number of this walk, so that its input is a new value and
-/// the file is read again; the salt stays while the file does, so that a
-/// file read late enough to be sure is not read once more.
-pub(crate) fn racy(mtime_ns: i64, since: Option<i64>) -> bool {
-    since.is_some_and(|since| mtime_ns >= since.saturating_sub(lighthouse_spec::RACY_NS))
-}
-
-/// The state of the last walk, kept beside the graph.
-#[derive(Default, Serialize, Deserialize)]
-pub(crate) struct Walked {
-    pub started: Option<i64>,
-    pub walks: u64,
-    /// The salt of each file that was racy, by path.
-    pub salts: std::collections::BTreeMap<String, u64>,
-    pub dirs: lighthouse_spec::Dirs,
-    pub overlaid: Vec<String>,
 }

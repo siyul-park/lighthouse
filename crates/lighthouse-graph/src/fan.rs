@@ -35,8 +35,6 @@ use std::{
 
 use crate::{Db, node::Locked};
 
-type Run<I, R> = Box<dyn Fn(&Db, &I) -> R + Send + Sync>;
-
 struct Fan<I, R> {
     items: Vec<I>,
     next: AtomicUsize,
@@ -45,6 +43,8 @@ struct Fan<I, R> {
     done: Condvar,
     run: Run<I, R>,
 }
+
+type Run<I, R> = Box<dyn Fn(&Db, &I) -> R + Send + Sync>;
 
 impl<I, R> Fan<I, R> {
     /// Runs items until none is left to take.
