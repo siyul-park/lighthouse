@@ -5,7 +5,7 @@
 
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_graph::{Db, Durability, Error, Input, Query};
+use lighthouse_graph::{Db, Durability, Error, Input, Query, par_map};
 use serde::{Deserialize, Serialize};
 
 pub static FILE: Input<String, Option<String>> = Input::new("file");
@@ -100,7 +100,7 @@ fn report(db: &Db, _: &()) -> Result<Vec<(String, Facts)>, Error> {
 
 fn par_report(db: &Db, _: &()) -> Result<Vec<(String, Facts)>, Error> {
     let files = db.input(&FILES, &())?.as_ref().clone();
-    db.par_map(files, |db, path| {
+    par_map(db, files, |db, path| {
         Ok((path.clone(), db.query(&FACTS, path)?.as_ref().clone()))
     })
     .into_iter()

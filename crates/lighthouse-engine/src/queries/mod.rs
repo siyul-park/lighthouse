@@ -11,15 +11,19 @@
 
 mod content;
 mod detect;
+mod graph;
+mod inputs;
+mod pull;
 
 use std::path::Path;
 
-use lighthouse_graph::{Db, Error, Input, Query};
+use lighthouse_graph::{Db, Error, Input, Query, par_map};
 use lighthouse_spec::Stat;
 use serde::{Deserialize, Serialize};
 
 pub(crate) use content::{Content, Readable};
-pub(crate) use detect::{Detected, Graph};
+pub(crate) use detect::Detected;
+pub(crate) use graph::Graph;
 
 /// A directory with fewer entries than this is hashed on one thread.
 const FAN_OUT: usize = 4;
@@ -68,6 +72,10 @@ pub(crate) fn register(db: &Db) {
     db.register_query(&FILES);
 }
 
+pub(super) fn key(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
 /// Whether a file is too new to trust the `stat` that was taken of it at the
 /// last walk, which started at `since`: a change within the clock's tick of
 /// the walk that hashed it does not show in its `stat`. The file is then
@@ -101,7 +109,7 @@ fn dir(db: &Db, path: &String) -> Result<Hash, Error> {
     } else {
         let shared = std::sync::Arc::new(children.clone());
         let order: Vec<usize> = (0..shared.len()).collect();
-        db.par_map(order, move |db, i| child(db, &shared[*i]))
+        par_map(db, order, move |db, i| child(db, &shared[*i]))
     };
     let mut hasher = blake3::Hasher::new();
     for ((name, _, is_dir), hash) in children.iter().zip(hashes) {

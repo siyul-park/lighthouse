@@ -20,7 +20,7 @@ const REPOSITORY: &str = ".git";
 /// How to list the files of one project root.
 #[derive(Clone)]
 pub struct ProjectFiles {
-    pub(crate) root: PathBuf,
+    root: PathBuf,
     patterns: Vec<String>,
     ignores: Gitignore,
 }

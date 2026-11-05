@@ -17,13 +17,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use ignore::{
-    Match,
-    gitignore::{Gitignore, GitignoreBuilder},
-};
 use serde::{Deserialize, Serialize};
 
+mod chain;
+
 use crate::{Attributes, Listing, ProjectFiles};
+use chain::{Level, ignored};
 
 /// A directory whose modification time is this close to the start of the last
 /// walk, or later, is read again: the file system's clock may be as coarse as
@@ -32,6 +31,7 @@ pub const RACY_NS: i64 = 2_000_000_000;
 
 struct Walk<'a> {
     project: &'a ProjectFiles,
+    root: PathBuf,
     previous: &'a Dirs,
     since: Option<i64>,
     out: Walked,
@@ -133,12 +133,6 @@ impl Stat {
     }
 }
 
-/// The ignore files of one directory.
-struct Level {
-    gitignore: Gitignore,
-    exclude: Gitignore,
-}
-
 impl ProjectFiles {
     /// Every file of the project and its `lstat`. `previous` is what the last
     /// walk read and `since` when that walk started, in nanoseconds since the
@@ -146,6 +140,7 @@ impl ProjectFiles {
     pub fn walk(&self, previous: &Dirs, since: Option<i64>) -> Walked {
         let mut walk = Walk {
             project: self,
+            root: self.root().to_owned(),
             previous,
             since,
             out: Walked::default(),
@@ -158,7 +153,7 @@ impl ProjectFiles {
 
 impl Walk<'_> {
     fn visit(&mut self, rel: &Path, chain: &mut Vec<Level>) {
-        let abs = self.project.root.join(rel);
+        let abs = self.root.join(rel);
         let stat = match fs::symlink_metadata(&abs) {
             Ok(meta) => Stat::of(&meta),
             Err(e) => {
@@ -172,19 +167,7 @@ impl Walk<'_> {
         let Some(dir) = self.read(rel, &abs, stat) else {
             return;
         };
-        let has = |name: &str| dir.entries.iter().any(|raw| raw.name == name);
-        chain.push(Level {
-            gitignore: if has(".gitignore") {
-                self.gitignore(&abs)
-            } else {
-                Gitignore::empty()
-            },
-            exclude: if has(".git") {
-                self.exclude(&abs)
-            } else {
-                Gitignore::empty()
-            },
-        });
+        chain.push(Level::of(&abs, &dir.entries, &mut self.out.listing.errors));
         let mut listed = Vec::new();
         let mut below = Vec::new();
         for raw in &dir.entries {
@@ -265,35 +248,8 @@ impl Walk<'_> {
         Some(Dir { stat, entries })
     }
 
-    fn gitignore(&mut self, abs: &Path) -> Gitignore {
-        let (gitignore, error) = Gitignore::new(abs.join(".gitignore"));
-        self.out.listing.errors.extend(error.map(|e| e.to_string()));
-        gitignore
-    }
-
-    /// `info/exclude` of the repository the directory is the root of: of the
-    /// common directory when `.git` is a file of a worktree.
-    fn exclude(&mut self, abs: &Path) -> Gitignore {
-        let git = abs.join(".git");
-        let Some(dir) = git_dir(&git, fs::metadata(&git).ok().is_some_and(|m| m.is_file())) else {
-            return Gitignore::empty();
-        };
-        let file = dir.join("info/exclude");
-        let mut builder = GitignoreBuilder::new(abs);
-        if file.exists() {
-            self.out
-                .listing
-                .errors
-                .extend(builder.add(&file).map(|e| e.to_string()));
-        }
-        builder.build().unwrap_or_else(|e| {
-            self.out.listing.errors.push(e.to_string());
-            Gitignore::empty()
-        })
-    }
-
     fn finish(mut self) -> Walked {
-        let root = self.project.root.clone();
+        let root = self.root.clone();
         let stats = stat_all(&root, &self.files);
         let mut files: Vec<PathBuf> = Vec::with_capacity(stats.len());
         for (rel, stat) in stats {
@@ -322,42 +278,6 @@ impl Walk<'_> {
         self.out.listing.attributes = attributes;
         self.out
     }
-}
-
-/// Whether the deepest `.gitignore`, then the deepest `info/exclude`, that
-/// has a say ignores the path.
-fn ignored(chain: &[Level], path: &Path, is_dir: bool) -> bool {
-    let mut found = Match::None;
-    for level in chain.iter().rev() {
-        found = level.gitignore.matched(path, is_dir);
-        if !found.is_none() {
-            return found.is_ignore();
-        }
-    }
-    for level in chain.iter().rev() {
-        found = level.exclude.matched(path, is_dir);
-        if !found.is_none() {
-            break;
-        }
-    }
-    found.is_ignore()
-}
-
-/// Where `info/exclude` is for the `.git` at `git`: the directory itself, or
-/// for the file of a worktree the common directory of the one it names.
-fn git_dir(git: &Path, is_file: bool) -> Option<PathBuf> {
-    if !is_file {
-        return Some(git.to_owned());
-    }
-    let text = fs::read_to_string(git).ok()?;
-    let real = PathBuf::from(text.lines().next()?.strip_prefix("gitdir: ")?);
-    let common = fs::read_to_string(real.join("commondir")).ok()?;
-    let common = common.lines().next()?;
-    Some(if common.starts_with('.') {
-        real.join(common)
-    } else {
-        PathBuf::from(common)
-    })
 }
 
 /// The `lstat` of each file, on as many threads as the machine has: threads

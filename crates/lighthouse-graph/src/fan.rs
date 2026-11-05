@@ -75,56 +75,52 @@ impl<I, R> Fan<I, R> {
     }
 }
 
-impl Db {
-    /// Runs `run` on every item, on the calling thread and on the threads of
-    /// the current `rayon` pool that are free, and returns the results in
-    /// the order of the items. What `run` reads through the handle it is
-    /// given is read by the query that called `par_map`.
-    ///
-    /// A claimed node that an item waits for is run by its owner, and a cycle
-    /// that runs through items is an [`Error::Cycle`](crate::Error::Cycle)
-    /// like any other. See the module docs for why this is the way to fan
-    /// out. A panic in `run` is raised again here.
-    pub fn par_map<I, R>(
-        &self,
-        items: Vec<I>,
-        run: impl Fn(&Db, &I) -> R + Send + Sync + 'static,
-    ) -> Vec<R>
-    where
-        I: Send + Sync + 'static,
-        R: Send + 'static,
-    {
-        let count = items.len();
-        let fan = Arc::new(Fan {
-            results: Mutex::new((0..count).map(|_| None).collect()),
-            left: Mutex::new(count),
-            next: AtomicUsize::new(0),
-            items,
-            done: Condvar::new(),
-            run: Box::new(run),
-        });
-        let helpers = count.saturating_sub(1).min(rayon::current_num_threads());
-        for _ in 0..helpers {
-            let (fan, db) = (fan.clone(), self.handle());
-            rayon::spawn(move || fan.drain(&db));
-        }
-        fan.drain(self);
-        fan.wait();
-        let results = std::mem::take(&mut *fan.results.locked());
-        results
-            .into_iter()
-            .map(|result| match result.expect("every item ran") {
-                Ok(value) => value,
-                Err(panic) => resume_unwind(panic),
-            })
-            .collect()
+/// Runs `run` on every item, on the calling thread and on the threads of
+/// the current `rayon` pool that are free, and returns the results in
+/// the order of the items. What `run` reads through the handle it is
+/// given is read by the query that called `par_map`.
+///
+/// A claimed node that an item waits for is run by its owner, and a cycle
+/// that runs through items is an [`Error::Cycle`](crate::Error::Cycle)
+/// like any other. See the module docs for why this is the way to fan
+/// out. A panic in `run` is raised again here.
+pub fn par_map<I, R>(
+    db: &Db,
+    items: Vec<I>,
+    run: impl Fn(&Db, &I) -> R + Send + Sync + 'static,
+) -> Vec<R>
+where
+    I: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    let count = items.len();
+    let fan = Arc::new(Fan {
+        results: Mutex::new((0..count).map(|_| None).collect()),
+        left: Mutex::new(count),
+        next: AtomicUsize::new(0),
+        items,
+        done: Condvar::new(),
+        run: Box::new(run),
+    });
+    let helpers = count.saturating_sub(1).min(rayon::current_num_threads());
+    for _ in 0..helpers {
+        let (fan, db) = (
+            fan.clone(),
+            Db {
+                shared: db.shared.clone(),
+                frame: db.frame.clone(),
+            },
+        );
+        rayon::spawn(move || fan.drain(&db));
     }
-
-    /// Another handle for the same query, to give to another thread.
-    fn handle(&self) -> Db {
-        Db {
-            shared: self.shared.clone(),
-            frame: self.frame.clone(),
-        }
-    }
+    fan.drain(db);
+    fan.wait();
+    let results = std::mem::take(&mut *fan.results.locked());
+    results
+        .into_iter()
+        .map(|result| match result.expect("every item ran") {
+            Ok(value) => value,
+            Err(panic) => resume_unwind(panic),
+        })
+        .collect()
 }

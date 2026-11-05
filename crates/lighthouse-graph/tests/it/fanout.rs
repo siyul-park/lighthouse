@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_graph::{Db, Error, Query};
+use lighthouse_graph::{Db, Error, Query, par_map};
 use rayon::ThreadPoolBuilder;
 
 const LAYERS: u32 = 50;
@@ -29,7 +29,7 @@ static BACK: Query<At, u64> = Query::new("back", back);
 static TOP: Query<u32, u64> = Query::new("top", top_of);
 static RING: Query<u32, u64> = Query::new("ring", |db, at| {
     let next = vec![(at + 1) % 6, (at + 3) % 6];
-    all(db.par_map(next, |db, to| db.query(&RING, to).map(|v| *v)))
+    all(par_map(db, next, |db, to| db.query(&RING, to).map(|v| *v)))
 });
 
 /// The dependencies of a node: shared by construction, as many nodes of a
@@ -61,7 +61,9 @@ fn fan(db: &Db, at: At, query: &'static Query<At, u64>) -> Result<u64, Error> {
         return Ok(u64::from(at.1) + 1);
     }
     let mut values = Vec::new();
-    for result in db.par_map(deps(at), move |db, dep| db.query(query, dep).map(|v| *v)) {
+    for result in par_map(db, deps(at), move |db, dep| {
+        db.query(query, dep).map(|v| *v)
+    }) {
         values.push(result?);
     }
     Ok(mix(&values, at))
@@ -81,7 +83,7 @@ fn back(db: &Db, at: &At) -> Result<u64, Error> {
         wanted.push((6, 0));
     }
     let mut sum = 0u64;
-    for result in db.par_map(wanted, |db, dep| db.query(&BACK, dep).map(|v| *v)) {
+    for result in par_map(db, wanted, |db, dep| db.query(&BACK, dep).map(|v| *v)) {
         sum = sum.wrapping_add(result?);
     }
     Ok(sum)
@@ -94,7 +96,9 @@ fn tops(top: u32) -> Vec<At> {
 }
 
 fn top_of(db: &Db, top: &u32) -> Result<u64, Error> {
-    all(db.par_map(tops(*top), |db, at| db.query(&NODE, at).map(|v| *v)))
+    all(par_map(db, tops(*top), |db, at| {
+        db.query(&NODE, at).map(|v| *v)
+    }))
 }
 
 /// What the graph must give, by plain recursion, and the nodes it reaches.

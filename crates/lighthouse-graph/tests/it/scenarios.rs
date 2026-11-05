@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_graph::{Durability, Error, Input, Query, Reason};
+use lighthouse_graph::{Durability, Error, Input, Query, Reason, try_input};
 
 use crate::toy::*;
 
@@ -198,7 +198,7 @@ fn verify_mode_reports_a_query_that_reads_outside_the_graph() {
 
 static MAYBE: Input<u32, u32> = Input::new("maybe");
 static READS_MAYBE: Query<u32, u32> = Query::new("reads-maybe", |db, key| {
-    Ok(db.try_input(&MAYBE, key)?.map_or(0, |value| *value + 1))
+    Ok(try_input(db, &MAYBE, key)?.map_or(0, |value| *value + 1))
 });
 
 #[test]

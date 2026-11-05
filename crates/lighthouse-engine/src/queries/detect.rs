@@ -7,28 +7,24 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-use lighthouse_graph::{Db, Durability};
 use lighthouse_spec::Listing;
 
+use lighthouse_graph::{set_state, state};
+
 use super::{
-    CONFIG, CONTENT, Content, DIR, ENTRIES, FILES, OVERLAY, ROOT, STAT, Walked, racy, register,
+    Content, Walked,
+    inputs::set_overlays,
+    key,
+    pull::{Pulled, pull},
 };
 use crate::{
-    Error, Overlays, cache,
+    Error, Overlays,
     engine::{Engine, in_pool},
     timings::Detect,
 };
 
-/// The file of the graph under the cache directory.
-const DB: &str = "graph.db";
 /// Where the last walk is kept in the graph's store.
-const WALK: &str = "walk";
-
-/// The open graph of an engine, and what a run knows of it.
-pub(crate) struct Graph {
-    db: Db,
-    notice: Option<String>,
-}
+pub(super) const WALK: &str = "walk";
 
 /// What detect found: the listing, the content of the files `wanted`, and
 /// where the time went.
@@ -53,67 +49,23 @@ impl Engine {
         let db = &mut graph.db;
         db.take_executed();
 
-        let state: Walked = db
-            .state(WALK)?
+        let state: Walked = state(db, WALK)?
             .and_then(|bytes| postcard::from_bytes(&bytes).ok())
             .unwrap_or_default();
         let started = now_ns();
         let walks = state.walks + 1;
         let walk = self.files.walk(&state.dirs, state.started);
 
-        let root = self.ws.root.to_string_lossy().into_owned();
-        db.set_input(&ROOT, &(), root, Durability::Static)?;
-        let ignores = blake3::hash(self.ws.ignores.join("\n").as_bytes())
-            .to_hex()
-            .to_string();
-        db.set_input(&CONFIG, &(), ignores, Durability::Stable)?;
-        let mut salts = state.salts;
-        for (rel, stat) in &walk.stats {
-            let at = key(rel);
-            if racy(stat.mtime_ns, state.started) {
-                salts.insert(at.clone(), walks);
-            }
-            let salt = salts.get(&at).copied().unwrap_or(0);
-            db.set_input(&STAT, &at, (*stat, salt), Durability::Volatile)?;
-        }
-        salts.retain(|at, _| walk.stats.contains_key(Path::new(at)));
-        for (dir, children) in &walk.listed {
-            let names = children
-                .iter()
-                .map(|c| (c.name.to_string_lossy().into_owned(), c.is_dir))
-                .collect();
-            db.set_input(&ENTRIES, &key(dir), names, Durability::Volatile)?;
-        }
+        let salts = self.set_inputs(db, &state, &walk)?;
+        set_overlays(db, &state.overlaid, overlays)?;
         let overlaid: BTreeSet<String> = overlays.keys().map(|p| key(p)).collect();
-        for (path, text) in overlays {
-            let content = Some(Content::of_text(text));
-            db.set_input(&OVERLAY, &key(path), content, Durability::Volatile)?;
-        }
-        for gone in state.overlaid.iter().filter(|p| !overlaid.contains(*p)) {
-            db.set_input(&OVERLAY, gone, None, Durability::Volatile)?;
-        }
+        let Pulled {
+            files,
+            root: root_hash,
+            contents,
+        } = in_pool(|| pull(db, &wanted))?;
 
         let db = &*db;
-        let (files, root_hash, contents) = in_pool(|| -> Result<_, Error> {
-            let files = db.query(&FILES, &())?;
-            let root_hash = *db.query(&DIR, &String::new())?;
-            let claimed: Vec<PathBuf> = files
-                .iter()
-                .map(PathBuf::from)
-                .filter(|rel| wanted(rel))
-                .collect();
-            let pulled = db.par_map(claimed.clone(), |db, rel| {
-                db.query(&CONTENT, &key(rel))
-                    .map(|content| content.as_ref().clone())
-            });
-            let contents: Result<BTreeMap<PathBuf, Content>, Error> = claimed
-                .into_iter()
-                .zip(pulled)
-                .map(|(rel, content)| Ok((rel, content?)))
-                .collect();
-            Ok((files, root_hash, contents?))
-        })?;
-
         let executed = db.take_executed();
         let read = executed
             .iter()
@@ -140,7 +92,7 @@ impl Engine {
         };
         let committing = Instant::now();
         let bytes = postcard::to_stdvec(&walked).map_err(|e| Error::Fix(e.to_string()))?;
-        graph.db.set_state(WALK, bytes);
+        set_state(&mut graph.db, WALK, bytes);
         if let Err(e) = graph.db.commit() {
             notices.push(format!("the graph was not saved: {e}"));
         }
@@ -158,29 +110,6 @@ impl Engine {
             notices,
         })
     }
-
-    /// Opens `graph.db` beside the result cache; without a cache, or when it
-    /// cannot be opened, the graph lives in memory.
-    fn open_graph(&self) -> Graph {
-        let versions = [("binary".to_owned(), cache::build_identity())].into();
-        let opened = match &self.cache {
-            Some(cache) => Db::open(&cache.dir.join(DB), &versions).map(|mut db| {
-                db.set_limit(cache.limit);
-                (db, None)
-            }),
-            None => Db::in_memory(&versions).map(|db| (db, None)),
-        };
-        let (db, notice) = opened.unwrap_or_else(|e| {
-            let db = Db::in_memory(&versions).expect("an in-memory graph opens");
-            (db, Some(format!("the graph is not kept: {e}")))
-        });
-        register(&db);
-        Graph { db, notice }
-    }
-}
-
-fn key(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
 }
 
 fn now_ns() -> i64 {

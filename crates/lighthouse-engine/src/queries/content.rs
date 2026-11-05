@@ -2,7 +2,7 @@
 
 use std::{fs::File, io::Read, path::Path};
 
-use lighthouse_graph::{Db, Error};
+use lighthouse_graph::{Db, Error, try_input};
 use lighthouse_protocol::hash;
 use serde::{Deserialize, Serialize};
 
@@ -60,9 +60,7 @@ pub(super) fn content(db: &Db, path: &String) -> Result<Content, Error> {
 /// The overlay of a path, if one is set: an input that is never set for most
 /// paths reads as none, and the read is recorded all the same.
 fn overlay(db: &Db, path: &String) -> Result<Option<Content>, Error> {
-    Ok(db
-        .try_input(&OVERLAY, path)?
-        .and_then(|content| content.as_ref().clone()))
+    Ok(try_input(db, &OVERLAY, path)?.and_then(|content| content.as_ref().clone()))
 }
 
 /// Reads the file once, in chunks, for both hashes and for whether it is
