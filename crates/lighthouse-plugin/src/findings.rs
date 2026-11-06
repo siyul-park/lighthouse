@@ -180,6 +180,9 @@ pub fn judge(
 ) -> Result<Findings, Error> {
     let runtime = Runtime::of(graph)?;
     let rule = rule_of(runtime, id)?;
+    if graph.verifying() && !rule.manifest().tools.is_empty() {
+        return Err(Error::Unverifiable);
+    }
     let options = options_of(judged, id)?;
     let held = Held::default();
     let view = View::new(graph, &held)?;
@@ -354,6 +357,9 @@ fn findings(
 
 fn command(graph: &Graph, key: &Key) -> Result<Batched, Error> {
     let (rule, variant, files) = key;
+    if graph.verifying() {
+        return Err(Error::Unverifiable);
+    }
     graph.input(&VERSION, &"binary".to_owned())?;
     let judged = configuration(graph, rule, variant)?;
     let runtime = Runtime::of(graph)?;

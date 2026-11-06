@@ -100,8 +100,11 @@ impl Graph {
 
     /// Verify mode: runs the node again and compares.
     fn verify(&self, id: &NodeId, kind: &'static dyn Kind, expected: Hash) -> Result<(), Error> {
-        let inside = self.within(&Frame::new(id.clone(), self.frame.clone()));
-        let output = kind.execute(&inside, &id.key)?;
+        let inside = self.within(&Frame::checking(id.clone(), self.frame.clone()));
+        let output = match kind.execute(&inside, &id.key) {
+            Err(Error::Unverifiable) => return Ok(()),
+            other => other?,
+        };
         match hash(&output.blob) == expected {
             true => Ok(()),
             false => Err(Error::Impure(self.shared.label(id))),

@@ -207,6 +207,32 @@ fn verify_mode_reports_a_query_that_reads_outside_the_graph() {
     assert!(matches!(pulled, Err(Error::Impure(_))), "{pulled:?}");
 }
 
+#[test]
+fn verify_mode_does_not_run_a_query_that_starts_a_program_again() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use lighthouse_graph::{Graph, Query};
+
+    static STARTED: AtomicU64 = AtomicU64::new(0);
+    static PROGRAM: Query<(), u64> = Query::new("program", |graph: &Graph, _: &()| {
+        if graph.verifying() {
+            return Err(Error::Unverifiable);
+        }
+        Ok(STARTED.fetch_add(1, Ordering::SeqCst) + 1)
+    });
+    let options = Options {
+        verify: 1,
+        ..Options::default()
+    };
+    let graph = Graph::in_memory(options).expect("open");
+
+    for _ in 0..4 {
+        assert_eq!(*graph.query(&PROGRAM, &()).expect("pull"), 1);
+    }
+
+    assert_eq!(STARTED.load(Ordering::SeqCst), 1);
+}
+
 static MAYBE: Input<u32, u32> = Input::new("maybe");
 static READS_MAYBE: Query<u32, u32> = Query::new("reads-maybe", |graph, key| {
     Ok(graph.input(&MAYBE, key)?.map_or(0, |value| *value + 1))

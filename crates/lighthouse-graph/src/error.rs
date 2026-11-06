@@ -9,6 +9,10 @@ pub enum Error {
     /// something that is not an input.
     #[error("{0} gave another value when run again: it reads outside the graph")]
     Impure(String),
+    /// A query that starts a program declines to run again in verify mode: a
+    /// check that starts the programs of a run starts them once.
+    #[error("the query starts a program, which verify mode does not repeat")]
+    Unverifiable,
     /// A key or a value that cannot be encoded.
     #[error("cannot encode: {0}")]
     Encode(String),
