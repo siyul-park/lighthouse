@@ -38,18 +38,6 @@ pub(super) struct Reporting {
     basis: String,
 }
 
-impl Reporting {
-    /// The state of the run on a project of root hash `tree` whose providers
-    /// answered as `index`.
-    fn state(&self, tree: &str, index: &str) -> String {
-        let mut hasher = Hasher::new();
-        hasher.update(&self.basis);
-        hasher.update(tree);
-        hasher.update(index);
-        hasher.hex()
-    }
-}
-
 impl Engine {
     /// The report `selected` over `scopes` asks for, or `None` when what it
     /// reports is not a function of the graph: a rule asks a model.
@@ -141,5 +129,17 @@ impl Engine {
             return;
         };
         let _ = state_report(graph, &reporting.scope, (reads, text));
+    }
+}
+
+impl Reporting {
+    /// The state of the run on a project of root hash `tree` whose providers
+    /// answered as `index`.
+    fn state(&self, tree: &str, index: &str) -> String {
+        let mut hasher = Hasher::new();
+        hasher.update(&self.basis);
+        hasher.update(tree);
+        hasher.update(index);
+        hasher.hex()
     }
 }

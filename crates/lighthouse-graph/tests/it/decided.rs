@@ -51,7 +51,7 @@ fn the_dependencies_that_decide_stand_for_the_rest() {
 fn a_query_that_was_never_computed_is_not_fresh() {
     let mut graph = Graph::in_memory(Options::default()).expect("graph");
     set(&mut graph, 1, 1);
-    assert!(!graph.is_fresh(&SUMMARY, &()).expect("fresh"));
+    assert!(!SUMMARY.is_fresh(&graph, &()).expect("fresh"));
     graph.query(&SUMMARY, &()).expect("pull");
-    assert!(graph.is_fresh(&SUMMARY, &()).expect("fresh"));
+    assert!(SUMMARY.is_fresh(&graph, &()).expect("fresh"));
 }

@@ -88,16 +88,7 @@ impl Engine {
             self.identify(found, &scene, &mut run)?;
             run.timings.fingerprints = started.elapsed();
         }
-        run.questions = models.subjects();
-        run.probabilities = models.probabilities();
-        run.usage = models.usage();
-        run.notices.extend(models.finish());
-        if let Some(cache) = &cache
-            && let Err(e) = cache.finish()
-        {
-            run.notices
-                .insert(format!("the result cache was not saved: {e}"));
-        }
+        Self::conclude(&mut run, (&models, cache.as_ref()));
         run.incomplete.sort();
         run.incomplete.dedup();
         run.reported = scopes.0.clone();
@@ -112,6 +103,20 @@ impl Engine {
         }
         run.project = project;
         Ok(run)
+    }
+
+    /// Takes what the models say of the run, and closes the result cache.
+    fn conclude(run: &mut Run, (models, cache): (&RunModels<'_>, Option<&Cache>)) {
+        run.questions = models.subjects();
+        run.probabilities = models.probabilities();
+        run.usage = models.usage();
+        run.notices.extend(models.finish());
+        if let Some(cache) = cache
+            && let Err(e) = cache.finish()
+        {
+            run.notices
+                .insert(format!("the result cache was not saved: {e}"));
+        }
     }
 
     /// Rejects a rule that is unknown or not enabled.

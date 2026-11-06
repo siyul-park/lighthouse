@@ -7,7 +7,10 @@ use std::{
 
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{Error, Graph, node::Hash};
+use crate::{
+    Error, Graph,
+    node::{Hash, Locked, NodeId},
+};
 
 /// What a key is: encoded to identify a node, decoded to run its query.
 pub trait Key: Serialize + DeserializeOwned + Debug + 'static {}
@@ -202,6 +205,29 @@ impl<K: Key, V: Value> Query<K, V> {
     /// Recorded as read, so the reader runs again when the hash moves.
     pub fn hash(&'static self, graph: &Graph, key: &K) -> Result<[u8; 32], Error> {
         graph.hash_of(self, key)
+    }
+
+    /// Whether the query has a value for the key that is not due to be written
+    /// again: the store's mark of it is not older than half the commits the
+    /// graph retains, the age at which a node found green is written again.
+    /// A node that is only ever validated through the first dependencies that
+    /// decide it (see [`Query::decided_by`]) keeps the rest from being used;
+    /// asking first lets a caller have them validated now and then.
+    ///
+    /// # Errors
+    ///
+    /// The store could not be read.
+    pub fn is_fresh(&'static self, graph: &Graph, key: &K) -> Result<bool, Error> {
+        let registered = graph.shared.register(self)?;
+        let id = NodeId {
+            kind: registered.name,
+            key: encode(key)?.into(),
+        };
+        let slot = graph.shared.slot(&id);
+        let mut node = slot.node.locked();
+        graph.shared.load(&mut node, &id)?;
+        let fresh = node.stored_verified_at >= graph.shared.horizon(graph.shared.retain / 2);
+        Ok(node.present && (node.value.is_some() || node.on_disk) && fresh)
     }
 
     /// Makes the query known to `graph` before anything pulls it, so that a

@@ -32,15 +32,15 @@ pub struct Reported {
     pub body: String,
 }
 
-/// The rule, the file (the project when empty) and the variant of a findings
-/// node a report is made of.
-pub type Read = (String, String, String);
-
 /// What the host gives `report` to answer with when it has to run.
 #[derive(Default)]
 pub struct Statements {
     stated: HashMap<String, (Vec<Read>, String)>,
 }
+
+/// The rule, the file (the project when empty) and the variant of a findings
+/// node a report is made of.
+pub type Read = (String, String, String);
 
 /// Sets what the run is, so that a report of another run is not this one's.
 ///
@@ -58,7 +58,7 @@ pub fn set_run(graph: &mut Graph, state: String) -> Result<(), Error> {
 /// The store could not be read.
 pub fn quiet_report(graph: &Graph, scope: &str) -> Result<Option<String>, Error> {
     let scope = scope.to_owned();
-    if !graph.is_fresh(&REPORT, &scope)? {
+    if !REPORT.is_fresh(graph, &scope)? {
         return Ok(None);
     }
     match graph.query(&REPORT, &scope) {

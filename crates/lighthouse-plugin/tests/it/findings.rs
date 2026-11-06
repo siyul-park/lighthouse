@@ -17,7 +17,7 @@ use lighthouse_model::{
 use lighthouse_plugin::{
     Analyzer, AnalyzerContext, AnalyzerManifest, Annotations, COMMAND, Context, Error, FINDINGS,
     Findings, Judged, Judging, NoModels, Plugin, PluginManifest, Registry, Rule, RuleManifest,
-    Runtime, Workspace, judge, run_batches, set_judged,
+    Runtime, Workspace, judge, quiet_report, run_batches, set_judged, set_run, state_report,
 };
 use serde_json::Value;
 
@@ -334,4 +334,48 @@ impl Plugin for Shared {
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         vec![Box::new(Delegate(self.1.clone()))]
     }
+}
+
+/// A graph that does not run green nodes again to check them: a report that
+/// is answered from its first dependencies is not one it can check.
+fn unverified() -> Graph {
+    let runtime = Runtime::new(
+        registry(),
+        (nothing, not_overlaid),
+        (Workspace::new(""), false),
+    );
+    let options = GraphOptions {
+        verify: 0,
+        ..GraphOptions::default()
+    };
+    Graph::in_memory(options.data(Arc::new(runtime))).unwrap()
+}
+
+#[test]
+fn state_report_keeps_the_body_that_quiet_report_gives() {
+    let mut graph = unverified();
+    let variant = set_judged(&mut graph, RULE, judged("{}")).unwrap();
+    set_run(&mut graph, "one".to_owned()).unwrap();
+    assert_eq!(quiet_report(&graph, "all").unwrap(), None);
+
+    let reads = vec![(RULE.to_owned(), String::new(), variant)];
+    state_report(&graph, "all", (reads, "body".to_owned())).unwrap();
+
+    assert_eq!(
+        quiet_report(&graph, "all").unwrap().as_deref(),
+        Some("body")
+    );
+    assert_eq!(quiet_report(&graph, "other").unwrap(), None);
+}
+
+#[test]
+fn set_run_to_another_state_leaves_no_report_to_give() {
+    let mut graph = unverified();
+    set_run(&mut graph, "one".to_owned()).unwrap();
+    state_report(&graph, "all", (Vec::new(), "body".to_owned())).unwrap();
+
+    set_run(&mut graph, "one".to_owned()).unwrap();
+    assert!(quiet_report(&graph, "all").unwrap().is_some());
+    set_run(&mut graph, "two".to_owned()).unwrap();
+    assert_eq!(quiet_report(&graph, "all").unwrap(), None);
 }
