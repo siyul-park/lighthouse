@@ -106,6 +106,26 @@ fn applicability_excludes_files_without_subjects() {
 }
 
 #[test]
+fn applicability_excludes_by_asks_for_test_code_only_when_a_decision_needs_it() {
+    let production = file("a.go", false, false);
+    let asked = std::cell::Cell::new(0);
+    let has_test_code = |answer: bool| {
+        let asked = &asked;
+        move || {
+            asked.set(asked.get() + 1);
+            answer
+        }
+    };
+
+    assert!(!Applicability::default().excludes_by(&production, has_test_code(false)));
+    assert_eq!(asked.get(), 0);
+    let only = by(true, TestScope::Only);
+    assert!(only.excludes_by(&production, has_test_code(false)));
+    assert!(!only.excludes_by(&production, has_test_code(true)));
+    assert_eq!(asked.get(), 2);
+}
+
+#[test]
 fn applicability_excludes() {
     let plain = symbol("a.go", "Plain");
     let inline = symbol("lib.go", "InlineTest");
