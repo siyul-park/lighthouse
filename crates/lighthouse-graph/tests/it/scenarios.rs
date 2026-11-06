@@ -225,6 +225,7 @@ fn graph_verifying_is_declined_by_a_query_that_starts_a_program() {
         ..Options::default()
     };
     let graph = Graph::in_memory(options).expect("open");
+    assert!(!graph.verifying(), "the owner of the graph does not verify");
 
     for _ in 0..4 {
         assert_eq!(*graph.query(&PROGRAM, &()).expect("pull"), 1);
