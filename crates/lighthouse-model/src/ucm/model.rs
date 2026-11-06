@@ -64,6 +64,11 @@ pub trait Model {
     /// The edges that start at symbol `id`, in the project's edge order.
     fn edges_from(&self, id: &SymbolId) -> Boxed<'_, Edge>;
 
+    /// The file the edge at position `at` of `edges` comes from, when it starts
+    /// at a module and its fragment is about one file; an edge that starts at
+    /// a symbol comes from the file of the symbol.
+    fn origin(&self, at: usize) -> Option<&Path>;
+
     /// The types that implement the interface `id`, in test files too.
     fn implementers(&self, id: &SymbolId) -> &[SymbolId];
 
@@ -189,6 +194,14 @@ pub trait Model {
 }
 
 impl Model for Project {
+    fn origin(&self, at: usize) -> Option<&Path> {
+        self.inner
+            .index
+            .origins
+            .get(&at)
+            .map(std::path::PathBuf::as_path)
+    }
+
     fn file(&self, path: &Path) -> Option<&File> {
         let at = self
             .inner

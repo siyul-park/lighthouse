@@ -102,7 +102,7 @@ impl Orchestrator<'_> {
         // The files whose fixes answer the change are verified with it.
         let scope: Vec<PathBuf> = changed.iter().chain(joined.prior.keys()).cloned().collect();
         if let Some(after) = &after {
-            let blame = Blame::new(self.proposer.engine, (before, after), &scope);
+            let blame = Blame::new((before, after), &scope);
             failed.extend(worse(&blame));
             for (file, why) in displaced {
                 failed.entry(file).or_insert(why);

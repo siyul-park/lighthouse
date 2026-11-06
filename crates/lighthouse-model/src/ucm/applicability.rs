@@ -1,12 +1,14 @@
 use std::{collections::BTreeSet, sync::Arc};
 
+use serde::{Deserialize, Serialize};
+
 use super::{File, Model, Module, Symbol};
 use crate::{ExampleScope, TestScope};
 
 /// What a decision's subjects may be, besides being of its subject kind:
 /// generated and test code, example code, and the language of the code, are
 /// told apart by the host, once, so no check has to guard against them.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Applicability {
     /// Generated code is a subject too.
     pub generated: bool,

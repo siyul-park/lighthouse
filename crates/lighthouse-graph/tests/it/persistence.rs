@@ -430,3 +430,62 @@ mod lazy {
         );
     }
 }
+
+mod transient {
+    use lighthouse_graph::{Durability, Graph, Input, Options, Query};
+
+    static SEED: Input<(), u8> = Input::new("seed");
+    static HELD: Query<(), String> = Query::new("held", |graph, _| {
+        Ok("h".repeat(usize::from(
+            graph.input(&SEED, &())?.map_or(0, |seed| *seed),
+        )))
+    })
+    .transient();
+    static READER: Query<(), usize> =
+        Query::new("reader", |graph, _| Ok(graph.query(&HELD, &())?.len()));
+
+    fn open(path: &std::path::Path, seed: u8) -> Graph {
+        let mut graph = Graph::open(
+            path,
+            Options {
+                verify: 0,
+                ..Options::default()
+            },
+        )
+        .expect("open");
+        HELD.register(&graph).expect("register");
+        graph
+            .set_input(&SEED, &(), seed, Durability::Stable)
+            .expect("set");
+        graph
+    }
+
+    #[test]
+    fn a_new_process_finds_what_read_a_transient_query_green() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let mut graph = open(&path, 3);
+        assert_eq!(*graph.query(&READER, &()).unwrap(), 3);
+        graph.commit().expect("commit");
+        drop(graph);
+
+        let graph = open(&path, 3);
+
+        assert_eq!(*graph.query(&READER, &()).unwrap(), 3);
+        assert_eq!(graph.take_executed(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_new_process_runs_what_read_a_transient_query_when_its_input_moved() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let mut graph = open(&path, 3);
+        graph.query(&READER, &()).unwrap();
+        graph.commit().expect("commit");
+        drop(graph);
+
+        let graph = open(&path, 5);
+
+        assert_eq!(*graph.query(&READER, &()).unwrap(), 5);
+    }
+}

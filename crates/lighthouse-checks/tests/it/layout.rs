@@ -59,15 +59,16 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
     let facts = Default::default();
     let ctx = Context {
         workspace: &ws,
-        project: &project,
+        model: &project,
         file: Some((&file, "")),
         facts: &facts,
         trusted: false,
-        memo: &lighthouse_plugin::Memo::default(),
         annotations: &lighthouse_plugin::Annotations::default(),
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        batch: &Default::default(),
+        documents: &[],
         queries: &lighthouse_plugin::NoQueries,
     };
 

@@ -5,8 +5,8 @@ mod analysis;
 mod annotations;
 mod cel;
 mod error;
+mod findings;
 mod fix;
-mod memo;
 mod models;
 mod notices;
 mod queries;
@@ -21,25 +21,28 @@ use std::{
 };
 
 use lighthouse_model::{
-    Diagnostic, Fingerprint, GeneratedSpec, Incomplete, Options, Reach, RunScope, Severity,
-    ucm::{Applicability, Capability, File, Fragment, Project},
+    Diagnostic, Document, Fingerprint, GeneratedSpec, Incomplete, Options, RunScope, Severity,
+    ucm::{Applicability, Capability, File, Fragment, Model as CodeModel},
 };
 use lighthouse_process::Policy;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
 
-pub use analysis::{ANALYSIS, AnalyzerContext, Analyzers, TextOf};
+pub use analysis::{ANALYSIS, AnalyzerContext, OverlaidOf, Runtime, TextOf};
 pub use annotations::Annotations;
 pub use cel::{
     CatalogFunction, CelCatalog, CelLibrary, CelLibraryManifest, Function, Overload, Precedence,
 };
 pub use error::Error;
+pub use findings::{
+    BATCH, BATCHED, Batched, COMMAND, FINDINGS, Findings, JUDGED, Judged, Judging, PATHS, TOOL,
+    judge, set_judged,
+};
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
 pub use lighthouse_protocol::{
     Conventions, EmbeddedRegion, Mapping, TestNaming, TextMapSegment, Units, UnitsBy,
 };
-pub use memo::{Memo, Pending};
 pub use models::{
     Abstained, Answer, Answered, Ask, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR,
     Decided, DecisionRef, EditRequest, Edited, Example, Explored, FAIL_AT, FineTuneJobError,
@@ -103,15 +106,15 @@ impl Workspace {
 /// Everything an analyzer or rule may read in one run.
 pub struct Context<'a> {
     pub workspace: &'a Workspace,
-    pub project: &'a Project,
+    /// The code model as the graph holds it: what a rule reads of it is
+    /// recorded as a dependency of its findings.
+    pub model: &'a dyn CodeModel,
     /// The focused file and its text; `None` for project scope.
     pub file: Option<(&'a File, &'a str)>,
     pub facts: &'a Facts,
     /// The user trusts the project to run the commands it names. The user
     /// decides that, never the repository.
     pub trusted: bool,
-    /// Values the rules of this run share, so that each is computed once.
-    pub memo: &'a Memo,
     /// What the suppression directives of the files say, once the engine has
     /// judged them; read by the rules that run after suppression.
     pub annotations: &'a Annotations,
@@ -122,10 +125,24 @@ pub struct Context<'a> {
     /// the project's configuration left it. The engine drops the files that
     /// are out before the rule runs; a rule drops the symbols that are.
     pub applies: Applicability,
+    /// The batch the focused file is in, for a rule that
+    /// [`batches`](Rule::batches); empty for another.
+    pub batch: &'a Batch,
+    /// The project's own documents, found by the engine for the rules that are
+    /// about them.
+    pub documents: &'a [Document],
     /// The models rules may put subjects to.
     pub models: &'a dyn Models,
     /// The graph the run's facts and indexes are pulled from.
     pub queries: &'a dyn Queries,
+}
+
+/// The files a program is run over together, and the configuration of the rule
+/// that runs it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Batch {
+    pub variant: String,
+    pub files: Vec<String>,
 }
 
 impl Context<'_> {
@@ -395,10 +412,15 @@ pub struct RuleManifest {
     pub capabilities: Vec<Capability>,
     /// What code the rule's subjects may be in, from its decision's scope.
     pub applicability: Applicability,
-    /// What the findings depend on, when the host may store and reuse them;
-    /// `None` when it must run the rule every time, such as one that reads
-    /// more than the code model.
-    pub caching: Option<Caching>,
+    /// Changes whenever the way the rule judges changes (its check, scope,
+    /// severity and option defaults, as the decision wrote them), so that the
+    /// findings of the old way are not used. `None` for a rule whose findings
+    /// are no node of the graph and are made again every run, such as one that
+    /// reads more than the code model.
+    pub revision: Option<String>,
+    /// The programs the findings come from, by name: their identity is an
+    /// input of the findings.
+    pub tools: Vec<String>,
 }
 
 impl RuleManifest {
@@ -414,24 +436,6 @@ impl RuleManifest {
     }
 }
 
-/// What lets the host reuse a rule's findings instead of running it again.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Caching {
-    /// How much of the project the findings about one subject depend on.
-    pub reach: Reach,
-    /// Whether the findings read the place of the symbols one edge away (their
-    /// lines and columns), not only what they are.
-    pub positions: bool,
-    /// Changes whenever the way the rule judges changes (its check, scope,
-    /// severity and option defaults, as the decision wrote them), so that
-    /// stored findings of the old way are not used.
-    pub revision: String,
-    /// The programs the findings come from, by name: the stored findings are
-    /// used again only while the host finds them (and the files that choose
-    /// their version and configuration) as they were.
-    pub tools: Vec<String>,
-}
-
 /// A check that turns facts into diagnostics. `validate` rejects bad options
 /// before any run; `check` must report only for the scope in `manifest()`.
 pub trait Rule: Send + Sync {
@@ -439,9 +443,26 @@ pub trait Rule: Send + Sync {
     fn validate(&self, options: &Options) -> Result<(), Error>;
     fn check(&self, ctx: &Context, options: &Options) -> Result<Vec<Diagnostic>, Error>;
     /// Whether the rule puts subjects to models (an `abstain` route). Its findings
-    /// are stored only for a run that does not ask the models.
+    /// are a node of the graph only for a run that does not ask the models.
     fn reviews(&self) -> bool {
         false
+    }
+    /// Whether the rule runs one program over a batch of files, the files of
+    /// the unit (or the directory) of the file it judges, and takes what the
+    /// program says of the file from the answer for the batch ([`Rule::batch`]).
+    fn batches(&self) -> bool {
+        false
+    }
+    /// The findings in each of `files` that one run of the rule's program over
+    /// them tells; a file left out is not answered, and the rule judges it by
+    /// itself.
+    fn batch(
+        &self,
+        _ctx: &Context,
+        _options: &Options,
+        _files: &[PathBuf],
+    ) -> Result<BTreeMap<PathBuf, Vec<Diagnostic>>, Error> {
+        Ok(BTreeMap::new())
     }
     /// Whether the rule reads the suppression directives of its files with
     /// what each suppressed (see [`Annotations`]). The engine runs such a rule
@@ -450,32 +471,11 @@ pub trait Rule: Send + Sync {
     fn after_suppression(&self) -> bool {
         false
     }
-    /// Whether the rule runs one program over a batch of files, so that the
-    /// host looks up what it has stored for the files first and gives the
-    /// batch only the files that are left (see [`Pending`]).
-    fn batches(&self) -> bool {
-        false
-    }
-    /// Whether what the rule finds in a file of `language` also depends on the
-    /// paths of the project's files and on the content of its files of that
-    /// language, as a link depends on the file it names and a formatter that
-    /// follows `mod` on the modules it reads.
-    fn siblings(&self, _language: &str) -> bool {
-        false
-    }
     /// The sort of subject whose facts the rule's expressions read (`symbol`,
     /// `function` or `test`) and the fields they read of it; none for a rule
     /// that reads no fact of a subject.
     fn reads(&self) -> Option<(&'static str, Reads)> {
         None
-    }
-    /// How far what the rule finds in a file of `language` reaches: what its
-    /// manifest declares, and the whole project when it declares nothing.
-    fn reach(&self, _language: &str) -> Reach {
-        self.manifest()
-            .caching
-            .as_ref()
-            .map_or(Reach::Global, |caching| caching.reach)
     }
 }
 

@@ -12,7 +12,10 @@ use std::{
     path::Path,
 };
 
-use lighthouse_graph::{Durability, Error, Graph, Input, Query};
+#[cfg(test)]
+use lighthouse_graph::Durability;
+use lighthouse_graph::{Error, Graph, Input, Query};
+#[cfg(test)]
 use lighthouse_model::ucm::{Fragment, Host, key};
 use lighthouse_plugin::UnitsBy;
 use lighthouse_spec::{CONTENT, FILES, Hash};
@@ -144,6 +147,7 @@ impl Read {
 /// Sets the inputs of a project that is the given fragments, one unit per
 /// file, with nothing else known of the files: what the keys of fragments made
 /// without a run are read from.
+#[cfg(test)]
 pub(crate) fn set_units(graph: &mut Graph, fragments: &[Fragment]) -> Result<(), Error> {
     for fragment in fragments {
         let Some(file) = fragment.files.first() else {

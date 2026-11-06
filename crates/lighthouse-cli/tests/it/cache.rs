@@ -1,4 +1,4 @@
-//! The result cache is invisible: a run that takes findings from it prints
+//! The graph is invisible: a run that takes findings from it prints
 //! the same bytes and exits the same as a run that does not, through an edit
 //! script over a Rust and a Go project, and the cache is cleaned on request.
 
@@ -20,7 +20,7 @@ struct Run {
     stdout: String,
 }
 
-/// A run that also says how many rule runs the cache answered.
+/// A run that also says how many findings the graph had.
 struct Timed {
     run: Run,
     hits: usize,
@@ -56,19 +56,16 @@ fn warm(dir: &Path) -> Timed {
     let (run, stderr) = check(dir, &["--timings"]);
     let line = stderr
         .lines()
-        .find(|l| l.starts_with("timings: hashing "))
-        .unwrap_or_else(|| panic!("no hashing line in:\n{stderr}"));
+        .find(|l| l.starts_with("findings: "))
+        .unwrap_or_else(|| panic!("no findings line in:\n{stderr}"));
     let numbers: Vec<usize> = line
-        .split_once(" (")
-        .unwrap()
-        .1
         .split(|c: char| !c.is_ascii_digit())
         .filter_map(|n| n.parse().ok())
         .collect();
     Timed {
         run,
-        hits: numbers[0],
-        misses: numbers[1],
+        hits: numbers[1],
+        misses: numbers[0],
     }
 }
 
@@ -101,7 +98,11 @@ fn differential(fixture: &Fixture) {
         assert_eq!(got.run, expected, "{step}");
         // A provider option is in the key of every unit: all of them are asked.
         if edit.name != "provider option changed" {
-            assert!(got.hits > 0, "{step}: the cache answered nothing");
+            assert!(
+                got.hits > 0,
+                "{step}: the cache answered nothing of {}",
+                got.misses
+            );
         }
         if edit.mostly_warm {
             assert!(

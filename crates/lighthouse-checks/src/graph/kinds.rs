@@ -14,7 +14,7 @@ use std::{
     sync::Arc,
 };
 
-use lighthouse_graph::{Durability, Error, Graph, Input, Query};
+use lighthouse_graph::{Durability, Error, Graph, Input, Query, VERSION};
 use lighthouse_model::ucm::{Held, Model, SymbolId, View};
 use lighthouse_plugin::{ANALYSIS, Pulling, Queries, Reads, Rule, TestNaming, Workspace};
 use serde::{Deserialize, Serialize};
@@ -192,6 +192,9 @@ impl Pulling for Pulls {
             .filter_map(|rule| rule.reads())
             .map(|(_, reads)| (class_of(&reads), reads))
             .collect();
+        SUBJECT.register(graph)?;
+        INDEX.register(graph)?;
+        AGGREGATE.register(graph)?;
         for (class, reads) in classes {
             graph.set_input(&READS, &class, reads, Durability::Stable)?;
         }
@@ -208,6 +211,7 @@ impl Pulling for Pulls {
 }
 
 fn aggregate(graph: &Graph, sort: &Sort) -> Result<Aggregate, Error> {
+    graph.input(&VERSION, &"binary".to_owned())?;
     let held = Held::default();
     let view = View::new(graph, &held)?;
     let model: &dyn Model = &view;
@@ -228,6 +232,7 @@ fn aggregate(graph: &Graph, sort: &Sort) -> Result<Aggregate, Error> {
 }
 
 fn index(graph: &Graph, (name, key): &(String, String)) -> Result<Entry, Error> {
+    graph.input(&VERSION, &"binary".to_owned())?;
     if name == CREDITED {
         let held = Held::default();
         let view = View::new(graph, &held)?;
@@ -272,6 +277,7 @@ fn index(graph: &Graph, (name, key): &(String, String)) -> Result<Entry, Error> 
 }
 
 fn fact(graph: &Graph, (kind, class, file): &(String, String, String)) -> Result<Facts, Error> {
+    graph.input(&VERSION, &"binary".to_owned())?;
     let reads = graph
         .input(&READS, class)?
         .map(|reads| reads.as_ref().clone())
@@ -304,7 +310,8 @@ fn fact(graph: &Graph, (kind, class, file): &(String, String, String)) -> Result
             .map(|(id, fact)| (id, Built::of(fact)))
             .collect()
     };
-    view.failure().map_or(Ok(Facts::of(facts)), Err)
+    let r = view.failure().map_or(Ok(Facts::of(facts)), Err);
+    r
 }
 
 fn workspace(graph: &Graph) -> Result<Workspace, Error> {

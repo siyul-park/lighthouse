@@ -86,7 +86,7 @@ impl<'a> Builder<'a> {
             .file
             .map_or_else(String::new, |(file, _)| file.analysis_language().to_owned());
         let over = Over {
-            model: ctx.project,
+            model: ctx.model,
             indexes,
             ws: ctx.workspace,
         };

@@ -1,7 +1,10 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -14,15 +17,14 @@ use crate::{
     timings::Timings,
 };
 use ignore::gitignore::Gitignore;
-use lighthouse_graph::Graph;
+use lighthouse_graph::{Error as GraphError, Graph};
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Options, Severity, Suppressed,
     ucm::{Applicability, File, Project},
 };
 use lighthouse_plugin::{
-    Annotations, Context, EmbeddedFile, Facts, LanguageProvider, Memo, Notices, Registry, Rule,
-    Source, Workspace,
+    Annotations, EmbeddedFile, Facts, Findings, LanguageProvider, Registry, Rule, Source, Workspace,
 };
 use lighthouse_spec::{
     Catalog, Config, GlobSet, Held, Models as BoundModels, ProjectFiles, Projects, Routing,
@@ -32,11 +34,11 @@ use rayon::prelude::*;
 use serde_json::Value;
 
 mod availability;
-mod cached;
 mod client;
 mod config;
 mod index;
 mod injections;
+mod judging;
 mod models;
 mod phases;
 mod project;
@@ -47,7 +49,6 @@ mod scopes;
 mod text;
 
 pub use availability::{Availability, Needs};
-use cached::RunCache;
 pub use client::CommandModels;
 pub use config::active;
 use config::{
@@ -181,39 +182,11 @@ struct Scene<'a> {
     inputs: &'a [Input],
     project: &'a Project,
     facts: &'a Facts,
-    memo: &'a Memo,
     annotations: &'a Annotations,
-    /// Where findings of an earlier run are looked up and kept, if the run has
-    /// a cache.
-    cache: Option<&'a RunCache<'a>>,
     /// The models the rules may ask.
     models: &'a dyn lighthouse_plugin::Models,
-    /// The graph the rules pull their facts and indexes from.
-    queries: &'a dyn lighthouse_plugin::Queries,
-}
-
-impl<'a> Scene<'a> {
-    /// What a rule reads when run for `file` (the project when `None`).
-    fn context(
-        &'a self,
-        trusted: bool,
-        file: Option<(&'a File, &'a str)>,
-        (notices, applies): (&'a Notices, Applicability),
-    ) -> Context<'a> {
-        Context {
-            workspace: self.workspace,
-            project: self.project,
-            file,
-            facts: self.facts,
-            trusted,
-            memo: self.memo,
-            annotations: self.annotations,
-            notices,
-            applies,
-            models: self.models,
-            queries: self.queries,
-        }
-    }
+    /// The graph the findings are pulled from.
+    graph: &'a Graph,
 }
 
 pub(crate) struct Input {
@@ -250,6 +223,43 @@ impl Gathered {
             *self.times.entry(rule).or_default() += time;
         }
     }
+
+    /// Adds the findings a model answered.
+    fn answer(&mut self, found: Vec<Diagnostic>) {
+        self.found.extend(found);
+    }
+
+    /// Adds what the rule `id` found, noticed and could not finish in `file`
+    /// (`None` for the project), at `level`.
+    fn settle(
+        &mut self,
+        (id, level): (&str, Severity),
+        file: Option<&Path>,
+        result: Result<Arc<Findings>, GraphError>,
+    ) -> Result<(), Error> {
+        match result {
+            Ok(findings) => {
+                self.notices.extend(findings.notices.iter().cloned());
+                let found = findings
+                    .diagnostics()
+                    .map_err(|e| Error::Graph(GraphError::Encode(e.to_string())))?;
+                self.found
+                    .extend(found.into_iter().map(|d| phases::leveled(d, level)));
+                Ok(())
+            }
+            Err(GraphError::Incomplete(reason)) => {
+                self.unsettled
+                    .insert((id.to_owned(), file.map(Path::to_owned)));
+                self.incomplete.push(Incomplete {
+                    path: file.map(Path::to_owned),
+                    provider: None,
+                    reason: format!("{id}: {reason}"),
+                });
+                Ok(())
+            }
+            Err(e) => Err(Error::Graph(e)),
+        }
+    }
 }
 
 /// The rules that did not finish, by file (`None` for the project).
@@ -258,7 +268,7 @@ pub(crate) type Unsettled = BTreeSet<(String, Option<PathBuf>)>;
 /// A configured set of plugins that analyzes one project root. Running it does
 /// not modify the project or the engine.
 pub struct Engine {
-    pub(crate) registry: Registry,
+    pub(crate) registry: Arc<Registry>,
     pub(crate) config: Config,
     /// The projects `extends` can name.
     projects: Projects,
@@ -389,7 +399,7 @@ impl Engine {
         };
         let enabled = active(&config, &projects)?;
         Ok(Self {
-            registry,
+            registry: Arc::new(registry),
             config,
             projects,
             binding,

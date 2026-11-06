@@ -17,8 +17,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use lighthouse_model::{Diagnostic, Position, RunScope, Span, squash, ucm::Project};
-use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
+use lighthouse_model::{Diagnostic, Position, RunScope, Span, squash};
+use lighthouse_plugin::{Context, Error as PluginError, PATHS, RuleManifest};
 use lighthouse_process::{Environment, Home, Job, Ran, context, copy_project, expand};
 use lighthouse_protocol::hash::Hasher;
 use lighthouse_spec::{
@@ -89,7 +89,11 @@ impl CommandRule {
             if !self.selects(&file.path) {
                 return Ok(Vec::new());
             }
-            if let Some(found) = self.answered((meta, ctx, options), &file.path) {
+            if self.siblings(meta.scope, &file.lang) {
+                // What the file names may be any file of the project.
+                ctx.queries.pull(PATHS, "")?;
+            }
+            if let Some(found) = self.answered((meta, ctx, options), &file.path)? {
                 return Ok(found);
             }
             return run(program)?.one(&file.path, Some(text));
@@ -112,6 +116,18 @@ impl CommandRule {
             }
         }
         Ok(found)
+    }
+
+    /// The findings in each of `files` that one run of the program over the
+    /// batch tells.
+    pub(crate) fn batch(
+        &self,
+        meta: &RuleManifest,
+        ctx: &Context,
+        options: &Map<String, Value>,
+        files: &[PathBuf],
+    ) -> Result<BTreeMap<PathBuf, Vec<Diagnostic>>, PluginError> {
+        self.answers((meta, ctx, options), files)
     }
 
     /// The run of `program` for the rule `meta` over `ctx`, in `root`.
@@ -152,7 +168,7 @@ impl CommandRule {
     /// that names no file runs once, for no file.
     fn assigned(&self, ctx: &Context) -> Vec<(&Program, Vec<PathBuf>)> {
         let mut by: BTreeMap<Option<&str>, Vec<PathBuf>> = BTreeMap::new();
-        for file in ctx.project.files.iter().filter(|f| self.selects(&f.path)) {
+        for file in ctx.model.files().filter(|f| self.selects(&f.path)) {
             let key = self
                 .programs
                 .is_language(&file.lang)
@@ -313,7 +329,7 @@ impl Invocation<'_> {
     /// of is an error, not a run without a value.
     fn fact(&self, file: &Path, fact: &str) -> Result<String, PluginError> {
         self.ctx
-            .project
+            .model
             .file(file)
             .and_then(|f| f.facts.get(fact))
             .cloned()
@@ -538,7 +554,7 @@ impl Invocation<'_> {
             .components()
             .filter(|c| !matches!(c, std::path::Component::CurDir))
             .collect::<PathBuf>();
-        known(self.ctx.project, &relative).then_some(relative)
+        known(self.ctx.model, &relative).then_some(relative)
     }
 }
 
@@ -551,7 +567,7 @@ fn stderr_of(ran: &Ran) -> String {
         .collect()
 }
 
-fn known(project: &Project, path: &Path) -> bool {
+fn known(project: &dyn Model, path: &Path) -> bool {
     project.file(path).is_some()
 }
 

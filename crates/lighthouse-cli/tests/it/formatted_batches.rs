@@ -70,6 +70,10 @@ fn project() -> Option<Project> {
 }
 
 fn check(project: &Project) -> String {
+    check_with(project, &[])
+}
+
+fn check_with(project: &Project, args: &[&str]) -> String {
     let dir = project.dir.path();
     let path = env::join_paths(
         [project.tools.path().to_owned()]
@@ -85,6 +89,7 @@ fn check(project: &Project) -> String {
         .env("PATH", path)
         .args(["check", "--no-store", "--format", "json", "--decision"])
         .arg("core/formatted")
+        .args(args)
         .output()
         .unwrap();
     String::from_utf8(out.stdout).unwrap()
@@ -129,11 +134,30 @@ fn one_run_formats_every_file_and_a_run_without_changes_starts_none() {
     );
     assert_eq!(check(&project), first);
     let after_edit = runs(&project.log);
-    assert_eq!(after_edit.len(), 2, "one run for the changed file");
-    assert!(
-        after_edit[1].contains("a.go")
-            && !after_edit[1].contains("b.go")
-            && !after_edit[1].contains("c.go"),
-        "only the file that changed is formatted: {after_edit:?}"
+    assert_eq!(
+        after_edit.len(),
+        2,
+        "one run for the unit of the changed file"
     );
+    for file in ["a.go", "b.go", "c.go"] {
+        assert!(
+            after_edit[1].contains(file),
+            "the files of the unit are formatted together: {after_edit:?}"
+        );
+    }
+}
+
+#[test]
+fn the_findings_of_a_command_equal_a_fresh_run_after_an_edit_and_its_undo() {
+    let Some(project) = project() else { return };
+    let dir = project.dir.path();
+    let clean = "package demo\n\n// A is a.\nfunc A() {}\n";
+    let marked = "package demo\n\n// A is a. UNFORMATTED\nfunc A() {}\n";
+
+    for text in [clean, marked, clean, marked] {
+        write(dir, "a.go", text);
+        let fresh = check_with(&project, &["--no-cache"]);
+        assert_eq!(check(&project), fresh, "after writing {text:?}");
+        assert_eq!(check(&project), fresh, "again after writing {text:?}");
+    }
 }

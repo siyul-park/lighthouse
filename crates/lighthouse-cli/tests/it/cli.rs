@@ -107,7 +107,6 @@ fn timings_go_to_stderr_and_leave_the_report_alone() {
         "fetch",
         "merge",
         "rules",
-        "rule core/max-lines",
         "fingerprints",
         "store",
         "report",

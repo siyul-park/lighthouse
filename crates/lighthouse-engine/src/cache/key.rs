@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 
-use lighthouse_model::Document;
 use lighthouse_protocol::hash::Hasher;
 use serde::Serialize;
 
@@ -34,25 +33,6 @@ impl KeyBuilder {
 
 /// A SHA-256.
 pub type Digest = [u8; 32];
-
-/// The digest of the documents of a project, which no file key covers.
-pub fn documents(documents: &[Document]) -> Result<Digest, Error> {
-    let mut hasher = Hasher::new();
-    for document in documents {
-        feed(
-            &mut hasher,
-            &(
-                &document.file,
-                document.at,
-                &document.kind,
-                &document.name,
-                &document.uid,
-                &document.labels,
-            ),
-        )?;
-    }
-    Ok(hasher.finish())
-}
 
 /// The hash of the JSON of `value`.
 pub(crate) fn digest_of<T: Serialize + ?Sized>(value: &T) -> Result<Digest, Error> {

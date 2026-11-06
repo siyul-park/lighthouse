@@ -166,8 +166,8 @@ impl<K, V> Query<K, V> {
     }
 
     /// Keeps the value in memory only: it is never written to the store, so a
-    /// process that needs it computes it again. Its hash is kept and recorded
-    /// for what reads it, as for any query.
+    /// process that needs it computes it again. Its hash and what it read are
+    /// kept, and its hash is recorded for what reads it, as for any query.
     pub const fn transient(self) -> Self {
         Self {
             transient: true,
@@ -182,6 +182,12 @@ impl<K: Key, V: Value> Query<K, V> {
     /// Recorded as read, so the reader runs again when the hash moves.
     pub fn hash(&'static self, graph: &Graph, key: &K) -> Result<[u8; 32], Error> {
         graph.hash_of(self, key)
+    }
+
+    /// Makes the query known to `graph` before anything pulls it, so that a
+    /// node stored as having read it can be validated by name.
+    pub fn register(&'static self, graph: &Graph) -> Result<(), Error> {
+        graph.shared.register(self).map(|_| ())
     }
 }
 

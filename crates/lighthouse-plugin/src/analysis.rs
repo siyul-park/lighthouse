@@ -8,9 +8,14 @@
 //! [data](lighthouse_graph::Options::data), fixed for its life: every analyzer
 //! of every plugin takes this path.
 
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    path::Path,
+    sync::{Arc, Mutex, PoisonError},
+    time::Duration,
+};
 
-use lighthouse_graph::{Error, Graph, Query};
+use lighthouse_graph::{Error, Graph, Query, VERSION};
 use lighthouse_model::{
     RunScope,
     ucm::{File, Held, Model, PATHS, View},
@@ -18,7 +23,7 @@ use lighthouse_model::{
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::{Analyzer, Facts};
+use crate::{Analyzer, Facts, Registry, Workspace};
 
 /// The fact of the analyzer `id` for a file, or for the project when the key
 /// is empty, as JSON.
@@ -49,36 +54,96 @@ impl AnalyzerContext<'_> {
     }
 }
 
-/// The analyzers of a run by id, and how they read the text of a file: the
-/// data a graph that runs analyzers is opened with.
-pub struct Analyzers {
-    by_id: BTreeMap<String, Arc<dyn Analyzer>>,
-    text: TextOf,
+/// What a graph runs its analyzers and rules with: the registry that holds
+/// them, how the text of a file is read, and the workspace and trust the rules
+/// run in. It is the data a graph that runs them is opened with.
+pub struct Runtime {
+    pub(crate) registry: Arc<Registry>,
+    pub(crate) text: TextOf,
+    pub(crate) overlaid: OverlaidOf,
+    pub(crate) workspace: Workspace,
+    pub(crate) trusted: bool,
+    pub(crate) times: Mutex<BTreeMap<String, Duration>>,
 }
 
-impl Analyzers {
-    /// These analyzers, whose files' text is read with `text`.
-    pub fn new(by_id: BTreeMap<String, Arc<dyn Analyzer>>, text: TextOf) -> Self {
-        Self { by_id, text }
+impl Runtime {
+    /// The analyzers and rules of `registry`, whose files' text is read with
+    /// `text`, run in `workspace` (without the texts a run stands in place of
+    /// files: those are the graph's overlays).
+    pub fn new(
+        registry: Arc<Registry>,
+        (text, overlaid): (TextOf, OverlaidOf),
+        (workspace, trusted): (Workspace, bool),
+    ) -> Self {
+        Self {
+            registry,
+            text,
+            overlaid,
+            workspace,
+            trusted,
+            times: Mutex::default(),
+        }
     }
 
-    fn get(&self, id: &str) -> Result<&Arc<dyn Analyzer>, Error> {
-        self.by_id
-            .get(id)
+    /// The runtime of `graph`.
+    pub fn of(graph: &Graph) -> Result<&Self, Error> {
+        graph
+            .data::<Self>()
+            .ok_or_else(|| Error::Encode("the graph has no registry".to_owned()))
+    }
+
+    /// The time each rule spent running since the last call.
+    pub fn take_times(&self) -> BTreeMap<String, Duration> {
+        std::mem::take(&mut *self.times.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    pub(crate) fn analyzer(&self, id: &str) -> Result<&dyn Analyzer, Error> {
+        self.registry
+            .analyzer(id)
             .ok_or_else(|| Error::Encode(format!("no analyzer `{id}` is registered")))
     }
 }
+
+/// The text a run stands in place of a file, read through the graph; `None`
+/// for a file the run does not replace.
+pub type OverlaidOf = fn(&Graph, &str) -> Result<Option<String>, Error>;
 
 /// How the text of a file is read through the graph, recording the file's
 /// content as a dependency; `None` for a file that is no text.
 pub type TextOf = fn(&Graph, &str) -> Result<Arc<Option<String>>, Error>;
 
+/// The facts of the analyzers `requires`, read as queries.
+pub(crate) fn required(
+    graph: &Graph,
+    analyzers: &Runtime,
+    requires: &[String],
+    file: &str,
+) -> Result<Facts, Error> {
+    let mut facts = Facts::new();
+    for id in requires {
+        let scope = analyzers.analyzer(id)?.manifest().scope;
+        let keys: Vec<String> = match (scope, file) {
+            (RunScope::Project, _) => vec![String::new()],
+            (_, file) if !file.is_empty() => vec![file.to_owned()],
+            _ => graph
+                .input(&PATHS, &())?
+                .map(|paths| paths.as_ref().clone())
+                .unwrap_or_default(),
+        };
+        for key in keys {
+            let json = graph.query(&ANALYSIS, &(id.clone(), key.clone()))?;
+            let value = serde_json::from_str(&json).map_err(|e| Error::Encode(e.to_string()))?;
+            facts.insert(id, key, value);
+        }
+    }
+    Ok(facts)
+}
+
 fn analysis(graph: &Graph, (id, file): &(String, String)) -> Result<String, Error> {
-    let analyzers = graph
-        .data::<Analyzers>()
-        .ok_or_else(|| Error::Encode("the graph has no analyzers".to_owned()))?;
-    let analyzer = analyzers.get(id)?;
-    let facts = required(graph, analyzers, analyzer.as_ref(), file)?;
+    let analyzers = Runtime::of(graph)?;
+    graph.input(&VERSION, &"binary".to_owned())?;
+    let analyzer = analyzers.analyzer(id)?;
+    let facts = required(graph, analyzers, &analyzer.manifest().requires, file)?;
     let held = Held::default();
     let view = View::new(graph, &held)?;
     let text = match file.as_str() {
@@ -101,31 +166,4 @@ fn analysis(graph: &Graph, (id, file): &(String, String)) -> Result<String, Erro
         return Err(error);
     }
     Ok(fact.to_string())
-}
-
-/// The facts of the analyzers `analyzer` requires, read as queries.
-fn required(
-    graph: &Graph,
-    analyzers: &Analyzers,
-    analyzer: &dyn Analyzer,
-    file: &str,
-) -> Result<Facts, Error> {
-    let mut facts = Facts::new();
-    for id in &analyzer.manifest().requires {
-        let scope = analyzers.get(id)?.manifest().scope;
-        let keys: Vec<String> = match (scope, file) {
-            (RunScope::Project, _) => vec![String::new()],
-            (_, file) if !file.is_empty() => vec![file.to_owned()],
-            _ => graph
-                .input(&PATHS, &())?
-                .map(|paths| paths.as_ref().clone())
-                .unwrap_or_default(),
-        };
-        for key in keys {
-            let json = graph.query(&ANALYSIS, &(id.clone(), key.clone()))?;
-            let value = serde_json::from_str(&json).map_err(|e| Error::Encode(e.to_string()))?;
-            facts.insert(id, key, value);
-        }
-    }
-    Ok(facts)
 }

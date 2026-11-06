@@ -361,83 +361,9 @@ impl Engine {
         Ok(facts)
     }
 
-    /// Runs the rules over the files and the project, in parallel; what they
-    /// found comes back in a fixed order: the findings of each file in file
-    /// order, rule by rule, then those of the project rules in rule order.
-    pub(super) fn apply(&self, scene: &Scene) -> Result<Gathered, Error> {
-        let (files, project) = in_pool(|| {
-            rayon::join(
-                || self.apply_file_rules(scene),
-                || self.apply_project_rules(scene),
-            )
-        });
-        let mut all = files?;
-        all.merge(project?);
-        Ok(all)
-    }
-
-    fn apply_file_rules(&self, scene: &Scene) -> Result<Gathered, Error> {
-        self.expect_batches(scene)?;
-        let per_file: Vec<Result<Gathered, Error>> = scene
-            .inputs
-            .par_iter()
-            .map(|input| self.apply_to_file(scene, input))
-            .collect();
-        let mut all = Gathered::default();
-        for gathered in per_file {
-            all.merge(gathered?);
-        }
-        Ok(all)
-    }
-
-    /// Before the rules run, notes for each rule that runs a program over a
-    /// batch of files which files the result cache has nothing for, so that
-    /// the batch holds those alone.
-    fn expect_batches(&self, scene: &Scene) -> Result<(), Error> {
-        let Some(cache) = scene.cache else {
-            return Ok(());
-        };
-        let batching: Vec<&&dyn Rule> = scene
-            .rules
-            .iter()
-            .filter(|r| r.batches() && !r.after_suppression())
-            .collect();
-        if batching.is_empty() {
-            return Ok(());
-        }
-        let checked: Vec<Result<(), Error>> = scene
-            .inputs
-            .par_iter()
-            .map(|input| {
-                let resolved =
-                    self.config
-                        .resolve(&input.file.path, &input.file.lang, &self.projects)?;
-                let file = scene.project.file(&input.file.path).unwrap_or(&input.file);
-                for rule in &batching {
-                    let mut scratch = Gathered::default();
-                    let Some((options, _, applies)) =
-                        self.judged(scene, **rule, &resolved, file, &mut scratch)
-                    else {
-                        continue;
-                    };
-                    let notices = Notices::default();
-                    let at = Some((file, input.text.as_str()));
-                    let ctx = scene.context(self.trusted, at, (&notices, applies));
-                    cache.expect(**rule, &ctx, &options);
-                }
-                Ok(())
-            })
-            .collect();
-        checked.into_iter().collect()
-    }
-
-    fn apply_to_file(&self, scene: &Scene, input: &Input) -> Result<Gathered, Error> {
-        self.apply_rules_of(scene, input, false)
-    }
-
-    /// Judges the suppression directives, which the rules that read them
-    /// (`after_suppression`) see as `said` them, once the findings of every
-    /// other rule are known. What they find is not itself suppressed.
+    /// Judges the directives (`said`), which the rules that read them
+    /// (`after_suppression`) see once the findings of every other rule are
+    /// known. What they find is not itself suppressed.
     pub(super) fn judge_annotations(
         &self,
         scene: &Scene,
@@ -448,77 +374,31 @@ impl Engine {
             return Ok(Vec::new());
         }
         let annotations = scene.annotations;
-        let mut with_directives = BTreeSet::new();
+        let mut with_directives = Vec::new();
         for input in scene.inputs {
             let path = &input.file.path;
             let directives = said.remove(path).unwrap_or_default();
             if !directives.is_empty() {
-                with_directives.insert(path);
+                with_directives.push(input);
             }
             annotations.insert(path.clone(), directives);
         }
         // A rule that reads the directives judges them: a file that has none
         // has nothing for it to find.
-        let per_file: Vec<Result<Gathered, Error>> = in_pool(|| {
-            scene
-                .inputs
-                .par_iter()
-                .filter(|input| with_directives.contains(&input.file.path))
-                .map(|input| self.apply_rules_of(scene, input, true))
-                .collect()
-        });
-        let mut all = Gathered::default();
-        for gathered in per_file {
-            all.merge(gathered?);
-        }
+        let all = self.judge_directives(scene, &with_directives, &mut run.timings)?;
         run.notices.extend(all.notices);
         run.incomplete.extend(all.incomplete);
         run.timings.add_rules(all.times);
         Ok(all.found)
     }
 
-    /// The rules of the files that read the directives (`after`), or those
-    /// that do not, over one file.
-    fn apply_rules_of(&self, scene: &Scene, input: &Input, after: bool) -> Result<Gathered, Error> {
-        let mut gathered = Gathered::default();
-        let resolved = self
-            .config
-            .resolve(&input.file.path, &input.file.lang, &self.projects)?;
-        // What the merged model says of the file: a provider may know it is
-        // generated where the host, reading it, did not.
-        let file = scene.project.file(&input.file.path).unwrap_or(&input.file);
-        for rule in scene
-            .rules
-            .iter()
-            .filter(|r| r.manifest().scope == RunScope::File && r.after_suppression() == after)
-        {
-            let Some((options, level, applies)) =
-                self.judged(scene, *rule, &resolved, file, &mut gathered)
-            else {
-                continue;
-            };
-            let at = Some((file, input.text.as_str()));
-            self.run_one(scene, *rule, (&options, level, applies), at, &mut gathered)?;
-        }
-        // Settle the models queued by this phase with the same resolved levels.
-        for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
-            let Some(level) = resolved.get(&rule).and_then(|config| config.level) else {
-                continue;
-            };
-            gathered
-                .found
-                .extend(found.into_iter().map(|d| answered(d, level)));
-        }
-        Ok(gathered)
-    }
-
     /// How `rule` is to judge `file` as the configuration sets it: its
     /// options, level and applicability; `None` when it is off, leaves the
     /// file out or cannot read it (a provider without a capability it needs,
     /// which is noticed and left unsettled).
-    fn judged<'a>(
+    pub(super) fn judged<'a>(
         &'a self,
-        scene: &Scene,
+        project: &Project,
         rule: &dyn Rule,
         resolved: &'a lighthouse_spec::Rules,
         file: &File,
@@ -528,7 +408,7 @@ impl Engine {
         let config = resolved.get(&meta.id)?;
         let level = config.level?;
         let applies = self.applies(&meta.applicability, config);
-        if applies.excludes(scene.project, file) {
+        if applies.excludes(project, file) {
             return None;
         }
         if let Some((language, missing)) = self.lacking(meta, &applies, file) {
@@ -572,93 +452,9 @@ impl Engine {
         })
     }
 
-    fn apply_project_rules(&self, scene: &Scene) -> Result<Gathered, Error> {
-        let languages: BTreeSet<usize> = scene.inputs.iter().map(|i| i.language).collect();
-        let resolved = self.config.resolve(Path::new(""), "", &self.projects)?;
-        let rules: Vec<&&dyn Rule> = scene
-            .rules
-            .iter()
-            .filter(|r| r.manifest().scope == RunScope::Project)
-            .collect();
-        let per_rule: Vec<Result<Gathered, Error>> = rules
-            .par_iter()
-            .map(|rule| self.apply_project_rule(scene, **rule, &languages, &resolved))
-            .collect();
-        let mut all = Gathered::default();
-        for gathered in per_rule {
-            all.merge(gathered?);
-        }
-        Ok(all)
-    }
-
-    fn apply_project_rule(
-        &self,
-        scene: &Scene,
-        rule: &dyn Rule,
-        languages: &BTreeSet<usize>,
-        resolved: &lighthouse_spec::Rules,
-    ) -> Result<Gathered, Error> {
-        let mut gathered = Gathered::default();
-        let meta = rule.manifest();
-        let Some(config) = resolved.get(&meta.id) else {
-            return Ok(gathered);
-        };
-        let Some(level) = config.level else {
-            return Ok(gathered);
-        };
-        let missing = meta.capabilities.iter().find(|c| {
-            languages
-                .iter()
-                .any(|&l| !self.provider(l).manifest().capabilities.contains(c))
-        });
-        if let Some(missing) = missing {
-            gathered.notices.insert(format!(
-                "{}: skipped, missing capability {missing}",
-                meta.id
-            ));
-            gathered.unsettled.insert((meta.id.clone(), None));
-            return Ok(gathered);
-        }
-        let applies = self.applies(&meta.applicability, config);
-        let options = options_at(&self.inherited, resolved, &meta.id, &config.options);
-        self.run_one(scene, rule, (&options, level, applies), None, &mut gathered)?;
-        Ok(gathered)
-    }
-
-    /// Runs `rule` for `file` and its text (the project when `None`) as the
-    /// configuration sets it, and adds what it found, noticed and could not
-    /// finish to `gathered`.
-    fn run_one(
-        &self,
-        scene: &Scene,
-        rule: &dyn Rule,
-        (options, level, applies): (&Options, Severity, Applicability),
-        file: Option<(&File, &str)>,
-        gathered: &mut Gathered,
-    ) -> Result<(), Error> {
-        let meta = rule.manifest();
-        let notices = Notices::default();
-        let ctx = scene.context(self.trusted, file, (&notices, applies));
-        let started = Instant::now();
-        let checked = self.run_rule(scene, rule, &ctx, options);
-        gathered.notices.extend(notices.take());
-        *gathered.times.entry(meta.id.clone()).or_default() += started.elapsed();
-        let at = file.map(|(file, _)| file.path.as_path());
-        if matches!(checked, Err(lighthouse_plugin::Error::Incomplete(_))) {
-            gathered
-                .unsettled
-                .insert((meta.id.clone(), at.map(Path::to_owned)));
-        }
-        let found = unfinished(checked, &meta.id, at, &mut gathered.incomplete)?;
-        gathered
-            .found
-            .extend(found.into_iter().map(|d| leveled(d, level)));
-        Ok(())
-    }
-
     /// What code a rule may report on at a file: the decision's scope, unless
     /// the project says otherwise for this rule (`generated`).
-    fn applies(&self, declared: &Applicability, rule: &RuleConfig) -> Applicability {
+    pub(super) fn applies(&self, declared: &Applicability, rule: &RuleConfig) -> Applicability {
         Applicability {
             generated: rule.generated.unwrap_or(declared.generated),
             ..declared.clone()
@@ -668,7 +464,7 @@ impl Engine {
 
 /// A finding at the level the configuration gives its rule; a subject nothing
 /// decided is only `info`.
-fn leveled(mut d: Diagnostic, level: Severity) -> Diagnostic {
+pub(super) fn leveled(mut d: Diagnostic, level: Severity) -> Diagnostic {
     d.severity = if d.review.is_some() {
         Severity::Info
     } else {
@@ -678,32 +474,10 @@ fn leveled(mut d: Diagnostic, level: Severity) -> Diagnostic {
 }
 
 /// A finding that came from a model's answer: it is not worth an `error`.
-fn answered(d: Diagnostic, level: Severity) -> Diagnostic {
+pub(super) fn answered(d: Diagnostic, level: Severity) -> Diagnostic {
     let level = match level {
         Severity::Error => Severity::Warn,
         other => other,
     };
     leveled(d, level)
-}
-
-/// What a rule found, or nothing and a gap when it could not finish: the gap
-/// is recorded for the file (or the project), so the run is incomplete rather
-/// than clean. Any other failure ends the run.
-fn unfinished(
-    checked: Result<Vec<Diagnostic>, lighthouse_plugin::Error>,
-    rule: &str,
-    file: Option<&Path>,
-    incomplete: &mut Vec<Incomplete>,
-) -> Result<Vec<Diagnostic>, Error> {
-    match checked {
-        Err(lighthouse_plugin::Error::Incomplete(reason)) => {
-            incomplete.push(Incomplete {
-                path: file.map(Path::to_owned),
-                provider: None,
-                reason: format!("{rule}: {reason}"),
-            });
-            Ok(Vec::new())
-        }
-        other => Ok(other?),
-    }
 }

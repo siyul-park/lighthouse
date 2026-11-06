@@ -1,22 +1,17 @@
-//! `results.db`: one table of values by key, in WAL mode. Lookups are answered
+//! `results.db`: one table of what models answered and fixes proposed, by key, in WAL mode. Lookups are answered
 //! while the run goes, each from a read-only connection of a small pool so that
 //! threads do not queue; stores and the use of what was found are written once,
 //! in one transaction, at the end.
 
 use std::{
-    borrow::Cow,
     fs,
     path::{Path, PathBuf},
-    sync::{
-        Mutex, PoisonError,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::{Mutex, PoisonError},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use lighthouse_model::Diagnostic;
 use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, params};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 
 use super::{Digest, Error};
 
@@ -29,7 +24,7 @@ const IGNORE: &str = "*\n";
 
 /// Bumped whenever the table or what its values mean changes: a database of
 /// another version is emptied.
-const SCHEMA: i64 = 2;
+const SCHEMA: i64 = 3;
 
 /// The size, in bytes of the database, past which the least recently used
 /// results are pruned: 256 MB. The cap is approximate: it counts the pages of
@@ -44,18 +39,9 @@ const PRUNE_TO: f64 = 0.9;
 /// than this, so that a run that only reads does not write every key.
 const TOUCH_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
 
-/// What a rule found for one subject and told about it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Stored<'a> {
-    pub diagnostics: Cow<'a, [Diagnostic]>,
-    pub notices: Cow<'a, [String]>,
-}
-
 /// What a run did with the cache.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Stats {
-    pub hits: usize,
-    pub misses: usize,
     /// Values written.
     pub stored: usize,
     /// Values pruned for the size limit.
@@ -70,8 +56,6 @@ pub struct Cache {
     used: Mutex<Vec<Digest>>,
     fresh: Mutex<Vec<Write>>,
     limit: u64,
-    hits: AtomicUsize,
-    misses: AtomicUsize,
 }
 
 impl Cache {
@@ -107,8 +91,6 @@ impl Cache {
             used: Mutex::default(),
             fresh: Mutex::default(),
             limit,
-            hits: AtomicUsize::new(0),
-            misses: AtomicUsize::new(0),
         })
     }
 
@@ -132,12 +114,6 @@ impl Cache {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(Write { key, value });
-    }
-
-    /// Counts a lookup as answered by the cache, or not.
-    pub fn count(&self, hit: bool) {
-        let counter = if hit { &self.hits } else { &self.misses };
-        counter.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Stores `value` under `key` when the run ends. A value that cannot be
@@ -170,8 +146,6 @@ impl Cache {
         let pruned = prune(&tx, self.limit)?;
         tx.commit()?;
         Ok(Stats {
-            hits: self.hits.load(Ordering::Relaxed),
-            misses: self.misses.load(Ordering::Relaxed),
             stored: fresh.len(),
             pruned,
         })

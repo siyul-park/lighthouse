@@ -2,11 +2,8 @@
 //! the file it lives in is a file of that type's own concern.
 
 use lighthouse_checks::probe;
-use lighthouse_model::{
-    Reach,
-    ucm::{Applicability, EdgeKind, Project, Symbol, SymbolKind},
-};
-use lighthouse_plugin::{Context, Memo, Notices, Workspace};
+use lighthouse_model::ucm::{Applicability, EdgeKind, Project, Symbol, SymbolKind};
+use lighthouse_plugin::{Context, Notices, Workspace};
 use serde_json::{Value, json};
 
 use crate::support::World;
@@ -24,22 +21,28 @@ fn fact(project: &Project, name: &str) -> Value {
         .clone();
     let ws = Workspace::new(".");
     let facts = Default::default();
-    let memo = Memo::default();
     let notices = Notices::default();
     let ctx = Context {
         workspace: &ws,
-        project,
+        model: project,
         file: None,
         facts: &facts,
         trusted: false,
-        memo: &memo,
         annotations: &lighthouse_plugin::Annotations::default(),
         notices: &notices,
         applies: Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        batch: &Default::default(),
+        documents: &[],
         queries: &lighthouse_plugin::NoQueries,
     };
-    probe::symbol_fact(&lighthouse_test_support::cel(), &ctx, &symbol, "split").unwrap()
+    probe::symbol_fact(
+        &lighthouse_test_support::cel(),
+        (&ctx, project),
+        &symbol,
+        "split",
+    )
+    .unwrap()
 }
 
 /// `Store` in its home file with two methods `a` and `b` in `FAR`, `a`
@@ -127,25 +130,4 @@ fn a_helper_used_outside_its_file_is_no_local_helper() {
     w.edge(EdgeKind::Calls, &user, &helper);
     let value = fact(&w.project(), "a");
     assert_eq!(value["share"], json!(2.0 / 3.0));
-}
-
-#[test]
-fn the_fact_reads_the_whole_project_so_it_reaches_globally() {
-    let reach = lighthouse_checks::caching::FACTS
-        .iter()
-        .find(|(word, _)| *word == "split")
-        .map(|(_, reach)| *reach);
-    assert_eq!(reach, Some(Reach::Global));
-    // A method that moves into the file in another file changes the fact of
-    // one that stays.
-    let (mut w, ..) = concern();
-    let before = fact(&w.project(), "a");
-    let store = w
-        .symbols
-        .iter()
-        .find(|s| s.name == "Store")
-        .unwrap()
-        .clone();
-    w.member(&store, "c", SymbolKind::Method, FAR);
-    assert_ne!(fact(&w.project(), "a"), before);
 }

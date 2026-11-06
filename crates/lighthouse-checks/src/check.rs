@@ -3,15 +3,15 @@
 //! The decision supplies id, severity, scope, options and the examples that
 //! `lighthouse decision test` runs.
 
-use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
     sync::Arc,
 };
 
-use lighthouse_model::{Diagnostic, Options, Reach, RunScope};
+use lighthouse_model::{Diagnostic, Options, RunScope};
 
-use lighthouse_plugin::{Caching, Context, Error as PluginError, Reads, Rule, RuleManifest};
+use lighthouse_plugin::{Context, Error as PluginError, Reads, Rule, RuleManifest};
 use lighthouse_protocol::hash;
 use lighthouse_spec::{CheckKind, Decision, Select};
 use serde_json::{Map, Value};
@@ -104,33 +104,22 @@ impl Check {
         }
         let revision = revision(decision, &libraries)
             .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
-        let (reach, positions) = match &kind {
-            Kind::Cel(rule) => rule.reach(meta.scope),
-            Kind::Command(_) => (Reach::Global, false),
+        // The findings of a program that reads the code model are a node of
+        // the graph; those of a command, which reads whatever the program
+        // reads, and of a rule that reads the directives, which depend on what
+        // every other rule found, are made again every run, unless the command
+        // is cacheable: it keeps no secret in its environment and says what its
+        // programs read.
+        let tools = match &kind {
+            Kind::Command(rule) => rule.tools(),
+            Kind::Cel(_) => Vec::new(),
         };
-        // The findings of a program that reads the code model are stored;
-        // those of a command, which reads whatever the program reads, and of
-        // a rule that reads the directives, which depend on what every other
-        // rule found, are not. A bundled command that judges a file with no
-        // secret in its environment is: by the file's text alone when the
-        // program is `independent`, else by the project's files of its
-        // language too (what the file names).
-        meta.caching = match &kind {
+        meta.revision = match &kind {
             Kind::Cel(rule) if rule.after_suppression() => None,
-            Kind::Command(rule) if rule.cacheable(meta.scope) => Some(Caching {
-                reach: Reach::Global,
-                positions: false,
-                revision,
-                tools: rule.tools(),
-            }),
-            Kind::Command(_) => None,
-            _ => Some(Caching {
-                reach,
-                positions,
-                revision,
-                tools: Vec::new(),
-            }),
+            Kind::Command(rule) if !rule.cacheable(meta.scope) => None,
+            _ => Some(revision),
         };
+        meta.tools = tools;
         Ok(Some(Self {
             meta,
             decision: decision.clone(),
@@ -187,9 +176,9 @@ impl Check {
         };
         let mut languages: BTreeSet<&str> = BTreeSet::from([file.analysis_language()]);
         languages.extend(
-            ctx.project
+            ctx.model
                 .symbols_in(&file.path)
-                .filter_map(|symbol| ctx.project.language_of(symbol)),
+                .filter_map(|symbol| ctx.model.language_of(symbol)),
         );
         if languages.len() < 2 {
             return Vec::new();
@@ -223,20 +212,17 @@ impl Rule for Check {
         }
     }
 
-    fn siblings(&self, language: &str) -> bool {
-        matches!(&*self.kind, Kind::Command(rule) if rule.siblings(self.meta.scope, language))
-    }
-
-    /// A command that finds in a file what the file alone holds reads only
-    /// that file, whatever the rule's declared reach.
-    fn reach(&self, language: &str) -> Reach {
+    fn batch(
+        &self,
+        ctx: &Context,
+        options: &Options,
+        files: &[PathBuf],
+    ) -> Result<BTreeMap<PathBuf, Vec<Diagnostic>>, PluginError> {
         match &*self.kind {
-            Kind::Command(rule) if rule.alone(self.meta.scope, language) => Reach::Local,
-            _ => self
-                .meta
-                .caching
-                .as_ref()
-                .map_or(Reach::Global, |caching| caching.reach),
+            Kind::Command(rule) => {
+                rule.batch(&self.meta, ctx, &self.resolved(options, ctx)?, files)
+            }
+            Kind::Cel(_) => Ok(BTreeMap::new()),
         }
     }
 

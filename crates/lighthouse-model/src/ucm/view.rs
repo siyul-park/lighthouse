@@ -6,7 +6,7 @@
 
 use std::{
     cell::{OnceCell, RefCell},
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     rc::Rc,
     sync::Arc,
@@ -25,7 +25,7 @@ use super::{
 pub struct View<'v> {
     graph: &'v Graph,
     held: &'v Held,
-    table: &'v Table,
+    table: OnceCell<&'v Table>,
     resolved: RefCell<HashMap<PathBuf, &'v Resolved>>,
     incoming: RefCell<HashMap<PathBuf, &'v Incoming>>,
     homes: RefCell<HashMap<SymbolId, Rc<Home<'v>>>>,
@@ -56,7 +56,7 @@ struct Everything<'v> {
     symbols: OnceCell<Vec<&'v Symbol>>,
     functions: OnceCell<Vec<&'v FunctionSummary>>,
     files: OnceCell<Vec<&'v File>>,
-    edges: OnceCell<Vec<&'v Edge>>,
+    edges: OnceCell<(Vec<&'v Edge>, BTreeMap<usize, PathBuf>)>,
 }
 
 /// What the views of one query pull, kept until the query is done.
@@ -74,11 +74,10 @@ pub struct Held {
 impl<'v> View<'v> {
     /// The view of the project `graph` holds.
     pub fn new(graph: &'v Graph, held: &'v Held) -> Result<Self, Error> {
-        let table = &**held.tables.alloc(graph.query(&SYMBOLS, &())?);
         Ok(Self {
             graph,
             held,
-            table,
+            table: OnceCell::new(),
             resolved: RefCell::default(),
             incoming: RefCell::default(),
             homes: RefCell::default(),
@@ -120,6 +119,40 @@ impl<'v> View<'v> {
         })
     }
 
+    /// The edges of every file's slice that repeat none, and the file of those
+    /// that start at a module and come from a fragment about one file.
+    fn all_edges(&self) -> &(Vec<&'v Edge>, BTreeMap<usize, PathBuf>) {
+        self.everything.edges.get_or_init(|| {
+            let edges = self.keep(self.graph.query(&EDGES, &()));
+            let edges = edges.map(|edges| &**self.held.edges.alloc(edges));
+            let (mut all, mut origins) = (Vec::new(), BTreeMap::new());
+            for path in self.paths() {
+                let Some(resolved) = self.resolved(Path::new(&path)) else {
+                    continue;
+                };
+                let dropped = edges
+                    .and_then(|edges| edges.dropped.get(Path::new(&path)))
+                    .map_or(&[][..], Vec::as_slice);
+                let mut files = resolved
+                    .slice
+                    .runs
+                    .iter()
+                    .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
+                for (at, edge) in resolved.slice.fragment.edges.iter().enumerate() {
+                    let file = files.next().flatten();
+                    if dropped.binary_search(&(at as u32)).is_ok() {
+                        continue;
+                    }
+                    if let (Node::Module(_), Some(file)) = (&edge.from, file) {
+                        origins.insert(all.len(), file.clone());
+                    }
+                    all.push(edge);
+                }
+            }
+            (all, origins)
+        })
+    }
+
     /// The paths of the project's files, whose parts are pulled on every
     /// thread the first time they are all asked for: one after the other is
     /// what a read of the whole project would wait for.
@@ -146,7 +179,7 @@ impl<'v> View<'v> {
             let symbols = &resolved.slice.fragment.symbols;
             at = (0..symbols.len())
                 .filter(|&i| {
-                    self.table
+                    self.table()
                         .entry(&symbols[i].id)
                         .is_some_and(|entry| entry.file == path)
                 })
@@ -218,7 +251,7 @@ impl<'v> View<'v> {
         if let Some(found) = self.homes.borrow().get(id) {
             return Rc::clone(found);
         }
-        let file = self.table.entry(id).map(|entry| entry.file.clone());
+        let file = self.table().entry(id).map(|entry| entry.file.clone());
         let home = Rc::new(Home {
             resolved: file.as_deref().and_then(|file| self.resolved(file)),
             file,
@@ -249,6 +282,17 @@ impl<'v> View<'v> {
         let incoming = &**self.held.incoming.alloc(incoming);
         self.incoming.borrow_mut().insert(path.to_owned(), incoming);
         Some(incoming)
+    }
+
+    /// The table of symbols, read when first asked for: a rule that reads no
+    /// symbol does not depend on them.
+    fn table(&self) -> &'v Table {
+        self.table.get_or_init(|| {
+            let table = self
+                .keep(self.graph.query(&SYMBOLS, &()))
+                .unwrap_or_default();
+            &**self.held.tables.alloc(table)
+        })
     }
 
     fn keep<T>(&self, found: Result<T, Error>) -> Option<T> {
@@ -288,7 +332,7 @@ impl<'v> Model for View<'v> {
     }
 
     fn module(&self, path: &str) -> Option<&Module> {
-        self.table.module(path)
+        self.table().module(path)
     }
 
     fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
@@ -399,9 +443,10 @@ impl<'v> Model for View<'v> {
             let run = runs.next().flatten();
             edge.when == When::Load
                 && match &edge.from {
-                    Node::Symbol(id) => {
-                        self.table.entry(id).is_some_and(|entry| entry.file == file)
-                    }
+                    Node::Symbol(id) => self
+                        .table()
+                        .entry(id)
+                        .is_some_and(|entry| entry.file == file),
                     Node::Module(_) => run.is_some_and(|run| run == file),
                 }
         });
@@ -428,7 +473,7 @@ impl<'v> Model for View<'v> {
     }
 
     fn modules(&self) -> Boxed<'_, Module> {
-        Box::new(self.table.modules())
+        Box::new(self.table().modules())
     }
 
     fn files(&self) -> Boxed<'_, File> {
@@ -442,25 +487,10 @@ impl<'v> Model for View<'v> {
     }
 
     fn edges(&self) -> Boxed<'_, Edge> {
-        let all = self.everything.edges.get_or_init(|| {
-            let edges = self.keep(self.graph.query(&EDGES, &()));
-            let edges = edges.map(|edges| &**self.held.edges.alloc(edges));
-            let mut all = Vec::new();
-            for path in self.paths() {
-                let Some(resolved) = self.resolved(Path::new(&path)) else {
-                    continue;
-                };
-                let dropped = edges
-                    .and_then(|edges| edges.dropped.get(Path::new(&path)))
-                    .map_or(&[][..], Vec::as_slice);
-                for (at, edge) in resolved.slice.fragment.edges.iter().enumerate() {
-                    if dropped.binary_search(&(at as u32)).is_err() {
-                        all.push(edge);
-                    }
-                }
-            }
-            all
-        });
-        Box::new(all.iter().copied())
+        Box::new(self.all_edges().0.iter().copied())
+    }
+
+    fn origin(&self, at: usize) -> Option<&Path> {
+        self.all_edges().1.get(&at).map(PathBuf::as_path)
     }
 }

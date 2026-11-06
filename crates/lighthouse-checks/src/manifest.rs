@@ -25,7 +25,8 @@ pub(crate) fn rule_manifest(decision: &Decision) -> Option<RuleManifest> {
         analyzers: Vec::new(),
         capabilities: Vec::new(),
         applicability: decision.applicability(),
-        caching: None,
+        revision: None,
+        tools: Vec::new(),
     })
 }
 

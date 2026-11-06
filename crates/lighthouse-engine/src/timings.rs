@@ -32,12 +32,10 @@ pub struct Timings {
     pub merge: Duration,
     /// Each analyzer, over all files, in the order they ran.
     pub analyzers: Vec<(String, Duration)>,
-    /// Hashing the merged project for the keys of the result cache; zero
-    /// without one.
-    pub hashing: Duration,
-    /// Rule runs whose findings the result cache had, and those it did not.
-    pub cache_hits: usize,
-    pub cache_misses: usize,
+    /// The findings nodes the rules were pulled through, those that ran and
+    /// those that were green.
+    pub findings_run: usize,
+    pub findings_green: usize,
     /// All the rules together, on the wall clock.
     pub rules: Duration,
     /// Each rule, summed over its runs, longest first.
@@ -87,14 +85,10 @@ impl Timings {
         }
         out.push(line("fetch", self.fetch));
         out.push(line("merge", self.merge));
-        if self.hashing > Duration::ZERO {
-            out.push(format!(
-                "{} ({} cache hit(s), {} miss(es))",
-                line("hashing", self.hashing),
-                self.cache_hits,
-                self.cache_misses
-            ));
-        }
+        out.push(format!(
+            "findings: {} run, {} green",
+            self.findings_run, self.findings_green
+        ));
         out.extend(
             self.analyzers
                 .iter()

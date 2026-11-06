@@ -3,6 +3,8 @@
 
 use std::path::Path;
 
+use lighthouse_model::Document;
+
 use super::*;
 
 impl Evaluation<'_> {
@@ -48,7 +50,7 @@ impl Evaluation<'_> {
 
     /// The symbols of `file` that are subjects of the decision's scope.
     fn check_symbols(&self, ctx: &Context, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
-        let project = ctx.project;
+        let project = ctx.model;
         let kind = match self.rule.select {
             Select::Function => FUNCTION,
             Select::Test => TEST,
@@ -109,7 +111,7 @@ impl Evaluation<'_> {
 
     /// The comments of `file` that are subjects of the decision's scope.
     fn check_comments(&self, ctx: &Context, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
-        let project = ctx.project;
+        let project = ctx.model;
         let facts = self.facts(COMMENT, &file.path)?;
         let mut found = Vec::new();
         for (at, comment) in project.comments_in(&file.path).enumerate() {
@@ -161,12 +163,12 @@ impl Evaluation<'_> {
     }
 
     pub(super) fn check_project(&self, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
-        let project = ctx.project;
+        let project = ctx.model;
         let declared = modules::index(project);
         let mut found = Vec::new();
         match self.rule.select {
             Select::Module => {
-                for module in &project.modules {
+                for module in project.modules() {
                     let Some(declared) = declared.get(module.path.as_str()) else {
                         continue;
                     };
@@ -183,7 +185,7 @@ impl Evaluation<'_> {
                 }
             }
             Select::Edge => {
-                for (at, edge) in project.edges.iter().enumerate() {
+                for (at, edge) in project.edges().enumerate() {
                     let Some(place) = edge_anchor(ctx, &declared, at, edge) else {
                         continue;
                     };
@@ -192,16 +194,16 @@ impl Evaluation<'_> {
                     found.extend(self.judge(value, place, &key)?);
                 }
             }
-            Select::Decision => found.extend(self.check_decisions(project)?),
+            Select::Decision => found.extend(self.check_decisions(ctx.documents)?),
             _ => {}
         }
         Ok(found)
     }
 
     /// The decision documents of the project that are subjects.
-    fn check_decisions(&self, project: &Project) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check_decisions(&self, documents: &[Document]) -> Result<Vec<Diagnostic>, PluginError> {
         let mut found = Vec::new();
-        for document in project.documents().iter().filter(|d| d.kind == "Decision") {
+        for document in documents.iter().filter(|d| d.kind == "Decision") {
             let value = cel_fact(&facts::document(document));
             let place = Anchor {
                 file: document.file.clone(),

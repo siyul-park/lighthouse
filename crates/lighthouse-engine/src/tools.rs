@@ -1,22 +1,22 @@
 //! What the findings of a program depend on besides the project's code: the
 //! program as the host finds it, its version, and the files that choose the
 //! version or configure it. A tool is as it was when its file, its version
-//! answer, and those files are. The answer to `--version` is kept in the
-//! cache under the file's identity, so that a run in which nothing changed
-//! starts no program.
+//! answer, and those files are. The answer to `--version` is kept for the
+//! process under the file's identity, so that a fix run that checks many times
+//! starts each program once.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     env, fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::{Mutex, OnceLock, PoisonError},
     time::{Duration, Instant, UNIX_EPOCH},
 };
 
 use lighthouse_model::ucm::Project;
 use lighthouse_protocol::hash::Hasher;
-
-use super::{Cache, KeyBuilder};
+use rayon::prelude::*;
 
 /// Files that choose which version of a toolchain runs, or configure a
 /// formatter, wherever the project has a directory.
@@ -67,9 +67,19 @@ const SELECTING_VARIABLES: [&str; 3] = ["RUSTUP_TOOLCHAIN", "GOENV_VERSION", "GO
 /// How long a program may take to say its version.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// The identity of `tools`, given the digest of the files that choose their
-/// version or configure them ([`selectors`]).
-pub(crate) fn identity(tools: &[String], selectors: &str, cache: &Cache) -> String {
+/// The identity of each program of `tools`, by name, as the host finds it now:
+/// the program, its version and what chooses the version or configures it
+/// ([`selectors`]). What a program answers to `--version` is asked once for
+/// each file the search path finds in a process, side by side.
+pub(crate) fn identities(
+    root: &Path,
+    project: &Project,
+    tools: &[String],
+) -> Vec<(String, String)> {
+    if tools.is_empty() {
+        return Vec::new();
+    }
+    let selectors = selectors(root, project);
     let mut hasher = Hasher::new();
     for (name, value) in SELECTING_VARIABLES.map(|name| (name, env::var_os(name))) {
         hasher.update(name);
@@ -79,12 +89,23 @@ pub(crate) fn identity(tools: &[String], selectors: &str, cache: &Cache) -> Stri
                 .unwrap_or_default(),
         );
     }
-    hasher.update(selectors);
-    for tool in tools {
-        hasher.update(tool);
-        hasher.update(found(tool, selectors, cache));
-    }
-    hasher.hex()
+    hasher.update(&selectors);
+    let shared = hasher.hex();
+    let found: Vec<String> = tools
+        .par_iter()
+        .map(|tool| found(tool, &selectors))
+        .collect();
+    tools
+        .iter()
+        .zip(found)
+        .map(|(tool, found)| {
+            let mut hasher = Hasher::new();
+            hasher.update(&shared);
+            hasher.update(tool);
+            hasher.update(found);
+            (tool.clone(), hasher.hex())
+        })
+        .collect()
 }
 
 /// The digest of the files that choose a version or configure a formatter:
@@ -118,7 +139,8 @@ pub(crate) fn selectors(root: &Path, project: &Project) -> String {
 
 /// What tells this version of `tool` from another: the file the search path
 /// finds, and what it and its companion say of their versions.
-fn found(tool: &str, selectors: &str, cache: &Cache) -> String {
+fn found(tool: &str, selectors: &str) -> String {
+    static ANSWERS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
     let Some(path) = which(tool) else {
         return format!("{tool}: not found");
     };
@@ -133,17 +155,25 @@ fn found(tool: &str, selectors: &str, cache: &Cache) -> String {
     }) else {
         return format!("{tool}: unreadable");
     };
-    let mut key = KeyBuilder::new();
-    key.part("tool-version").part(&file).part(selectors);
+    let mut key = format!("{file}\0{selectors}");
     for variable in SELECTING_VARIABLES {
-        key.part(env::var_os(variable).unwrap_or_default().as_encoded_bytes());
+        key.push('\0');
+        key.push_str(&env::var_os(variable).unwrap_or_default().to_string_lossy());
     }
-    let key = key.finish();
-    if let Some(version) = cache.get::<String>(&key) {
-        return format!("{file}:{version}");
-    }
-    let version = probe(&path, &["--version"]) + &companion(tool);
-    cache.put(key, &version);
+    let answers = ANSWERS.get_or_init(Mutex::default);
+    let known = answers
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get(&key)
+        .cloned();
+    let version = known.unwrap_or_else(|| {
+        let version = probe(&path, &["--version"]) + &companion(tool);
+        answers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(key, version.clone());
+        version
+    });
     format!("{file}:{version}")
 }
 

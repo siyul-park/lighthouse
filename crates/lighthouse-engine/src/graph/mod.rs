@@ -3,15 +3,15 @@
 //! each, and the pull of what a run needs of the files.
 
 mod detect;
-mod keys;
 mod open;
 mod pull;
 pub(crate) mod units;
 
 pub(crate) use detect::Detected;
-pub use keys::{FileKey, Keys};
+#[cfg(test)]
+pub(crate) use units::set_units;
 pub(crate) use units::{
-    API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, Read, Stored, UNIT, UNITS, set_units,
+    API, CLAIMED, EVERY, FRAGMENT, PROVIDER, Provider, Read, Stored, UNIT, UNITS,
 };
 
 #[cfg(test)]

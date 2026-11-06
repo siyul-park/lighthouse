@@ -315,6 +315,11 @@ impl Registry {
         Ok(walk.out)
     }
 
+    /// The analyzer with this qualified id.
+    pub fn analyzer(&self, id: &str) -> Option<&dyn Analyzer> {
+        self.analyzers.get(id).map(Arc::as_ref)
+    }
+
     /// Every registered analyzer by id: what a graph that runs them is opened
     /// with.
     pub fn analyzers(&self) -> BTreeMap<String, Arc<dyn Analyzer>> {

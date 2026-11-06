@@ -3,8 +3,6 @@
 //! makes of the same fragments, and what a file's keys follow is what its
 //! neighbors can see.
 
-use std::path::PathBuf;
-
 use lighthouse_graph::{Graph, Options};
 use lighthouse_model::{
     Position, Span,
@@ -14,7 +12,7 @@ use lighthouse_model::{
     },
 };
 
-use crate::graph::{Keys, set_units};
+use crate::graph::set_units;
 
 /// A tiny deterministic generator.
 struct Rng(u64);
@@ -174,10 +172,6 @@ impl World {
                 .map(|(at, spec)| spec.fragment(&spec.path(at))),
         )
     }
-
-    fn keys(&self) -> Keys {
-        Keys::new(&self.graph, &self.project(), true).unwrap()
-    }
 }
 
 fn spec(module: &str, functions: &[&str]) -> Spec {
@@ -268,62 +262,6 @@ fn the_project_the_queries_give_is_the_project_a_merge_makes_after_every_edit() 
 }
 
 /// An edit of the specs of a world.
-type Change = fn(&mut Vec<Spec>);
-
-fn keys_after(change: impl FnOnce(&mut Vec<Spec>)) -> (Keys, Keys) {
-    let before = World::new(two()).keys();
-    let mut specs = two();
-    change(&mut specs);
-    (before, World::new(specs).keys())
-}
-
-fn a() -> PathBuf {
-    PathBuf::from("p0.rs")
-}
-
-#[test]
-fn a_neighbor_that_moves_leaves_the_neighbors_key_and_changes_the_one_with_places() {
-    let (before, after) = keys_after(|specs| specs[1].shift = 40);
-    let (old, new) = (before.file(&a()).unwrap(), after.file(&a()).unwrap());
-    assert_eq!(old.slice, new.slice);
-    assert_eq!(old.neighbors, new.neighbors);
-    assert_ne!(old.neighbors_at, new.neighbors_at);
-}
-
-#[test]
-fn what_a_neighbor_is_described_by_changes_the_neighbors_key() {
-    let changes: Vec<(&str, Change)> = vec![
-        ("name", |s| {
-            s[1].functions = vec!["fb".to_owned(), "other".to_owned()]
-        }),
-        ("a second caller", |s| {
-            s.push(spec("c", &["fc"]));
-            s[2].calls.push(("fc".to_owned(), "b::fb".to_owned()));
-        }),
-        ("lang", |s| s[1].lang = "go"),
-    ];
-    for (what, change) in changes {
-        let (before, after) = keys_after(change);
-        let (old, new) = (before.file(&a()).unwrap(), after.file(&a()).unwrap());
-        assert_ne!(old.neighbors, new.neighbors, "{what}");
-    }
-}
-
-#[test]
-fn a_body_edit_of_a_neighbor_that_changes_nothing_it_is_described_by_moves_no_key_of_the_file() {
-    let (before, after) = keys_after(|specs| specs[1].statements = 9);
-    assert_eq!(before.file(&a()), after.file(&a()));
-}
-
-#[test]
-fn the_siblings_and_project_keys_follow_what_the_files_hold() {
-    let world = World::new(two()).keys();
-    assert_eq!(world.project(), World::new(two()).keys().project());
-    assert!(world.siblings("go").is_none());
-    let (_, edited) = keys_after(|specs| specs[1].statements = 9);
-    assert_ne!(edited.siblings("rust"), world.siblings("rust"));
-    assert_ne!(edited.project(), world.project());
-}
 
 #[test]
 fn a_body_edit_runs_no_resolution_and_the_symbol_table_stays_equal() {

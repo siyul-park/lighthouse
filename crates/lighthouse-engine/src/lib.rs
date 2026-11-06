@@ -12,6 +12,7 @@ mod generated;
 mod graph;
 mod tester;
 mod timings;
+mod tools;
 
 pub mod cache;
 

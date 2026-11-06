@@ -18,7 +18,7 @@ pub const MODULE_BODY: &str = "<module>";
 /// declarations.
 pub fn declarations<'a>(ctx: &Context<'a>) -> Vec<Vec<&'a Symbol>> {
     ctx.file
-        .map_or_else(Vec::new, |(file, _)| declarations_in(ctx.project, file))
+        .map_or_else(Vec::new, |(file, _)| declarations_in(ctx.model, file))
 }
 
 /// [`declarations`] of `file`.

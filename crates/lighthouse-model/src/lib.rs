@@ -46,7 +46,7 @@ pub use model_ref::ModelRef;
 pub use resource::{API_VERSION, Metadata, Resource, Spec, is_uid, kind_of, new_uid, resource};
 pub use review::{AgentKind, Attribution, Judged, Judgment, Label, Role};
 pub use schema::{SCHEMA_URL_BASE, Schema, header, schema, schema_file};
-pub use scope::{ExampleScope, Reach, RunScope, TestScope};
+pub use scope::{ExampleScope, RunScope, TestScope};
 pub use signal::{SignalClass, SignalStatus};
 pub use text::{
     ColumnUnit, LineIndex, Position, Span, byte_position, eol_of, slashed, squash, utf16_position,

@@ -9,8 +9,8 @@ use std::{
 
 use cel::{Program, common::value::CowVal, context::VariableResolver};
 use lighthouse_model::{
-    Diagnostic, Position, Reach, Span,
-    ucm::{Edge, File, Model, Node, Project, Symbol, SymbolId},
+    Diagnostic, Position, Span,
+    ucm::{Edge, File, Node, Symbol, SymbolId},
 };
 use lighthouse_plugin::{Context, Error as PluginError, Queries, Reads, RuleManifest};
 use lighthouse_spec::{CelCheck, Decision, Env, Select};
@@ -20,7 +20,6 @@ use crate::{
     Composition, Error,
     abstain::{Abstain, Candidate},
     builder::Builder,
-    caching,
     eval::{Frame, Template, Var, cel_fact, compile, compile_all, compile_shared},
     fact::{COMMENT, FACT, FUNCTION, Facts, SYMBOL, Subject, TEST, class_of, fact_key},
     facts,
@@ -173,17 +172,6 @@ impl CelRule {
         } else {
             Vec::new()
         }
-    }
-
-    /// How far the findings about one subject reach: a project decision reads
-    /// the whole project, and so does one that reports at a symbol other than
-    /// its subject; else what the expressions read.
-    pub(crate) fn reach(&self, scope: lighthouse_model::RunScope) -> (Reach, bool) {
-        let elsewhere = self.at.as_ref().is_some_and(|at| at.symbol.is_some());
-        if scope == lighthouse_model::RunScope::Project || elsewhere {
-            return (Reach::Global, false);
-        }
-        caching::reach(&self.needs)
     }
 
     pub(crate) fn check(
@@ -472,7 +460,7 @@ fn edge_anchor<'p>(
     at: usize,
     edge: &Edge,
 ) -> Option<Anchor> {
-    let project = ctx.project;
+    let project = ctx.model;
     match &edge.from {
         Node::Symbol(id) => {
             let symbol = project
@@ -517,7 +505,7 @@ fn admits_module(
     let files: Vec<&File> = declared
         .files
         .iter()
-        .filter_map(|path| ctx.project.file(path))
+        .filter_map(|path| ctx.model.file(path))
         .collect();
     ctx.applies.admits_module(module, &files)
 }

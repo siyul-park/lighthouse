@@ -30,7 +30,6 @@ mod modules;
 mod naming;
 mod text;
 
-pub mod caching;
 pub mod command;
 pub mod layout;
 pub mod metrics;

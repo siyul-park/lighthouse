@@ -1,9 +1,9 @@
 //! One run of the engine: choose the rules, load the project, apply the rules,
 //! suppress what the source waives and give every finding its identity.
 
+use super::judging::Judgment;
 use super::*;
 use lighthouse_model::ucm::Model;
-use lighthouse_plugin::{NoQueries, Queries};
 
 impl Engine {
     pub(super) fn run(
@@ -31,12 +31,6 @@ impl Engine {
         });
         let models = RunModels::new(self, &scopes, cache.as_ref());
         let (inputs, project) = self.load(&selected, overlays, &mut run)?;
-        let started = Instant::now();
-        let run_cache = cache.as_ref().and_then(|cache| {
-            self.run_cache(cache, &project, &selected, &models, &mut run.notices)
-        });
-        run.timings.hashing = started.elapsed();
-        let memo = Memo::default();
         let annotations = Annotations::default();
         // The rules read what the run stands in place of files, as the
         // providers do.
@@ -54,49 +48,45 @@ impl Engine {
             pulling.inputs(graph, &selected, &workspace)?;
         }
         let facts = self.analyze(graph, (&selected, &inputs), &mut run.timings)?;
+        let refs: Vec<&Input> = inputs.iter().collect();
+        let judgment = Judgment {
+            rules: &selected,
+            inputs: &refs,
+            project: &project,
+            models: &models,
+        };
+        let plan = self.plan(&judgment, false)?;
+        self.judging_inputs(graph, &plan, &judgment)?;
+        {
+            let scene = Scene {
+                workspace: &workspace,
+                rules: &selected,
+                inputs: &inputs,
+                project: &project,
+                facts: &facts,
+                annotations: &annotations,
+                models: &models,
+                graph,
+            };
+            let (found, unsettled) = self.collect(&scene, plan, &mut run)?;
+            let started = Instant::now();
+            let found = self.suppress(found, &scene, (&ran, &unsettled), &scopes, &mut run)?;
+            self.identify(found, &scene, &mut run)?;
+            run.timings.fingerprints = started.elapsed();
+        }
         if let Err(e) = graph.commit() {
             run.notices.insert(format!("the graph was not saved: {e}"));
         }
-        let queries: Box<dyn Queries + '_> = match (self.registry.pulling(), guard.as_ref()) {
-            (Some(pulling), Some(graph)) => pulling.queries(graph),
-            _ => Box::new(NoQueries),
-        };
-        let scene = Scene {
-            workspace: &workspace,
-            rules: &selected,
-            inputs: &inputs,
-            project: &project,
-            facts: &facts,
-            memo: &memo,
-            annotations: &annotations,
-            cache: run_cache.as_ref(),
-            models: &models,
-            queries: queries.as_ref(),
-        };
-        let (found, unsettled) = self.collect(&scene, &mut run)?;
         run.questions = models.subjects();
         run.probabilities = models.probabilities();
         run.usage = models.usage();
         run.notices.extend(models.finish());
-        if let Some(cache) = &cache {
-            if let Some(run_cache) = &run_cache {
-                run_cache.store_rows();
-            }
-            match cache.finish() {
-                Ok(stats) => {
-                    run.timings.cache_hits = stats.hits;
-                    run.timings.cache_misses = stats.misses;
-                }
-                Err(e) => {
-                    run.notices
-                        .insert(format!("the result cache was not saved: {e}"));
-                }
-            }
+        if let Some(cache) = &cache
+            && let Err(e) = cache.finish()
+        {
+            run.notices
+                .insert(format!("the result cache was not saved: {e}"));
         }
-        let started = Instant::now();
-        let found = self.suppress(found, &scene, (&ran, &unsettled), &scopes, &mut run)?;
-        self.identify(found, &scene, &mut run)?;
-        run.timings.fingerprints = started.elapsed();
         run.incomplete.sort();
         run.incomplete.dedup();
         run.reported = scopes.0.clone();
@@ -160,9 +150,14 @@ impl Engine {
 
     /// Applies the rules and keeps what they found, noticed and could not
     /// finish.
-    fn collect(&self, scene: &Scene, run: &mut Run) -> Result<Collected, Error> {
+    fn collect(
+        &self,
+        scene: &Scene,
+        plan: super::judging::Plan,
+        run: &mut Run,
+    ) -> Result<Collected, Error> {
         let started = Instant::now();
-        let applied = self.apply(scene)?;
+        let applied = self.judge_plan(scene, plan, &mut run.timings)?;
         run.timings.rules = started.elapsed();
         run.timings.add_rules(applied.times);
         run.notices.extend(applied.notices);

@@ -20,6 +20,10 @@ pub enum Error {
         had: String,
         now: String,
     },
+    /// A query that could not finish what it was asked: it is not stored, and
+    /// the next pull runs it again.
+    #[error("{0}")]
+    Incomplete(String),
     /// The store failed.
     #[error("store: {0}")]
     Store(#[from] rusqlite::Error),

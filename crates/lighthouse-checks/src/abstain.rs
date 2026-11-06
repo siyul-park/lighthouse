@@ -4,10 +4,7 @@
 //! left to agent review.
 
 use cel::Program;
-use lighthouse_model::{
-    Diagnostic, Position, Span,
-    ucm::{Model, SymbolId},
-};
+use lighthouse_model::{Diagnostic, Position, Span, ucm::SymbolId};
 use lighthouse_plugin::{
     Answered, Ask, Context, DecisionRef, Neighbor, RuleManifest, State, Subject,
 };
@@ -146,7 +143,7 @@ impl Abstain {
             .symbol
             .as_deref()
             .and_then(SymbolId::parse)
-            .and_then(|id| ctx.project.symbol(&id));
+            .and_then(|id| ctx.model.symbol(&id));
         let text = match (self.select, symbol) {
             (Select::File, _) | (_, None) => {
                 if self.select == Select::File {
@@ -169,7 +166,7 @@ impl Abstain {
             ),
             state: State {
                 language: ctx
-                    .project
+                    .model
                     .file(&diagnostic.file)
                     .map(|f| f.lang.clone())
                     .unwrap_or_default(),
@@ -206,7 +203,7 @@ fn outcome(answered: Answered, candidate: Candidate, decision: &DecisionRef) -> 
 /// The callers and callees of a symbol, with the source of those in the same
 /// file.
 fn neighbors(ctx: &Context, source: &str, symbol: &lighthouse_model::ucm::Symbol) -> Vec<Neighbor> {
-    let project = ctx.project;
+    let project = ctx.model;
     let around = |ids: &[SymbolId], relation: &str| -> Vec<Neighbor> {
         ids.iter()
             .filter_map(|id| project.symbol(id))

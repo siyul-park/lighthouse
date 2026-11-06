@@ -45,15 +45,16 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
     let facts = Facts::new();
     let ctx = Context {
         workspace: &ws,
-        project: &project,
+        model: &project,
         file: Some((&file, text)),
         facts: &facts,
         trusted: false,
-        memo: &lighthouse_plugin::Memo::default(),
         annotations: &lighthouse_plugin::Annotations::default(),
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
+        batch: &Default::default(),
+        documents: &[],
         queries: &lighthouse_plugin::NoQueries,
     };
     registry

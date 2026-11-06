@@ -80,10 +80,9 @@ impl Orchestrator<'_> {
         let proposed = self.proposer.propose(outcome, &self.texts, phase, taking);
         self.timings.propose += started.elapsed();
         let (proposals, mut declined) = proposed?;
-        let engine = self.proposer.engine;
         let (proposals, refused): (Vec<_>, Vec<_>) = proposals
             .into_iter()
-            .map(|p| (incomplete::refusal(engine, outcome, &p), p))
+            .map(|p| (incomplete::refusal(outcome), p))
             .partition(|(why, _)| why.is_none());
         for (why, p) in refused {
             declined.insert(

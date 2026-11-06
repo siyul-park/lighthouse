@@ -3,7 +3,7 @@
 use std::sync::{Arc, PoisonError};
 
 use lighthouse_graph::{Graph, Options};
-use lighthouse_plugin::Analyzers;
+use lighthouse_plugin::Runtime;
 
 use crate::{cache, engine::Engine};
 
@@ -26,7 +26,11 @@ impl Engine {
                     limit,
                     ..Options::default()
                 }
-                .data(Arc::new(Analyzers::new(self.registry.analyzers(), text)))
+                .data(Arc::new(Runtime::new(
+                    self.registry.clone(),
+                    (text, overlaid),
+                    (self.ws.clone(), self.trusted),
+                )))
             };
             let opened = match &self.cache {
                 Some(cache) => Graph::open(&cache.dir.join(FILE), options(cache.limit)),
@@ -49,4 +53,12 @@ impl Engine {
 /// The text of a file, read through the graph.
 fn text(graph: &Graph, path: &str) -> Result<Arc<Option<String>>, lighthouse_graph::Error> {
     lighthouse_spec::text(graph, path).map(Arc::new)
+}
+
+/// The text a run stands in place of a file, read through the graph.
+fn overlaid(graph: &Graph, path: &str) -> Result<Option<String>, lighthouse_graph::Error> {
+    Ok(graph
+        .input(&lighthouse_spec::OVERLAY, &path.to_owned())?
+        .and_then(|content| content.as_ref().clone())
+        .and_then(|content| content.text))
 }

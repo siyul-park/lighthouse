@@ -1,6 +1,6 @@
-//! The engine's result cache over rules that count their runs: what a run
-//! takes from the cache, what makes it run again, and what happens when the
-//! cache cannot be used.
+//! The findings of rules that count their runs, as nodes of the graph: what a
+//! run takes from the graph, what makes it run again, and what happens when
+//! the graph cannot be kept.
 
 use std::{
     fs,
@@ -13,12 +13,12 @@ use std::{
 
 use lighthouse_engine::{Engine, Run};
 use lighthouse_model::{
-    Diagnostic, Fingerprint, Options, Position, Reach, RunScope, Severity, Span,
+    Diagnostic, Fingerprint, Options, Position, RunScope, Severity, Span,
     ucm::{Applicability, Fragment},
 };
 use lighthouse_plugin::{
-    Caching, Context, Error as PluginError, Fragments, Indexed, LanguageManifest, LanguageProvider,
-    Plugin, PluginManifest, Registry, Rule, RuleManifest, Unit, Workspace,
+    Context, Error as PluginError, Fragments, Indexed, LanguageManifest, LanguageProvider, Plugin,
+    PluginManifest, Registry, Rule, RuleManifest, Unit, Workspace,
 };
 use lighthouse_spec::Config;
 use tempfile::TempDir;
@@ -72,8 +72,8 @@ impl Rule for Counting {
         let (file, message) = match ctx.file {
             Some((file, text)) => (file.path.clone(), format!("{} bytes", text.len())),
             None => (
-                ctx.project.files[0].path.clone(),
-                format!("{} files", ctx.project.files.len()),
+                ctx.model.files().next().unwrap().path.clone(),
+                format!("{} files", ctx.model.files().count()),
             ),
         };
         let at = Position { line: 1, col: 1 };
@@ -112,7 +112,7 @@ impl Plugin for CountingPlugin {
         )))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        let meta = |id: &str, scope, reach| RuleManifest {
+        let meta = |id: &str, scope| RuleManifest {
             id: id.to_owned(),
             uid: None,
             severity: Severity::Warn,
@@ -122,24 +122,20 @@ impl Plugin for CountingPlugin {
             analyzers: Vec::new(),
             capabilities: Vec::new(),
             applicability: Applicability::default(),
-            caching: Some(Caching {
-                reach,
-                positions: false,
-                revision: "1".to_owned(),
-                tools: Vec::new(),
-            }),
+            revision: Some("1".to_owned()),
+            tools: Vec::new(),
         };
         vec![
             Box::new(Counting {
-                meta: meta("counting/local", RunScope::File, Reach::Local),
+                meta: meta("counting/local", RunScope::File),
                 runs: Arc::clone(&self.counted.local),
             }),
             Box::new(Counting {
-                meta: meta("counting/global", RunScope::Project, Reach::Global),
+                meta: meta("counting/global", RunScope::Project),
                 runs: Arc::clone(&self.counted.global),
             }),
             Box::new(Counting {
-                meta: meta("counting/rows", RunScope::File, Reach::Global),
+                meta: meta("counting/rows", RunScope::File),
                 runs: Arc::clone(&self.counted.rows),
             }),
         ]
@@ -204,7 +200,7 @@ fn runs(counted: &Counted) -> (usize, usize) {
 }
 
 #[test]
-fn engine_with_cache_takes_findings_instead_of_running_rules_again() {
+fn a_run_takes_the_findings_the_graph_has_instead_of_running_rules_again() {
     let dir = project();
     let cache = tempfile::tempdir().unwrap();
     let cached = || {
@@ -225,8 +221,8 @@ fn engine_with_cache_takes_findings_instead_of_running_rules_again() {
     assert_eq!(found(&second), found(&first));
     assert_eq!(second.notices, first.notices);
     assert_eq!(
-        (second.timings.cache_hits, second.timings.cache_misses),
-        (3, 0)
+        (second.timings.findings_run, second.timings.findings_green),
+        (0, 3)
     );
 
     // One file changes: its rule runs again and so does the one that reads
@@ -240,44 +236,25 @@ fn engine_with_cache_takes_findings_instead_of_running_rules_again() {
     assert_eq!(runs(&plain_runs), (2, 1));
     assert_eq!(found(&third), found(&plain));
     assert_eq!(third.notices, plain.notices);
+
+    // The change undone: what the rules saw before is what they see, and
+    // the findings are the ones of the first run.
+    fs::write(dir.path().join("a.txt"), "aa").unwrap();
+    let (fourth, _) = cached();
+    let fourth = fourth.check(&[], &[]).unwrap();
+    assert_eq!(found(&fourth), found(&first));
 }
 
 #[test]
-fn engine_with_cache_keeps_the_size_under_its_limit() {
+fn a_run_without_a_kept_graph_runs_every_rule() {
     let dir = project();
-    let cache = tempfile::tempdir().unwrap();
-    for _ in 0..2 {
-        let (engine, counted) = engine(dir.path());
-        let engine = engine.with_cache(cache.path().join("cache"), 1);
-        engine.check(&[], &[]).unwrap();
-        assert_eq!(runs(&counted), (2, 1), "everything is pruned at the end");
-    }
-}
-
-#[test]
-fn engine_with_cache_runs_without_it_when_it_cannot_be_opened() {
-    let dir = project();
-    let cache = tempfile::tempdir().unwrap();
-    let blocked = cache.path().join("cache");
-    fs::write(&blocked, "a file where the directory belongs").unwrap();
     let (engine, counted) = engine(dir.path());
-    let outcome = engine
-        .with_cache(blocked, u64::MAX)
-        .check(&[], &[])
-        .unwrap();
+    engine.check(&[], &[]).unwrap();
     assert_eq!(runs(&counted), (2, 1));
-    assert!(
-        outcome
-            .notices
-            .iter()
-            .any(|n| n.starts_with("the result cache is not used")),
-        "{:?}",
-        outcome.notices
-    );
 }
 
 #[test]
-fn a_global_rule_that_runs_per_file_keeps_one_row_for_the_project_state() {
+fn a_rule_that_reads_the_project_runs_for_every_file_when_the_project_changes() {
     const ROWS: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/rows\" = \"warn\"\n";
     let dir = project();
     let cache = tempfile::tempdir().unwrap();
@@ -297,32 +274,9 @@ fn a_global_rule_that_runs_per_file_keeps_one_row_for_the_project_state() {
     assert_eq!(second_runs.rows.load(Ordering::SeqCst), 0);
     assert_eq!(found(&second), found(&first));
 
-    // Any change of the project is another state: every file is judged again.
     fs::write(dir.path().join("b.txt"), "bbbb").unwrap();
-    let (third, third_runs) = cached();
+    let (third, _) = cached();
     let third = third.check(&[], &[]).unwrap();
-    assert_eq!(third_runs.rows.load(Ordering::SeqCst), 2);
     let (plain, _) = engine_with(dir.path(), ROWS);
     assert_eq!(found(&third), found(&plain.check(&[], &[]).unwrap()));
-}
-
-#[test]
-fn documents_digest_follows_their_content() {
-    let document = |name: &str| lighthouse_model::Document {
-        file: "d.yaml".into(),
-        at: Position { line: 1, col: 1 },
-        kind: "Decision".to_owned(),
-        name: name.to_owned(),
-        uid: None,
-        labels: Default::default(),
-    };
-    let one = lighthouse_engine::cache::documents(&[document("a")]).unwrap();
-    assert_eq!(
-        one,
-        lighthouse_engine::cache::documents(&[document("a")]).unwrap()
-    );
-    assert_ne!(
-        one,
-        lighthouse_engine::cache::documents(&[document("b")]).unwrap()
-    );
 }

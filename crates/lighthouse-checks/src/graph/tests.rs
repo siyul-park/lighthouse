@@ -21,7 +21,7 @@ use lighthouse_model::{
 use lighthouse_spec::{Content, OVERLAY};
 use std::sync::Arc;
 
-use lighthouse_plugin::{ANALYSIS, Analyzers, Plugin, Queries, Reads, Workspace};
+use lighthouse_plugin::{ANALYSIS, Queries, Reads, Registry, Runtime, Workspace};
 
 use crate::metrics::{MEASURES, Metrics};
 
@@ -266,14 +266,15 @@ fn everything() -> Reads {
     }
 }
 
-/// The analyzers of the graph: the metrics, over files that have no text.
-fn analyzers() -> Arc<Analyzers> {
-    let by_id = Metrics
-        .analyzers()
-        .into_iter()
-        .map(|analyzer| (analyzer.manifest().id.clone(), Arc::from(analyzer)))
-        .collect();
-    Arc::new(Analyzers::new(by_id, |_, _| Ok(Arc::new(None))))
+/// What the graph runs: the metrics, over files that have no text.
+fn analyzers() -> Arc<Runtime> {
+    let mut registry = Registry::default();
+    registry.register(&Metrics).unwrap();
+    Arc::new(Runtime::new(
+        Arc::new(registry),
+        (|_, _| Ok(Arc::new(None)), |_, _| Ok(None)),
+        (Workspace::new(""), false),
+    ))
 }
 
 fn fragments(specs: &[Spec]) -> Vec<Fragment> {

@@ -1,11 +1,8 @@
-//! The host result cache: what a rule found for one subject, kept between runs
-//! under a key of everything the finding depends on. The cache is local and
-//! derived: it is never committed, a run can bypass it, `clean` deletes it, and
-//! its size is capped, oldest use first. Any doubt is a miss.
-//!
-//! The graph's `Keys` give the hashes of the model, per file and as a whole; a
-//! [`KeyBuilder`] builds a key from those and from the rule; [`Cache`] stores the
-//! findings under it in `results.db`.
+//! The host result cache: what models answered and what fixes proposed, kept
+//! between runs under a key of everything they depend on. The findings of the
+//! rules are nodes of the graph, not rows here. The cache is local and derived:
+//! it is never committed, a run can bypass it, `clean` deletes it, and its size
+//! is capped, oldest use first. Any doubt is a miss.
 
 use std::{
     fs, io,
@@ -17,12 +14,10 @@ use thiserror::Error;
 
 mod key;
 mod store;
-pub(crate) mod tools;
 
-pub use crate::graph::{FileKey, Keys};
 pub(crate) use key::digest_of;
-pub use key::{Digest, KeyBuilder, documents};
-pub use store::{Cache, DEFAULT_LIMIT, Stats, Stored};
+pub use key::{Digest, KeyBuilder};
+pub use store::{Cache, DEFAULT_LIMIT, Stats};
 
 /// Name of the cache directory under `.lighthouse`.
 pub const DIR: &str = "cache";

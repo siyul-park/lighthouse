@@ -14,39 +14,30 @@
 //! A batch that fails answers nothing either. The batches of a group run
 //! side by side, and their answers are joined in the order of the files.
 
-use lighthouse_model::ucm::Model;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, OnceLock, PoisonError},
 };
 
 use lighthouse_model::{Diagnostic, RunScope};
-use lighthouse_plugin::{Context, Pending, RuleManifest};
+use lighthouse_plugin::{BATCHED, Batched, Context, Error as PluginError, RuleManifest};
 use lighthouse_spec::{Batching, Stdin};
 use serde_json::{Map, Value};
 
 use super::{CommandRule, Invocation, chunks};
-
-/// The fewest files worth a process of their own.
-const LEAST_BATCH: usize = 32;
 
 /// The findings of the files the batches of a rule held.
 type Findings = BTreeMap<PathBuf, Vec<Diagnostic>>;
 
 /// What one run of a program over several files told.
 enum Answer {
-    /// The findings in each of the files.
+    /// The findings in each file.
     Told(Findings),
     /// It ran and found something it does not attribute to a file.
     Mixed,
     /// It did not run, or what it printed cannot be read.
     Failed,
 }
-
-/// What the batches of a run found in the files they held, by rule.
-#[derive(Default)]
-pub(super) struct Answers(Mutex<HashMap<String, Arc<OnceLock<Findings>>>>);
 
 /// What a check needs to run a program: its rule, context and options.
 type Check<'a> = (&'a RuleManifest, &'a Context<'a>, &'a Map<String, Value>);
@@ -74,24 +65,24 @@ impl CommandRule {
             && (self.bundled || self.programs.all().all(|p| p.independent || p.follows))
     }
 
+    /// Whether the findings for a file of `language` also depend on which
+    /// files the project has: the program is cacheable but not `independent`,
+    /// so it may read what the file names.
+    pub(super) fn siblings(&self, scope: RunScope, language: &str) -> bool {
+        self.cacheable(scope)
+            && self.programs.of(language).is_some()
+            && !self.alone(scope, language)
+    }
+
     /// Whether the findings for a file of `language` are what the program
     /// finds in that file alone: it is cacheable and `independent`, or bundled
     /// and given the text on stdin, so that no other file, complete or not,
     /// changes them.
-    pub(crate) fn alone(&self, scope: RunScope, language: &str) -> bool {
+    fn alone(&self, scope: RunScope, language: &str) -> bool {
         self.cacheable(scope)
             && self.programs.of(language).is_some_and(|program| {
                 program.independent || (self.bundled && program.stdin == Stdin::File)
             })
-    }
-
-    /// Whether the findings for a file of `language` also depend on the
-    /// project's other files: the program is cacheable but not `independent`,
-    /// so it may read what the file names.
-    pub(crate) fn siblings(&self, scope: RunScope, language: &str) -> bool {
-        self.cacheable(scope)
-            && self.programs.of(language).is_some()
-            && !self.alone(scope, language)
     }
 
     /// The programs the findings come from, by name.
@@ -104,91 +95,83 @@ impl CommandRule {
         names.into_iter().cloned().collect()
     }
 
-    /// What a batch of the run found in `file`, when one held it and ran.
-    pub(super) fn answered(&self, check: Check, file: &Path) -> Option<Vec<Diagnostic>> {
-        let (meta, ctx, _) = check;
-        // A fix run stands texts in place of files, which a batch cannot read.
-        if !self.batched(meta.scope) || !ctx.workspace.overlays.is_empty() {
-            return None;
+    /// What the batch of the file found in it, when the batch ran and told
+    /// it: the answer is a node of the graph, shared by the files of the
+    /// batch.
+    pub(super) fn answered(
+        &self,
+        (meta, ctx, _): Check,
+        file: &Path,
+    ) -> Result<Option<Vec<Diagnostic>>, PluginError> {
+        if !self.batched(meta.scope) || ctx.batch.files.is_empty() {
+            return Ok(None);
         }
-        let cell = {
-            let slot = ctx.memo.slot::<Answers>();
-            let mut by_rule = slot.0.lock().unwrap_or_else(PoisonError::into_inner);
-            Arc::clone(by_rule.entry(meta.id.clone()).or_default())
+        let key = serde_json::to_string(&(&meta.id, &ctx.batch.variant, &ctx.batch.files))
+            .map_err(|e| PluginError::Failed(e.to_string()))?;
+        let batched = ctx
+            .queries
+            .pull(BATCHED, &key)?
+            .downcast::<Batched>()
+            .map_err(|_| PluginError::Failed(format!("`{BATCHED}` has an unexpected value")))?;
+        let name = file.to_string_lossy();
+        let Some((_, json)) = batched.answered.iter().find(|(path, _)| *path == name) else {
+            return Ok(None);
         };
-        cell.get_or_init(|| self.answers(check)).get(file).cloned()
+        batched
+            .notices
+            .iter()
+            .for_each(|notice| ctx.notices.push(notice.clone()));
+        serde_json::from_str(json)
+            .map(Some)
+            .map_err(|e| PluginError::Failed(e.to_string()))
     }
 
-    /// The findings in each file of the project that a run of its program
-    /// over a group of files answered for. Files the rule is not applied to
-    /// are left out.
-    fn answers(&self, check: Check) -> Findings {
+    /// The findings in each of `files` that a run of the program over them
+    /// told, for the files of the language it is the program of. Files the
+    /// rule is not applied to are left out by the host.
+    pub(super) fn answers(&self, check: Check, files: &[PathBuf]) -> Result<Findings, PluginError> {
         let (meta, ctx, _) = check;
-        let mut answers = BTreeMap::new();
-        for (program, files) in self.assigned(ctx) {
-            // The files the cache had findings for are not run again.
-            let pending = ctx.memo.slot::<Pending>();
-            let files: Vec<PathBuf> = files
-                .into_iter()
-                .filter(|path| pending.wants(&meta.id, path))
-                .filter(|path| {
-                    ctx.project
-                        .file(path)
-                        .is_some_and(|file| !ctx.applies.excludes(ctx.project, file))
-                })
-                .collect();
-            let Ok(run) = self.invocation(program, check, &ctx.workspace.root) else {
+        let mut by: BTreeMap<Option<&str>, Vec<PathBuf>> = BTreeMap::new();
+        for path in files.iter().filter(|path| self.selects(path)) {
+            let Some(file) = ctx.model.file(path) else {
+                continue;
+            };
+            if self.programs.of(&file.lang).is_some() {
+                let key = self
+                    .programs
+                    .is_language(&file.lang)
+                    .then_some(file.lang.as_str());
+                by.entry(key).or_default().push(path.clone());
+            }
+        }
+        let held = self.root_for(ctx, None)?;
+        let root = held
+            .as_ref()
+            .map_or_else(|| ctx.workspace.root.clone(), |dir| dir.path().to_owned());
+        let mut answers = Findings::new();
+        for (key, files) in by {
+            let Some(program) = key.map_or(Some(self.programs.own()), |l| self.programs.of(l))
+            else {
+                continue;
+            };
+            let Ok(run) = self.invocation(program, check, &root) else {
                 continue;
             };
             let Ok(groups) = run.grouped(files) else {
                 continue;
             };
             for group in groups {
-                let batches = split(chunks(&program.command, &group));
-                answers.extend(run.side_by_side(&batches, program.independent));
+                for chunk in chunks(&program.command, &group) {
+                    run.settle(chunk, program.independent, &mut answers);
+                }
             }
         }
-        answers
+        let _ = meta;
+        Ok(answers)
     }
-}
-
-/// The chunks cut so that there is a batch for each processor, none of fewer
-/// than [`LEAST_BATCH`] files: the processors are otherwise idle while one
-/// program works through the project.
-fn split(chunks: Vec<&[PathBuf]>) -> Vec<&[PathBuf]> {
-    let processors = std::thread::available_parallelism().map_or(1, usize::from);
-    chunks
-        .into_iter()
-        .flat_map(|chunk| chunk.chunks(chunk.len().div_ceil(processors).max(LEAST_BATCH)))
-        .collect()
 }
 
 impl Invocation<'_> {
-    /// The findings of `batches`, each run in a thread of its own, joined in
-    /// the order of the batches.
-    fn side_by_side(&self, batches: &[&[PathBuf]], independent: bool) -> Findings {
-        std::thread::scope(|scope| {
-            let running: Vec<_> = batches
-                .iter()
-                .map(|batch| {
-                    scope.spawn(move || {
-                        let mut found = Findings::new();
-                        self.settle(batch, independent, &mut found);
-                        found
-                    })
-                })
-                .collect();
-            running
-                .into_iter()
-                .flat_map(|thread| {
-                    thread
-                        .join()
-                        .unwrap_or_else(|e| std::panic::resume_unwind(e))
-                })
-                .collect::<Findings>()
-        })
-    }
-
     /// The findings of `files` from runs over them, in `answers`. A run that
     /// found something a program that is not `independent` does not attribute
     /// is repeated over each half of the files, so that the clean half is

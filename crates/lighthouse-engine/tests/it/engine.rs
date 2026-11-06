@@ -103,7 +103,8 @@ fn meta(
         analyzers: analyzers.iter().map(|a| (*a).to_owned()).collect(),
         capabilities: capabilities.to_vec(),
         applicability: Applicability::default(),
-        caching: None,
+        revision: None,
+        tools: Vec::new(),
     }
 }
 
@@ -130,7 +131,10 @@ impl Rule for Fake {
             Some((file, _)) => (file.path.clone(), "file".to_owned()),
             None => {
                 let count: usize = ctx.fact("fake/count-files")?;
-                (ctx.project.files[0].path.clone(), format!("{count} files"))
+                (
+                    ctx.model.files().next().unwrap().path.clone(),
+                    format!("{count} files"),
+                )
             }
         };
         let fp = Fingerprint::new(&self.meta.id, &file.to_string_lossy(), "");

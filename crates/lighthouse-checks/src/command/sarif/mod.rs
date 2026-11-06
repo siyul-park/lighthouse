@@ -9,7 +9,6 @@ pub mod place;
 mod tally;
 pub mod words;
 
-use lighthouse_model::ucm::Model;
 use std::path::{Path, PathBuf};
 
 use lighthouse_model::{ColumnUnit, Diagnostic, Position, Span, Suppression, byte_position};
@@ -136,7 +135,7 @@ impl Reading<'_> {
             return Location::Project;
         };
         let path = place::relative(&path, self.root);
-        if self.ctx.project.file(&path).is_none() {
+        if self.ctx.model.file(&path).is_none() {
             tally.left_out(&path);
             return Location::Outside;
         }
@@ -185,7 +184,7 @@ impl Reading<'_> {
     /// does not identify it, so moving code keeps the finding.
     fn subject(&self, path: &Path, start: Position) -> String {
         self.ctx
-            .project
+            .model
             .symbols_in(path)
             .filter(|s| {
                 let extent = s.extent.unwrap_or(s.span);

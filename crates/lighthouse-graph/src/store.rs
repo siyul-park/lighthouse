@@ -271,8 +271,10 @@ fn put(tx: &rusqlite::Transaction<'_>, write: &Write) -> Result<(), Error> {
         ))?;
     } else {
         tx.prepare_cached(
-            "UPDATE node SET hash = ?3, deps = ?4, changed_at = ?5, verified_at = ?6, durability = ?7,
-                 input = ?8, used_at = ?9 WHERE kind = ?1 AND key = ?2",
+            "INSERT INTO node(kind, key, hash, deps, changed_at, verified_at, durability, input, used_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(kind, key) DO UPDATE SET hash = ?3, deps = ?4, changed_at = ?5, verified_at = ?6,
+                 durability = ?7, input = ?8, used_at = ?9",
         )?
         .execute(common)?;
     }

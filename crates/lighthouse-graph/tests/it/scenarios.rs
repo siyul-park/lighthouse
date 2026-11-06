@@ -349,3 +349,14 @@ fn the_data_a_graph_was_opened_with_is_the_same_in_memory_and_after_a_reopen() {
     }
     assert!(open(None, &project).data::<String>().is_none());
 }
+
+static CLASH: Query<String, u32> = Query::new("api", |_, _| Ok(0));
+
+#[test]
+fn register_knows_a_query_before_it_is_pulled_and_refuses_another_by_its_name() {
+    let graph = graph(&project());
+
+    assert!(API.register(&graph).is_ok());
+    assert!(API.register(&graph).is_ok());
+    assert!(matches!(CLASH.register(&graph), Err(Error::Kind { .. })));
+}

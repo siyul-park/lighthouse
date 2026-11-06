@@ -6,22 +6,18 @@
 //! them, and only a rule that reads the whole project (`global`, or one that
 //! declares nothing) by any change of the round.
 
-use lighthouse_model::ucm::Model;
 use std::{
     cell::OnceCell,
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::Reach;
-
 use super::super::model::reach;
-use crate::{Engine, Run};
+use crate::Run;
 
 /// The charges for what the check `after` found more of than the check
 /// `before`, when the files `changed` were changed between them.
 pub(super) struct Blame<'a> {
-    engine: &'a Engine,
     before: &'a Run,
     after: &'a Run,
     changed: &'a [PathBuf],
@@ -30,13 +26,8 @@ pub(super) struct Blame<'a> {
 }
 
 impl<'a> Blame<'a> {
-    pub(super) fn new(
-        engine: &'a Engine,
-        (before, after): (&'a Run, &'a Run),
-        changed: &'a [PathBuf],
-    ) -> Self {
+    pub(super) fn new((before, after): (&'a Run, &'a Run), changed: &'a [PathBuf]) -> Self {
         Self {
-            engine,
             before,
             after,
             changed,
@@ -74,14 +65,9 @@ impl<'a> Blame<'a> {
     }
 
     /// The changed files a new finding of `rule` in the unchanged `file` is
-    /// charged to: by the reach of the rule, none, those the file's symbols
-    /// have an edge to or from, or all.
-    pub(super) fn charged(&self, file: &Path, rule: &str) -> Vec<&'a PathBuf> {
-        match self.reach_of(rule, file) {
-            Reach::Local => Vec::new(),
-            Reach::Global => self.changed.iter().collect(),
-            Reach::Neighbors => self.reaching(file),
-        }
+    /// charged to: all of them, until the findings say what they read.
+    pub(super) fn charged(&self, _file: &Path, _rule: &str) -> Vec<&'a PathBuf> {
+        self.changed.iter().collect()
     }
 
     /// The changed files that have an edge to or from `file`, in either state.
@@ -111,21 +97,6 @@ impl<'a> Blame<'a> {
             }
         }
         found
-    }
-
-    /// How far a finding of `rule` in `file` reaches: a rule that declares
-    /// nothing reads the project, and one that finds in a file of its language
-    /// what the file holds reads the file.
-    fn reach_of(&self, rule: &str, file: &Path) -> Reach {
-        let Some(rule) = self.engine.registry.rule(rule) else {
-            return Reach::Global;
-        };
-        let language = self
-            .after
-            .project
-            .file(file)
-            .map_or("", |f| f.lang.as_str());
-        rule.reach(language)
     }
 
     fn reached(&self) -> &[BTreeSet<PathBuf>] {
