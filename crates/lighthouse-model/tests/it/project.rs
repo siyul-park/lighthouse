@@ -63,6 +63,34 @@ fn file_analysis_language_defaults_to_host_and_honors_embedded_override() {
 }
 
 #[test]
+fn files_in_lists_the_files_directly_in_a_directory() {
+    let file = |path: &str| File {
+        path: PathBuf::from(path),
+        lang: "go".to_owned(),
+        hash: String::new(),
+        generated: false,
+        test: false,
+        facts: BTreeMap::new(),
+    };
+    let project = Project::merge([Fragment {
+        files: vec![
+            file("a/x.go"),
+            file("a/y.go"),
+            file("a/b/z.go"),
+            file("c/w.go"),
+        ],
+        ..Fragment::default()
+    }]);
+
+    let found: Vec<&Path> = project
+        .files_in(Path::new("a"))
+        .map(|file| file.path.as_path())
+        .collect();
+
+    assert_eq!(found, [Path::new("a/x.go"), Path::new("a/y.go")]);
+}
+
+#[test]
 fn symbol_ids_are_qualified_and_stable() {
     let id = SymbolId::new("pkg", &["Owner"], "run", SymbolKind::Method);
     assert_eq!(id.as_str(), "pkg::Owner::run#method");

@@ -94,6 +94,10 @@ pub trait Model {
     /// Every file, sorted by path.
     fn files(&self) -> Boxed<'_, File>;
 
+    /// The files directly in the directory `dir`, sorted by path: a reader of
+    /// them does not depend on the files of the rest of the project.
+    fn files_in<'a>(&'a self, dir: &'a Path) -> Boxed<'a, File>;
+
     /// Every edge, in the project's order.
     fn edges(&self) -> Boxed<'_, Edge>;
 
@@ -330,6 +334,16 @@ impl Model for Project {
 
     fn files(&self) -> Boxed<'_, File> {
         Box::new(self.inner.all.files.iter())
+    }
+
+    fn files_in<'a>(&'a self, dir: &'a Path) -> Boxed<'a, File> {
+        Box::new(
+            self.inner
+                .all
+                .files
+                .iter()
+                .filter(move |file| file.path.parent() == Some(dir)),
+        )
     }
 
     fn edges(&self) -> Boxed<'_, Edge> {

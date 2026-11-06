@@ -60,6 +60,7 @@ impl Builder<'_> {
             .and_then(|e| e.to_str())
             .unwrap_or_default();
         let expected = file.path.with_file_name(format!("{base}.{extension}"));
+        let dir = file.path.parent().unwrap_or(Path::new(""));
         let stem = facts::file_stem(self.project, &file.path);
         let stem = stem.strip_suffix(TEST_SUFFIX);
         let found = self
@@ -67,7 +68,7 @@ impl Builder<'_> {
             .file(&expected)
             .filter(|f| !f.test)
             .or_else(|| {
-                self.project.files().find(|f| {
+                self.project.files_in(dir).find(|f| {
                     !f.test
                         && f.path.parent() == file.path.parent()
                         && f.path.extension() == file.path.extension()
@@ -75,7 +76,7 @@ impl Builder<'_> {
                 })
             })
             .map_or_else(String::new, |f| path(&f.path));
-        let sourced = self.project.files().any(|f| {
+        let sourced = self.project.files_in(dir).any(|f| {
             !f.test
                 && f.path.parent() == file.path.parent()
                 && f.path.extension() == file.path.extension()
