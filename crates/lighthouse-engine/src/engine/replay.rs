@@ -3,7 +3,11 @@
 //! checked it, the run is what that one reported, and no rule is asked for it.
 //! What the run depends on is hashed into a key kept with the report.
 
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use lighthouse_protocol::hash::Hasher;
 use serde::{Deserialize, Serialize};
@@ -11,8 +15,9 @@ use serde::{Deserialize, Serialize};
 use super::*;
 use crate::{cache, tools};
 
-/// Where the report is kept, in the cache directory.
-const FILE: &str = "report.json";
+/// How many reports are kept, in the cache directory, one file for each key:
+/// a project edited and put back is a project that was reported.
+const KEPT: usize = 4;
 
 /// What a run reports, as it is kept.
 #[derive(Serialize, Deserialize)]
@@ -82,7 +87,7 @@ impl Engine {
         let Some(settings) = &self.cache else {
             return false;
         };
-        let Ok(text) = fs::read(settings.dir.join(FILE)) else {
+        let Ok(text) = fs::read(file_of(&settings.dir, key)) else {
             return false;
         };
         let Ok(kept) = serde_json::from_slice::<Snapshot>(&text) else {
@@ -124,10 +129,36 @@ impl Engine {
         let Ok(text) = serde_json::to_vec(&kept) else {
             return;
         };
-        let file = settings.dir.join(FILE);
+        let file = file_of(&settings.dir, key);
         let part = file.with_extension("part");
         if fs::write(&part, text).is_ok() && fs::rename(&part, &file).is_err() {
             let _ = fs::remove_file(&part);
         }
+        prune(&settings.dir);
+    }
+}
+
+/// The file the report of `key` is kept in.
+fn file_of(dir: &Path, key: &str) -> PathBuf {
+    dir.join(format!(
+        "report-{}.json",
+        key.chars().take(16).collect::<String>()
+    ))
+}
+
+/// Removes the reports beyond the newest [`KEPT`].
+fn prune(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let mut kept: Vec<(std::time::SystemTime, PathBuf)> = entries
+        .flatten()
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with("report-"))
+        .filter_map(|entry| Some((entry.metadata().ok()?.modified().ok()?, entry.path())))
+        .collect();
+    kept.sort();
+    let extra = kept.len().saturating_sub(KEPT);
+    for (_, path) in kept.into_iter().take(extra) {
+        let _ = fs::remove_file(path);
     }
 }
