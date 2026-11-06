@@ -224,9 +224,11 @@ impl Engine {
     /// Writes what the step set: the answers of the units, under their keys.
     pub(super) fn commit_index(&self, run: &mut Run) {
         let mut guard = self.lock_graph();
-        if let Some(graph) = guard.as_mut()
-            && let Err(e) = graph.commit()
-        {
+        let Some(graph) = guard.as_mut() else { return };
+        let started = Instant::now();
+        let committed = graph.commit();
+        run.timings.commit += started.elapsed();
+        if let Err(e) = committed {
             run.notices.insert(format!("the graph was not saved: {e}"));
         }
     }

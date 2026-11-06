@@ -293,7 +293,9 @@ impl Graph {
     pub fn commit(&mut self) -> Result<(), Error> {
         let slots = self.shared.dirty.take();
         let revision = self.shared.revision.load(Ordering::Acquire);
-        let writes: Vec<Write> = slots.iter().map(|slot| write_of(slot, revision)).collect();
+        let mut writes: Vec<Write> = slots.iter().map(|slot| write_of(slot, revision)).collect();
+        // In key order, so that rows go into the store's tree beside the last.
+        writes.sort_unstable_by(|a, b| (&a.kind, &a.key).cmp(&(&b.kind, &b.key)));
         let marks = self.shared.marks_with(revision);
         let meta = self.shared.meta(&marks)?;
         let limit = self.shared.limit.load(Ordering::Acquire);

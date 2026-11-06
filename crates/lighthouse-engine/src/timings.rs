@@ -36,6 +36,11 @@ pub struct Timings {
     /// those that were green.
     pub findings_run: usize,
     pub findings_green: usize,
+    /// Setting what the findings nodes read: the programs' identities and
+    /// the one run of each rule's program over its stale batches.
+    pub commands: Duration,
+    /// Writing the graph, over all commits of the run.
+    pub commit: Duration,
     /// All the rules together, on the wall clock.
     pub rules: Duration,
     /// Each rule, summed over its runs, longest first.
@@ -94,6 +99,7 @@ impl Timings {
                 .iter()
                 .map(|(analyzer, spent)| line(&format!("analyzer {analyzer}"), *spent)),
         );
+        out.push(line("commands", self.commands));
         out.push(format!("{} (wall clock)", line("rules", self.rules)));
         out.extend(self.rule.iter().take(TOP_RULES).map(|(rule, spent)| {
             format!(
@@ -101,6 +107,7 @@ impl Timings {
                 line(&format!("rule {rule}"), *spent)
             )
         }));
+        out.push(line("commit", self.commit));
         out.push(line("fingerprints", self.fingerprints));
         out.push(line("store", self.store));
         out.push(line("report", report));

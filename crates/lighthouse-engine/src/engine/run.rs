@@ -56,7 +56,9 @@ impl Engine {
             models: &models,
         };
         let plan = self.plan(&judgment, false)?;
+        let started = Instant::now();
         self.judging_inputs(graph, &plan, &judgment)?;
+        run.timings.commands = started.elapsed();
         {
             let scene = Scene {
                 workspace: &workspace,
@@ -74,7 +76,10 @@ impl Engine {
             self.identify(found, &scene, &mut run)?;
             run.timings.fingerprints = started.elapsed();
         }
-        if let Err(e) = graph.commit() {
+        let started = Instant::now();
+        let committed = graph.commit();
+        run.timings.commit += started.elapsed();
+        if let Err(e) = committed {
             run.notices.insert(format!("the graph was not saved: {e}"));
         }
         run.questions = models.subjects();
