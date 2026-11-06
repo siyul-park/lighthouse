@@ -37,23 +37,30 @@ impl Applicability {
     }
 
     /// Whether no subject of `file` can be a subject of the decision, the
-    /// project's symbols considered: it is in a language the decision does not
+    /// project's symbols considered (`has_test_code` says whether the file
+    /// declares test code, and is asked only when the decision needs it): it is in a language the decision does not
     /// cover (nor do its regions), it is generated code the decision skips,
     /// test code it leaves to other decisions, a production file without test
     /// code in a decision that is only about tests, or without example code in
     /// a decision that is only about examples. A file the provider read from its
     /// source alone is no subject of any decision.
-    pub fn excludes(&self, project: &dyn Model, file: &File) -> bool {
+    pub fn excludes_by(&self, file: &File, has_test_code: impl FnOnce() -> bool) -> bool {
         file.is_syntactic()
             || !(self.admits_host(file) || self.admits_regions(file))
             || (!self.generated && file.generated)
             || (self.tests == TestScope::Exclude && file.test)
-            || (self.tests == TestScope::Only
-                && !file.test
-                && !project
-                    .symbols_in(&file.path)
-                    .any(|symbol| project.in_test(&symbol.id)))
+            || (self.tests == TestScope::Only && !file.test && !has_test_code())
             || (self.examples == ExampleScope::Only && !file.regions().any(|(_, example)| example))
+    }
+
+    /// [`Applicability::excludes_by`] with the test code `project` says the
+    /// file declares.
+    pub fn excludes(&self, project: &dyn Model, file: &File) -> bool {
+        self.excludes_by(file, || {
+            project
+                .symbols_in(&file.path)
+                .any(|symbol| project.in_test(&symbol.id))
+        })
     }
 
     /// Whether a file is a subject of a decision about files.

@@ -11,12 +11,16 @@ use std::{collections::BTreeSet, path::PathBuf};
 
 use lighthouse_model::ucm::{Project, Symbol};
 
-use crate::Run;
+use crate::Outcome;
 
 /// `changed` and the files of the symbols that call or refer to a symbol of
 /// them, or that a symbol of them calls or refers to, in either state: the
 /// one `before` the edit and the one `after` it.
-pub(in crate::fix) fn reach(changed: &[PathBuf], before: &Run, after: &Run) -> Vec<PathBuf> {
+pub(in crate::fix) fn reach(
+    changed: &[PathBuf],
+    before: &Outcome,
+    after: &Outcome,
+) -> Vec<PathBuf> {
     let mut files: BTreeSet<PathBuf> = changed.iter().cloned().collect();
     for project in [&before.project, &after.project] {
         for path in changed {

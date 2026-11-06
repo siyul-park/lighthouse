@@ -39,7 +39,7 @@ fn run_with(root: &Path, cache: Option<&Path>, ignores: &str) -> Run {
         Some(dir) => engine.with_cache(dir.to_owned(), LIMIT),
         None => engine,
     };
-    engine.check_project(&[], &[]).expect("check")
+    engine.check_project(&[], &[]).expect("check").run
 }
 
 fn found(run: &Run) -> Vec<(String, String)> {

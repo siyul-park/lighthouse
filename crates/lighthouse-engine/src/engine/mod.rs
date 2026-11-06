@@ -47,6 +47,7 @@ mod report;
 mod route;
 mod run;
 mod scopes;
+mod stated;
 mod text;
 
 pub use availability::{Availability, Needs};
@@ -60,6 +61,7 @@ use models::RunModels;
 pub(crate) use phases::in_pool;
 pub(crate) use route::{Member, Refusal, Route, Usage};
 pub(crate) use scopes::Scopes;
+use stated::Stated;
 pub(crate) use text::Text;
 
 /// Process exit code of a run whose analysis was incomplete.
@@ -116,13 +118,34 @@ pub struct Run {
     /// Findings that source directives suppress, within the report scope.
     /// They are not in `diagnostics` and never fail the run.
     pub suppressed: Vec<Suppressed>,
-    /// The analysis the findings came from; fixes read it.
-    pub project: Project,
     /// The SHA-256 of the text the run read of each file of the project, by
     /// path: what a fix compares the file with before it writes.
     pub read: BTreeMap<PathBuf, String>,
     /// Where the time of the run went.
     pub timings: Timings,
+}
+
+/// A run and the project it read: what a fix works from. The project is
+/// merged from the graph once the run is done, which a check that only
+/// reports never does.
+#[derive(Debug, Clone, Default)]
+pub struct Outcome {
+    pub run: Run,
+    pub project: Project,
+}
+
+impl std::ops::Deref for Outcome {
+    type Target = Run;
+
+    fn deref(&self) -> &Run {
+        &self.run
+    }
+}
+
+impl std::ops::DerefMut for Outcome {
+    fn deref_mut(&mut self) -> &mut Run {
+        &mut self.run
+    }
 }
 
 impl Run {
@@ -184,7 +207,8 @@ struct Scene<'a> {
     workspace: &'a Workspace,
     rules: &'a [&'a dyn Rule],
     inputs: &'a [Input],
-    project: &'a Project,
+    /// What the files state, and the documents.
+    stated: &'a Stated,
     facts: &'a Facts,
     annotations: &'a Annotations,
     /// The models the rules may ask.
@@ -496,12 +520,13 @@ impl Engine {
         self.run(scopes, gaps, only, (&Overlays::new(), true))
     }
 
-    /// Like `check`, but the run is never answered from the last report: its
-    /// `project` is the one that was read, as a fix needs it.
-    pub fn check_project(&self, paths: &[PathBuf], only: &[String]) -> Result<Run, Error> {
+    /// Like `check`, but the run is never answered from the last report, and
+    /// the project that was read comes with it, as a fix needs it.
+    pub fn check_project(&self, paths: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
         self.validate_only(only)?;
         let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
-        self.run(scopes, gaps, only, (&Overlays::new(), false))
+        let run = self.run(scopes, gaps, only, (&Overlays::new(), false))?;
+        self.outcome(run)
     }
 
     /// Like `check`, but the project is read with `overlays` standing in for
@@ -512,10 +537,11 @@ impl Engine {
         paths: &[PathBuf],
         only: &[String],
         overlays: &Overlays,
-    ) -> Result<Run, Error> {
+    ) -> Result<Outcome, Error> {
         self.validate_only(only)?;
         let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
-        self.run(scopes, gaps, only, (overlays, false))
+        let run = self.run(scopes, gaps, only, (overlays, false))?;
+        self.outcome(run)
     }
 
     /// Checks the whole project, then reports only the diagnostics in `files`,

@@ -20,7 +20,7 @@ use super::{
     super::{AppliedFix, DeclinedFix, EditUsage, FileChange, FixReport, FixedBy},
     Orchestrator,
 };
-use crate::{Error, Run};
+use crate::{Error, Outcome};
 
 /// What became of the findings given to a model by decision, the requests that
 /// went to it, their cost, and the runs of an agent that edits.
@@ -51,7 +51,7 @@ impl Orchestrator<'_> {
     /// and the hash are checked again right before the rename); if a write
     /// fails, the files already written are put back and nothing counts as
     /// applied. A dry run writes nothing.
-    pub(super) fn write(mut self, outcome: Result<Run, Error>) -> Result<FixReport, Error> {
+    pub(super) fn write(mut self, outcome: Result<Outcome, Error>) -> Result<FixReport, Error> {
         let outcome = outcome?;
         let started = Instant::now();
         let changed: Vec<PathBuf> = self
@@ -201,7 +201,7 @@ impl Orchestrator<'_> {
         &self,
         changed: &[PathBuf],
         skipped: &BTreeMap<PathBuf, String>,
-        outcome: &Run,
+        outcome: &Outcome,
     ) -> Option<(String, String)> {
         let root = &self.proposer.engine.ws.root;
         let sources = Sources::new(root, &outcome.project, &self.texts);
@@ -229,7 +229,7 @@ impl Orchestrator<'_> {
 
     /// The new text of every file the kept proposals edit. Files whose edits
     /// cannot be applied are `failed`.
-    pub(super) fn round(&self, kept: &[Proposal], before: &Run) -> Round {
+    pub(super) fn round(&self, kept: &[Proposal], before: &Outcome) -> Round {
         let sources = Sources::new(&self.proposer.engine.ws.root, &before.project, &self.texts);
         let mut by_file: BTreeMap<PathBuf, Vec<&TextEdit>> = BTreeMap::new();
         for edit in kept.iter().flat_map(|p| &p.edits) {

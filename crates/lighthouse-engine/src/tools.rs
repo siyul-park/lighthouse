@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant, UNIX_EPOCH},
 };
 
-use lighthouse_model::ucm::Project;
+use lighthouse_model::ucm::File;
 use lighthouse_protocol::hash::Hasher;
 use rayon::prelude::*;
 
@@ -71,15 +71,11 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 /// the program, its version and what chooses the version or configures it
 /// ([`selectors`]). What a program answers to `--version` is asked once for
 /// each file the search path finds in a process, side by side.
-pub(crate) fn identities(
-    root: &Path,
-    project: &Project,
-    tools: &[String],
-) -> Vec<(String, String)> {
+pub(crate) fn identities(root: &Path, files: &[File], tools: &[String]) -> Vec<(String, String)> {
     if tools.is_empty() {
         return Vec::new();
     }
-    let selectors = selectors(root, project);
+    let selectors = selectors(root, files);
     let mut hasher = Hasher::new();
     for (name, value) in SELECTING_VARIABLES.map(|name| (name, env::var_os(name))) {
         hasher.update(name);
@@ -134,9 +130,9 @@ pub(crate) fn state(tools: &[String]) -> String {
 /// The digest of the files that choose a version or configure a formatter:
 /// those of the user's toolchain managers, and those in the directories of
 /// the project.
-pub(crate) fn selectors(root: &Path, project: &Project) -> String {
+pub(crate) fn selectors(root: &Path, files: &[File]) -> String {
     let mut dirs: BTreeSet<PathBuf> = BTreeSet::from([PathBuf::new()]);
-    for file in &project.files {
+    for file in files {
         dirs.extend(file.path.ancestors().skip(1).map(Path::to_owned));
     }
     let mut hasher = Hasher::new();

@@ -17,7 +17,7 @@ use super::{
     chain::Mark,
     rollback::kept_proposals,
 };
-use crate::{Error, Run};
+use crate::{Error, Outcome};
 
 /// The state of a run before a group is tried, to put back what is not kept.
 struct Trial {
@@ -31,7 +31,11 @@ impl Orchestrator<'_> {
     /// Verifies the `withheld` fixes the run may not write, over the state the
     /// rounds left, and reports those the checks accept as previews. The texts
     /// are left as they were.
-    pub(super) fn preview(&mut self, outcome: &Run, withheld: Vec<Proposal>) -> Result<(), Error> {
+    pub(super) fn preview(
+        &mut self,
+        outcome: &Outcome,
+        withheld: Vec<Proposal>,
+    ) -> Result<(), Error> {
         let order = listing(&withheld);
         let mut shown = Vec::new();
         for group in layers(withheld) {
@@ -47,7 +51,7 @@ impl Orchestrator<'_> {
 
     fn preview_group(
         &mut self,
-        outcome: &Run,
+        outcome: &Outcome,
         group: Vec<Proposal>,
         shown: &mut Vec<(Fingerprint, PreviewedFix)>,
     ) -> Result<(), Error> {

@@ -40,7 +40,7 @@ fn generated(lang: &str, id: &str, plugin: &Path, extra: &str, files: &[&str]) -
     )
     .unwrap();
 
-    let run = engine.check(&[], &[]).unwrap();
+    let run = engine.check_project(&[], &[]).unwrap();
 
     files
         .iter()

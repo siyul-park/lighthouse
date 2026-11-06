@@ -21,7 +21,7 @@ use lighthouse_spec::{FixScope, Models};
 use super::{FILE, finding, proposal, run, symbol};
 use crate::fix::model::{Account, ModelFixer, edit::conflict, reach::reach, verify::judge};
 use crate::{
-    Overlays, Run,
+    Outcome, Overlays, Run,
     cache::KeyBuilder,
     engine::{Member, Refusal, Route},
     fix::{
@@ -95,10 +95,10 @@ fn project_calling(result: &str, calls: bool) -> Project {
     }])
 }
 
-fn with_project(project: Project) -> Run {
-    Run {
+fn with_project(project: Project) -> Outcome {
+    Outcome {
         project,
-        ..Run::default()
+        ..Outcome::default()
     }
 }
 
@@ -197,15 +197,19 @@ fn an_edit_that_removes_the_last_use_of_a_symbol_is_judged_by_what_the_symbol_ge
     };
     let target = place("r", "b.go");
     let unused = place("design/unused", "a.go");
-    let before = Run {
+    let before = Outcome {
         project: project("int"),
-        diagnostics: vec![target.clone()],
-        ..Run::default()
+        run: Run {
+            diagnostics: vec![target.clone()],
+            ..Run::default()
+        },
     };
-    let after = Run {
+    let after = Outcome {
         project: project_calling("int", false),
-        diagnostics: vec![unused],
-        ..Run::default()
+        run: Run {
+            diagnostics: vec![unused],
+            ..Run::default()
+        },
     };
     for aim in [Aim::Finding, Aim::File] {
         let edit = Proposal {
@@ -285,7 +289,7 @@ fn agent() -> Agent {
     })
 }
 
-fn indexed() -> Run {
+fn indexed() -> Outcome {
     let file = File {
         path: FILE.into(),
         lang: "go".to_owned(),
@@ -293,14 +297,16 @@ fn indexed() -> Run {
         test: false,
         facts: Default::default(),
     };
-    Run {
+    Outcome {
         project: Project::merge([Fragment {
             files: vec![file],
             ..Fragment::default()
         }]),
-        // What the run read of the file, which stays as the file changes.
-        read: BTreeMap::from([(FILE.into(), "h".to_owned())]),
-        ..Run::default()
+        run: Run {
+            // What the run read of the file, which stays as the file changes.
+            read: BTreeMap::from([(FILE.into(), "h".to_owned())]),
+            ..Run::default()
+        },
     }
 }
 

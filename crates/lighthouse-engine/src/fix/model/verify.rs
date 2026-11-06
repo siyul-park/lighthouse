@@ -16,7 +16,7 @@ use lighthouse_model::{Diagnostic, Fingerprint};
 
 use super::{Class, reach::reach};
 use crate::{
-    Run,
+    Outcome,
     fix::{
         FixedBy,
         propose::{Aim, Proposal},
@@ -41,8 +41,8 @@ pub(in crate::fix) struct Verdict {
 pub(in crate::fix) fn judge(
     kept: &[Proposal],
     merged: &[(Proposal, Fingerprint)],
-    before: &Run,
-    after: &Run,
+    before: &Outcome,
+    after: &Outcome,
 ) -> Verdict {
     let known: BTreeSet<&Fingerprint> = before.diagnostics.iter().map(|d| &d.fingerprint).collect();
     let mut verdict = Verdict::default();
@@ -86,7 +86,7 @@ fn reject(verdict: &mut Verdict, group: &[&Proposal], class: Class, reason: Stri
 fn judge_file(
     verdict: &mut Verdict,
     group: &[&Proposal],
-    (before, after): (&Run, &Run),
+    (before, after): (&Outcome, &Outcome),
     known: &BTreeSet<&Fingerprint>,
 ) {
     let reached = reach(&group[0].files, before, after);
@@ -110,7 +110,7 @@ fn judge_file(
 /// finding of a rule in the file stands for one of the old ones of that rule.
 fn unresolved<'p>(
     group: &[&'p Proposal],
-    after: &Run,
+    after: &Outcome,
     known: &BTreeSet<&Fingerprint>,
 ) -> Vec<&'p Proposal> {
     let present: BTreeSet<&Fingerprint> =
@@ -141,7 +141,7 @@ fn unresolved<'p>(
 /// holds the fingerprints of the findings before it.
 fn flaw(
     proposal: &Proposal,
-    (before, after): (&Run, &Run),
+    (before, after): (&Outcome, &Outcome),
     known: &BTreeSet<&Fingerprint>,
 ) -> Option<(Class, String)> {
     // A rewrite that keeps the problem can change the text a fingerprint
@@ -165,7 +165,7 @@ fn flaw(
 /// The findings of the check `after` in `files` that were not there before.
 fn new_in<'a>(
     files: &'a [PathBuf],
-    after: &'a Run,
+    after: &'a Outcome,
     known: &'a BTreeSet<&Fingerprint>,
 ) -> impl Iterator<Item = &'a Diagnostic> {
     after
@@ -181,7 +181,7 @@ fn new_in<'a>(
 /// findings look new.
 fn regression(
     files: &[PathBuf],
-    (before, after): (&Run, &Run),
+    (before, after): (&Outcome, &Outcome),
     known: &BTreeSet<&Fingerprint>,
 ) -> Option<(Class, String)> {
     if let Some(new) = introduced(files, (before, after), known) {
@@ -208,7 +208,7 @@ fn regression(
 /// of them is not; else the first of them.
 fn introduced<'a>(
     files: &[PathBuf],
-    (before, after): (&Run, &'a Run),
+    (before, after): (&Outcome, &'a Outcome),
     known: &BTreeSet<&Fingerprint>,
 ) -> Option<&'a Diagnostic> {
     let mut held: BTreeMap<(&Path, &str), usize> = BTreeMap::new();
@@ -235,6 +235,6 @@ fn introduced<'a>(
 }
 
 /// The findings of error or warn severity of the check `run` in `files`.
-fn loud_in<'r>(files: &[PathBuf], run: &'r Run) -> Vec<&'r Diagnostic> {
+fn loud_in<'r>(files: &[PathBuf], run: &'r Outcome) -> Vec<&'r Diagnostic> {
     run.loud().filter(|d| files.contains(&d.file)).collect()
 }

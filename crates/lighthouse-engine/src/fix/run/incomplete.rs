@@ -4,10 +4,10 @@
 
 use lighthouse_model::Incomplete;
 
-use crate::Run;
+use crate::Outcome;
 
 /// Why the analysis of `outcome` is too incomplete for a fix, if it is.
-pub(super) fn refusal(outcome: &Run) -> Option<String> {
+pub(super) fn refusal(outcome: &Outcome) -> Option<String> {
     outcome.incomplete.first().map(describe)
 }
 

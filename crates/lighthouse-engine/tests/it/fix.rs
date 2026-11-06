@@ -162,7 +162,7 @@ fn a_round_that_applies_a_fix_checks_the_project_twice() {
 fn a_check_the_caller_made_of_the_project_is_the_first_check_of_the_run() {
     let dir = project("fn a\nTODO here\n");
     let engine = engine(&dir, "");
-    let initial = engine.check(&[], &[]).unwrap();
+    let initial = engine.check_project(&[], &[]).unwrap();
 
     let report = engine
         .fix(

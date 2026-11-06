@@ -13,20 +13,20 @@ use std::{
 };
 
 use super::super::model::reach;
-use crate::Run;
+use crate::Outcome;
 
 /// The charges for what the check `after` found more of than the check
 /// `before`, when the files `changed` were changed between them.
 pub(super) struct Blame<'a> {
-    before: &'a Run,
-    after: &'a Run,
+    before: &'a Outcome,
+    after: &'a Outcome,
     changed: &'a [PathBuf],
     /// What each changed file reaches, found when a rule needs it.
     reached: OnceCell<Vec<BTreeSet<PathBuf>>>,
 }
 
 impl<'a> Blame<'a> {
-    pub(super) fn new((before, after): (&'a Run, &'a Run), changed: &'a [PathBuf]) -> Self {
+    pub(super) fn new((before, after): (&'a Outcome, &'a Outcome), changed: &'a [PathBuf]) -> Self {
         Self {
             before,
             after,
@@ -35,7 +35,7 @@ impl<'a> Blame<'a> {
         }
     }
 
-    pub(super) fn runs(&self) -> (&'a Run, &'a Run) {
+    pub(super) fn runs(&self) -> (&'a Outcome, &'a Outcome) {
         (self.before, self.after)
     }
 
@@ -47,7 +47,7 @@ impl<'a> Blame<'a> {
     /// severity after than before, wherever in the file they are.
     pub(super) fn grown(&self) -> Vec<(&'a Path, &'a str)> {
         type Key<'k> = (&'k Path, &'k str);
-        fn count(run: &Run) -> BTreeMap<Key<'_>, usize> {
+        fn count(run: &Outcome) -> BTreeMap<Key<'_>, usize> {
             let mut counts = BTreeMap::new();
             for d in run.loud() {
                 *counts

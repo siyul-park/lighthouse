@@ -29,7 +29,7 @@ use super::{
     propose::{Aim, Proposal, Proposer},
     rewrite::World,
 };
-use crate::{Error, Overlays, Run};
+use crate::{Error, Outcome, Overlays};
 
 /// A finding given to a model, and the fix that is asked of it.
 type Asked<'o> = (&'o Diagnostic, FixBinding);
@@ -55,7 +55,7 @@ impl Proposer<'_> {
     /// their files; the findings that get none are declined with the reason.
     pub(super) fn propose_edits<'o>(
         &self,
-        outcome: &Run,
+        outcome: &Outcome,
         texts: &Overlays,
         sources: &Sources,
         found: Vec<Asked<'o>>,

@@ -13,7 +13,7 @@ use crate::fix::model::{
     verify::{Verdict, judge},
 };
 use crate::{
-    Run,
+    Outcome,
     fix::{
         brief::{Target, brief},
         propose::{Aim, Proposal},
@@ -148,7 +148,7 @@ fn shared(finding: &Diagnostic) -> Proposal {
 
 /// The verdict on the edit of one file for `findings`, the first of which is
 /// kept and the others share its edits, after the check `after`.
-fn judged(findings: &[Diagnostic], after: &Run) -> Verdict {
+fn judged(findings: &[Diagnostic], after: &Outcome) -> Verdict {
     let kept = [shared(&findings[0])];
     let merged: Vec<(Proposal, Fingerprint)> = findings[1..]
         .iter()

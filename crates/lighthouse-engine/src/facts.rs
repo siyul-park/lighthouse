@@ -1,10 +1,7 @@
 use lighthouse_model::ucm::Model;
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_model::{
-    Diagnostic,
-    ucm::{Project, SymbolId},
-};
+use lighthouse_model::{Diagnostic, ucm::SymbolId};
 use lighthouse_plugin::Facts;
 use serde_json::{Map, Value, json};
 
@@ -13,7 +10,7 @@ use crate::engine::Input;
 /// What the analysis knew about the subject of each finding, frozen into the
 /// finding's record so a later review can snapshot it without re-analysis.
 pub(crate) struct FindingFacts<'a> {
-    project: &'a Project,
+    project: &'a dyn Model,
     /// Measured facts (a map by symbol id, or a single value for a file) by
     /// the file key they were computed for; the empty key holds
     /// project-scope facts.
@@ -22,7 +19,7 @@ pub(crate) struct FindingFacts<'a> {
 }
 
 impl<'a> FindingFacts<'a> {
-    pub(crate) fn new(project: &'a Project, facts: &'a Facts, inputs: &'a [Input]) -> Self {
+    pub(crate) fn new(project: &'a dyn Model, facts: &'a Facts, inputs: &'a [Input]) -> Self {
         let mut measured: BTreeMap<&str, Vec<(&str, &Value)>> = BTreeMap::new();
         for (analyzer, key, value) in facts.iter() {
             measured.entry(key).or_default().push((analyzer, value));

@@ -7,8 +7,9 @@ use lighthouse_graph::{Graph, Options};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, File, Fragment, FunctionSummary, Held, Model, Module, Node, PROJECT, Place,
-        Project, Resolution, Symbol, SymbolId, SymbolKind, Target, View, Visibility,
+        Edge, EdgeKind, File, Fragment, FunctionSummary, Held, Model, Module, NOTICES, Node,
+        PROJECT, Place, Project, Resolution, Symbol, SymbolId, SymbolKind, Target, View,
+        Visibility,
     },
 };
 
@@ -190,6 +191,11 @@ impl World {
                 file.path
             );
         }
+        assert_eq!(
+            *self.graph.query(&NOTICES, &()).unwrap(),
+            merged.notices(),
+            "{at}: notices"
+        );
     }
 
     fn merged(&self) -> Project {

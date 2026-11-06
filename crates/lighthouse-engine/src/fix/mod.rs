@@ -35,7 +35,7 @@ use model::ModelFix;
 pub use model::{BatchTrace, ModelCounts, ToolCounts};
 pub(crate) use run::fix;
 
-use crate::{FixTimings, Needs, Run};
+use crate::{FixTimings, Needs, Outcome};
 
 /// The most apply-and-recheck rounds a run takes. A run ends sooner: at a
 /// fixpoint, where no fix is left to apply; when files come back to a text
@@ -291,7 +291,7 @@ pub struct FixRun {
     /// The check of the project as it stands on disk, made by the same engine,
     /// when the caller already has it: the first round takes it for its own
     /// instead of checking again.
-    pub initial: Option<Run>,
+    pub initial: Option<Outcome>,
 }
 
 /// What a fix run did.
@@ -322,7 +322,7 @@ pub struct FixReport {
     pub model_edits: Option<EditUsage>,
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
-    pub finished: Run,
+    pub finished: Outcome,
     /// Where the time of the run went.
     pub timings: FixTimings,
 }

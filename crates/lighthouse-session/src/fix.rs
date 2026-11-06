@@ -471,9 +471,9 @@ fn suppressed(
     root: &std::path::Path,
     catalog: &Catalog,
     store: bool,
-) -> Result<(BTreeSet<Fingerprint>, lighthouse_engine::Run)> {
+) -> Result<(BTreeSet<Fingerprint>, lighthouse_engine::Outcome)> {
     let checked = engine.check_project(&[], &[])?;
-    let mut outcome = checked.clone();
+    let mut outcome = checked.run.clone();
     let all: BTreeSet<Fingerprint> = outcome
         .diagnostics
         .iter()

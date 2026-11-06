@@ -17,7 +17,7 @@ use lighthouse_spec::FixScope;
 
 use super::{localize, tokens};
 use crate::{
-    Overlays, Run,
+    Outcome, Overlays,
     fix::{
         brief::{Localized, Target as Brief, brief},
         rewrite::World,
@@ -233,9 +233,9 @@ impl Fixture {
     }
 
     fn localized_in(&self, project: Project, scope: FixScope, budget: usize) -> Localized {
-        let outcome = Run {
+        let outcome = Outcome {
             project,
-            ..Run::default()
+            ..Outcome::default()
         };
         let texts = self.texts();
         let root = PathBuf::from("/nowhere");
@@ -532,9 +532,9 @@ fn a_long_list_of_imports_takes_what_is_left_and_drops_no_signature_or_place() {
 #[test]
 fn a_symbol_inside_the_extent_of_another_is_not_given_twice() {
     for fixture in fixtures() {
-        let outcome = Run {
+        let outcome = Outcome {
             project: fixture.project(false, 0, false),
-            ..Run::default()
+            ..Outcome::default()
         };
         let texts = fixture.texts();
         let root = PathBuf::from("/nowhere");

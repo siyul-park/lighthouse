@@ -23,7 +23,7 @@ use super::{
     propose::{Aim, NOT_KEPT, Proposal, Proposer},
     rewrite::{Bounds, Change, Changes, Scratch, World, accept, collect},
 };
-use crate::{Overlays, Run};
+use crate::{Outcome, Overlays};
 
 /// How many characters of what a program said a reason carries.
 const SAID_SHOWN: usize = 400;
@@ -51,7 +51,7 @@ impl Proposer<'_> {
     /// The proposal of the command `fix` for `finding`, or why there is none.
     pub(super) fn propose_command(
         &self,
-        outcome: &Run,
+        outcome: &Outcome,
         finding: &Diagnostic,
         (binding, fix): (&FixBinding, &CommandFix),
         (sources, texts): (&Sources, &Overlays),

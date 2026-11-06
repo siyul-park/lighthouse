@@ -14,7 +14,7 @@ use lighthouse_model::Severity;
 use lighthouse_protocol::hash;
 
 use super::{super::propose::Proposal, DeclinedFix, Orchestrator};
-use crate::{Error, Run};
+use crate::{Error, Outcome};
 
 /// The texts the files of a run passed through.
 #[derive(Default)]
@@ -43,7 +43,7 @@ impl Orchestrator<'_> {
     /// rounds before `round` left. A file that came back to a text it had is
     /// put back to its best and frozen; the run of the state then, which is
     /// checked again after that.
-    pub(super) fn watch(&mut self, outcome: Run, round: usize) -> Result<Run, Error> {
+    pub(super) fn watch(&mut self, outcome: Outcome, round: usize) -> Result<Outcome, Error> {
         let errors = errors_by_file(&outcome);
         if round == 1 {
             self.trail.errors = errors.clone();
@@ -138,7 +138,7 @@ impl Orchestrator<'_> {
     }
 
     /// Declines the findings of `rules` that `outcome` still has in `file`.
-    fn decline_cycle(&mut self, outcome: &Run, file: &PathBuf, rules: &[String]) {
+    fn decline_cycle(&mut self, outcome: &Outcome, file: &PathBuf, rules: &[String]) {
         let reason = format!("the fixes of {} undo each other", rules.join(", "));
         for d in outcome
             .diagnostics
@@ -167,7 +167,7 @@ impl Orchestrator<'_> {
     }
 }
 
-fn errors_by_file(run: &Run) -> BTreeMap<PathBuf, usize> {
+fn errors_by_file(run: &Outcome) -> BTreeMap<PathBuf, usize> {
     let mut counts = BTreeMap::new();
     for d in run
         .diagnostics

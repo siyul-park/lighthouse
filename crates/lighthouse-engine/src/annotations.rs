@@ -8,7 +8,7 @@ use lighthouse_model::{
     Diagnostic, Position, Span, Suppressed, Suppression,
     annotation::{self, Directive, Form},
     squash,
-    ucm::{Comment, Project},
+    ucm::Comment,
 };
 use serde_json::{Value, json};
 
@@ -160,7 +160,11 @@ enum Coverage {
 /// whatever its severity. A directive that disables without a reason is
 /// ignored. What each directive said and whether it suppressed anything is
 /// returned for the rules that judge directives.
-pub(crate) fn apply<'g>(found: Vec<Diagnostic>, project: &Project, gate: &'g Gate<'g>) -> Applied {
+pub(crate) fn apply<'g>(
+    found: Vec<Diagnostic>,
+    project: &dyn Model,
+    gate: &'g Gate<'g>,
+) -> Applied {
     let mut allowed = Vec::new();
     let mut open = Vec::new();
     for mut diagnostic in found {
@@ -185,7 +189,7 @@ pub(crate) fn apply<'g>(found: Vec<Diagnostic>, project: &Project, gate: &'g Gat
     }
     let mut found: Vec<Option<Diagnostic>> = open.into_iter().map(Some).collect();
     let mut annotations = BTreeMap::new();
-    for file in &project.files {
+    for file in project.files() {
         let located = locate(project, &file.path);
         if located.is_empty() {
             continue;
@@ -226,7 +230,7 @@ pub(crate) fn apply<'g>(found: Vec<Diagnostic>, project: &Project, gate: &'g Gat
 }
 
 /// The directives of the comments of `file`, in source order.
-fn locate<'a>(project: &'a Project, file: &Path) -> Vec<Located<'a>> {
+fn locate<'a>(project: &'a dyn Model, file: &Path) -> Vec<Located<'a>> {
     project
         .comments_in(file)
         .flat_map(|comment| {
@@ -442,7 +446,7 @@ fn annotation_span(at: &Located) -> Span {
 
 /// The line of the first thing in a file that is neither blank nor comment: a
 /// `lighthouse-disable` above it is at the top of the file. Imports are code.
-fn first_code_line(project: &Project, file: &Path, text: &str) -> u32 {
+fn first_code_line(project: &dyn Model, file: &Path, text: &str) -> u32 {
     let comments: Vec<_> = project.comments_in(file).collect();
     let covered = |line: u32, content: &str| {
         comments.iter().any(|c| {

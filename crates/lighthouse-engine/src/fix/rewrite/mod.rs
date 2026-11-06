@@ -31,7 +31,7 @@ pub(in crate::fix) use scratch::{Change, Changes, Scratch, run_verify};
 
 use super::model::Class;
 use crate::{
-    Overlays, Run,
+    Outcome, Overlays,
     cache::{Digest, digest_of},
 };
 
@@ -39,7 +39,7 @@ use crate::{
 pub(in crate::fix) struct World<'a> {
     pub(in crate::fix) files: &'a ProjectFiles,
     /// The check the findings come from.
-    pub(in crate::fix) outcome: &'a Run,
+    pub(in crate::fix) outcome: &'a Outcome,
     /// The texts that stand in for the files of the project: those of the
     /// rounds before, and every edit already accepted in this pass.
     pub(in crate::fix) texts: &'a Overlays,
@@ -52,7 +52,7 @@ pub(in crate::fix) struct World<'a> {
 impl<'a> World<'a> {
     pub(in crate::fix) fn new(
         files: &'a ProjectFiles,
-        outcome: &'a Run,
+        outcome: &'a Outcome,
         texts: &'a Overlays,
     ) -> Self {
         Self {

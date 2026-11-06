@@ -24,7 +24,7 @@ use super::{
     displaced::{displaced, moved_files, unordered},
     settle::{Joined, fold},
 };
-use crate::{Error, Run};
+use crate::{Error, Outcome};
 
 impl Orchestrator<'_> {
     /// Applies what does not collide to the texts in memory, verifies them
@@ -33,10 +33,10 @@ impl Orchestrator<'_> {
     /// when nothing was dropped.
     pub(super) fn apply_round(
         &mut self,
-        before: &Run,
+        before: &Outcome,
         proposals: Vec<Proposal>,
         round: usize,
-    ) -> Result<Option<Run>, Error> {
+    ) -> Result<Option<Outcome>, Error> {
         self.round = round;
         let started = Instant::now();
         let applied = self.apply_proposals(before, proposals, round);
@@ -46,10 +46,10 @@ impl Orchestrator<'_> {
 
     fn apply_proposals(
         &mut self,
-        before: &Run,
+        before: &Outcome,
         mut proposals: Vec<Proposal>,
         round: usize,
-    ) -> Result<Option<Run>, Error> {
+    ) -> Result<Option<Outcome>, Error> {
         // The higher priority wins a collision, and the order of the findings
         // breaks a tie (the sort is stable). Safety is no key: what the run
         // may not write was set apart before, and takes no span.

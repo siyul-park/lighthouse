@@ -22,7 +22,7 @@ use super::{
     Bounds, Change, Changes, Scratch, World, accept, run_verify, run_verify_in,
     scope::first_outside,
 };
-use crate::{Overlays, Run};
+use crate::{Outcome, Overlays};
 
 fn span(from: (u32, u32), to: (u32, u32)) -> Span {
     Span {
@@ -310,12 +310,12 @@ fn call(from: &Symbol, to: &Symbol) -> Edge {
     }
 }
 
-fn world_run() -> Run {
+fn world_run() -> Outcome {
     let files = ["a.go", "b.go", "c.go", "d.go", "e.go"];
     let [f, g, h, x, k] = files.map(|file| declared(&file.replace(".go", ""), file));
     let edges = vec![call(&g.0, &f.0), call(&h.0, &f.0), call(&k.0, &g.0)];
     let (symbols, places) = [f, g, h, x, k].into_iter().unzip();
-    Run {
+    Outcome {
         project: Project::merge([Fragment {
             files: files
                 .iter()
@@ -332,7 +332,7 @@ fn world_run() -> Run {
             edges,
             ..Fragment::default()
         }]),
-        ..Run::default()
+        ..Outcome::default()
     }
 }
 

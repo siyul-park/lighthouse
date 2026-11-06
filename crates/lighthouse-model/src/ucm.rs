@@ -25,8 +25,8 @@ pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
 pub use kinds::{
-    CASES, DECLARATIONS, EDGES, HOST, Host, INCOMING, MARKERS, MODULE_CASES, ORDERED_BY, PATHS,
-    PAYLOAD, PROJECT, Payload, REGIONS_UNIT, RESOLVED, SITES, SLICE, SYMBOLS, key,
+    CASES, DECLARATIONS, EDGES, HOST, Host, INCOMING, MARKERS, MODULE_CASES, NOTICES, ORDERED_BY,
+    PATHS, PAYLOAD, PROJECT, Payload, REGIONS_UNIT, RESOLVED, SITES, SLICE, SYMBOLS, key,
 };
 pub use load_order::{LoadNeed, LoadPoint, load_needs};
 pub use markers::Markers;
@@ -736,6 +736,6 @@ impl Index {
     }
 }
 
-fn ambiguity(count: usize) -> String {
+pub(super) fn ambiguity(count: usize) -> String {
     format!("{count} edge target(s) matched several symbols and stayed unresolved")
 }

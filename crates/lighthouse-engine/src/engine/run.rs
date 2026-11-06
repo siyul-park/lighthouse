@@ -3,11 +3,11 @@
 
 use super::judging::Judgment;
 use super::*;
-use lighthouse_model::ucm::Model;
+use lighthouse_model::ucm::{Held, Model, View};
 
 /// What a run that is not answered by the report of the graph goes on with:
-/// the files read and the project they make.
-type Loaded = (Vec<Input>, Project);
+/// the files read and what the model states of them.
+type Loaded = (Vec<Input>, Stated);
 
 impl Engine {
     pub(super) fn run(
@@ -37,7 +37,7 @@ impl Engine {
         let reporting = (reuse && overlays.is_empty())
             .then(|| self.reporting(&selected, (&scopes, only), (&models, &run)))
             .flatten();
-        let Some((inputs, project)) =
+        let Some((inputs, stated)) =
             self.load(&selected, overlays, (reporting.as_ref(), &mut run))?
         else {
             return Ok(run);
@@ -63,7 +63,7 @@ impl Engine {
         let judgment = Judgment {
             rules: &selected,
             inputs: &refs,
-            project: &project,
+            project: &stated,
             models: &models,
         };
         let plan = self.plan(&judgment, false)?;
@@ -76,7 +76,7 @@ impl Engine {
                 workspace: &workspace,
                 rules: &selected,
                 inputs: &inputs,
-                project: &project,
+                stated: &stated,
                 facts: &facts,
                 annotations: &annotations,
                 models: &models,
@@ -84,8 +84,19 @@ impl Engine {
             };
             let (found, unsettled) = self.collect(&scene, plan, &mut run)?;
             let started = Instant::now();
-            let found = self.suppress(found, &scene, (&ran, &unsettled), &scopes, &mut run)?;
-            self.identify(found, &scene, &mut run)?;
+            let held = Held::default();
+            let view = View::new(graph, &held)?;
+            let found = self.suppress(
+                found,
+                (&scene, &view),
+                (&ran, &unsettled),
+                &scopes,
+                &mut run,
+            )?;
+            self.identify(found, (&scene, &view), &mut run)?;
+            if let Some(failed) = view.failure() {
+                return Err(failed.into());
+            }
             run.timings.fingerprints = started.elapsed();
         }
         Self::conclude(&mut run, (&models, cache.as_ref()));
@@ -105,7 +116,6 @@ impl Engine {
             .iter()
             .map(|input| (input.file.path.clone(), input.sha256.clone()))
             .collect();
-        run.project = project;
         Ok(run)
     }
 
@@ -207,7 +217,7 @@ impl Engine {
     fn suppress(
         &self,
         found: Vec<Diagnostic>,
-        scene: &Scene,
+        (scene, model): (&Scene, &dyn Model),
         (ran, unsettled): (&BTreeSet<String>, &Unsettled),
         scopes: &Scopes,
         run: &mut Run,
@@ -224,7 +234,7 @@ impl Engine {
             unsettled,
             text: &text,
         };
-        let applied = annotations::apply(found, scene.project, &gate);
+        let applied = annotations::apply(found, model, &gate);
         let mut kept = applied.kept;
         kept.extend(self.judge_annotations(scene, applied.annotations, run)?);
         kept.retain(|d| scopes.contains(&d.file));
@@ -243,12 +253,12 @@ impl Engine {
     fn identify(
         &self,
         mut found: Vec<Diagnostic>,
-        scene: &Scene,
+        (scene, model): (&Scene, &dyn Model),
         run: &mut Run,
     ) -> Result<(), Error> {
         in_order(&mut found);
-        let ordinal = Diagnostic::disambiguate(&mut found, |d| scene.project.discriminator(d));
-        let facts = FindingFacts::new(scene.project, scene.facts, scene.inputs);
+        let ordinal = Diagnostic::disambiguate(&mut found, |d| model.discriminator(d));
+        let facts = FindingFacts::new(model, scene.facts, scene.inputs);
         run.facts = found
             .iter()
             .map(|d| {
@@ -259,7 +269,7 @@ impl Engine {
                 (d.fingerprint.clone(), facts)
             })
             .collect();
-        run.options = self.options_of(&found, scene.project)?;
+        run.options = self.options_of(&found, scene.stated)?;
         run.diagnostics = found;
         Ok(())
     }
@@ -269,7 +279,7 @@ impl Engine {
     fn options_of(
         &self,
         found: &[Diagnostic],
-        project: &Project,
+        stated: &Stated,
     ) -> Result<BTreeMap<Fingerprint, Options>, Error> {
         let mut options = BTreeMap::new();
         for d in found {
@@ -277,7 +287,7 @@ impl Engine {
                 .registry
                 .rule(&d.rule_id)
                 .is_some_and(|r| r.manifest().scope == RunScope::Project);
-            let (path, lang) = match project.file(&d.file) {
+            let (path, lang) = match stated.file(&d.file) {
                 Some(file) if !project_scope => (file.path.as_path(), file.lang.as_str()),
                 _ => (Path::new(""), ""),
             };

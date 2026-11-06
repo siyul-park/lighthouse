@@ -1,7 +1,6 @@
 //! The phases of a run between reading files and collecting findings: read the
 //! files, have the providers index them, compute the facts and apply the rules.
 
-use lighthouse_model::ucm::Model;
 use std::{borrow::Cow, sync::OnceLock};
 
 use lighthouse_model::ucm::Capability;
@@ -180,7 +179,7 @@ impl Engine {
         inputs: Vec<Input>,
         overlays: &Overlays,
         (reporting, run): (Option<(&report::Reporting, &str)>, &mut Run),
-    ) -> Option<(Vec<Input>, Project)> {
+    ) -> Option<(Vec<Input>, Stated)> {
         let ws = Workspace {
             overlays: overlays.clone(),
             ..self.ws.clone()
@@ -211,15 +210,14 @@ impl Engine {
             return None;
         }
         let started = Instant::now();
-        let project = self.assemble(&inputs, (&units, &views), run);
+        let stated = self.stated(&inputs, (&units, &views), run);
         run.timings.merge = started.elapsed();
         self.commit_index(run);
-        run.notices.extend(project.notices().iter().cloned());
         let kept = inputs
             .into_iter()
-            .filter(|i| project.file(&i.file.path).is_some())
+            .filter(|i| stated.file(&i.file.path).is_some())
             .collect();
-        Some((kept, project))
+        Some((kept, stated))
     }
 
     /// The files injections select, `None` when none does.
@@ -404,7 +402,7 @@ impl Engine {
     /// which is noticed and left unsettled).
     pub(super) fn judged<'a>(
         &'a self,
-        project: &Project,
+        stated: &Stated,
         rule: &dyn Rule,
         resolved: &'a lighthouse_spec::Rules,
         file: &File,
@@ -414,7 +412,7 @@ impl Engine {
         let config = resolved.get(&meta.id)?;
         let level = config.level?;
         let applies = self.applies(&meta.applicability, config);
-        if applies.excludes(project, file) {
+        if applies.excludes_by(file, || stated.has_test_code(&file.path)) {
             return None;
         }
         if let Some((language, missing)) = self.lacking(meta, &applies, file) {

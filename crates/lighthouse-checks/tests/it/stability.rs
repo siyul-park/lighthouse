@@ -289,7 +289,7 @@ fn indexed(id: &str, plugin: &Path, files: &[(&str, &str)]) -> System {
         dir.path(),
     )
     .unwrap()
-    .check(&[], &[])
+    .check_project(&[], &[])
     .unwrap();
     modules(&outcome.project)
 }

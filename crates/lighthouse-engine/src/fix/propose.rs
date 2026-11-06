@@ -33,7 +33,7 @@ use super::{
     rewrite::{Bounds, Change, Changes, World, accept},
 };
 use crate::{
-    Engine, Error, Needs, Overlays, Run,
+    Engine, Error, Needs, Outcome, Overlays,
     cache::{Cache, Digest, KeyBuilder},
     engine::Scopes,
 };
@@ -174,7 +174,7 @@ impl<'e> Proposer<'e> {
     /// says which findings are taken up.
     pub(super) fn propose(
         &self,
-        outcome: &Run,
+        outcome: &Outcome,
         texts: &Overlays,
         phase: Phase,
         taking: Taking<'_>,
@@ -278,7 +278,7 @@ impl<'e> Proposer<'e> {
     /// change introduced are taken up whatever rules the run selected.
     fn select<'o>(
         &self,
-        outcome: &'o Run,
+        outcome: &'o Outcome,
         scopes: &Scopes,
         taking: Taking<'_>,
     ) -> Vec<&'o Diagnostic> {
@@ -345,7 +345,7 @@ impl<'e> Proposer<'e> {
 
     fn propose_one(
         &self,
-        outcome: &Run,
+        outcome: &Outcome,
         finding: &Diagnostic,
         binding: &FixBinding,
         (lowerer, sources, texts, memo): (&Lowerer, &Sources, &Overlays, &Memo),
@@ -450,7 +450,7 @@ impl Proposer<'_> {
         &self,
         memo: &Memo,
         scope: FixScope,
-        (outcome, finding): (&Run, &Diagnostic),
+        (outcome, finding): (&Outcome, &Diagnostic),
         edits: &[TextEdit],
         texts: (&Sources, &Overlays),
     ) -> Result<(), String> {
@@ -471,7 +471,7 @@ impl Proposer<'_> {
     fn within(
         &self,
         scope: FixScope,
-        outcome: &Run,
+        outcome: &Outcome,
         finding: &Diagnostic,
         edits: &[TextEdit],
         (sources, texts): (&Sources, &Overlays),

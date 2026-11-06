@@ -25,7 +25,7 @@ use super::{
 use chain::{Links, Mark};
 use cycle::Trail;
 
-use crate::{Engine, Error, FixTimings, Overlays, Run};
+use crate::{Engine, Error, FixTimings, Outcome, Overlays};
 
 /// The state of one fix run.
 pub(super) struct Orchestrator<'e> {
@@ -62,7 +62,7 @@ struct Standing {
 
 impl Orchestrator<'_> {
     /// A check of the project over the texts of the run, timed.
-    pub(super) fn recheck(&mut self) -> Result<Run, Error> {
+    pub(super) fn recheck(&mut self) -> Result<Outcome, Error> {
         let started = Instant::now();
         let run = self.proposer.engine.check_overlaid(&[], &[], &self.texts);
         self.timings.checks.push((self.round, started.elapsed()));
@@ -72,7 +72,7 @@ impl Orchestrator<'_> {
     /// The proposals of the fixers over the texts of the run, timed.
     pub(super) fn proposals(
         &mut self,
-        outcome: &Run,
+        outcome: &Outcome,
         phase: Phase,
         taking: Taking<'_>,
     ) -> Result<(Vec<Proposal>, BTreeMap<Fingerprint, DeclinedFix>), Error> {
@@ -103,7 +103,7 @@ impl Orchestrator<'_> {
     /// of what it may not, over the state the rounds left: the run of the last
     /// check. Candidates live in memory only, so an error leaves the disk as it
     /// was.
-    fn rounds(&mut self) -> Result<Run, Error> {
+    fn rounds(&mut self) -> Result<Outcome, Error> {
         let (outcome, withheld) = self.apply_rules()?;
         let withheld = match withheld {
             Some(withheld) => withheld,
@@ -116,8 +116,8 @@ impl Orchestrator<'_> {
     /// Rounds until one applies nothing, or the run stops; the run of the last
     /// check and, when it ended because nothing was left to apply, the
     /// proposals the run may not write over that state.
-    fn apply_rules(&mut self) -> Result<(Run, Option<Vec<Proposal>>), Error> {
-        let mut checked: Option<Run> = self.proposer.run.initial.clone();
+    fn apply_rules(&mut self) -> Result<(Outcome, Option<Vec<Proposal>>), Error> {
+        let mut checked: Option<Outcome> = self.proposer.run.initial.clone();
         // The states of the texts the rounds began from: one that comes again
         // means the rounds go round.
         let mut seen = BTreeSet::new();
@@ -169,7 +169,7 @@ impl Orchestrator<'_> {
 
     /// The proposals over the state the rounds left that the run may not
     /// write.
-    fn withheld(&mut self, outcome: &Run) -> Result<Vec<Proposal>, Error> {
+    fn withheld(&mut self, outcome: &Outcome) -> Result<Vec<Proposal>, Error> {
         let (proposals, declined) = self.proposals(outcome, Phase::Rules, Taking::Selected)?;
         self.declined.extend(declined);
         Ok(self
@@ -186,7 +186,7 @@ impl Orchestrator<'_> {
     /// runs of the chain are rolled back newest first until they pass, and
     /// their findings are declined. The others are verified over what is
     /// written and withdrawn to previews. The run of the last check.
-    fn model_round(&mut self, outcome: Run) -> Result<Run, Error> {
+    fn model_round(&mut self, outcome: Outcome) -> Result<Outcome, Error> {
         let (proposals, declined) = self.proposals(&outcome, Phase::Models, Taking::Selected)?;
         self.declined.extend(declined);
         let (written, withheld): (Vec<_>, Vec<_>) = self
@@ -204,7 +204,11 @@ impl Orchestrator<'_> {
 
     /// Applies the `proposals` of a model the run may write, and keeps those
     /// the programs of `[fix] verify` pass over. The run of the last check.
-    fn write_models(&mut self, outcome: Run, proposals: Vec<Proposal>) -> Result<Run, Error> {
+    fn write_models(
+        &mut self,
+        outcome: Outcome,
+        proposals: Vec<Proposal>,
+    ) -> Result<Outcome, Error> {
         if proposals.is_empty() {
             return Ok(outcome);
         }
@@ -240,16 +244,16 @@ impl Orchestrator<'_> {
     /// each, by link, and the check of the last state that changed.
     fn apply_chain(
         &mut self,
-        outcome: &Run,
+        outcome: &Outcome,
         proposals: Vec<Proposal>,
         round: usize,
-    ) -> Result<(BTreeMap<usize, Mark>, Option<Run>), Error> {
+    ) -> Result<(BTreeMap<usize, Mark>, Option<Outcome>), Error> {
         let mut links: BTreeMap<usize, Vec<Proposal>> = BTreeMap::new();
         for p in proposals {
             links.entry(p.chain).or_default().push(p);
         }
         let mut marks = BTreeMap::new();
-        let mut current: Option<Run> = None;
+        let mut current: Option<Outcome> = None;
         for (number, link) in links {
             let link = self.made_over_standing(link);
             if link.is_empty() {

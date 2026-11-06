@@ -20,7 +20,7 @@ use super::{
     super::{DeclinedFix, FixedBy, PreviewedFix},
     Orchestrator, Standing,
 };
-use crate::{Overlays, Run};
+use crate::{Outcome, Overlays};
 
 /// The state of a run at a point: its texts, the first text of every file it
 /// changed, its rounds and how many fixes it had applied.
@@ -87,7 +87,7 @@ impl Orchestrator<'_> {
     /// stand, and declines its findings with `why`. False when none stands.
     pub(super) fn roll_back_newest(
         &mut self,
-        outcome: &Run,
+        outcome: &Outcome,
         links: &Links,
         marks: &BTreeMap<usize, Mark>,
         why: &str,
@@ -100,7 +100,7 @@ impl Orchestrator<'_> {
 
     fn undo_newest(
         &mut self,
-        outcome: &Run,
+        outcome: &Outcome,
         links: &Links,
         marks: &BTreeMap<usize, Mark>,
         why: &str,

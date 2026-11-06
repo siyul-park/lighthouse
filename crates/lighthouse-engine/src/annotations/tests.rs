@@ -52,7 +52,7 @@ fn a_rule_that_did_not_finish_keeps_its_suppression_unsettled() {
 fn non_ascii_code_before_a_comment_does_not_panic_when_finding_the_file_top() {
     let path = PathBuf::from("x.rs");
     let comment_text = "          // lighthouse-disable-next-line a/x -- reason";
-    let project = Project::merge([lighthouse_model::ucm::Fragment {
+    let project = lighthouse_model::ucm::Project::merge([lighthouse_model::ucm::Fragment {
         comments: vec![Comment {
             file: path.clone(),
             span: Span {

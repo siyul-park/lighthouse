@@ -3,7 +3,7 @@
 //! The host says what it knows of each file (`host`) and which files make the
 //! project (`paths`). From the provider's answers for the units the files are
 //! in, `part` makes the fragments of a file as the host stamps them, `slice`
-//! qualifies them, `declared` is the modules a file declares and `outline` what
+//! qualifies them, `declared` is the modules a file declares and `declarations` what
 //! the table takes of a slice, `symbols` is the table of all declarations,
 //! `resolved` the slice with its targets resolved against it, `edges` the
 //! reverse maps of all edges, `sites` where they refer from and `incoming` what the rest of
@@ -25,7 +25,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     Declarations, Edges, File, Fragment, Incoming, Markers, ORDERED, Project, REGIONS, Resolved,
-    Sites, Slice, Table, TestCase, collisions, declared,
+    Sites, Slice, Symbol, Table, TestCase, ambiguity, collisions, declared,
+    merge::duplicate_notice,
 };
 
 /// The id of the unit that holds the regions selected in the project's files.
@@ -71,6 +72,10 @@ pub static CASES: Query<(), BTreeMap<String, Vec<TestCase>>> =
 /// leaves them as they were leaves what read them green; held in memory only.
 pub static MODULE_CASES: Query<String, Vec<TestCase>> =
     Query::new("module_cases", module_cases).transient();
+/// What putting the files together drops or leaves undecided, for the user
+/// to see: the ids declared in several files and the targets that stayed
+/// ambiguous.
+pub static NOTICES: Query<(), Vec<String>> = Query::new("notices", notices);
 /// The files put together; held in memory only.
 pub static PROJECT: Query<(), Project> = Query::new("project", project).transient();
 
@@ -352,6 +357,21 @@ fn project(graph: &Graph, _: &()) -> Result<Project, Error> {
         resolved.iter().map(Arc::as_ref),
         (&edges, &sites),
     ))
+}
+
+fn notices(graph: &Graph, _: &()) -> Result<Vec<String>, Error> {
+    let declared = each(graph, |graph, path| graph.query(&DECLARATIONS, path))?;
+    let mut symbols: Vec<&Symbol> = declared.iter().flat_map(|d| &d.symbols).collect();
+    symbols.sort_by(|a, b| a.id.cmp(&b.id));
+    let mut notices: Vec<String> = duplicate_notice(&symbols).into_iter().collect();
+    let ambiguous: usize = each(graph, |graph, path| graph.query(&RESOLVED, path))?
+        .iter()
+        .map(|resolved| resolved.ambiguous)
+        .sum();
+    if ambiguous > 0 {
+        notices.push(ambiguity(ambiguous));
+    }
+    Ok(notices)
 }
 
 fn cases(graph: &Graph, _: &()) -> Result<BTreeMap<String, Vec<TestCase>>, Error> {

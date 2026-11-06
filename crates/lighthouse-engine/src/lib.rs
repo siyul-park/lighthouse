@@ -17,8 +17,8 @@ mod tools;
 pub mod cache;
 
 pub use engine::{
-    Availability, CommandModels, EXIT_INCOMPLETE, Engine, FailOn, ModelOptions, Needs, Overlays,
-    Run, active,
+    Availability, CommandModels, EXIT_INCOMPLETE, Engine, FailOn, ModelOptions, Needs, Outcome,
+    Overlays, Run, active,
 };
 pub use error::Error;
 pub use fix::{

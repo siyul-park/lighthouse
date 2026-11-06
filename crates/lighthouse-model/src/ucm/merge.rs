@@ -268,7 +268,7 @@ pub(super) fn settle(all: &mut Fragment) -> Option<String> {
         same
     });
     all.symbols.sort_by(|a, b| a.id.cmp(&b.id));
-    let notice = duplicate_notice(&all.symbols);
+    let notice = duplicate_notice(&all.symbols.iter().collect::<Vec<_>>());
     all.symbols.dedup_by(|a, b| a.id == b.id);
     all.places.sort_by(|a, b| a.symbol.cmp(&b.symbol));
     all.places.dedup_by(|a, b| a.symbol == b.symbol);
@@ -282,7 +282,8 @@ pub(super) fn settle(all: &mut Fragment) -> Option<String> {
     notice
 }
 
-fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {
+/// The notice for ids declared in several files, from the symbols sorted by id.
+pub(super) fn duplicate_notice(sorted: &[&Symbol]) -> Option<String> {
     let mut groups: Vec<(&SymbolId, Vec<String>)> = Vec::new();
     for pair in sorted.windows(2) {
         if pair[0].id != pair[1].id || pair[0].file == pair[1].file {

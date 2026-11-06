@@ -7,7 +7,7 @@ use lighthouse_graph::{Durability, Graph};
 use lighthouse_spec::key;
 
 use super::{index::Call, regions::Views, *};
-use lighthouse_model::ucm::{HOST, Host, MARKERS, PATHS, PROJECT};
+use lighthouse_model::ucm::{HOST, Held, Host, MARKERS, NOTICES, PATHS, PROJECT, View};
 
 /// The unit each file of a run is in, and whether the unit is a host unit:
 /// one with files that injections take regions from.
@@ -31,30 +31,66 @@ impl Units {
 }
 
 impl Engine {
-    /// The project the providers' answers make, from the graph; what goes
-    /// wrong is a gap, and the run goes on with no project.
-    pub(super) fn assemble(
+    /// What the providers' answers make of the project, as the graph holds
+    /// it: the files as the model states them, and what merging them noticed.
+    /// What goes wrong is a gap, and the run goes on with no project.
+    pub(super) fn stated(
         &self,
         inputs: &[Input],
         (units, views): (&Units, &Views),
         run: &mut Run,
-    ) -> Project {
+    ) -> Stated {
         let mut guard = self.lock_graph();
         let graph = self.graph_in(&mut guard, &mut run.notices);
         let built = self
             .host_inputs(graph, inputs, (units, views))
-            .and_then(|()| Ok(in_pool(|| graph.query(&PROJECT, &()))?));
+            .and_then(|()| {
+                let graph: &Graph = graph;
+                Ok(in_pool(|| {
+                    let held = Held::default();
+                    let view = View::new(graph, &held)?;
+                    let stated = Stated::of(&view);
+                    let notices = graph.query(&NOTICES, &())?;
+                    match view.failure() {
+                        Some(e) => Err(e),
+                        None => Ok((stated, notices)),
+                    }
+                })?)
+            });
         match built {
-            Ok(project) => (*project).clone(),
+            Ok((stated, notices)) => {
+                run.notices.extend(notices.iter().cloned());
+                stated
+            }
             Err(e) => {
                 run.incomplete.push(Incomplete {
                     path: None,
                     provider: None,
                     reason: format!("the model cannot be built: {e}"),
                 });
-                Project::default()
+                Stated::default()
             }
         }
+    }
+
+    /// The project the last run read, merged from the graph: what a fix and
+    /// the analyses of the whole project work from, which no check does.
+    pub fn project(&self) -> Result<Project, Error> {
+        let mut guard = self.lock_graph();
+        let Some(graph) = guard.as_mut() else {
+            return Ok(Project::default());
+        };
+        let graph: &Graph = graph;
+        let project = in_pool(|| graph.query(&PROJECT, &()))?;
+        Ok((*project).clone())
+    }
+
+    /// The run with the project it read.
+    pub(super) fn outcome(&self, run: Run) -> Result<Outcome, Error> {
+        Ok(Outcome {
+            run,
+            project: self.project()?,
+        })
     }
 
     /// Says what the host knows of each file, and which files there are.

@@ -35,7 +35,7 @@ use super::{
     blame::Blame,
     rollback::{close_over, kept_proposals, worse},
 };
-use crate::{Error, Overlays, Run};
+use crate::{Error, Outcome, Overlays};
 
 /// How many times the safe fixes of the findings a change introduced are
 /// applied: the findings those fixes introduce get one more.
@@ -170,11 +170,11 @@ impl Orchestrator<'_> {
     /// applied.
     pub(super) fn settle(
         &mut self,
-        before: &Run,
-        mut after: Run,
+        before: &Outcome,
+        mut after: Outcome,
         changed: &[PathBuf],
         fixes: &[Proposal],
-    ) -> Result<(Run, Vec<Followed>, Joined), Error> {
+    ) -> Result<(Outcome, Vec<Followed>, Joined), Error> {
         let mut followed = Vec::new();
         let mut joined = Joined::default();
         if self.proposer.run.fixer.is_some() || changed.is_empty() {

@@ -17,7 +17,7 @@ mod edit;
 
 use super::{Account, Class, Event, extent, verify::judge};
 use crate::{
-    Run,
+    Outcome, Run,
     fix::{
         FixedBy,
         propose::{Aim, Proposal},
@@ -157,11 +157,14 @@ pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
     }
 }
 
-pub(super) fn run(findings: Vec<Diagnostic>, incomplete: Vec<Incomplete>) -> Run {
-    Run {
-        diagnostics: findings,
-        incomplete,
-        ..Run::default()
+pub(super) fn run(findings: Vec<Diagnostic>, incomplete: Vec<Incomplete>) -> Outcome {
+    Outcome {
+        run: Run {
+            diagnostics: findings,
+            incomplete,
+            ..Run::default()
+        },
+        ..Outcome::default()
     }
 }
 

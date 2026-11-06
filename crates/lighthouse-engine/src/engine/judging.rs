@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use lighthouse_graph::{Durability, Error as GraphError, Graph};
-use lighthouse_model::ucm::{Applicability, Model};
+use lighthouse_model::ucm::Applicability;
 use lighthouse_plugin::{
     BATCH, COMMAND, FINDINGS, Findings, Judged, Judging, Key, Runtime, TOOL, judge, run_batches,
     set_judged,
@@ -52,7 +52,7 @@ pub(super) struct Task<'r> {
 pub(super) struct Judgment<'a> {
     pub rules: &'a [&'a dyn Rule],
     pub inputs: &'a [&'a Input],
-    pub project: &'a Project,
+    pub project: &'a Stated,
     pub models: &'a dyn lighthouse_plugin::Models,
 }
 
@@ -242,7 +242,7 @@ impl Engine {
         }
         COMMAND.register(graph)?;
         let tools: Vec<String> = programs.into_iter().collect();
-        for (tool, identity) in tools::identities(&self.ws.root, run.project, &tools) {
+        for (tool, identity) in tools::identities(&self.ws.root, run.project.files(), &tools) {
             graph.set_input(&TOOL, &tool, identity, Durability::Stable)?;
         }
         if batching {
@@ -394,7 +394,7 @@ impl Engine {
             models: scene.models,
             annotations: scene.annotations,
             workspace: Some(scene.workspace),
-            documents: scene.project.documents(),
+            documents: scene.stated.documents(),
         };
         judge(
             scene.graph,
@@ -418,7 +418,7 @@ impl Engine {
         let run = Judgment {
             rules: scene.rules,
             inputs,
-            project: scene.project,
+            project: scene.stated,
             models: scene.models,
         };
         let plan = self.plan(&run, true)?;

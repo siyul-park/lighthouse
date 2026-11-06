@@ -33,7 +33,7 @@ fn main() -> Result<()> {
     let config = PathBuf::from(config).canonicalize()?;
     let session = Session::load_in(Path::new(repo), Some(&config))?;
     let checked = check(&session, &CheckRequest::default())?;
-    let project = &checked.run.project;
+    let project = &checked.project()?;
 
     let (by_module, by_symbol) = (modules(project), symbols(project));
     let core: Vec<&String> = by_module
