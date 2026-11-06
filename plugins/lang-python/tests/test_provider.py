@@ -332,6 +332,11 @@ class UnitTests(unittest.TestCase):
         two = self.answers({"a.py": "def f(x, y):\n    return x\n"})["a.py"]
         self.assertNotEqual(one["api"], two["api"])
 
+    def test_a_test_file_edit_keeps_the_api(self):
+        one = self.answers({"test_a.py": "def test_f():\n    pass\n"})["test_a.py"]
+        two = self.answers({"test_a.py": "def test_f(x):\n    pass\n"})["test_a.py"]
+        self.assertEqual(one["api"], two["api"])
+
     def test_a_method_body_edit_keeps_the_api(self):
         one = self.answers({"a.py": "class C:\n    def m(self):\n        return 1\n"})["a.py"]
         two = self.answers({"a.py": "class C:\n    def m(self):\n        return 2\n"})["a.py"]

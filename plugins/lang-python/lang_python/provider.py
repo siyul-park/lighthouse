@@ -9,6 +9,7 @@ from lang_python.sdk.wire import FileRef, UnitRef, UnitResult
 from lang_python.project import is_stub
 from lang_python.modules import module_path
 from lang_python.project import Project
+from lang_python.tests import is_test_file
 from lang_python.regions import Remap, Snippet, host_line, plan_snippets
 from lang_python.functions import Types
 from lang_python import api
@@ -150,6 +151,8 @@ class _Indexing:
     def _api(self, files: list[FileRef]) -> str:
         parts = []
         for file in files:
+            if is_test_file(file["path"]):
+                continue
             parsed = self.model.file(file["path"])
             parts.append(file["hash"] if parsed is None else api.digest(parsed.tree, parsed.text))
         return hashlib.sha256("\n".join(parts).encode()).hexdigest()

@@ -110,3 +110,32 @@ fn table_modules() {
 
     assert_eq!(paths, ["a", "b"]);
 }
+
+#[test]
+fn declarations_and_table_do_not_depend_on_the_order_of_declarations_or_files() {
+    let (a, b) = (fragment("a", "f", None), fragment("b", "g", None));
+    let both = |first: &Fragment, second: &Fragment| Fragment {
+        symbols: [first.symbols.clone(), second.symbols.clone()].concat(),
+        modules: vec![module("b"), module("a")],
+        ..Fragment::default()
+    };
+    let none = BTreeSet::new();
+    let slice = |part: Fragment| Slice::new(PathBuf::from("x.go"), vec![part], &none);
+
+    let forward = Declarations::new(&slice(both(&a, &b)));
+    let reversed = Declarations::new(&slice(both(&b, &a)));
+
+    assert_eq!(forward, reversed);
+    let (in_a, in_b) = (Declarations::new(&slice(a)), Declarations::new(&slice(b)));
+    assert_eq!(Table::new([&in_a, &in_b]), Table::new([&in_b, &in_a]));
+}
+
+fn module(path: &str) -> Module {
+    Module {
+        path: path.to_owned(),
+        name: None,
+        test_of: None,
+        language: None,
+        example: false,
+    }
+}

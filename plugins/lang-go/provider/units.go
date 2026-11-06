@@ -9,6 +9,7 @@ import (
 	"go/scanner"
 	"go/token"
 	"go/types"
+	"hash"
 	"os"
 	"path/filepath"
 	"slices"
@@ -89,16 +90,23 @@ type dirDigest struct {
 type fileFacts struct {
 	// Imports are the import paths of the file.
 	Imports []string
-	// API digests the tokens of the file without the bodies of its functions and
-	// methods. An edit inside a body leaves it unchanged, and with it the `api`
-	// of every package that depends on this one (early cutoff).
-	API string
+	// API digests each declaration of the file without the bodies of its
+	// functions and methods. An edit inside a body leaves it unchanged, and with
+	// it the `api` of every package that depends on this one (early cutoff).
+	API []string
+	// Directives digests the directives outside the declarations; empty when
+	// there are none. They belong to the file, not to a declaration.
+	Directives string
 	// Interfaces digests the type declarations that may declare an interface;
 	// empty when there are none. `implements` edges read every project
 	// interface, so a unit that declares one is imported by all.
 	Interfaces string
 	matching   matching
 }
+
+// declSpan is where a top-level declaration lies in the source: from its doc
+// comment to its end, and the braces of its body, -1 when it has none.
+type declSpan struct{ start, end, bodyStart, bodyEnd int }
 
 // goEnvVars are the settings of the go command that decide which files make a
 // package and what they mean: the toolchain, the target, the flags and the
@@ -203,7 +211,12 @@ func (pl *planner) goFile(u *directory, d *dirDigest, name string) bool {
 		u.requested = append(u.requested, rel)
 	}
 	d.content = append(d.content, name, hash)
-	d.api = append(d.api, name, facts.API)
+	if !strings.HasSuffix(name, "_test.go") {
+		d.api = append(d.api, facts.API...)
+		if facts.Directives != "" {
+			d.api = append(d.api, digest(name, facts.Directives))
+		}
+	}
 	if facts.Interfaces != "" {
 		d.ifaces = append(d.ifaces, name, facts.Interfaces)
 	}
@@ -261,6 +274,7 @@ func (d *dirDigest) seal(u *directory) {
 	slices.Sort(d.imports)
 	u.imports = slices.Compact(d.imports)
 	u.content = digest(d.content...)
+	slices.Sort(d.api)
 	u.api = digest(d.api...)
 	if len(d.ifaces) > 0 {
 		u.ifaces = digest(append([]string{u.rel}, d.ifaces...)...)
@@ -453,17 +467,17 @@ func factsOf(src []byte) fileFacts {
 	file, err := parser.ParseFile(fset, "", src, parser.SkipObjectResolution)
 	if file == nil {
 		whole := contentHash(src)
-		return fileFacts{API: whole, Interfaces: whole, matching: matching{open: true, unknown: true}}
+		return fileFacts{API: []string{whole}, Interfaces: whole, matching: matching{open: true, unknown: true}}
 	}
 	facts := fileFacts{Imports: importsOf(file), matching: matchingOf(file)}
 	tf := fset.File(file.Pos())
 	if err != nil || tf == nil {
 		whole := contentHash(src)
-		facts.API, facts.Interfaces = whole, whole
+		facts.API, facts.Interfaces = []string{whole}, whole
 		return facts
 	}
 	offset := func(p token.Pos) int { return tf.Offset(p) }
-	facts.API = apiDigest(src, file, offset)
+	facts.API, facts.Directives = apiDigest(src, file, offset)
 	facts.Interfaces = interfaceDigest(src, file, offset)
 	return facts
 }
@@ -483,29 +497,29 @@ func importsOf(file *ast.File) []string {
 	return out
 }
 
-// apiDigest hashes the tokens of a file outside the bodies of its functions:
-// what an importer can see of it. Comments and layout are not in it, except
-// the directives (`//go:build`, `//go:embed`, `// +build`), which change what
-// the file declares; a doc comment is a fact of the fragment.
-func apiDigest(src []byte, file *ast.File, offset func(token.Pos) int) string {
-	type span struct{ start, end int }
-	var bodies []span
-	for _, decl := range file.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Body == nil {
-			continue
-		}
-		start, end := offset(fn.Body.Lbrace), offset(fn.Body.Rbrace)+1
-		if start < 0 || end > len(src) || start > end {
-			return contentHash(src)
-		}
-		bodies = append(bodies, span{start, end})
+// apiDigest is what an importer can see of a file, one digest per top-level
+// declaration, and the directives that stand outside them, with no file name in
+// either: where a declaration is written is not part of what it declares. A
+// declaration is its tokens without the bodies of its functions and methods.
+// Comments and layout are not in it, except the directives (`//go:build`,
+// `//go:embed`, `// +build`), which change what the file declares; a doc comment
+// is a fact of the fragment. The directives outside the declarations are one
+// text, which belongs to the file.
+func apiDigest(src []byte, file *ast.File, offset func(token.Pos) int) (decls []string, directives string) {
+	spans, ok := declSpans(src, file, offset)
+	if !ok {
+		return []string{contentHash(src)}, ""
 	}
 	fset := token.NewFileSet()
 	tf := fset.AddFile("", fset.Base(), len(src))
 	var scan scanner.Scanner
 	scan.Init(tf, src, nil, scanner.ScanComments)
-	h := sha256.New()
+	hashes := make([]hash.Hash, len(spans))
+	for i := range hashes {
+		hashes[i] = sha256.New()
+	}
+	header, outside := sha256.New(), new(strings.Builder)
+	packageEnd := offset(file.Name.End())
 	next := 0
 	for {
 		pos, tok, lit := scan.Scan()
@@ -513,21 +527,67 @@ func apiDigest(src []byte, file *ast.File, offset func(token.Pos) int) string {
 			break
 		}
 		at := tf.Offset(pos)
-		for next < len(bodies) && at >= bodies[next].end {
+		for next < len(spans) && at >= spans[next].end {
 			next++
 		}
-		if next < len(bodies) && at >= bodies[next].start {
-			continue
-		}
-		if tok == token.COMMENT && !directive(lit) {
+		isDirective := tok == token.COMMENT && directive(lit)
+		if tok == token.COMMENT && !isDirective {
 			continue
 		}
 		if lit == "" {
 			lit = tok.String()
 		}
-		fmt.Fprintf(h, "%d:%s\x00", tok, lit)
+		switch {
+		case next < len(spans) && at >= spans[next].start:
+			if !inBody(spans[next], at) {
+				fmt.Fprintf(hashes[next], "%d:%s\x00", tok, lit)
+			}
+		case isDirective:
+			fmt.Fprintf(outside, "%d:%s\x00", tok, lit)
+		case at < packageEnd:
+			fmt.Fprintf(header, "%d:%s\x00", tok, lit)
+		}
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	decls = append(decls, hex.EncodeToString(header.Sum(nil)))
+	for _, h := range hashes {
+		decls = append(decls, hex.EncodeToString(h.Sum(nil)))
+	}
+	if outside.Len() > 0 {
+		directives = contentHash([]byte(outside.String()))
+	}
+	return decls, directives
+}
+
+// inBody reports whether the offset lies in the body of the function of sp.
+func inBody(sp declSpan, at int) bool {
+	return sp.bodyStart >= 0 && at >= sp.bodyStart && at < sp.bodyEnd
+}
+
+// declSpans are the spans of the declarations of file; false when a position
+// lies outside src.
+func declSpans(src []byte, file *ast.File, offset func(token.Pos) int) ([]declSpan, bool) {
+	spans := make([]declSpan, 0, len(file.Decls))
+	for _, decl := range file.Decls {
+		sp := declSpan{start: offset(decl.Pos()), end: offset(decl.End()), bodyStart: -1, bodyEnd: -1}
+		switch d := decl.(type) {
+		case *ast.GenDecl:
+			if d.Doc != nil {
+				sp.start = offset(d.Doc.Pos())
+			}
+		case *ast.FuncDecl:
+			if d.Doc != nil {
+				sp.start = offset(d.Doc.Pos())
+			}
+			if d.Body != nil {
+				sp.bodyStart, sp.bodyEnd = offset(d.Body.Lbrace), offset(d.Body.Rbrace)+1
+			}
+		}
+		if sp.start < 0 || sp.end > len(src) || sp.start > sp.end || sp.bodyStart > sp.bodyEnd || sp.bodyEnd > sp.end {
+			return nil, false
+		}
+		spans = append(spans, sp)
+	}
+	return spans, true
 }
 
 // directive reports whether a comment is a build or compiler directive.

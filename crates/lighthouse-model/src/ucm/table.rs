@@ -161,12 +161,18 @@ pub struct Declarations {
 }
 
 impl Declarations {
-    /// What a slice declares.
+    /// What a slice declares, the symbols by id and the modules by path: where
+    /// a declaration is written is not part of what it declares, and a reader
+    /// that wants the source order has the places.
     pub fn new(slice: &Slice) -> Self {
         let part = &slice.fragment;
+        let mut symbols = part.symbols.clone();
+        symbols.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut modules = part.modules.clone();
+        modules.sort_by(|a, b| a.path.cmp(&b.path));
         Self {
-            symbols: part.symbols.clone(),
-            modules: part.modules.clone(),
+            symbols,
+            modules,
             files: part.files.clone(),
         }
     }

@@ -28,6 +28,13 @@ var unitFixture = map[string]string{
 	"e/e.go": "package e\n\ntype E struct{}\n\nfunc (E) M() int { return 1 }\n\nfunc (E) N() int { return 2 }\n",
 }
 
+// apiFixture is a package of two files, a constant block and a function.
+var apiFixture = map[string]string{
+	"go.mod": testModule,
+	"p/a.go": "package p\n\nconst (\n\tX = iota\n\tY\n)\n",
+	"p/b.go": "package p\n\nfunc F(n int) int { return n }\n\nfunc G() {}\n",
+}
+
 func byID(units []sdk.UnitResult) map[string]sdk.UnitResult {
 	out := map[string]sdk.UnitResult{}
 	for _, unit := range units {
@@ -232,6 +239,65 @@ func TestProviderUnits(t *testing.T) {
 }
 
 // unitsAt indexes every directory of the project as a unit of its own.
+func TestProviderUnitsApi(t *testing.T) {
+	apiAfter := func(t *testing.T, edits map[string]string) (string, string) {
+		root := t.TempDir()
+		writeTree(t, root, apiFixture)
+		before := byID(unitsAt(t, root))["p"]
+		for name, text := range edits {
+			writeFile(t, root, name, text)
+		}
+		after := byID(unitsAt(t, root))["p"]
+		return before.Api, after.Api
+	}
+
+	t.Run("a test file edit moves the body and no api", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, apiFixture)
+		writeFile(t, root, "p/a_test.go", "package p\n\nfunc TestA() {}\n")
+		before := byID(unitsAt(t, root))["p"]
+
+		writeFile(t, root, "p/a_test.go", "package p\n\nfunc TestA() {}\n\nfunc TestB() {}\n")
+		after := byID(unitsAt(t, root))["p"]
+
+		require.NotEqual(t, before.Body, after.Body)
+		require.Equal(t, before.Api, after.Api)
+	})
+
+	t.Run("a reorder of declarations moves no api", func(t *testing.T) {
+		before, after := apiAfter(t, map[string]string{
+			"p/b.go": "package p\n\nfunc G() {}\n\nfunc F(n int) int { return n }\n",
+		})
+
+		require.Equal(t, before, after)
+	})
+
+	t.Run("a declaration moved to another file moves no api", func(t *testing.T) {
+		before, after := apiAfter(t, map[string]string{
+			"p/a.go": "package p\n\nconst (\n\tX = iota\n\tY\n)\n\nfunc G() {}\n",
+			"p/b.go": "package p\n\nfunc F(n int) int { return n }\n",
+		})
+
+		require.Equal(t, before, after)
+	})
+
+	t.Run("a reorder inside a constant block moves the api", func(t *testing.T) {
+		before, after := apiAfter(t, map[string]string{
+			"p/a.go": "package p\n\nconst (\n\tY = iota\n\tX\n)\n",
+		})
+
+		require.NotEqual(t, before, after)
+	})
+
+	t.Run("a signature edit moves the api", func(t *testing.T) {
+		before, after := apiAfter(t, map[string]string{
+			"p/b.go": "package p\n\nfunc F(n int64) int { return int(n) }\n\nfunc G() {}\n",
+		})
+
+		require.NotEqual(t, before, after)
+	})
+}
+
 func unitsAt(t *testing.T, root string) []sdk.UnitResult {
 	t.Helper()
 	result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
