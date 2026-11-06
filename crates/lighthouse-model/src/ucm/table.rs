@@ -149,7 +149,7 @@ impl Table {
 }
 
 /// What the table takes of a file's slice: its declarations as entries, its
-/// modules, and the facts of its files and whether they are tests. Not a span and not a content hash, so
+/// modules, and the facts of its files. Not a span and not a content hash, so
 /// that an edit that only moves things leaves it equal.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Outline {
@@ -177,7 +177,7 @@ impl Outline {
                     lang: String::new(),
                     hash: String::new(),
                     generated: false,
-                    test: file.test,
+                    test: false,
                     facts: file.facts.clone(),
                 })
                 .collect(),

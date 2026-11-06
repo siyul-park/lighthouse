@@ -17,8 +17,8 @@ use typed_arena::Arena;
 
 use super::{
     Boxed, Comment, EDGES, Edge, Edges, File, FunctionSummary, INCOMING, Incoming, LoadNeed,
-    MODULE_CASES, Model, Module, Node, OUTLINE, Outline, PATHS, RESOLVED, Resolved, SITES, SYMBOLS,
-    Site, Sites, Symbol, SymbolId, Table, TestCase, Tie, When, key, load_needs,
+    MODULE_CASES, Model, Module, Node, PATHS, RESOLVED, Resolved, SITES, SYMBOLS, Site, Sites,
+    Symbol, SymbolId, Table, TestCase, Tie, When, key, load_needs,
 };
 
 /// The model of the project as the graph holds it.
@@ -28,7 +28,6 @@ pub struct View<'v> {
     table: OnceCell<&'v Table>,
     resolved: RefCell<HashMap<PathBuf, &'v Resolved>>,
     incoming: RefCell<HashMap<PathBuf, &'v Incoming>>,
-    outlined: RefCell<HashMap<PathBuf, &'v Outline>>,
     homes: RefCell<HashMap<SymbolId, Rc<Home<'v>>>>,
     files: RefCell<HashMap<String, Option<&'v File>>>,
     declared: RefCell<HashMap<String, Rc<Vec<usize>>>>,
@@ -66,7 +65,6 @@ pub struct Held {
     resolved: Arena<Arc<Resolved>>,
     incoming: Arena<Arc<Incoming>>,
     tables: Arena<Arc<Table>>,
-    outlines: Arena<Arc<Outline>>,
     sites: Arena<Arc<Sites>>,
     edges: Arena<Arc<Edges>>,
     cases: Arena<Arc<Vec<TestCase>>>,
@@ -82,7 +80,6 @@ impl<'v> View<'v> {
             table: OnceCell::new(),
             resolved: RefCell::default(),
             incoming: RefCell::default(),
-            outlined: RefCell::default(),
             homes: RefCell::default(),
             files: RefCell::default(),
             declared: RefCell::default(),
@@ -277,28 +274,6 @@ impl<'v> View<'v> {
         Some(resolved)
     }
 
-    fn outlined(&self, path: &Path) -> Option<&'v Outline> {
-        if let Some(found) = self.outlined.borrow().get(path) {
-            return Some(found);
-        }
-        let outline = self.keep(self.graph.query(&OUTLINE, &key(path)))?;
-        let outline = &**self.held.outlines.alloc(outline);
-        self.outlined.borrow_mut().insert(path.to_owned(), outline);
-        Some(outline)
-    }
-
-    /// Whether the file is a test file, as its outline says: what no edit of
-    /// the code in it moves.
-    fn test_file(&self, path: &Path) -> bool {
-        self.outlined(path).is_some_and(|outline| {
-            outline
-                .files
-                .iter()
-                .find(|file| file.path == path)
-                .is_some_and(|file| file.test)
-        })
-    }
-
     fn incoming(&self, path: &Path) -> Option<&'v Incoming> {
         if let Some(found) = self.incoming.borrow().get(path) {
             return Some(found);
@@ -358,15 +333,6 @@ impl<'v> Model for View<'v> {
 
     fn module(&self, path: &str) -> Option<&Module> {
         self.table().module(path)
-    }
-
-    fn in_test(&self, id: &SymbolId) -> bool {
-        self.table()
-            .entry(id)
-            .is_some_and(|entry| self.test_file(&entry.file))
-            || self
-                .module(id.module())
-                .is_some_and(|module| module.test_of.is_some())
     }
 
     fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
