@@ -310,8 +310,7 @@ fn fact(graph: &Graph, (kind, class, file): &(String, String, String)) -> Result
             .map(|(id, fact)| (id, Built::of(fact)))
             .collect()
     };
-    let r = view.failure().map_or(Ok(Facts::of(facts)), Err);
-    r
+    view.failure().map_or(Ok(Facts::of(facts)), Err)
 }
 
 fn workspace(graph: &Graph) -> Result<Workspace, Error> {
