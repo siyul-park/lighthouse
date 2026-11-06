@@ -2,14 +2,14 @@
 //! head matches one, set by the host and applied to the fragments of a file.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::PathBuf,
     sync::{Arc, Mutex, OnceLock, PoisonError},
 };
 
 use regex::{RegexSet, RegexSetBuilder};
 
-use super::{Comment, File, Fragment, Symbol};
+use super::{Comment, File, Fragment, Place, SymbolId};
 
 /// The regular expressions that mark a file generated when a head comment
 /// matches one.
@@ -69,10 +69,16 @@ impl Markers {
     }
 
     fn carries(&self, file: &File, fragment: &Fragment) -> bool {
-        let first = fragment
+        let own: HashSet<&SymbolId> = fragment
             .symbols
             .iter()
             .filter(|s| s.file == file.path)
+            .map(|s| &s.id)
+            .collect();
+        let first = fragment
+            .places
+            .iter()
+            .filter(|p| own.contains(&p.symbol))
             .map(start)
             .min();
         fragment
@@ -83,8 +89,8 @@ impl Markers {
     }
 }
 
-fn start(symbol: &Symbol) -> (u32, u32) {
-    (symbol.span.start.line, symbol.span.start.col)
+fn start(place: &Place) -> (u32, u32) {
+    (place.span.start.line, place.span.start.col)
 }
 
 fn ends_before(comment: &Comment, at: (u32, u32)) -> bool {

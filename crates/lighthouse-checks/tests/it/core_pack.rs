@@ -30,7 +30,6 @@ fn file() -> File {
     File {
         path: "dir/a.txt".into(),
         lang: "text".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),

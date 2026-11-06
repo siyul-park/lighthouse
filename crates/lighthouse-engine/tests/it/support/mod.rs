@@ -8,8 +8,8 @@ use lighthouse_engine::{Engine, FixBinding, FixPlan, FixedBy, Needs};
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, LineIndex, Options, Position, Safety, Severity, Span,
     ucm::{
-        Capability, Edge, EdgeKind, EditOp, File, FixOutcome, Fragment, Node, Resolution, Symbol,
-        SymbolId, SymbolKind, Target, Visibility,
+        Capability, Edge, EdgeKind, EditOp, File, FixOutcome, Fragment, Node, Place, Resolution,
+        Symbol, SymbolId, SymbolKind, Target, Visibility,
     },
 };
 use lighthouse_model::{RunScope, ucm::Applicability};
@@ -42,7 +42,7 @@ impl LanguageProvider for Toy {
         for unit in units {
             let mut indexed = Fragments::new(unit.id, Vec::new());
             for source in unit.files {
-                let symbols = source
+                let (symbols, places): (Vec<_>, Vec<_>) = source
                     .text
                     .lines()
                     .enumerate()
@@ -56,22 +56,26 @@ impl LanguageProvider for Toy {
                             start: at(0),
                             end: at(line.len()),
                         };
-                        Some(Symbol {
-                            id: SymbolId::new("m", &[], name, SymbolKind::Function),
+                        let id = SymbolId::new("m", &[], name, SymbolKind::Function);
+                        let place = Place {
+                            extent: Some(span),
+                            ..Place::new(id.clone(), span)
+                        };
+                        let symbol = Symbol {
+                            id,
                             kind: SymbolKind::Function,
                             visibility: Visibility::Private,
                             owner: None,
                             file: source.file.path.clone(),
-                            span,
-                            extent: Some(span),
-                            doc: None,
                             name: name.to_owned(),
                             role: None,
                             optional: false,
                             type_ref: None,
-                        })
+                            implementation: false,
+                        };
+                        Some((symbol, place))
                     })
-                    .collect();
+                    .unzip();
                 // `call name` refers to the symbol `name` from the function above it;
                 // `load name` does too, as the file loads.
                 let mut edges = Vec::new();
@@ -138,6 +142,7 @@ impl LanguageProvider for Toy {
                         ..source.file.clone()
                     }],
                     symbols,
+                    places,
                     edges,
                     ..Fragment::default()
                 });

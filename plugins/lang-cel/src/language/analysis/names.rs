@@ -9,7 +9,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 use cel::common::ast::{CallExpr, Expr};
 use lighthouse_model::{
     Position, Span,
-    ucm::{Symbol, SymbolId, SymbolKind, Visibility},
+    ucm::{Place, Symbol, SymbolId, SymbolKind, Visibility},
 };
 use lighthouse_plugin::{CelLibraryManifest, Function};
 
@@ -98,7 +98,7 @@ const MATH: &[&str] = &[
 
 /// A standard function a call names.
 pub(super) struct Standard {
-    pub(super) symbol: Symbol,
+    pub(super) symbol: (Symbol, Place),
     /// Whether the call is made on its namespace (`strings.quote(x)`), so the
     /// target is no value to walk.
     pub(super) namespaced: bool,
@@ -106,7 +106,7 @@ pub(super) struct Standard {
 
 /// A library function a call names.
 pub(super) struct LibraryCall {
-    pub(super) symbol: Symbol,
+    pub(super) symbol: (Symbol, Place),
     /// Whether the call is made on its namespace (`regex.matches(a, b)`).
     pub(super) namespaced: bool,
 }
@@ -120,10 +120,10 @@ pub(super) fn namespaces() -> impl Iterator<Item = &'static str> {
 /// those of `libraries`.
 pub(in crate::language) fn function_catalog(
     libraries: &[CelLibraryManifest],
-) -> BTreeMap<SymbolId, Symbol> {
+) -> BTreeMap<SymbolId, (Symbol, Place)> {
     let mut symbols = BTreeMap::new();
-    let mut add = |symbol: Symbol| {
-        symbols.entry(symbol.id.clone()).or_insert(symbol);
+    let mut add = |declared: (Symbol, Place)| {
+        symbols.entry(declared.0.id.clone()).or_insert(declared);
     };
     for name in GLOBALS {
         add(standard_symbol("cel/stdlib", None, name));
@@ -220,21 +220,23 @@ pub(super) fn external_symbol(
     kind: SymbolKind,
     name: &str,
     doc: Option<&str>,
-) -> Symbol {
-    Symbol {
+) -> (Symbol, Place) {
+    let at = Span {
+        start: Position { line: 1, col: 1 },
+        end: Position { line: 1, col: 1 },
+    };
+    let place = Place {
         doc: doc.map(str::to_owned),
-        ..Symbol::new(
-            id,
-            kind,
-            Visibility::Public,
-            PathBuf::from("@cel/library"),
-            Span {
-                start: Position { line: 1, col: 1 },
-                end: Position { line: 1, col: 1 },
-            },
-            name,
-        )
-    }
+        ..Place::new(id.clone(), at)
+    };
+    let symbol = Symbol::new(
+        id,
+        kind,
+        Visibility::Public,
+        PathBuf::from("@cel/library"),
+        name,
+    );
+    (symbol, place)
 }
 
 /// The identifier a call is made on: `strings` of `strings.quote(x)`.
@@ -245,13 +247,13 @@ fn call_namespace(call: &CallExpr) -> Option<&str> {
     })
 }
 
-fn standard_symbol(module: &str, owner: Option<&str>, name: &str) -> Symbol {
+fn standard_symbol(module: &str, owner: Option<&str>, name: &str) -> (Symbol, Place) {
     let owner = owner.into_iter().collect::<Vec<_>>();
     let id = SymbolId::new(module, &owner, name, SymbolKind::Function);
     external_symbol(id, SymbolKind::Function, name, None)
 }
 
-fn library_symbol(library: &str, function: &Function) -> Symbol {
+fn library_symbol(library: &str, function: &Function) -> (Symbol, Place) {
     let receiver = function.receiver.as_deref().unwrap_or("global");
     let id = SymbolId::new(
         &format!("cel/library/{library}"),

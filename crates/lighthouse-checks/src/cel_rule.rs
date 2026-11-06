@@ -468,7 +468,9 @@ fn edge_anchor<'p>(
                 .filter(|s| ctx.applies.admits_symbol(project, s))?;
             Some(Anchor {
                 file: symbol.file.clone(),
-                span: edge.site.unwrap_or(symbol.span),
+                span: edge
+                    .site
+                    .unwrap_or_else(|| crate::facts::span_of(project, &symbol.id)),
                 symbol: None,
             })
         }
@@ -489,7 +491,7 @@ fn edge_anchor<'p>(
                 .is_none_or(|module| admits_module(ctx, declared, module))
                 .then(|| Anchor {
                     file: declared.anchor.file.clone(),
-                    span: edge.site.unwrap_or(declared.anchor.span),
+                    span: edge.site.unwrap_or(declared.anchor_span),
                     symbol: None,
                 })
         }

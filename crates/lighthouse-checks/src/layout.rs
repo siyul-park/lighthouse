@@ -34,7 +34,7 @@ pub fn declarations_in<'a>(project: &'a dyn Model, file: &File) -> Vec<Vec<&'a S
             }
         })
         .collect();
-    all.sort_by(|a, b| (a.span.start, &a.id).cmp(&(b.span.start, &b.id)));
+    all.sort_by_key(|s| (crate::facts::span_of(project, &s.id).start, &s.id));
     let mut modules: Vec<(&str, Vec<&Symbol>)> = Vec::new();
     for symbol in all {
         let module = symbol.id.module();

@@ -326,7 +326,7 @@ fn unit_ref(unit: &Unit, source_globs: Option<&globset::GlobSet>) -> wire::UnitR
             .into_iter()
             .map(|source| wire::FileRef {
                 path: source.file.path.to_string_lossy().replace('\\', "/"),
-                hash: source.file.hash.clone(),
+                hash: hash::sha256(source.text),
                 source_ast: source_globs.is_some_and(|globs| globs.is_match(&source.file.path)),
             })
             .collect(),
@@ -359,7 +359,7 @@ fn declared(kind: &str, promised: &[String], reported: &[&str]) -> Result<(), St
 fn embedded_wire(source: &Source<'_>) -> wire::EmbeddedFile {
     wire::EmbeddedFile {
         path: source.file.path.to_string_lossy().replace('\\', "/"),
-        hash: source.file.hash.clone(),
+        hash: hash::sha256(source.text),
         text: source.text.to_owned(),
         test: source.file.test,
         facts: source.file.facts.clone(),

@@ -5,11 +5,11 @@
 use std::collections::BTreeSet;
 
 use lighthouse_model::ucm::{
-    EdgeKind, FunctionSummary, Model, Node, Symbol, SymbolId, SymbolKind, Target, Visibility,
+    EdgeKind, Model, Node, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
 use serde_json::{Value, json};
 
-use super::Builder;
+use super::{Builder, Summary};
 use crate::metrics::Measures;
 
 impl Builder<'_> {
@@ -17,8 +17,8 @@ impl Builder<'_> {
     /// measures of the function and of its single-use helpers, the helpers
     /// themselves and, for a function that is one, its caller; null for what
     /// is no function.
-    pub(super) fn unit(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Value {
-        let Some(summary) = summary else {
+    pub(super) fn unit(&self, symbol: &Symbol, summary: Summary<'_>) -> Value {
+        let Some(summary) = summary.get() else {
             return Value::Null;
         };
         let project = self.project;
@@ -77,9 +77,7 @@ fn helpers_of<'p>(project: &'p dyn Model, root: &'p SymbolId) -> Vec<&'p Symbol>
 fn sole_caller<'p>(project: &'p dyn Model, callee: &Symbol) -> Option<&'p Symbol> {
     let serves = callee.visibility == Visibility::Private
         && matches!(callee.kind, SymbolKind::Function | SymbolKind::Method)
-        && project
-            .function(&callee.id)
-            .is_some_and(|f| !f.implementation)
+        && !callee.implementation
         && project.references(&callee.id).is_empty()
         && !project.in_test(&callee.id)
         && !calls_itself(project, &callee.id);

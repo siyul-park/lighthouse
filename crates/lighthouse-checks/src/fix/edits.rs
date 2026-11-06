@@ -179,7 +179,11 @@ fn region(target: &Target, place: &Place) -> Result<(PathBuf, Span), String> {
                 .symbol(&id)
                 .ok_or_else(|| format!("`{}` is not in the project", id.as_str()))?;
             // Without its extent only the name is known, not the declaration.
-            let extent = found.extent.ok_or_else(|| {
+            let extent = place
+                .project
+                .place(&id)
+                .and_then(|p| p.extent)
+                .ok_or_else(|| {
                 format!(
                     "`{}` has no extent: its language provider does not report declaration extents",
                     found.name
@@ -254,7 +258,10 @@ fn reorder(nodes: &[Symbol], place: &Place) -> Lowered {
     let Some(first) = found.first() else {
         return Ok(Vec::new());
     };
-    let mut places: Vec<_> = found.iter().map(|s| (s.span.start, &s.id)).collect();
+    let mut places: Vec<_> = found
+        .iter()
+        .map(|s| (crate::facts::span_of(place.project, &s.id).start, &s.id))
+        .collect();
     places.sort();
     let held: Vec<&SymbolId> = places.into_iter().map(|(_, id)| id).collect();
     if held.iter().zip(&ids).all(|(held, wanted)| *held == wanted) {

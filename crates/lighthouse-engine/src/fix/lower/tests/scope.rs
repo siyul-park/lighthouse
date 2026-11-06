@@ -2,7 +2,7 @@
 //! not show, and the imports lead the file.
 
 use super::*;
-use lighthouse_model::ucm::{Edge, EdgeKind, Node, Resolution, Target};
+use lighthouse_model::ucm::{Edge, EdgeKind, Node, Place, Resolution, Target};
 
 const MODULE: &str = "import os\n\ndef fixture():\n    return 1\n\nclass Suite:\n    def test_a(self):\n        return 1\n\n    def test_b(self):\n        return 2\n\ndef helper():\n    return 3\n";
 
@@ -10,14 +10,28 @@ const LATE_IMPORT: &str = "def test_one():\n    return 1\n\nimport os\n\nCONST =
 
 /// A declaration of `text` over whole lines `from..=to`, in the scope of the
 /// class `owner` when it has one.
-fn declared(text: &str, owner: Option<&str>, name: &str, (from, to): (u32, u32)) -> Symbol {
+fn declared(
+    text: &str,
+    owner: Option<&str>,
+    name: &str,
+    (from, to): (u32, u32),
+) -> (Symbol, Place) {
     let owners: Vec<&str> = owner.into_iter().collect();
     let kind = SymbolKind::Function;
-    Symbol {
-        id: SymbolId::new("m", &owners, name, kind),
+    let (shaped, placed) = symbol(text, name, from, to);
+    let id = SymbolId::new("m", &owners, name, kind);
+    let symbol = Symbol {
+        id: id.clone(),
         owner: owner.map(|o| SymbolId::new("m", &[], o, SymbolKind::Type)),
-        ..symbol(text, name, from, to)
-    }
+        ..shaped
+    };
+    (
+        symbol,
+        Place {
+            symbol: id,
+            ..placed
+        },
+    )
 }
 
 /// An import of the module `m` on `line` of `text`, at the whole line.
@@ -33,23 +47,24 @@ fn import(text: &str, line: u32) -> Edge {
     }
 }
 
-fn python(text: &str, symbols: Vec<Symbol>) -> Case {
+fn python(text: &str, symbols: Vec<(Symbol, Place)>) -> Case {
     python_with(text, symbols, Vec::new())
 }
 
-fn python_with(text: &str, symbols: Vec<Symbol>, edges: Vec<Edge>) -> Case {
+fn python_with(text: &str, declared: Vec<(Symbol, Place)>, edges: Vec<Edge>) -> Case {
+    let (symbols, places) = declared.into_iter().unzip();
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join(FILE), text).unwrap();
     let project = Project::merge([Fragment {
         files: vec![File {
             path: FILE.into(),
             lang: "python".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),
         }],
         symbols,
+        places,
         edges,
         ..Fragment::default()
     }]);
@@ -57,11 +72,19 @@ fn python_with(text: &str, symbols: Vec<Symbol>, edges: Vec<Edge>) -> Case {
 }
 
 fn module() -> Case {
-    let class = Symbol {
-        id: SymbolId::new("m", &[], "Suite", SymbolKind::Type),
-        kind: SymbolKind::Type,
-        ..symbol(MODULE, "Suite", 6, 11)
-    };
+    let (shaped, placed) = symbol(MODULE, "Suite", 6, 11);
+    let id = SymbolId::new("m", &[], "Suite", SymbolKind::Type);
+    let class = (
+        Symbol {
+            id: id.clone(),
+            kind: SymbolKind::Type,
+            ..shaped
+        },
+        Place {
+            symbol: id,
+            ..placed
+        },
+    );
     python(
         MODULE,
         vec![

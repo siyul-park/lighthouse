@@ -28,6 +28,9 @@ impl Swap<'_> {
                 self.id(owner);
             }
         }
+        for place in &mut part.places {
+            self.id(&mut place.symbol);
+        }
         for edge in &mut part.edges {
             self.node(&mut edge.from);
             self.target(&mut edge.to);

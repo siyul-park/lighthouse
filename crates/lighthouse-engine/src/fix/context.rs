@@ -300,7 +300,7 @@ fn used(
             }
             items.push(Item {
                 rank: if symbol.file == file { 1 } else { 2 },
-                text: declared(symbol, texts),
+                text: declared(project, symbol, texts),
                 file: slashed(&symbol.file),
             });
         }
@@ -372,7 +372,9 @@ fn places<'p>(
                 if is_project_secret(&symbol.file) {
                     continue;
                 }
-                let line = symbol.span.start.line;
+                let line = project
+                    .place(&symbol.id)
+                    .map_or(1, |place| place.span.start.line);
                 found.insert(
                     (
                         symbol.file != file,
@@ -409,12 +411,12 @@ fn shown_in(place: &Place<'_>, project: &Project) -> Vec<String> {
 fn rendered(place: &Place<'_>, project: &Project, texts: &mut Texts<'_, '_>) -> String {
     let at = format!("{}:{}", slashed(place.file), place.line);
     match place.holder {
-        Holder::Symbol(symbol) => format!("{at}  {}", declared(symbol, texts)),
+        Holder::Symbol(symbol) => format!("{at}  {}", declared(project, symbol, texts)),
         Holder::Site(Node::Symbol(id)) => {
             let said = texts.line(place.file, place.line);
             let holder = project
                 .symbol(id)
-                .map_or_else(String::new, |s| declared(s, texts));
+                .map_or_else(String::new, |s| declared(project, s, texts));
             format!("{at}  {said}  in {holder}")
         }
         Holder::Site(Node::Module(name)) => {
@@ -426,9 +428,11 @@ fn rendered(place: &Place<'_>, project: &Project, texts: &mut Texts<'_, '_>) -> 
 
 /// The declaration of `symbol`: its first lines up to the body, then where it
 /// is and the first line of its doc.
-fn declared(symbol: &Symbol, texts: &mut Texts<'_, '_>) -> String {
+fn declared(project: &Project, symbol: &Symbol, texts: &mut Texts<'_, '_>) -> String {
+    let place = project.place(&symbol.id);
+    let line = place.map_or(1, |p| p.span.start.line);
     let mut declaration = String::new();
-    let start = symbol.span.start.line.max(1) as usize - 1;
+    let start = line.max(1) as usize - 1;
     if let Some(lines) = texts.lines(&symbol.file) {
         for line in lines.iter().skip(start).take(MAX_DECLARATION_LINES) {
             let line = line.trim();
@@ -446,11 +450,10 @@ fn declared(symbol: &Symbol, texts: &mut Texts<'_, '_>) -> String {
         "{}  ({}:{})",
         cut(&declaration),
         slashed(&symbol.file),
-        symbol.span.start.line
+        line
     );
-    if let Some(doc) = symbol
-        .doc
-        .as_deref()
+    if let Some(doc) = place
+        .and_then(|p| p.doc.as_deref())
         .and_then(|doc| doc.lines().map(str::trim).find(|line| !line.is_empty()))
     {
         text.push_str(" - ");

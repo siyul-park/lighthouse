@@ -24,8 +24,8 @@ use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Edges, File, Fragment, Incoming, Markers, ORDERED, Outline, Project, REGIONS, Resolved, Sites,
-    Slice, Table, TestCase, collisions, declared,
+    Declarations, Edges, File, Fragment, Incoming, Markers, ORDERED, Project, REGIONS, Resolved,
+    Sites, Slice, Table, TestCase, collisions, declared,
 };
 
 /// The id of the unit that holds the regions selected in the project's files.
@@ -50,8 +50,9 @@ pub(crate) static DECLARED: Query<String, Vec<(String, String)>> = Query::new("d
 pub(crate) static COLLISIONS: Query<(), BTreeSet<String>> = Query::new("collisions", collide);
 /// The fragments of a file, qualified.
 pub static SLICE: Query<String, Slice> = Query::new("slice", slice);
-/// What the table takes of a slice.
-pub static OUTLINE: Query<String, Outline> = Query::new("outline", outline);
+/// What a file declares, with no position or doc: equal after an edit inside a
+/// body.
+pub static DECLARATIONS: Query<String, Declarations> = Query::new("declarations", declarations);
 /// The table of all declarations.
 pub static SYMBOLS: Query<(), Table> = Query::new("symbols", symbols);
 /// A slice with its targets resolved against the table.
@@ -307,16 +308,15 @@ fn slice(graph: &Graph, path: &String) -> Result<Slice, Error> {
     ))
 }
 
-/// What the table takes of a file.
-fn outline(graph: &Graph, path: &String) -> Result<Outline, Error> {
+fn declarations(graph: &Graph, path: &String) -> Result<Declarations, Error> {
     let slice = graph.query(&SLICE, path)?;
-    Ok(Outline::new(&slice))
+    Ok(Declarations::new(&slice))
 }
 
 /// The table of the symbols of every file.
 fn symbols(graph: &Graph, _: &()) -> Result<Table, Error> {
-    let outlines = each(graph, |graph, path| graph.query(&OUTLINE, path))?;
-    Ok(Table::new(outlines.iter().map(Arc::as_ref)))
+    let declared = each(graph, |graph, path| graph.query(&DECLARATIONS, path))?;
+    Ok(Table::new(declared.iter().map(Arc::as_ref)))
 }
 
 fn resolved(graph: &Graph, path: &String) -> Result<Resolved, Error> {
@@ -395,6 +395,7 @@ fn paths(graph: &Graph) -> Result<Arc<Vec<String>>, Error> {
 fn has_content(fragment: &Fragment) -> bool {
     !fragment.modules.is_empty()
         || !fragment.symbols.is_empty()
+        || !fragment.places.is_empty()
         || !fragment.edges.is_empty()
         || !fragment.functions.is_empty()
         || !fragment.tests.is_empty()

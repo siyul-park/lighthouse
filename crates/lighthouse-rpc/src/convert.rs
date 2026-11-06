@@ -273,20 +273,30 @@ fn incomplete_of(item: wire::Incomplete) -> Incomplete {
 
 fn fragment_of(f: wire::Fragment) -> Result<core::Fragment, String> {
     let path = PathBuf::from(&f.file.path);
+    let mut symbols = Vec::new();
+    let mut places = Vec::new();
+    for wired in f.symbols {
+        let (symbol, place) = symbol(wired)?;
+        symbols.push(symbol);
+        places.push(place);
+    }
+    let functions = f
+        .functions
+        .into_iter()
+        .map(function)
+        .collect::<Result<Vec<_>, _>>()?;
+    for (summary, implementation) in &functions {
+        if let Some(symbol) = symbols.iter_mut().find(|s| s.id == summary.symbol) {
+            symbol.implementation = *implementation;
+        }
+    }
     Ok(core::Fragment {
         files: Vec::new(),
         modules: f.modules.into_iter().map(module).collect(),
-        symbols: f
-            .symbols
-            .into_iter()
-            .map(symbol)
-            .collect::<Result<_, _>>()?,
+        symbols,
+        places,
         edges: f.edges.into_iter().map(edge).collect::<Result<_, _>>()?,
-        functions: f
-            .functions
-            .into_iter()
-            .map(function)
-            .collect::<Result<_, _>>()?,
+        functions: functions.into_iter().map(|(summary, _)| summary).collect(),
         tests: f.tests.into_iter().map(test).collect::<Result<_, _>>()?,
         comments: f
             .comments
@@ -310,21 +320,29 @@ fn id(raw: String) -> Result<core::SymbolId, String> {
     core::SymbolId::parse(&raw).ok_or_else(|| format!("malformed symbol id `{raw}`"))
 }
 
-fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
-    Ok(core::Symbol {
-        id: id(s.id)?,
+/// The shape and the place of one wire symbol. The wire carries them in one
+/// record; the model keeps them apart so a body edit moves only the place.
+fn symbol(s: wire::Symbol) -> Result<(core::Symbol, core::Place), String> {
+    let symbol_id = id(s.id)?;
+    let place = core::Place {
+        symbol: symbol_id.clone(),
+        span: span(s.span),
+        extent: s.extent.map(span),
+        doc: s.doc,
+    };
+    let symbol = core::Symbol {
+        id: symbol_id,
         kind: symbol_kind(s.kind),
         visibility: visibility(s.visibility),
         owner: s.owner.map(id).transpose()?,
         file: PathBuf::from(s.file),
-        span: span(s.span),
-        extent: s.extent.map(span),
-        doc: s.doc,
         name: s.name,
         role: s.role.map(role),
         optional: s.optional,
         type_ref: s.type_ref.map(type_ref),
-    })
+        implementation: false,
+    };
+    Ok((symbol, place))
 }
 
 fn span(s: wire::Span) -> Span {
@@ -365,8 +383,11 @@ fn flow(f: wire::Flow) -> core::Flow {
     }
 }
 
-fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
-    Ok(core::FunctionSummary {
+/// The summary, and whether the function is an implementation, which the model
+/// keeps on the symbol.
+fn function(f: wire::FunctionSummary) -> Result<(core::FunctionSummary, bool), String> {
+    let implementation = f.implementation;
+    let summary = core::FunctionSummary {
         symbol: id(f.symbol)?,
         max_nesting: f.max_nesting,
         statements: f.statements,
@@ -382,10 +403,10 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         },
         events: f.events.into_iter().map(event).collect(),
         manual_assertions: f.manual_assertions,
-        implementation: f.implementation,
         constructs: f.constructs,
         configures: f.configures,
-    })
+    };
+    Ok((summary, implementation))
 }
 
 fn type_ref(t: wire::TypeRef) -> core::TypeRef {

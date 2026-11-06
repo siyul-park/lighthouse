@@ -26,6 +26,7 @@ fn ordered(uses: &[(&str, &str, EdgeKind, When)]) -> Case {
     let mut fragment = Fragment {
         files: case.project.files.clone(),
         symbols: case.project.symbols.clone(),
+        places: case.project.places.clone(),
         edges: case.project.edges.clone(),
         ..Fragment::default()
     };

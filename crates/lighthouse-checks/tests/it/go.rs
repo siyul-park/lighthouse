@@ -47,7 +47,6 @@ fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
     let file = File {
         path: "p.go".into(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),

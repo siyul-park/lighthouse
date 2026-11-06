@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lighthouse_model::{
     LineIndex, Span,
-    ucm::{File, Fragment, Module, Symbol, SymbolId, SymbolKind, Visibility},
+    ucm::{File, Fragment, Module, Place, Symbol, SymbolId, SymbolKind, Visibility},
 };
 use lighthouse_plugin::Source;
 
@@ -80,18 +80,19 @@ pub(super) struct VariableDecl {
 }
 
 impl VariableDecl {
-    pub(super) fn symbol(&self, file: &File) -> Symbol {
-        Symbol {
+    pub(super) fn symbol(&self, file: &File) -> (Symbol, Place) {
+        let symbol = Symbol::new(
+            self.id.clone(),
+            SymbolKind::Var,
+            Visibility::Private,
+            file.path.clone(),
+            &self.name,
+        );
+        let place = Place {
             extent: Some(self.extent),
-            ..Symbol::new(
-                self.id.clone(),
-                SymbolKind::Var,
-                Visibility::Private,
-                file.path.clone(),
-                self.span,
-                &self.name,
-            )
-        }
+            ..Place::new(self.id.clone(), self.span)
+        };
+        (symbol, place)
     }
 }
 
@@ -104,19 +105,22 @@ pub(super) struct Parameter {
 }
 
 impl Parameter {
-    pub(super) fn symbol(&self, file: &File) -> Symbol {
-        Symbol {
+    pub(super) fn symbol(&self, file: &File) -> (Symbol, Place) {
+        let symbol = Symbol {
             owner: Some(self.owner.clone()),
-            extent: Some(self.span),
             ..Symbol::new(
                 self.id.clone(),
                 SymbolKind::Var,
                 Visibility::Private,
                 file.path.clone(),
-                self.span,
                 &self.name,
             )
-        }
+        };
+        let place = Place {
+            extent: Some(self.span),
+            ..Place::new(self.id.clone(), self.span)
+        };
+        (symbol, place)
     }
 }
 
@@ -132,19 +136,20 @@ pub(super) struct Snippet {
 }
 
 impl Snippet {
-    pub(super) fn symbol(&self, file: &File) -> Symbol {
+    pub(super) fn symbol(&self, file: &File) -> (Symbol, Place) {
         let span = self.source.span(0, self.source.text.len());
-        Symbol {
+        let symbol = Symbol::new(
+            self.id.clone(),
+            SymbolKind::Function,
+            Visibility::Public,
+            file.path.clone(),
+            &self.name,
+        );
+        let place = Place {
             extent: Some(span),
-            ..Symbol::new(
-                self.id.clone(),
-                SymbolKind::Function,
-                Visibility::Public,
-                file.path.clone(),
-                span,
-                &self.name,
-            )
-        }
+            ..Place::new(self.id.clone(), span)
+        };
+        (symbol, place)
     }
 }
 

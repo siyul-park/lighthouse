@@ -11,9 +11,10 @@ fn a_korean_banner_and_a_multibyte_end_do_not_split_a_character() {
     let mut fragment = Fragment {
         files: case.project.files.clone(),
         symbols: case.project.symbols.clone(),
+        places: case.project.places.clone(),
         ..Fragment::default()
     };
-    fragment.symbols[1].extent = Some(span((4, 1), (4, 17)));
+    fragment.places[1].extent = Some(span((4, 1), (4, 17)));
     case.project = Project::merge([fragment]);
 
     let moved = case.run(&[after("a", "b")]).unwrap();
@@ -36,9 +37,10 @@ fn an_extent_that_ends_inside_a_character_is_refused_not_a_panic() {
     let mut fragment = Fragment {
         files: case.project.files.clone(),
         symbols: case.project.symbols.clone(),
+        places: case.project.places.clone(),
         ..Fragment::default()
     };
-    fragment.symbols[0].extent = Some(span((1, 1), (1, 12)));
+    fragment.places[0].extent = Some(span((1, 1), (1, 12)));
     case.project = Project::merge([fragment]);
 
     let why = case.run(&[after("a", "b")]).unwrap_err();
@@ -87,7 +89,6 @@ fn generated_files_are_not_edited() {
         files: vec![File {
             path: FILE.into(),
             lang: "src".to_owned(),
-            hash: String::new(),
             generated: true,
             test: false,
             facts: Default::default(),
@@ -116,7 +117,6 @@ fn a_symlinked_file_or_directory_is_not_followed() {
     let file = |path: &str| File {
         path: path.into(),
         lang: "src".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),

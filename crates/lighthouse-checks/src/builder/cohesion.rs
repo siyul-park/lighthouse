@@ -46,14 +46,14 @@ fn entry(project: &dyn Model, ty: &Symbol) -> Value {
     let own: Vec<&Symbol> = methods
         .iter()
         .copied()
-        .filter(|m| !project.function(&m.id).is_some_and(|f| f.implementation))
+        .filter(|m| !m.implementation)
         .collect();
     let groups = groups(project, ty, &own);
     json!({
         "id": ty.id.as_str(),
         "name": ty.name,
         "file": ty.file.to_string_lossy(),
-        "line": ty.span.start.line,
+        "line": crate::facts::span_of(project, &ty.id).start.line,
         "methods": own.len(),
         "public_methods": own.iter().filter(|m| m.visibility == Visibility::Public).count(),
         "lcom4": groups.len(),

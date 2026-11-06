@@ -6,7 +6,7 @@ use std::{
 use cel::Env;
 use lighthouse_model::{
     Incomplete,
-    ucm::{Edge, EdgeKind, Fragment, Module, Node, Resolution, Symbol, SymbolId, Target},
+    ucm::{Edge, EdgeKind, Fragment, Module, Node, Place, Resolution, Symbol, SymbolId, Target},
 };
 use lighthouse_plugin::{
     CelLibraryManifest, EmbeddedFile, EmbeddedRegion, Error, Fragments, Indexed, LanguageManifest,
@@ -101,7 +101,10 @@ fn index_embedded_sources(
     if external.is_empty() {
         return;
     }
-    let modules: BTreeSet<String> = external.values().map(external_module).collect();
+    let modules: BTreeSet<String> = external
+        .values()
+        .map(|(symbol, _)| external_module(symbol))
+        .collect();
     output.fragments.push(Fragment {
         modules: modules
             .into_iter()
@@ -113,7 +116,11 @@ fn index_embedded_sources(
                 example: false,
             })
             .collect(),
-        symbols: external.into_values().collect(),
+        symbols: external
+            .values()
+            .map(|(symbol, _)| symbol.clone())
+            .collect(),
+        places: external.into_values().map(|(_, place)| place).collect(),
         ..Fragment::default()
     });
 }
@@ -452,16 +459,17 @@ fn index_snippets(
     }
 }
 
-fn declare(fragment: &mut Fragment, from: Node, symbol: Symbol) {
+fn declare(fragment: &mut Fragment, from: Node, (symbol, place): (Symbol, Place)) {
     fragment.edges.push(Edge {
         kind: EdgeKind::Contains,
         from,
         to: Target::Path(symbol.id.as_str().to_owned()),
         resolution: Resolution::Syntactic,
-        site: Some(symbol.span),
+        site: Some(place.span),
         when: Default::default(),
     });
     fragment.symbols.push(symbol);
+    fragment.places.push(place);
 }
 
 #[cfg(test)]

@@ -21,13 +21,11 @@ fn symbol(name: &str, file: &str) -> Symbol {
         visibility: Visibility::Private,
         owner: None,
         file: file.into(),
-        span: span(1, 1),
-        extent: None,
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
+        implementation: false,
     }
 }
 
@@ -47,7 +45,6 @@ fn fragment(file: &str, symbols: Vec<Symbol>, edges: Vec<Edge>) -> Fragment {
         files: vec![File {
             path: file.into(),
             lang: "x".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),

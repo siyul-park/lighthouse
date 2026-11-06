@@ -10,7 +10,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{File, Fragment, Module, Slice, SymbolId, SymbolKind};
+use super::{File, Fragment, Module, Slice, Symbol, SymbolId, SymbolKind};
 
 /// The symbols of a project by id, the first declaration of an id kept, with
 /// its modules as they are reconciled and the files that are example code.
@@ -37,15 +37,17 @@ impl Table {
     /// The table of the outlines of a project's slices, in the order of their
     /// paths: the first declaration of an id wins, as it does when the
     /// fragments are merged.
-    pub fn new<'a>(outlines: impl IntoIterator<Item = &'a Outline>) -> Self {
+    pub fn new<'a>(declarations: impl IntoIterator<Item = &'a Declarations>) -> Self {
         let mut symbols: BTreeMap<SymbolId, Entry> = BTreeMap::new();
         let mut modules: BTreeMap<String, Module> = BTreeMap::new();
         let mut files: BTreeMap<&std::path::Path, File> = BTreeMap::new();
-        for outline in outlines {
-            for (id, entry) in &outline.symbols {
-                symbols.entry(id.clone()).or_insert_with(|| entry.clone());
+        for declared in declarations {
+            for symbol in &declared.symbols {
+                symbols
+                    .entry(symbol.id.clone())
+                    .or_insert_with(|| Entry::of(symbol));
             }
-            for module in &outline.modules {
+            for module in &declared.modules {
                 match modules.get_mut(&module.path) {
                     Some(kept) => reconcile(kept, module),
                     None => {
@@ -53,7 +55,7 @@ impl Table {
                     }
                 }
             }
-            for file in &outline.files {
+            for file in &declared.files {
                 match files.get_mut(file.path.as_path()) {
                     Some(kept) => kept.facts.extend(file.facts.clone()),
                     None => {
@@ -148,45 +150,30 @@ impl Table {
     }
 }
 
-/// What the table takes of a file's slice: its declarations as entries, its
-/// modules, and the facts of its files. Not a span and not a content hash, so
-/// that an edit that only moves things leaves it equal.
+/// What a file declares: its symbols, modules and files, and no position, doc
+/// text or body, so that an edit inside a declaration leaves it equal. The
+/// table is made of these, and so is every reader of the shape of a symbol.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Outline {
-    pub symbols: Vec<(SymbolId, Entry)>,
+pub struct Declarations {
+    pub symbols: Vec<Symbol>,
     pub modules: Vec<Module>,
     pub files: Vec<File>,
 }
 
-impl Outline {
-    /// The outline of a slice.
+impl Declarations {
+    /// What a slice declares.
     pub fn new(slice: &Slice) -> Self {
         let part = &slice.fragment;
         Self {
-            symbols: part
-                .symbols
-                .iter()
-                .map(|symbol| (symbol.id.clone(), Entry::of(symbol)))
-                .collect(),
+            symbols: part.symbols.clone(),
             modules: part.modules.clone(),
-            files: part
-                .files
-                .iter()
-                .map(|file| File {
-                    path: file.path.clone(),
-                    lang: String::new(),
-                    hash: String::new(),
-                    generated: false,
-                    test: false,
-                    facts: file.facts.clone(),
-                })
-                .collect(),
+            files: part.files.clone(),
         }
     }
 }
 
 impl Entry {
-    fn of(symbol: &super::Symbol) -> Self {
+    fn of(symbol: &Symbol) -> Self {
         Self {
             file: symbol.file.clone(),
             kind: symbol.kind,

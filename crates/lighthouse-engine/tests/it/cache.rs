@@ -226,12 +226,13 @@ fn a_run_takes_the_findings_the_graph_has_instead_of_running_rules_again() {
         "the report of the last run is taken whole"
     );
 
-    // One file changes: its rule runs again and so does the one that reads
-    // the project; the other file's findings are taken.
+    // One file changes: its rule runs again; the one that reads the project
+    // does not, for the model of the project is the one it read; the other
+    // file's findings are taken.
     fs::write(dir.path().join("a.txt"), "aaaa").unwrap();
     let (third, third_runs) = cached();
     let third = third.check(&[], &[]).unwrap();
-    assert_eq!(runs(&third_runs), (1, 1));
+    assert_eq!(runs(&third_runs), (1, 0));
     let (plain, plain_runs) = engine(dir.path());
     let plain = plain.check(&[], &[]).unwrap();
     assert_eq!(runs(&plain_runs), (2, 1));

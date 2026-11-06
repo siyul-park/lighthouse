@@ -93,9 +93,16 @@ impl<'a> World<'a> {
     /// The digest of the file as it stands: the text that stands in for it,
     /// else the hash of the file on disk.
     fn stand(&self, file: &File) -> String {
-        self.texts
-            .get(&file.path)
-            .map_or_else(|| file.hash.clone(), hash::sha256)
+        self.texts.get(&file.path).map_or_else(
+            || {
+                self.outcome
+                    .read
+                    .get(&file.path)
+                    .cloned()
+                    .unwrap_or_default()
+            },
+            hash::sha256,
+        )
     }
 }
 

@@ -12,9 +12,8 @@ const DOC: &str = "design/exported-doc";
 fn exported_doc_flags_only_public_documented_less_symbols_of_public_owners() {
     let mut w = World::default();
     w.symbol("m", "Flagged", SymbolKind::Function, "m/a.ucm");
-    let mut documented = w.symbol("m", "Documented", SymbolKind::Function, "m/a.ucm");
-    documented.doc = Some("x".to_owned());
-    w.symbols.last_mut().unwrap().doc = documented.doc;
+    w.symbol("m", "Documented", SymbolKind::Function, "m/a.ucm");
+    w.places.last_mut().unwrap().doc = Some("x".to_owned());
     let hidden = w.symbol("m", "hidden", SymbolKind::Function, "m/a.ucm");
     w.private(&hidden);
     let internal = w.symbol("m", "Internal", SymbolKind::Function, "m/a.ucm");
@@ -41,11 +40,11 @@ fn exported_doc_can_include_internal_symbols() {
 fn exported_doc_skips_exempt_methods_interface_members_private_owners_and_kinds() {
     let mut w = World::default();
     let public = w.symbol("m", "T", SymbolKind::Type, "m/a.ucm");
-    w.symbols[0].doc = Some("T is documented.".to_owned());
+    w.places[0].doc = Some("T is documented.".to_owned());
     let hidden = w.symbol("m", "hidden", SymbolKind::Type, "m/a.ucm");
     w.private(&hidden);
     let iface = w.symbol("m", "Reader", SymbolKind::Interface, "m/a.ucm");
-    w.symbols[2].doc = Some("Reader reads.".to_owned());
+    w.places[2].doc = Some("Reader reads.".to_owned());
     let member = |w: &mut World, owner: &Symbol, name: &str, kind: SymbolKind| {
         let mut s = w.symbol("m", name, kind, "m/a.ucm");
         s.owner = Some(owner.id.clone());
@@ -66,7 +65,7 @@ fn exported_doc_skips_exempt_methods_interface_members_private_owners_and_kinds(
 fn exported_doc_leaves_interface_implementations_to_the_interface() {
     let mut w = World::default();
     let ty = w.symbol("m", "T", SymbolKind::Type, "m/a.ucm");
-    w.symbols[0].doc = Some("T is documented.".to_owned());
+    w.places[0].doc = Some("T is documented.".to_owned());
     for name in ["Read", "Other"] {
         w.symbol("m", name, SymbolKind::Method, "m/a.ucm");
         let added = w.symbols.last_mut().unwrap();
@@ -75,7 +74,7 @@ fn exported_doc_leaves_interface_implementations_to_the_interface() {
     }
     let read = w.symbols[1].clone();
     w.summarize(&read, 1, &[]);
-    w.summaries.last_mut().unwrap().implementation = true;
+    w.implement(&read.id);
     // An implementation is the interface's to document, by default.
     assert_eq!(w.names(&w.check(DOC, json!({}))), ["Other"]);
     let strict = w.check(DOC, json!({ "exemptInterfaceMethods": false }));
@@ -137,7 +136,8 @@ fn single_use_wrapper_ignores_interface_methods_docs_and_shared_targets() {
     );
 
     let (mut w, _, load, _) = wrapped();
-    w.symbols.iter_mut().find(|s| s.id == load.id).unwrap().doc = Some("load explains.".to_owned());
+    let at = w.symbols.iter().position(|s| s.id == load.id).unwrap();
+    w.places[at].doc = Some("load explains.".to_owned());
     assert!(w.check(WRAP, json!({})).is_empty(), "documented");
 
     let (mut w, _, load, read) = wrapped();
@@ -148,11 +148,7 @@ fn single_use_wrapper_ignores_interface_methods_docs_and_shared_targets() {
     {
         symbol.kind = SymbolKind::Method;
     }
-    w.summaries
-        .iter_mut()
-        .find(|s| s.symbol == load.id)
-        .unwrap()
-        .implementation = true;
+    w.implement(&load.id);
     assert!(
         w.check(WRAP, json!({})).is_empty(),
         "implements an interface method"
@@ -288,10 +284,8 @@ fn a_role_is_the_first_flag_that_fits() {
         w.summarize(symbol, 10, &[]);
     }
     flag(&mut w, &built, |s| s.constructs = true);
-    flag(&mut w, &both, |s| {
-        s.constructs = true;
-        s.implementation = true;
-    });
+    flag(&mut w, &both, |s| s.constructs = true);
+    w.implement(&both.id);
     // One limit per role, each below the 10 statements: every role is told
     // apart by the limit it gets.
     let limits = |role: &str| {
@@ -351,11 +345,7 @@ fn a_constructor_may_take_one_more_parameter_and_an_implementation_any() {
     let object = w.symbol("m", "Object", SymbolKind::Type, "m/a.ucm");
     let hook = w.member(&object, "fmt", SymbolKind::Method, "m/a.ucm");
     params(&mut w, &hook, 9);
-    w.summaries
-        .iter_mut()
-        .find(|s| s.symbol == hook.id)
-        .unwrap()
-        .implementation = true;
+    w.implement(&hook.id);
     let found = w.check(PARAMS, json!({}));
     assert_eq!(w.names(&found), ["build", "NewServer"]);
 }

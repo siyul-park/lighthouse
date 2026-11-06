@@ -1,6 +1,6 @@
 use lighthouse_model::{
     Diagnostic, Fingerprint, Position, Severity, Span,
-    ucm::{Fragment, Model, Project, Symbol, SymbolId, SymbolKind, Visibility},
+    ucm::{Fragment, Model, Place, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
 
 #[test]
@@ -158,31 +158,36 @@ fn a_project_discriminates_a_finding_by_its_symbol_else_by_nothing() {
     assert_eq!(Project::default().discriminator(&found), "m::f#function");
 }
 
-fn declared(name: &str, lines: (u32, u32)) -> Symbol {
+fn declared(name: &str, lines: (u32, u32)) -> (Symbol, Place) {
     let at = |line| Position { line, col: 1 };
-    Symbol {
-        id: SymbolId::new("m", &[], name, SymbolKind::Function),
+    let id = SymbolId::new("m", &[], name, SymbolKind::Function);
+    let place = Place::new(
+        id.clone(),
+        Span {
+            start: at(lines.0),
+            end: at(lines.1),
+        },
+    );
+    let symbol = Symbol {
+        id,
         kind: SymbolKind::Function,
         visibility: Visibility::Public,
         owner: None,
         file: "a.go".into(),
-        span: Span {
-            start: at(lines.0),
-            end: at(lines.1),
-        },
-        extent: None,
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
-    }
+        implementation: false,
+    };
+    (symbol, place)
 }
 
 #[test]
 fn a_finding_is_anchored_to_its_symbol_else_to_the_innermost_symbol_around_it() {
     let project = Project::merge([Fragment {
-        symbols: vec![declared("outer", (1, 20)), declared("inner", (5, 8))],
+        symbols: vec![declared("outer", (1, 20)).0, declared("inner", (5, 8)).0],
+        places: vec![declared("outer", (1, 20)).1, declared("inner", (5, 8)).1],
         ..Fragment::default()
     }]);
     let at = |line| Position { line, col: 3 };

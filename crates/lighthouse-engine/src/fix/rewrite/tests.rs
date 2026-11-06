@@ -11,8 +11,8 @@ use std::{
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, File, Fragment, Node, Project, Resolution, Symbol, SymbolId, SymbolKind,
-        Target, Visibility,
+        Edge, EdgeKind, File, Fragment, Node, Place, Project, Resolution, Symbol, SymbolId,
+        SymbolKind, Target, Visibility,
     },
 };
 use lighthouse_process::Policy;
@@ -278,22 +278,25 @@ fn a_secret_a_verify_program_prints_is_not_in_the_note_of_its_failure() {
 // `g` in b.go and `h` in c.go; `g` called by `k` in e.go; `x` in d.go refers
 // to nothing.
 
-fn declared(name: &str, file: &str) -> Symbol {
-    let span = span((1, 1), (1, 40));
-    Symbol {
-        id: SymbolId::new("m", &[], name, SymbolKind::Function),
+fn declared(name: &str, file: &str) -> (Symbol, Place) {
+    let id = SymbolId::new("m", &[], name, SymbolKind::Function);
+    let place = Place {
+        extent: Some(span((1, 1), (1, 40))),
+        ..Place::new(id.clone(), span((1, 1), (1, 40)))
+    };
+    let symbol = Symbol {
+        id,
         kind: SymbolKind::Function,
         visibility: Visibility::Public,
         owner: None,
         file: file.into(),
-        span,
-        extent: Some(span),
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
-    }
+        implementation: false,
+    };
+    (symbol, place)
 }
 
 fn call(from: &Symbol, to: &Symbol) -> Edge {
@@ -310,7 +313,8 @@ fn call(from: &Symbol, to: &Symbol) -> Edge {
 fn world_run() -> Run {
     let files = ["a.go", "b.go", "c.go", "d.go", "e.go"];
     let [f, g, h, x, k] = files.map(|file| declared(&file.replace(".go", ""), file));
-    let edges = vec![call(&g, &f), call(&h, &f), call(&k, &g)];
+    let edges = vec![call(&g.0, &f.0), call(&h.0, &f.0), call(&k.0, &g.0)];
+    let (symbols, places) = [f, g, h, x, k].into_iter().unzip();
     Run {
         project: Project::merge([Fragment {
             files: files
@@ -318,13 +322,13 @@ fn world_run() -> Run {
                 .map(|path| File {
                     path: (*path).into(),
                     lang: "go".to_owned(),
-                    hash: String::new(),
                     generated: false,
                     test: false,
                     facts: Default::default(),
                 })
                 .collect(),
-            symbols: vec![f, g, h, x, k],
+            symbols,
+            places,
             edges,
             ..Fragment::default()
         }]),

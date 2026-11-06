@@ -4,11 +4,11 @@
 
 use lighthouse_model::{
     Span,
-    ucm::{Event, FunctionSummary, Symbol, TypeRef},
+    ucm::{Event, Symbol, TypeRef},
 };
 use serde_json::{Map, Value, json};
 
-use super::Builder;
+use super::{Builder, Summary};
 use crate::eval::{Var, cel_fact};
 
 /// One event of a function, ready to be judged.
@@ -26,10 +26,10 @@ impl Builder<'_> {
         &self,
         map: &mut Map<String, Value>,
         symbol: &Symbol,
-        summary: Option<&FunctionSummary>,
+        summary: Summary<'_>,
     ) {
         if self.needs.field("params") || self.needs.field("results") {
-            let signature = summary.map(|s| &s.signature);
+            let signature = summary.get().map(|s| &s.signature);
             let list = |types: Option<&[TypeRef]>| {
                 types
                     .unwrap_or_default()

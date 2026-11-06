@@ -185,12 +185,16 @@ impl<'a> Lowerer<'a> {
     /// identifier for a name, and its leading comments gone.
     fn blank(&self, block: &Block, text: &str) -> Result<Vec<TextEdit>, String> {
         let symbol = &block.symbol;
+        let at = self
+            .project
+            .place(&symbol.id)
+            .map_or(Position { line: 1, col: 1 }, |place| place.span.start);
         let name = LineIndex::new(text)
             .range(Span {
-                start: symbol.span.start,
+                start: at,
                 end: Position {
-                    line: symbol.span.start.line,
-                    col: symbol.span.start.col + u32::try_from(symbol.name.len()).unwrap_or(0),
+                    line: at.line,
+                    col: at.col + u32::try_from(symbol.name.len()).unwrap_or(0),
                 },
             })
             .filter(|range| text.get(range.clone()) == Some(symbol.name.as_str()))
@@ -402,8 +406,10 @@ impl<'a> Lowerer<'a> {
         let loose = self.project.symbols_in(file).find(|s| {
             s.owner.is_none()
                 && !listed.contains(&s.id)
-                && index
-                    .range(s.span)
+                && self
+                    .project
+                    .place(&s.id)
+                    .and_then(|place| index.range(place.span))
                     .is_some_and(|r| open < r.start && r.start < close)
         });
         if let Some(loose) = loose {
@@ -438,12 +444,16 @@ impl<'a> Lowerer<'a> {
             .project
             .symbol(id)
             .ok_or_else(|| format!("`{}` is not in the project", id.as_str()))?;
-        let extent = symbol.extent.ok_or_else(|| {
-            format!(
-                "`{}` has no extent: its language provider does not report declaration extents",
-                symbol.name
-            )
-        })?;
+        let extent = self
+            .project
+            .place(id)
+            .and_then(|place| place.extent)
+            .ok_or_else(|| {
+                format!(
+                    "`{}` has no extent: its language provider does not report declaration extents",
+                    symbol.name
+                )
+            })?;
         let text = self.sources.text(&symbol.file)?;
         let starts = self.starts(&symbol.file)?;
         let range = LineIndex::over(&text, &starts)
@@ -486,9 +496,12 @@ impl<'a> Lowerer<'a> {
     /// declared apart from its owner (a Go receiver) is in the scope of the file.
     fn scope_of(&self, symbol: &Symbol) -> Option<SymbolId> {
         let owner = self.project.symbol(symbol.owner.as_ref()?)?;
-        let within = owner.extent.is_some_and(|extent| {
-            extent.start <= symbol.span.start && symbol.span.end <= extent.end
-        });
+        let within = self
+            .project
+            .place(&owner.id)
+            .and_then(|place| place.extent)
+            .zip(self.project.place(&symbol.id))
+            .is_some_and(|(extent, at)| extent.start <= at.span.start && at.span.end <= extent.end);
         within.then(|| owner.id.clone())
     }
 

@@ -71,9 +71,10 @@ fn a_symbol_without_an_extent_cannot_move() {
     let mut fragment = Fragment {
         files: case.project.files.clone(),
         symbols: case.project.symbols.clone(),
+        places: case.project.places.clone(),
         ..Fragment::default()
     };
-    fragment.symbols[0].extent = None;
+    fragment.places[0].extent = None;
     case.project = Project::merge([fragment]);
 
     let why = case.run(&[after("a", "b")]).unwrap_err();
@@ -118,9 +119,10 @@ fn a_declaration_sharing_its_line_with_other_code_cannot_move_alone() {
     let mut fragment = Fragment {
         files: case.project.files.clone(),
         symbols: case.project.symbols.clone(),
+        places: case.project.places.clone(),
         ..Fragment::default()
     };
-    fragment.symbols[0].extent = Some(span((1, 11), (1, 20)));
+    fragment.places[0].extent = Some(span((1, 11), (1, 20)));
     case.project = Project::merge([fragment]);
 
     let why = case.run(&[after("b", "c")]).unwrap_err();
@@ -145,9 +147,10 @@ fn a_block_comment_after_the_closing_brace_shares_the_line() {
     let mut fragment = Fragment {
         files: case.project.files.clone(),
         symbols: case.project.symbols.clone(),
+        places: case.project.places.clone(),
         ..Fragment::default()
     };
-    fragment.symbols[0].extent = Some(span((1, 1), (1, 10)));
+    fragment.places[0].extent = Some(span((1, 1), (1, 10)));
     case.project = Project::merge([fragment]);
 
     let why = case.run(&[after("a", "c")]).unwrap_err();

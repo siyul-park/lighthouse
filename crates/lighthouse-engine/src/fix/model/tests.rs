@@ -8,7 +8,7 @@ use std::{
 
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Position, Safety, Severity, Span,
-    ucm::{File, Fragment, Project, Symbol, SymbolId, SymbolKind, Visibility},
+    ucm::{File, Fragment, Place, Project, Symbol, SymbolId, SymbolKind, Visibility},
 };
 use serde_json::json;
 
@@ -37,35 +37,40 @@ pub(super) fn span(from: (u32, u32), to: (u32, u32)) -> Span {
     }
 }
 
-pub(super) fn symbol(name: &str, lines: (u32, u32), end_col: u32) -> Symbol {
+pub(super) fn symbol(name: &str, lines: (u32, u32), end_col: u32) -> (Symbol, Place) {
     let span = span((lines.0, 1), (lines.1, end_col));
-    Symbol {
-        id: SymbolId::new("m", &[], name, SymbolKind::Function),
+    let id = SymbolId::new("m", &[], name, SymbolKind::Function);
+    let place = Place {
+        extent: Some(span),
+        ..Place::new(id.clone(), span)
+    };
+    let symbol = Symbol {
+        id,
         kind: SymbolKind::Function,
         visibility: Visibility::Public,
         owner: None,
         file: FILE.into(),
-        span,
-        extent: Some(span),
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
-    }
+        implementation: false,
+    };
+    (symbol, place)
 }
 
-fn project(symbols: Vec<Symbol>) -> Project {
+fn project(declared: Vec<(Symbol, Place)>) -> Project {
+    let (symbols, places) = declared.into_iter().unzip();
     Project::merge([Fragment {
         files: vec![File {
             path: FILE.into(),
             lang: "go".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),
         }],
         symbols,
+        places,
         ..Fragment::default()
     }])
 }
@@ -98,7 +103,7 @@ fn the_extent_is_the_symbol_of_the_finding_else_the_one_around_it_else_a_small_f
     assert_eq!(around, span((4, 1), (5, 3)));
 
     let mut named = finding("r", 8, Severity::Warn, "b");
-    named.symbol = Some(symbol("outer", (3, 6), 2).id.as_str().to_owned());
+    named.symbol = Some(symbol("outer", (3, 6), 2).0.id.as_str().to_owned());
     assert_eq!(choose(&named).unwrap(), span((3, 1), (6, 2)));
 
     let whole = choose(&finding("r", 8, Severity::Warn, "c")).unwrap();

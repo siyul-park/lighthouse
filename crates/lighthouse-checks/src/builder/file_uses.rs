@@ -52,7 +52,7 @@ impl Builder<'_> {
             .iter()
             .filter(|n| n.user == LoadPoint::Declaration(symbol.id.clone()))
             .filter_map(|n| project.symbol(&n.binding))
-            .map(|s| json!({"id": s.id.as_str(), "pos": crate::facts::pos(s.span.start)}))
+            .map(|s| json!({"id": s.id.as_str(), "pos": crate::facts::pos(crate::facts::span_of(project, &s.id).start)}))
             .collect();
         found.sort_by_key(|v| v["pos"].as_u64());
         Value::Array(found)
@@ -68,9 +68,9 @@ impl Builder<'_> {
             .iter()
             .filter(|n| n.binding == symbol.id)
             .filter_map(|n| match &n.user {
-                LoadPoint::Declaration(id) => {
-                    project.symbol(id).map(|s| (id.as_str(), s.span.start))
-                }
+                LoadPoint::Declaration(id) => project
+                    .symbol(id)
+                    .map(|s| (id.as_str(), crate::facts::span_of(project, &s.id).start)),
                 LoadPoint::Site(span) => Some(("", span.start)),
             })
             .map(|(id, at)| json!({"id": id, "pos": crate::facts::pos(at)}))

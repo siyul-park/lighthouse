@@ -236,6 +236,7 @@ pub(super) fn sorted_union(
         all.files.extend(part.files);
         all.modules.extend(part.modules);
         all.symbols.extend(part.symbols);
+        all.places.extend(part.places);
         all.edges.extend(part.edges);
         all.functions.extend(part.functions);
         all.tests.extend(part.tests);
@@ -269,6 +270,8 @@ pub(super) fn settle(all: &mut Fragment) -> Option<String> {
     all.symbols.sort_by(|a, b| a.id.cmp(&b.id));
     let notice = duplicate_notice(&all.symbols);
     all.symbols.dedup_by(|a, b| a.id == b.id);
+    all.places.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+    all.places.dedup_by(|a, b| a.symbol == b.symbol);
     all.functions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
     all.functions.dedup_by(|a, b| a.symbol == b.symbol);
     all.tests.sort_by(|a, b| a.symbol.cmp(&b.symbol));

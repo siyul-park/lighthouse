@@ -67,6 +67,7 @@ impl Slice {
             all.files.extend(part.files);
             all.modules.extend(part.modules);
             all.symbols.extend(part.symbols);
+            all.places.extend(part.places);
             all.edges.extend(part.edges);
             all.functions.extend(part.functions);
             all.tests.extend(part.tests);

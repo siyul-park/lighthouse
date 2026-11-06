@@ -232,7 +232,7 @@ fn missing_owner_exempts_data_types_and_trait_impl_methods() {
     );
     *w.symbols.last_mut().unwrap() = via_trait.clone();
     w.summarize(&via_trait, 1, &[]);
-    w.summaries.last_mut().unwrap().implementation = true;
+    w.implement(&via_trait.id);
     let found = w.names(&check(&w, MISSING, json!({})));
     assert_eq!(
         found,

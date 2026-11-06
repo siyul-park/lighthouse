@@ -118,6 +118,9 @@ pub struct Run {
     pub suppressed: Vec<Suppressed>,
     /// The analysis the findings came from; fixes read it.
     pub project: Project,
+    /// The SHA-256 of the text the run read of each file of the project, by
+    /// path: what a fix compares the file with before it writes.
+    pub read: BTreeMap<PathBuf, String>,
     /// Where the time of the run went.
     pub timings: Timings,
 }
@@ -193,6 +196,8 @@ struct Scene<'a> {
 pub(crate) struct Input {
     pub(crate) file: File,
     pub(crate) text: Text,
+    /// The SHA-256 of the text, as the graph holds it.
+    pub(crate) sha256: String,
     language: usize,
 }
 

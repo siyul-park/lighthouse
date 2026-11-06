@@ -40,14 +40,15 @@ fn symbols_carry_kind_visibility_owner_doc_and_span() {
     let table: Vec<String> = fragment
         .symbols
         .iter()
-        .map(|s| {
+        .zip(&fragment.places)
+        .map(|(s, place)| {
             let owner = s.owner.as_ref().map_or("-", |o| o.as_str());
             format!(
                 "{} {:?} doc={} owner={owner} line={}",
                 s.id.as_str(),
                 s.visibility,
-                s.doc.is_some(),
-                s.span.start.line
+                place.doc.is_some(),
+                place.span.start.line
             )
         })
         .collect();
@@ -68,10 +69,10 @@ fn symbols_carry_kind_visibility_owner_doc_and_span() {
         ]
     );
     assert_eq!(
-        fragment.symbols[0].doc.as_deref(),
+        fragment.places[0].doc.as_deref(),
         Some("Store keeps values.")
     );
-    let span = fragment.symbols[0].span;
+    let span = fragment.places[0].span;
     assert_eq!((span.start.line, span.end.line), (10, 13));
 }
 
@@ -84,10 +85,11 @@ fn group_docs_cover_every_spec_and_trailing_comments_do_not_leak() {
     let indexed = f.index();
     let fragment = f.fragment(&indexed, "p.go");
     let doc = |name: &str| {
+        let id = &fragment.symbols.iter().find(|s| s.name == name).unwrap().id;
         fragment
-            .symbols
+            .places
             .iter()
-            .find(|s| s.name == name)
+            .find(|place| place.symbol == *id)
             .unwrap()
             .doc
             .clone()

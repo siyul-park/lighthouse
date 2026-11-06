@@ -107,8 +107,10 @@ impl Lowerer<'_> {
         let mut edits = Vec::new();
         let text = self.sources.text(&symbol.file)?;
         let index = LineIndex::new(&text);
-        let declaration = index
-            .range(symbol.span)
+        let declaration = self
+            .project
+            .place(&symbol.id)
+            .and_then(|place| index.range(place.span))
             .ok_or_else(|| "the declaration is outside its file".to_owned())?;
         let at = name_in(&text[declaration.clone()], &symbol.name)
             .ok_or_else(|| format!("cannot find `{}` in its declaration", symbol.name))?;
@@ -164,13 +166,13 @@ impl Lowerer<'_> {
                 .project
                 .symbols_in(&site.file)
                 .filter(|s| matches!(s.kind, SymbolKind::Function | SymbolKind::Method))
-                .filter(|s| {
-                    let extent = s.extent.unwrap_or(s.span);
+                .filter_map(|s| Some((s, self.project.place(&s.id)?.whole())))
+                .filter(|(_, extent)| {
                     extent.start <= site.span.start && site.span.end <= extent.end
                 })
-                .max_by_key(|s| s.extent.unwrap_or(s.span).start);
-            if let Some(function) = around {
-                let range = LineIndex::new(&text).range(function.extent.unwrap_or(function.span));
+                .max_by_key(|(_, extent)| extent.start);
+            if let Some((function, extent)) = around {
+                let range = LineIndex::new(&text).range(extent);
                 if range.is_some_and(|range| has_word(&text[range], name)) {
                     return Err(format!(
                         "`{name}` already occurs in `{}`, which refers to `{}`, so the new name could capture or shadow it",

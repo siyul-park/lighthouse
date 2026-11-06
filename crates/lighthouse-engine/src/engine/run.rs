@@ -101,6 +101,10 @@ impl Engine {
         if let Err(e) = committed {
             run.notices.insert(format!("the graph was not saved: {e}"));
         }
+        run.read = inputs
+            .iter()
+            .map(|input| (input.file.path.clone(), input.sha256.clone()))
+            .collect();
         run.project = project;
         Ok(run)
     }

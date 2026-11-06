@@ -13,7 +13,8 @@ use std::{
 };
 
 use super::{
-    Edge, EdgeKind, File, Fragment, Index, Model, Node, Resolution, Symbol, SymbolId, Target, When,
+    Edge, EdgeKind, File, Fragment, Index, Model, Node, Place, Resolution, Symbol, SymbolId,
+    Target, When,
 };
 use crate::{Position, Span};
 
@@ -108,8 +109,8 @@ pub(super) fn index(all: &Fragment, index: &Index) -> BTreeMap<PathBuf, Vec<usiz
     loads
 }
 
-pub(super) fn start_of(symbol: &Symbol) -> Position {
-    symbol.extent.unwrap_or(symbol.span).start
+pub(super) fn start_of(place: &Place) -> Position {
+    place.extent.unwrap_or(place.span).start
 }
 
 /// The needs a load edge states, with those of the functions it calls.
@@ -176,10 +177,11 @@ fn need(
                 .take_while(|(a, b)| a.id == b.id)
                 .count();
             let (user, binding) = (up.get(shared)?, *down.get(shared)?);
-            let user = if user.extent.is_some() {
+            let place = model.place(&user.id)?;
+            let user = if place.extent.is_some() {
                 LoadPoint::Declaration(user.id.clone())
             } else {
-                LoadPoint::Site(site.unwrap_or(user.span))
+                LoadPoint::Site(site.unwrap_or(place.span))
             };
             (user, binding)
         }

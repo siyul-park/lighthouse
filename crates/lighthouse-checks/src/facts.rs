@@ -5,9 +5,10 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Document, Position,
+    Document, Position, Span,
     ucm::{
-        Edge, Model, Module, Node, Symbol, SymbolKind, SymbolRole, Target, TestCase, Visibility,
+        Edge, Model, Module, Node, Symbol, SymbolId, SymbolKind, SymbolRole, Target, TestCase,
+        Visibility,
     },
 };
 
@@ -19,6 +20,12 @@ use crate::{
 use serde_json::{Value, json};
 
 const POS_LINE: u64 = 1 << 20;
+
+/// The span of a declaration whose place the model does not hold.
+const UNPLACED: Span = Span {
+    start: Position { line: 1, col: 1 },
+    end: Position { line: 1, col: 1 },
+};
 
 pub(crate) fn visibility(v: Visibility) -> &'static str {
     match v {
@@ -33,38 +40,21 @@ pub(crate) fn pos(p: Position) -> u64 {
     u64::from(p.line) * POS_LINE + u64::from(p.col)
 }
 
+/// Where a declaration is: the span of its place, which moves with any edit
+/// above it.
+pub(crate) fn span_of(project: &dyn Model, id: &SymbolId) -> Span {
+    project.place(id).map_or(UNPLACED, |place| place.span)
+}
+
+/// The whole declaration, from its first doc comment or attribute to its last
+/// token; its span where the provider does not report the extent.
+pub(crate) fn extent_of(project: &dyn Model, id: &SymbolId) -> Span {
+    project.place(id).map_or(UNPLACED, |place| place.whole())
+}
+
 /// The fields that identify a declaration, for the nodes of a list.
 pub(crate) fn node(project: &dyn Model, s: &Symbol) -> Value {
-    let owner = s.owner.as_ref().and_then(|o| project.symbol(o));
-    let file = project.file(&s.file);
-    json!({
-        "id": s.id.as_str(),
-        "name": s.name,
-        "name_key": text::key(&s.name),
-        "kind": s.kind.as_str(),
-        "visibility": visibility(s.visibility),
-        "owner_kind": owner.map_or("", |o| o.kind.as_str()),
-        "owner_visibility": owner.map_or("", |o| visibility(o.visibility)),
-        "file": path(&s.file),
-        // The stem of the declaring file: its name without the extension and
-        // what its language ignores in a name (Go's build constraint suffixes).
-        "file_stem": file_stem(project, &s.file),
-        "line": s.span.start.line,
-        "col": s.span.start.col,
-        "pos": pos(s.span.start),
-        "end_line": s.span.end.line,
-        "module": s.id.module(),
-        "test_role": s.role.map_or("", role),
-        "documented": s.doc.is_some(),
-        "test": project.in_test(&s.id),
-        "file_test": file.is_some_and(|f| f.test),
-        "generated": file.is_some_and(|f| f.generated),
-        "owner_key": owner_key(s).unwrap_or_default(),
-        "declaration": is_declaration(project, s),
-        // The method implements one a trait or interface declares elsewhere:
-        // its placement and ownership are that declaration's, as the provider says.
-        "implementation": project.function(&s.id).is_some_and(|f| f.implementation),
-    })
+    shaped(project, s, true)
 }
 
 /// The stem of a file: what its provider states, else its name without the
@@ -82,6 +72,12 @@ pub(crate) fn file_stem(project: &dyn Model, file: &Path) -> String {
 }
 
 pub(crate) fn symbol(project: &dyn Model, s: &Symbol) -> Value {
+    symbol_with(project, s, true)
+}
+
+/// A symbol as [`symbol`] has it, with the fields that are where it is and
+/// what it says (`doc` too) only when `placed`.
+pub(crate) fn symbol_with(project: &dyn Model, s: &Symbol, placed: bool) -> Value {
     let lang = project
         .language_of(s)
         .map_or_else(String::new, str::to_owned);
@@ -99,11 +95,14 @@ pub(crate) fn symbol(project: &dyn Model, s: &Symbol) -> Value {
     let spelled = module
         .and_then(|m| m.name.clone())
         .unwrap_or_else(|| last.clone());
-    extended(
-        node(project, s),
+    let doc = placed
+        .then(|| project.place(&s.id).and_then(|p| p.doc.clone()))
+        .flatten()
+        .unwrap_or_default();
+    let mut value = extended(
+        shaped(project, s, placed),
         json!({
         "lang": lang,
-        "doc": s.doc.clone().unwrap_or_default(),
         "name_key": text::key(&s.name),
         "module_forms": if module.is_some() {
             json!([
@@ -114,7 +113,11 @@ pub(crate) fn symbol(project: &dyn Model, s: &Symbol) -> Value {
             json!([])
         },
         }),
-    )
+    );
+    if placed && let Some(map) = value.as_object_mut() {
+        map.insert("doc".to_owned(), json!(doc));
+    }
+    value
 }
 
 /// A symbol with its function summary; the metrics are zero for a symbol
@@ -213,6 +216,50 @@ pub(crate) fn file(project: &dyn Model, f: &lighthouse_model::ucm::File, text: &
         "lines": text.lines().count(),
         "functions": functions,
     })
+}
+
+/// A node with its place fields (`line`, `col`, `pos`, `end_line` and
+/// `documented`) only when `placed`: without them it is the declaration's
+/// shape, which a body edit leaves as it was.
+fn shaped(project: &dyn Model, s: &Symbol, placed: bool) -> Value {
+    let owner = s.owner.as_ref().and_then(|o| project.symbol(o));
+    let file = project.file(&s.file);
+    let mut value = json!({
+        "id": s.id.as_str(),
+        "name": s.name,
+        "name_key": text::key(&s.name),
+        "kind": s.kind.as_str(),
+        "visibility": visibility(s.visibility),
+        "owner_kind": owner.map_or("", |o| o.kind.as_str()),
+        "owner_visibility": owner.map_or("", |o| visibility(o.visibility)),
+        "file": path(&s.file),
+        // The stem of the declaring file: its name without the extension and
+        // what its language ignores in a name (Go's build constraint suffixes).
+        "file_stem": file_stem(project, &s.file),
+        "module": s.id.module(),
+        "test_role": s.role.map_or("", role),
+        "test": project.in_test(&s.id),
+        "file_test": file.is_some_and(|f| f.test),
+        "generated": file.is_some_and(|f| f.generated),
+        "owner_key": owner_key(s).unwrap_or_default(),
+        "declaration": is_declaration(project, s),
+        // The method implements one a trait or interface declares elsewhere:
+        // its placement and ownership are that declaration's, as the provider says.
+        "implementation": s.implementation,
+    });
+    if placed && let Some(map) = value.as_object_mut() {
+        let place = project.place(&s.id);
+        let span = place.map_or(UNPLACED, |p| p.span);
+        map.insert("line".to_owned(), json!(span.start.line));
+        map.insert("col".to_owned(), json!(span.start.col));
+        map.insert("pos".to_owned(), json!(pos(span.start)));
+        map.insert("end_line".to_owned(), json!(span.end.line));
+        map.insert(
+            "documented".to_owned(),
+            json!(place.is_some_and(|p| p.doc.is_some())),
+        );
+    }
+    value
 }
 
 /// `value` with the fields of the object `extra` added.

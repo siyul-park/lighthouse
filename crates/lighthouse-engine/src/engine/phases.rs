@@ -138,7 +138,6 @@ impl Engine {
         let file = File {
             path: rel.to_owned(),
             lang: self.provider(language).manifest().id.clone(),
-            hash: content.sha256.clone(),
             generated: self.generated.names(rel) || attributes.is_generated(rel),
             test: self.languages[language].tests.is_match(rel),
             facts: Default::default(),
@@ -146,6 +145,7 @@ impl Engine {
         Some(Ok(Input {
             file,
             text,
+            sha256: content.sha256.clone(),
             language,
         }))
     }

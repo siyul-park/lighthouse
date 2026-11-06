@@ -227,7 +227,7 @@ impl Evaluation<'_> {
     ) -> Result<Option<Diagnostic>, PluginError> {
         let place = Anchor {
             file: symbol.file.clone(),
-            span: symbol.span,
+            span: crate::facts::span_of(self.builder.project(), &symbol.id),
             symbol: Some(symbol.id.clone()),
         };
         self.judge(value, place, symbol.id.as_str())
@@ -331,7 +331,7 @@ impl Evaluation<'_> {
                 })?;
             return Ok(Anchor {
                 file: symbol.file.clone(),
-                span: symbol.span,
+                span: crate::facts::span_of(self.builder.project(), &symbol.id),
                 symbol: Some(symbol.id.clone()),
             });
         }

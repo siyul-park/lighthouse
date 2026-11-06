@@ -16,9 +16,10 @@ use lighthouse_graph::{Error, Graph};
 use typed_arena::Arena;
 
 use super::{
-    Boxed, Comment, EDGES, Edge, Edges, File, FunctionSummary, INCOMING, Incoming, LoadNeed,
-    MODULE_CASES, Model, Module, Node, PATHS, RESOLVED, Resolved, SITES, SYMBOLS, Site, Sites,
-    Symbol, SymbolId, Table, TestCase, Tie, When, key, load_needs,
+    Boxed, Comment, DECLARATIONS, Declarations, EDGES, Edge, Edges, File, FunctionSummary,
+    INCOMING, Incoming, LoadNeed, MODULE_CASES, Model, Module, Node, PATHS, Place, RESOLVED,
+    Resolved, SITES, SYMBOLS, Site, Sites, Symbol, SymbolId, Table, TestCase, Tie, When, key,
+    load_needs,
 };
 
 /// The model of the project as the graph holds it.
@@ -28,6 +29,7 @@ pub struct View<'v> {
     table: OnceCell<&'v Table>,
     resolved: RefCell<HashMap<PathBuf, &'v Resolved>>,
     incoming: RefCell<HashMap<PathBuf, &'v Incoming>>,
+    declared_in: RefCell<HashMap<PathBuf, &'v Declarations>>,
     homes: RefCell<HashMap<SymbolId, Rc<Home<'v>>>>,
     files: RefCell<HashMap<String, Option<&'v File>>>,
     declared: RefCell<HashMap<String, Rc<Vec<usize>>>>,
@@ -42,9 +44,9 @@ pub struct View<'v> {
 /// What a view found of one symbol: where it is declared and what is said of
 /// it, each found when first asked for, for the rest of the view.
 struct Home<'v> {
-    resolved: Option<&'v Resolved>,
     file: Option<PathBuf>,
     symbol: OnceCell<Option<&'v Symbol>>,
+    place: OnceCell<Option<&'v Place>>,
     function: OnceCell<Option<&'v FunctionSummary>>,
     test: OnceCell<Option<&'v TestCase>>,
     tie: OnceCell<Option<&'v Tie>>,
@@ -65,6 +67,7 @@ pub struct Held {
     resolved: Arena<Arc<Resolved>>,
     incoming: Arena<Arc<Incoming>>,
     tables: Arena<Arc<Table>>,
+    declarations: Arena<Arc<Declarations>>,
     sites: Arena<Arc<Sites>>,
     edges: Arena<Arc<Edges>>,
     cases: Arena<Arc<Vec<TestCase>>>,
@@ -80,6 +83,7 @@ impl<'v> View<'v> {
             table: OnceCell::new(),
             resolved: RefCell::default(),
             incoming: RefCell::default(),
+            declared_in: RefCell::default(),
             homes: RefCell::default(),
             files: RefCell::default(),
             declared: RefCell::default(),
@@ -106,10 +110,10 @@ impl<'v> View<'v> {
                 .iter()
                 .flat_map(|path| {
                     let path = Path::new(path);
-                    let resolved = self.resolved(path);
+                    let declared = self.declarations(path);
                     let at = self.declared(path);
                     (0..at.len())
-                        .filter_map(move |n| resolved.map(|r| &r.slice.fragment.symbols[at[n]]))
+                        .filter_map(move |n| declared.map(|d| &d.symbols[at[n]]))
                         .collect::<Vec<_>>()
                 })
                 .collect();
@@ -175,8 +179,8 @@ impl<'v> View<'v> {
             return Rc::clone(found);
         }
         let mut at: Vec<usize> = Vec::new();
-        if let Some(resolved) = self.resolved(path) {
-            let symbols = &resolved.slice.fragment.symbols;
+        if let Some(declared) = self.declarations(path) {
+            let symbols = &declared.symbols;
             at = (0..symbols.len())
                 .filter(|&i| {
                     self.table()
@@ -220,13 +224,8 @@ impl<'v> View<'v> {
         if let Some(found) = self.files.borrow().get(&key) {
             return *found;
         }
-        let merged = self.resolved(path).and_then(|resolved| {
-            let mut files = resolved
-                .slice
-                .fragment
-                .files
-                .iter()
-                .filter(|file| file.path == path);
+        let merged = self.declarations(path).and_then(|declared| {
+            let mut files = declared.files.iter().filter(|file| file.path == path);
             let mut kept = files.next()?.clone();
             for later in files {
                 kept.facts.extend(later.facts.clone());
@@ -253,9 +252,9 @@ impl<'v> View<'v> {
         }
         let file = self.table().entry(id).map(|entry| entry.file.clone());
         let home = Rc::new(Home {
-            resolved: file.as_deref().and_then(|file| self.resolved(file)),
             file,
             symbol: OnceCell::new(),
+            place: OnceCell::new(),
             function: OnceCell::new(),
             test: OnceCell::new(),
             tie: OnceCell::new(),
@@ -272,6 +271,19 @@ impl<'v> View<'v> {
         let resolved = &**self.held.resolved.alloc(resolved);
         self.resolved.borrow_mut().insert(path.to_owned(), resolved);
         Some(resolved)
+    }
+
+    /// What the file at `path` declares.
+    fn declarations(&self, path: &Path) -> Option<&'v Declarations> {
+        if let Some(found) = self.declared_in.borrow().get(path) {
+            return Some(found);
+        }
+        let declared = self.keep(self.graph.query(&DECLARATIONS, &key(path)))?;
+        let declared = &**self.held.declarations.alloc(declared);
+        self.declared_in
+            .borrow_mut()
+            .insert(path.to_owned(), declared);
+        Some(declared)
     }
 
     fn incoming(&self, path: &Path) -> Option<&'v Incoming> {
@@ -314,21 +326,31 @@ impl<'v> Model for View<'v> {
     fn symbol(&self, id: &SymbolId) -> Option<&Symbol> {
         let home = self.home(id);
         *home.symbol.get_or_init(|| {
-            home.resolved?
-                .slice
-                .fragment
+            self.declarations(home.file.as_deref()?)?
                 .symbols
                 .iter()
                 .find(|symbol| symbol.id == *id)
         })
     }
 
+    fn place(&self, id: &SymbolId) -> Option<&Place> {
+        let home = self.home(id);
+        *home.place.get_or_init(|| {
+            self.resolved(home.file.as_deref()?)?
+                .slice
+                .fragment
+                .places
+                .iter()
+                .find(|place| place.symbol == *id)
+        })
+    }
+
     fn symbols_in(&self, path: &Path) -> Boxed<'_, Symbol> {
-        let Some(resolved) = self.resolved(path) else {
+        let Some(declared) = self.declarations(path) else {
             return Box::new(std::iter::empty());
         };
         let at = self.declared(path);
-        Box::new((0..at.len()).map(move |n| &resolved.slice.fragment.symbols[at[n]]))
+        Box::new((0..at.len()).map(move |n| &declared.symbols[at[n]]))
     }
 
     fn module(&self, path: &str) -> Option<&Module> {
@@ -338,7 +360,7 @@ impl<'v> Model for View<'v> {
     fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
         let home = self.home(id);
         *home.function.get_or_init(|| {
-            home.resolved?
+            self.resolved(home.file.as_deref()?)?
                 .slice
                 .fragment
                 .functions
@@ -366,7 +388,7 @@ impl<'v> Model for View<'v> {
     fn test(&self, id: &SymbolId) -> Option<&TestCase> {
         let home = self.home(id);
         *home.test.get_or_init(|| {
-            home.resolved?
+            self.resolved(home.file.as_deref()?)?
                 .slice
                 .fragment
                 .tests
@@ -408,7 +430,12 @@ impl<'v> Model for View<'v> {
     }
 
     fn edges_from(&self, id: &SymbolId) -> Boxed<'_, Edge> {
-        let Some(resolved) = self.home(id).resolved else {
+        let Some(resolved) = self
+            .home(id)
+            .file
+            .as_deref()
+            .and_then(|file| self.resolved(file))
+        else {
             return Box::new(std::iter::empty());
         };
         let id = id.clone();

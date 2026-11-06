@@ -273,7 +273,6 @@ impl Engine {
         part(self.provider_of(language).identity.as_bytes());
         for file in regions {
             part(file.file.path.to_string_lossy().as_bytes());
-            part(file.file.hash.as_bytes());
             part(&[u8::from(file.file.test)]);
             part(file.text.as_bytes());
             part(&serde_json::to_vec(&file.regions).unwrap_or_default());

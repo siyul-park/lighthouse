@@ -423,12 +423,12 @@ fn repository_regions(injections: &[InjectionSpec], asts: &[Source], root: &Path
             file: lighthouse_model::ucm::File {
                 path: PathBuf::from(&ast.path),
                 lang: String::new(),
-                hash: String::new(),
                 generated: false,
                 test: false,
                 facts: BTreeMap::new(),
             },
             text: crate::engine::Text::held(std::fs::read_to_string(root.join(&ast.path)).unwrap()),
+            sha256: String::new(),
             language: 0,
         })
         .collect();
@@ -511,7 +511,6 @@ fn repository_asts(files: &[PathBuf], globs: &[String], root: &Path) -> Vec<Sour
                 let file = lighthouse_model::ucm::File {
                     path: path.clone(),
                     lang: manifest.id.clone(),
-                    hash: String::new(),
                     generated: false,
                     test: false,
                     facts: BTreeMap::new(),

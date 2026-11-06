@@ -10,7 +10,7 @@ use std::{collections::BTreeMap, ops::Range, path::Path};
 
 use lighthouse_model::{
     LineIndex, Position, Span,
-    ucm::{LoadNeed, LoadPoint, Symbol, SymbolId},
+    ucm::{LoadNeed, LoadPoint, Project, Symbol, SymbolId},
 };
 
 use super::Lowerer;
@@ -43,7 +43,7 @@ impl Lowerer<'_> {
                 self.project.load_place(&need.user).and_then(offset),
                 self.project
                     .symbol(&need.binding)
-                    .and_then(|s| offset(start_of(s))),
+                    .and_then(|s| offset(start_of(self.project, s))),
             ) else {
                 continue;
             };
@@ -84,7 +84,7 @@ impl Lowerer<'_> {
         file: &Path,
         wanted: &[&SymbolId],
     ) -> Result<Vec<usize>, String> {
-        let place = |id: &SymbolId| self.project.symbol(id).map(start_of);
+        let place = |id: &SymbolId| self.project.symbol(id).map(|s| start_of(self.project, s));
         let mut after: BTreeMap<&SymbolId, Vec<&SymbolId>> = BTreeMap::new();
         let needs = self.project.load_needs(file);
         for need in &needs {
@@ -156,6 +156,8 @@ fn is_ready(
     })
 }
 
-fn start_of(symbol: &Symbol) -> Position {
-    symbol.extent.unwrap_or(symbol.span).start
+fn start_of(project: &Project, symbol: &Symbol) -> Position {
+    project
+        .place(&symbol.id)
+        .map_or(Position { line: 1, col: 1 }, |place| place.whole().start)
 }

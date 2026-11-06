@@ -6,9 +6,9 @@ use std::{collections::BTreeSet, path::PathBuf, sync::Arc};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, Edges, Entry, File, Fragment, Incoming, Module, Node, Outline, Project,
-        Resolution, Resolved, Reverse, Sites, Slice, Symbol, SymbolId, SymbolKind, Table, Target,
-        Visibility, collisions, declared,
+        Declarations, Edge, EdgeKind, Edges, Entry, File, Fragment, Incoming, Module, Node, Place,
+        Project, Resolution, Resolved, Reverse, Sites, Slice, Symbol, SymbolId, SymbolKind, Table,
+        Target, Visibility, collisions, declared,
     },
 };
 
@@ -25,7 +25,6 @@ fn fragment(module: &str, name: &str, callee: Option<&str>) -> Fragment {
         SymbolKind::Function,
         Visibility::Public,
         path.clone(),
-        at(),
         name,
     );
     let edges = callee.into_iter().map(|to| Edge {
@@ -36,17 +35,18 @@ fn fragment(module: &str, name: &str, callee: Option<&str>) -> Fragment {
         site: None,
         when: Default::default(),
     });
+    let edges: Vec<Edge> = edges.collect();
     Fragment {
         files: vec![File {
             path,
             lang: "go".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),
         }],
         symbols: vec![symbol],
-        edges: edges.collect(),
+        places: vec![Place::new(id.clone(), at())],
+        edges,
         ..Fragment::default()
     }
 }
@@ -67,8 +67,8 @@ fn assemble_the_slices_resolved_against_the_table_as_merge_does() {
             Slice::new(path, vec![part.clone()], &none)
         })
         .collect();
-    let outlines: Vec<Outline> = slices.iter().map(Outline::new).collect();
-    let table = Table::new(&outlines);
+    let declarations: Vec<Declarations> = slices.iter().map(Declarations::new).collect();
+    let table = Table::new(&declarations);
     let entry: &Entry = table.entry(&b).unwrap();
     assert_eq!(entry.name, "g");
     let resolved: Vec<Resolved> = slices.iter().map(|s| Resolved::new(s, &table)).collect();
@@ -87,6 +87,7 @@ fn fragment_of(project: &Project) -> Fragment {
         files: project.files.clone(),
         modules: project.modules.clone(),
         symbols: project.symbols.clone(),
+        places: project.places.clone(),
         ..Fragment::default()
     }
 }

@@ -7,7 +7,7 @@ use lighthouse_checks::Checks;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Options, Position, Severity, Span,
     ucm::{
-        Anchor, EditOp, File, FixOutcome, Fragment, Node, Owner, Project, Symbol, SymbolId,
+        Anchor, EditOp, File, FixOutcome, Fragment, Node, Owner, Place, Project, Symbol, SymbolId,
         SymbolKind, Visibility,
     },
 };
@@ -41,7 +41,7 @@ fn project(names: &[&str]) -> Project {
 
 /// The same, with the extents of the declarations when `extents`.
 fn declared(names: &[&str], extents: bool) -> Project {
-    let symbols = names
+    let (symbols, places): (Vec<Symbol>, Vec<Place>) = names
         .iter()
         .enumerate()
         .map(|(n, name)| {
@@ -49,31 +49,34 @@ fn declared(names: &[&str], extents: bool) -> Project {
                 (u32::try_from(n).unwrap() + 1, 1),
                 (u32::try_from(n).unwrap() + 1, 10),
             );
-            Symbol {
+            let place = Place {
+                extent: extents.then_some(at),
+                ..Place::new(id(name), at)
+            };
+            let symbol = Symbol {
                 id: id(name),
                 kind: SymbolKind::Function,
                 visibility: Visibility::Private,
                 owner: None,
                 file: FILE.into(),
-                span: at,
-                extent: extents.then_some(at),
-                doc: None,
                 name: (*name).to_owned(),
                 role: None,
                 optional: false,
                 type_ref: None,
-            }
+                implementation: false,
+            };
+            (symbol, place)
         })
-        .collect();
+        .unzip();
     Project::merge([Fragment {
         files: vec![File {
             path: FILE.into(),
             lang: "src".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),
         }],
+        places,
         symbols,
         ..Fragment::default()
     }])

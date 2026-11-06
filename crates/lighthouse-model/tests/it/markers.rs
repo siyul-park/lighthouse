@@ -17,7 +17,6 @@ fn commented(text: &str) -> Fragment {
         files: vec![File {
             path: "a.go".into(),
             lang: "go".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),

@@ -1,7 +1,6 @@
 #[path = "builders.rs"]
 mod builders;
 
-use lighthouse_model::ucm::Model;
 use std::{
     collections::BTreeMap,
     fs,
@@ -824,8 +823,7 @@ fn an_overlaid_check_reads_the_overlay_not_the_disk_and_leaves_the_disk_alone() 
     let out = engine.check_overlaid(&[], &[], &overlays).unwrap();
     let plain = engine.check_project(&[], &[]).unwrap();
 
-    let hash =
-        |o: &lighthouse_engine::Run, f: &str| o.project.file(Path::new(f)).unwrap().hash.clone();
+    let hash = |o: &lighthouse_engine::Run, f: &str| o.read[Path::new(f)].clone();
     assert_eq!(
         hash(&out, "a.txt"),
         lighthouse_protocol::hash::sha256("overlaid")

@@ -1,6 +1,6 @@
 use lighthouse_model::{
     Position, Span,
-    ucm::{File, Fragment, Module, Symbol, SymbolId, SymbolKind, TestCase, TestStyle},
+    ucm::{File, Fragment, Module, Place, Symbol, SymbolId, SymbolKind, TestCase, TestStyle},
 };
 
 use super::*;
@@ -17,7 +17,6 @@ fn symbol(owners: &[&str], name: &str, kind: SymbolKind) -> Symbol {
         kind,
         Visibility::Public,
         "m.py".into(),
-        span(),
         name,
     );
     symbol.owner = owners
@@ -37,11 +36,14 @@ fn project(symbols: Vec<Symbol>, tests: &[&str]) -> Project {
             targets: Vec::new(),
         })
         .collect();
+    let places = symbols
+        .iter()
+        .map(|s| Place::new(s.id.clone(), span()))
+        .collect();
     Project::merge([Fragment {
         files: vec![File {
             path: "m.py".into(),
             lang: "python".to_owned(),
-            hash: String::new(),
             generated: false,
             test: true,
             facts: Default::default(),
@@ -54,6 +56,7 @@ fn project(symbols: Vec<Symbol>, tests: &[&str]) -> Project {
             example: false,
         }],
         symbols,
+        places,
         tests,
         ..Default::default()
     }])

@@ -49,8 +49,30 @@ mod widths;
 
 use forward::{forwarded, reaches};
 
-/// The fields of a node that are where it is.
-const POSITIONAL: [&str; 4] = ["line", "col", "pos", "end_line"];
+/// The fields of a node that are where it is and what it says.
+const POSITIONAL: [&str; 6] = ["line", "col", "pos", "end_line", "documented", "doc"];
+
+/// The summary of a function, read when a field asks for it: the summary moves
+/// with the body of the function, so a node related to another one is built
+/// without it unless an expression reads what it holds.
+#[derive(Clone, Copy)]
+pub(super) struct Summary<'p> {
+    project: &'p dyn Model,
+    symbol: &'p SymbolId,
+}
+
+impl<'p> Summary<'p> {
+    pub(super) fn of(project: &'p dyn Model, symbol: &'p Symbol) -> Self {
+        Self {
+            project,
+            symbol: &symbol.id,
+        }
+    }
+
+    pub(super) fn get(self) -> Option<&'p FunctionSummary> {
+        self.project.function(self.symbol)
+    }
+}
 
 /// Builds the values of one check over one file (or the project).
 pub(crate) struct Builder<'a> {
@@ -156,8 +178,13 @@ impl<'a> Builder<'a> {
             .or_else(|| {
                 self.project
                     .symbols_in(&comment.file)
-                    .filter(|symbol| symbol.span.start.line > end && symbol.name != MODULE_BODY)
-                    .min_by_key(|symbol| (symbol.span.start, &symbol.id))
+                    .filter(|symbol| {
+                        facts::span_of(self.project, &symbol.id).start.line > end
+                            && symbol.name != MODULE_BODY
+                    })
+                    .min_by_key(|symbol| {
+                        (facts::span_of(self.project, &symbol.id).start, &symbol.id)
+                    })
             });
         let bodies: Vec<&str> = comment
             .text
@@ -186,7 +213,13 @@ impl<'a> Builder<'a> {
                         .iter()
                         .any(|prefix| body.starts_with(prefix))
             });
-        let gap = next.map_or(0, |symbol| blank_lines(text, end, symbol.span.start.line));
+        let gap = next.map_or(0, |symbol| {
+            blank_lines(
+                text,
+                end,
+                facts::span_of(self.project, &symbol.id).start.line,
+            )
+        });
         let blank = Span {
             start: Position {
                 line: end + 1,
@@ -221,7 +254,7 @@ impl<'a> Builder<'a> {
     /// A symbol with every fact its check asks for.
     pub(crate) fn symbol(&self, symbol: &Symbol) -> Value {
         let mut value = facts::symbol(self.project, symbol);
-        self.enrich(&mut value, symbol, self.project.function(&symbol.id));
+        self.enrich(&mut value, symbol, Summary::of(self.project, symbol));
         value
     }
 
@@ -240,9 +273,9 @@ impl<'a> Builder<'a> {
     /// no summary, is no subject of a function check, and its `func` is
     /// `null`. That is "not applicable", never a failure.
     pub(crate) fn function(&self, symbol: &Symbol) -> Option<Value> {
-        let summary = self.project.function(&symbol.id)?;
+        self.project.function(&symbol.id)?;
         let mut value = facts::function(self.project, symbol)?;
-        self.enrich(&mut value, symbol, Some(summary));
+        self.enrich(&mut value, symbol, Summary::of(self.project, symbol));
         Some(value)
     }
 
@@ -251,7 +284,7 @@ impl<'a> Builder<'a> {
     pub(crate) fn test(&self, symbol: &Symbol) -> Option<Value> {
         let case = self.project.test(&symbol.id)?;
         let mut value = facts::test(self.project, symbol, case);
-        self.enrich(&mut value, symbol, self.project.function(&symbol.id));
+        self.enrich(&mut value, symbol, Summary::of(self.project, symbol));
         Some(value)
     }
 
@@ -268,7 +301,7 @@ impl<'a> Builder<'a> {
                 .symbols()
                 .filter(|s| s.id.module() == module.path)
                 .collect();
-            symbols.sort_by_key(|s| (&s.file, s.span.start, &s.id));
+            symbols.sort_by_key(|s| (&s.file, facts::span_of(self.project, &s.id).start, &s.id));
             value["symbols"] = Value::Array(symbols.into_iter().map(|s| self.related(s)).collect());
         }
         if self.needs.field("types") {
@@ -300,7 +333,7 @@ impl<'a> Builder<'a> {
         value["generated"] = json!(self.project.file(&file.path).is_none_or(|f| f.generated));
         if self.needs.field("symbols") {
             let mut symbols: Vec<&Symbol> = self.project.symbols_in(&file.path).collect();
-            symbols.sort_by_key(|s| (s.span.start, &s.id));
+            symbols.sort_by_key(|s| (facts::span_of(self.project, &s.id).start, &s.id));
             value["symbols"] = Value::Array(symbols.into_iter().map(|s| self.related(s)).collect());
         }
         if self.needs.field("comments") {
@@ -337,7 +370,7 @@ impl<'a> Builder<'a> {
         value
     }
 
-    fn enrich(&self, value: &mut Value, symbol: &Symbol, summary: Option<&FunctionSummary>) {
+    fn enrich(&self, value: &mut Value, symbol: &Symbol, summary: Summary<'_>) {
         if let Some(map) = value.as_object_mut() {
             map.extend(self.extras(symbol, summary));
         }
@@ -345,7 +378,7 @@ impl<'a> Builder<'a> {
 
     /// The fields on top of the base fields of a symbol, which only the
     /// expressions of this check ask for.
-    fn extras(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Map<String, Value> {
+    fn extras(&self, symbol: &Symbol, summary: Summary<'_>) -> Map<String, Value> {
         let mut extras = self.fields(symbol, summary, self.needs);
         self.relations(&mut extras, symbol);
         extras
@@ -353,12 +386,7 @@ impl<'a> Builder<'a> {
 
     /// The extra fields that are no relation to other nodes: what a node
     /// related to another one has, as the node itself.
-    fn fields(
-        &self,
-        symbol: &Symbol,
-        summary: Option<&FunctionSummary>,
-        needs: &Needs,
-    ) -> Map<String, Value> {
+    fn fields(&self, symbol: &Symbol, summary: Summary<'_>, needs: &Needs) -> Map<String, Value> {
         let mut extras = Map::new();
         let map = &mut extras;
         if needs.field("metrics") {
@@ -374,7 +402,10 @@ impl<'a> Builder<'a> {
             map.insert("tests".to_owned(), self.tests(symbol));
         }
         if needs.field("span") {
-            map.insert("span".to_owned(), span(&symbol.file, symbol.span));
+            map.insert(
+                "span".to_owned(),
+                span(&symbol.file, facts::span_of(self.project, &symbol.id)),
+            );
         }
         if needs.field("words") {
             map.insert("words".to_owned(), json!(crate::text::words(&symbol.name)));
@@ -387,12 +418,12 @@ impl<'a> Builder<'a> {
         &self,
         map: &mut Map<String, Value>,
         symbol: &Symbol,
-        summary: Option<&FunctionSummary>,
+        summary: Summary<'_>,
         needs: &Needs,
     ) {
         let project = self.project;
         if needs.field("forwards_only") || needs.field("forward_target") {
-            let target = summary.and_then(|_| forwarded(project, symbol));
+            let target = summary.get().and_then(|_| forwarded(project, symbol));
             map.insert("forwards_only".to_owned(), json!(target.is_some()));
             map.insert(
                 "forward_target".to_owned(),
@@ -517,11 +548,13 @@ impl<'a> Builder<'a> {
 
     /// A related node as the expressions read it; see [`Builder::related`].
     fn build_related(&self, symbol: &Symbol) -> Value {
-        let summary = self.project.function(&symbol.id);
-        let mut value = facts::symbol(self.project, symbol);
+        let summary = Summary::of(self.project, symbol);
         let needs = &self.related_needs;
-        // Where a related node is moves with any edit above it: the rules that
-        // do not read a position of it do not depend on one.
+        // Where a related node is moves with any edit above it, and what it says
+        // with an edit of its comment: the rules that read neither of it do not
+        // depend on either, and the node is built from its shape alone.
+        let placed = POSITIONAL.iter().any(|name| needs.field(name));
+        let mut value = facts::symbol_with(self.project, symbol, placed);
         if let Some(map) = value.as_object_mut() {
             map.retain(|name, _| !POSITIONAL.contains(&name.as_str()) || needs.field(name));
         }
@@ -580,7 +613,7 @@ impl<'a> Builder<'a> {
                 .filter(|s| s.owner == symbol.owner)
                 .collect()
         };
-        peers.sort_by_key(|s| (s.span.start, &s.id));
+        peers.sort_by_key(|s| (facts::span_of(self.project, &s.id).start, &s.id));
         let Some(at) = peers.iter().position(|s| s.id == symbol.id) else {
             return (Value::Null, Value::Null);
         };
@@ -632,7 +665,8 @@ impl<'a> Builder<'a> {
 
     /// What is measured of a function, the numbers of its signature among them;
     /// `measured` says whether the analyzer measured it.
-    fn metrics(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Value {
+    fn metrics(&self, symbol: &Symbol, summary: Summary<'_>) -> Value {
+        let summary = summary.get();
         let found = self.indexes.measured(symbol);
         let measures = found.unwrap_or_default();
         json!({
@@ -688,14 +722,17 @@ impl<'a> Builder<'a> {
         {
             return json!([]);
         }
-        callers.sort_by_key(|s| (s.span.start, &s.id));
+        callers.sort_by_key(|s| (facts::span_of(self.project, &s.id).start, &s.id));
         Value::Array(callers.into_iter().map(|s| self.related(s)).collect())
     }
 
     fn file_module(&self, file: &lighthouse_model::ucm::File) -> Option<String> {
         self.project
             .symbols_in(&file.path)
-            .min_by(|a, b| (a.span.start, &a.id).cmp(&(b.span.start, &b.id)))
+            .min_by(|a, b| {
+                (facts::span_of(self.project, &a.id).start, &a.id)
+                    .cmp(&(facts::span_of(self.project, &b.id).start, &b.id))
+            })
             .map(|s| s.id.module().to_owned())
     }
 
@@ -704,7 +741,7 @@ impl<'a> Builder<'a> {
     fn private_reach(&self, file: &lighthouse_model::ucm::File) -> Value {
         let project = self.project;
         let mut symbols: Vec<&Symbol> = project.symbols_in(&file.path).collect();
-        symbols.sort_by_key(|s| (s.span.start, &s.id));
+        symbols.sort_by_key(|s| (facts::span_of(self.project, &s.id).start, &s.id));
         let Some(first) = symbols.first() else {
             return json!({ "symbols": [], "first": "" });
         };

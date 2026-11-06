@@ -14,8 +14,8 @@ use lighthouse_model::ucm::{Comment, Host};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, File, Fragment, FunctionSummary, Model, Module, Node, Project, Resolution,
-        Symbol, SymbolId, SymbolKind, TestCase, TestStyle, Visibility,
+        Edge, EdgeKind, File, Fragment, FunctionSummary, Model, Module, Node, Place, Project,
+        Resolution, Symbol, SymbolId, SymbolKind, TestCase, TestStyle, Visibility,
     },
 };
 use lighthouse_spec::{Content, OVERLAY};
@@ -67,14 +67,13 @@ impl Spec {
         let id = |name: &str, kind| SymbolId::new(&self.module, &[], name, kind);
         let ty = id("T", SymbolKind::Type);
         let mut symbols = Vec::new();
+        let mut places = Vec::new();
         let mut functions = Vec::new();
         let mut line = self.shift;
         let mut push = |symbol: Symbol| {
             line += 1;
-            symbols.push(Symbol {
-                span: at(line),
-                ..symbol
-            });
+            places.push(Place::new(symbol.id.clone(), at(line)));
+            symbols.push(symbol);
         };
         for name in &self.functions {
             let id = id(name, SymbolKind::Function);
@@ -84,7 +83,6 @@ impl Spec {
                 SymbolKind::Function,
                 Visibility::Private,
                 path.into(),
-                at(0),
                 name.clone(),
             ));
         }
@@ -94,7 +92,6 @@ impl Spec {
                 SymbolKind::Type,
                 Visibility::Public,
                 path.into(),
-                at(0),
                 "T",
             ));
         }
@@ -108,7 +105,6 @@ impl Spec {
                     SymbolKind::Method,
                     Visibility::Public,
                     path.into(),
-                    at(0),
                     name.clone(),
                 )
             });
@@ -128,7 +124,6 @@ impl Spec {
                 SymbolKind::Test,
                 Visibility::Private,
                 path.into(),
-                at(0),
                 "test_a",
             ));
         }
@@ -153,7 +148,6 @@ impl Spec {
             files: vec![File {
                 path: path.into(),
                 lang: self.lang.to_owned(),
-                hash: format!("{}", self.shift),
                 generated: false,
                 test: false,
                 facts: Default::default(),
@@ -166,6 +160,7 @@ impl Spec {
                 example: false,
             }],
             symbols,
+            places,
             functions: functions
                 .into_iter()
                 .map(|f| FunctionSummary {
@@ -194,7 +189,6 @@ fn summary(symbol: SymbolId) -> FunctionSummary {
         signature: Default::default(),
         events: Vec::new(),
         manual_assertions: 0,
-        implementation: false,
         constructs: false,
         configures: None,
     }

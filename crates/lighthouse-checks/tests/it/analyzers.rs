@@ -4,32 +4,26 @@ use lighthouse_checks::metrics::{MEASURES, Measures, Metrics};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Project, Resolution,
-        Symbol, SymbolId, SymbolKind, Target, Visibility,
+        Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Place, Project,
+        Resolution, Symbol, SymbolId, SymbolKind, Target, Visibility,
     },
 };
 use lighthouse_plugin::{AnalyzerContext, Facts, Plugin};
 
 const FILE: &str = "m/m.go";
 
-fn symbol(module: &str, name: &str, kind: SymbolKind, file: &str, lines: (u32, u32)) -> Symbol {
-    let at = |line| Position { line, col: 1 };
+fn symbol(module: &str, name: &str, kind: SymbolKind, file: &str, _lines: (u32, u32)) -> Symbol {
     Symbol {
         id: SymbolId::new(module, &[], name, kind),
         kind,
         visibility: Visibility::Private,
         owner: None,
         file: file.into(),
-        span: Span {
-            start: at(lines.0),
-            end: at(lines.1),
-        },
-        extent: None,
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
+        implementation: false,
     }
 }
 
@@ -47,7 +41,6 @@ fn summary(symbol: &Symbol, nesting: u32, statements: u32, flow: &[Flow]) -> Fun
         signature: Default::default(),
         events: Vec::new(),
         manual_assertions: 0,
-        implementation: false,
         constructs: false,
         configures: None,
     }
@@ -57,7 +50,6 @@ fn file(path: &str, test: bool) -> File {
     File {
         path: path.into(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test,
         facts: Default::default(),
@@ -228,6 +220,13 @@ fn size_reports_statements_and_lines_and_nesting_the_deepest_level() {
     let project = Project::merge([Fragment {
         files: vec![file(FILE, false)],
         functions: vec![summary(&f, 3, 12, &[])],
+        places: vec![Place::new(
+            f.id.clone(),
+            Span {
+                start: Position { line: 10, col: 1 },
+                end: Position { line: 24, col: 1 },
+            },
+        )],
         symbols: vec![f],
         ..Fragment::default()
     }]);

@@ -186,11 +186,10 @@ impl Reading<'_> {
         self.ctx
             .model
             .symbols_in(path)
-            .filter(|s| {
-                let extent = s.extent.unwrap_or(s.span);
-                extent.start <= start && start <= extent.end
-            })
-            .max_by_key(|s| s.extent.unwrap_or(s.span).start)
+            .map(|s| (s, crate::facts::extent_of(self.ctx.model, &s.id)))
+            .filter(|(_, extent)| extent.start <= start && start <= extent.end)
+            .max_by_key(|(_, extent)| extent.start)
+            .map(|(s, _)| s)
             .map_or_else(|| slashed(path), |s| s.id.as_str().to_owned())
     }
 }

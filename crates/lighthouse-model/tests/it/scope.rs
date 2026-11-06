@@ -11,7 +11,6 @@ fn file(path: &str, generated: bool, test: bool) -> File {
     File {
         path: path.into(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated,
         test,
         facts: Default::default(),
@@ -19,20 +18,17 @@ fn file(path: &str, generated: bool, test: bool) -> File {
 }
 
 fn symbol(path: &str, name: &str) -> Symbol {
-    let p = Position { line: 1, col: 1 };
     Symbol {
         id: SymbolId::new("m", &[], name, SymbolKind::Function),
         kind: SymbolKind::Function,
         visibility: Visibility::Public,
         owner: None,
         file: path.into(),
-        span: Span { start: p, end: p },
-        extent: None,
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
+        implementation: false,
     }
 }
 

@@ -78,7 +78,7 @@ fn handshake_declares_languages_and_index_converts_the_result() {
     let kept = &indexed.fragments[0].files[0];
     assert_eq!(kept.path, Path::new("a.fake"));
     assert!(!kept.generated, "the host decides");
-    assert_eq!(kept.hash, "abc", "the engine's file data is kept");
+    assert_eq!(kept.lang, "fake", "the engine's file data is kept");
     assert_eq!(indexed.fragments[0].modules[0].path, "m");
     assert_eq!(indexed.notices, ["from plugin"]);
     assert!(indexed.incomplete.iter().any(|i| i.reason == "half"));
@@ -101,7 +101,7 @@ fn handshake_declares_languages_and_index_converts_the_result() {
     );
     assert_eq!(
         params["units"][0]["files"][0],
-        json!({ "path": "a.fake", "hash": "abc" })
+        json!({ "path": "a.fake", "hash": lighthouse_protocol::hash::sha256("") })
     );
     assert_eq!(params["context"]["options"]["fake"]["tags"][0], "x");
     assert!(params["context"].get("overlays").is_none());

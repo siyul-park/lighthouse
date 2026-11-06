@@ -5,7 +5,7 @@ use lighthouse_checks::layout::{
 };
 use lighthouse_model::{
     Position, Span,
-    ucm::{File, Fragment, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility},
+    ucm::{File, Fragment, Place, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility},
 };
 use lighthouse_plugin::{Context, Workspace};
 
@@ -14,7 +14,15 @@ fn at(line: u32) -> Span {
     Span { start: p, end: p }
 }
 
-fn symbol(name: &str, kind: SymbolKind, owner: Option<&Symbol>, line: u32) -> Symbol {
+/// The symbols and their places, each declared on the line given.
+fn placed(declared: &[(&Symbol, u32)]) -> (Vec<Symbol>, Vec<Place>) {
+    declared
+        .iter()
+        .map(|(symbol, line)| ((*symbol).clone(), Place::new(symbol.id.clone(), at(*line))))
+        .unzip()
+}
+
+fn symbol(name: &str, kind: SymbolKind, owner: Option<&Symbol>, _line: u32) -> Symbol {
     let owners: Vec<&str> = owner.iter().map(|o| o.name.as_str()).collect();
     Symbol {
         id: SymbolId::new("m", &owners, name, kind),
@@ -22,13 +30,11 @@ fn symbol(name: &str, kind: SymbolKind, owner: Option<&Symbol>, line: u32) -> Sy
         visibility: Visibility::Public,
         owner: owner.map(|o| o.id.clone()),
         file: "m/a.go".into(),
-        span: at(line),
-        extent: None,
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
+        implementation: false,
     }
 }
 
@@ -36,7 +42,6 @@ fn file() -> File {
     File {
         path: "m/a.go".into(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -50,9 +55,11 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
     let func = symbol("Open", SymbolKind::Function, None, 5);
     let field = symbol("id", SymbolKind::Field, Some(&ty), 4);
     let file = file();
+    let (symbols, places) = placed(&[(&method, 9), (&func, 5), (&field, 4), (&ty, 3)]);
     let project = Project::merge([Fragment {
         files: vec![file.clone()],
-        symbols: vec![method.clone(), func.clone(), field, ty.clone()],
+        symbols,
+        places,
         ..Fragment::default()
     }]);
     let ws = Workspace::new(".");
@@ -92,9 +99,11 @@ fn declarations_in_a_test_file_are_its_fixtures_in_source_order() {
         test: true,
         ..file()
     };
+    let (symbols, places) = placed(&[(&late, 9), (&case, 5), (&early, 2)]);
     let project = Project::merge([Fragment {
         files: vec![test_file.clone()],
-        symbols: vec![late, case, early],
+        symbols,
+        places,
         ..Fragment::default()
     }]);
 
@@ -144,15 +153,17 @@ fn is_declaration_leaves_out_fields_and_members_of_interfaces() {
     let field = symbol("id", SymbolKind::Field, Some(&ty), 3);
     let method = symbol("Get", SymbolKind::Method, Some(&ty), 4);
     let declared = symbol("Read", SymbolKind::Method, Some(&iface), 5);
+    let (symbols, places) = placed(&[
+        (&ty, 1),
+        (&iface, 2),
+        (&field, 3),
+        (&method, 4),
+        (&declared, 5),
+    ]);
     let project = Project::merge([Fragment {
         files: vec![file()],
-        symbols: vec![
-            ty.clone(),
-            iface.clone(),
-            field.clone(),
-            method.clone(),
-            declared.clone(),
-        ],
+        symbols,
+        places,
         ..Fragment::default()
     }]);
     assert!(is_declaration(&project, &ty));
@@ -164,9 +175,11 @@ fn is_declaration_leaves_out_fields_and_members_of_interfaces() {
 #[test]
 fn the_body_of_a_module_is_no_declaration() {
     let body = symbol(MODULE_BODY, SymbolKind::Function, None, 1);
+    let (symbols, places) = placed(&[(&body, 1)]);
     let project = Project::merge([Fragment {
         files: vec![file()],
-        symbols: vec![body.clone()],
+        symbols,
+        places,
         ..Fragment::default()
     }]);
     assert!(!is_declaration(&project, &body));

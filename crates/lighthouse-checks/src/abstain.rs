@@ -153,7 +153,7 @@ impl Abstain {
                 }
             }
             (_, Some(symbol)) => cut(
-                &lines(source, symbol.extent.unwrap_or(symbol.span)),
+                &lines(source, crate::facts::extent_of(ctx.model, &symbol.id)),
                 MAX_TEXT,
             ),
         };
@@ -214,7 +214,7 @@ fn neighbors(ctx: &Context, source: &str, symbol: &lighthouse_model::ucm::Symbol
                 relation: relation.to_owned(),
                 text: if near.file == symbol.file {
                     cut(
-                        &lines(source, near.extent.unwrap_or(near.span)),
+                        &lines(source, crate::facts::extent_of(project, &near.id)),
                         MAX_NEIGHBOR_TEXT,
                     )
                 } else {

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Position, Severity, Span,
     ucm::{
-        Edge, EdgeKind, File, Fragment, Module, Node, Project, Resolution, Symbol, SymbolId,
+        Edge, EdgeKind, File, Fragment, Module, Node, Place, Project, Resolution, Symbol, SymbolId,
         SymbolKind, Target, Visibility,
     },
 };
@@ -85,20 +85,30 @@ fn span(from: u32, to: u32) -> Span {
     }
 }
 
-fn symbol(file: &str, (name, from, to, doc): (&str, u32, u32, Option<&str>)) -> Symbol {
+/// Where a symbol of the fixture is, and what it says.
+fn place((name, from, to, doc): (&str, u32, u32, Option<&str>)) -> Place {
+    Place {
+        extent: Some(span(from, to)),
+        doc: doc.map(str::to_owned),
+        ..Place::new(
+            SymbolId::new("m", &[], name, SymbolKind::Function),
+            span(from, to),
+        )
+    }
+}
+
+fn symbol(file: &str, (name, _, _, _): (&str, u32, u32, Option<&str>)) -> Symbol {
     Symbol {
         id: SymbolId::new("m", &[], name, SymbolKind::Function),
         kind: SymbolKind::Function,
         visibility: Visibility::Public,
         owner: None,
         file: file.into(),
-        span: span(from, to),
-        extent: Some(span(from, to)),
-        doc: doc.map(str::to_owned),
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
+        implementation: false,
     }
 }
 
@@ -106,7 +116,6 @@ fn file(path: &str, language: &str) -> File {
     File {
         path: path.into(),
         lang: language.to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -160,12 +169,14 @@ impl Fixture {
                 }],
                 edges,
                 symbols: own.clone(),
+                places: self.own_symbols.map(place).to_vec(),
                 ..Fragment::default()
             },
             Fragment {
                 files: vec![file(self.other.0, self.language)],
                 edges: vec![calls(&caller, &own[0], self.caller.3)],
                 symbols: vec![caller],
+                places: vec![place((self.caller.0, self.caller.1, self.caller.2, None))],
                 ..Fragment::default()
             },
         ];
@@ -178,6 +189,7 @@ impl Fixture {
                     calls(&own[0], &leak, self.inside.0),
                 ],
                 symbols: vec![leak],
+                places: vec![place(("leak", 1, 1, None))],
                 ..Fragment::default()
             });
         }
@@ -409,11 +421,13 @@ fn a_used_symbol_of_another_file_makes_that_file_briefed_only_while_it_fits() {
             }],
             edges: vec![calls(&greet, &helper, fixture.inside.0)],
             symbols: vec![greet],
+            places: vec![place(fixture.own_symbols[0])],
             ..Fragment::default()
         },
         Fragment {
             files: vec![file("h.go", "go")],
             symbols: vec![helper],
+            places: vec![place(("helper", 1, 1, None))],
             ..Fragment::default()
         },
     ]);

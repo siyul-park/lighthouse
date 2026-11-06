@@ -54,7 +54,7 @@ impl Lowerer<'_> {
         let held: Vec<Range<usize>> = self
             .project
             .symbols_in(file)
-            .filter_map(|s| index.range(s.extent?))
+            .filter_map(|s| index.range(self.project.place(&s.id)?.extent?))
             .collect();
         self.project
             .edges

@@ -48,7 +48,6 @@ fn undeclared_source_expressions_keep_edges_without_becoming_functions() {
     let file = File {
         path: PathBuf::from("decisions/example.yaml"),
         lang: "yaml".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -101,7 +100,6 @@ fn indexes_embedded_cel_at_original_host_coordinates() {
     let file = File {
         path: PathBuf::from("decisions/example.yaml"),
         lang: "yaml".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -148,8 +146,13 @@ fn indexes_embedded_cel_at_original_host_coordinates() {
         .iter()
         .find(|symbol| symbol.name == "where")
         .unwrap();
-    assert_eq!(expression_symbol.span.start.line, 1);
-    assert_eq!(expression_symbol.span.start.col, 8);
+    let place = project
+        .places
+        .iter()
+        .find(|place| place.symbol == expression_symbol.id)
+        .unwrap();
+    assert_eq!(place.span.start.line, 1);
+    assert_eq!(place.span.start.col, 8);
     assert!(
         project
             .functions
@@ -217,7 +220,6 @@ fn a_decision_resolves_the_shared_variable_of_its_pack() {
     let file = File {
         path: PathBuf::from("decisions/x.yaml"),
         lang: "yaml".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),

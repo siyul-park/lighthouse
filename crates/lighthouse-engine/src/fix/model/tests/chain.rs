@@ -8,8 +8,8 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::Mutex};
 use lighthouse_model::{
     Fingerprint, Severity,
     ucm::{
-        Edge, EdgeKind, File, Fragment, FunctionSummary, Node, Project, Resolution, Signature,
-        Symbol, Target, TypeRef,
+        Edge, EdgeKind, File, Fragment, FunctionSummary, Node, Place, Project, Resolution,
+        Signature, Symbol, Target, TypeRef,
     },
 };
 use lighthouse_plugin::{
@@ -30,8 +30,8 @@ use crate::{
     },
 };
 
-fn function(name: &str, file: &str, result: &str) -> (Symbol, FunctionSummary) {
-    let mut symbol = symbol(name, (1, 1), 2);
+fn function(name: &str, file: &str, result: &str) -> (Symbol, Place, FunctionSummary) {
+    let (mut symbol, place) = symbol(name, (1, 1), 2);
     symbol.file = file.into();
     let summary = FunctionSummary {
         symbol: symbol.id.clone(),
@@ -53,11 +53,10 @@ fn function(name: &str, file: &str, result: &str) -> (Symbol, FunctionSummary) {
         },
         events: Vec::new(),
         manual_assertions: 0,
-        implementation: false,
         constructs: false,
         configures: None,
     };
-    (symbol, summary)
+    (symbol, place, summary)
 }
 
 /// A project of `a.go`, which declares `f` returning `result`, and `b.go`,
@@ -68,13 +67,12 @@ fn project(result: &str) -> Project {
 
 /// The same project, `g` calling `f` only when `calls`.
 fn project_calling(result: &str, calls: bool) -> Project {
-    let (f, f_summary) = function("f", "a.go", result);
-    let (g, g_summary) = function("g", "b.go", "int");
-    let (h, h_summary) = function("h", "c.go", "int");
+    let (f, f_place, f_summary) = function("f", "a.go", result);
+    let (g, g_place, g_summary) = function("g", "b.go", "int");
+    let (h, h_place, h_summary) = function("h", "c.go", "int");
     let file = |path: &str| File {
         path: path.into(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -90,6 +88,7 @@ fn project_calling(result: &str, calls: bool) -> Project {
     Project::merge([Fragment {
         files: vec![file("a.go"), file("b.go"), file("c.go")],
         symbols: vec![f, g, h],
+        places: vec![f_place, g_place, h_place],
         edges: if calls { vec![calls_f] } else { Vec::new() },
         functions: vec![f_summary, g_summary, h_summary],
         ..Fragment::default()
@@ -142,11 +141,10 @@ fn a_change_reaches_the_files_that_use_its_symbols_and_those_they_use_before_or_
 /// `a.go` declares `f` and `b.go` refers to it at module level, as an
 /// import or a call outside any function does; `without_f` leaves `f` out.
 fn with_module_level_use(without_f: bool) -> Project {
-    let (f, summary) = function("f", "a.go", "int");
+    let (f, _, summary) = function("f", "a.go", "int");
     let file = |path: &str| File {
         path: path.into(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -287,11 +285,10 @@ fn agent() -> Agent {
     })
 }
 
-fn indexed(hash: &str) -> Run {
+fn indexed() -> Run {
     let file = File {
         path: FILE.into(),
         lang: "go".to_owned(),
-        hash: hash.to_owned(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -301,6 +298,8 @@ fn indexed(hash: &str) -> Run {
             files: vec![file],
             ..Fragment::default()
         }]),
+        // What the run read of the file, which stays as the file changes.
+        read: BTreeMap::from([(FILE.into(), "h".to_owned())]),
         ..Run::default()
     }
 }
@@ -309,7 +308,7 @@ fn indexed(hash: &str) -> Run {
 fn an_answer_kept_over_texts_that_are_not_there_any_more_is_declined_as_a_conflict() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join(FILE), "disk\n").unwrap();
-    let outcome = indexed("h");
+    let outcome = indexed();
     let texts = Overlays::new();
     let fixes = BTreeMap::new();
     let mut bound = Models::default();

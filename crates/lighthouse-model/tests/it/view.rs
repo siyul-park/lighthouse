@@ -4,8 +4,8 @@ use lighthouse_graph::{Graph, Options};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        File, Fragment, Held, Host, Model, Symbol, SymbolId, SymbolKind, TestCase, TestStyle, View,
-        Visibility,
+        File, Fragment, Held, Host, Model, Place, Symbol, SymbolId, SymbolKind, TestCase,
+        TestStyle, View, Visibility,
     },
 };
 
@@ -23,19 +23,18 @@ fn fragment(module: &str, name: &str, test: bool) -> Fragment {
         kind,
         Visibility::Public,
         path.clone().into(),
-        Span { start: at, end: at },
         name,
     );
     Fragment {
         files: vec![File {
             path: path.into(),
             lang: "go".to_owned(),
-            hash: String::new(),
             generated: false,
             test,
             facts: Default::default(),
         }],
         symbols: vec![symbol],
+        places: vec![Place::new(id.clone(), Span { start: at, end: at })],
         tests: test
             .then(|| TestCase {
                 symbol: id,

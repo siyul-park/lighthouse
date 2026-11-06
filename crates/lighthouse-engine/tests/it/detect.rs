@@ -2,7 +2,6 @@
 //! system the files and their hashes are those of a fresh walk, the findings
 //! are those of a run without a cache, and a file is read only when it moved.
 
-use lighthouse_model::ucm::Model;
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
@@ -65,10 +64,9 @@ fn fresh(root: &Path, patterns: &[String]) -> Vec<(PathBuf, String)> {
 }
 
 fn hashes(run: &Run) -> Vec<(PathBuf, String)> {
-    run.project
-        .files
+    run.read
         .iter()
-        .map(|file| (file.path.clone(), file.hash.clone()))
+        .map(|(path, hash)| (path.clone(), hash.clone()))
         .collect()
 }
 
@@ -217,10 +215,7 @@ fn an_edit_in_the_same_second_as_the_last_run_is_seen() {
 
     let run = run_with(&root, Some(cache.path()), "");
 
-    assert_eq!(
-        run.project.file(Path::new("x.txt")).unwrap().hash,
-        hash::sha256("same-2")
-    );
+    assert_eq!(run.read[Path::new("x.txt")], hash::sha256("same-2"));
 }
 
 #[test]
@@ -232,7 +227,7 @@ fn an_overlay_stands_in_for_the_file_and_gives_way_when_it_is_dropped() {
     write(&root, "y.txt", "other");
     let (engine, _) = engine_with(&root, &config(""));
     let engine = engine.with_cache(cache.path().to_owned(), LIMIT);
-    let hash_of = |run: &Run, name: &str| run.project.file(Path::new(name)).unwrap().hash.clone();
+    let hash_of = |run: &Run, name: &str| run.read[Path::new(name)].clone();
     let overlaid = |text: &str| -> lighthouse_engine::Overlays {
         [(PathBuf::from("x.txt"), text.to_owned())].into()
     };
@@ -278,7 +273,7 @@ fn runs_from_several_threads_each_see_their_own_overlays() {
                     .into();
                     let run = engine.check_overlaid(&[], &[], &overlays).unwrap();
                     let (path, text) = overlays.iter().next().unwrap();
-                    let seen = run.project.file(path).unwrap().hash.clone();
+                    let seen = run.read[path].clone();
                     assert_eq!(seen, hash::sha256(text), "thread {n} round {round}");
                 }
             });

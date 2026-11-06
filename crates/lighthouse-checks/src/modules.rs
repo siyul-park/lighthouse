@@ -6,13 +6,18 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::ucm::{EdgeKind, Model, Node, Symbol, SymbolKind, Target};
+use lighthouse_model::{
+    Span,
+    ucm::{EdgeKind, Model, Node, Symbol, SymbolKind, Target},
+};
 
 /// A module that declares a symbol.
 pub(crate) struct Declared<'p> {
     /// The symbol that sorts first by file and position; the findings of a
     /// project decision about the module are reported there.
     pub anchor: &'p Symbol,
+    /// Where the anchor is.
+    pub anchor_span: Span,
     /// Semantic language of the module, distinct from the physical host format.
     pub lang: String,
     /// The files that declare a symbol of it.
@@ -36,7 +41,9 @@ pub(crate) fn index(project: &dyn Model) -> BTreeMap<&str, Declared<'_>> {
     let mut extents: BTreeMap<(&str, &Path), (u32, u32)> = BTreeMap::new();
     for symbol in project.symbols() {
         let path = symbol.id.module();
-        let span = symbol.extent.unwrap_or(symbol.span);
+        let place = project.place(&symbol.id);
+        let at = crate::facts::span_of(project, &symbol.id);
+        let span = place.and_then(|p| p.extent).unwrap_or(at);
         let (first, last) = extents
             .entry((path, symbol.file.as_path()))
             .or_insert((span.start.line, span.end.line));
@@ -47,6 +54,7 @@ pub(crate) fn index(project: &dyn Model) -> BTreeMap<&str, Declared<'_>> {
             .map_or_else(String::new, str::to_owned);
         let module = modules.entry(path).or_insert_with(|| Declared {
             anchor: symbol,
+            anchor_span: at,
             lang,
             files: BTreeSet::new(),
             lines: 0,
@@ -55,8 +63,9 @@ pub(crate) fn index(project: &dyn Model) -> BTreeMap<&str, Declared<'_>> {
             children: Vec::new(),
         });
         module.files.insert(symbol.file.as_path());
-        if (&symbol.file, symbol.span.start) < (&module.anchor.file, module.anchor.span.start) {
+        if (&symbol.file, at.start) < (&module.anchor.file, module.anchor_span.start) {
             module.anchor = symbol;
+            module.anchor_span = at;
         }
         module.declares += usize::from(declares(symbol));
     }

@@ -12,7 +12,7 @@ use lighthouse_model::ucm::{FunctionSummary, Model, Symbol, SymbolId, SymbolKind
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::Builder;
+use super::{Builder, Summary};
 
 /// Who takes and touches which type.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,12 +34,8 @@ struct Hidden {
 impl Builder<'_> {
     /// `[{struct, fields: [optional]}]` for a function: one entry per
     /// parameter that is a single-use struct (once per parameter).
-    pub(super) fn param_structs(
-        &self,
-        function: &Symbol,
-        summary: Option<&FunctionSummary>,
-    ) -> Value {
-        let Some(summary) = summary else {
+    pub(super) fn param_structs(&self, function: &Symbol, summary: Summary<'_>) -> Value {
+        let Some(summary) = summary.get() else {
             return json!([]);
         };
         Value::Array(

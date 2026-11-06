@@ -1,9 +1,9 @@
 //! The `role` fact of a function and the constructor facts beside it.
 
-use lighthouse_model::ucm::{FunctionSummary, Symbol, SymbolKind};
+use lighthouse_model::ucm::{Symbol, SymbolKind};
 use serde_json::{Map, Value, json};
 
-use super::Builder;
+use super::{Builder, Summary};
 use crate::layout;
 
 /// What a function is, as the providers and the project's conventions say.
@@ -23,7 +23,7 @@ impl Builder<'_> {
         &self,
         map: &mut Map<String, Value>,
         symbol: &Symbol,
-        summary: Option<&FunctionSummary>,
+        summary: Summary<'_>,
     ) {
         let needs = self.needs;
         if needs.field("constructor_named") {
@@ -40,6 +40,7 @@ impl Builder<'_> {
         }
         if needs.field("configures") {
             let named = summary
+                .get()
                 .and_then(|s| s.configures.as_deref())
                 .and_then(|id| id.rsplit_once("::"))
                 .map_or("", |(_, name)| name);
@@ -66,8 +67,9 @@ impl Builder<'_> {
     /// its prefix names, as written (`NewServer` builds `Server`) or with a
     /// lowercase first letter (`newServer` builds `server`); else that name
     /// itself; else its owner (`Server::new`); else its own name.
-    pub(super) fn built(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> String {
+    pub(super) fn built(&self, symbol: &Symbol, summary: Summary<'_>) -> String {
         let returned = summary
+            .get()
             .filter(|s| s.constructs)
             .and_then(|s| s.signature.results.iter().find_map(|r| r.symbol.as_deref()))
             .and_then(|id| id.rsplit_once("::"))
@@ -120,7 +122,7 @@ impl Builder<'_> {
 
     /// What a function is for: the first role its flags give (see
     /// [`precedence`]). Empty for anything that is not a function.
-    pub(super) fn role(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> &'static str {
+    pub(super) fn role(&self, symbol: &Symbol, summary: Summary<'_>) -> &'static str {
         if !matches!(
             symbol.kind,
             SymbolKind::Function | SymbolKind::Method | SymbolKind::Test
@@ -129,8 +131,9 @@ impl Builder<'_> {
         }
         precedence(Flags {
             test: symbol.kind == SymbolKind::Test || self.project.in_test(&symbol.id),
-            implementation: summary.is_some_and(|s| s.implementation),
-            constructor: summary.is_some_and(|s| s.constructs) || self.constructor_named(symbol),
+            implementation: symbol.implementation,
+            constructor: summary.get().is_some_and(|s| s.constructs)
+                || self.constructor_named(symbol),
             entrypoint: self.entrypoint(symbol),
             method: symbol.kind == SymbolKind::Method,
         })

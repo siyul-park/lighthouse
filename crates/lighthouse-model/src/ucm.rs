@@ -25,8 +25,8 @@ pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
 pub use kinds::{
-    CASES, EDGES, HOST, Host, INCOMING, MARKERS, MODULE_CASES, ORDERED_BY, OUTLINE, PATHS, PAYLOAD,
-    PROJECT, Payload, REGIONS_UNIT, RESOLVED, SITES, SLICE, SYMBOLS, key,
+    CASES, DECLARATIONS, EDGES, HOST, Host, INCOMING, MARKERS, MODULE_CASES, ORDERED_BY, PATHS,
+    PAYLOAD, PROJECT, Payload, REGIONS_UNIT, RESOLVED, SITES, SLICE, SYMBOLS, key,
 };
 pub use load_order::{LoadNeed, LoadPoint, load_needs};
 pub use markers::Markers;
@@ -35,7 +35,7 @@ pub use model::{Boxed, Model};
 use crate::{Document, Span};
 use merge::{dedup_edges, resolve_all, settle, sites_of, sorted_union};
 pub use slice::{Edges, Incoming, Resolved, Reverse, Sites, Slice, Tie, collisions, declared};
-pub use table::{Entry, Outline, Table};
+pub use table::{Declarations, Entry, Table};
 pub use view::{Held, View};
 
 /// The fact of a file that lists its regions, see [`File::regions`].
@@ -188,6 +188,9 @@ pub struct Fragment {
     pub files: Vec<File>,
     pub modules: Vec<Module>,
     pub symbols: Vec<Symbol>,
+    /// Where each symbol is and what it says, one per symbol.
+    #[serde(default)]
+    pub places: Vec<Place>,
     pub edges: Vec<Edge>,
     pub functions: Vec<FunctionSummary>,
     pub tests: Vec<TestCase>,
@@ -195,13 +198,12 @@ pub struct Fragment {
     pub comments: Vec<Comment>,
 }
 
-/// A project file; `path` is its project-relative identity and `hash` its content hash.
+/// A project file; `path` is its project-relative identity.
 /// `generated` and `test` are the provider's classification, never inferred here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct File {
     pub path: PathBuf,
     pub lang: String,
-    pub hash: String,
     pub generated: bool,
     pub test: bool,
     /// What the provider says of the file besides that, by name: the edition
@@ -284,14 +286,6 @@ pub struct Symbol {
     pub visibility: Visibility,
     pub owner: Option<SymbolId>,
     pub file: PathBuf,
-    pub span: Span,
-    /// The whole declaration, from its first leading doc comment, attribute or
-    /// annotation to its last token, `None` when the provider does not report
-    /// it (capability `extent`). It is what moving or deleting the declaration
-    /// takes along.
-    #[serde(default)]
-    pub extent: Option<Span>,
-    pub doc: Option<String>,
     pub name: String,
     pub role: Option<SymbolRole>,
     /// A field a caller may leave out (an `Option`, a collection, a pointer).
@@ -300,17 +294,53 @@ pub struct Symbol {
     /// The type of a field.
     #[serde(default)]
     pub type_ref: Option<TypeRef>,
+    /// A method of a trait impl: its signature is not its own to choose.
+    #[serde(default)]
+    pub implementation: bool,
+}
+
+/// Where a symbol is and what it says: what moves with every edit above it or
+/// inside it, apart from the shape of the declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Place {
+    pub symbol: SymbolId,
+    pub span: Span,
+    /// The whole declaration, from its first leading doc comment, attribute or
+    /// annotation to its last token, `None` when the provider does not report
+    /// it (capability `extent`). It is what moving or deleting the declaration
+    /// takes along.
+    #[serde(default)]
+    pub extent: Option<Span>,
+    pub doc: Option<String>,
+}
+
+impl Place {
+    /// The place of `symbol` at `span`, with no extent and no doc; set those
+    /// with struct update.
+    pub fn new(symbol: SymbolId, span: Span) -> Self {
+        Self {
+            symbol,
+            span,
+            extent: None,
+            doc: None,
+        }
+    }
+
+    /// The declaration as a whole: its extent where the provider reports one,
+    /// else its span.
+    pub fn whole(&self) -> Span {
+        self.extent.unwrap_or(self.span)
+    }
 }
 
 impl Symbol {
-    /// A declaration with nothing but what every one has: no owner, extent,
-    /// doc, role or type; set those with struct update.
+    /// A declaration with nothing but what every one has: no owner, role or
+    /// type; set those with struct update.
     pub fn new(
         id: SymbolId,
         kind: SymbolKind,
         visibility: Visibility,
         file: PathBuf,
-        span: Span,
         name: impl Into<String>,
     ) -> Self {
         Self {
@@ -319,13 +349,11 @@ impl Symbol {
             visibility,
             owner: None,
             file,
-            span,
-            extent: None,
-            doc: None,
             name: name.into(),
             role: None,
             optional: false,
             type_ref: None,
+            implementation: false,
         }
     }
 }
@@ -530,6 +558,7 @@ struct Index {
     symbols: BTreeMap<SymbolId, usize>,
     in_file: BTreeMap<PathBuf, Vec<usize>>,
     functions: BTreeMap<SymbolId, usize>,
+    places: BTreeMap<SymbolId, usize>,
     /// What the edges say, by the symbol at the end that is asked.
     reverse: Arc<Reverse>,
     /// Where the edges refer to a symbol from.
@@ -599,6 +628,7 @@ impl Project {
             all.files.extend(part.files.iter().cloned());
             all.modules.extend(part.modules.iter().cloned());
             all.symbols.extend(part.symbols.iter().cloned());
+            all.places.extend(part.places.iter().cloned());
             all.functions.extend(part.functions.iter().cloned());
             all.tests.extend(part.tests.iter().cloned());
             all.comments.extend(part.comments.iter().cloned());
@@ -690,6 +720,9 @@ impl Index {
                 .entry(symbol.file.clone())
                 .or_default()
                 .push(at);
+        }
+        for (at, place) in all.places.iter().enumerate() {
+            index.places.insert(place.symbol.clone(), at);
         }
         for (at, function) in all.functions.iter().enumerate() {
             index.functions.insert(function.symbol.clone(), at);

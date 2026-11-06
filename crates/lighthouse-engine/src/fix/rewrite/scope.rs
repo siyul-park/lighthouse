@@ -99,7 +99,10 @@ fn changed_symbols<'a>(project: &'a Project, path: &Path, old: &str, new: &str) 
     project
         .symbols_in(path)
         .filter(|symbol| {
-            let (first, end) = lines_of(&symbol.extent.unwrap_or(symbol.span));
+            let Some(place) = project.place(&symbol.id) else {
+                return false;
+            };
+            let (first, end) = lines_of(&place.whole());
             changed
                 .iter()
                 .any(|lines| lines.start < end.max(first + 1) && first < lines.end)

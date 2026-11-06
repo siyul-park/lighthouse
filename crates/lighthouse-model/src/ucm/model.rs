@@ -5,8 +5,8 @@
 use std::path::Path;
 
 use super::{
-    Comment, Edge, File, FunctionSummary, LoadNeed, LoadPoint, Module, Project, Site, Symbol,
-    SymbolId, TestCase, load_order,
+    Comment, Edge, File, FunctionSummary, LoadNeed, LoadPoint, Module, Place, Project, Site,
+    Symbol, SymbolId, TestCase, load_order,
 };
 use crate::{Diagnostic, Position};
 
@@ -26,6 +26,9 @@ pub trait Model {
 
     /// The module with this path.
     fn module(&self, path: &str) -> Option<&Module>;
+
+    /// Where the symbol is and what it says; `None` for an id not declared.
+    fn place(&self, id: &SymbolId) -> Option<&Place>;
 
     /// The summary of a function or method symbol; `None` for other kinds.
     fn function(&self, id: &SymbolId) -> Option<&FunctionSummary>;
@@ -142,7 +145,7 @@ pub trait Model {
         self.load_needs(file)
             .into_iter()
             .filter(
-                |need| match (self.load_place(&need.user), self.symbol(&need.binding)) {
+                |need| match (self.load_place(&need.user), self.place(&need.binding)) {
                     (Some(user), Some(binding)) => load_order::start_of(binding) >= user,
                     _ => false,
                 },
@@ -153,7 +156,7 @@ pub trait Model {
     /// Where the code of `point` starts.
     fn load_place(&self, point: &LoadPoint) -> Option<Position> {
         match point {
-            LoadPoint::Declaration(id) => self.symbol(id).map(load_order::start_of),
+            LoadPoint::Declaration(id) => self.place(id).map(load_order::start_of),
             LoadPoint::Site(span) => Some(span.start),
         }
     }
@@ -181,8 +184,10 @@ pub trait Model {
         let at = finding.span.start;
         let preceding = self
             .symbols_in(&finding.file)
-            .filter(|s| s.span.end < at)
-            .max_by_key(|s| s.span.end);
+            .filter_map(|s| Some((s, self.place(&s.id)?.span)))
+            .filter(|(_, span)| span.end < at)
+            .max_by_key(|(_, span)| span.end)
+            .map(|(s, _)| s);
         self.enclosing(finding)
             .or(preceding)
             .map_or_else(String::new, |s| s.id.as_str().to_owned())
@@ -192,8 +197,10 @@ pub trait Model {
     fn enclosing(&self, finding: &Diagnostic) -> Option<&Symbol> {
         let at = finding.span.start;
         self.symbols_in(&finding.file)
-            .filter(|s| s.span.start <= at && at <= s.span.end)
-            .max_by_key(|s| s.span.start)
+            .filter_map(|s| Some((s, self.place(&s.id)?.span)))
+            .filter(|(_, span)| span.start <= at && at <= span.end)
+            .max_by_key(|(_, span)| span.start)
+            .map(|(s, _)| s)
     }
 }
 
@@ -241,6 +248,10 @@ impl Model for Project {
             .binary_search_by(|m| m.path.as_str().cmp(path))
             .ok()?;
         self.inner.all.modules.get(at)
+    }
+
+    fn place(&self, id: &SymbolId) -> Option<&Place> {
+        self.inner.all.places.get(*self.inner.index.places.get(id)?)
     }
 
     fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {

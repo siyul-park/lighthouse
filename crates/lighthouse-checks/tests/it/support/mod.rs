@@ -9,8 +9,8 @@ use lighthouse_engine::Engine;
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Resolution,
-        Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
+        Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Place,
+        Resolution, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
     },
 };
 use lighthouse_plugin::{
@@ -104,6 +104,8 @@ pub struct Subject<'a> {
 pub struct World {
     pub files: BTreeMap<String, bool>,
     pub symbols: Vec<Symbol>,
+    /// The place of each symbol, in the order of `symbols`.
+    pub places: Vec<Place>,
     pub edges: Vec<Edge>,
     pub summaries: Vec<FunctionSummary>,
     pub comments: Vec<Comment>,
@@ -142,14 +144,13 @@ impl World {
             visibility: Visibility::Public,
             owner: None,
             file: file.into(),
-            span: at(line),
-            extent: None,
-            doc: None,
             name: name.to_owned(),
             role: None,
             optional: false,
             type_ref: None,
+            implementation: false,
         };
+        self.places.push(Place::new(symbol.id.clone(), at(line)));
         self.symbols.push(symbol.clone());
         symbol
     }
@@ -170,6 +171,22 @@ impl World {
         let symbol = self.symbol(module, name, SymbolKind::Function, file);
         self.summarize(&symbol, 1, &[]);
         symbol
+    }
+
+    /// The line a symbol of the world is declared on.
+    pub fn line_of(&self, symbol: &Symbol) -> u32 {
+        let at = self.symbols.iter().position(|s| s.id == symbol.id).unwrap();
+        self.places[at].span.start.line
+    }
+
+    /// Marks the symbol as one that implements a method a trait or interface
+    /// declares.
+    pub fn implement(&mut self, id: &SymbolId) {
+        self.symbols
+            .iter_mut()
+            .find(|s| s.id == *id)
+            .unwrap()
+            .implementation = true;
     }
 
     pub fn private(&mut self, symbol: &Symbol) {
@@ -195,7 +212,6 @@ impl World {
             signature: Default::default(),
             events: Vec::new(),
             manual_assertions: 0,
-            implementation: false,
             constructs: false,
             configures: None,
         });
@@ -372,7 +388,6 @@ impl World {
                 let file = File {
                     path: path.into(),
                     lang: if python { "python" } else { "go" }.to_owned(),
-                    hash: String::new(),
                     generated: *generated,
                     test: path.ends_with("_test.ucm") || path.ends_with("_pytest.pyu"),
                     facts: Default::default(),
@@ -388,6 +403,16 @@ impl World {
                     files: vec![file],
                     modules: self.modules.clone(),
                     symbols: self.symbols.iter().filter(|s| own(s)).cloned().collect(),
+                    places: self
+                        .symbols
+                        .iter()
+                        .zip(&self.places)
+                        .filter(|(s, _)| own(s))
+                        .map(|(s, p)| Place {
+                            symbol: s.id.clone(),
+                            ..p.clone()
+                        })
+                        .collect(),
                     functions: self
                         .summaries
                         .iter()
@@ -523,10 +548,11 @@ impl World {
             .map(|(file, line)| {
                 self.symbols
                     .iter()
-                    .find(|s| {
-                        s.file.to_string_lossy() == file.as_str() && s.span.start.line == *line
+                    .zip(&self.places)
+                    .find(|(s, p)| {
+                        s.file.to_string_lossy() == file.as_str() && p.span.start.line == *line
                     })
-                    .map(|s| s.name.clone())
+                    .map(|(s, _)| s.name.clone())
                     .unwrap_or_else(|| format!("{file}:{line}"))
             })
             .collect()

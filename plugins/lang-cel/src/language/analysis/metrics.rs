@@ -137,7 +137,6 @@ impl Metrics {
             },
             events: Vec::new(),
             manual_assertions: 0,
-            implementation: false,
             constructs: false,
             configures: None,
         }

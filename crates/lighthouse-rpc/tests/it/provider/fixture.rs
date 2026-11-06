@@ -49,7 +49,6 @@ impl Fixture {
             .map(|p| File {
                 path: p.into(),
                 lang: "go".to_owned(),
-                hash: String::new(),
                 generated: false,
                 test: p.ends_with("_test.go"),
                 facts: Default::default(),

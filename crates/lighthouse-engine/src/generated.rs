@@ -51,7 +51,7 @@ impl Generated {
 mod tests {
     use lighthouse_model::{
         Position, Span,
-        ucm::{Comment, File, Fragment, Symbol, SymbolId, SymbolKind, Visibility},
+        ucm::{Comment, File, Fragment, Place, Symbol, SymbolId, SymbolKind, Visibility},
     };
     use lighthouse_plugin::Registry;
     use lighthouse_spec::Config;
@@ -82,18 +82,21 @@ mod tests {
             SymbolKind::Function,
             Visibility::Public,
             path.into(),
-            span(5, 6),
             "f".to_owned(),
         );
         Fragment {
             files: vec![File {
                 path: path.into(),
                 lang: "x".to_owned(),
-                hash: String::new(),
                 generated: false,
                 test: false,
                 facts: Default::default(),
             }],
+            places: if symbols {
+                vec![Place::new(function.id.clone(), span(5, 6))]
+            } else {
+                Vec::new()
+            },
             symbols: if symbols { vec![function] } else { Vec::new() },
             comments,
             ..Fragment::default()

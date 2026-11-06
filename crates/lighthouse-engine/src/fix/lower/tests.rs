@@ -4,7 +4,7 @@ use std::fs;
 
 use lighthouse_model::{
     Position, Span,
-    ucm::{Edge, EdgeKind, File, Fragment, Resolution, SymbolKind, Target, Visibility},
+    ucm::{Edge, EdgeKind, File, Fragment, Place, Resolution, SymbolKind, Target, Visibility},
 };
 
 use super::{rename::name_in, *};
@@ -37,23 +37,27 @@ fn span(from: (u32, u32), to: (u32, u32)) -> Span {
 }
 
 /// A declaration that fills whole lines `from..=to` of `text`.
-fn symbol(text: &str, name: &str, from: u32, to: u32) -> Symbol {
+fn symbol(text: &str, name: &str, from: u32, to: u32) -> (Symbol, Place) {
     let last = text.lines().nth(to as usize - 1).unwrap_or_default();
     let extent = span((from, 1), (to, u32::try_from(last.len()).unwrap() + 1));
-    Symbol {
-        id: SymbolId::new("m", &[], name, SymbolKind::Function),
+    let id = SymbolId::new("m", &[], name, SymbolKind::Function);
+    let place = Place {
+        extent: Some(extent),
+        ..Place::new(id.clone(), extent)
+    };
+    let symbol = Symbol {
+        id,
         kind: SymbolKind::Function,
         visibility: Visibility::Private,
         owner: None,
         file: FILE.into(),
-        span: extent,
-        extent: Some(extent),
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
-    }
+        implementation: false,
+    };
+    (symbol, place)
 }
 
 fn id(name: &str) -> Node {
@@ -68,19 +72,20 @@ struct Case {
 fn case(text: &str, symbols: &[(&str, u32, u32)], edges: Vec<Edge>) -> Case {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join(FILE), text).unwrap();
+    let declared: Vec<(Symbol, Place)> = symbols
+        .iter()
+        .map(|(name, from, to)| symbol(text, name, *from, *to))
+        .collect();
     let project = Project::merge([Fragment {
         files: vec![File {
             path: FILE.into(),
             lang: "src".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),
         }],
-        symbols: symbols
-            .iter()
-            .map(|(name, from, to)| symbol(text, name, *from, *to))
-            .collect(),
+        symbols: declared.iter().map(|(symbol, _)| symbol.clone()).collect(),
+        places: declared.into_iter().map(|(_, place)| place).collect(),
         edges,
         ..Fragment::default()
     }]);

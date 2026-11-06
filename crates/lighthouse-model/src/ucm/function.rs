@@ -34,9 +34,6 @@ pub struct FunctionSummary {
     /// compares and whose only effect is to fail the test.
     #[serde(default)]
     pub manual_assertions: u32,
-    /// A method of a trait impl: its signature is not its own to choose.
-    #[serde(default)]
-    pub implementation: bool,
     /// An associated function without a receiver that returns its owner.
     #[serde(default)]
     pub constructs: bool,

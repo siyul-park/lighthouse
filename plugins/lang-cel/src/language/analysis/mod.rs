@@ -7,7 +7,8 @@ use cel::common::ast::{CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryEx
 use lighthouse_model::{
     Span,
     ucm::{
-        Edge, EdgeKind, FunctionSummary, Node, Resolution, Symbol, SymbolId, SymbolKind, Target,
+        Edge, EdgeKind, FunctionSummary, Node, Place, Resolution, Symbol, SymbolId, SymbolKind,
+        Target,
     },
 };
 use lighthouse_plugin::CelLibraryManifest;
@@ -54,7 +55,7 @@ pub(super) struct Analysis<'a> {
     variables: &'a [VariableDecl],
     packs: &'a PackVariables,
     libraries: &'a [CelLibraryManifest],
-    external: &'a mut BTreeMap<SymbolId, Symbol>,
+    external: &'a mut BTreeMap<SymbolId, (Symbol, Place)>,
 }
 
 /// The shared variables of the packs by name: the document that declares each,
@@ -85,7 +86,7 @@ impl<'a> Analysis<'a> {
         variables: &'a [VariableDecl],
         packs: &'a PackVariables,
         libraries: &'a [CelLibraryManifest],
-        external: &'a mut BTreeMap<SymbolId, Symbol>,
+        external: &'a mut BTreeMap<SymbolId, (Symbol, Place)>,
     ) -> Self {
         Self {
             variables,
@@ -267,7 +268,7 @@ impl<'a> Analysis<'a> {
             })
         };
         if let Some(library) = library_target(call, self.libraries) {
-            let id = library.symbol.id.clone();
+            let id = library.symbol.0.id.clone();
             self.external.entry(id.clone()).or_insert(library.symbol);
             return found(id, library.namespaced);
         }
@@ -283,7 +284,7 @@ impl<'a> Analysis<'a> {
             return found(id.clone(), false);
         }
         if let Some(standard) = standard_target(call) {
-            let id = standard.symbol.id.clone();
+            let id = standard.symbol.0.id.clone();
             self.external.entry(id.clone()).or_insert(standard.symbol);
             return found(id, standard.namespaced);
         }

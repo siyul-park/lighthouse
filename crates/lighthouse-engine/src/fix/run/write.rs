@@ -1,7 +1,6 @@
 //! The text of a round and its landing on disk: the formatted candidates, and
 //! the verified result written in two phases.
 
-use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -245,8 +244,8 @@ impl Orchestrator<'_> {
                     continue;
                 }
             };
-            let analyzed = before.project.file(file).map(|f| f.hash.as_str());
-            if analyzed.is_some_and(|hash| hash != hash::sha256(base.as_bytes())) {
+            let analyzed = before.read.get(file);
+            if analyzed.is_some_and(|hash| *hash != hash::sha256(base.as_bytes())) {
                 out.failed
                     .insert(file.clone(), "changed concurrently".to_owned());
                 continue;

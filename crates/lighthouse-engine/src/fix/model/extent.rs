@@ -17,7 +17,10 @@ pub(in crate::fix) fn choose(
 ) -> Result<Span, String> {
     let index = LineIndex::new(text);
     let span = match project.anchor(finding) {
-        Some(symbol) => symbol.extent.unwrap_or(symbol.span),
+        Some(symbol) => project
+            .place(&symbol.id)
+            .map(lighthouse_model::ucm::Place::whole)
+            .ok_or_else(|| "the declaration has no place".to_owned())?,
         None if text.lines().count() < WHOLE_FILE_LINES => Span {
             start: Position { line: 1, col: 1 },
             end: index.position(text.len()),

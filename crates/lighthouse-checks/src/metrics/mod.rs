@@ -81,7 +81,10 @@ impl Measures {
             u32::try_from(ids.iter().filter(callable).filter(keep).count()).unwrap_or(u32::MAX)
         };
         Self {
-            lines: symbol.span.end.line - symbol.span.start.line + 1,
+            lines: {
+                let span = crate::facts::span_of(project, &symbol.id);
+                span.end.line - span.start.line + 1
+            },
             statements: summary.statements,
             cyclomatic,
             cognitive,

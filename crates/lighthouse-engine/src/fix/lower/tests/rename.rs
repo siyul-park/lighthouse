@@ -95,6 +95,7 @@ fn renamed(visibility: Visibility, to: &str, complete: bool) -> Result<String, S
     let mut fragment = Fragment {
         files: case.project.files.clone(),
         symbols: case.project.symbols.clone(),
+        places: case.project.places.clone(),
         ..Fragment::default()
     };
     fragment.symbols[0].visibility = visibility;

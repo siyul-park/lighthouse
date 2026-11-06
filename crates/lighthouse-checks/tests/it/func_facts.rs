@@ -143,10 +143,7 @@ fn gap_is_empty_for_the_first_method_of_an_owner_and_for_a_free_function() {
     let empty = "func.gap.previous == null && func.gap.between.size() == 0";
     let found = flagged(&w, "function", empty, &options);
     let lines: BTreeSet<u32> = found.iter().map(|(_, line)| *line).collect();
-    assert_eq!(
-        lines,
-        BTreeSet::from([free.span.start.line, one.span.start.line])
-    );
+    assert_eq!(lines, BTreeSet::from([w.line_of(&free), w.line_of(&one)]));
 }
 
 #[test]
@@ -163,7 +160,7 @@ fn gap_names_the_previous_method_and_what_lies_between() {
     let found = flagged(&w, "function", &condition, &json!({}));
     assert_eq!(
         found,
-        BTreeSet::from([("m/a.ucm".to_owned(), two.span.start.line)])
+        BTreeSet::from([("m/a.ucm".to_owned(), w.line_of(&two))])
     );
 }
 
@@ -184,11 +181,11 @@ fn symbol_func_is_the_function_fact_of_a_function_and_null_of_a_type() {
     };
     assert_eq!(
         lines("symbol.func != null && symbol.func.statements > 5"),
-        BTreeSet::from([big.span.start.line])
+        BTreeSet::from([w.line_of(&big)])
     );
     assert_eq!(
         lines("symbol.func == null"),
-        BTreeSet::from([ty.span.start.line])
+        BTreeSet::from([w.line_of(&ty)])
     );
 }
 
@@ -218,11 +215,11 @@ fn a_must_constructor_builds_what_its_new_form_builds() {
     };
     assert_eq!(
         lines("func.constructor_named && func.built == 'Server'"),
-        BTreeSet::from([must.span.start.line, lower.span.start.line])
+        BTreeSet::from([w.line_of(&must), w.line_of(&lower)])
     );
     assert_eq!(
         lines("func.role == 'constructor'"),
-        BTreeSet::from([must.span.start.line, lower.span.start.line])
+        BTreeSet::from([w.line_of(&must), w.line_of(&lower)])
     );
     let _ = server;
 }

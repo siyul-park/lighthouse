@@ -133,7 +133,6 @@ pub(super) fn file(path: &str) -> File {
     File {
         path: path.into(),
         lang: "fake".to_owned(),
-        hash: "abc".to_owned(),
         generated: false,
         test: false,
         facts: Default::default(),

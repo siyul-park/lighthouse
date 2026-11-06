@@ -12,11 +12,6 @@ use lighthouse_model::{
     },
 };
 
-fn at() -> Span {
-    let p = Position { line: 1, col: 1 };
-    Span { start: p, end: p }
-}
-
 fn symbol(module: &str, name: &str) -> Symbol {
     Symbol {
         id: SymbolId::new(module, &[], name, SymbolKind::Function),
@@ -24,13 +19,11 @@ fn symbol(module: &str, name: &str) -> Symbol {
         visibility: Visibility::Public,
         owner: None,
         file: format!("{module}/{name}.go").into(),
-        span: at(),
-        extent: None,
-        doc: None,
         name: name.to_owned(),
         role: None,
         optional: false,
         type_ref: None,
+        implementation: false,
     }
 }
 
@@ -50,7 +43,6 @@ fn file_analysis_language_defaults_to_host_and_honors_embedded_override() {
     let mut file = File {
         path: PathBuf::from("settings.yaml"),
         lang: "yaml".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: BTreeMap::new(),
@@ -67,7 +59,6 @@ fn files_in_lists_the_files_directly_in_a_directory() {
     let file = |path: &str| File {
         path: PathBuf::from(path),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: BTreeMap::new(),
@@ -152,7 +143,6 @@ fn summary(symbol: &Symbol, forwards_to: Option<Target>) -> FunctionSummary {
         signature: Default::default(),
         events: Vec::new(),
         manual_assertions: 0,
-        implementation: false,
         constructs: false,
         configures: None,
     }
@@ -227,7 +217,6 @@ fn a_module_edge_remembers_the_file_of_the_first_fragment_that_has_it() {
         files: vec![File {
             path: path.into(),
             lang: "go".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),
@@ -273,7 +262,6 @@ fn an_import_at_several_sites_is_one_edge_with_the_site_of_the_first_file_in_pat
         files: vec![File {
             path: path.into(),
             lang: "go".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: Default::default(),
@@ -299,7 +287,6 @@ fn project_indexes_answer_by_file_symbol_and_call_graph() {
     let test_file = File {
         path: b.file.clone(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: true,
         facts: Default::default(),
@@ -698,7 +685,6 @@ fn file_of(symbol: &Symbol) -> File {
     File {
         path: symbol.file.clone(),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -737,7 +723,6 @@ fn host(facts: &[(&str, &str)]) -> Fragment {
         files: vec![File {
             path: PathBuf::from("README.md"),
             lang: "markdown".to_owned(),
-            hash: String::new(),
             generated: false,
             test: false,
             facts: facts
@@ -849,7 +834,6 @@ fn file_is_example_when_every_region_of_it_is_example_code() {
     let file = |regions: Option<&str>| File {
         path: PathBuf::from("README.md"),
         lang: "markdown".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: regions
@@ -870,7 +854,6 @@ fn file_is_syntactic_when_the_provider_states_it_and_no_decision_judges_it() {
     let file = |facts: &[(&str, &str)]| File {
         path: PathBuf::from("foo_arm64_test.go"),
         lang: "go".to_owned(),
-        hash: String::new(),
         generated: false,
         test: true,
         facts: facts

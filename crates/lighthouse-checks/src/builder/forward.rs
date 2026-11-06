@@ -12,16 +12,18 @@ use lighthouse_model::ucm::{Model, Node, Symbol, SymbolId, SymbolKind, Target, V
 /// forwarded when exactly one symbol reads it.
 pub(super) fn forwarded<'p>(project: &'p dyn Model, wrapper: &Symbol) -> Option<&'p SymbolId> {
     if wrapper.visibility != Visibility::Private
-        || wrapper.doc.is_some()
+        || project
+            .place(&wrapper.id)
+            .is_some_and(|place| place.doc.is_some())
         || uses(project, wrapper) != 1
         || (wrapper.kind != SymbolKind::Var && !project.references(&wrapper.id).is_empty())
     {
         return None;
     }
-    let summary = project.function(&wrapper.id)?;
-    if summary.implementation {
+    if wrapper.implementation {
         return None;
     }
+    let summary = project.function(&wrapper.id)?;
     let Some(Target::Resolved(Node::Symbol(target))) = &summary.forwards_to else {
         return None;
     };

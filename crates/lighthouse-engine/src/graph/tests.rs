@@ -7,8 +7,8 @@ use lighthouse_graph::{Graph, Options};
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, PROJECT, Project,
-        Resolution, Symbol, SymbolId, SymbolKind, Target, Visibility,
+        Edge, EdgeKind, File, Fragment, FunctionSummary, Held, Model, Module, Node, PROJECT, Place,
+        Project, Resolution, Symbol, SymbolId, SymbolKind, Target, View, Visibility,
     },
 };
 
@@ -45,6 +45,7 @@ struct Spec {
     imports: Vec<String>,
     shift: u32,
     statements: u32,
+    test: bool,
 }
 
 impl Spec {
@@ -58,17 +59,18 @@ impl Spec {
         let symbols: Vec<Symbol> = self
             .functions
             .iter()
-            .enumerate()
-            .map(|(n, name)| {
+            .map(|name| {
                 Symbol::new(
                     id(name),
                     SymbolKind::Function,
                     Visibility::Public,
                     path.into(),
-                    at(n as u32 + 1 + self.shift),
                     name.clone(),
                 )
             })
+            .collect();
+        let places: Vec<Place> = (0..self.functions.len())
+            .map(|n| Place::new(id(&self.functions[n]), at(n as u32 + 1 + self.shift)))
             .collect();
         let call = |from: &str, to: &str| Edge {
             kind: EdgeKind::Calls,
@@ -91,9 +93,8 @@ impl Spec {
             files: vec![File {
                 path: path.into(),
                 lang: self.lang.to_owned(),
-                hash: format!("{}{}", self.shift, self.statements),
                 generated: false,
-                test: false,
+                test: self.test,
                 facts: Default::default(),
             }],
             modules: vec![Module {
@@ -109,6 +110,7 @@ impl Spec {
                 .map(|name| summary(id(name), self.statements))
                 .collect(),
             symbols,
+            places,
             edges,
             ..Fragment::default()
         }
@@ -129,7 +131,6 @@ fn summary(symbol: SymbolId, statements: u32) -> FunctionSummary {
         signature: Default::default(),
         events: Vec::new(),
         manual_assertions: 0,
-        implementation: false,
         constructs: false,
         configures: None,
     }
@@ -164,6 +165,33 @@ impl World {
         (*self.graph.query(&PROJECT, &()).unwrap()).clone()
     }
 
+    /// What the view reads of the graph is what the merge says of every symbol
+    /// and file: the shape, the place, the summary and the test flag.
+    fn agrees(&self, at: &str) {
+        let held = Held::default();
+        let view = View::new(&self.graph, &held).unwrap();
+        let merged = self.merged();
+        for symbol in merged.symbols() {
+            let id = &symbol.id;
+            assert_eq!(view.symbol(id), Some(symbol), "{at}: symbol {id:?}");
+            assert_eq!(view.place(id), merged.place(id), "{at}: place {id:?}");
+            assert_eq!(
+                view.function(id),
+                merged.function(id),
+                "{at}: function {id:?}"
+            );
+            assert_eq!(view.in_test(id), merged.in_test(id), "{at}: in_test {id:?}");
+        }
+        for file in merged.files() {
+            assert_eq!(
+                view.file(&file.path),
+                Some(file),
+                "{at}: file {:?}",
+                file.path
+            );
+        }
+    }
+
     fn merged(&self) -> Project {
         Project::merge(
             self.specs
@@ -196,7 +224,7 @@ fn random(rng: &mut Rng, specs: &mut Vec<Spec>) {
     let names = ["x", "y", "z", "w"];
     let name = names[rng.next(names.len())].to_owned();
     let target = format!("m{}::{}", rng.next(5), names[rng.next(names.len())]);
-    match rng.next(11) {
+    match rng.next(12) {
         0 => specs[at].shift += 1,
         1 => specs[at].statements += 1,
         2 => {
@@ -227,6 +255,7 @@ fn random(rng: &mut Rng, specs: &mut Vec<Spec>) {
         9 if specs.len() > 2 => {
             specs.remove(at);
         }
+        11 => specs[at].test = !specs[at].test,
         _ => specs[at].lang = if specs[at].lang == "go" { "rust" } else { "go" },
     }
 }
@@ -255,6 +284,7 @@ fn the_project_the_queries_give_is_the_project_a_merge_makes_after_every_edit() 
             world.set();
             let project = world.project();
             assert_eq!(project, world.merged(), "seed {seed} step {step}");
+            world.agrees(&format!("seed {seed} step {step}"));
             noticed += usize::from(!project.notices().is_empty());
         }
     }
@@ -274,7 +304,7 @@ fn a_body_edit_runs_no_resolution_and_the_symbol_table_stays_equal() {
     let ran = world.graph.take_executed();
     let count = |kind: &str| ran.iter().filter(|label| label.starts_with(kind)).count();
     assert_eq!(count("resolved("), 1, "{ran:?}");
-    assert_eq!(count("outline("), 1);
+    assert_eq!(count("declarations("), 1, "{ran:?}");
     assert_eq!(count("symbols("), 0, "{ran:?}");
     assert_eq!(
         count("incoming("),

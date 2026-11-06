@@ -4,8 +4,8 @@ use lighthouse_model::ucm::Model;
 use lighthouse_model::{
     Position, Span,
     ucm::{
-        Edge, EdgeKind, File, Fragment, LoadNeed, LoadPoint, Node, ORDERED, Project, Resolution,
-        Symbol, SymbolId, SymbolKind, Target, Visibility, When,
+        Edge, EdgeKind, File, Fragment, LoadNeed, LoadPoint, Node, ORDERED, Place, Project,
+        Resolution, Symbol, SymbolId, SymbolKind, Target, Visibility, When,
     },
 };
 
@@ -24,18 +24,20 @@ fn id(owners: &[&str], name: &str) -> SymbolId {
 
 /// A declaration on `line`; `extent` says whether it has an extent, which the
 /// body of a module has none of.
-fn symbol(owners: &[&str], name: &str, line: u32, extent: bool) -> Symbol {
+fn symbol(owners: &[&str], name: &str, line: u32, extent: bool) -> (Symbol, Place) {
     let mut symbol = Symbol::new(
         id(owners, name),
         SymbolKind::Function,
         Visibility::Private,
         FILE.into(),
-        at(line),
         name,
     );
     symbol.owner = owners.split_last().map(|(owner, rest)| id(rest, owner));
-    symbol.extent = extent.then(|| at(line));
-    symbol
+    let place = Place {
+        extent: extent.then(|| at(line)),
+        ..Place::new(symbol.id.clone(), at(line))
+    };
+    (symbol, place)
 }
 
 fn edge(from: Option<SymbolId>, to: SymbolId, kind: EdgeKind, when: When, line: u32) -> Edge {
@@ -49,11 +51,11 @@ fn edge(from: Option<SymbolId>, to: SymbolId, kind: EdgeKind, when: When, line: 
     }
 }
 
-fn project(ordered: bool, symbols: Vec<Symbol>, edges: Vec<Edge>) -> Project {
+fn project(ordered: bool, symbols: Vec<(Symbol, Place)>, edges: Vec<Edge>) -> Project {
+    let (symbols, places) = symbols.into_iter().unzip();
     let mut file = File {
         path: FILE.into(),
         lang: "python".to_owned(),
-        hash: String::new(),
         generated: false,
         test: false,
         facts: Default::default(),
@@ -64,6 +66,7 @@ fn project(ordered: bool, symbols: Vec<Symbol>, edges: Vec<Edge>) -> Project {
     Project::merge([Fragment {
         files: vec![file],
         symbols,
+        places,
         edges,
         ..Fragment::default()
     }])
@@ -195,9 +198,9 @@ fn calling_a_function_at_load_needs_what_its_body_uses() {
 fn a_member_of_a_class_needs_its_sibling_and_the_class_what_is_outside() {
     let class = id(&[], "A");
     let mut x = symbol(&["A"], "x", 3, true);
-    x.owner = Some(class.clone());
+    x.0.owner = Some(class.clone());
     let mut y = symbol(&["A"], "y", 4, true);
-    y.owner = Some(class.clone());
+    y.0.owner = Some(class.clone());
     let p = project(
         true,
         vec![symbol(&[], "k", 1, true), symbol(&[], "A", 2, true), x, y],
