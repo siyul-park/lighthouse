@@ -36,7 +36,8 @@ pub struct View<'v> {
     commented: RefCell<HashMap<String, Rc<Vec<usize>>>>,
     cases: RefCell<HashMap<String, &'v [TestCase]>>,
     sited: OnceCell<&'v Sites>,
-    loaded: OnceCell<()>,
+    resolved_all: OnceCell<()>,
+    declared_all: OnceCell<()>,
     everything: Everything<'v>,
     failed: RefCell<Option<Error>>,
 }
@@ -90,7 +91,8 @@ impl<'v> View<'v> {
             commented: RefCell::default(),
             cases: RefCell::default(),
             sited: OnceCell::new(),
-            loaded: OnceCell::new(),
+            resolved_all: OnceCell::new(),
+            declared_all: OnceCell::new(),
             everything: Everything::default(),
             failed: RefCell::new(None),
         })
@@ -106,7 +108,7 @@ impl<'v> View<'v> {
     fn all_symbols(&self) -> &[&'v Symbol] {
         self.everything.symbols.get_or_init(|| {
             let mut all: Vec<&Symbol> = self
-                .paths()
+                .declared_paths()
                 .iter()
                 .flat_map(|path| {
                     let path = Path::new(path);
@@ -130,7 +132,7 @@ impl<'v> View<'v> {
             let edges = self.keep(self.graph.query(&EDGES, &()));
             let edges = edges.map(|edges| &**self.held.edges.alloc(edges));
             let (mut all, mut origins) = (Vec::new(), BTreeMap::new());
-            for path in self.paths() {
+            for path in self.resolved_paths() {
                 let Some(resolved) = self.resolved(Path::new(&path)) else {
                     continue;
                 };
@@ -157,18 +159,35 @@ impl<'v> View<'v> {
         })
     }
 
-    /// The paths of the project's files, whose parts are pulled on every
-    /// thread the first time they are all asked for: one after the other is
-    /// what a read of the whole project would wait for.
-    fn paths(&self) -> Vec<String> {
-        let paths = self.keep(self.graph.input(&PATHS, &())).flatten();
-        let paths = paths.map_or_else(Vec::new, |paths| paths.as_ref().clone());
-        self.loaded.get_or_init(|| {
+    /// [`View::paths`], with what the files declare pulled on every thread the
+    /// first time: one after the other is what a read of the whole project
+    /// would wait for. A read of the declarations does not depend on where
+    /// they sit.
+    fn declared_paths(&self) -> Vec<String> {
+        let paths = self.paths();
+        self.declared_all.get_or_init(|| {
+            self.graph.par_map(paths.clone(), |graph, path| {
+                let _ = graph.query(&DECLARATIONS, path);
+            });
+        });
+        paths
+    }
+
+    /// [`View::paths`], with the resolved slices pulled likewise.
+    fn resolved_paths(&self) -> Vec<String> {
+        let paths = self.paths();
+        self.resolved_all.get_or_init(|| {
             self.graph.par_map(paths.clone(), |graph, path| {
                 let _ = graph.query(&RESOLVED, path);
             });
         });
         paths
+    }
+
+    /// The paths of the project's files.
+    fn paths(&self) -> Vec<String> {
+        let paths = self.keep(self.graph.input(&PATHS, &())).flatten();
+        paths.map_or_else(Vec::new, |paths| paths.as_ref().clone())
     }
 
     /// The positions among the symbols of `path`'s slice of those it declares
@@ -487,7 +506,7 @@ impl<'v> Model for View<'v> {
     fn functions(&self) -> Boxed<'_, FunctionSummary> {
         let all = self.everything.functions.get_or_init(|| {
             let mut all: Vec<&FunctionSummary> = self
-                .paths()
+                .resolved_paths()
                 .iter()
                 .filter_map(|path| self.resolved(Path::new(path)))
                 .flat_map(|resolved| &resolved.slice.fragment.functions)
@@ -505,7 +524,7 @@ impl<'v> Model for View<'v> {
 
     fn files(&self) -> Boxed<'_, File> {
         let all = self.everything.files.get_or_init(|| {
-            self.paths()
+            self.declared_paths()
                 .iter()
                 .filter_map(|path| self.merged(Path::new(path)))
                 .collect()

@@ -1,6 +1,8 @@
 //! The model as the graph holds it, read through a view.
 
-use lighthouse_graph::{Graph, Options};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use lighthouse_graph::{Error, Graph, Options, Query};
 use lighthouse_model::{
     Position, Span,
     ucm::{
@@ -83,4 +85,29 @@ fn view_failure() {
 
     assert_eq!(view.symbols().count(), 1);
     assert!(view.failure().is_none());
+}
+
+static RUNS: AtomicUsize = AtomicUsize::new(0);
+static SYMBOL_COUNT: Query<(), usize> = Query::new("symbol_count", symbol_count);
+
+fn symbol_count(graph: &Graph, _: &()) -> Result<usize, Error> {
+    RUNS.fetch_add(1, Ordering::SeqCst);
+    let held = Held::default();
+    let view = View::new(graph, &held)?;
+    Ok(view.symbols().count())
+}
+
+#[test]
+fn view_symbols_ignore_places() {
+    let mut graph = graph(&[fragment("a", "f", false), fragment("b", "g", false)]);
+    SYMBOL_COUNT.register(&graph).unwrap();
+    assert_eq!(*graph.query(&SYMBOL_COUNT, &()).unwrap(), 2);
+
+    let mut moved = fragment("b", "g", false);
+    let at = Position { line: 5, col: 1 };
+    moved.places[0].span = Span { start: at, end: at };
+    Host::set_units(&mut graph, &[fragment("a", "f", false), moved]).unwrap();
+
+    assert_eq!(*graph.query(&SYMBOL_COUNT, &()).unwrap(), 2);
+    assert_eq!(RUNS.load(Ordering::SeqCst), 1);
 }
