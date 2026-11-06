@@ -32,6 +32,9 @@ pub(crate) struct Node {
     pub deps: Arc<[Dep]>,
     pub changed_at: u64,
     pub verified_at: u64,
+    /// The `verified_at` the store has: a node found green is written again
+    /// only when that is old, as nothing that read it can have moved.
+    pub stored_verified_at: u64,
     pub durability: Durability,
     pub used_at: u64,
     pub synced_used_at: u64,
@@ -88,6 +91,7 @@ impl Node {
             deps: Arc::from([]),
             changed_at: 0,
             verified_at: 0,
+            stored_verified_at: 0,
             durability: Durability::Static,
             used_at: 0,
             synced_used_at: 0,

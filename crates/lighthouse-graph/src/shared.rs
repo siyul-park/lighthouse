@@ -145,22 +145,30 @@ impl Shared {
         let Ok(deps) = decode::<Vec<(String, Vec<u8>, Hash)>>(&row.deps) else {
             return;
         };
+        let kinds = self
+            .kinds
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let deps = deps
             .into_iter()
             .map(|(kind, key, hash)| Dep {
                 id: NodeId {
-                    kind: self.intern(&kind),
+                    kind: kinds
+                        .get(kind.as_str())
+                        .map_or_else(|| Arc::from(kind), |found| found.name.clone()),
                     key: key.into(),
                 },
                 hash,
             })
             .collect();
+        drop(kinds);
         node.present = true;
         node.input = row.input;
         node.hash = row.hash;
         node.deps = deps;
         node.changed_at = row.changed_at;
         node.verified_at = row.verified_at;
+        node.stored_verified_at = row.verified_at;
         node.durability = row.durability;
         node.used_at = row.used_at;
         node.synced_used_at = row.used_at;
@@ -361,5 +369,6 @@ pub(crate) fn settle_clean(slot: &Arc<Slot>) {
     }
     node.dirty = false;
     node.value_dirty = false;
+    node.stored_verified_at = node.verified_at;
     node.synced_used_at = node.used_at;
 }
