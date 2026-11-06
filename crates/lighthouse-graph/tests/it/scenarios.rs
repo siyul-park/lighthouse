@@ -208,7 +208,7 @@ fn verify_mode_reports_a_query_that_reads_outside_the_graph() {
 }
 
 #[test]
-fn verify_mode_does_not_run_a_query_that_starts_a_program_again() {
+fn verifying_is_what_a_query_that_starts_a_program_declines_to_run_again_by() {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     use lighthouse_graph::{Graph, Query};

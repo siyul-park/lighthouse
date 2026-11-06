@@ -70,6 +70,29 @@ pub const EXIT_INCOMPLETE: u8 = 3;
 /// A model that fails this many requests is skipped for the rest of the run.
 const MAX_FAILURES: usize = 3;
 
+/// A run and the project it read: what a fix works from. The project is
+/// merged from the graph once the run is done, which a check that only
+/// reports never does.
+#[derive(Debug, Clone, Default)]
+pub struct Outcome {
+    pub run: Run,
+    pub project: Project,
+}
+
+impl std::ops::Deref for Outcome {
+    type Target = Run;
+
+    fn deref(&self) -> &Run {
+        &self.run
+    }
+}
+
+impl std::ops::DerefMut for Outcome {
+    fn deref_mut(&mut self) -> &mut Run {
+        &mut self.run
+    }
+}
+
 /// The result of a run: findings, notices and the parts that were not analyzed.
 #[derive(Debug, Clone, Default)]
 pub struct Run {
@@ -123,29 +146,6 @@ pub struct Run {
     pub read: BTreeMap<PathBuf, String>,
     /// Where the time of the run went.
     pub timings: Timings,
-}
-
-/// A run and the project it read: what a fix works from. The project is
-/// merged from the graph once the run is done, which a check that only
-/// reports never does.
-#[derive(Debug, Clone, Default)]
-pub struct Outcome {
-    pub run: Run,
-    pub project: Project,
-}
-
-impl std::ops::Deref for Outcome {
-    type Target = Run;
-
-    fn deref(&self) -> &Run {
-        &self.run
-    }
-}
-
-impl std::ops::DerefMut for Outcome {
-    fn deref_mut(&mut self) -> &mut Run {
-        &mut self.run
-    }
 }
 
 impl Run {
