@@ -162,6 +162,9 @@ impl Queries for Pulled<'_> {
     }
 }
 
+/// What one run of a program found in each path, and what it said besides.
+type BatchRun = (BTreeMap<PathBuf, Vec<Diagnostic>>, Vec<String>);
+
 /// Runs the rule `id` over `file` (the project when empty) as `judged` says,
 /// through `graph`: the findings of the node, or of a rule that is not one.
 ///
@@ -405,9 +408,6 @@ fn batch_paths(
     });
     Ok(paths)
 }
-
-/// What one run of a program found in each path, and what it said besides.
-type BatchRun = (BTreeMap<PathBuf, Vec<Diagnostic>>, Vec<String>);
 
 /// One run of the program of `rule` over `paths`: what it found in each, and
 /// what it said besides.
