@@ -108,6 +108,29 @@ pub(crate) fn identities(
         .collect()
 }
 
+/// What tells the programs of `tools` apart from other ones, without asking
+/// them anything: the file the search path finds, the variables that choose
+/// a version and the files of the user's toolchain managers. The files of the
+/// project that configure them are the project's own.
+pub(crate) fn state(tools: &[String]) -> String {
+    let mut hasher = Hasher::new();
+    for name in SELECTING_VARIABLES {
+        hasher.update(name);
+        hasher.update(env::var_os(name).unwrap_or_default().as_encoded_bytes());
+    }
+    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
+        for name in GLOBAL_SELECTORS {
+            hasher.update(name);
+            hasher.update(fs::read(home.join(name)).unwrap_or_default());
+        }
+    }
+    for tool in tools {
+        hasher.update(tool);
+        hasher.update(file_of(tool).unwrap_or_default());
+    }
+    hasher.hex()
+}
+
 /// The digest of the files that choose a version or configure a formatter:
 /// those of the user's toolchain managers, and those in the directories of
 /// the project.
@@ -144,15 +167,7 @@ fn found(tool: &str, selectors: &str) -> String {
     let Some(path) = which(tool) else {
         return format!("{tool}: not found");
     };
-    let Some(file) = fs::metadata(&path).ok().and_then(|meta| {
-        let nanos = meta
-            .modified()
-            .ok()?
-            .duration_since(UNIX_EPOCH)
-            .ok()?
-            .as_nanos();
-        Some(format!("{}:{}:{nanos}", path.display(), meta.len()))
-    }) else {
+    let Some(file) = identity_of(&path) else {
         return format!("{tool}: unreadable");
     };
     let mut key = format!("{file}\0{selectors}");
@@ -175,6 +190,22 @@ fn found(tool: &str, selectors: &str) -> String {
         version
     });
     format!("{file}:{version}")
+}
+
+/// The file the search path finds for `tool`, by path, size and time.
+fn file_of(tool: &str) -> Option<String> {
+    identity_of(&which(tool)?)
+}
+
+fn identity_of(path: &Path) -> Option<String> {
+    let meta = fs::metadata(path).ok()?;
+    let nanos = meta
+        .modified()
+        .ok()?
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    Some(format!("{}:{}:{nanos}", path.display(), meta.len()))
 }
 
 /// The version of the toolchain a program without a version flag belongs to.

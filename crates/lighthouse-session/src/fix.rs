@@ -472,7 +472,7 @@ fn suppressed(
     catalog: &Catalog,
     store: bool,
 ) -> Result<(BTreeSet<Fingerprint>, lighthouse_engine::Run)> {
-    let checked = engine.check(&[], &[])?;
+    let checked = engine.check_project(&[], &[])?;
     let mut outcome = checked.clone();
     let all: BTreeSet<Fingerprint> = outcome
         .diagnostics

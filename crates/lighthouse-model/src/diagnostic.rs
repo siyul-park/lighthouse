@@ -58,7 +58,7 @@ impl SuppressionStatus {
 
 /// A finding a suppression keeps out of the report. A run states how many
 /// there were, and SARIF keeps them with their suppression.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Suppressed {
     pub diagnostic: Diagnostic,
     pub suppression: Suppression,

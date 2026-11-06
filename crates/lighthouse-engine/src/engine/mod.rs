@@ -43,6 +43,7 @@ mod models;
 mod phases;
 mod project;
 mod regions;
+mod replay;
 mod route;
 mod run;
 mod scopes;
@@ -485,7 +486,17 @@ impl Engine {
     /// Checks the whole project, then reports diagnostics under `paths`.
     /// `only` restricts which rules run; empty means all enabled rules.
     pub fn check(&self, paths: &[PathBuf], only: &[String]) -> Result<Run, Error> {
-        self.check_overlaid(paths, only, &Overlays::new())
+        self.validate_only(only)?;
+        let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
+        self.run(scopes, gaps, only, (&Overlays::new(), true))
+    }
+
+    /// Like `check`, but the run is never answered from the last report: its
+    /// `project` is the one that was read, as a fix needs it.
+    pub fn check_project(&self, paths: &[PathBuf], only: &[String]) -> Result<Run, Error> {
+        self.validate_only(only)?;
+        let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
+        self.run(scopes, gaps, only, (&Overlays::new(), false))
     }
 
     /// Like `check`, but the project is read with `overlays` standing in for
@@ -499,7 +510,7 @@ impl Engine {
     ) -> Result<Run, Error> {
         self.validate_only(only)?;
         let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
-        self.run(scopes, gaps, only, overlays)
+        self.run(scopes, gaps, only, (overlays, false))
     }
 
     /// Checks the whole project, then reports only the diagnostics in `files`,
@@ -508,7 +519,12 @@ impl Engine {
     /// the report is narrowed.
     pub fn check_files(&self, files: &[PathBuf], only: &[String]) -> Result<Run, Error> {
         self.validate_only(only)?;
-        self.run(Scopes::files(files), Vec::new(), only, &Overlays::new())
+        self.run(
+            Scopes::files(files),
+            Vec::new(),
+            only,
+            (&Overlays::new(), true),
+        )
     }
 }
 

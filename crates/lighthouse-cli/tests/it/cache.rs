@@ -97,7 +97,8 @@ fn differential(fixture: &Fixture) {
         let step = format!("{}: {}", fixture.name, edit.name);
         assert_eq!(got.run, expected, "{step}");
         // A provider option is in the key of every unit: all of them are asked.
-        if edit.name != "provider option changed" {
+        // A run that nothing moved for is answered whole and counts none.
+        if edit.name != "provider option changed" && got.misses > 0 {
             assert!(
                 got.hits > 0,
                 "{step}: the cache answered nothing of {}",

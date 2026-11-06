@@ -222,7 +222,8 @@ fn a_run_takes_the_findings_the_graph_has_instead_of_running_rules_again() {
     assert_eq!(second.notices, first.notices);
     assert_eq!(
         (second.timings.findings_run, second.timings.findings_green),
-        (0, 3)
+        (0, 0),
+        "the report of the last run is taken whole"
     );
 
     // One file changes: its rule runs again and so does the one that reads

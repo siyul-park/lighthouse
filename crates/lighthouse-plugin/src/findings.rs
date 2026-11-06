@@ -406,6 +406,9 @@ fn batch_paths(
     Ok(paths)
 }
 
+/// What one run of a program found in each path, and what it said besides.
+type BatchRun = (BTreeMap<PathBuf, Vec<Diagnostic>>, Vec<String>);
+
 /// One run of the program of `rule` over `paths`: what it found in each, and
 /// what it said besides.
 fn run_batch(
@@ -414,7 +417,7 @@ fn run_batch(
     (judged, options): (&Judged, &Options),
     paths: &[PathBuf],
     workspace: &Workspace,
-) -> Result<(BTreeMap<PathBuf, Vec<Diagnostic>>, Vec<String>), Error> {
+) -> Result<BatchRun, Error> {
     let runtime = Runtime::of(graph)?;
     let held = Held::default();
     let view = View::new(graph, &held)?;

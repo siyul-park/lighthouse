@@ -175,7 +175,7 @@ impl Engine {
     /// What the way `rule` judges depends on besides the code: the plugins,
     /// how the languages are configured, and the rule's own revision. The
     /// build is the `binary` version, which every node reads.
-    fn environment(&self, rule: &dyn Rule) -> String {
+    pub(super) fn environment(&self, rule: &dyn Rule) -> String {
         let mut hasher = Hasher::new();
         for plugin in self.registry.manifests() {
             hasher.update(&plugin.id);

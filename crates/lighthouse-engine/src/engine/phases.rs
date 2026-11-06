@@ -179,8 +179,8 @@ impl Engine {
         &self,
         inputs: Vec<Input>,
         overlays: &Overlays,
-        run: &mut Run,
-    ) -> (Vec<Input>, Project) {
+        (key, run): (Option<&str>, &mut Run),
+    ) -> Option<(Vec<Input>, Project)> {
         let ws = Workspace {
             overlays: overlays.clone(),
             ..self.ws.clone()
@@ -204,6 +204,14 @@ impl Engine {
             file_calls.entry(target).or_default().regions = files.into_values().collect();
         }
         self.index_calls(&ws, file_calls, None, run);
+        // Nothing the providers had to be asked about moved: the run reports
+        // what the last one did on this key.
+        if key.is_some_and(|key| {
+            run.timings.sent.iter().all(|(_, asked)| *asked == 0) && self.recall(key, run)
+        }) {
+            self.commit_index(run);
+            return None;
+        }
         let started = Instant::now();
         let project = self.assemble(&inputs, (&units, &views), run);
         run.timings.merge = started.elapsed();
@@ -213,7 +221,7 @@ impl Engine {
             .into_iter()
             .filter(|i| project.file(&i.file.path).is_some())
             .collect();
-        (kept, project)
+        Some((kept, project))
     }
 
     /// The files injections select, `None` when none does.

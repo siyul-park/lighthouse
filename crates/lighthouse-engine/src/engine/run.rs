@@ -5,13 +5,17 @@ use super::judging::Judgment;
 use super::*;
 use lighthouse_model::ucm::Model;
 
+/// What a run that is not replayed goes on with: the files read, the project
+/// they make and the key to keep its report under.
+type Loaded = (Vec<Input>, Project, Option<String>);
+
 impl Engine {
     pub(super) fn run(
         &self,
         scopes: Scopes,
         gaps: Vec<Incomplete>,
         only: &[String],
-        overlays: &Overlays,
+        (overlays, reuse): (&Overlays, bool),
     ) -> Result<Run, Error> {
         let selected = self.select_rules(only);
         let ran: BTreeSet<String> = selected.iter().map(|r| r.manifest().id.clone()).collect();
@@ -30,7 +34,13 @@ impl Engine {
                 .ok()
         });
         let models = RunModels::new(self, &scopes, cache.as_ref());
-        let (inputs, project) = self.load(&selected, overlays, &mut run)?;
+        let basis = (reuse && overlays.is_empty())
+            .then(|| self.basis(&selected, (&scopes, only), (&models, &run)))
+            .flatten();
+        let Some((inputs, project, key)) = self.load(&selected, overlays, (&basis, &mut run))?
+        else {
+            return Ok(run);
+        };
         let annotations = Annotations::default();
         // The rules read what the run stands in place of files, as the
         // providers do.
@@ -96,6 +106,9 @@ impl Engine {
         run.incomplete.dedup();
         run.reported = scopes.0.clone();
         run.project = project;
+        if let Some(key) = &key {
+            self.remember(key, &run);
+        }
         Ok(run)
     }
 
@@ -131,26 +144,30 @@ impl Engine {
         &self,
         selected: &[&dyn Rule],
         overlays: &Overlays,
-        run: &mut Run,
-    ) -> Result<(Vec<Input>, Project), Error> {
+        (basis, run): (&Option<replay::Basis>, &mut Run),
+    ) -> Result<Option<Loaded>, Error> {
         let started = Instant::now();
         let detected = self.detect(overlays, |rel| self.claimed(rel))?;
         run.notices.extend(detected.listing.notices.iter().cloned());
         run.notices.extend(detected.notices.iter().cloned());
+        let key = basis.as_ref().map(|basis| basis.key(&detected.timing.tree));
         let listing = &detected.listing;
         let inputs = self.read(&detected, overlays, run);
         run.timings.read = started.elapsed();
         run.timings.files = detected.timing.clone();
-        let (inputs, project) = self.build_project(inputs, overlays, run);
+        let Some((inputs, project)) = self.build_project(inputs, overlays, (key.as_deref(), run))
+        else {
+            return Ok(None);
+        };
         let documented = selected
             .iter()
             .any(|rule| self.documented.contains(&rule.manifest().id));
         if !documented {
-            return Ok((inputs, project));
+            return Ok(Some((inputs, project, key)));
         }
         let found = Documents::scan(&self.ws.root, &listing.files, overlays);
         run.notices.extend(found.notices);
-        Ok((inputs, project.with_documents(found.documents)))
+        Ok(Some((inputs, project.with_documents(found.documents), key)))
     }
 
     /// Applies the rules and keeps what they found, noticed and could not

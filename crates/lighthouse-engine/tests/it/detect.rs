@@ -40,7 +40,7 @@ fn run_with(root: &Path, cache: Option<&Path>, ignores: &str) -> Run {
         Some(dir) => engine.with_cache(dir.to_owned(), LIMIT),
         None => engine,
     };
-    engine.check(&[], &[]).expect("check")
+    engine.check_project(&[], &[]).expect("check")
 }
 
 fn found(run: &Run) -> Vec<(String, String)> {
@@ -238,14 +238,14 @@ fn an_overlay_stands_in_for_the_file_and_gives_way_when_it_is_dropped() {
     };
 
     // Files this new are read again at the next run; two runs settle them.
-    engine.check(&[], &[]).unwrap();
+    engine.check_project(&[], &[]).unwrap();
     std::thread::sleep(Duration::from_millis(2200));
-    engine.check(&[], &[]).unwrap();
-    let plain = engine.check(&[], &[]).unwrap();
+    engine.check_project(&[], &[]).unwrap();
+    let plain = engine.check_project(&[], &[]).unwrap();
     let first = engine.check_overlaid(&[], &[], &overlaid("one")).unwrap();
     let second = engine.check_overlaid(&[], &[], &overlaid("two")).unwrap();
     let again = engine.check_overlaid(&[], &[], &overlaid("one")).unwrap();
-    let dropped = engine.check(&[], &[]).unwrap();
+    let dropped = engine.check_project(&[], &[]).unwrap();
 
     assert_eq!(hash_of(&plain, "x.txt"), hash::sha256("on disk"));
     assert_eq!(hash_of(&first, "x.txt"), hash::sha256("one"));
