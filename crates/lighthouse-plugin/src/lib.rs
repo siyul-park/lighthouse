@@ -11,6 +11,7 @@ mod models;
 mod notices;
 mod queries;
 mod registry;
+mod report;
 
 use std::{
     borrow::Cow,
@@ -55,6 +56,7 @@ pub use models::{
 pub use notices::Notices;
 pub use queries::{NoQueries, Pulling, Queries, Reads};
 pub use registry::{Language, Registry, plugin_of};
+pub use report::{REPORT, RUN, Read, Reported, quiet_report, set_run, state_report};
 
 /// Identity of a plugin: `id` prefixes every analyzer, rule and fixer
 /// it contributes. Every plugin kind describes itself through a manifest, a

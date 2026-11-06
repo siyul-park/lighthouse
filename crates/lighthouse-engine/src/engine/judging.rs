@@ -56,6 +56,27 @@ pub(super) struct Judgment<'a> {
     pub models: &'a dyn lighthouse_plugin::Models,
 }
 
+impl Plan<'_> {
+    /// The findings nodes the plan is made of: the tasks of the rules that are
+    /// not nodes read the files and the index, which the run's state holds.
+    pub(super) fn nodes(&self) -> Vec<(String, String, String)> {
+        let key = |task: &Task, file: &str| {
+            (
+                task.rule.manifest().id.clone(),
+                file.to_owned(),
+                task.variant.clone(),
+            )
+        };
+        let mut keys = Vec::new();
+        for file in &self.files {
+            let name = file.input.file.path.to_string_lossy();
+            keys.extend(file.tasks.iter().filter(|t| t.node).map(|t| key(t, &name)));
+        }
+        keys.extend(self.project.iter().filter(|t| t.node).map(|t| key(t, "")));
+        keys
+    }
+}
+
 impl Engine {
     /// Chooses, for each file and the project, the rules to judge and how:
     /// the rules that read the directives (`after`), or those that do not.

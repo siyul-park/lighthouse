@@ -5,9 +5,9 @@ use super::judging::Judgment;
 use super::*;
 use lighthouse_model::ucm::Model;
 
-/// What a run that is not replayed goes on with: the files read, the project
-/// they make and the key to keep its report under.
-type Loaded = (Vec<Input>, Project, Option<String>);
+/// What a run that is not answered by the report of the graph goes on with:
+/// the files read and the project they make.
+type Loaded = (Vec<Input>, Project);
 
 impl Engine {
     pub(super) fn run(
@@ -34,10 +34,11 @@ impl Engine {
                 .ok()
         });
         let models = RunModels::new(self, &scopes, cache.as_ref());
-        let basis = (reuse && overlays.is_empty())
-            .then(|| self.basis(&selected, (&scopes, only), (&models, &run)))
+        let reporting = (reuse && overlays.is_empty())
+            .then(|| self.reporting(&selected, (&scopes, only), (&models, &run)))
             .flatten();
-        let Some((inputs, project, key)) = self.load(&selected, overlays, (&basis, &mut run))?
+        let Some((inputs, project)) =
+            self.load(&selected, overlays, (reporting.as_ref(), &mut run))?
         else {
             return Ok(run);
         };
@@ -66,6 +67,7 @@ impl Engine {
             models: &models,
         };
         let plan = self.plan(&judgment, false)?;
+        let reads = plan.nodes();
         let started = Instant::now();
         self.judging_inputs(graph, &plan, &judgment)?;
         run.timings.commands = started.elapsed();
@@ -86,12 +88,6 @@ impl Engine {
             self.identify(found, &scene, &mut run)?;
             run.timings.fingerprints = started.elapsed();
         }
-        let started = Instant::now();
-        let committed = graph.commit();
-        run.timings.commit += started.elapsed();
-        if let Err(e) = committed {
-            run.notices.insert(format!("the graph was not saved: {e}"));
-        }
         run.questions = models.subjects();
         run.probabilities = models.probabilities();
         run.usage = models.usage();
@@ -105,10 +101,16 @@ impl Engine {
         run.incomplete.sort();
         run.incomplete.dedup();
         run.reported = scopes.0.clone();
-        run.project = project;
-        if let Some(key) = &key {
-            self.remember(key, &run);
+        if let Some(reporting) = &reporting {
+            self.remember(graph, reporting, reads, &run);
         }
+        let started = Instant::now();
+        let committed = graph.commit();
+        run.timings.commit += started.elapsed();
+        if let Err(e) = committed {
+            run.notices.insert(format!("the graph was not saved: {e}"));
+        }
+        run.project = project;
         Ok(run)
     }
 
@@ -144,30 +146,32 @@ impl Engine {
         &self,
         selected: &[&dyn Rule],
         overlays: &Overlays,
-        (basis, run): (&Option<replay::Basis>, &mut Run),
+        (reporting, run): (Option<&report::Reporting>, &mut Run),
     ) -> Result<Option<Loaded>, Error> {
         let started = Instant::now();
         let detected = self.detect(overlays, |rel| self.claimed(rel))?;
         run.notices.extend(detected.listing.notices.iter().cloned());
         run.notices.extend(detected.notices.iter().cloned());
-        let key = basis.as_ref().map(|basis| basis.key(&detected.timing.tree));
         let listing = &detected.listing;
         let inputs = self.read(&detected, overlays, run);
         run.timings.read = started.elapsed();
         run.timings.files = detected.timing.clone();
-        let Some((inputs, project)) = self.build_project(inputs, overlays, (key.as_deref(), run))
-        else {
+        let Some((inputs, project)) = self.build_project(
+            inputs,
+            overlays,
+            (reporting.map(|r| (r, detected.timing.tree.as_str())), run),
+        ) else {
             return Ok(None);
         };
         let documented = selected
             .iter()
             .any(|rule| self.documented.contains(&rule.manifest().id));
         if !documented {
-            return Ok(Some((inputs, project, key)));
+            return Ok(Some((inputs, project)));
         }
         let found = Documents::scan(&self.ws.root, &listing.files, overlays);
         run.notices.extend(found.notices);
-        Ok(Some((inputs, project.with_documents(found.documents), key)))
+        Ok(Some((inputs, project.with_documents(found.documents))))
     }
 
     /// Applies the rules and keeps what they found, noticed and could not

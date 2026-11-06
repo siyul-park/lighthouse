@@ -43,7 +43,7 @@ mod models;
 mod phases;
 mod project;
 mod regions;
-mod replay;
+mod report;
 mod route;
 mod run;
 mod scopes;

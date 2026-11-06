@@ -219,6 +219,33 @@ impl Engine {
             }
         }
         run.timings.fetch += started.elapsed();
+        run.timings
+            .answers
+            .push_str(&self.index_state(graph, &lanes));
+    }
+
+    /// What the providers answered for the units of `lanes`, hashed: the keys
+    /// they were asked under, the interfaces they gave, and the files outside
+    /// the project they read.
+    fn index_state(&self, graph: &Graph, lanes: &[Lane<'_>]) -> String {
+        let mut hasher = Hasher::new();
+        for lane in lanes {
+            hasher.update(&lane.id);
+            for id in lane.ids() {
+                let Ok(Some(stored)) = graph.input(&FRAGMENT, &lane.at(id)) else {
+                    continue;
+                };
+                hasher.update(id);
+                hasher.update(&stored.key);
+                hasher.update(&stored.api);
+                hasher.update([u8::from(stored.clean)]);
+                for read in &stored.reads {
+                    hasher.update(&read.path);
+                    hasher.update(&read.hash);
+                }
+            }
+        }
+        hasher.hex()
     }
 
     /// Writes what the step set: the answers of the units, under their keys.

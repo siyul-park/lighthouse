@@ -799,7 +799,7 @@ fn an_overlay_on_a_warm_engine_gives_what_a_fresh_engine_gives() {
     warm.check(&[], &[]).unwrap();
 
     let got = warm.check_overlaid(&[], &[], &overlays).unwrap();
-    let back = warm.check(&[], &[]).unwrap();
+    let back = warm.check_project(&[], &[]).unwrap();
 
     let fresh = |overlays: &lighthouse_engine::Overlays| {
         engine(&dir, ALL)
@@ -822,7 +822,7 @@ fn an_overlaid_check_reads_the_overlay_not_the_disk_and_leaves_the_disk_alone() 
     let overlays = lighthouse_engine::Overlays::from([("a.txt".into(), "overlaid".to_owned())]);
 
     let out = engine.check_overlaid(&[], &[], &overlays).unwrap();
-    let plain = engine.check(&[], &[]).unwrap();
+    let plain = engine.check_project(&[], &[]).unwrap();
 
     let hash =
         |o: &lighthouse_engine::Run, f: &str| o.project.file(Path::new(f)).unwrap().hash.clone();

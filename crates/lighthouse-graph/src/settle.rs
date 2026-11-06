@@ -30,7 +30,7 @@ impl Graph {
         if !snapshot.present {
             return self.execute(slot, kind, Cause::Computed);
         }
-        match self.revalidate(&snapshot)? {
+        match self.revalidate(&snapshot, kind.deciding())? {
             Some(moved) => self.execute(slot, kind, moved),
             None => self.green(slot, kind, want_value),
         }
@@ -39,14 +39,19 @@ impl Graph {
     /// `None` when nothing the node read has moved since it was verified:
     /// no input of its durability changed, or each dependency, validated in
     /// order, has not changed after it. Otherwise why it must run.
-    fn revalidate(&self, snapshot: &Snapshot) -> Result<Option<Cause>, Error> {
+    fn revalidate(
+        &self,
+        snapshot: &Snapshot,
+        deciding: Option<usize>,
+    ) -> Result<Option<Cause>, Error> {
         let revision = self.shared.revision.load(Ordering::Acquire);
         let quiet = self.shared.changed[snapshot.durability.index()].load(Ordering::Acquire)
             <= snapshot.verified_at;
         if snapshot.verified_at == revision || quiet {
             return Ok(None);
         }
-        for dep in snapshot.deps.iter() {
+        let looked = deciding.unwrap_or(snapshot.deps.len());
+        for dep in snapshot.deps.iter().take(looked) {
             let known = self.shared.registered(&dep.id.kind);
             let pulled = known
                 .map(|kind| self.pull(&dep.id, kind, false))

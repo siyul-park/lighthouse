@@ -25,6 +25,9 @@ pub struct Timings {
     pub sent: Vec<(String, usize)>,
     /// Taking the answers of the units the providers were not asked for.
     pub fetch: Duration,
+    /// What the providers answered for the units, hashed: what a report of
+    /// the run rests on besides the files.
+    pub answers: String,
     /// Where a provider says its own time went, by language id: the phases in
     /// the order it ran them. Only providers that say are listed.
     pub index_phases: Vec<(String, Vec<(String, Duration)>)>,

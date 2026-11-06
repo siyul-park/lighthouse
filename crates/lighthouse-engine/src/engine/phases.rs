@@ -179,7 +179,7 @@ impl Engine {
         &self,
         inputs: Vec<Input>,
         overlays: &Overlays,
-        (key, run): (Option<&str>, &mut Run),
+        (reporting, run): (Option<(&report::Reporting, &str)>, &mut Run),
     ) -> Option<(Vec<Input>, Project)> {
         let ws = Workspace {
             overlays: overlays.clone(),
@@ -204,11 +204,9 @@ impl Engine {
             file_calls.entry(target).or_default().regions = files.into_values().collect();
         }
         self.index_calls(&ws, file_calls, None, run);
-        // Nothing the providers had to be asked about moved: the run reports
-        // what the last one did on this key.
-        if key.is_some_and(|key| {
-            run.timings.sent.iter().all(|(_, asked)| *asked == 0) && self.recall(key, run)
-        }) {
+        // Nothing moved since the graph's report of the run was verified: the
+        // run is that report.
+        if reporting.is_some_and(|(reporting, tree)| self.recall(reporting, tree, run)) {
             self.commit_index(run);
             return None;
         }

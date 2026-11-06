@@ -236,6 +236,33 @@ impl Graph {
         self.read(query, key)
     }
 
+    /// Whether the query has a value for the key that is not due to be written
+    /// again: the store's mark of it is not older than half the commits the
+    /// graph retains, the age at which a node found green is written again. A node that is only
+    /// ever validated through the first dependencies that decide it
+    /// (see [`Query::decided_by`]) keeps the rest from being used; asking
+    /// first lets a caller have them validated now and then.
+    ///
+    /// # Errors
+    ///
+    /// The store could not be read.
+    pub fn is_fresh<K: Key, V: Value>(
+        &self,
+        query: &'static Query<K, V>,
+        key: &K,
+    ) -> Result<bool, Error> {
+        let registered = self.shared.register(query)?;
+        let id = NodeId {
+            kind: registered.name,
+            key: encode(key)?.into(),
+        };
+        let slot = self.shared.slot(&id);
+        let mut node = slot.node.locked();
+        self.shared.load(&mut node, &id)?;
+        let fresh = node.stored_verified_at >= self.shared.horizon(self.shared.retain / 2);
+        Ok(node.present && (node.value.is_some() || node.on_disk) && fresh)
+    }
+
     /// The data the graph was opened with, if it is a `T`: what a query
     /// calls through that is fixed for the life of the graph, see
     /// [`Options::data`].

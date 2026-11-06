@@ -27,6 +27,11 @@ pub(crate) trait Kind: Send + Sync {
     fn transient(&self) -> bool {
         false
     }
+    /// How many of the first dependencies of a query decide whether it is
+    /// current: the rest are not looked at.
+    fn deciding(&self) -> Option<usize> {
+        None
+    }
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error>;
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>>;
     fn describe(&self, key: &[u8]) -> String;
@@ -153,6 +158,7 @@ pub struct Query<K, V> {
     name: &'static str,
     run: fn(&Graph, &K) -> Result<V, Error>,
     transient: bool,
+    deciding: Option<usize>,
 }
 
 impl<K, V> Query<K, V> {
@@ -162,6 +168,20 @@ impl<K, V> Query<K, V> {
             name,
             run,
             transient: false,
+            deciding: None,
+        }
+    }
+
+    /// Makes the first `deps` dependencies of the query, in the order it reads
+    /// them, the whole of what decides that its value is current: when they
+    /// have not moved, the rest are not validated. A query declares this when
+    /// what it reads first states what the rest are in (a hash of the state
+    /// of the inputs), and the rest only say it again; they stay recorded, so
+    /// that what reads them is known to be in use.
+    pub const fn decided_by(self, deps: usize) -> Self {
+        Self {
+            deciding: Some(deps),
+            ..self
         }
     }
 
@@ -206,6 +226,10 @@ impl<K: Key, V: Value> Kind for Query<K, V> {
 
     fn transient(&self) -> bool {
         self.transient
+    }
+
+    fn deciding(&self) -> Option<usize> {
+        self.deciding
     }
 
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error> {

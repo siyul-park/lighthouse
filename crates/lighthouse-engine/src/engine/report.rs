@@ -1,28 +1,23 @@
-//! The report of a run that nothing has moved since: when the project's root
-//! hash and everything else a run depends on are those of the last run that
-//! checked it, the run is what that one reported, and no rule is asked for it.
-//! What the run depends on is hashed into a key kept with the report.
+//! The report of a run as the graph keeps it: what the run is besides the
+//! files (its state), asked of `report(scope)` before any rule is, and stated
+//! to it after the rules have run. A run that no input has moved since is the
+//! report the graph holds; one that something moved runs as it always did.
 
 use std::{
-    collections::BTreeMap,
-    fs,
-    path::{Path, PathBuf},
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
 };
 
+use lighthouse_plugin::{Read, quiet_report, set_run, state_report};
 use lighthouse_protocol::hash::Hasher;
 use serde::{Deserialize, Serialize};
 
 use super::*;
 use crate::{cache, tools};
 
-/// How many reports are kept, in the cache directory, one file for each key:
-/// a project edited and put back is a project that was reported.
-const KEPT: usize = 4;
-
 /// What a run reports, as it is kept.
 #[derive(Serialize, Deserialize)]
-struct Snapshot {
-    key: String,
+struct Body {
     diagnostics: Vec<Diagnostic>,
     notices: BTreeSet<String>,
     incomplete: Vec<Incomplete>,
@@ -35,29 +30,35 @@ struct Snapshot {
     suppressed: Vec<Suppressed>,
 }
 
-/// What a run depends on besides the files it reads, hashed.
-pub(super) struct Basis(String);
+/// What a run is besides the files it reads, and the report it asks for.
+pub(super) struct Reporting {
+    /// The reported paths: the node of the report.
+    scope: String,
+    /// What the run is made of, apart from the files and the index.
+    basis: String,
+}
 
-impl Basis {
-    /// The key of the run on a project whose root hash is `tree`.
-    pub(super) fn key(&self, tree: &str) -> String {
+impl Reporting {
+    /// The state of the run on a project of root hash `tree` whose providers
+    /// answered as `index`.
+    fn state(&self, tree: &str, index: &str) -> String {
         let mut hasher = Hasher::new();
-        hasher.update(&self.0);
+        hasher.update(&self.basis);
         hasher.update(tree);
+        hasher.update(index);
         hasher.hex()
     }
 }
 
 impl Engine {
-    /// What the run of `selected` over `scopes` depends on besides the files,
-    /// or `None` when its report is not a function of them: a rule asks a
-    /// model, or the run is read with texts in place of files.
-    pub(super) fn basis(
+    /// The report `selected` over `scopes` asks for, or `None` when what it
+    /// reports is not a function of the graph: a rule asks a model.
+    pub(super) fn reporting(
         &self,
         selected: &[&dyn Rule],
         (scopes, only): (&Scopes, &[String]),
         (models, run): (&dyn lighthouse_plugin::Models, &Run),
-    ) -> Option<Basis> {
+    ) -> Option<Reporting> {
         let asks = selected
             .iter()
             .any(|rule| rule.reviews() && models.asks(&rule.manifest().id));
@@ -67,7 +68,7 @@ impl Engine {
         let mut hasher = Hasher::new();
         hasher.update(cache::build_identity());
         hasher.update(format!(
-            "{scopes:?}{only:?}{:?}{:?}{:?}{}",
+            "{only:?}{:?}{:?}{:?}{}",
             run.incomplete, self.active, self.models, self.trusted
         ));
         hasher.update(format!("{:?}", self.config));
@@ -79,23 +80,29 @@ impl Engine {
         for rule in selected {
             hasher.update(self.environment(*rule));
         }
-        Some(Basis(hasher.hex()))
+        Some(Reporting {
+            scope: format!("{scopes:?}"),
+            basis: hasher.hex(),
+        })
     }
 
-    /// The report kept for `key`, put in `run`; whether there was one.
-    pub(super) fn recall(&self, key: &str, run: &mut Run) -> bool {
-        let Some(settings) = &self.cache else {
+    /// Sets the state of the run and puts in `run` the report the graph has
+    /// for it, when no input has moved since that report was verified.
+    pub(super) fn recall(&self, reporting: &Reporting, tree: &str, run: &mut Run) -> bool {
+        let mut guard = self.lock_graph();
+        let Some(graph) = guard.as_mut() else {
             return false;
         };
-        let Ok(text) = fs::read(file_of(&settings.dir, key)) else {
-            return false;
-        };
-        let Ok(kept) = serde_json::from_slice::<Snapshot>(&text) else {
-            return false;
-        };
-        if kept.key != key {
+        let state = reporting.state(tree, &run.timings.answers);
+        if set_run(graph, state).is_err() {
             return false;
         }
+        let Ok(Some(body)) = quiet_report(graph, &reporting.scope) else {
+            return false;
+        };
+        let Ok(kept) = serde_json::from_str::<Body>(&body) else {
+            return false;
+        };
         run.diagnostics = kept.diagnostics;
         run.notices = kept.notices;
         run.incomplete = kept.incomplete;
@@ -109,12 +116,16 @@ impl Engine {
         true
     }
 
-    /// Keeps what `run` reports for `key`. A report that cannot be written is
-    /// not kept, and the next run is asked.
-    pub(super) fn remember(&self, key: &str, run: &Run) {
-        let Some(settings) = &self.cache else { return };
-        let kept = Snapshot {
-            key: key.to_owned(),
+    /// States what `run` reports to the graph, made of the findings `reads`.
+    /// A report that cannot be stated is not kept, and the next run is asked.
+    pub(super) fn remember(
+        &self,
+        graph: &Graph,
+        reporting: &Reporting,
+        reads: Vec<Read>,
+        run: &Run,
+    ) {
+        let body = Body {
             diagnostics: run.diagnostics.clone(),
             notices: run.notices.clone(),
             incomplete: run.incomplete.clone(),
@@ -126,39 +137,9 @@ impl Engine {
             reviews: run.reviews.clone(),
             suppressed: run.suppressed.clone(),
         };
-        let Ok(text) = serde_json::to_vec(&kept) else {
+        let Ok(text) = serde_json::to_string(&body) else {
             return;
         };
-        let file = file_of(&settings.dir, key);
-        let part = file.with_extension("part");
-        if fs::write(&part, text).is_ok() && fs::rename(&part, &file).is_err() {
-            let _ = fs::remove_file(&part);
-        }
-        prune(&settings.dir);
-    }
-}
-
-/// The file the report of `key` is kept in.
-fn file_of(dir: &Path, key: &str) -> PathBuf {
-    dir.join(format!(
-        "report-{}.json",
-        key.chars().take(16).collect::<String>()
-    ))
-}
-
-/// Removes the reports beyond the newest [`KEPT`].
-fn prune(dir: &Path) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    let mut kept: Vec<(std::time::SystemTime, PathBuf)> = entries
-        .flatten()
-        .filter(|entry| entry.file_name().to_string_lossy().starts_with("report-"))
-        .filter_map(|entry| Some((entry.metadata().ok()?.modified().ok()?, entry.path())))
-        .collect();
-    kept.sort();
-    let extra = kept.len().saturating_sub(KEPT);
-    for (_, path) in kept.into_iter().take(extra) {
-        let _ = fs::remove_file(path);
+        let _ = state_report(graph, &reporting.scope, (reads, text));
     }
 }
