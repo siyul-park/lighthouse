@@ -325,13 +325,13 @@ fn stop(child: &mut Child, grace: Duration) {
     signal_group(child, false);
     let asked = Instant::now();
     while asked.elapsed() < grace {
-        if matches!(child.try_wait(), Ok(Some(_))) {
+        if matches!(exited(child), Ok(Some(()))) {
             break;
         }
         thread::sleep(POLL);
     }
-    // Whether or not the leader obeyed, what it left running is killed: `reap`
-    // skips a leader that has already exited.
+    // Whether or not the leader obeyed, what it left running is killed. A
+    // leader that exited is not collected yet, so the group id is still ours.
     signal_group(child, true);
     reap(child);
 }
