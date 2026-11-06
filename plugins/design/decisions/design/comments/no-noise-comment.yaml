@@ -122,23 +122,23 @@ spec:
       expression: |-
         size(bodies) > 0 && (['go:', '+build', 'nolint', 'lint:', 'lighthouse-', '#[', 'SAFETY:', 'noqa']
               .exists(p, bodies[0].startsWith(p))
-            || bodies[0].matches('^[a-z]+:[a-z]'))
+            || regex.matches(bodies[0], '^[a-z]+:[a-z]'))
     - name: prose
       expression: "!documentation && !comment.text.contains('```') && !directive"
     - name: matched
       expression: |-
         ('banner' in options.kinds && comment.standalone && !documentation && size(bodies) > 0
           && bodies.all(b, options.labels.exists(m, b.startsWith(m))
-                           || b.matches('^' + rule + '{' + string(options.minRun) + ',}'))
+                           || regex.matches(b, '^' + rule + '{' + string(options.minRun) + ',}'))
           ? ['banner'] : [])
         + ('commented-code' in options.kinds && prose && comment.standalone && !comment.attached && size(bodies) >= 1
-          && bodies.all(b, options.codePatterns.exists(p, b.matches(p)))
+          && bodies.all(b, options.codePatterns.exists(p, regex.matches(b, p)))
           ? ['commented-code'] : [])
         + ('journal' in options.kinds
-          && bodies.exists(b, options.historyPatterns.exists(p, b.matches(p)))
+          && bodies.exists(b, options.historyPatterns.exists(p, regex.matches(b, p)))
           ? ['journal'] : [])
         + ('closing' in options.kinds && comment.before == '}' && size(bodies) == 1
-          && bodies[0].matches('(?i)^(end\\b|(if|else|for|switch|select|case|func|fn|loop|match|while|impl|mod|struct|try)\\b)')
+          && regex.matches(bodies[0], '(?i)^(end\\b|(if|else|for|switch|select|case|func|fn|loop|match|while|impl|mod|struct|try)\\b)')
           ? ['closing'] : [])
     where: size(matched) > 0
     abstain: "!comment.generated && !comment.attached && !documentation && size(bodies)

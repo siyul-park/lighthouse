@@ -51,14 +51,14 @@ spec:
         ''^#+'', '''').trim()).filter(b, b != '''')'
     - name: directive
       expression: size(bodies) > 0 && (['go:', '+build', 'nolint', 'lint:', 'lighthouse-',
-        '#[', 'SAFETY:', 'noqa'].exists(p, bodies[0].startsWith(p)) || bodies[0].matches('^[a-z]+:[a-z]'))
+        '#[', 'SAFETY:', 'noqa'].exists(p, bodies[0].startsWith(p)) || regex.matches(bodies[0], '^[a-z]+:[a-z]'))
     - name: prose
       expression: "!documentation && !comment.text.contains('```') && !directive"
     - name: matched
       expression: 'options.enabled && prose && size(bodies) > 0 && options.todoKeywords.exists(k,
-        bodies[0].matches(''^'' + k + ''\\b'')) ? [''todo''] : []'
+        regex.matches(bodies[0], ''^'' + k + ''\\b'')) ? [''todo''] : []'
     where: size(matched) > 0
-    message: "{{ options.todoKeywords.filter(k, bodies[0].matches('^' + k + '\\\\b'))[0]
+    message: "{{ options.todoKeywords.filter(k, regex.matches(bodies[0], '^' + k + '\\\\b'))[0]
       + ' comment: do it, file it, or delete it' }}"
     evidence:
       kind: "'todo'"

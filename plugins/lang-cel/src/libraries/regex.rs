@@ -1,5 +1,5 @@
 //! The regex extension of cel-go (`ext.Regex()`): `regex.replace`,
-//! `regex.extract` and `regex.extractAll`, with RE2 patterns (the `regex`
+//! `regex.extract` and `regex.extractAll`, and `regex.matches`, with RE2 patterns (the `regex`
 //! crate has no look-around either, so a pattern means the same).
 //!
 //! - `regex.replace(target, pattern, replacement[, count])` replaces the
@@ -9,6 +9,8 @@
 //!   else after a backslash, a group the pattern lacks and a `$` are errors.
 //! - `regex.extract(target, pattern)` is the first match, as an optional.
 //! - `regex.extractAll(target, pattern)` is the list of all matches.
+//! - `regex.matches(target, pattern)` is whether the pattern matches anywhere
+//!   in the target: the standard `matches` under the library's prefix.
 //!
 //! A pattern with one capture group matches as that group, a pattern with more
 //! is an error.
@@ -16,7 +18,7 @@
 use cel::{
     DeclarationError, Env, ExecutionError,
     common::{
-        types::{CelInt, CelList, CelOptional, CelString},
+        types::{CelBool, CelInt, CelList, CelOptional, CelString},
         value::Val,
     },
 };
@@ -49,6 +51,12 @@ pub(crate) fn library() -> Library {
                 ],
                 "Replaces the matches of the pattern: all of them, or the first `count` when it is not negative. The replacement writes a group as `\\1` and a backslash as `\\\\`.",
                 "regex.replace('banana', 'a', 'x', 2) == 'bxnxna'",
+            ),
+            regex_function(
+                "matches",
+                vec![Overload::new(&["string", "string"], "bool")],
+                "Whether the pattern matches anywhere in the text.",
+                "regex.matches('item-A', 'item-[A-Z]')",
             ),
             regex_function(
                 "extract",
@@ -84,6 +92,8 @@ fn install(env: &mut Env) -> Result<(), DeclarationError> {
         name = "regex.replace")?;
     cel::add_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> Result<CelString>,
         name = "regex.replace")?;
+    cel::add_overload!(env, fn matches: (CelString, CelString) -> Result<CelBool>,
+        name = "regex.matches")?;
     cel::add_overload!(env, fn extract: (CelString, CelString) -> Result<CelOptional>,
         name = "regex.extract")?;
     cel::add_overload!(env, fn extract_all: (CelString, CelString) -> Result<CelList>,
@@ -172,6 +182,11 @@ fn expand(out: &mut String, pieces: &[Piece], found: &Captures<'_>) {
             Piece::Group(group) => out.push_str(found.get(*group).map_or("", |m| m.as_str())),
         }
     }
+}
+
+fn matches(target: &CelString<'_>, pattern: &CelString<'_>) -> Result<CelBool, ExecutionError> {
+    let regex = compile("regex.matches", pattern)?;
+    Ok(CelBool::from(regex.is_match(target.inner())))
 }
 
 fn extract(

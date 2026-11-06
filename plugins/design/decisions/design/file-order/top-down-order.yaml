@@ -48,7 +48,7 @@ spec:
       params: [f, b]
       expression: |-
         f.type != null && (f.type.symbol == b.id.split('#')[0]
-          || (f.type.symbol == '' && f.type.text.matches(
+          || (f.type.symbol == '' && regex.matches(f.type.text,
                 b.lang == 'go'
                 ? (b.module == '.' ? '\\.' : '/' + b.module.replace('.', '\\.') + '\\.')
                   + b.name + '($|[^A-Za-z0-9_])'

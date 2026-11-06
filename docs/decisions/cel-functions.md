@@ -104,6 +104,16 @@ Every match of the pattern (its capture group when it has one).
 regex.extractAll('id:1, id:22', 'id:([0-9]+)') == ['1', '22']
 ```
 
+### `regex.matches` (step 2)
+
+Whether the pattern matches anywhere in the text.
+
+- `regex.matches(string, string) -> bool`
+
+```text
+regex.matches('item-A', 'item-[A-Z]')
+```
+
 ### `regex.replace` (step 2)
 
 Replaces the matches of the pattern: all of them, or the first `count` when it is not negative. The replacement writes a group as `\1` and a backslash as `\\`.

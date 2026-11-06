@@ -182,9 +182,14 @@ pub fn parse_template(text: &str) -> Result<Vec<TemplatePart>, String> {
 
 /// Why `source`, written as `what`, is not a CEL expression.
 pub(crate) fn compile_problem(cel: &Env, what: &str, source: &str) -> Option<String> {
-    cel.compile_shared(source)
-        .err()
-        .map(|e| format!("{what}: {e}"))
+    let program = match cel.compile_shared(source) {
+        Ok(program) => program,
+        Err(e) => return Some(format!("{what}: {e}")),
+    };
+    program_calls(cel, &program)
+        .iter()
+        .any(|call| call.name == "matches" && call.namespace.is_none())
+        .then(|| format!("{what}: `matches` is not a function of decisions, use `regex.matches(text, pattern)`"))
 }
 
 /// Why the `{{ cel }}` template `text`, written as `what`, is not well formed.

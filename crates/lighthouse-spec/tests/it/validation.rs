@@ -142,6 +142,15 @@ fn a_cel_check_must_compile_and_select_what_the_scope_runs_over() {
     )
     .unwrap();
     rejected(decision_with(&cel("file", "1 +")), "check where");
+    rejected(
+        decision_with(&cel("file", "file.path.matches('a')")),
+        "regex.matches",
+    );
+    Catalog::from_files(
+        decision_with(&cel("file", "regex.matches(file.path, 'a')")),
+        &lighthouse_test_support::cel(),
+    )
+    .unwrap();
     rejected(decision_with(&cel("module", "true")), "cannot run over");
     rejected(
         decision_with(&format!(

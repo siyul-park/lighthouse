@@ -98,6 +98,13 @@ fn regex_extract_is_the_first_match_as_an_optional() {
 }
 
 #[test]
+fn regex_matches_is_whether_the_pattern_matches_anywhere() {
+    is("regex.matches('item-A', 'item-[A-Z]')", "true");
+    is("regex.matches('item-A', '^[A-Z]')", "false");
+    fails("regex.matches('a', '(')", "invalid regex string");
+}
+
+#[test]
 fn regex_extract_all_lists_every_match() {
     is(
         "regex.extractAll('id:123, id:456', 'id:\\\\d+')",

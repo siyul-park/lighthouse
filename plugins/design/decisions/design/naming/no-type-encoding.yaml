@@ -56,7 +56,7 @@ spec:
   check:
     type: cel
     select: symbol
-    where: options.enabled && options.encodings.exists(e, symbol.name.matches(e.pattern)
+    where: options.enabled && options.encodings.exists(e, regex.matches(symbol.name, e.pattern)
       && (!has(e.kinds) || symbol.kind in e.kinds))
     message: "{{ symbol.name + ' encodes its type or scope in its name; drop the prefix'
       }}"
