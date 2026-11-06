@@ -13,7 +13,7 @@ use crate::{
 
 /// Bumped whenever a table or what a value means changes: a database of
 /// another version is replaced.
-const SCHEMA: i64 = 4;
+const SCHEMA: i64 = 5;
 
 /// Pruning goes down to this part of the limit, so that a run that is just
 /// over does not prune every time.
@@ -33,6 +33,7 @@ CREATE TABLE node(
     value BLOB,
     PRIMARY KEY(kind, key)
 ) WITHOUT ROWID;
+CREATE INDEX node_verified ON node(verified_at);
 CREATE TABLE meta(
     id INTEGER PRIMARY KEY CHECK(id = 0),
     revision INTEGER NOT NULL,

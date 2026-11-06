@@ -144,7 +144,8 @@ impl Graph {
         let revision = self.shared.revision.load(Ordering::Acquire);
         self.shared.executed.locked().push(slot.id.clone());
         let mut node = slot.node.locked();
-        if !(node.present && node.hash == new_hash) {
+        let same = node.present && node.hash == new_hash;
+        if !same {
             node.changed_at = revision;
         }
         node.present = true;
@@ -155,7 +156,8 @@ impl Graph {
         node.value = Some(output.value);
         let kept = !kind.transient();
         node.blob = kept.then_some(output.blob);
-        node.value_dirty = kept;
+        // A value the store holds already is the one the hash says.
+        node.value_dirty = kept && !(same && node.on_disk);
         node.cause = cause;
         node.used_at = now();
         self.shared.dirty.mark(slot, &mut node);
