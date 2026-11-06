@@ -9,7 +9,13 @@
 //! what its way of judging depends on besides the code) is the input `judged`
 //! under the `variant` that tells the configurations of a rule apart.
 
-use std::{any::Any, path::Path, sync::Arc, time::Instant};
+use std::{
+    any::Any,
+    collections::{BTreeMap, BTreeSet, HashMap},
+    path::{Path, PathBuf},
+    sync::{Arc, PoisonError},
+    time::Instant,
+};
 
 use lighthouse_graph::{Durability, Error, Graph, Input, Query, VERSION};
 use lighthouse_model::{
@@ -45,7 +51,7 @@ pub static TOOL: Input<String, String> = Input::new("tool");
 
 /// What one run of the program of the rule over the files told of each
 /// (`rule`, `variant`, `files`).
-pub static COMMAND: Query<(String, String, Vec<String>), Batched> = Query::new("command", command);
+pub static COMMAND: Query<Key, Batched> = Query::new("command", command);
 
 /// What the rule `rule` found in the file `file` (the project when empty)
 /// judged as `variant` says.
@@ -107,6 +113,18 @@ pub struct Judging<'a> {
     pub workspace: Option<&'a Workspace>,
     pub documents: &'a [Document],
 }
+
+/// What the runs of the programs of a graph's rules are collected and kept
+/// with, see [`run_batches`].
+#[derive(Default)]
+pub struct Actions {
+    collecting: bool,
+    pending: Vec<Key>,
+    ready: HashMap<Key, Batched>,
+}
+
+/// A batch: the rule, the variant of its configuration and the files.
+pub type Key = (String, String, Vec<String>);
 
 /// The files of the batch the program of a rule is run over, as it said the
 /// findings in each (JSON), and what it said besides.
@@ -246,6 +264,76 @@ pub fn set_judged(graph: &mut Graph, rule: &str, judged: Judged) -> Result<Strin
     Ok(variant)
 }
 
+/// Runs the programs of the batches the graph holds no answer for, one run
+/// of a rule's program over the files of all its stale batches, and keeps
+/// what each batch was told for the nodes that are about to be pulled: the
+/// process count of a run is that of a run without a graph, and an edit runs
+/// one process over the stale batches. A batch the run does not answer is left
+/// to its own node.
+///
+/// # Errors
+///
+/// A batch that cannot be read through the graph.
+pub fn run_batches(graph: &Graph, wanted: Vec<Key>) -> Result<(), Error> {
+    let runtime = Runtime::of(graph)?;
+    {
+        let mut actions = runtime
+            .actions
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        actions.collecting = true;
+        actions.pending.clear();
+    }
+    let _ = graph.par_map(wanted, |graph, key| graph.query(&COMMAND, key).map(|_| ()));
+    let pending = {
+        let mut actions = runtime
+            .actions
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        actions.collecting = false;
+        std::mem::take(&mut actions.pending)
+    };
+    let mut by_rule: BTreeMap<(&str, &str), Vec<&Key>> = BTreeMap::new();
+    for key in &pending {
+        by_rule.entry((&key.0, &key.1)).or_default().push(key);
+    }
+    for ((rule, variant), keys) in by_rule {
+        let judged = configuration(graph, rule, variant)?;
+        let options = options_of(&judged, rule)?;
+        let rule = rule_of(runtime, rule)?;
+        let held = Held::default();
+        let view = View::new(graph, &held)?;
+        let mut workspace = runtime.workspace.clone();
+        let mut batches = Vec::new();
+        for key in keys {
+            batches.push((
+                key,
+                batch_paths(graph, (&judged, &view), &key.2, &mut workspace)?,
+            ));
+        }
+        let union: BTreeSet<PathBuf> = batches
+            .iter()
+            .flat_map(|(_, p)| p.iter().cloned())
+            .collect();
+        let union: Vec<PathBuf> = union.into_iter().collect();
+        let Ok((answered, notices)) =
+            run_batch(graph, rule, (&judged, &options), &union, &workspace)
+        else {
+            continue;
+        };
+        let mut actions = runtime
+            .actions
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        for (key, paths) in batches {
+            actions
+                .ready
+                .insert(key.clone(), told_of(&answered, &paths, notices.clone()));
+        }
+    }
+    Ok(())
+}
+
 fn findings(
     graph: &Graph,
     (rule, file, variant): &(String, String, String),
@@ -261,37 +349,79 @@ fn findings(
     judge(graph, rule, file, &judged, &judging)
 }
 
-fn command(
-    graph: &Graph,
-    (rule, variant, files): &(String, String, Vec<String>),
-) -> Result<Batched, Error> {
+fn command(graph: &Graph, key: &Key) -> Result<Batched, Error> {
+    let (rule, variant, files) = key;
     graph.input(&VERSION, &"binary".to_owned())?;
     let judged = configuration(graph, rule, variant)?;
     let runtime = Runtime::of(graph)?;
     let rule = rule_of(runtime, rule)?;
-    let options = options_of(&judged, &rule.manifest().id)?;
     let identity = tools(graph, rule)?;
     let mut workspace = runtime.workspace.clone();
+    let held = Held::default();
+    let view = View::new(graph, &held)?;
+    let paths = batch_paths(graph, (&judged, &view), files, &mut workspace)?;
+    drop(identity);
+    if let Some(error) = view.failure() {
+        return Err(error);
+    }
+    let mut actions = runtime
+        .actions
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    if let Some(told) = actions.ready.remove(key) {
+        return Ok(told);
+    }
+    if actions.collecting {
+        actions.pending.push(key.clone());
+        return Err(Error::Incomplete("the command is to be run".to_owned()));
+    }
+    drop(actions);
+    let options = options_of(&judged, &rule.manifest().id)?;
+    let (answered, notices) = run_batch(graph, rule, (&judged, &options), &paths, &workspace)?;
+    Ok(told_of(&answered, &paths, notices))
+}
+
+/// The files of a batch the rule is applied to, read through the graph (the
+/// program reads them from the disk: the text it is given in place of one is
+/// a copy the rule makes, so the overlays of `workspace` take them).
+fn batch_paths(
+    graph: &Graph,
+    (judged, view): (&Judged, &View),
+    files: &[String],
+    workspace: &mut Workspace,
+) -> Result<Vec<PathBuf>, Error> {
+    let runtime = Runtime::of(graph)?;
     let mut paths = Vec::new();
     for file in files {
-        // The program reads the files from the disk: the text it is given in
-        // place of one is a copy the rule makes.
         (runtime.text)(graph, file)?;
         if let Some(text) = (runtime.overlaid)(graph, file)? {
             workspace.overlays.insert(file.into(), text);
         }
-        paths.push(std::path::PathBuf::from(file));
+        paths.push(PathBuf::from(file));
     }
-    let held = Held::default();
-    let view = View::new(graph, &held)?;
     paths.retain(|path| {
         view.file(path)
-            .is_some_and(|file| !judged.applies.excludes(&view, file))
+            .is_some_and(|file| !judged.applies.excludes(view, file))
     });
+    Ok(paths)
+}
+
+/// One run of the program of `rule` over `paths`: what it found in each, and
+/// what it said besides.
+fn run_batch(
+    graph: &Graph,
+    rule: &dyn Rule,
+    (judged, options): (&Judged, &Options),
+    paths: &[PathBuf],
+    workspace: &Workspace,
+) -> Result<(BTreeMap<PathBuf, Vec<Diagnostic>>, Vec<String>), Error> {
+    let runtime = Runtime::of(graph)?;
+    let held = Held::default();
+    let view = View::new(graph, &held)?;
     let notices = Notices::default();
     let queries = queries_of(graph, runtime);
     let ctx = Context {
-        workspace: &workspace,
+        workspace,
         model: &view,
         file: None,
         facts: &Facts::new(),
@@ -305,23 +435,29 @@ fn command(
         queries: &queries,
     };
     let answered = rule
-        .batch(&ctx, &options, &paths)
+        .batch(&ctx, options, paths)
         .map_err(|e| outcome(e, &rule.manifest().id))?;
     if let Some(error) = view.failure() {
         return Err(error);
     }
-    drop(identity);
-    let answered = answered
-        .into_iter()
-        .map(|(path, found)| {
-            let json = serde_json::to_string(&found).map_err(|e| Error::Encode(e.to_string()))?;
-            Ok((path.to_string_lossy().into_owned(), json))
+    Ok((answered, notices.take()))
+}
+
+/// What the batch of `paths` was told, from what a run over them found.
+fn told_of(
+    answered: &BTreeMap<PathBuf, Vec<Diagnostic>>,
+    paths: &[PathBuf],
+    notices: Vec<String>,
+) -> Batched {
+    let answered = paths
+        .iter()
+        .filter_map(|path| {
+            let found = answered.get(path)?;
+            let json = serde_json::to_string(found).ok()?;
+            Some((path.to_string_lossy().into_owned(), json))
         })
-        .collect::<Result<Vec<_>, Error>>()?;
-    Ok(Batched {
-        answered,
-        notices: notices.take(),
-    })
+        .collect();
+    Batched { answered, notices }
 }
 
 fn configuration(graph: &Graph, rule: &str, variant: &str) -> Result<Arc<Judged>, Error> {

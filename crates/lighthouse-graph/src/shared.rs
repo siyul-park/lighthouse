@@ -175,16 +175,6 @@ impl Shared {
         node.on_disk = row.has_value;
     }
 
-    fn intern(&self, name: &str) -> Arc<str> {
-        let kinds = self
-            .kinds
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        kinds
-            .get(name)
-            .map_or_else(|| Arc::from(name), |found| found.name.clone())
-    }
-
     /// Starts a revision for an input of `reach` durability: nodes that read
     /// only inputs of a higher durability are not affected.
     pub(crate) fn start_revision(&self, reach: Durability) -> u64 {
@@ -285,6 +275,26 @@ impl Shared {
                 drop_value(&mut slot.node.locked());
             }
         }
+    }
+
+    /// Queues a node found green for the store, when the mark it has there is
+    /// old: nothing it read has moved after that mark, so it still says what a
+    /// later run needs to know, and the row is written again only to keep it
+    /// from aging out.
+    pub(crate) fn mark_verified(&self, slot: &Arc<Slot>, node: &mut Node) {
+        if node.stored_verified_at < self.horizon(self.retain / 2) {
+            self.dirty.mark(slot, node);
+        }
+    }
+
+    fn intern(&self, name: &str) -> Arc<str> {
+        let kinds = self
+            .kinds
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        kinds
+            .get(name)
+            .map_or_else(|| Arc::from(name), |found| found.name.clone())
     }
 }
 

@@ -12,7 +12,8 @@ use std::sync::Arc;
 use lighthouse_graph::{Durability, Error as GraphError, Graph};
 use lighthouse_model::ucm::{Applicability, Model};
 use lighthouse_plugin::{
-    BATCH, COMMAND, FINDINGS, Findings, Judged, Judging, Runtime, TOOL, judge, set_judged,
+    BATCH, COMMAND, FINDINGS, Findings, Judged, Judging, Key, Runtime, TOOL, judge, run_batches,
+    set_judged,
 };
 use lighthouse_protocol::hash::Hasher;
 
@@ -225,6 +226,7 @@ impl Engine {
         }
         if batching {
             self.set_batches(graph, run)?;
+            run_batches(graph, batches_of(graph, plan)?)?;
         }
         Ok(())
     }
@@ -408,4 +410,21 @@ impl Engine {
 struct Direct {
     results: BTreeMap<usize, Result<Arc<Findings>, GraphError>>,
     answered: Vec<Diagnostic>,
+}
+
+/// The batches the nodes of the plan read: of each rule that runs a program
+/// over a batch, the files of the batch of each file it judges.
+fn batches_of(graph: &Graph, plan: &Plan) -> Result<Vec<Key>, GraphError> {
+    let mut batches = BTreeSet::new();
+    for file in &plan.files {
+        let name = file.input.file.path.to_string_lossy().into_owned();
+        let Some(files) = graph.input(&BATCH, &name)? else {
+            continue;
+        };
+        for task in file.tasks.iter().filter(|t| t.node && t.rule.batches()) {
+            let id = task.rule.manifest().id.clone();
+            batches.insert((id, task.variant.clone(), files.as_ref().clone()));
+        }
+    }
+    Ok(batches.into_iter().collect())
 }

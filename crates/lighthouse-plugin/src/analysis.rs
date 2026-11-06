@@ -64,6 +64,7 @@ pub struct Runtime {
     pub(crate) workspace: Workspace,
     pub(crate) trusted: bool,
     pub(crate) times: Mutex<BTreeMap<String, Duration>>,
+    pub(crate) actions: Mutex<crate::findings::Actions>,
 }
 
 impl Runtime {
@@ -82,6 +83,7 @@ impl Runtime {
             workspace,
             trusted,
             times: Mutex::default(),
+            actions: Mutex::default(),
         }
     }
 

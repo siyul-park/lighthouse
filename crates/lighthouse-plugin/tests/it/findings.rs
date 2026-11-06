@@ -2,8 +2,12 @@
 //! runtime a graph runs it with.
 
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use lighthouse_graph::{Graph, Options as GraphOptions};
@@ -11,9 +15,9 @@ use lighthouse_model::{
     Diagnostic, Fingerprint, Options, Position, RunScope, Severity, Span, ucm::Applicability,
 };
 use lighthouse_plugin::{
-    Analyzer, AnalyzerContext, AnalyzerManifest, Annotations, Context, Error, FINDINGS, Findings,
-    Judged, Judging, NoModels, Plugin, PluginManifest, Registry, Rule, RuleManifest, Runtime,
-    Workspace, judge, set_judged,
+    Analyzer, AnalyzerContext, AnalyzerManifest, Annotations, COMMAND, Context, Error, FINDINGS,
+    Findings, Judged, Judging, NoModels, Plugin, PluginManifest, Registry, Rule, RuleManifest,
+    Runtime, Workspace, judge, run_batches, set_judged,
 };
 use serde_json::Value;
 
@@ -58,6 +62,33 @@ impl Rule for Found {
             },
             Fingerprint::new(RULE, "a.txt", ""),
         )])
+    }
+}
+
+/// Counts the runs of its program over a batch.
+struct Batching(RuleManifest, AtomicUsize);
+
+impl Rule for Batching {
+    fn manifest(&self) -> &RuleManifest {
+        &self.0
+    }
+    fn validate(&self, _: &Options) -> Result<(), Error> {
+        Ok(())
+    }
+    fn check(&self, _: &Context, _: &Options) -> Result<Vec<Diagnostic>, Error> {
+        Ok(Vec::new())
+    }
+    fn batches(&self) -> bool {
+        true
+    }
+    fn batch(
+        &self,
+        _: &Context,
+        _: &Options,
+        _: &[PathBuf],
+    ) -> Result<BTreeMap<PathBuf, Vec<Diagnostic>>, Error> {
+        self.1.fetch_add(1, Ordering::SeqCst);
+        Ok(BTreeMap::new())
     }
 }
 
@@ -227,4 +258,80 @@ fn judge_runs_the_rule() {
         )
         .unwrap();
     assert_eq!(node.found, said.found);
+}
+
+#[test]
+fn run_batches_runs_one_program_over_the_stale_batches_of_a_rule() {
+    let rule = Arc::new(Batching(Found::new().0, AtomicUsize::new(0)));
+    let mut registry = Registry::default();
+    registry
+        .register(&Shared(
+            PluginManifest {
+                id: "t".to_owned(),
+                version: "0".to_owned(),
+            },
+            rule.clone(),
+        ))
+        .unwrap();
+    let runtime = Runtime::new(
+        Arc::new(registry),
+        (nothing, not_overlaid),
+        (Workspace::new(""), false),
+    );
+    let mut graph = Graph::in_memory(GraphOptions::default().data(Arc::new(runtime))).unwrap();
+    let found = judged("{}");
+    let variant = set_judged(&mut graph, RULE, found).unwrap();
+    let wanted = vec![
+        (RULE.to_owned(), variant.clone(), vec!["a".to_owned()]),
+        (RULE.to_owned(), variant, vec!["b".to_owned()]),
+    ];
+
+    run_batches(&graph, wanted.clone()).unwrap();
+
+    assert_eq!(rule.1.load(Ordering::SeqCst), 1);
+    for key in &wanted {
+        assert!(graph.query(&COMMAND, key).unwrap().answered.is_empty());
+    }
+    assert_eq!(
+        rule.1.load(Ordering::SeqCst),
+        1,
+        "the nodes took the answer"
+    );
+}
+
+/// The rule the test counts the runs of, given to a registry.
+struct Shared(PluginManifest, Arc<Batching>);
+
+struct Delegate(Arc<Batching>);
+
+impl Rule for Delegate {
+    fn manifest(&self) -> &RuleManifest {
+        self.0.manifest()
+    }
+    fn validate(&self, options: &Options) -> Result<(), Error> {
+        self.0.validate(options)
+    }
+    fn check(&self, ctx: &Context, options: &Options) -> Result<Vec<Diagnostic>, Error> {
+        self.0.check(ctx, options)
+    }
+    fn batches(&self) -> bool {
+        true
+    }
+    fn batch(
+        &self,
+        ctx: &Context,
+        options: &Options,
+        files: &[PathBuf],
+    ) -> Result<BTreeMap<PathBuf, Vec<Diagnostic>>, Error> {
+        self.0.batch(ctx, options, files)
+    }
+}
+
+impl Plugin for Shared {
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
+    }
+    fn rules(&self) -> Vec<Box<dyn Rule>> {
+        vec![Box::new(Delegate(self.1.clone()))]
+    }
 }

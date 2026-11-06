@@ -83,12 +83,7 @@ impl Graph {
             if node.verified_at != revision {
                 node.verified_at = revision;
                 node.cause = Cause::Green;
-                // Nothing it read has moved after the stored mark, so the
-                // stored mark still says what a later run needs to know: the
-                // row is written again only to keep it from aging out.
-                if node.stored_verified_at < self.shared.horizon(self.shared.retain / 2) {
-                    self.shared.dirty.mark(slot, &mut node);
-                }
+                self.shared.mark_verified(slot, &mut node);
             }
             self.shared.dirty.touch(slot, &mut node);
             (want_value && node.value.is_none(), node.hash)
