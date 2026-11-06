@@ -279,16 +279,6 @@ impl Checked {
             .collect()
     }
 
-    /// The project the check read, merged: what the analyses of the whole of
-    /// it work from.
-    ///
-    /// # Errors
-    ///
-    /// The graph the check read cannot be queried.
-    pub fn project(&self) -> Result<lighthouse_model::ucm::Project> {
-        Ok(self.engine.project()?)
-    }
-
     /// The briefing the agent formats draw on. It always carries the
     /// catalog, so that the summary and every format agree on which findings
     /// ask for review.

@@ -51,11 +51,13 @@ pub static TOOL: Input<String, String> = Input::new("tool");
 
 /// What one run of the program of the rule over the files told of each
 /// (`rule`, `variant`, `files`).
-pub static COMMAND: Query<Key, Batched> = Query::new("command", command);
+pub static COMMAND: Query<Key, Batched> =
+    Query::new("command", command).starting_program(|_, _| true);
 
 /// What the rule `rule` found in the file `file` (the project when empty)
 /// judged as `variant` says.
-pub static FINDINGS: Query<(String, String, String), Findings> = Query::new("findings", findings);
+pub static FINDINGS: Query<(String, String, String), Findings> =
+    Query::new("findings", findings).starting_program(runs_tools);
 
 /// How one rule judges one configuration of its code.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -180,9 +182,6 @@ pub fn judge(
 ) -> Result<Findings, Error> {
     let runtime = Runtime::of(graph)?;
     let rule = rule_of(runtime, id)?;
-    if graph.verifying() && !rule.manifest().tools.is_empty() {
-        return Err(Error::Unverifiable);
-    }
     let options = options_of(judged, id)?;
     let held = Held::default();
     let view = View::new(graph, &held)?;
@@ -355,11 +354,15 @@ fn findings(
     judge(graph, rule, file, &judged, &judging)
 }
 
+/// Whether the rule of the node has tools, the programs it starts.
+fn runs_tools(graph: &Graph, (rule, _, _): &(String, String, String)) -> bool {
+    Runtime::of(graph)
+        .and_then(|runtime| rule_of(runtime, rule))
+        .is_ok_and(|rule| !rule.manifest().tools.is_empty())
+}
+
 fn command(graph: &Graph, key: &Key) -> Result<Batched, Error> {
     let (rule, variant, files) = key;
-    if graph.verifying() {
-        return Err(Error::Unverifiable);
-    }
     graph.input(&VERSION, &"binary".to_owned())?;
     let judged = configuration(graph, rule, variant)?;
     let runtime = Runtime::of(graph)?;

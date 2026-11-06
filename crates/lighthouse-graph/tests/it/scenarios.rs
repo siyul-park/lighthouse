@@ -208,27 +208,26 @@ fn verify_mode_reports_a_query_that_reads_outside_the_graph() {
 }
 
 #[test]
-fn graph_verifying_is_declined_by_a_query_that_starts_a_program() {
+fn query_starting_program_is_not_run_again_by_verify_mode() {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     use lighthouse_graph::{Graph, Query};
 
     static STARTED: AtomicU64 = AtomicU64::new(0);
-    static PROGRAM: Query<(), u64> = Query::new("program", |graph: &Graph, _: &()| {
-        if graph.verifying() {
-            return Err(Error::Unverifiable);
-        }
-        Ok(STARTED.fetch_add(1, Ordering::SeqCst) + 1)
-    });
+    let program: &'static Query<(), u64> = Box::leak(Box::new(
+        Query::new("program", |_: &Graph, _: &()| {
+            Ok(STARTED.fetch_add(1, Ordering::SeqCst) + 1)
+        })
+        .starting_program(|_, _| true),
+    ));
     let options = Options {
         verify: 1,
         ..Options::default()
     };
     let graph = Graph::in_memory(options).expect("open");
-    assert!(!graph.verifying(), "the owner of the graph does not verify");
 
     for _ in 0..4 {
-        assert_eq!(*graph.query(&PROGRAM, &()).expect("pull"), 1);
+        assert_eq!(*graph.query(program, &()).expect("pull"), 1);
     }
 
     assert_eq!(STARTED.load(Ordering::SeqCst), 1);

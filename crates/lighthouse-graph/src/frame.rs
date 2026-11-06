@@ -16,8 +16,6 @@ const MAX_HOPS: usize = 100_000;
 /// it, what it has read, and what it waits for.
 pub(crate) struct Frame {
     pub id: NodeId,
-    /// The frame runs a node again to compare, see [`Graph::verifying`].
-    pub verifying: bool,
     parent: Option<Arc<Frame>>,
     reads: Mutex<Reads>,
     link: Mutex<Link>,
@@ -40,16 +38,6 @@ struct Link {
 
 impl Frame {
     pub(crate) fn new(id: NodeId, parent: Option<Arc<Frame>>) -> Arc<Self> {
-        let verifying = parent.as_ref().is_some_and(|parent| parent.verifying);
-        Self::make(id, parent, verifying)
-    }
-
-    /// The frame of a node run again to compare with its value.
-    pub(crate) fn checking(id: NodeId, parent: Option<Arc<Frame>>) -> Arc<Self> {
-        Self::make(id, parent, true)
-    }
-
-    fn make(id: NodeId, parent: Option<Arc<Frame>>, verifying: bool) -> Arc<Self> {
         let reads = Reads {
             list: Vec::new(),
             seen: HashSet::new(),
@@ -57,7 +45,6 @@ impl Frame {
         };
         Arc::new(Self {
             id,
-            verifying,
             parent,
             reads: Mutex::new(reads),
             link: Mutex::default(),

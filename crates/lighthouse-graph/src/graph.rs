@@ -259,12 +259,6 @@ impl Graph {
         Ok(explain::walk(&self.shared, id))
     }
 
-    /// Whether the query being run is a node run again by verify mode, which
-    /// a query that starts a program answers with [`Error::Unverifiable`].
-    pub fn verifying(&self) -> bool {
-        self.frame.as_ref().is_some_and(|frame| frame.verifying)
-    }
-
     /// The nodes that ran since the last call, as `kind(key)`, in order of
     /// completion.
     pub fn take_executed(&self) -> Vec<String> {

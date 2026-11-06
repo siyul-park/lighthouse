@@ -16,7 +16,7 @@ use lighthouse_checks::metrics::{
     propagation::{modules, symbols},
 };
 use lighthouse_model::ucm::{SymbolId, SymbolKind};
-use lighthouse_session::{CheckRequest, Result, Session, check};
+use lighthouse_session::{Result, Session};
 use serde_json::json;
 
 /// How many functions the report names.
@@ -32,8 +32,8 @@ fn main() -> Result<()> {
     }
     let config = PathBuf::from(config).canonicalize()?;
     let session = Session::load_in(Path::new(repo), Some(&config))?;
-    let checked = check(&session, &CheckRequest::default())?;
-    let project = &checked.project()?;
+    let (engine, _) = session.engine()?;
+    let project = &engine.check_project(&[PathBuf::from(".")], &[])?.project;
 
     let (by_module, by_symbol) = (modules(project), symbols(project));
     let core: Vec<&String> = by_module

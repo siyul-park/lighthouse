@@ -53,11 +53,9 @@ impl Graph {
                 .map(|kind| self.pull(&dep.id, kind, false))
                 .transpose()?;
             let moved = match pulled {
-                // An input that was unset when read and still is.
-                Some(pulled) if pulled.missing && dep.hash == [0; 32] => None,
-                // Read as unset, set since: whatever it is set to is news.
-                Some(pulled) if !pulled.missing && dep.hash == [0; 32] => {
-                    Some(Cause::DepMoved(dep.id.clone()))
+                // Read as unset: whatever it is set to since is news.
+                Some(pulled) if dep.hash == [0; 32] => {
+                    (!pulled.missing).then(|| Cause::DepMoved(dep.id.clone()))
                 }
                 Some(pulled) if !pulled.missing => (pulled.changed_at > snapshot.verified_at)
                     .then(|| Cause::DepMoved(dep.id.clone())),
@@ -89,7 +87,7 @@ impl Graph {
             self.shared.dirty.touch(slot, &mut node);
             (want_value && node.value.is_none(), node.hash)
         };
-        if self.shared.sampled() {
+        if self.shared.sampled() && !kind.starts_program(self, &slot.id.key) {
             self.verify(&slot.id, kind, expected)?;
         }
         if needs_value && !self.load_value(slot, kind, expected)? {
@@ -100,15 +98,12 @@ impl Graph {
 
     /// Verify mode: runs the node again and compares.
     fn verify(&self, id: &NodeId, kind: &'static dyn Kind, expected: Hash) -> Result<(), Error> {
-        let inside = self.within(&Frame::checking(id.clone(), self.frame.clone()));
-        let output = match kind.execute(&inside, &id.key) {
-            Err(Error::Unverifiable) => return Ok(()),
-            other => other?,
-        };
-        match hash(&output.blob) == expected {
-            true => Ok(()),
-            false => Err(Error::Impure(self.shared.label(id))),
+        let inside = self.within(&Frame::new(id.clone(), self.frame.clone()));
+        let output = kind.execute(&inside, &id.key)?;
+        if hash(&output.blob) != expected {
+            return Err(Error::Impure(self.shared.label(id)));
         }
+        Ok(())
     }
 
     /// Reads the stored value, if it is there and is what its hash says.

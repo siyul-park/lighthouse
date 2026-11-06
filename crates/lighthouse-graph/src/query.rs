@@ -35,6 +35,11 @@ pub(crate) trait Kind: Send + Sync {
     fn deciding(&self) -> Option<usize> {
         None
     }
+    /// Whether running the query for the key starts a program, which verify
+    /// mode does not repeat.
+    fn starts_program(&self, _graph: &Graph, _key: &[u8]) -> bool {
+        false
+    }
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error>;
     fn decode(&self, blob: &[u8]) -> Option<Arc<dyn Any + Send + Sync>>;
     fn describe(&self, key: &[u8]) -> String;
@@ -162,6 +167,7 @@ pub struct Query<K, V> {
     run: fn(&Graph, &K) -> Result<V, Error>,
     transient: bool,
     deciding: Option<usize>,
+    starts_program: Option<fn(&Graph, &K) -> bool>,
 }
 
 impl<K, V> Query<K, V> {
@@ -172,6 +178,7 @@ impl<K, V> Query<K, V> {
             run,
             transient: false,
             deciding: None,
+            starts_program: None,
         }
     }
 
@@ -184,6 +191,16 @@ impl<K, V> Query<K, V> {
     pub const fn decided_by(self, deps: usize) -> Self {
         Self {
             deciding: Some(deps),
+            ..self
+        }
+    }
+
+    /// Declares which keys run a program when computed, which a check that
+    /// starts the programs of a run starts once: verify mode does not run
+    /// those again.
+    pub const fn starting_program(self, when: fn(&Graph, &K) -> bool) -> Self {
+        Self {
+            starts_program: Some(when),
             ..self
         }
     }
@@ -256,6 +273,13 @@ impl<K: Key, V: Value> Kind for Query<K, V> {
 
     fn deciding(&self) -> Option<usize> {
         self.deciding
+    }
+
+    fn starts_program(&self, graph: &Graph, key: &[u8]) -> bool {
+        let key: Option<K> = decode(key).ok();
+        self.starts_program
+            .zip(key)
+            .is_some_and(|(when, key)| when(graph, &key))
     }
 
     fn execute(&self, graph: &Graph, key: &[u8]) -> Result<Output, Error> {

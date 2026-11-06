@@ -38,19 +38,6 @@ fn checked_summary() {
 }
 
 #[test]
-fn project_is_the_one_the_check_read() {
-    let dir = project("error");
-    write(dir.path(), "b.txt", "b\n");
-
-    use lighthouse_model::ucm::Model;
-    let project = everything(&session(dir.path())).project().unwrap();
-
-    for name in ["a.txt", "b.txt"] {
-        assert!(project.file(std::path::Path::new(name)).is_some(), "{name}");
-    }
-}
-
-#[test]
 fn check_reports_only_the_changed_files_of_a_working_tree() {
     let dir = repo("error");
     // `a.txt` is committed with its finding; `b.txt` is new.
