@@ -23,7 +23,10 @@ pub(super) struct Stated {
 impl Stated {
     /// What `model` states of the files, sorted by path.
     pub(super) fn of(model: &dyn Model) -> Self {
-        let files: Vec<File> = model.files().cloned().collect();
+        // A view lists the files as their keys sort, which is not how paths
+        // sort: `a.rs` comes before `a/b.rs` as text, after it as a path.
+        let mut files: Vec<File> = model.files().cloned().collect();
+        files.sort_by(|a, b| a.path.cmp(&b.path));
         let tested = files
             .iter()
             .filter(|file| {
@@ -70,3 +73,6 @@ impl Stated {
         &self.documents
     }
 }
+
+#[cfg(test)]
+mod tests;
