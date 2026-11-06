@@ -49,6 +49,9 @@ mod widths;
 
 use forward::{forwarded, reaches};
 
+/// The fields of a node that are where it is.
+const POSITIONAL: [&str; 4] = ["line", "col", "pos", "end_line"];
+
 /// Builds the values of one check over one file (or the project).
 pub(crate) struct Builder<'a> {
     project: &'a dyn Model,
@@ -517,6 +520,11 @@ impl<'a> Builder<'a> {
         let summary = self.project.function(&symbol.id);
         let mut value = facts::symbol(self.project, symbol);
         let needs = &self.related_needs;
+        // Where a related node is moves with any edit above it: the rules that
+        // do not read a position of it do not depend on one.
+        if let Some(map) = value.as_object_mut() {
+            map.retain(|name, _| !POSITIONAL.contains(&name.as_str()) || needs.field(name));
+        }
         let mut fields = self.fields(symbol, summary, needs);
         if needs.field("func") {
             let mut func = facts::function(self.project, symbol).unwrap_or(Value::Null);
