@@ -213,10 +213,28 @@ impl Engine {
         let stated = self.stated(&inputs, (&units, &views), run);
         run.timings.merge = started.elapsed();
         self.commit_index(run);
-        let kept = inputs
+        let (kept, unstated): (Vec<_>, Vec<_>) = inputs
             .into_iter()
-            .filter(|i| stated.file(&i.file.path).is_some())
+            .partition(|i| stated.file(&i.file.path).is_some());
+        // A file the model does not state is never silent: unless a gap says
+        // why already, the run says it.
+        let said = run.incomplete.clone();
+        let covered = |input: &Input| {
+            said.iter().any(|gap| {
+                gap.path.as_deref() == Some(input.file.path.as_path())
+                    || (gap.path.is_none() && gap.provider.as_deref() == Some(&input.file.lang))
+            })
+        };
+        let gaps: Vec<_> = unstated
+            .into_iter()
+            .filter(|input| !covered(input))
+            .map(|input| Incomplete {
+                path: Some(input.file.path),
+                provider: Some(input.file.lang),
+                reason: "the model states no file for it".to_owned(),
+            })
             .collect();
+        run.incomplete.extend(gaps);
         Some((kept, stated))
     }
 

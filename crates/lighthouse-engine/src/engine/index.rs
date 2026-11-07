@@ -227,19 +227,24 @@ impl Engine {
     }
 
     /// What the providers answered for the units of `lanes`, hashed: the keys
-    /// they were asked under, the interfaces they gave, and the files outside
-    /// the project they read.
+    /// they were asked under, the interfaces they gave, the digests of their
+    /// payloads, whether the graph holds each answer and payload, and the
+    /// files outside the project they read. A report made of an answer that is
+    /// missing or another is not the report of a run that has it.
     fn index_state(&self, graph: &Graph, lanes: &[Lane<'_>]) -> String {
         let mut hasher = Hasher::new();
         for lane in lanes {
             hasher.update(&lane.id);
             for id in lane.ids() {
-                let Ok(Some(stored)) = graph.input(&FRAGMENT, &lane.at(id)) else {
-                    continue;
-                };
+                let unit = lane.at(id);
+                let held = lighthouse_graph::holds(graph, &PAYLOAD, &unit).unwrap_or(false);
+                let stored = graph.input(&FRAGMENT, &unit).ok().flatten();
                 hasher.update(id);
+                hasher.update([u8::from(stored.is_some()), u8::from(held)]);
+                let Some(stored) = stored else { continue };
                 hasher.update(&stored.key);
                 hasher.update(&stored.api);
+                hasher.update(&stored.payload);
                 hasher.update([u8::from(stored.clean)]);
                 for read in &stored.reads {
                     hasher.update(&read.path);

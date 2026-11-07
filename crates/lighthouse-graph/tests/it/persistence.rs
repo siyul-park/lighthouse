@@ -352,6 +352,85 @@ mod persisted {
     }
 }
 
+mod owned {
+    use lighthouse_graph::{Durability, Graph, Input, Options, holds};
+
+    static ANSWER: Input<String, String> = Input::new("answer").persisted();
+    static PAYLOAD: Input<String, String> = Input::new("payload").persisted();
+    static TICK: Input<(), usize> = Input::new("tick");
+
+    fn reopen(path: &std::path::Path, owned: bool) -> Graph {
+        let options = Options {
+            verify: 0,
+            retain: 2,
+            ..Options::default()
+        };
+        let options = if owned {
+            options.owned(&PAYLOAD, &ANSWER)
+        } else {
+            options
+        };
+        Graph::open(path, options).expect("open")
+    }
+
+    /// Commits `rounds` times, each in a process of its own, touching the
+    /// answer of `a` in all of them and its payload in none.
+    fn aged(path: &std::path::Path, owned: bool, touched: bool, rounds: usize) {
+        let name = "a".to_owned();
+        let mut graph = reopen(path, owned);
+        for (input, value) in [(&ANSWER, "one"), (&PAYLOAD, "body")] {
+            graph
+                .set_input(input, &name, value.to_owned(), Durability::Volatile)
+                .expect("set");
+        }
+        graph.commit().expect("commit");
+        for round in 0..rounds {
+            drop(graph);
+            graph = reopen(path, owned);
+            // Each commit is a revision on.
+            graph
+                .set_input(&TICK, &(), round, Durability::Volatile)
+                .expect("set");
+            if touched {
+                graph
+                    .set_input(&ANSWER, &name, "one".to_owned(), Durability::Volatile)
+                    .expect("set");
+            }
+            graph.commit().expect("commit");
+        }
+    }
+
+    fn held(path: &std::path::Path) -> (bool, bool) {
+        let graph = reopen(path, true);
+        let name = "a".to_owned();
+        (
+            holds(&graph, &ANSWER, &name).expect("holds"),
+            holds(&graph, &PAYLOAD, &name).expect("holds"),
+        )
+    }
+
+    #[test]
+    fn a_row_of_an_owned_kind_stays_while_the_row_of_its_owner_does() {
+        let dir = tempfile::tempdir().expect("dir");
+        aged(&dir.path().join("graph.db"), true, true, 8);
+        assert_eq!(held(&dir.path().join("graph.db")), (true, true));
+    }
+
+    #[test]
+    fn a_row_of_a_kind_that_is_not_owned_ages_out_alone() {
+        let dir = tempfile::tempdir().expect("dir");
+        aged(&dir.path().join("graph.db"), false, true, 8);
+        assert_eq!(held(&dir.path().join("graph.db")), (true, false));
+    }
+
+    #[test]
+    fn the_rows_of_an_owner_and_its_owned_kind_go_together() {
+        let dir = tempfile::tempdir().expect("dir");
+        aged(&dir.path().join("graph.db"), true, false, 8);
+        assert_eq!(held(&dir.path().join("graph.db")), (false, false));
+    }
+}
+
 mod lazy {
     use lighthouse_graph::{Durability, Graph, Input, Options, Query};
 

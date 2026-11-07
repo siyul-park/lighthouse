@@ -54,12 +54,28 @@ pub struct Options {
     /// past that a commit deletes it, so that the rows of files that are gone
     /// go too.
     pub retain: u64,
+    /// Kinds whose rows live and die with the row of another kind at the same
+    /// key, see [`Options::owned`].
+    pub owned: Vec<(&'static str, &'static str)>,
     /// What the queries of this graph read besides the graph, see
     /// [`Options::data`].
     pub data: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl Options {
+    /// Makes the rows of `input` live and die with the row of `owner` at the
+    /// same key: a commit deletes one only when it deletes, or finds missing,
+    /// that of the owner, never because it was not verified. Inputs that a
+    /// reader needs together are not left with one of them gone.
+    pub fn owned<K: Key, V: Value, L: Key, W: Value>(
+        mut self,
+        input: &'static Input<K, V>,
+        owner: &'static Input<L, W>,
+    ) -> Self {
+        self.owned.push((input.name(), owner.name()));
+        self
+    }
+
     /// Gives the queries `data` to read with [`Graph::data`]: the per-graph
     /// user data of Buck2's DICE and the fields of the user's database in
     /// Salsa. What a query reads there is not recorded, so it must be fixed
@@ -81,6 +97,7 @@ impl fmt::Debug for Options {
             .field("versions", &self.versions)
             .field("verify", &self.verify)
             .field("retain", &self.retain)
+            .field("owned", &self.owned)
             .field("data", &self.data.is_some())
             .finish()
     }
@@ -96,6 +113,7 @@ impl Default for Options {
                 0
             },
             retain: DEFAULT_RETAIN,
+            owned: Vec::new(),
             data: None,
         }
     }
@@ -136,6 +154,7 @@ impl Graph {
             verify_count: AtomicU64::new(0),
             versions: Mutex::default(),
             retain: options.retain,
+            owned: options.owned,
             data: options.data,
         };
         let mut graph = Self {
@@ -293,7 +312,8 @@ impl Graph {
         let marks = self.shared.marks_with(revision);
         let meta = self.shared.meta(&marks)?;
         let forget = self.shared.oldest(&marks);
-        if let Err(err) = self.shared.store.commit(&writes, &meta, forget) {
+        let kept = (forget, self.shared.owned.as_slice());
+        if let Err(err) = self.shared.store.commit(&writes, &meta, kept) {
             self.shared.dirty.restore(slots);
             return Err(err);
         }

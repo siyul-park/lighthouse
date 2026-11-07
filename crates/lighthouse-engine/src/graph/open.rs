@@ -5,7 +5,8 @@ use std::sync::{Arc, PoisonError};
 use lighthouse_graph::{Graph, Options};
 use lighthouse_plugin::Runtime;
 
-use crate::{cache, engine::Engine};
+use crate::{cache, engine::Engine, graph::FRAGMENT};
+use lighthouse_model::ucm::PAYLOAD;
 
 /// The file of the graph under the cache directory.
 const FILE: &str = "graph.db";
@@ -25,6 +26,8 @@ impl Engine {
                     versions: [("binary".to_owned(), cache::build_identity())].into(),
                     ..Options::default()
                 }
+                // The answer of a unit and its payload are read together.
+                .owned(&PAYLOAD, &FRAGMENT)
                 .data(Arc::new(Runtime::new(
                     self.registry.clone(),
                     (text, overlaid),

@@ -8,7 +8,7 @@
 
 use std::{collections::HashMap, fs, path::Path, sync::Mutex, time::Duration};
 
-use rusqlite::{Connection, ErrorCode, OptionalExtension, params};
+use rusqlite::{Connection, ErrorCode, OptionalExtension, params, params_from_iter, types::Value};
 
 use crate::{
     Durability, Error, blob,
@@ -286,13 +286,14 @@ impl Store {
     }
 
     /// Writes the nodes and the meta in one transaction and deletes the rows
-    /// last verified before revision `forget_before`, then returns a bounded
-    /// number of the free pages to the system.
+    /// last verified before revision `forget_before`, those of the `owned`
+    /// kinds only with the row of their owner, then returns a bounded number
+    /// of the free pages to the system.
     pub(crate) fn commit(
         &self,
         writes: &[Write],
         meta: &Meta,
-        forget_before: u64,
+        (forget_before, owned): (u64, &[(&str, &str)]),
     ) -> Result<(), Error> {
         let mut conn = self.conn.locked();
         let tx = conn.transaction()?;
@@ -300,10 +301,7 @@ impl Store {
         writes
             .iter()
             .try_for_each(|write| put(&tx, write, &mut old))?;
-        let aged = tx.execute(
-            "DELETE FROM node WHERE verified_at < ?1",
-            [forget_before as i64],
-        )?;
+        let aged = forget(&tx, forget_before, owned)?;
         put_meta(&tx, meta)?;
         blob::collect(&tx, &old)?;
         if aged > 0 {
@@ -337,6 +335,38 @@ fn vacuum(conn: &Connection, pages: u32) -> Result<(), Error> {
     let mut steps = statement.query([])?;
     while steps.next()?.is_some() {}
     Ok(())
+}
+
+/// Deletes the rows last verified before `before`, apart from those of the
+/// kinds that live with another: a row of those goes when no row of its owner
+/// is left at its key, which is how a pair is never left with one of them.
+/// Returns how many rows went.
+fn forget(
+    tx: &rusqlite::Transaction<'_>,
+    before: u64,
+    owned: &[(&str, &str)],
+) -> Result<usize, Error> {
+    let marks: Vec<String> = (2..owned.len() + 2).map(|at| format!("?{at}")).collect();
+    let kinds = std::iter::once(Value::Integer(before as i64)).chain(
+        owned
+            .iter()
+            .map(|(kind, _)| Value::Text((*kind).to_owned())),
+    );
+    let mut gone = tx.execute(
+        &format!(
+            "DELETE FROM node WHERE verified_at < ?1 AND kind NOT IN ({})",
+            marks.join(", ")
+        ),
+        params_from_iter(kinds),
+    )?;
+    for (kind, owner) in owned {
+        gone += tx.execute(
+            "DELETE FROM node WHERE kind = ?1
+             AND NOT EXISTS (SELECT 1 FROM node o WHERE o.kind = ?2 AND o.key = node.key)",
+            params![kind, owner],
+        )?;
+    }
+    Ok(gone)
 }
 
 fn read_row(row: &rusqlite::Row<'_>, at: usize) -> rusqlite::Result<Option<Row>> {

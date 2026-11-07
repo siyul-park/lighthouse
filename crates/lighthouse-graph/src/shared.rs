@@ -38,6 +38,8 @@ pub(crate) struct Shared {
     pub versions: Mutex<Versions>,
     /// How many commits a row that nothing verified is kept.
     pub retain: u64,
+    /// The kinds that live and die with another, see `Options::owned`.
+    pub owned: Vec<(&'static str, &'static str)>,
     /// The graph's user data, fixed at open.
     pub data: Option<Arc<dyn Any + Send + Sync>>,
 }

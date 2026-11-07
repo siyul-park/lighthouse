@@ -115,7 +115,9 @@ impl Engine {
         run.incomplete.sort();
         run.incomplete.dedup();
         run.reported = scopes.0.clone();
-        if let Some(reporting) = &reporting {
+        // A run with a gap is not the report of the project: the next one tries
+        // again.
+        if let Some(reporting) = reporting.as_ref().filter(|_| run.incomplete.is_empty()) {
             self.remember(graph, reporting, reads, &run);
         }
         let started = Instant::now();

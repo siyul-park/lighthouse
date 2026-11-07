@@ -7,7 +7,7 @@ use std::{
     path::Path,
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 
@@ -25,7 +25,12 @@ use tempfile::TempDir;
 
 const CONFIG: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/local\" = \"warn\"\n\"counting/global\" = \"warn\"\n";
 
-struct Files(LanguageManifest, Arc<AtomicUsize>);
+struct Files(
+    LanguageManifest,
+    Arc<AtomicUsize>,
+    Arc<AtomicBool>,
+    Arc<AtomicBool>,
+);
 
 impl LanguageProvider for Files {
     fn manifest(&self) -> &LanguageManifest {
@@ -33,13 +38,21 @@ impl LanguageProvider for Files {
     }
     fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, PluginError> {
         self.1.fetch_add(1, Ordering::SeqCst);
+        if self.2.load(Ordering::SeqCst) {
+            return Err(PluginError::Failed("the provider is down".to_owned()));
+        }
         Ok(Indexed {
             units: units
                 .iter()
                 .map(|unit| {
+                    let files = if self.3.load(Ordering::SeqCst) {
+                        &[]
+                    } else {
+                        unit.files
+                    };
                     Fragments::new(
                         unit.id,
-                        unit.files
+                        files
                             .iter()
                             .map(|source| Fragment {
                                 files: vec![source.file.clone()],
@@ -72,10 +85,13 @@ impl Rule for Counting {
         ctx.notices.push(format!("{} ran", self.meta.id));
         let (file, message) = match ctx.file {
             Some((file, text)) => (file.path.clone(), format!("{} bytes", text.len())),
-            None => (
-                ctx.model.files().next().unwrap().path.clone(),
-                format!("{} files", ctx.model.files().count()),
-            ),
+            None => match ctx.model.files().next() {
+                Some(first) => (
+                    first.path.clone(),
+                    format!("{} files", ctx.model.files().count()),
+                ),
+                None => return Ok(Vec::new()),
+            },
         };
         let at = Position { line: 1, col: 1 };
         let fingerprint = Fingerprint::new(&self.meta.id, &file.to_string_lossy(), "");
@@ -97,6 +113,10 @@ pub(crate) struct Counted {
     rows: Arc<AtomicUsize>,
     /// The requests the provider got.
     indexed: Arc<AtomicUsize>,
+    /// Whether the provider fails.
+    down: Arc<AtomicBool>,
+    /// Whether the provider answers with no fragment.
+    mute: Arc<AtomicBool>,
 }
 
 struct CountingPlugin {
@@ -112,6 +132,8 @@ impl Plugin for CountingPlugin {
         vec![Box::new(Files(
             LanguageManifest::new("any", vec!["**".to_owned()]),
             Arc::clone(&self.counted.indexed),
+            Arc::clone(&self.counted.down),
+            Arc::clone(&self.counted.mute),
         ))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
@@ -155,6 +177,8 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
         global: Arc::default(),
         rows: Arc::default(),
         indexed: Arc::default(),
+        down: Arc::default(),
+        mute: Arc::default(),
     };
     let mut registry = Registry::default();
     registry
@@ -168,6 +192,8 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
                 global: Arc::clone(&counted.global),
                 rows: Arc::clone(&counted.rows),
                 indexed: Arc::clone(&counted.indexed),
+                down: Arc::clone(&counted.down),
+                mute: Arc::clone(&counted.mute),
             },
         })
         .unwrap();
@@ -411,6 +437,98 @@ fn an_answer_whose_payload_is_gone_from_the_graph_is_asked_of_the_provider_again
     assert!(counted.indexed.load(Ordering::SeqCst) > 0, "asked again");
     assert_eq!(found(&second), found(&first));
     assert_eq!(second.incomplete, first.incomplete);
+}
+
+/// Takes the payloads of the graph away, rows and all, as a forgetting
+/// that went wrong would.
+fn forget_payloads(kept: &Path) {
+    let db = rusqlite::Connection::open(kept.join("graph.db")).unwrap();
+    db.execute("DELETE FROM node WHERE kind = 'payload'", [])
+        .unwrap();
+    db.execute(
+        "DELETE FROM blob WHERE hash NOT IN (SELECT hash FROM node)",
+        [],
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_graph_that_lost_its_payloads_gives_the_full_result_and_never_an_empty_one() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let (first, _) = engine(dir.path());
+    let first = first
+        .with_cache(kept.clone(), u64::MAX)
+        .check(&[], &[])
+        .unwrap();
+    assert!(!first.diagnostics.is_empty());
+    forget_payloads(&kept);
+
+    let (second, counted) = engine(dir.path());
+    let second = second.with_cache(kept, u64::MAX).check(&[], &[]).unwrap();
+
+    assert!(counted.indexed.load(Ordering::SeqCst) > 0, "asked again");
+    assert_eq!(found(&second), found(&first));
+    assert_eq!(second.incomplete, first.incomplete);
+}
+
+#[test]
+fn a_run_that_could_not_have_its_payloads_is_incomplete_and_is_not_the_report() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let (first, _) = engine(dir.path());
+    let first = first
+        .with_cache(kept.clone(), u64::MAX)
+        .check(&[], &[])
+        .unwrap();
+    forget_payloads(&kept);
+
+    let (down, counted) = engine(dir.path());
+    counted.down.store(true, Ordering::SeqCst);
+    let down = down
+        .with_cache(kept.clone(), u64::MAX)
+        .check(&[], &[])
+        .unwrap();
+    assert!(!down.incomplete.is_empty());
+    assert!(down.diagnostics.is_empty());
+
+    let (third, counted) = engine(dir.path());
+    let third = third.with_cache(kept, u64::MAX).check(&[], &[]).unwrap();
+    assert!(counted.indexed.load(Ordering::SeqCst) > 0, "asked again");
+    assert_eq!(found(&third), found(&first));
+    assert!(third.incomplete.is_empty());
+}
+
+#[test]
+fn a_file_the_model_does_not_state_is_a_gap_and_the_run_is_not_the_report() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let (mute, counted) = engine(dir.path());
+    counted.mute.store(true, Ordering::SeqCst);
+    let mute = mute
+        .with_cache(kept.clone(), u64::MAX)
+        .check(&[], &[])
+        .unwrap();
+    let paths: Vec<_> = mute
+        .incomplete
+        .iter()
+        .map(|gap| gap.path.as_deref())
+        .collect();
+    assert_eq!(
+        paths,
+        [Some(Path::new("a.txt")), Some(Path::new("b.txt"))],
+        "{:?}",
+        mute.incomplete
+    );
+    assert_eq!(mute.incomplete[0].provider.as_deref(), Some("any"));
+
+    // The empty answer is the graph's, and the next run says the same.
+    let (again, _) = engine(dir.path());
+    let again = again.with_cache(kept, u64::MAX).check(&[], &[]).unwrap();
+    assert_eq!(again.incomplete, mute.incomplete);
 }
 
 #[test]
