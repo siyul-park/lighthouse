@@ -6,6 +6,10 @@ use rusqlite::{OptionalExtension, Transaction, params};
 
 use crate::{Error, Graph, store::Write};
 
+/// What a row of a node weighs besides its key and its dependencies, as far
+/// as the pages of the file are concerned.
+const ROW_BYTES: i64 = 64;
+
 /// Stores the value of a write, if it has one, and returns the hash the node
 /// had before, whose value may have no owner now.
 pub(crate) fn put(tx: &Transaction<'_>, write: &Write) -> Result<Option<Vec<u8>>, Error> {
@@ -75,7 +79,37 @@ pub(crate) fn free(tx: &Transaction<'_>, bytes: u64) -> Result<Vec<(String, Vec<
     if left <= 0 {
         return Ok(Vec::new());
     }
-    node_values(tx, left)
+    let mut dropped = node_values(tx, left)?;
+    let left = wanted - (before - stored(tx)?);
+    if left > 0 {
+        dropped.extend(node_rows(tx, left)?);
+    }
+    Ok(dropped)
+}
+
+/// Deletes the rows of nodes that can be computed again, those of lower
+/// durability first and the least recently used first, while what the ones
+/// before them freed is short of `excess`: the last thing to go, when no value
+/// is left to drop. A node without a row is run when it is pulled. Returns the
+/// nodes.
+fn node_rows(tx: &Transaction<'_>, excess: i64) -> Result<Vec<(String, Vec<u8>)>, Error> {
+    let mut statement = tx.prepare(
+        "SELECT kind, key FROM (
+             SELECT kind, key, COALESCE(SUM(length(key) + length(deps) + ?2) OVER (
+                 ORDER BY durability, used_at ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed
+             FROM node WHERE input = 0)
+         WHERE freed < ?1",
+    )?;
+    let rows = statement.query_map(params![excess, ROW_BYTES], |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })?;
+    let doomed: Vec<(String, Vec<u8>)> = rows.collect::<Result<_, _>>()?;
+    for (kind, key) in &doomed {
+        tx.prepare_cached("DELETE FROM node WHERE kind = ?1 AND key = ?2")?
+            .execute(params![kind, key])?;
+    }
+    collect_all(tx)?;
+    Ok(doomed)
 }
 
 /// The bytes of the values stored.
