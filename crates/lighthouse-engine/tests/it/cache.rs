@@ -25,13 +25,14 @@ use tempfile::TempDir;
 
 const CONFIG: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/local\" = \"warn\"\n\"counting/global\" = \"warn\"\n";
 
-struct Files(LanguageManifest);
+struct Files(LanguageManifest, Arc<AtomicUsize>);
 
 impl LanguageProvider for Files {
     fn manifest(&self) -> &LanguageManifest {
         &self.0
     }
     fn index(&self, _: &Workspace, units: &[Unit], _: &[String]) -> Result<Indexed, PluginError> {
+        self.1.fetch_add(1, Ordering::SeqCst);
         Ok(Indexed {
             units: units
                 .iter()
@@ -94,6 +95,8 @@ pub(crate) struct Counted {
     pub(crate) local: Arc<AtomicUsize>,
     global: Arc<AtomicUsize>,
     rows: Arc<AtomicUsize>,
+    /// The requests the provider got.
+    indexed: Arc<AtomicUsize>,
 }
 
 struct CountingPlugin {
@@ -106,10 +109,10 @@ impl Plugin for CountingPlugin {
         &self.manifest
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Files(LanguageManifest::new(
-            "any",
-            vec!["**".to_owned()],
-        )))]
+        vec![Box::new(Files(
+            LanguageManifest::new("any", vec!["**".to_owned()]),
+            Arc::clone(&self.counted.indexed),
+        ))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         let meta = |id: &str, scope| RuleManifest {
@@ -151,6 +154,7 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
         local: Arc::default(),
         global: Arc::default(),
         rows: Arc::default(),
+        indexed: Arc::default(),
     };
     let mut registry = Registry::default();
     registry
@@ -163,6 +167,7 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
                 local: Arc::clone(&counted.local),
                 global: Arc::clone(&counted.global),
                 rows: Arc::clone(&counted.rows),
+                indexed: Arc::clone(&counted.indexed),
             },
         })
         .unwrap();
@@ -245,6 +250,25 @@ fn a_run_takes_the_findings_the_graph_has_instead_of_running_rules_again() {
     let (fourth, _) = cached();
     let fourth = fourth.check(&[], &[]).unwrap();
     assert_eq!(found(&fourth), found(&first));
+}
+
+#[test]
+fn an_edit_and_its_revert_ask_no_provider_and_run_no_rule() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let (engine, counted) = engine(dir.path());
+    let engine = engine.with_cache(cache.path().join("cache"), u64::MAX);
+    let first = engine.check(&[], &[]).unwrap();
+    fs::write(dir.path().join("a.txt"), "aaaa").unwrap();
+    engine.check(&[], &[]).unwrap();
+    let (asked, ran) = (counted.indexed.load(Ordering::SeqCst), runs(&counted));
+
+    fs::write(dir.path().join("a.txt"), "aa").unwrap();
+    let reverted = engine.check(&[], &[]).unwrap();
+
+    assert_eq!(found(&reverted), found(&first));
+    assert_eq!(counted.indexed.load(Ordering::SeqCst), asked);
+    assert_eq!(runs(&counted), ran);
 }
 
 #[test]

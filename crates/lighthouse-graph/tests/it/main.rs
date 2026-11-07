@@ -4,5 +4,6 @@ mod decided;
 mod differential;
 mod fanout;
 mod persistence;
+mod retained;
 mod scenarios;
 mod toy;

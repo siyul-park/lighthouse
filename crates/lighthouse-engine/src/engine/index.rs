@@ -293,14 +293,21 @@ impl Engine {
             .iter()
             .map(|lane| Ok(graph.input(&CLAIMED, &lane.id)?.unwrap_or_default()))
             .collect::<Result<_, EngineError>>()?;
-        let rounds = 1 + lanes.iter().map(|lane| lane.ids().count()).sum::<usize>();
+        let rounds = 1 + 2 * lanes.iter().map(|lane| lane.ids().count()).sum::<usize>();
         for _ in 0..rounds {
             let mut asked: Vec<(usize, Vec<Pending<'_>>)> = Vec::new();
+            let mut recalled = false;
             for (at, lane) in lanes.iter().enumerate() {
-                let stale = self.stale(graph, lane, &settled)?;
+                let (stale, taken) = self.stale(graph, lane, &settled)?;
+                recalled |= taken;
                 if !stale.is_empty() {
                     asked.push((at, stale));
                 }
+            }
+            // An answer taken back moved the `api` of its unit: what imports
+            // it is judged again before anything is asked.
+            if recalled {
+                continue;
             }
             if asked.is_empty() {
                 return Ok(());
@@ -339,15 +346,17 @@ impl Engine {
 
     /// The units of the lane that need the provider: those it has no clean
     /// answer for under the key they have now, or whose imports are not what
-    /// that answer saw. A unit that was asked and gave nothing clean is not
-    /// asked again.
+    /// that answer saw, and for which no earlier answer of the unit is that.
+    /// A unit that was asked and gave nothing clean is not asked again. Also
+    /// whether an earlier answer was taken back, which moves what others
+    /// import.
     fn stale<'a>(
         &self,
-        graph: &Graph,
+        graph: &mut Graph,
         lane: &'a Lane<'_>,
         settled: &BTreeSet<(String, String)>,
-    ) -> Result<Vec<Pending<'a>>, EngineError> {
-        let mut pending = Vec::new();
+    ) -> Result<(Vec<Pending<'a>>, bool), EngineError> {
+        let (mut pending, mut recalled) = (Vec::new(), false);
         for id in lane.ids() {
             let unit = lane.at(id);
             if settled.contains(&unit) {
@@ -355,30 +364,63 @@ impl Engine {
             }
             let key = self.key_of(graph, lane, id)?;
             let stored = graph.input(&FRAGMENT, &unit)?;
-            let mut imports = BTreeMap::new();
-            let mut stale = match &stored {
-                Some(stored) => {
-                    stored.key != key
-                        || !stored.clean
-                        || stored.reads.iter().any(|read| read.moved(stored.at))
-                }
-                None => true,
-            };
-            for (import, seen) in stored.iter().flat_map(|stored| &stored.imports) {
-                let now = graph.query(&API, &(lane.id.clone(), import.clone()))?;
-                stale |= now.as_str() != seen;
-                imports.insert(import.clone(), now.as_ref().clone());
+            let imports = Self::imports_now(graph, lane, stored.as_deref())?;
+            if stored.is_some_and(|stored| holds(&stored, &key, &imports)) {
+                continue;
             }
-            if stale {
-                pending.push(Pending {
-                    id: id.to_owned(),
-                    key,
-                    imports,
-                    sources: self.sources_of(lane, id),
-                });
+            if let Some((answer, payload)) = self.earlier(graph, lane, &unit, &key)? {
+                graph.set_input(&FRAGMENT, &unit, answer, Durability::Volatile)?;
+                graph.set_input(&PAYLOAD, &unit, payload, Durability::Volatile)?;
+                recalled = true;
+                continue;
+            }
+            pending.push(Pending {
+                id: id.to_owned(),
+                key,
+                imports,
+                sources: self.sources_of(lane, id),
+            });
+        }
+        Ok((pending, recalled))
+    }
+
+    /// The `api` each import of an answer has now.
+    fn imports_now(
+        graph: &Graph,
+        lane: &Lane<'_>,
+        stored: Option<&Stored>,
+    ) -> Result<BTreeMap<String, String>, EngineError> {
+        let mut imports = BTreeMap::new();
+        for (import, _) in stored.iter().flat_map(|stored| &stored.imports) {
+            let now = graph.query(&API, &(lane.id.clone(), import.clone()))?;
+            imports.insert(import.clone(), now.as_ref().clone());
+        }
+        Ok(imports)
+    }
+
+    /// The newest earlier answer of the unit that holds under the key and
+    /// imports it has now, with its payload, if the graph still has both.
+    fn earlier(
+        &self,
+        graph: &Graph,
+        lane: &Lane<'_>,
+        unit: &(String, String),
+        key: &str,
+    ) -> Result<Option<(Stored, Payload)>, EngineError> {
+        for answer in FRAGMENT.retained(graph, unit)? {
+            let imports = Self::imports_now(graph, lane, Some(&answer))?;
+            if !holds(&answer, key, &imports) {
+                continue;
+            }
+            let current = graph.input(&PAYLOAD, unit)?;
+            let payloads = PAYLOAD.retained(graph, unit)?;
+            for payload in current.iter().chain(&payloads) {
+                if lighthouse_graph::digest(payload.as_ref())? == answer.payload {
+                    return Ok(Some((answer.as_ref().clone(), payload.as_ref().clone())));
+                }
             }
         }
-        Ok(pending)
+        Ok(None)
     }
 
     /// The key of a unit of the lane, as hex.
@@ -573,6 +615,18 @@ impl Lane<'_> {
     }
 }
 
+/// Whether an answer is what a unit needs: asked under its key, clean, with
+/// the files it read as they were and its imports' `api` as they are.
+fn holds(stored: &Stored, key: &str, imports: &BTreeMap<String, String>) -> bool {
+    stored.key == key
+        && stored.clean
+        && !stored.reads.iter().any(|read| read.moved(stored.at))
+        && stored
+            .imports
+            .iter()
+            .all(|(import, seen)| imports.get(import) == Some(seen))
+}
+
 /// The `api` of an import once the answers of the round are in: the one a
 /// returned unit gave, else the graph's. Of every unit, it is the hash of all.
 fn api_now(graph: &Graph, lane: &Lane<'_>, round: &BTreeMap<&str, &str>, import: &str) -> String {
@@ -615,6 +669,11 @@ fn stored_of(
         let host = asked.sources.iter().find(|s| s.file.path == file.path);
         file.generated &= host.is_none_or(|s| !s.file.generated);
     }
+    let payload = Payload {
+        fragments,
+        sources: serde_json::to_vec(&unit.sources)
+            .map_err(|e| lighthouse_graph::Error::Encode(e.to_string()))?,
+    };
     let meta = Stored {
         key: asked.key.clone(),
         clean,
@@ -634,11 +693,7 @@ fn stored_of(
             .map(|gap| (gap.path.clone(), gap.reason.clone()))
             .collect(),
         sources: !unit.sources.is_empty(),
-    };
-    let payload = Payload {
-        fragments,
-        sources: serde_json::to_vec(&unit.sources)
-            .map_err(|e| lighthouse_graph::Error::Encode(e.to_string()))?,
+        payload: lighthouse_graph::digest(&payload)?,
     };
     Ok((meta, payload))
 }

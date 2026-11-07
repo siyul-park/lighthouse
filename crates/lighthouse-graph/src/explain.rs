@@ -30,6 +30,9 @@ pub enum Reason {
     UnknownDep(String),
     /// An input set to a value of another hash.
     InputChanged(Revision),
+    /// An earlier value of it was taken back, as what it read is again what
+    /// that value read.
+    Retained,
     /// It was verified without running, and last moved at this revision.
     Unchanged(Revision),
 }
@@ -51,6 +54,7 @@ impl fmt::Display for Reason {
             Self::DepMoved(dep) => write!(f, "{dep} changed"),
             Self::UnknownDep(dep) => write!(f, "{dep} cannot be validated"),
             Self::InputChanged(revision) => write!(f, "set to a new value at {revision}"),
+            Self::Retained => write!(f, "took back an earlier value"),
             Self::Unchanged(revision) => write!(f, "did not run; last changed at {revision}"),
         }
     }
@@ -86,6 +90,7 @@ fn reason_of(shared: &Shared, cause: Cause, changed_at: Revision) -> (Reason, Op
         Cause::Computed => (Reason::Computed, None),
         Cause::Evicted => (Reason::Evicted, None),
         Cause::InputChanged => (Reason::InputChanged(changed_at), None),
+        Cause::Retained => (Reason::Retained, None),
         Cause::Green => (Reason::Unchanged(changed_at), None),
         Cause::UnknownDep(dep) => (Reason::UnknownDep(shared.label(&dep)), None),
         Cause::DepMoved(dep) => (Reason::DepMoved(shared.label(&dep)), Some(dep)),

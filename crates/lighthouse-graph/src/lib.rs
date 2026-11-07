@@ -9,6 +9,9 @@
 //!   dependency moved. A run that gives an equal hash keeps `changed_at`
 //!   (backdating), so what read it stays green. Nodes that read only durable
 //!   inputs are green without a walk while none of them changed.
+//! - A node keeps its last [`RETAINED`] values with what each read. A node
+//!   whose dependencies moved takes back one whose dependencies all hold
+//!   again, an edit and its revert, without running.
 //! - The store, `graph.db`, is the cache: rows are read when pulled, values
 //!   apart from hashes, and written back at [`Graph::commit`]. An evicted value
 //!   keeps its hash and dependencies.
@@ -34,5 +37,6 @@ mod store;
 pub use error::Error;
 pub use explain::{Explanation, Reason, Step};
 pub use graph::{DEFAULT_LIMIT, DEFAULT_RETAIN, Graph, Options, VERSION};
-pub use query::{Input, Key, Query, Value};
+pub use node::RETAINED;
+pub use query::{Input, Key, Query, Value, digest};
 pub use revision::{Durability, Revision};

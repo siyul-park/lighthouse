@@ -5,6 +5,9 @@ use std::{
 
 use crate::{Durability, frame::Frame};
 
+/// How many earlier states a node keeps besides the current one.
+pub const RETAINED: usize = 3;
+
 /// A node and the signal that a claim on it was released.
 pub(crate) struct Slot {
     pub id: NodeId,
@@ -45,10 +48,24 @@ pub(crate) struct Node {
     pub dirty: bool,
     pub value_dirty: bool,
     pub cause: Cause,
+    /// Earlier states, newest first, none that is the current one.
+    pub traces: Vec<Trace>,
+    /// The store has traces of the node that are not in `traces` yet.
+    pub traces_stored: bool,
+    pub traces_dirty: bool,
+}
+
+/// An earlier state of a node: its value's hash and bytes, and what it read.
+#[derive(Debug, Clone)]
+pub(crate) struct Trace {
+    pub hash: Hash,
+    pub deps: Arc<[Dep]>,
+    pub durability: Durability,
+    pub blob: Arc<[u8]>,
 }
 
 /// A node that was read, with the hash seen.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Dep {
     pub id: NodeId,
     pub hash: Hash,
@@ -68,6 +85,7 @@ pub(crate) enum Cause {
     DepMoved(NodeId),
     UnknownDep(NodeId),
     InputChanged,
+    Retained,
     Green,
 }
 
@@ -102,11 +120,43 @@ impl Node {
             dirty: false,
             value_dirty: false,
             cause: Cause::Computed,
+            traces: Vec::new(),
+            traces_stored: false,
+            traces_dirty: false,
         }
     }
 }
 
 impl Node {
+    /// Keeps the current state as the newest trace, when it has bytes to give
+    /// back, and drops the oldest past [`RETAINED`].
+    pub(crate) fn retain(&mut self) {
+        let Some(blob) = self.blob.clone().filter(|_| self.present) else {
+            return;
+        };
+        self.forget_trace(self.hash, &self.deps.clone());
+        self.traces.insert(
+            0,
+            Trace {
+                hash: self.hash,
+                deps: self.deps.clone(),
+                durability: self.durability,
+                blob,
+            },
+        );
+        self.traces.truncate(RETAINED);
+        self.traces_dirty = true;
+    }
+
+    /// Drops the traces of this value read from these dependencies: the node
+    /// has that as its current state.
+    pub(crate) fn forget_trace(&mut self, hash: Hash, deps: &[Dep]) {
+        let before = self.traces.len();
+        self.traces
+            .retain(|trace| !(trace.hash == hash && *trace.deps == *deps));
+        self.traces_dirty |= self.traces.len() != before;
+    }
+
     /// The node as an input just set to a value of this hash.
     pub(crate) fn become_input(
         &mut self,

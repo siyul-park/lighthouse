@@ -125,6 +125,19 @@ impl<K, V> Input<K, V> {
     }
 }
 
+impl<K: Key, V: Value> Input<K, V> {
+    /// The values a persisted input had before its current one, newest first:
+    /// at most [`RETAINED`](crate::RETAINED) of them, the store's as well. A
+    /// value stays until it is set again or older ones push it out.
+    ///
+    /// # Errors
+    ///
+    /// The store could not be read.
+    pub fn retained(&'static self, graph: &Graph, key: &K) -> Result<Vec<Arc<V>>, Error> {
+        graph.earlier(self, key)
+    }
+}
+
 impl<K: Key, V: Value> Kind for Input<K, V> {
     fn name(&self) -> &'static str {
         self.name
@@ -306,6 +319,15 @@ pub(crate) fn encode<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error>
 
 pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, Error> {
     postcard::from_bytes(bytes).map_err(|err| Error::Encode(err.to_string()))
+}
+
+/// The hash a node of this value has: what a stored value says of itself.
+///
+/// # Errors
+///
+/// The value cannot be encoded.
+pub fn digest<V: Value>(value: &V) -> Result<[u8; 32], Error> {
+    Ok(hash(&encode(value)?))
 }
 
 pub(crate) fn hash(blob: &[u8]) -> Hash {

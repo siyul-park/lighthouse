@@ -105,6 +105,9 @@ pub(crate) struct Stored {
     pub gaps: Vec<(Option<std::path::PathBuf>, String)>,
     /// The answer has source trees of host files.
     pub sources: bool,
+    /// The hash of the `payload` that went with it, to find that payload
+    /// again among those the graph retains.
+    pub payload: [u8; 32],
 }
 
 /// A file outside the project that an answer depended on, with what the host

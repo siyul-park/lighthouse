@@ -11,9 +11,9 @@ use std::{
 use crate::{
     Durability, Error,
     dirty::Dirty,
-    node::{Dep, Hash, Locked, Node, NodeId, Slot},
+    node::{Dep, Hash, Locked, Node, NodeId, Slot, Trace},
     query::{Kind, decode, encode, hash},
-    store::{Meta, Row, Store, Write},
+    store::{Meta, Row, Store, TraceRow, Write},
 };
 
 /// How many nodes one task frees when the graph is dropped.
@@ -142,26 +142,9 @@ impl Shared {
     }
 
     fn fill(&self, node: &mut Node, row: Row) {
-        let Ok(deps) = decode::<Vec<(String, Vec<u8>, Hash)>>(&row.deps) else {
+        let Some(deps) = self.deps_of(&row.deps) else {
             return;
         };
-        let kinds = self
-            .kinds
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let deps = deps
-            .into_iter()
-            .map(|(kind, key, hash)| Dep {
-                id: NodeId {
-                    kind: kinds
-                        .get(kind.as_str())
-                        .map_or_else(|| Arc::from(kind), |found| found.name.clone()),
-                    key: key.into(),
-                },
-                hash,
-            })
-            .collect();
-        drop(kinds);
         node.present = true;
         node.input = row.input;
         node.hash = row.hash;
@@ -173,6 +156,66 @@ impl Shared {
         node.used_at = row.used_at;
         node.synced_used_at = row.used_at;
         node.on_disk = row.has_value;
+        node.traces_stored = row.has_traces;
+    }
+
+    /// The dependencies as stored, their kinds named as this process has them.
+    fn deps_of(&self, bytes: &[u8]) -> Option<Arc<[Dep]>> {
+        let deps = decode::<Vec<(String, Vec<u8>, Hash)>>(bytes).ok()?;
+        let kinds = self
+            .kinds
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        Some(
+            deps.into_iter()
+                .map(|(kind, key, hash)| Dep {
+                    id: NodeId {
+                        kind: kinds
+                            .get(kind.as_str())
+                            .map_or_else(|| Arc::from(kind), |found| found.name.clone()),
+                        key: key.into(),
+                    },
+                    hash,
+                })
+                .collect(),
+        )
+    }
+
+    /// Reads the retained states the store has of the node, once, before they
+    /// are used or changed.
+    pub(crate) fn load_traces(&self, node: &mut Node, id: &NodeId) -> Result<(), Error> {
+        if !node.traces_stored {
+            return Ok(());
+        }
+        let rows = self.store.traces(&id.kind, &id.key)?;
+        node.traces = rows
+            .into_iter()
+            .filter_map(|row| {
+                Some(Trace {
+                    hash: row.hash,
+                    deps: self.deps_of(&row.deps)?,
+                    durability: row.durability,
+                    blob: row.value.into(),
+                })
+            })
+            .collect();
+        node.traces_stored = false;
+        Ok(())
+    }
+
+    /// Makes the current state of a node a retained one, before it is
+    /// replaced: its bytes are read from the store if the process has not got
+    /// them.
+    pub(crate) fn retain(&self, node: &mut Node, id: &NodeId) -> Result<(), Error> {
+        self.load_traces(node, id)?;
+        if node.blob.is_none() && node.on_disk {
+            let bytes = self.store.value(&id.kind, &id.key)?;
+            node.blob = bytes
+                .filter(|bytes| hash(bytes) == node.hash)
+                .map(Into::into);
+        }
+        node.retain();
+        Ok(())
     }
 
     /// Starts a revision for an input of `reach` durability: nodes that read
@@ -334,18 +377,16 @@ pub(crate) fn drop_value(node: &mut Node) {
     node.value = None;
     node.blob = None;
     node.on_disk = false;
+    node.traces.clear();
+    node.traces_stored = false;
+    node.traces_dirty = false;
 }
 
 pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
     let node = slot.node.locked();
-    let deps: Vec<(&str, &[u8], Hash)> = node
-        .deps
-        .iter()
-        .map(|dep| (&*dep.id.kind, &*dep.id.key, dep.hash))
-        .collect();
     let row = Row {
         hash: node.hash,
-        deps: encode(&deps).unwrap_or_default(),
+        deps: deps_blob(&node.deps),
         changed_at: node.changed_at,
         // An input is confirmed by being set: what is written is as of now.
         verified_at: if node.input {
@@ -357,6 +398,7 @@ pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
         input: node.input,
         used_at: node.used_at,
         has_value: false,
+        has_traces: false,
     };
     let value = node
         .blob
@@ -369,6 +411,17 @@ pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
         row,
         with_value: node.value_dirty,
         value,
+        traces: node.traces_dirty.then(|| {
+            node.traces
+                .iter()
+                .map(|trace| TraceRow {
+                    hash: trace.hash,
+                    deps: deps_blob(&trace.deps),
+                    durability: trace.durability,
+                    value: trace.blob.to_vec(),
+                })
+                .collect()
+        }),
     }
 }
 
@@ -379,6 +432,15 @@ pub(crate) fn settle_clean(slot: &Arc<Slot>) {
     }
     node.dirty = false;
     node.value_dirty = false;
+    node.traces_dirty = false;
     node.stored_verified_at = node.verified_at;
     node.synced_used_at = node.used_at;
+}
+
+fn deps_blob(deps: &[Dep]) -> Vec<u8> {
+    let deps: Vec<(&str, &[u8], Hash)> = deps
+        .iter()
+        .map(|dep| (&*dep.id.kind, &*dep.id.key, dep.hash))
+        .collect();
+    encode(&deps).unwrap_or_default()
 }

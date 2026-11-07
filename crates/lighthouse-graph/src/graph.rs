@@ -179,10 +179,13 @@ impl Graph {
         let slot = self.shared.slot(&id);
         let mut node = slot.node.locked();
         self.shared.load(&mut node, &id)?;
+        let moved = !node.present || node.hash != new_hash || node.durability != durability;
+        if moved && persisted && node.present {
+            self.shared.retain(&mut node, &id)?;
+        }
         node.value = Some(Arc::new(value));
         node.persisted = persisted;
         node.blob = persisted.then(|| blob.into());
-        let moved = !node.present || node.hash != new_hash || node.durability != durability;
         if moved {
             let reach = if node.present {
                 node.durability.max(durability)
@@ -313,6 +316,27 @@ impl Graph {
         }
         self.shared.forget_values(&pruned);
         Ok(())
+    }
+
+    pub(crate) fn earlier<K: Key, V: Value>(
+        &self,
+        input: &'static Input<K, V>,
+        key: &K,
+    ) -> Result<Vec<Arc<V>>, Error> {
+        let registered = self.shared.register(input)?;
+        let id = NodeId {
+            kind: registered.name,
+            key: encode(key)?.into(),
+        };
+        let slot = self.shared.slot(&id);
+        let mut node = slot.node.locked();
+        self.shared.load(&mut node, &id)?;
+        self.shared.load_traces(&mut node, &id)?;
+        Ok(node
+            .traces
+            .iter()
+            .filter_map(|trace| decode::<V>(&trace.blob).ok().map(Arc::new))
+            .collect())
     }
 
     pub(crate) fn hash_of<K: Key, V: Value>(

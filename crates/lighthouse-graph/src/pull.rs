@@ -16,7 +16,6 @@ use crate::{
 /// What a pull tells its caller about the node.
 pub(crate) struct Pulled {
     pub hash: Hash,
-    pub changed_at: u64,
     pub durability: Durability,
     pub value: Option<Arc<dyn Any + Send + Sync>>,
     /// The node has never been computed or set.
@@ -157,7 +156,6 @@ impl Pulled {
     fn of(node: &Node, want_value: bool) -> Self {
         Self {
             hash: node.hash,
-            changed_at: node.changed_at,
             durability: node.durability,
             value: if want_value { node.value.clone() } else { None },
             missing: !node.present,
