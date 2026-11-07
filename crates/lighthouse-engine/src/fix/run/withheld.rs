@@ -63,9 +63,8 @@ impl Orchestrator<'_> {
     ) -> Result<(), Error> {
         let trial = self.begin();
         let wanted: BTreeSet<Fingerprint> = group.iter().map(|p| p.fingerprint.clone()).collect();
-        let alone = group.len() == 1 || files_unshared(&group);
         self.apply_round(outcome, group.clone(), self.rounds + 1)?;
-        if alone || self.standing_whole(&trial, &wanted) {
+        if files_unshared(&group) || self.standing_whole(&trial, &wanted) {
             self.withdraw_previews(trial, shown);
             return Ok(());
         }
@@ -74,20 +73,18 @@ impl Orchestrator<'_> {
         // What the trial spoiled is tried by itself; the rest, which it
         // cannot have spoiled, once more as a group. Without a culprit the
         // group is halved.
-        if implicated.is_empty() {
-            let mut first = group;
-            let second = first.split_off(first.len() / 2);
-            self.preview_group(outcome, first, shown)?;
-            return self.preview_group(outcome, second, shown);
-        }
         let (alone, rest): (Vec<_>, Vec<_>) = group
             .into_iter()
             .partition(|p| implicated.contains(&p.fingerprint));
-        if !rest.is_empty() {
-            self.preview_group(outcome, rest, shown)?;
+        let mut parts = vec![rest];
+        parts.extend(alone.into_iter().map(|p| vec![p]));
+        if implicated.is_empty() {
+            let half = parts[0].len() / 2;
+            let second = parts[0].split_off(half);
+            parts.push(second);
         }
-        for p in alone {
-            self.preview_group(outcome, vec![p], shown)?;
+        for part in parts.into_iter().filter(|part| !part.is_empty()) {
+            self.preview_group(outcome, part, shown)?;
         }
         Ok(())
     }
@@ -125,7 +122,7 @@ impl Orchestrator<'_> {
             .filter(|a| {
                 self.previewable
                     .get(&a.fingerprint)
-                    .is_some_and(|standing| standing.shown.is_ok())
+                    .is_some_and(|p| p.shown.is_ok())
             })
             .map(|a| a.fingerprint.clone())
             .collect();
@@ -151,9 +148,10 @@ impl Orchestrator<'_> {
     /// reported fixes being a follow-up.
     fn standing_whole(&self, trial: &Trial, wanted: &BTreeSet<Fingerprint>) -> bool {
         let since = &self.applied[trial.applied..];
-        since.iter().all(|a| !a.follow_up)
-            && since.len() == wanted.len()
-            && since.iter().all(|a| wanted.contains(&a.fingerprint))
+        since.len() == wanted.len()
+            && since
+                .iter()
+                .all(|a| !a.follow_up && wanted.contains(&a.fingerprint))
     }
 
     /// Puts the run back as it was at `trial`, as if the group was not tried.

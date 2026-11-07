@@ -565,3 +565,44 @@ mod file_size {
         assert_eq!(mode(&path), 2);
     }
 }
+
+mod inputs_stay {
+    use lighthouse_graph::{Durability, Graph, Input, Options, Query};
+
+    static KEPT: Input<(), String> = Input::new("kept");
+    static SAME: Query<(), String> = Query::new("same", |graph, _| {
+        Ok(graph
+            .input(&KEPT, &())?
+            .map_or_else(String::new, |v| v.as_ref().clone()))
+    });
+
+    #[test]
+    fn trimming_never_drops_an_input_or_a_value_it_shares() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let options = Options {
+            verify: 0,
+            ..Options::default()
+        };
+        let mut graph = Graph::open(&path, options).expect("open");
+        graph
+            .set_input(&KEPT, &(), "k".repeat(50_000), Durability::Volatile)
+            .expect("set");
+        // A query whose value is the very bytes of the input.
+        graph.query(&SAME, &()).expect("pull");
+        graph.commit().expect("commit");
+
+        lighthouse_graph::trim(&mut graph, u64::MAX).expect("trim");
+        drop(graph);
+
+        let conn = rusqlite::Connection::open(&path).expect("open the file");
+        let held: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM node JOIN blob ON blob.hash = node.hash WHERE node.kind = 'kept'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count");
+        assert_eq!(held, 1);
+    }
+}

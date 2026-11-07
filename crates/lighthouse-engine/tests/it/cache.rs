@@ -385,3 +385,53 @@ fn a_run_under_its_limit_touches_nothing_in_the_directory() {
     engine.with_cache(kept, u64::MAX).check(&[], &[]).unwrap();
     assert!(leftover.join("fragments.json").exists());
 }
+
+#[test]
+fn an_answer_whose_payload_is_gone_from_the_graph_is_asked_of_the_provider_again() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let (first, _) = engine(dir.path());
+    let first = first
+        .with_cache(kept.clone(), u64::MAX)
+        .check(&[], &[])
+        .unwrap();
+    {
+        let db = rusqlite::Connection::open(kept.join("graph.db")).unwrap();
+        db.execute(
+            "DELETE FROM blob WHERE hash IN (SELECT hash FROM node WHERE kind = 'payload')",
+            [],
+        )
+        .unwrap();
+    }
+
+    let (second, counted) = engine(dir.path());
+    let second = second.with_cache(kept, u64::MAX).check(&[], &[]).unwrap();
+
+    assert!(counted.indexed.load(Ordering::SeqCst) > 0, "asked again");
+    assert_eq!(found(&second), found(&first));
+    assert_eq!(second.incomplete, first.incomplete);
+}
+
+#[test]
+fn a_run_the_graph_answers_still_brings_the_directory_under_its_limit() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let (engine_a, _) = engine(dir.path());
+    let first = engine_a
+        .with_cache(kept.clone(), u64::MAX)
+        .check(&[], &[])
+        .unwrap();
+    let before = tree(&kept);
+
+    let (engine_b, counted) = engine(dir.path());
+    let warm = engine_b
+        .with_cache(kept.clone(), 1)
+        .check(&[], &[])
+        .unwrap();
+
+    assert_eq!(runs(&counted), (0, 0), "answered from the report");
+    assert_eq!(found(&warm), found(&first));
+    assert!(tree(&kept) < before, "{} -> {}", before, tree(&kept));
+}

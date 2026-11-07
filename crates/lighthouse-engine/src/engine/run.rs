@@ -10,6 +10,16 @@ use lighthouse_model::ucm::{Held, Model, View};
 type Loaded = (Vec<Input>, Stated);
 
 impl Engine {
+    /// Brings the cache under its limit after a run, whichever way the run
+    /// ended: one that the graph's report answers, or that failed, wrote too.
+    pub(super) fn finished(&self, run: Result<Run, Error>) -> Result<Run, Error> {
+        let trimmed = crate::cache::fit(self.cache.as_ref(), self.lock_graph().as_mut());
+        run.map(|mut run| {
+            run.notices.extend(trimmed);
+            run
+        })
+    }
+
     pub(super) fn run(
         &self,
         scopes: Scopes,
@@ -112,10 +122,6 @@ impl Engine {
         if let Err(e) = committed {
             run.notices.insert(format!("the graph was not saved: {e}"));
         }
-        let started = Instant::now();
-        run.notices
-            .extend(crate::cache::fit(self.cache.as_ref(), Some(graph)));
-        run.timings.commit += started.elapsed();
         run.read = inputs
             .iter()
             .map(|input| (input.file.path.clone(), input.sha256.clone()))

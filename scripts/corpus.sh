@@ -27,6 +27,8 @@
 #              revision of cel's policy package), so
 #              that the analysis is complete and `fix` does not refuse it.
 #
+# Each corpus is also checked by the tip with a cache limit of 1 MB, twice, and
+# the second run must equal the one without a cache.
 # Each corpus is checked by both binaries with scripts/baseline/strict-go.toml
 # (strict-root.toml for a Cargo workspace), `--format json --detail full --limit 1000000`,
 # no cache and no store. The corpora run in parallel; the summaries print in
@@ -89,6 +91,18 @@ check() {
         echo "$?" >"$dir/$tag.rc"
 }
 
+# Checks the tip again with the cache on and a limit far under what it keeps,
+# so that every run evicts, and compares the second run with the one without a
+# cache: what is evicted is recomputed, never answered with less.
+evicted() {
+    dir=$1
+    for _ in 1 2; do
+        (cd "$dir/tree" && LIGHTHOUSE_CACHE_LIMIT_MB=1 LIGHTHOUSE_TRUST=1 "$tip" check . --format json --detail full --limit 1000000 --no-store --config "$dir/config.toml" >"$dir/evicted.json" 2>/dev/null) || true
+    done
+    cmp -s "$dir/tip.json" "$dir/evicted.json" ||
+        { echo "$dir: a run over a cache limit of 1 MB differs from one without a cache" >>"$dir/summary.txt"; echo 1 >"$dir/differs"; }
+}
+
 corpus() {
     spec=$1
     label=${spec%%=*}
@@ -108,6 +122,7 @@ corpus() {
     [ -z "$base" ] || check "$dir" base "$base" base-config.toml
     check "$dir" tip "$tip" config.toml
     python3 -I scripts/corpus-diff.py "$label" "$dir" "$([ -n "$base" ] && echo 1)" >"$dir/summary.txt" || echo 1 >"$dir/differs"
+    evicted "$dir"
 }
 
 for spec in "$@"; do

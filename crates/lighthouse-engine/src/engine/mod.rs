@@ -517,7 +517,7 @@ impl Engine {
     pub fn check(&self, paths: &[PathBuf], only: &[String]) -> Result<Run, Error> {
         self.validate_only(only)?;
         let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
-        self.run(scopes, gaps, only, (&Overlays::new(), true))
+        self.finished(self.run(scopes, gaps, only, (&Overlays::new(), true)))
     }
 
     /// Like `check`, but the run is never answered from the last report, and
@@ -525,7 +525,7 @@ impl Engine {
     pub fn check_project(&self, paths: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
         self.validate_only(only)?;
         let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
-        let run = self.run(scopes, gaps, only, (&Overlays::new(), false))?;
+        let run = self.finished(self.run(scopes, gaps, only, (&Overlays::new(), false)))?;
         self.outcome(run)
     }
 
@@ -540,7 +540,7 @@ impl Engine {
     ) -> Result<Outcome, Error> {
         self.validate_only(only)?;
         let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
-        let run = self.run(scopes, gaps, only, (overlays, false))?;
+        let run = self.finished(self.run(scopes, gaps, only, (overlays, false)))?;
         self.outcome(run)
     }
 
@@ -550,12 +550,12 @@ impl Engine {
     /// the report is narrowed.
     pub fn check_files(&self, files: &[PathBuf], only: &[String]) -> Result<Run, Error> {
         self.validate_only(only)?;
-        self.run(
+        self.finished(self.run(
             Scopes::files(files),
             Vec::new(),
             only,
             (&Overlays::new(), true),
-        )
+        ))
     }
 }
 

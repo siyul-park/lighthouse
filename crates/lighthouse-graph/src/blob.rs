@@ -104,14 +104,16 @@ fn retained_values(tx: &Transaction<'_>, excess: i64) -> Result<(), Error> {
     collect_all(tx)
 }
 
-/// Deletes the values of nodes, and the states they retained, while what the
-/// ones before them freed is short of `excess`. Returns the nodes.
+/// Deletes the values of nodes that can be computed again (not inputs, whose
+/// value is all there is of it), and the states they retained, while what the
+/// ones before them freed is short of `excess`. A value an input has too
+/// stays. Returns the nodes.
 fn node_values(tx: &Transaction<'_>, excess: i64) -> Result<Vec<(String, Vec<u8>)>, Error> {
     let mut statement = tx.prepare(
         "SELECT kind, key, hash FROM (
              SELECT n.kind, n.key, n.hash, COALESCE(SUM(length(b.value)) OVER (
                  ORDER BY n.durability, n.used_at ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed
-             FROM node n JOIN blob b ON b.hash = n.hash)
+             FROM node n JOIN blob b ON b.hash = n.hash WHERE n.input = 0)
          WHERE freed < ?1",
     )?;
     let rows = statement.query_map([excess], |row| {
@@ -119,8 +121,11 @@ fn node_values(tx: &Transaction<'_>, excess: i64) -> Result<Vec<(String, Vec<u8>
     })?;
     let pruned: Vec<(String, Vec<u8>, Vec<u8>)> = rows.collect::<Result<_, _>>()?;
     for (kind, key, hash) in &pruned {
-        tx.prepare_cached("DELETE FROM blob WHERE hash = ?1")?
-            .execute([hash])?;
+        tx.prepare_cached(
+            "DELETE FROM blob WHERE hash = ?1
+             AND NOT EXISTS (SELECT 1 FROM node WHERE input = 1 AND node.hash = ?1)",
+        )?
+        .execute([hash])?;
         tx.prepare_cached("DELETE FROM retained WHERE kind = ?1 AND key = ?2")?
             .execute(params![kind, key])?;
     }

@@ -365,7 +365,8 @@ impl Engine {
             let key = self.key_of(graph, lane, id)?;
             let stored = graph.input(&FRAGMENT, &unit)?;
             let imports = Self::imports_now(graph, lane, stored.as_deref())?;
-            if stored.is_some_and(|stored| holds(&stored, &key, &imports)) {
+            let payload = graph.input(&PAYLOAD, &unit)?.is_some();
+            if payload && stored.is_some_and(|stored| holds(&stored, &key, &imports)) {
                 continue;
             }
             if let Some((answer, payload)) = self.earlier(graph, lane, &unit, &key)? {
