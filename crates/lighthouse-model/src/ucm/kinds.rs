@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     Declarations, Edges, File, Fragment, Incoming, Markers, ORDERED, Project, REGIONS, Resolved,
-    Sites, Slice, Symbol, Table, TestCase, ambiguity, collisions, declared,
+    Sites, Slice, Symbol, SymbolId, Table, TestCase, ambiguity, collisions, declared,
     merge::duplicate_notice,
 };
 
@@ -48,12 +48,16 @@ pub static MARKERS: Input<(), Vec<String>> = Input::new("markers");
 
 pub(crate) static PART: Query<String, Vec<Fragment>> = Query::new("part", part);
 pub(crate) static DECLARED: Query<String, Vec<(String, String)>> = Query::new("declared", declare);
-pub(crate) static COLLISIONS: Query<(), BTreeSet<String>> = Query::new("collisions", collide);
+/// The module paths declared in several languages, from every file.
+pub static COLLISIONS: Query<(), BTreeSet<String>> = Query::new("collisions", collide);
 /// The fragments of a file, qualified.
 pub static SLICE: Query<String, Slice> = Query::new("slice", slice);
 /// What a file declares, with no position or doc: equal after an edit inside a
 /// body.
 pub static DECLARATIONS: Query<String, Declarations> = Query::new("declarations", declarations);
+/// The ids that several files declare, which the first of them owns: the only
+/// ids for which what a file owns is not what it declares.
+pub static DUPLICATED: Query<(), BTreeSet<SymbolId>> = Query::new("duplicated", duplicated);
 /// The table of all declarations.
 pub static SYMBOLS: Query<(), Table> = Query::new("symbols", symbols);
 /// A slice with its targets resolved against the table.
@@ -316,6 +320,18 @@ fn slice(graph: &Graph, path: &String) -> Result<Slice, Error> {
 fn declarations(graph: &Graph, path: &String) -> Result<Declarations, Error> {
     let slice = graph.query(&SLICE, path)?;
     Ok(Declarations::new(&slice))
+}
+
+fn duplicated(graph: &Graph, _: &()) -> Result<BTreeSet<SymbolId>, Error> {
+    let declared = each(graph, |graph, path| graph.query(&DECLARATIONS, path))?;
+    let mut seen = BTreeSet::new();
+    let mut twice = BTreeSet::new();
+    for symbol in declared.iter().flat_map(|declared| &declared.symbols) {
+        if !seen.insert(&symbol.id) {
+            twice.insert(symbol.id.clone());
+        }
+    }
+    Ok(twice)
 }
 
 /// The table of the symbols of every file.

@@ -19,7 +19,7 @@ use super::{
     Boxed, Comment, DECLARATIONS, Declarations, EDGES, Edge, Edges, File, FunctionSummary,
     INCOMING, Incoming, LoadNeed, MODULE_CASES, Model, Module, Node, PATHS, Place, RESOLVED,
     Resolved, SITES, SYMBOLS, Site, Sites, Symbol, SymbolId, Table, TestCase, Tie, When, key,
-    load_needs,
+    kinds::DUPLICATED, load_needs,
 };
 
 /// The model of the project as the graph holds it.
@@ -200,11 +200,16 @@ impl<'v> View<'v> {
         let mut at: Vec<usize> = Vec::new();
         if let Some(declared) = self.declarations(path) {
             let symbols = &declared.symbols;
+            let duplicated = self
+                .keep(self.graph.query(&DUPLICATED, &()))
+                .unwrap_or_default();
             at = (0..symbols.len())
                 .filter(|&i| {
-                    self.table()
-                        .entry(&symbols[i].id)
-                        .is_some_and(|entry| entry.file == path)
+                    !duplicated.contains(&symbols[i].id)
+                        || self
+                            .table()
+                            .entry(&symbols[i].id)
+                            .is_some_and(|entry| entry.file == path)
                 })
                 .collect();
             at.sort_by(|&a, &b| symbols[a].id.cmp(&symbols[b].id));
