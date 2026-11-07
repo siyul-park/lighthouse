@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_graph::{Reads, Revision};
+use lighthouse_graph::{Reads, Revision, keys, reads};
 use lighthouse_model::ucm::{
     COLLISIONS, DECLARATIONS, DUPLICATED, HOST, INCOMING, PATHS, RESOLVED, SLICE,
 };
@@ -48,20 +48,23 @@ pub(super) fn files(
     } else {
         &[COLLISIONS.name(), DUPLICATED.name()]
     };
-    let reads = graph
-        .keys(&JUDGED)
+    let reads = keys(graph, &JUDGED)
         .into_iter()
         .filter(|(id, _)| id == rule)
         .find_map(|(id, variant)| {
-            graph
-                .reads(&FINDINGS, &(id, name.clone(), variant), (moved, except))
-                .ok()?
+            reads(
+                graph,
+                &FINDINGS,
+                &(id, name.clone(), variant),
+                (moved, except),
+            )
+            .ok()?
         })?;
     told_by_files(&reads)
 }
 
 fn told_by_files(reads: &Reads) -> Option<BTreeSet<PathBuf>> {
-    if reads.has(PATHS.name()) {
+    if !reads.keys::<()>(PATHS.name()).is_empty() {
         return None;
     }
     let files: BTreeSet<PathBuf> = OF_A_FILE

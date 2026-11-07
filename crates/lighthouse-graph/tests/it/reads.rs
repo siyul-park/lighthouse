@@ -26,8 +26,7 @@ fn files_of(
     graph: &Graph,
     moved: Option<(lighthouse_graph::Revision, lighthouse_graph::Revision)>,
 ) -> Vec<String> {
-    let reads = graph
-        .reads(&FACTS, &"a".to_owned(), (moved, &[]))
+    let reads = lighthouse_graph::reads(graph, &FACTS, &"a".to_owned(), (moved, &[]))
         .expect("reads")
         .expect("a node");
     let mut files = reads.keys::<String>(FILE.name());
@@ -57,7 +56,7 @@ fn a_node_moved_by_the_files_that_changed_between_two_revisions_and_no_other() {
     let mut graph = open(None, &before);
     apply(&mut graph, &before, &known(&before));
     pull(&graph);
-    let since = graph.revision();
+    let since = lighthouse_graph::revision(&graph);
 
     let after = edited(
         &edited(&before, "b", "api=B2;body=b0;uses="),
@@ -66,7 +65,7 @@ fn a_node_moved_by_the_files_that_changed_between_two_revisions_and_no_other() {
     );
     apply(&mut graph, &after, &known(&after));
     pull(&graph);
-    let until = graph.revision();
+    let until = lighthouse_graph::revision(&graph);
 
     assert_eq!(files_of(&graph, Some((since, until))), ["b"]);
 }
@@ -76,9 +75,20 @@ fn a_node_the_graph_does_not_hold_has_no_reads() {
     let project = project();
     let graph = open(None, &project);
 
-    let reads = graph
-        .reads(&FACTS, &"a".to_owned(), (None, &[]))
-        .expect("reads");
+    let reads =
+        lighthouse_graph::reads(&graph, &FACTS, &"a".to_owned(), (None, &[])).expect("reads");
 
     assert!(reads.is_none());
+}
+
+#[test]
+fn the_keys_of_an_input_are_those_that_were_set() {
+    let project = project();
+    let mut graph = open(None, &project);
+    apply(&mut graph, &project, &known(&project));
+
+    let mut keys = lighthouse_graph::keys(&graph, &FILE);
+    keys.sort();
+
+    assert_eq!(keys, ["a", "b", "c"]);
 }

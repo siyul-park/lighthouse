@@ -43,5 +43,5 @@ pub use explain::{Explanation, Reason, Step};
 pub use graph::{DEFAULT_RETAIN, Graph, Options, VERSION};
 pub use node::RETAINED;
 pub use query::{Input, Key, Query, Value, digest};
-pub use reads::Reads;
+pub use reads::{Reads, keys, reads, revision};
 pub use revision::{Durability, Revision};

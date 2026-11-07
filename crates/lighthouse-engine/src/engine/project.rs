@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_graph::{Durability, Graph};
+use lighthouse_graph::{Durability, Graph, revision};
 use lighthouse_spec::key;
 
 use super::{index::Call, regions::Views, *};
@@ -88,11 +88,7 @@ impl Engine {
     /// The run with the project it read.
     pub(super) fn outcome(&self, mut run: Run) -> Result<Outcome, Error> {
         let project = self.project()?;
-        run.revision = self
-            .lock_graph()
-            .as_ref()
-            .map(Graph::revision)
-            .unwrap_or_default();
+        run.revision = self.lock_graph().as_ref().map(revision).unwrap_or_default();
         Ok(Outcome { run, project })
     }
 
