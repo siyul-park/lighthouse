@@ -13,9 +13,11 @@ impl Engine {
     /// Brings the cache under its limit after a run, whichever way the run
     /// ended: one that the graph's report answers, or that failed, wrote too.
     pub(super) fn finished(&self, run: Result<Run, Error>) -> Result<Run, Error> {
+        let started = Instant::now();
         let trimmed = crate::cache::fit(self.cache.as_ref(), self.lock_graph().as_mut());
         run.map(|mut run| {
             run.notices.extend(trimmed);
+            run.timings.cache = started.elapsed();
             run
         })
     }

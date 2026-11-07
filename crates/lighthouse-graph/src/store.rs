@@ -115,13 +115,14 @@ pub(crate) struct Meta {
 
 pub(crate) struct Store {
     conn: Mutex<Connection>,
-    /// Every row, read in one scan at the first load: a row is then taken
-    /// from memory, not asked of the connection one node at a time.
-    rows: Mutex<Option<Rows>>,
+    /// The rows of a kind, read in one scan at the first load of a node of
+    /// it: a row is then taken from memory, not asked of the connection one
+    /// node at a time, and a kind no node of which is touched is not read.
+    rows: Mutex<HashMap<String, Rows>>,
 }
 
-/// The rows of the nodes not yet touched, by kind and key.
-type Rows = HashMap<(String, Vec<u8>), Row>;
+/// The rows of the nodes of a kind not yet touched, by key.
+type Rows = HashMap<Vec<u8>, Row>;
 
 impl Store {
     /// Opens `path`, creating it. A database that is damaged or of another
@@ -175,7 +176,7 @@ impl Store {
         }
         Ok(Self {
             conn: Mutex::new(conn),
-            rows: Mutex::new(None),
+            rows: Mutex::default(),
         })
     }
 
@@ -209,35 +210,33 @@ impl Store {
     /// The row of a node, without its value; it is taken, so a node is loaded
     /// once.
     pub(crate) fn load(&self, kind: &str, key: &[u8]) -> Result<Option<Row>, Error> {
-        let mut rows = self.rows.locked();
-        if rows.is_none() {
-            *rows = Some(self.scan()?);
+        let mut kinds = self.rows.locked();
+        if !kinds.contains_key(kind) {
+            kinds.insert(kind.to_owned(), self.scan(kind)?);
         }
-        Ok(rows
-            .as_mut()
-            .and_then(|rows| rows.remove(&(kind.to_owned(), key.to_vec()))))
+        Ok(kinds.get_mut(kind).and_then(|rows| rows.remove(key)))
     }
 
-    /// Every row, without the values.
-    fn scan(&self) -> Result<Rows, Error> {
+    /// Every row of a kind, without the values.
+    fn scan(&self, kind: &str) -> Result<Rows, Error> {
         let conn = self.conn.locked();
-        let mut statement = conn.prepare(
-            "SELECT kind, key, hash, deps, changed_at, verified_at, durability, input, used_at, EXISTS(SELECT 1 FROM blob WHERE blob.hash = node.hash)
-             FROM node",
+        let mut statement = conn.prepare_cached(
+            "SELECT key, hash, deps, changed_at, verified_at, durability, input, used_at, EXISTS(SELECT 1 FROM blob WHERE blob.hash = node.hash)
+             FROM node WHERE kind = ?1",
         )?;
         let mut found = Rows::new();
-        let mut cursor = statement.query([])?;
+        let mut cursor = statement.query([kind])?;
         while let Some(row) = cursor.next()? {
-            if let Some(read) = read_row(row, 2)? {
-                found.insert((row.get(0)?, row.get(1)?), read);
+            if let Some(read) = read_row(row, 1)? {
+                found.insert(row.get(0)?, read);
             }
         }
         drop(cursor);
-        drop(statement);
-        let mut statement = conn.prepare("SELECT DISTINCT kind, key FROM retained")?;
-        let mut cursor = statement.query([])?;
+        let mut statement =
+            conn.prepare_cached("SELECT DISTINCT key FROM retained WHERE kind = ?1")?;
+        let mut cursor = statement.query([kind])?;
         while let Some(row) = cursor.next()? {
-            if let Some(read) = found.get_mut(&(row.get(0)?, row.get(1)?)) {
+            if let Some(read) = found.get_mut(&row.get::<_, Vec<u8>>(0)?) {
                 read.has_traces = true;
             }
         }

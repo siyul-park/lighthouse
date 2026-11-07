@@ -79,7 +79,8 @@ impl Kept {
 /// its manifest version and the protocol and host that read its answer.
 fn build_key(found: &Found) -> Option<String> {
     let mut hash = Hasher::new();
-    hash.update(&fs::read(found.command_path()?).ok()?);
+    hash.update(found.program_stamp()?.as_bytes());
+    hash.update([0]);
     for part in [
         found.resource.spec.version.as_str(),
         wire::VERSION,

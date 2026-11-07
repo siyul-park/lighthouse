@@ -187,9 +187,11 @@ impl Engine {
                 call,
             })
             .collect();
+        let started = std::time::Instant::now();
         let settled = self
             .settle(ws, graph, &mut lanes, run)
             .and_then(|()| self.drop_stale(graph, &lanes));
+        run.timings.settle += started.elapsed();
         if let Err(e) = settled {
             run.incomplete.push(Incomplete {
                 path: None,
@@ -365,7 +367,7 @@ impl Engine {
             let key = self.key_of(graph, lane, id)?;
             let stored = graph.input(&FRAGMENT, &unit)?;
             let imports = Self::imports_now(graph, lane, stored.as_deref())?;
-            let payload = graph.input(&PAYLOAD, &unit)?.is_some();
+            let payload = lighthouse_graph::holds(graph, &PAYLOAD, &unit)?;
             if payload && stored.is_some_and(|stored| holds(&stored, &key, &imports)) {
                 continue;
             }

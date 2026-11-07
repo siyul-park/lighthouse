@@ -31,6 +31,9 @@ pub struct Timings {
     /// Where a provider says its own time went, by language id: the phases in
     /// the order it ran them. Only providers that say are listed.
     pub index_phases: Vec<(String, Vec<(String, Duration)>)>,
+    /// Deciding, unit by unit, which answers of the providers stand, and
+    /// asking for the others.
+    pub settle: Duration,
     /// Merging what the providers indexed into one project.
     pub merge: Duration,
     /// Each analyzer, over all files, in the order they ran.
@@ -44,6 +47,8 @@ pub struct Timings {
     pub commands: Duration,
     /// Writing the graph, over all commits of the run.
     pub commit: Duration,
+    /// Keeping the cache directory under its limit, after the run.
+    pub cache: Duration,
     /// All the rules together, on the wall clock.
     pub rules: Duration,
     /// Each rule, summed over its runs, longest first.
@@ -91,6 +96,7 @@ impl Timings {
                 out.push(format!("timings: index {language}: {phases}"));
             }
         }
+        out.push(line("settle", self.settle));
         out.push(line("fetch", self.fetch));
         out.push(line("merge", self.merge));
         out.push(format!(
@@ -111,6 +117,7 @@ impl Timings {
             )
         }));
         out.push(line("commit", self.commit));
+        out.push(line("cache", self.cache));
         out.push(line("fingerprints", self.fingerprints));
         out.push(line("store", self.store));
         out.push(line("report", report));

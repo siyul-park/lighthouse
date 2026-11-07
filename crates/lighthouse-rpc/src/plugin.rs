@@ -1,6 +1,5 @@
 use std::{
     collections::BTreeSet,
-    fs,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -128,9 +127,9 @@ impl RpcPlugin {
         let digest = if languages.is_empty() {
             String::new()
         } else {
-            let binary = found.command_path().and_then(|path| fs::read(path).ok());
+            let stamp = found.program_stamp();
             let version = &found.resource.spec.version;
-            hash::sha256(binary.as_deref().unwrap_or(version.as_bytes()))
+            hash::sha256(stamp.as_deref().unwrap_or(version).as_bytes())
         };
         Ok(Self {
             ignores: found.resource.spec.ignores.clone(),

@@ -606,3 +606,26 @@ mod inputs_stay {
         assert_eq!(held, 1);
     }
 }
+
+mod holds {
+    use lighthouse_graph::{Durability, Graph, Input, Options};
+
+    static SEED: Input<(), u8> = Input::new("seed");
+
+    #[test]
+    fn holds_tells_a_set_input_from_one_never_set_without_reading_it() {
+        let mut graph = Graph::in_memory(Options {
+            verify: 0,
+            ..Options::default()
+        })
+        .expect("open");
+
+        assert!(!lighthouse_graph::holds(&graph, &SEED, &()).expect("holds"));
+
+        graph
+            .set_input(&SEED, &(), 1, Durability::Stable)
+            .expect("set");
+
+        assert!(lighthouse_graph::holds(&graph, &SEED, &()).expect("holds"));
+    }
+}

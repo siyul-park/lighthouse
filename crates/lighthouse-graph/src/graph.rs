@@ -365,3 +365,18 @@ impl Graph {
             .map_err(|_| Error::Encode(format!("{} holds another type", id.kind)))
     }
 }
+
+/// Whether an input has a value, set in this process or kept by the store,
+/// without reading it. Nothing records the question as a read.
+pub fn holds<K: Key, V: Value>(
+    graph: &Graph,
+    input: &'static Input<K, V>,
+    key: &K,
+) -> Result<bool, Error> {
+    let registered = graph.shared.register(input)?;
+    let id = NodeId {
+        kind: registered.name,
+        key: encode(key)?.into(),
+    };
+    Ok(!graph.pull(&id, input, false)?.missing)
+}

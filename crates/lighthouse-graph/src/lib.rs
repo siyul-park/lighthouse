@@ -40,7 +40,7 @@ mod store;
 pub use blob::trim;
 pub use error::Error;
 pub use explain::{Explanation, Reason, Step};
-pub use graph::{DEFAULT_RETAIN, Graph, Options, VERSION};
+pub use graph::{DEFAULT_RETAIN, Graph, Options, VERSION, holds};
 pub use node::RETAINED;
 pub use query::{Input, Key, Query, Value, digest};
 pub use reads::{Reads, keys, reads, revision};
