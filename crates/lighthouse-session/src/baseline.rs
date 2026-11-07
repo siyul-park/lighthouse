@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::{Result, Session};
 
 /// Under the cache directory: one directory per session.
-const DIR: &str = "hooks";
+const DIR: &str = cache::HOOKS;
 const MAX_SESSION_ID: usize = 128;
 /// Bytes read to tell text from binary.
 const SNIFF: usize = 8192;

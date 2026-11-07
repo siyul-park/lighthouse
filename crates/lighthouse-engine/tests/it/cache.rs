@@ -306,3 +306,82 @@ fn a_rule_that_reads_the_project_runs_for_every_file_when_the_project_changes() 
     let (plain, _) = engine_with(dir.path(), ROWS);
     assert_eq!(found(&third), found(&plain.check(&[], &[]).unwrap()));
 }
+
+/// Sizes of every file under `dir`.
+fn tree(dir: &std::path::Path) -> u64 {
+    fs::read_dir(dir).map_or(0, |entries| {
+        entries
+            .flatten()
+            .map(|entry| match entry.metadata() {
+                Ok(meta) if meta.is_dir() => tree(&entry.path()),
+                Ok(meta) => meta.len(),
+                Err(_) => 0,
+            })
+            .sum()
+    })
+}
+
+#[test]
+fn a_directory_over_its_limit_comes_back_under_it_and_the_findings_are_the_same() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let plugin = kept.join("lang-x");
+    fs::create_dir_all(plugin.join("0123456789abcdef")).unwrap();
+    fs::write(
+        plugin.join("0123456789abcdef/fragments.json"),
+        vec![b'x'; 3 << 20],
+    )
+    .unwrap();
+    fs::write(plugin.join("fragments.json"), vec![b'x'; 1 << 20]).unwrap();
+    fs::write(plugin.join("initialize-old.json"), "{}").unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    fs::write(plugin.join("initialize-new.json"), "{}").unwrap();
+    fs::create_dir_all(kept.join("hooks")).unwrap();
+    fs::write(kept.join("hooks/session.json"), "{}").unwrap();
+
+    let (plain, _) = engine(dir.path());
+    let plain = plain.check(&[], &[]).unwrap();
+    let limit = 1 << 20;
+    let (engine, _) = engine(dir.path());
+    let cached = engine.with_cache(kept.clone(), limit);
+    let cold = cached.check(&[], &[]).unwrap();
+
+    assert!(tree(&kept) <= limit, "{} bytes", tree(&kept));
+    assert!(!plugin.join("0123456789abcdef").exists());
+    assert!(!plugin.join("fragments.json").exists());
+    assert!(!plugin.join("initialize-old.json").exists());
+    assert!(plugin.join("initialize-new.json").exists());
+    assert!(kept.join("hooks/session.json").exists());
+    assert_eq!(found(&cold), found(&plain));
+    assert_eq!(found(&cached.check(&[], &[]).unwrap()), found(&plain));
+}
+
+#[test]
+fn a_limit_that_leaves_nothing_evicts_the_graph_and_results_are_still_the_same() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let (plain, _) = engine(dir.path());
+    let plain = plain.check(&[], &[]).unwrap();
+    for _ in 0..3 {
+        let (engine, _) = engine(dir.path());
+        let run = engine.with_cache(kept.clone(), 1).check(&[], &[]).unwrap();
+        assert_eq!(found(&run), found(&plain));
+    }
+    let graph = fs::metadata(kept.join("graph.db")).unwrap().len();
+    assert!(graph < 64 << 10, "{graph} bytes");
+}
+
+#[test]
+fn a_run_under_its_limit_touches_nothing_in_the_directory() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let leftover = kept.join("lang-x/0123456789abcdef");
+    fs::create_dir_all(&leftover).unwrap();
+    fs::write(leftover.join("fragments.json"), "{}").unwrap();
+    let (engine, _) = engine(dir.path());
+    engine.with_cache(kept, u64::MAX).check(&[], &[]).unwrap();
+    assert!(leftover.join("fragments.json").exists());
+}

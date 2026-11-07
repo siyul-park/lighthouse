@@ -134,16 +134,11 @@ fn a_body_edit_of_an_unused_file_runs_only_that_file() {
 #[test]
 fn an_evicted_node_is_run_again_only_when_pulled() {
     let project = project();
-    let mut graph = open_with(
-        None,
-        Options {
-            limit: 0,
-            ..options(&project)
-        },
-    );
+    let mut graph = open_with(None, options(&project));
     apply(&mut graph, &project, &known(&project));
     pull(&graph);
     graph.commit().expect("commit");
+    lighthouse_graph::trim(&mut graph, u64::MAX).expect("trim");
     graph.take_executed();
 
     assert_eq!(executed(&graph), set(&[]));

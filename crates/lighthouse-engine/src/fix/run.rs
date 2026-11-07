@@ -360,5 +360,10 @@ pub(crate) fn fix(engine: &Engine, plan: &FixPlan, run: &FixRun) -> Result<FixRe
     let outcome = orchestrator
         .rounds()
         .and_then(|outcome| orchestrator.model_round(outcome));
-    orchestrator.write(outcome)
+    let report = orchestrator.write(outcome);
+    let trimmed = crate::cache::fit(engine.cache.as_ref(), engine.lock_graph().as_mut());
+    report.map(|mut report| {
+        report.notes.extend(trimmed);
+        report
+    })
 }

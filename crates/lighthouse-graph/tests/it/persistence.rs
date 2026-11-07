@@ -1,8 +1,6 @@
 //! The same edits across reopen boundaries give the same results and the
 //! same executed nodes as one long-lived graph.
 
-use lighthouse_graph::Options;
-
 use crate::{differential::*, toy::*};
 
 /// Runs a sequence; the graph is dropped and opened again every `reopen`
@@ -29,10 +27,8 @@ fn run(seed: u64, steps: usize, reopen: usize) -> Trace {
         if matches!(edit, Edit::Evict) {
             graph.commit().expect("commit");
             drop(graph);
-            let mut options = options(&sim.project);
-            options.limit = 0;
-            let mut evicting = open_with(Some(&path), options);
-            evicting.commit().expect("commit");
+            let mut evicting = open(Some(&path), &sim.project);
+            lighthouse_graph::trim(&mut evicting, u64::MAX).expect("trim");
             drop(evicting);
             graph = open(Some(&path), &sim.project);
         }
@@ -124,18 +120,15 @@ fn a_damaged_store_is_replaced() {
 }
 
 #[test]
-fn the_byte_limit_drops_values_and_keeps_results() {
+fn trimming_drops_values_and_keeps_results() {
     let dir = tempfile::tempdir().expect("dir");
     let path = dir.path().join("graph.db");
     let sim = Sim::new();
-    let options = Options {
-        limit: 1,
-        ..options(&sim.project)
-    };
-    let mut graph = open_with(Some(&path), options);
+    let mut graph = open(Some(&path), &sim.project);
     apply(&mut graph, &sim.project, &sim.known);
     let first = pull(&graph);
     graph.commit().expect("commit");
+    lighthouse_graph::trim(&mut graph, u64::MAX).expect("trim");
 
     assert_eq!(pull(&graph), first);
     graph.take_executed();
@@ -174,7 +167,6 @@ mod eviction_order {
         let path = dir.path().join("graph.db");
         let options = Options {
             versions: [("v".to_owned(), "1".to_owned())].into(),
-            limit: 1500,
             verify: 0,
             ..Options::default()
         };
@@ -184,6 +176,7 @@ mod eviction_order {
             .expect("set");
         pull(&graph).expect("pull");
         graph.commit().expect("commit");
+        lighthouse_graph::trim(&mut graph, 1).expect("trim");
         graph.take_executed();
 
         drop(graph);
@@ -487,5 +480,88 @@ mod transient {
         let graph = open(&path, 5);
 
         assert_eq!(*graph.query(&READER, &()).unwrap(), 5);
+    }
+}
+
+mod file_size {
+    use lighthouse_graph::{Durability, Graph, Input, Options, Query};
+
+    static SEED: Input<(), u8> = Input::new("seed");
+    static BIG: Query<(), String> = Query::new("big", |graph, _| {
+        Ok(format!(
+            "{}{}",
+            graph.input(&SEED, &())?.unwrap_or_default(),
+            "b".repeat(200_000)
+        ))
+    });
+
+    fn options() -> Options {
+        Options {
+            verify: 0,
+            ..Options::default()
+        }
+    }
+
+    fn mode(path: &std::path::Path) -> i64 {
+        let conn = rusqlite::Connection::open(path).expect("open the file");
+        conn.query_row("PRAGMA auto_vacuum", [], |row| row.get(0))
+            .expect("mode")
+    }
+
+    #[test]
+    fn a_file_is_incremental_and_shrinks_when_values_are_trimmed() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let mut graph = Graph::open(&path, options()).expect("open");
+        graph
+            .set_input(&SEED, &(), 1, Durability::Volatile)
+            .expect("set");
+        graph.query(&BIG, &()).expect("pull");
+        graph.commit().expect("commit");
+        lighthouse_graph::trim(&mut graph, 0).expect("trim");
+        let full = std::fs::metadata(&path).expect("stat").len();
+
+        lighthouse_graph::trim(&mut graph, u64::MAX).expect("trim");
+
+        let small = std::fs::metadata(&path).expect("stat").len();
+        assert_eq!(mode(&path), 2);
+        assert!(full > 150_000 && small < 50_000, "{full} -> {small}");
+    }
+
+    #[test]
+    fn trimming_goes_through_retained_states_before_the_values_of_nodes() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let mut graph = Graph::open(&path, options()).expect("open");
+        for seed in 1..=3 {
+            graph
+                .set_input(&SEED, &(), seed, Durability::Volatile)
+                .expect("set");
+            graph.query(&BIG, &()).expect("pull");
+            graph.commit().expect("commit");
+        }
+        graph.take_executed();
+
+        lighthouse_graph::trim(&mut graph, 300_000).expect("trim");
+
+        graph.query(&BIG, &()).expect("pull");
+        assert!(graph.take_executed().is_empty(), "the current value stays");
+    }
+
+    #[test]
+    fn a_file_made_without_incremental_vacuum_is_replaced() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        drop(Graph::open(&path, options()).expect("open"));
+        {
+            let conn = rusqlite::Connection::open(&path).expect("open the file");
+            conn.pragma_update(None, "auto_vacuum", 0).expect("set");
+            conn.execute_batch("VACUUM").expect("vacuum");
+            assert_eq!(mode(&path), 0);
+        }
+
+        drop(Graph::open(&path, options()).expect("open"));
+
+        assert_eq!(mode(&path), 2);
     }
 }

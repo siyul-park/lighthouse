@@ -2,7 +2,7 @@
 //! between runs under a key of everything they depend on. The findings of the
 //! rules are nodes of the graph, not rows here. The cache is local and derived:
 //! it is never committed, a run can bypass it, `clean` deletes it, and its size
-//! is capped, oldest use first. Any doubt is a miss.
+//! is kept under one size limit, see [`fit`]. Any doubt is a miss.
 
 use std::{
     fs, io,
@@ -12,15 +12,23 @@ use std::{
 use lighthouse_model::STATE_DIR;
 use thiserror::Error;
 
+mod fit;
 mod key;
+mod plugins;
 mod store;
 
+pub(crate) use fit::fit;
 pub(crate) use key::digest_of;
 pub use key::{Digest, KeyBuilder};
 pub use store::{Cache, DEFAULT_LIMIT, Stats};
 
 /// Name of the cache directory under `.lighthouse`.
 pub const DIR: &str = "cache";
+
+/// The directory of the cache that holds the baselines of editing sessions:
+/// not derived, and aged out by the session. Any other directory of the cache
+/// is a plugin's.
+pub const HOOKS: &str = "hooks";
 
 /// Why the cache could not be opened or written. A run goes on without it.
 #[derive(Debug, Error)]
@@ -34,6 +42,8 @@ pub enum Error {
     },
     #[error("a value cannot be hashed: {0}")]
     Hash(#[from] serde_json::Error),
+    #[error("{0}")]
+    Graph(#[from] lighthouse_graph::Error),
 }
 
 /// Where the cache of the project at `root` lives: `<root>/.lighthouse/cache`.

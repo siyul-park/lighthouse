@@ -478,10 +478,10 @@ impl Engine {
         self
     }
 
-    /// Keeps what rules find in `dir`, at most `limit` bytes of it, so that a
-    /// later run over code that did not change what a rule reads takes the
-    /// findings instead of running the rule. The findings are the same either
-    /// way.
+    /// Keeps what rules find in `dir`, and the rest of the cache, at most
+    /// `limit` bytes of it all, so that a later run over code that did not
+    /// change what a rule reads takes the findings instead of running the
+    /// rule. The findings are the same either way.
     pub fn with_cache(mut self, dir: PathBuf, limit: u64) -> Self {
         self.cache = Some(CacheSettings { dir, limit });
         self
@@ -490,7 +490,7 @@ impl Engine {
     /// Opens the result cache, if the engine keeps one.
     pub(crate) fn open_cache(&self) -> Option<Result<Cache, CacheError>> {
         let settings = self.cache.as_ref()?;
-        Some(Cache::open(&settings.dir, settings.limit))
+        Some(Cache::open(&settings.dir))
     }
 
     /// Sets what the run may do with models.

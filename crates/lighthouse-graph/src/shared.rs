@@ -35,7 +35,6 @@ pub(crate) struct Shared {
     pub waits: Mutex<()>,
     pub verify_period: AtomicU64,
     pub verify_count: AtomicU64,
-    pub limit: AtomicU64,
     pub versions: Mutex<Versions>,
     /// How many commits a row that nothing verified is kept.
     pub retain: u64,

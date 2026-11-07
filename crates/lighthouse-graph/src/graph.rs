@@ -19,10 +19,6 @@ use crate::{
     store::{Store, Write},
 };
 
-/// The size, in bytes of stored values, past which the least recently used
-/// are dropped at [`Graph::commit`]: 256 MB.
-pub const DEFAULT_LIMIT: u64 = 256 << 20;
-
 /// Commits a row is kept without being verified. A row of a file that is gone
 /// is read by no run, so this is how long it outlives the file; a row that is
 /// read keeps itself alive. Sixty-four is a few days of commits at the pace a
@@ -43,8 +39,6 @@ pub struct Options {
     /// The binary's, each plugin's, ...: set as the `VERSION` inputs. One that
     /// changed since the last open invalidates exactly what read it.
     pub versions: Versions,
-    /// The most bytes of stored values kept at a [`Graph::commit`].
-    pub limit: u64,
     /// Verify mode: run one green node in this many again and fail with
     /// [`Error::Impure`] if its value differs, `0` for none. On by default in
     /// debug builds.
@@ -85,7 +79,6 @@ impl fmt::Debug for Options {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Options")
             .field("versions", &self.versions)
-            .field("limit", &self.limit)
             .field("verify", &self.verify)
             .field("retain", &self.retain)
             .field("data", &self.data.is_some())
@@ -97,7 +90,6 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             versions: Versions::new(),
-            limit: DEFAULT_LIMIT,
             verify: if cfg!(debug_assertions) {
                 VERIFY_PERIOD
             } else {
@@ -142,7 +134,6 @@ impl Graph {
             waits: Mutex::default(),
             verify_period: AtomicU64::new(options.verify),
             verify_count: AtomicU64::new(0),
-            limit: AtomicU64::new(options.limit),
             versions: Mutex::default(),
             retain: options.retain,
             data: options.data,
@@ -290,9 +281,9 @@ impl Graph {
         fan::map(self, items, run)
     }
 
-    /// Writes what changed since the last commit in one transaction, deletes
-    /// the rows nothing verified for [`Options::retain`] commits and prunes
-    /// values over the limit. Call it with no pull running.
+    /// Writes what changed since the last commit in one transaction and
+    /// deletes the rows nothing verified for [`Options::retain`] commits. Call
+    /// it with no pull running.
     pub fn commit(&mut self) -> Result<(), Error> {
         let slots = self.shared.dirty.take();
         let revision = self.shared.revision.load(Ordering::Acquire);
@@ -301,20 +292,15 @@ impl Graph {
         writes.sort_unstable_by(|a, b| (&a.kind, &a.key).cmp(&(&b.kind, &b.key)));
         let marks = self.shared.marks_with(revision);
         let meta = self.shared.meta(&marks)?;
-        let limit = self.shared.limit.load(Ordering::Acquire);
         let forget = self.shared.oldest(&marks);
-        let pruned = match self.shared.store.commit(&writes, &meta, limit, forget) {
-            Ok(pruned) => pruned,
-            Err(err) => {
-                self.shared.dirty.restore(slots);
-                return Err(err);
-            }
-        };
+        if let Err(err) = self.shared.store.commit(&writes, &meta, forget) {
+            self.shared.dirty.restore(slots);
+            return Err(err);
+        }
         *self.shared.marks.locked() = marks;
         for slot in &slots {
             settle_clean(slot);
         }
-        self.shared.forget_values(&pruned);
         Ok(())
     }
 

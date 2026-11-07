@@ -112,6 +112,10 @@ impl Engine {
         if let Err(e) = committed {
             run.notices.insert(format!("the graph was not saved: {e}"));
         }
+        let started = Instant::now();
+        run.notices
+            .extend(crate::cache::fit(self.cache.as_ref(), Some(graph)));
+        run.timings.commit += started.elapsed();
         run.read = inputs
             .iter()
             .map(|input| (input.file.path.clone(), input.sha256.clone()))

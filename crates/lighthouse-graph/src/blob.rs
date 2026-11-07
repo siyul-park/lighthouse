@@ -4,11 +4,7 @@
 
 use rusqlite::{OptionalExtension, Transaction, params};
 
-use crate::{Error, store::Write};
-
-/// Pruning goes down to this part of the limit, so that a run that is just
-/// over does not prune every time.
-const PRUNE_TO: f64 = 0.9;
+use crate::{Error, Graph, store::Write};
 
 /// Stores the value of a write, if it has one, and returns the hash the node
 /// had before, whose value may have no owner now.
@@ -52,20 +48,65 @@ pub(crate) fn collect_all(tx: &Transaction<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/// Deletes the values of the nodes, those of lower durability first and the
-/// least recently used first, until what is stored is under `limit` bytes,
-/// and the states they retained. Returns the nodes whose value went.
-pub(crate) fn prune(tx: &Transaction<'_>, limit: u64) -> Result<Vec<(String, Vec<u8>)>, Error> {
-    let total: i64 = tx.query_row(
+/// Frees at least `bytes` of the stored values of `graph`, fewer when there are
+/// not so many, and returns the free pages of its file to the system: the
+/// states nodes retain first, oldest first, then the values of nodes, those of
+/// lower durability first and the least recently used first. A node whose value
+/// went is run again when it is pulled; nothing else changes. With `0` only the
+/// free pages go. Call it with no pull running, after a [`Graph::commit`].
+pub fn trim(graph: &mut Graph, bytes: u64) -> Result<(), Error> {
+    let dropped = graph.shared.store.trim(bytes)?;
+    graph.shared.forget_values(&dropped);
+    Ok(())
+}
+
+/// Frees at least `bytes` of values: those of retained states that no node
+/// has as current, oldest first, then those of nodes (and the states they
+/// retained), those of lower durability first and the least recently used
+/// first. Returns the nodes whose value went.
+pub(crate) fn free(tx: &Transaction<'_>, bytes: u64) -> Result<Vec<(String, Vec<u8>)>, Error> {
+    if bytes == 0 {
+        return Ok(Vec::new());
+    }
+    let before = stored(tx)?;
+    let wanted = i64::try_from(bytes).unwrap_or(i64::MAX);
+    retained_values(tx, wanted)?;
+    let left = wanted - (before - stored(tx)?);
+    if left <= 0 {
+        return Ok(Vec::new());
+    }
+    node_values(tx, left)
+}
+
+/// The bytes of the values stored.
+fn stored(tx: &Transaction<'_>) -> Result<i64, Error> {
+    Ok(tx.query_row(
         "SELECT COALESCE(SUM(length(value)), 0) FROM blob",
         [],
         |row| row.get(0),
+    )?)
+}
+
+/// Deletes retained states, oldest first, while what the ones before them
+/// freed is short of `excess`; states whose value a node has free nothing and
+/// stay.
+fn retained_values(tx: &Transaction<'_>, excess: i64) -> Result<(), Error> {
+    tx.execute(
+        "DELETE FROM retained WHERE rowid IN (
+             SELECT id FROM (
+                 SELECT r.rowid AS id, COALESCE(SUM(length(b.value)) OVER (
+                     ORDER BY r.rowid ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed
+                 FROM retained r JOIN blob b ON b.hash = r.hash
+                 WHERE NOT EXISTS (SELECT 1 FROM node n WHERE n.hash = r.hash))
+             WHERE freed < ?1)",
+        [excess],
     )?;
-    if (total as u64) <= limit {
-        return Ok(Vec::new());
-    }
-    // Each goes while what the ones before it freed is short of the excess.
-    let excess = total - (limit as f64 * PRUNE_TO) as i64;
+    collect_all(tx)
+}
+
+/// Deletes the values of nodes, and the states they retained, while what the
+/// ones before them freed is short of `excess`. Returns the nodes.
+fn node_values(tx: &Transaction<'_>, excess: i64) -> Result<Vec<(String, Vec<u8>)>, Error> {
     let mut statement = tx.prepare(
         "SELECT kind, key, hash FROM (
              SELECT n.kind, n.key, n.hash, COALESCE(SUM(length(b.value)) OVER (

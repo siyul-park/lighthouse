@@ -1,6 +1,8 @@
 //! What a plugin answered to `initialize`, kept between runs: a run that
 //! finds no file the plugin claims then never starts its process. The answer
-//! is kept per build of the plugin, so a rebuilt plugin is asked again.
+//! is kept per build of the plugin, so a rebuilt plugin is asked again. Only
+//! the newest file of a plugin outlives a cache over its size limit (see
+//! `lighthouse_engine::cache`); nothing else is kept in a plugin's directory.
 
 use std::{
     fs,

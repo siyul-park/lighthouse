@@ -1,4 +1,5 @@
-//! `results.db`: one table of what models answered and fixes proposed, by key, in WAL mode. Lookups are answered
+//! `results.db`: one table of what models answered and fixes proposed, by key, in WAL mode,
+//! `auto_vacuum = INCREMENTAL`. Lookups are answered
 //! while the run goes, each from a read-only connection of a small pool so that
 //! threads do not queue; stores and the use of what was found are written once,
 //! in one transaction, at the end.
@@ -26,14 +27,16 @@ const IGNORE: &str = "*\n";
 /// another version is emptied.
 const SCHEMA: i64 = 3;
 
-/// The size, in bytes of the database, past which the least recently used
-/// results are pruned: 256 MB. The cap is approximate: it counts the pages of
-/// the database file in use, not the write-ahead log.
+/// The size, in bytes, the cache directory is kept under, the databases and
+/// what plugins keep together: 256 MB. See [`fit`](super::fit).
 pub const DEFAULT_LIMIT: u64 = 256 << 20;
 
-/// Pruning goes down to this part of the limit, so that a run that is just over
-/// does not prune every time.
-const PRUNE_TO: f64 = 0.9;
+/// `PRAGMA auto_vacuum` value of `INCREMENTAL`.
+const INCREMENTAL: i64 = 2;
+
+/// Free pages a write returns to the system: the cost of a run stays bounded,
+/// the rest goes with the next ones.
+const VACUUM_PAGES: u32 = 1024;
 
 /// A result that was used is marked used again only when its mark is older
 /// than this, so that a run that only reads does not write every key.
@@ -44,8 +47,6 @@ const TOUCH_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
 pub struct Stats {
     /// Values written.
     pub stored: usize,
-    /// Values pruned for the size limit.
-    pub pruned: usize,
 }
 
 /// An open cache. Lookups and stores may come from several threads.
@@ -55,7 +56,6 @@ pub struct Cache {
     readers: Mutex<Vec<Connection>>,
     used: Mutex<Vec<Digest>>,
     fresh: Mutex<Vec<Write>>,
-    limit: u64,
 }
 
 impl Cache {
@@ -63,7 +63,7 @@ impl Cache {
     /// of another version is replaced: it only holds what can be derived
     /// again. Any other failure (a directory that cannot be written, a locked
     /// file) is an error and the run goes on without a cache.
-    pub fn open(dir: &Path, limit: u64) -> Result<Self, Error> {
+    pub fn open(dir: &Path) -> Result<Self, Error> {
         fs::create_dir_all(dir).map_err(io_error(dir))?;
         let ignore = dir.join(".gitignore");
         if !ignore.exists() {
@@ -90,7 +90,6 @@ impl Cache {
             readers: Mutex::default(),
             used: Mutex::default(),
             fresh: Mutex::default(),
-            limit,
         })
     }
 
@@ -124,7 +123,7 @@ impl Cache {
         }
     }
 
-    /// Writes what the run stored and used, then prunes down to the limit.
+    /// Writes what the run stored and used.
     pub fn finish(&self) -> Result<Stats, Error> {
         let now = millis();
         let fresh = drain(&self.fresh);
@@ -143,12 +142,24 @@ impl Cache {
                 touch.execute(params![key, now])?;
             }
         }
-        let pruned = prune(&tx, self.limit)?;
         tx.commit()?;
+        vacuum(&db, VACUUM_PAGES)?;
         Ok(Stats {
             stored: fresh.len(),
-            pruned,
         })
+    }
+
+    /// Deletes the least recently used results until `bytes` are freed, or
+    /// none are left, and returns every free page to the system and empties
+    /// the log: the file is as small as what it holds.
+    pub fn trim(&self, bytes: u64) -> Result<(), Error> {
+        let mut db = self.writer.lock().unwrap_or_else(PoisonError::into_inner);
+        let tx = db.transaction()?;
+        prune(&tx, bytes)?;
+        tx.commit()?;
+        vacuum(&db, 0)?;
+        db.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
+        Ok(())
     }
 
     /// The value and the time it was last used, from a connection of the pool.
@@ -190,15 +201,30 @@ struct Write {
     value: Vec<u8>,
 }
 
+/// Returns up to `pages` free pages to the system, all of them for `0`. The
+/// pragma frees a page at each step.
+fn vacuum(db: &Connection, pages: u32) -> Result<(), Error> {
+    let mut statement = db.prepare(&format!("PRAGMA incremental_vacuum({pages})"))?;
+    let mut steps = statement.query([])?;
+    while steps.next()?.is_some() {}
+    Ok(())
+}
+
 /// Opens `path` as a results database, in WAL mode, of the current schema.
 fn connect(path: &Path) -> Result<Connection, Error> {
     let db = Connection::open(path)?;
     db.busy_timeout(Duration::from_secs(5))?;
+    // Before the first table: a file made without it takes it by a VACUUM.
+    db.pragma_update(None, "auto_vacuum", INCREMENTAL)?;
     db.pragma_update(None, "journal_mode", "WAL")?;
     db.pragma_update(None, "synchronous", "NORMAL")?;
     let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version != SCHEMA {
         db.execute_batch("DROP TABLE IF EXISTS results")?;
+    }
+    let mode: i64 = db.pragma_query_value(None, "auto_vacuum", |row| row.get(0))?;
+    if mode != INCREMENTAL {
+        db.execute_batch("VACUUM")?;
     }
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS results (
@@ -225,35 +251,20 @@ fn is_damage(error: &rusqlite::Error) -> bool {
     )
 }
 
-/// Deletes the least recently used results until what is left is under the
-/// limit; returns how many. Counting the stored bytes reads every row, so it is
-/// done only when the pages in use say the database may be over.
-fn prune(tx: &rusqlite::Transaction, limit: u64) -> Result<usize, Error> {
-    let pragma = |name: &str| tx.pragma_query_value(None, name, |row| row.get::<_, i64>(0));
-    let in_use = (pragma("page_count")? - pragma("freelist_count")?) * pragma("page_size")?;
-    let limit = i64::try_from(limit).unwrap_or(i64::MAX);
-    if in_use <= limit {
-        return Ok(0);
-    }
-    let total: i64 = tx.query_row(
-        "SELECT coalesce(sum(length(key) + length(value)), 0) FROM results",
-        [],
-        |row| row.get(0),
-    )?;
-    if total <= limit {
-        return Ok(0);
-    }
-    let target = (limit as f64 * PRUNE_TO) as i64;
-    let mut left = total;
+/// Deletes the least recently used results until `bytes` of them are gone,
+/// or none are left.
+fn prune(tx: &rusqlite::Transaction, bytes: u64) -> Result<(), Error> {
+    let wanted = i64::try_from(bytes).unwrap_or(i64::MAX);
+    let mut freed = 0;
     let mut doomed = Vec::new();
     {
         let mut oldest = tx.prepare(
             "SELECT key, length(key) + length(value) FROM results ORDER BY used_at, key",
         )?;
         let mut rows = oldest.query([])?;
-        while left > target {
+        while freed < wanted {
             let Some(row) = rows.next()? else { break };
-            left -= row.get::<_, i64>(1)?;
+            freed += row.get::<_, i64>(1)?;
             doomed.push(row.get::<_, Vec<u8>>(0)?);
         }
     }
@@ -261,7 +272,7 @@ fn prune(tx: &rusqlite::Transaction, limit: u64) -> Result<usize, Error> {
     for key in &doomed {
         delete.execute(params![key])?;
     }
-    Ok(doomed.len())
+    Ok(())
 }
 
 /// Empties a list kept behind a lock.

@@ -2,9 +2,11 @@
 //! values of both by hash and one row of meta, in WAL mode. A node row is read
 //! when the node is pulled or validated, its value apart from the rest; writes
 //! of a run go out in one transaction. A value is stored once, whoever has it
-//! as current or retained, so retaining a state copies no bytes.
+//! as current or retained, so retaining a state copies no bytes. The file is
+//! `auto_vacuum = INCREMENTAL`: pages that rows left are returned to the
+//! system a few at a commit, and all of them when the cache is trimmed.
 
-use std::{collections::HashMap, fs, path::Path, sync::Mutex};
+use std::{collections::HashMap, fs, path::Path, sync::Mutex, time::Duration};
 
 use rusqlite::{Connection, ErrorCode, OptionalExtension, params};
 
@@ -17,6 +19,16 @@ use crate::{
 /// Bumped whenever a table or what a value means changes: a database of
 /// another version is replaced.
 const SCHEMA: i64 = 7;
+
+/// `PRAGMA auto_vacuum` value of `INCREMENTAL`.
+const INCREMENTAL: i64 = 2;
+
+/// Free pages a commit returns to the system: the cost of a commit stays
+/// bounded, the rest goes with the next ones.
+const VACUUM_PAGES: u32 = 1024;
+
+/// How long a write waits for another process that has the file.
+const BUSY: Duration = Duration::from_secs(5);
 
 const TABLES: &str = "
 CREATE TABLE node(
@@ -140,10 +152,14 @@ impl Store {
 
     fn try_open(path: &Path) -> Result<Self, Error> {
         let conn = Connection::open(path)?;
+        conn.busy_timeout(BUSY)?;
+        // Before the first table: a file made without it cannot take it.
+        conn.pragma_update(None, "auto_vacuum", INCREMENTAL)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
-        if version != 0 && version != SCHEMA {
+        let mode: i64 = conn.pragma_query_value(None, "auto_vacuum", |row| row.get(0))?;
+        if version != 0 && (version != SCHEMA || mode != INCREMENTAL) {
             drop(conn);
             Self::remove(path);
             return Self::try_open(path);
@@ -270,17 +286,15 @@ impl Store {
             .optional()?)
     }
 
-    /// Writes the nodes and the meta in one transaction, deletes the rows last
-    /// verified before revision `forget_before`, then prunes values
-    /// down under `limit` bytes, those of lower durability first and the
-    /// least recently used first. Returns the nodes whose value was dropped.
+    /// Writes the nodes and the meta in one transaction and deletes the rows
+    /// last verified before revision `forget_before`, then returns a bounded
+    /// number of the free pages to the system.
     pub(crate) fn commit(
         &self,
         writes: &[Write],
         meta: &Meta,
-        limit: u64,
         forget_before: u64,
-    ) -> Result<Vec<(String, Vec<u8>)>, Error> {
+    ) -> Result<(), Error> {
         let mut conn = self.conn.locked();
         let tx = conn.transaction()?;
         let mut old = Vec::new();
@@ -296,10 +310,34 @@ impl Store {
         if aged > 0 {
             blob::collect_all(&tx)?;
         }
-        let pruned = blob::prune(&tx, limit)?;
         tx.commit()?;
-        Ok(pruned)
+        vacuum(&conn, VACUUM_PAGES)?;
+        Ok(())
     }
+
+    /// Frees at least `bytes` of stored values, fewer when there are not so
+    /// many: the states nodes retain, oldest first, then the values of nodes,
+    /// those of lower durability first and the least recently used first.
+    /// Every free page goes back to the system and the log is emptied, so the
+    /// file is as small as what it holds. Returns the nodes whose value went.
+    pub(crate) fn trim(&self, bytes: u64) -> Result<Vec<(String, Vec<u8>)>, Error> {
+        let mut conn = self.conn.locked();
+        let tx = conn.transaction()?;
+        let dropped = blob::free(&tx, bytes)?;
+        tx.commit()?;
+        vacuum(&conn, 0)?;
+        conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
+        Ok(dropped)
+    }
+}
+
+/// Returns up to `pages` free pages to the system, all of them for `0`. The
+/// pragma frees a page at each step.
+fn vacuum(conn: &Connection, pages: u32) -> Result<(), Error> {
+    let mut statement = conn.prepare(&format!("PRAGMA incremental_vacuum({pages})"))?;
+    let mut steps = statement.query([])?;
+    while steps.next()?.is_some() {}
+    Ok(())
 }
 
 fn read_row(row: &rusqlite::Row<'_>, at: usize) -> rusqlite::Result<Option<Row>> {

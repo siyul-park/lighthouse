@@ -3,8 +3,6 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_graph::Options;
-
 use crate::toy::*;
 
 /// A seeded generator: the sequences are the same on every run.
@@ -234,18 +232,11 @@ fn check_executed(
 }
 
 /// Runs one seeded sequence on a graph, checking each step. The `Evict` edit
-/// drops the stored values of every node: the graph's limit is none, so a
-/// commit prunes them all.
+/// drops the stored values of every node.
 pub fn run(seed: u64, steps: usize) {
     let mut rng = Rng::new(seed);
     let mut sim = Sim::new();
-    let mut graph = open_with(
-        None,
-        Options {
-            limit: 0,
-            ..options(&sim.project)
-        },
-    );
+    let mut graph = open(None, &sim.project);
     apply(&mut graph, &sim.project, &sim.known);
     pull(&graph);
     pull_par(&graph);
@@ -256,6 +247,7 @@ pub fn run(seed: u64, steps: usize) {
         let edit = sim.step(&mut rng);
         if matches!(edit, Edit::Evict) {
             graph.commit().expect("commit");
+            lighthouse_graph::trim(&mut graph, u64::MAX).expect("trim");
             tainted.extend(sim.project.files.keys().cloned());
         }
         apply(&mut graph, &sim.project, &sim.known);

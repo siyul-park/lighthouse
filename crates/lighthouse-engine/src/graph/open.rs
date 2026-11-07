@@ -20,10 +20,9 @@ impl Engine {
         notices: &mut impl Extend<String>,
     ) -> &'g mut Graph {
         slot.get_or_insert_with(|| {
-            let options = |limit| {
+            let options = || {
                 Options {
                     versions: [("binary".to_owned(), cache::build_identity())].into(),
-                    limit,
                     ..Options::default()
                 }
                 .data(Arc::new(Runtime::new(
@@ -33,13 +32,12 @@ impl Engine {
                 )))
             };
             let opened = match &self.cache {
-                Some(cache) => Graph::open(&cache.dir.join(FILE), options(cache.limit)),
-                None => Graph::in_memory(options(lighthouse_graph::DEFAULT_LIMIT)),
+                Some(cache) => Graph::open(&cache.dir.join(FILE), options()),
+                None => Graph::in_memory(options()),
             };
             opened.unwrap_or_else(|e| {
                 notices.extend([format!("the graph is not kept: {e}")]);
-                Graph::in_memory(options(lighthouse_graph::DEFAULT_LIMIT))
-                    .expect("an in-memory graph opens")
+                Graph::in_memory(options()).expect("an in-memory graph opens")
             })
         })
     }
