@@ -1,0 +1,453 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": "api::Open#function",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Open opens."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "api"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "api::Open#function"
+        }
+      ],
+      "file": {
+        "path": "api/api.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "api::Open#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "api",
+          "path": "api"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Open opens.",
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "api/api.go",
+          "id": "api::Open#function",
+          "kind": "function",
+          "name": "Open",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [
+        {
+          "attached_to": "api::sink#interface",
+          "span": {
+            "end": {
+              "col": 61,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// sink is an interface only a test of the package declares."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "api"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "api::sink#interface"
+        },
+        {
+          "from": {
+            "symbol": "api::sink#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "api::sink::Close#method"
+        },
+        {
+          "from": {
+            "symbol": "api::sink#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "api::sink::Flush#method"
+        }
+      ],
+      "file": {
+        "path": "api/api_test.go"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "name": "api",
+          "path": "api"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "sink is an interface only a test of the package declares.",
+          "edges": true,
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "api/api_test.go",
+          "id": "api::sink#interface",
+          "kind": "interface",
+          "name": "sink",
+          "requires": [
+            "Close:func()(error)",
+            "Flush:func()()"
+          ],
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "file": "api/api_test.go",
+          "id": "api::sink::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": "api::sink#interface",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 9,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "file": "api/api_test.go",
+          "id": "api::sink::Flush#method",
+          "kind": "method",
+          "name": "Flush",
+          "owner": "api::sink#interface",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [
+        {
+          "attached_to": "impl::File#type",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// File is a sink that never names the interface."
+        },
+        {
+          "attached_to": "impl::File::Close#method",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "text": "// Close closes."
+        },
+        {
+          "attached_to": "impl::File::Flush#method",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "text": "// Flush flushes."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "impl"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::File#type"
+        },
+        {
+          "from": {
+            "symbol": "impl::File#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::File::Close#method"
+        },
+        {
+          "from": {
+            "symbol": "impl::File#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::File::Flush#method"
+        }
+      ],
+      "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":7,\"open\":{\"col\":31,\"line\":7},\"close\":{\"col\":43,\"line\":7},\"statements\":[\"return nil\"],\"plain\":true}]"
+        },
+        "path": "impl/impl.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "pending": {
+            "carriers": [
+              "impl::File#type"
+            ],
+            "key": "Close:func()(error)"
+          },
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "impl::File::Close#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "pending": {
+            "carriers": [
+              "impl::File#type"
+            ],
+            "key": "Flush:func()()"
+          },
+          "returns": 0,
+          "statements": 0,
+          "symbol": "impl::File::Flush#method",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "impl",
+          "path": "impl"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "File is a sink that never names the interface.",
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::File#type",
+          "kind": "type",
+          "name": "File",
+          "provides": [
+            "Close:func()(error)",
+            "Flush:func()()"
+          ],
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 4
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Close closes.",
+          "extent": {
+            "end": {
+              "col": 44,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::File::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": "impl::File#type",
+          "span": {
+            "end": {
+              "col": 44,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Flush flushes.",
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::File::Flush#method",
+          "kind": "method",
+          "name": "Flush",
+          "owner": "impl::File#type",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

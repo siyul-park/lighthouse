@@ -223,6 +223,9 @@ impl Extractor<'_> {
             role: None,
             optional: false,
             type_ref: None,
+            provides: Vec::new(),
+            requires: Vec::new(),
+            edges: false,
         }
     }
 
@@ -270,6 +273,7 @@ impl Extractor<'_> {
             implementation: role.implementation,
             constructs: role.constructs,
             configures: None,
+            pending: None,
         });
         if let Some(attrs) = test {
             self.frag.tests.push(TestCase {

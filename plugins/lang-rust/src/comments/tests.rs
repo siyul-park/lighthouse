@@ -56,6 +56,9 @@ fn symbol_at(from: (u32, u32), to: (u32, u32)) -> Symbol {
         role: None,
         optional: false,
         type_ref: None,
+        provides: Vec::new(),
+        requires: Vec::new(),
+        edges: false,
     }
 }
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,9 +25,7 @@ type run struct {
 	// overlays hold the text that stands in for a file, by absolute path.
 	overlays map[string][]byte
 	// requested are the files the analysis loads: those of the units asked
-	// for and of the directories that declare interfaces, which are loaded to
-	// match types against them. emit are the files that have a fragment in the
-	// answer.
+	// for. emit are the files that have a fragment in the answer.
 	requested    map[string]sdk.FileRef
 	emit         map[string]bool
 	astRequested map[string]bool
@@ -50,9 +47,6 @@ type run struct {
 	// fenceFiles are the files that stand for the fences of host files: they
 	// are analysed with the rest but are no files of the request.
 	fenceFiles map[string]bool
-	// far holds, by file, the methods that implement only an interface of a
-	// package of the project that the package of the file does not import.
-	far map[string][]string
 	// times is where the request's time goes.
 	times *timings
 	// regionModules gives the module path of the unit of a fence by its file,
@@ -66,11 +60,6 @@ type batch struct {
 	dir       string
 	synthetic bool
 	files     []string
-}
-
-type declaredType struct {
-	obj  *types.TypeName
-	unit *unit
 }
 
 // loader loads the batches in the background, at most one load per CPU in
@@ -121,7 +110,6 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		fenceFiles:      map[string]bool{},
 		result:          answer{},
 		times:           &timings{},
-		far:             map[string][]string{},
 	}
 	for _, u := range params.Units {
 		for _, f := range u.Files {
@@ -235,7 +223,7 @@ func (r *run) analyze(b *batch, l loaded) {
 	r.collectSources(pkgs)
 	res := newResolver(r.root, pkgs, r.localModule(b))
 	r.collectIgnored(pkgs)
-	r.implements(r.claim(pkgs, res))
+	r.claim(pkgs, res)
 	r.packageErrors(pkgs)
 }
 
@@ -355,8 +343,7 @@ func (r *run) localModule(b *batch) *goModule {
 
 // claim builds the fragment of every requested file from the first package
 // variant that type-checked it.
-func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
-	var units []*unit
+func (r *run) claim(pkgs []*packages.Package, res *resolver) {
 	for _, pkg := range claimOrder(pkgs) {
 		if pkg.TypesInfo == nil || pkg.Types == nil {
 			continue
@@ -378,89 +365,14 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 			u := newUnit(rel, file, pkg, src, res)
 			u.frag.File.Facts = r.stemFacts(rel)
 			u.fence = r.fenceFiles[rel]
+			u.small = r.opts.SmallInterfaces
 			if module, ok := r.regionModules[rel]; ok {
 				u.module = module
 				u.frag.Modules[0].Path = module
 			}
 			r.fragments[rel] = u.fragment()
-			r.far[rel] = u.far
-			units = append(units, u)
 		}
 	}
-	return units
-}
-
-// implements adds an `implements` edge from every declared type to every
-// declared interface it satisfies, by value or by pointer.
-func (r *run) implements(units []*unit) {
-	interfaces, concrete := r.declaredTypes(units)
-	sort.Slice(concrete, func(i, j int) bool { return declaredBefore(concrete[i], concrete[j]) })
-	sort.Slice(interfaces, func(i, j int) bool { return declaredBefore(interfaces[i], interfaces[j]) })
-	for _, t := range concrete {
-		for _, i := range interfaces {
-			iface := i.obj.Type().Underlying().(*types.Interface)
-			if !satisfies(t.obj.Type().(*types.Named), iface) {
-				continue
-			}
-			frag := r.fragments[t.unit.rel]
-			frag.Edges = append(frag.Edges, sdk.Edge{
-				Kind:       edgeImplements,
-				From:       sdk.Node{Symbol: symbolID(kindType, t.unit.module, t.obj.Name())},
-				To:         target(t.unit.res.module(i.obj.Pkg()), i.obj.Name()),
-				Resolution: resolutionSemantic,
-			})
-		}
-	}
-}
-
-// declaredTypes splits the types the units declare into interfaces worth
-// matching and concrete types. Interfaces of one method are skipped unless
-// asked for: nearly every type satisfies them by accident.
-func (r *run) declaredTypes(units []*unit) (interfaces, concrete []declaredType) {
-	byFile := map[string]*unit{}
-	for _, u := range units {
-		byFile[u.rel] = u
-	}
-	seen := map[*types.Package]bool{}
-	for _, u := range units {
-		if seen[u.pkg.Types] {
-			continue
-		}
-		seen[u.pkg.Types] = true
-		for _, t := range r.typesOf(u, byFile) {
-			iface, isInterface := t.obj.Type().Underlying().(*types.Interface)
-			switch {
-			case !isInterface:
-				concrete = append(concrete, t)
-			case isGeneric(t.obj):
-				// a generic interface is a constraint family, not a method set to match
-			case iface.NumMethods() > 1 || (iface.NumMethods() == 1 && r.opts.SmallInterfaces):
-				interfaces = append(interfaces, t)
-			}
-		}
-	}
-	return interfaces, concrete
-}
-
-// typesOf lists the non-alias types of u's package that are
-// declared in a unit.
-func (r *run) typesOf(u *unit, byFile map[string]*unit) []declaredType {
-	var out []declaredType
-	scope := u.pkg.Types.Scope()
-	for _, name := range scope.Names() {
-		obj, ok := scope.Lookup(name).(*types.TypeName)
-		if !ok || obj.IsAlias() {
-			continue
-		}
-		rel, ok := r.rel(u.fset.Position(obj.Pos()).Filename)
-		owner := byFile[rel]
-		_, isNamed := obj.Type().(*types.Named)
-		if !ok || owner == nil || !isNamed {
-			continue
-		}
-		out = append(out, declaredType{obj, owner})
-	}
-	return out
 }
 
 // packageErrors records, per requested file, the first load, parse or type
@@ -680,22 +592,4 @@ func describe(e packages.Error) string {
 		return msg
 	}
 	return strings.TrimPrefix(e.Pos, file+":") + ": " + msg
-}
-
-// declaredBefore orders types by where they are declared, which does not
-// depend on the order in which the go command's packages were parsed.
-func declaredBefore(a, b declaredType) bool {
-	pa, pb := a.unit.fset.PositionFor(a.obj.Pos(), false), b.unit.fset.PositionFor(b.obj.Pos(), false)
-	if pa.Filename != pb.Filename {
-		return pa.Filename < pb.Filename
-	}
-	if pa.Offset != pb.Offset {
-		return pa.Offset < pb.Offset
-	}
-	return a.obj.Id() < b.obj.Id()
-}
-
-func isGeneric(obj *types.TypeName) bool {
-	named, ok := obj.Type().(*types.Named)
-	return ok && named.TypeParams().Len() > 0
 }

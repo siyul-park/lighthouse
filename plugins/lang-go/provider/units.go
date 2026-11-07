@@ -8,7 +8,6 @@ import (
 	"go/parser"
 	"go/scanner"
 	"go/token"
-	"go/types"
 	"hash"
 	"os"
 	"path/filepath"
@@ -20,19 +19,16 @@ import (
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 )
 
-// shape is how a request is analyzed: which directories are asked for, which
-// are loaded with them, and the `api` of each of those asked for.
+// shape is how a request is analyzed: which directories are asked for and the
+// `api` of each.
 type shape struct {
 	pl *planner
 	// asked are the directories of the units of files, by the host's id.
 	asked map[string]*directory
-	// interfaces are the directories that declare interfaces.
-	interfaces []*directory
 }
 
-// planner reads the directories of the project and tells what the host needs
-// to know of each: its `api`, the directories it imports, and whether it
-// declares interfaces.
+// planner reads the directories asked for and tells what the host needs to
+// know of each: its `api` and the directories it imports.
 type planner struct {
 	r       *run
 	modules []moduleRoot
@@ -50,29 +46,8 @@ type directory struct {
 	requested []string
 	content   string
 	api       string
-	ifaces    string
 	imports   []string
 	deps      []*directory
-	// matching tells which interfaces can match the types of the directory,
-	// and which types can match the interfaces of the others.
-	matching matching
-}
-
-// matching is what decides, from text alone, whether the types of one
-// directory can implement an interface of another: a type implements an
-// interface only if it has a method of each name of the interface. It errs
-// towards "can": a name set that is not known is an open one.
-type matching struct {
-	// methods are the names of the methods the files declare.
-	methods map[string]bool
-	// open is set when the method sets of the types are not the declared
-	// methods alone (an embedded field promotes more), or are not known.
-	open bool
-	// interfaces are the explicit method names of each interface the files
-	// declare, one list for each; unknown when a type may stand for one that
-	// the text does not show.
-	interfaces [][]string
-	unknown    bool
 }
 
 // moduleRoot is a module that holds project code: its import path and the
@@ -81,8 +56,7 @@ type moduleRoot struct{ path, dir string }
 
 // dirDigest collects what the files of one directory contribute to its unit.
 type dirDigest struct {
-	content, api, ifaces, imports []string // ifaces holds only the non-empty
-	matching                      matching
+	content, api, imports []string
 }
 
 // fileFacts are what the host needs to know about one Go source file, derived
@@ -97,16 +71,14 @@ type fileFacts struct {
 	// Directives digests the directives outside the declarations; empty when
 	// there are none. They belong to the file, not to a declaration.
 	Directives string
-	// Interfaces digests the type declarations that may declare an interface;
-	// empty when there are none. `implements` edges read every project
-	// interface, so a unit that declares one is imported by all.
-	Interfaces string
-	matching   matching
 }
 
 // declSpan is where a top-level declaration lies in the source: from its doc
 // comment to its end, and the braces of its body, -1 when it has none.
 type declSpan struct{ start, end, bodyStart, bodyEnd int }
+
+// everyUnit is the import that stands for every unit of the language.
+const everyUnit = "*"
 
 // goEnvVars are the settings of the go command that decide which files make a
 // package and what they mean: the toolchain, the target, the flags and the
@@ -116,15 +88,11 @@ var goEnvVars = []string{
 	"GOTOOLCHAIN", "GOAMD64", "GOARM", "GOARM64", "GO386", "GOMIPS", "GOMIPS64", "GOPPC64", "GORISCV64", "GOFIPS140",
 }
 
-// importsOf are the directories d imports and the ones that declare
-// interfaces, which every package reads for its `implements` edges, sorted.
+// importsOf are the directories d imports, sorted.
 func (s *shape) importsOf(d *directory) []string {
 	seen := map[string]bool{}
 	for _, dep := range d.deps {
 		seen[dep.rel] = true
-	}
-	for _, iface := range s.interfaces {
-		seen[iface.rel] = true
 	}
 	delete(seen, d.rel)
 	out := make([]string, 0, len(seen))
@@ -184,7 +152,6 @@ func (pl *planner) read(abs string) *directory {
 		return nil
 	}
 	d.seal(u)
-	u.matching = d.matching
 	return u
 }
 
@@ -217,10 +184,6 @@ func (pl *planner) goFile(u *directory, d *dirDigest, name string) bool {
 			d.api = append(d.api, digest(name, facts.Directives))
 		}
 	}
-	if facts.Interfaces != "" {
-		d.ifaces = append(d.ifaces, name, facts.Interfaces)
-	}
-	d.matching.add(facts.matching)
 	d.imports = append(d.imports, facts.Imports...)
 	return true
 }
@@ -276,60 +239,21 @@ func (d *dirDigest) seal(u *directory) {
 	u.content = digest(d.content...)
 	slices.Sort(d.api)
 	u.api = digest(d.api...)
-	if len(d.ifaces) > 0 {
-		u.ifaces = digest(append([]string{u.rel}, d.ifaces...)...)
-	}
 }
 
-// plan reads every directory of the project and has the run load, besides the
-// units asked for, the directories that declare an interface the types of the
-// units can implement: a method is an implementation of any interface of the
-// project, so types are matched against all of them. A directory whose
-// interfaces list a method that no type of the units has is not loaded: loading
-// one makes the go command build every package it imports that an edit changed.
+// plan reads the directories asked for, and those they import, to tell the
+// host what each imports and what an importer sees of it.
 func (r *run) plan(params sdk.IndexParams) *shape {
 	pl := &planner{r: r, dirs: map[string]*directory{}}
-	files := map[string][]string{}
-	for _, rel := range params.Files {
-		abs := filepath.Dir(filepath.Join(r.root, filepath.FromSlash(rel)))
-		files[abs] = append(files[abs], rel)
-	}
 	s := &shape{pl: pl, asked: map[string]*directory{}}
 	batches := r.batches(params.Files)
 	if !pl.moduleRoots(batches) {
 		return s
 	}
 	pl.outside(batches)
-	mine := matching{}
 	for _, u := range params.Units {
 		if len(u.Files) > 0 {
-			d := pl.unit(filepath.Join(r.root, filepath.FromSlash(u.ID)))
-			s.asked[u.ID] = d
-			if d != nil {
-				mine.add(d.matching)
-			}
-		}
-		// The fences of host files are matched against every interface.
-		mine.open = mine.open || len(u.Regions) > 0
-	}
-	dirs := make([]string, 0, len(files))
-	for abs := range files {
-		dirs = append(dirs, abs)
-	}
-	sort.Strings(dirs)
-	for _, abs := range dirs {
-		d := pl.unit(abs)
-		if d == nil || d.ifaces == "" {
-			continue
-		}
-		s.interfaces = append(s.interfaces, d)
-		if !mine.mayMatch(d.matching) {
-			continue
-		}
-		for _, rel := range files[abs] {
-			if _, asked := r.requested[rel]; !asked {
-				r.requested[rel] = sdk.FileRef{Path: rel}
-			}
+			s.asked[u.ID] = pl.unit(filepath.Join(r.root, filepath.FromSlash(u.ID)))
 		}
 	}
 	return s
@@ -346,7 +270,7 @@ func (r *run) unitResults(s *shape, params sdk.IndexParams, snippets []*snippet,
 	}
 	for _, u := range params.Units {
 		if len(u.Regions) > 0 {
-			out = append(out, r.regionsResult(s, u, snippets))
+			out = append(out, r.regionsResult(u, snippets))
 		}
 	}
 	return out
@@ -402,8 +326,8 @@ func (r *run) directoryResult(s *shape, u sdk.UnitRef, found answer) sdk.UnitRes
 }
 
 // regionsResult is the answer for the fences of the host files: it reads the
-// project's packages as an importer does, so it imports them all.
-func (r *run) regionsResult(s *shape, u sdk.UnitRef, snippets []*snippet) sdk.UnitResult {
+// project's packages as an importer does, so it imports every unit.
+func (r *run) regionsResult(u sdk.UnitRef, snippets []*snippet) sdk.UnitResult {
 	found := r.regionResult(answer{}, snippets)
 	hashes := make([]string, 0, len(u.Regions))
 	for _, host := range u.Regions {
@@ -415,7 +339,7 @@ func (r *run) regionsResult(s *shape, u sdk.UnitRef, snippets []*snippet) sdk.Un
 		Notices:    found.Notices,
 		Incomplete: found.Incomplete,
 		Body:       digest(hashes...),
-		Imports:    []string{},
+		Imports:    []string{everyUnit},
 	}
 	res.Api = res.Body
 	if res.Fragments == nil {
@@ -427,12 +351,6 @@ func (r *run) regionsResult(s *shape, u sdk.UnitRef, snippets []*snippet) sdk.Un
 	if res.Incomplete == nil {
 		res.Incomplete = []sdk.Incomplete{}
 	}
-	for _, d := range s.pl.dirs {
-		if d != nil && !filepath.IsAbs(d.rel) {
-			res.Imports = append(res.Imports, d.rel)
-		}
-	}
-	sort.Strings(res.Imports)
 	return res
 }
 
@@ -467,18 +385,17 @@ func factsOf(src []byte) fileFacts {
 	file, err := parser.ParseFile(fset, "", src, parser.SkipObjectResolution)
 	if file == nil {
 		whole := contentHash(src)
-		return fileFacts{API: []string{whole}, Interfaces: whole, matching: matching{open: true, unknown: true}}
+		return fileFacts{API: []string{whole}}
 	}
-	facts := fileFacts{Imports: importsOf(file), matching: matchingOf(file)}
+	facts := fileFacts{Imports: importsOf(file)}
 	tf := fset.File(file.Pos())
 	if err != nil || tf == nil {
 		whole := contentHash(src)
-		facts.API, facts.Interfaces = []string{whole}, whole
+		facts.API = []string{whole}
 		return facts
 	}
 	offset := func(p token.Pos) int { return tf.Offset(p) }
 	facts.API, facts.Directives = apiDigest(src, file, offset)
-	facts.Interfaces = interfaceDigest(src, file, offset)
 	return facts
 }
 
@@ -598,51 +515,6 @@ func directive(comment string) bool {
 		}
 	}
 	return false
-}
-
-// interfaceDigest hashes the type specs whose type might be an interface:
-// literal interfaces, and names or instantiations that could stand for one.
-func interfaceDigest(src []byte, file *ast.File, offset func(token.Pos) int) string {
-	h := sha256.New()
-	found := false
-	for _, decl := range file.Decls {
-		gen, ok := decl.(*ast.GenDecl)
-		if !ok || gen.Tok != token.TYPE {
-			continue
-		}
-		for _, spec := range gen.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok || !mayBeInterface(ts.Type) {
-				continue
-			}
-			start, end := offset(ts.Pos()), offset(ts.End())
-			if start < 0 || end > len(src) || start > end {
-				return contentHash(src)
-			}
-			found = true
-			h.Write(src[start:end])
-			h.Write([]byte{0})
-		}
-	}
-	if !found {
-		return ""
-	}
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func mayBeInterface(expr ast.Expr) bool {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		if tn, ok := types.Universe.Lookup(t.Name).(*types.TypeName); ok {
-			_, basic := tn.Type().Underlying().(*types.Basic)
-			return !basic
-		}
-		return true
-	case *ast.InterfaceType, *ast.SelectorExpr, *ast.IndexExpr, *ast.IndexListExpr, *ast.ParenExpr:
-		return true
-	default:
-		return false
-	}
 }
 
 // apiOf is what importers see of d: its own API and the API of everything it

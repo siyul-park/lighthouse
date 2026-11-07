@@ -326,6 +326,14 @@ pub(crate) fn go() -> Option<Fixture> {
                 "package util\n\nimport \"example.com/app/store\"\n\n// Total totals.\nfunc Total() int {\n\ts := store.New()\n\ts.Add(3)\n\treturn s.Sum()\n}\n\nfunc spare() {}\n",
             ),
             (
+                "iface/iface.go",
+                "package iface\n\n// Runner runs.\ntype Runner interface {\n\tRun()\n\tStop()\n}\n",
+            ),
+            (
+                "job/job.go",
+                "package job\n\n// Job is a job.\ntype Job struct{}\n\nfunc (Job) Run() {}\n\nfunc (Job) Stop() {}\n",
+            ),
+            (
                 "app/app_test.go",
                 "package app\n\nimport \"testing\"\n\nfunc TestRun(t *testing.T) {\n\tif Run() == 0 {\n\t\tt.Fatal(\"zero\")\n\t}\n}\n",
             ),
@@ -508,6 +516,49 @@ pub(crate) fn go() -> Option<Fixture> {
                         "server.Serve() + util.Total()",
                         "server.Serve()",
                     );
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "interface signature edit in a package the implementer does not import",
+                apply: |d| replace(d, "iface/iface.go", "Run()\n", "Run() error\n"),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "interface signature edit reverted",
+                apply: |d| replace(d, "iface/iface.go", "Run() error\n", "Run()\n"),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "method removed from the implementer",
+                apply: |d| replace(d, "job/job.go", "func (Job) Stop() {}\n", ""),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "an embedder takes up the missing method",
+                apply: |d| {
+                    write(
+                        d,
+                        "job/wrapper.go",
+                        "package job\n\n// Wrapper wraps a job.\ntype Wrapper struct{ Job }\n\nfunc (Wrapper) Stop() {}\n",
+                    )
+                },
+                mostly_warm: false,
+            },
+            Edit {
+                name: "an embedder drops the embedded field",
+                apply: |d| replace(d, "job/wrapper.go", "struct{ Job }", "struct{}"),
+                mostly_warm: false,
+            },
+            Edit {
+                name: "method added to the implementer",
+                apply: |d| {
+                    replace(
+                        d,
+                        "job/job.go",
+                        "func (Job) Run() {}\n",
+                        "func (Job) Run() {}\n\nfunc (Job) Stop() {}\n",
+                    )
                 },
                 mostly_warm: false,
             },

@@ -4,7 +4,7 @@ import json
 import sys
 from typing import Any, BinaryIO, Protocol
 
-PROTOCOL_VERSION = "0.7"
+PROTOCOL_VERSION = "0.8"
 
 PARSE_ERROR = -32700
 METHOD_NOT_FOUND = -32601

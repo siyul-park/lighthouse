@@ -1,10 +1,10 @@
-# Plugin protocol 0.7
+# Plugin protocol 0.8
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.7.json`](../protocol/schema/lighthouse-protocol-0.7.json),
+[`protocol/schema/lighthouse-protocol-0.8.json`](../protocol/schema/lighthouse-protocol-0.8.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,7 +27,7 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.7"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.8"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
@@ -36,7 +36,7 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them remains valid in 0.7, and hosts ignore what they do not
+sends none of them remains valid in 0.8, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -46,7 +46,7 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Protocol 0.7 indexes by unit. A request carries `units`: each is the files of one unit of the language (`files`, with `source_ast` asking for the selectable AST of a file) or the host files whose selected regions the core sends (`regions`). The provider answers one result per unit it was sent, the regions' facts merged into the fragment of their host file, in the unit with the id `#regions`. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
+Protocol 0.8 indexes by unit. A request carries `units`: each is the files of one unit of the language (`files`, with `source_ast` asking for the selectable AST of a file) or the host files whose selected regions the core sends (`regions`). The provider answers one result per unit it was sent, the regions' facts merged into the fragment of their host file, in the unit with the id `#regions`. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
 
 The host keeps each answer: a run sends a provider only the units whose key changed (their files, the provider's settings files, its identity), or whose `imports` moved: a unit lists the units whose `api` it read, and is asked again when one of those `api` is no longer what it was when the unit was answered. A run with every unit current starts no provider process. A provider keeps nothing between requests; it answers from what the request holds and from the disk.
 
@@ -433,6 +433,27 @@ edge says the source *may* use the target. The host ignores heuristic `calls`
 edges when it counts callers and callees (fan-in, fan-out, caller lists) but
 keeps heuristic `references`, so a rule asking "might this be used" fails safe.
 
+### Method sets
+
+A language that satisfies interfaces by structure (Go) states the facts the host needs to
+settle which type satisfies which interface across its units; other languages state none,
+which is valid. A key is opaque to the host: it compares keys for equality and sorts them,
+and two keys are equal exactly when the methods are interchangeable to an interface (the
+name, the declaring package when the name is not exported, and the signature).
+
+- A type symbol has `provides`: the sorted, unique keys of the methods a value of it can be
+  called with when it is addressable, those it gets from embedded fields included.
+- An interface symbol that is a method set has `requires`: the sorted, unique keys of its
+  methods, embedded ones included, and `edges` when the host draws an `implements` edge to
+  it. The host adds that edge, from the type symbol to the interface, for every type that
+  provides all the keys the interface requires, in the order of the declarations.
+- A method summary has `pending` when the provider could not tell whether the method
+  implements an interface, because the interface may be in a unit it did not read:
+  `{ key, carriers }`, the key of the method and the ids of the types that have it (its
+  receiver's type and the types of its unit that embed it). The host marks the method an
+  `implementation` when some interface of the language requires the key and a carrier
+  provides everything that interface requires.
+
 ### Function summaries and control flow
 
 `functions` holds one summary per function or method with a body:
@@ -448,7 +469,8 @@ single value, 0 for `()`), looking inside a `Result<T, E>` at `T`.
 
 `implementation` (optional) marks a function that implements a method a trait or
 interface declares elsewhere: a method of a trait impl in Rust, a method of a type
-that satisfies an interface its package names in Go. `constructs` (optional) marks an
+that satisfies an interface its package names or imports in Go; the host adds the
+methods that satisfy an interface of another package (`pending`, see "Method sets"). `constructs` (optional) marks an
 associated function without a receiver that returns `Self` or its owner type, bare
 or in a `Result` or `Option`. `configures` (optional) is the symbol id of the type a
 functional-option builder configures: a function without a receiver whose only result
@@ -627,10 +649,10 @@ type-checks with `go/types`.
   its text without function and method bodies and the `api` of every project directory it
   imports, directly or not, so a body edit leaves every other unit's results alone (early
   cutoff, as in rustc's incremental compilation and Go's build action IDs, which hash the
-  export data of dependencies rather than their sources). A unit imports the directories
-  that declare interfaces, because `implements` edges read every project interface: the
-  api of those moves only when an interface declaration does. Only the directories asked
-  for are loaded, besides those that declare interfaces. `go.mod`, `go.sum`, `go.work`,
+  export data of dependencies rather than their sources). Only the directories asked for
+  are loaded. A type that satisfies an interface of a package its unit does not import is
+  settled by the host from the method sets the unit states (see "Method sets").
+  `go.mod`, `go.sum`, `go.work`,
   `go.work.sum` and the `go env` values that decide a build are the settings of every unit.
   Edits of a module outside the project (a `replace` to `../x`) are not seen until a file
   of the project changes.

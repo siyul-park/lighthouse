@@ -949,6 +949,17 @@
           "minimum": 0,
           "type": "integer"
         },
+        "pending": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pending"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A method whose provider could not tell whether it implements an\ninterface, because the interface may be in a unit it did not read: the\nhost settles it from the interfaces of the language."
+        },
         "returns": {
           "format": "uint32",
           "minimum": 0,
@@ -1444,6 +1455,27 @@
       ],
       "type": "object"
     },
+    "Pending": {
+      "description": "A method that implements an interface when some interface of the project\nrequires its key and a type that has the method provides all that\ninterface requires.",
+      "properties": {
+        "carriers": {
+          "description": "Ids of the types that have the method: the receiver's type and the\ntypes of its unit that embed it, sorted.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "key": {
+          "description": "The key of the method, as in [`Symbol::provides`].",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "carriers"
+      ],
+      "type": "object"
+    },
     "PhaseTime": {
       "description": "How long one phase of an index request took in the provider.",
       "properties": {
@@ -1670,6 +1702,10 @@
             "null"
           ]
         },
+        "edges": {
+          "description": "The host adds an `implements` edge from every type that provides what\nthe interface requires.",
+          "type": "boolean"
+        },
         "extent": {
           "anyOf": [
             {
@@ -1705,6 +1741,20 @@
             "string",
             "null"
           ]
+        },
+        "provides": {
+          "description": "A type of a language that satisfies interfaces by structure: the\nsorted, unique keys of the methods a value of it can be called with,\nthose it gets from embedded fields included. A key is opaque to the\nhost: two keys are equal exactly when the methods are interchangeable\nto an interface.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requires": {
+          "description": "An interface of such a language that a type can satisfy: the sorted,\nunique keys of its methods, which a type satisfies when it provides all\nof them.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "role": {
           "anyOf": [

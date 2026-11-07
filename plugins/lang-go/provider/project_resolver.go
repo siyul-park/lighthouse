@@ -23,10 +23,8 @@ type resolver struct {
 	interfaces sync.Map
 	// constructors caches, per package, the constructors that take options.
 	constructors sync.Map
-	// declared are the packages inside the project.
-	declared []*packages.Package
-	// wider are the interfaces a package satisfies without naming them.
-	wider wider
+	// exported are the exported interfaces of a package, by package path.
+	exported sync.Map
 }
 
 // goModule is the module of a go.mod: its import path and its directory
@@ -49,9 +47,6 @@ func newResolver(root string, roots []*packages.Package, local *goModule) *resol
 		if module, inside := moduleOf(root, p); module != "" && r.modules[p.PkgPath] == "" {
 			r.modules[p.PkgPath] = module
 			r.project[p.PkgPath] = inside
-			if inside {
-				r.declared = append(r.declared, p)
-			}
 		}
 	})
 	return r
@@ -142,40 +137,30 @@ func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
 	set := cached.(*interfaceSet)
 	set.once.Do(func() {
 		set.byMethod = collectInterfaces(pkg)
-		set.wider, set.near = r.widerInterfaces(pkg)
+		set.near = r.reachedInterfaces(pkg)
 		set.embedders = collectEmbedders(pkg)
 	})
 	return set
 }
 
-// widerInterfaces returns the interfaces a package may satisfy without naming
-// them, by method name.
-// The second map holds only those the package reaches through its imports: the
-// declared interfaces of the project's packages it imports, directly or not,
-// and the exported ones of the rest. A request that loads other packages of the
-// project finds more in the first; the second does not depend on what else
-// the request loaded.
-func (r *resolver) widerInterfaces(pkg *packages.Package) (all, near map[string][]*types.Interface) {
-	r.wider.once.Do(func() {
-		for _, p := range r.declared {
-			r.wider.project = append(r.wider.project, interfacesIn(p.Types, false)...)
-		}
-	})
-	found, reached := newMethodIndex(), newMethodIndex()
-	found.add(r.wider.project...)
+// reachedInterfaces returns the interfaces a package may satisfy without naming
+// them, by method name: the declared interfaces of the project's packages it
+// imports, directly or not, and the exported ones of the rest. They do not
+// depend on what else the request loaded.
+func (r *resolver) reachedInterfaces(pkg *packages.Package) map[string][]*types.Interface {
+	reached := newMethodIndex()
 	packages.Visit([]*packages.Package{pkg}, nil, func(p *packages.Package) {
-		cached, ok := r.wider.exported.Load(p.PkgPath)
-		if !ok {
-			cached, _ = r.wider.exported.LoadOrStore(p.PkgPath, interfacesIn(p.Types, true))
-		}
-		found.add(cached.([]*types.Interface)...)
 		if r.project[p.PkgPath] {
 			reached.add(interfacesIn(p.Types, false)...)
-		} else {
-			reached.add(cached.([]*types.Interface)...)
+			return
 		}
+		cached, ok := r.exported.Load(p.PkgPath)
+		if !ok {
+			cached, _ = r.exported.LoadOrStore(p.PkgPath, interfacesIn(p.Types, true))
+		}
+		reached.add(cached.([]*types.Interface)...)
 	})
-	return found.byName, reached.byName
+	return reached.byName
 }
 
 func (m *goModule) locate(importPath string) (string, bool) {

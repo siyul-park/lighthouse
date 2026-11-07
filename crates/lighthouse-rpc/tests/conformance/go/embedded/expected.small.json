@@ -453,54 +453,6 @@
             }
           },
           "to": ".::Closer::Close"
-        },
-        {
-          "from": {
-            "symbol": ".::Base#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": ".::Logger"
-        },
-        {
-          "from": {
-            "symbol": ".::Base#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": ".::Closer"
-        },
-        {
-          "from": {
-            "symbol": ".::Base#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": ".::LogCloser"
-        },
-        {
-          "from": {
-            "symbol": ".::Service#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": ".::Logger"
-        },
-        {
-          "from": {
-            "symbol": ".::Service#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": ".::Closer"
-        },
-        {
-          "from": {
-            "symbol": ".::Service#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": ".::LogCloser"
         }
       ],
       "file": {
@@ -650,6 +602,7 @@
       "symbols": [
         {
           "doc": "Logger writes lines.",
+          "edges": true,
           "extent": {
             "end": {
               "col": 2,
@@ -664,6 +617,9 @@
           "id": ".::Logger#interface",
           "kind": "interface",
           "name": "Logger",
+          "requires": [
+            "Log:func(string)()"
+          ],
           "span": {
             "end": {
               "col": 2,
@@ -706,6 +662,7 @@
         },
         {
           "doc": "Closer releases resources.",
+          "edges": true,
           "extent": {
             "end": {
               "col": 2,
@@ -720,6 +677,9 @@
           "id": ".::Closer#interface",
           "kind": "interface",
           "name": "Closer",
+          "requires": [
+            "Close:func()(error)"
+          ],
           "span": {
             "end": {
               "col": 2,
@@ -762,6 +722,7 @@
         },
         {
           "doc": "LogCloser does both.",
+          "edges": true,
           "extent": {
             "end": {
               "col": 2,
@@ -776,6 +737,10 @@
           "id": ".::LogCloser#interface",
           "kind": "interface",
           "name": "LogCloser",
+          "requires": [
+            "Close:func()(error)",
+            "Log:func(string)()"
+          ],
           "span": {
             "end": {
               "col": 2,
@@ -804,6 +769,10 @@
           "id": ".::Base#type",
           "kind": "type",
           "name": "Base",
+          "provides": [
+            "Close:func()(error)",
+            "Log:func(string)()"
+          ],
           "span": {
             "end": {
               "col": 34,
@@ -921,6 +890,11 @@
           "id": ".::Service#type",
           "kind": "type",
           "name": "Service",
+          "provides": [
+            "Close:func()(error)",
+            "Log:func(string)()",
+            "Read:func([]uint8)(int,error)"
+          ],
           "span": {
             "end": {
               "col": 2,

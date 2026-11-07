@@ -24,9 +24,9 @@ use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Declarations, Edges, File, Fragment, Incoming, Markers, ORDERED, Project, REGIONS, Resolved,
-    Sites, Slice, Symbol, SymbolId, Table, TestCase, ambiguity, collisions, declared,
-    merge::duplicate_notice,
+    Declarations, Edges, File, Fragment, Implemented, Incoming, Markers, Methods, ORDERED, Project,
+    REGIONS, Resolved, Settled, Sites, Slice, Symbol, SymbolId, Table, TestCase, ambiguity,
+    collisions, declared, merge::duplicate_notice, methods,
 };
 
 /// The id of the unit that holds the regions selected in the project's files.
@@ -41,11 +41,23 @@ pub static ORDERED_BY: Input<String, bool> = Input::new("ordered_by");
 /// its source trees as JSON. Persisted and read only by what builds the model
 /// of a file, which validates without loading.
 pub static PAYLOAD: Input<(String, String), Payload> = Input::new("payload").persisted();
+/// The units of a language that have a model in the run, by language id,
+/// sorted. `Volatile`.
+pub static MEMBERS: Input<String, Vec<String>> = Input::new("members");
 /// The paths of the files of the project, sorted. `Volatile`.
 pub static PATHS: Input<(), Vec<String>> = Input::new("paths");
 /// The patterns of the markers of generated files. `Stable`.
 pub static MARKERS: Input<(), Vec<String>> = Input::new("markers");
 
+/// What the provider of a unit `(language, id)` said of the method sets of its
+/// types and interfaces.
+pub static METHODS: Query<(String, String), Methods> = Query::new("methods", methods::methods);
+/// Which type of a language satisfies which interface of it, and which methods
+/// implement one, by unit.
+pub static IMPLEMENTS: Query<String, Implemented> = Query::new("implements", methods::implements);
+/// The part of `implements` that concerns the unit `(language, id)`: an edit
+/// elsewhere that leaves it as it was leaves the files of the unit green.
+pub static SETTLED: Query<(String, String), Settled> = Query::new("settled", methods::settled);
 pub(crate) static PART: Query<String, Vec<Fragment>> = Query::new("part", part);
 pub(crate) static DECLARED: Query<String, Vec<(String, String)>> = Query::new("declared", declare);
 /// The module paths declared in several languages, from every file.
@@ -83,11 +95,13 @@ pub static NOTICES: Query<(), Vec<String>> = Query::new("notices", notices);
 /// The files put together; held in memory only.
 pub static PROJECT: Query<(), Project> = Query::new("project", project).transient();
 
-/// The fragments of a unit, and its source trees as JSON.
+/// The fragments of a unit, its source trees as JSON and the method sets of
+/// its types, which the host settles with those of the other units.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Payload {
     pub fragments: Vec<Fragment>,
     pub sources: Vec<u8>,
+    pub methods: Methods,
 }
 
 /// How the host stamps the fragments a provider gave for a file.
@@ -98,17 +112,19 @@ struct Stamping<'a> {
 }
 
 impl Stamping<'_> {
-    /// The fragments of the unit whose first file is this one, as stored.
+    /// The fragments of the unit whose first file is this one, as stored, with
+    /// what settling the method sets of the unit decided for them.
     fn of(&self, language: &str, unit: &str) -> Result<Vec<Fragment>, Error> {
-        let payload = self
-            .graph
-            .input(&PAYLOAD, &(language.to_owned(), unit.to_owned()))?;
-        Ok(payload
+        let at = (language.to_owned(), unit.to_owned());
+        let payload = self.graph.input(&PAYLOAD, &at)?.unwrap_or_default();
+        let mut parts: Vec<Fragment> = payload
+            .fragments
             .iter()
-            .flat_map(|payload| &payload.fragments)
             .filter(|fragment| fragment.files.first().is_some_and(|f| f.path == self.path))
             .cloned()
-            .collect())
+            .collect();
+        methods::settle(self.graph, &at, &payload, &mut parts)?;
+        Ok(parts)
     }
 
     /// What the host says of a file is read again; `generated` also stays where
@@ -198,6 +214,7 @@ impl Host {
     /// with nothing else known of the files.
     pub fn set_units(graph: &mut Graph, fragments: &[Fragment]) -> Result<(), Error> {
         let mut paths = Vec::new();
+        let mut members: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for fragment in fragments {
             let Some(file) = fragment.files.first() else {
                 continue;
@@ -207,6 +224,7 @@ impl Host {
             let payload = Payload {
                 fragments: vec![fragment.clone()],
                 sources: Vec::new(),
+                methods: Methods::default(),
             };
             let host = Self {
                 file: file.clone(),
@@ -216,7 +234,11 @@ impl Host {
             };
             graph.set_input(&PAYLOAD, &unit, payload, Durability::Volatile)?;
             graph.set_input(&HOST, &path, host, Durability::Volatile)?;
+            members.entry(unit.0).or_default().push(path.clone());
             paths.push(path);
+        }
+        for (language, units) in members {
+            graph.set_input(&MEMBERS, &language, units, Durability::Volatile)?;
         }
         paths.sort();
         graph.set_input(&PATHS, &(), paths, Durability::Volatile)?;

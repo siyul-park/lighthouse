@@ -361,18 +361,40 @@ func use() []int { return Map[string, int](nil, func(s string) int { return len(
     };
     let indexed = f.index();
     let fragment = f.fragment(&indexed, "p.go");
-    let implements: Vec<_> = fragment
-        .edges
+    let provides = |name: &str| {
+        let id = format!(".::{name}#type");
+        let found = indexed
+            .methods
+            .types
+            .iter()
+            .find(|t| t.symbol.as_str() == id);
+        found.map(|t| t.keys.clone()).unwrap_or_default()
+    };
+    // Square has its methods by value, Circle by pointer: both are provided.
+    assert_eq!(
+        provides("Square"),
+        [
+            "Area:func()(float64)",
+            "Name:func()(string)",
+            "Perimeter:func()(float64)"
+        ]
+    );
+    assert_eq!(
+        provides("Circle"),
+        ["Area:func()(float64)", "Perimeter:func()(float64)"]
+    );
+    assert!(provides("Plain").is_empty());
+    let interfaces: Vec<_> = indexed
+        .methods
+        .interfaces
         .iter()
-        .filter(|e| e.kind == EdgeKind::Implements)
-        .map(|e| format!("{:?} -> {}", e.from, target(&e.to)))
+        .map(|i| (i.symbol.as_str(), i.edges))
         .collect();
     assert_eq!(
-        implements.len(),
-        2,
-        "single-method interfaces are skipped: {implements:?}"
+        interfaces,
+        [(".::Shape#interface", true), (".::Namer#interface", false)],
+        "single-method interfaces are skipped"
     );
-    assert!(implements.iter().all(|e| e.ends_with("-> .::Shape")));
     assert_eq!(edges(&fragment, EdgeKind::Calls, "::use#"), [".::Map"]);
 }
 

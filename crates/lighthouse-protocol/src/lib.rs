@@ -41,7 +41,7 @@ pub use model::{
 pub use route::{FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
-pub const VERSION: &str = "0.7";
+pub const VERSION: &str = "0.8";
 
 /// Request: handshake; the first message of a session.
 pub const INITIALIZE: &str = "initialize";

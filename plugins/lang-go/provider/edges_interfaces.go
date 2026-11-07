@@ -1,21 +1,6 @@
 package provider
 
-import (
-	"go/types"
-	"sync"
-)
-
-// wider are the interfaces beyond what a package names: every interface
-// declared in a package of the project, and the exported interfaces of the
-// packages its code can import, however indirectly. A type satisfies such an
-// interface without the package ever writing its name.
-type wider struct {
-	once sync.Once
-	// project are the interfaces declared in the project's packages.
-	project []*types.Interface
-	// exported are the exported interfaces of a package, by package path.
-	exported sync.Map
-}
+import "go/types"
 
 // methodIndex lists interfaces by the names of their methods, each once.
 type methodIndex struct {

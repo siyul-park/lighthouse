@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// unitFixture is a module of five packages: b imports a, e implements the
-// interface of d, and c stands alone.
+// unitFixture is a module of five packages: b imports a, e has the methods of
+// the interface of d, and c stands alone.
 var unitFixture = map[string]string{
 	"go.mod": testModule,
 	"a/a.go": "package a\n\ntype T struct{ N int }\n\nfunc A() int { return 1 }\n",
@@ -51,7 +51,7 @@ func TestProviderUnits(t *testing.T) {
 		units := byID(unitsAt(t, root))
 
 		require.Len(t, units, 5)
-		require.Equal(t, []string{"a", "d"}, units["b"].Imports, "b imports a and the package that declares an interface")
+		require.Equal(t, []string{"a"}, units["b"].Imports)
 		require.Empty(t, units["d"].Imports)
 		require.NotEmpty(t, units["a"].Api)
 		require.NotEmpty(t, units["a"].Body)
@@ -165,7 +165,7 @@ func TestProviderUnits(t *testing.T) {
 		require.Equal(t, together, alone)
 	})
 
-	t.Run("loads the packages whose interfaces the types of the unit can implement", func(t *testing.T) {
+	t.Run("loads only the package of the unit asked for", func(t *testing.T) {
 		root := t.TempDir()
 		writeTree(t, root, unitFixture)
 		packages := map[string]int{}
@@ -181,32 +181,9 @@ func TestProviderUnits(t *testing.T) {
 			packages[unit.ID] = g.Stats().Packages
 		}
 
-		// e has the methods of the interface of d; no other package has any
-		// method, so none of them needs d to be loaded with it.
-		require.Equal(t, map[string]int{"a": 1, "b": 1, "c": 1, "d": 1, "e": 2}, packages)
-	})
-
-	t.Run("loads every interface package for a type that embeds another", func(t *testing.T) {
-		root := t.TempDir()
-		writeTree(t, root, unitFixture)
-		writeFile(t, root, "c/c.go", "package c\n\nimport \"example.com/m/e\"\n\ntype C struct{ e.E }\n")
-		g := provider.New("lang-go", "test")
-		var unit sdk.UnitRef
-		for _, ref := range unitRefs(t, root) {
-			if ref.ID == "c" {
-				unit = ref
-			}
-		}
-
-		_, err := g.Index(sdk.IndexParams{
-			Project:  sdk.ProjectRef{Root: root},
-			Language: "go",
-			Units:    []sdk.UnitRef{unit},
-			Files:    projectFiles(t, root),
-		})
-
-		require.NoError(t, err)
-		require.Equal(t, 2, g.Stats().Packages, "c and d, whose interface the methods it takes from e may implement")
+		// e has the methods of the interface of d, and still loads alone: the
+		// host settles which types satisfy which interfaces.
+		require.Equal(t, map[string]int{"a": 1, "b": 1, "c": 1, "d": 1, "e": 1}, packages)
 	})
 
 	t.Run("a failure of the go command is a gap of a unit, so its answer can be reused", func(t *testing.T) {

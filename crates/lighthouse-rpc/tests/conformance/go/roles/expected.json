@@ -454,6 +454,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              ".::fixture#type"
+            ],
+            "key": "label\"example.com/roles\":func()(string)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -594,6 +600,9 @@
           "id": ".::fixture#type",
           "kind": "type",
           "name": "fixture",
+          "provides": [
+            "label\"example.com/roles\":func()(string)"
+          ],
           "role": "fixture",
           "span": {
             "end": {

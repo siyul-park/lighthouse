@@ -694,6 +694,7 @@ fn stored_of(
         fragments,
         sources: serde_json::to_vec(&unit.sources)
             .map_err(|e| lighthouse_graph::Error::Encode(e.to_string()))?,
+        methods: unit.methods.clone(),
     };
     let meta = Stored {
         key: asked.key.clone(),

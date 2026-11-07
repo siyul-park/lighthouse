@@ -307,6 +307,9 @@
           "id": ".::I#interface",
           "kind": "interface",
           "name": "I",
+          "requires": [
+            "M:func()()"
+          ],
           "span": {
             "end": {
               "col": 24,
@@ -363,6 +366,9 @@
           "id": ".::A#interface",
           "kind": "interface",
           "name": "A",
+          "requires": [
+            "M:func()()"
+          ],
           "span": {
             "end": {
               "col": 24,
@@ -419,6 +425,9 @@
           "id": ".::B#interface",
           "kind": "interface",
           "name": "B",
+          "requires": [
+            "M:func()()"
+          ],
           "span": {
             "end": {
               "col": 24,
@@ -475,6 +484,9 @@
           "id": ".::T#type",
           "kind": "type",
           "name": "T",
+          "provides": [
+            "M:func()()"
+          ],
           "span": {
             "end": {
               "col": 16,

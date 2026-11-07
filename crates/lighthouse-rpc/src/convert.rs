@@ -169,6 +169,7 @@ fn unit_of(
             continue;
         }
         let facts = fragment.file.facts.clone();
+        methods(&fragment, &mut out.methods)?;
         let mut converted = fragment_of(fragment)?;
         converted.files = vec![core::File {
             facts,
@@ -304,6 +305,51 @@ fn fragment_of(f: wire::Fragment) -> Result<core::Fragment, String> {
             .map(|c| comment(&path, c))
             .collect::<Result<_, _>>()?,
     })
+}
+
+/// Adds what a fragment says of the method sets of its types and interfaces to
+/// the unit's.
+fn methods(f: &wire::Fragment, out: &mut core::Methods) -> Result<(), String> {
+    let at = |s: &wire::Symbol| core::At {
+        file: s.file.clone(),
+        line: s.span.start.line,
+        col: s.span.start.col,
+    };
+    for s in &f.symbols {
+        if !s.provides.is_empty() {
+            out.types.push(core::Provided {
+                symbol: id(s.id.clone())?,
+                at: at(s),
+                keys: s.provides.clone(),
+            });
+        }
+        if !s.requires.is_empty() {
+            out.interfaces.push(core::Required {
+                symbol: id(s.id.clone())?,
+                at: at(s),
+                keys: s.requires.clone(),
+                edges: s.edges,
+            });
+        }
+    }
+    for pending in f
+        .functions
+        .iter()
+        .filter_map(|f| f.pending.as_ref().map(|p| (&f.symbol, p)))
+    {
+        out.pending.push(core::Pending {
+            method: id(pending.0.clone())?,
+            key: pending.1.key.clone(),
+            carriers: pending
+                .1
+                .carriers
+                .iter()
+                .cloned()
+                .map(id)
+                .collect::<Result<_, _>>()?,
+        });
+    }
+    Ok(())
 }
 
 fn module(m: wire::Module) -> core::Module {

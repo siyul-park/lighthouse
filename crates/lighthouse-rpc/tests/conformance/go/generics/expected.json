@@ -324,6 +324,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 1,
+          "pending": {
+            "carriers": [
+              ".::Stack#type"
+            ],
+            "key": "Push:func($T)()"
+          },
           "returns": 0,
           "signature": {
             "params": [
@@ -342,6 +348,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Stack#type"
+            ],
+            "key": "Len:func()(int)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -523,6 +535,10 @@
           "id": ".::Stack#type",
           "kind": "type",
           "name": "Stack",
+          "provides": [
+            "Len:func()(int)",
+            "Push:func($T)()"
+          ],
           "span": {
             "end": {
               "col": 2,

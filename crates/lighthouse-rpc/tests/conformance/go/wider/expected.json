@@ -56,6 +56,7 @@
       "symbols": [
         {
           "doc": "Sink takes what is written to it.",
+          "edges": true,
           "extent": {
             "end": {
               "col": 2,
@@ -70,6 +71,10 @@
           "id": "api::Sink#interface",
           "kind": "interface",
           "name": "Sink",
+          "requires": [
+            "Close:func()(error)",
+            "Flush:func()()"
+          ],
           "span": {
             "end": {
               "col": 2,
@@ -224,14 +229,6 @@
           "kind": "contains",
           "resolution": "semantic",
           "to": "impl::source::Other#method"
-        },
-        {
-          "from": {
-            "symbol": "impl::File#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": "api::Sink"
         }
       ],
       "file": {
@@ -243,9 +240,14 @@
       "functions": [
         {
           "flow": [],
-          "implementation": true,
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              "impl::File#type"
+            ],
+            "key": "Close:func()(error)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -262,9 +264,14 @@
         },
         {
           "flow": [],
-          "implementation": true,
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              "impl::File#type"
+            ],
+            "key": "Flush:func()()"
+          },
           "returns": 0,
           "statements": 0,
           "symbol": "impl::File::Flush#method",
@@ -301,6 +308,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              "impl::source#type"
+            ],
+            "key": "Other:func()()"
+          },
           "returns": 0,
           "statements": 0,
           "symbol": "impl::source::Other#method",
@@ -330,6 +343,10 @@
           "id": "impl::File#type",
           "kind": "type",
           "name": "File",
+          "provides": [
+            "Close:func()(error)",
+            "Flush:func()()"
+          ],
           "span": {
             "end": {
               "col": 19,
@@ -414,6 +431,10 @@
           "id": "impl::source#type",
           "kind": "type",
           "name": "source",
+          "provides": [
+            "Other:func()()",
+            "Read:func([]uint8)(int,error)"
+          ],
           "span": {
             "end": {
               "col": 21,

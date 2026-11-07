@@ -510,6 +510,12 @@
           ],
           "max_nesting": 1,
           "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Tree#type"
+            ],
+            "key": "Sum:func()(int)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -809,6 +815,12 @@
           "forwards_to": ".::Tree::child",
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Tree#type"
+            ],
+            "key": "left0\"example.com/flow\":func()(*\"example.com/flow\".Tree)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -829,6 +841,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Tree#type"
+            ],
+            "key": "child\"example.com/flow\":func()(*\"example.com/flow\".Tree)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -868,6 +886,11 @@
           "id": ".::Tree#type",
           "kind": "type",
           "name": "Tree",
+          "provides": [
+            "Sum:func()(int)",
+            "child\"example.com/flow\":func()(*\"example.com/flow\".Tree)",
+            "left0\"example.com/flow\":func()(*\"example.com/flow\".Tree)"
+          ],
           "span": {
             "end": {
               "col": 2,

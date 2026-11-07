@@ -21,9 +21,9 @@ The Go language provider: loads packages with `go/packages`, type-checks with `g
 | Fact | Source |
 | --- | --- |
 | `modules` | one per package, with `test_of` for external test packages |
-| `symbols` | functions, methods, types, struct fields, interface methods, constants, variables, tests; `extent`, `doc`, `optional`, `type_ref` of fields |
+| `symbols` | functions, methods, types, struct fields, interface methods, constants, variables, tests; `extent`, `doc`, `optional`, `type_ref` of fields; `provides` of a type, `requires` and `edges` of an interface (method sets the host settles) |
 | `edges` | `calls`, `references`, `imports`, `implements`, `accesses-private` from `go/types`, with sites; `syntactic` for names the prose of a fence defines |
-| `functions` | flow, nesting, statements, tokens, signature, `events` (`panic`, error comparisons and assertions, `fmt.Errorf` without `%w`), `forwards_to`, `implementation`, `constructs`, `configures`, `manual_assertions` |
+| `functions` | flow, nesting, statements, tokens, signature, `events` (`panic`, error comparisons and assertions, `fmt.Errorf` without `%w`), `forwards_to`, `implementation`, `pending`, `constructs`, `configures`, `manual_assertions` |
 | `tests` | `Test*` functions and their `t.Run` subtests, with table or scenario style |
 | `comments` | every comment group, with its markers (the host reads the `Code generated ... DO NOT EDIT.` header) |
 
@@ -46,7 +46,7 @@ A Go fence of a Markdown file is a unit of its own, as an importer sees the modu
 
 ## Conformance
 
-Goldens: `crates/lighthouse-rpc/tests/conformance/go`. Shared cases (the same name in every language plugin): `comments`, `errors`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`, and `events`. Own cases: `aliases`, `embedded`, `generics`, `layout`, `modules`, `nomod`, `roles`, `tags`, `wider`, `xtest`.
+Goldens: `crates/lighthouse-rpc/tests/conformance/go`. Shared cases (the same name in every language plugin): `comments`, `errors`, `extents`, `flow`, `generated`, `signatures`, `tests`, `visibility`, and `events`. Own cases: `aliases`, `embedded`, `generics`, `layout`, `modules`, `nomod`, `roles`, `tags`, `tested`, `unimported`, `wider`, `xtest`.
 
 ## Build
 

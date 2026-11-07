@@ -20,6 +20,8 @@ import (
 type unit struct {
 	// fence marks the file of a fence of a document.
 	fence bool
+	// small says that an interface of one method is stated too.
+	small bool
 	rel   string
 	file  *ast.File
 	pkg   *packages.Package
@@ -37,9 +39,6 @@ type unit struct {
 	cmap     ast.CommentMap
 	blocks   []declBlock
 	inlined  []inlineBody
-	// far are the methods that implement only an interface of a package of the
-	// project that this unit's package does not import.
-	far []string
 }
 
 // edgeKey identifies an emitted edge: the same relation at another site is
@@ -192,6 +191,7 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 	f := newFlow(d, u.info())
 	ast.Walk(f, d.Body)
 	params, returns := signature(d.Type)
+	implementation, pending := u.implementation(d)
 	manual := 0
 	if u.test {
 		manual = manualAssertions(d.Body, u.info())
@@ -208,7 +208,8 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		ForwardsTo:       forwardTarget(d, u.info(), u.res),
 		Signature:        u.signature(d),
 		Events:           u.events(d),
-		Implementation:   u.implements(id, d),
+		Implementation:   implementation,
+		Pending:          pending,
 		Constructs:       u.constructs(d),
 		Configures:       u.configures(d),
 		ManualAssertions: manual,
@@ -216,16 +217,6 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 	if isTestCase {
 		u.frag.Tests = append(u.frag.Tests, testCaseOf(d, id, usages, u.info()))
 	}
-}
-
-// implements reports whether the method implements an interface, and notes it
-// when only an interface of a package this one does not import says so.
-func (u *unit) implements(id string, d *ast.FuncDecl) bool {
-	implementation, far := u.implementation(d)
-	if far {
-		u.far = append(u.far, id)
-	}
-	return implementation
 }
 
 // usages are the distinct uses of a body in order of first use, and every
@@ -361,13 +352,39 @@ func (u *unit) typeSpec(s *ast.TypeSpec, d *ast.GenDecl) {
 		kind = kindInterface
 	}
 	id := symbolID(kind, u.module, name)
-	u.symbol(sdk.Symbol{ID: id, Kind: kind, Name: name, Owner: "", Doc: docText(s.Doc, d.Doc)}, s.Pos(), s.End(), u.specExtent(d, s))
+	sym := sdk.Symbol{ID: id, Kind: kind, Name: name, Owner: "", Doc: docText(s.Doc, d.Doc)}
+	u.methodSet(&sym, s.Name)
+	u.symbol(sym, s.Pos(), s.End(), u.specExtent(d, s))
 	switch t := s.Type.(type) {
 	case *ast.StructType:
 		u.fields(t, name, id)
 	case *ast.InterfaceType:
 		u.interfaceMethods(t, name, id)
 	}
+}
+
+// methodSet states what the host needs to settle which types satisfy which
+// interfaces of the project: the keys of the methods a type provides, the keys
+// an interface requires, and whether the host draws an `implements` edge for it.
+func (u *unit) methodSet(sym *sdk.Symbol, name *ast.Ident) {
+	obj, ok := u.info().Defs[name].(*types.TypeName)
+	if !ok || obj.IsAlias() {
+		return
+	}
+	named, ok := obj.Type().(*types.Named)
+	if !ok {
+		return
+	}
+	if _, isInterface := named.Underlying().(*types.Interface); !isInterface {
+		sym.Provides = providedKeys(named)
+		return
+	}
+	iface, ok := candidate(named)
+	if !ok {
+		return
+	}
+	sym.Requires = requiredKeys(iface)
+	sym.Edges = iface.NumMethods() > 1 || (iface.NumMethods() == 1 && u.small)
 }
 
 func (u *unit) fields(t *ast.StructType, owner, ownerID string) {

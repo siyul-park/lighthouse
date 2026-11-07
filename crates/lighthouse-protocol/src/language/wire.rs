@@ -560,6 +560,22 @@ pub struct Symbol {
     /// The type of a field. Added in 0.1 before 1.0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub type_ref: Option<TypeRef>,
+    /// A type of a language that satisfies interfaces by structure: the
+    /// sorted, unique keys of the methods a value of it can be called with,
+    /// those it gets from embedded fields included. A key is opaque to the
+    /// host: two keys are equal exactly when the methods are interchangeable
+    /// to an interface.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provides: Vec<String>,
+    /// An interface of such a language that a type can satisfy: the sorted,
+    /// unique keys of its methods, which a type satisfies when it provides all
+    /// of them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<String>,
+    /// The host adds an `implements` edge from every type that provides what
+    /// the interface requires.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub edges: bool,
 }
 
 /// What a declaration of a test file is for. Added in 0.1 before 1.0; a
@@ -739,6 +755,23 @@ pub struct FunctionSummary {
     /// every parameter on, in order.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forwards_to: Option<String>,
+    /// A method whose provider could not tell whether it implements an
+    /// interface, because the interface may be in a unit it did not read: the
+    /// host settles it from the interfaces of the language.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<Pending>,
+}
+
+/// A method that implements an interface when some interface of the project
+/// requires its key and a type that has the method provides all that
+/// interface requires.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Pending {
+    /// The key of the method, as in [`Symbol::provides`].
+    pub key: String,
+    /// Ids of the types that have the method: the receiver's type and the
+    /// types of its unit that embed it, sorted.
+    pub carriers: Vec<String>,
 }
 
 /// A control-flow construct and the number of enclosing nesting constructs,

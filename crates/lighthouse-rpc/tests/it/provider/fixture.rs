@@ -4,7 +4,7 @@
 use std::{fs, path::Path, time::Duration};
 
 use lighthouse_model::ucm::{
-    EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Target,
+    EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Methods, Node, Target,
 };
 use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Source, Unit, Workspace};
 use lighthouse_rpc::RpcPlugin;
@@ -96,6 +96,7 @@ impl Fixture {
 #[derive(PartialEq)]
 pub(super) struct Answer {
     pub(super) fragments: Vec<Fragment>,
+    pub(super) methods: Methods,
     pub(super) notices: Vec<String>,
     pub(super) incomplete: Vec<lighthouse_model::Incomplete>,
 }
@@ -104,11 +105,15 @@ impl From<Indexed> for Answer {
     fn from(indexed: Indexed) -> Self {
         let mut answer = Self {
             fragments: Vec::new(),
+            methods: Methods::default(),
             notices: indexed.notices,
             incomplete: indexed.incomplete,
         };
         for unit in indexed.units {
             answer.fragments.extend(unit.fragments);
+            answer.methods.types.extend(unit.methods.types);
+            answer.methods.interfaces.extend(unit.methods.interfaces);
+            answer.methods.pending.extend(unit.methods.pending);
             answer.notices.extend(unit.notices);
             answer.incomplete.extend(unit.incomplete);
         }

@@ -401,6 +401,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Service#type"
+            ],
+            "key": "Run:func()(int)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -629,6 +635,9 @@
           "id": ".::Service#type",
           "kind": "type",
           "name": "Service",
+          "provides": [
+            "Run:func()(int)"
+          ],
           "span": {
             "end": {
               "col": 2,
@@ -720,6 +729,9 @@
           "id": ".::Reader#interface",
           "kind": "interface",
           "name": "Reader",
+          "requires": [
+            "Read:func()(int)"
+          ],
           "span": {
             "end": {
               "col": 2,

@@ -23,7 +23,7 @@ use std::{
 
 use lighthouse_model::{
     Diagnostic, Document, Fingerprint, GeneratedSpec, Incomplete, Options, RunScope, Severity,
-    ucm::{Applicability, Capability, File, Fragment, Model as CodeModel},
+    ucm::{Applicability, Capability, File, Fragment, Methods, Model as CodeModel},
 };
 use lighthouse_process::Policy;
 use serde::de::DeserializeOwned;
@@ -298,6 +298,9 @@ pub struct Indexed {
 pub struct Fragments {
     pub id: String,
     pub fragments: Vec<Fragment>,
+    /// What the unit's types provide and its interfaces require, for the host
+    /// to settle across the units of the language.
+    pub methods: Methods,
     /// Serialized ASTs and source mappings returned for common source selection.
     pub sources: Vec<lighthouse_protocol::Source>,
     /// A hash of everything the unit's files hold.
@@ -323,6 +326,7 @@ impl Fragments {
         Self {
             id: id.into(),
             fragments,
+            methods: Methods::default(),
             sources: Vec::new(),
             body: hash.clone(),
             api: hash,

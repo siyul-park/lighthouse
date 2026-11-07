@@ -15,6 +15,7 @@ mod kinds;
 mod load_order;
 mod markers;
 mod merge;
+mod methods;
 mod model;
 mod qualify;
 mod slice;
@@ -25,12 +26,13 @@ pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
 pub use kinds::{
-    CASES, COLLISIONS, DECLARATIONS, DUPLICATED, EDGES, HOST, Host, INCOMING, MARKERS,
-    MODULE_CASES, NOTICES, ORDERED_BY, PATHS, PAYLOAD, PROJECT, Payload, REGIONS_UNIT, RESOLVED,
-    SITES, SLICE, SYMBOLS, key,
+    CASES, COLLISIONS, DECLARATIONS, DUPLICATED, EDGES, HOST, Host, IMPLEMENTS, INCOMING, MARKERS,
+    MEMBERS, METHODS, MODULE_CASES, NOTICES, ORDERED_BY, PATHS, PAYLOAD, PROJECT, Payload,
+    REGIONS_UNIT, RESOLVED, SETTLED, SITES, SLICE, SYMBOLS, key,
 };
 pub use load_order::{LoadNeed, LoadPoint, load_needs};
 pub use markers::Markers;
+pub use methods::{At, Implemented, Methods, Pending, Provided, Required, Settled};
 pub use model::{Boxed, Model};
 
 use crate::{Document, Span};

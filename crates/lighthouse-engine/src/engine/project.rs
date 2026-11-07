@@ -1,13 +1,15 @@
 //! The model of a run: what the host says of the files is set as inputs of the
 //! graph, and the project is pulled from it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_graph::{Durability, Graph, revision};
 use lighthouse_spec::key;
 
 use super::{index::Call, regions::Views, *};
-use lighthouse_model::ucm::{HOST, Held, Host, MARKERS, NOTICES, PATHS, PROJECT, View};
+use lighthouse_model::ucm::{
+    HOST, Held, Host, MARKERS, MEMBERS, NOTICES, PATHS, PROJECT, REGIONS_UNIT, View,
+};
 
 /// The unit each file of a run is in, and whether the unit is a host unit:
 /// one with files that injections take regions from.
@@ -106,6 +108,7 @@ impl Engine {
             Durability::Stable,
         )?;
         let mut paths = Vec::with_capacity(inputs.len());
+        let mut members: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for input in inputs {
             let Some((unit, staged)) = units.0.get(&input.file.path) else {
                 continue;
@@ -117,8 +120,22 @@ impl Engine {
                 views: views.of(&input.file.path),
             };
             let path = key(&input.file.path);
+            members
+                .entry(input.file.lang.clone())
+                .or_default()
+                .insert(unit.clone());
+            for (view, _) in &host.views {
+                members
+                    .entry(view.clone())
+                    .or_default()
+                    .insert(REGIONS_UNIT.to_owned());
+            }
             graph.set_input(&HOST, &path, host, Durability::Volatile)?;
             paths.push(path);
+        }
+        for (language, units) in members {
+            let units = units.into_iter().collect();
+            graph.set_input(&MEMBERS, &language, units, Durability::Volatile)?;
         }
         paths.sort();
         graph.set_input(&PATHS, &(), paths, Durability::Volatile)?;

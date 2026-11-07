@@ -11,13 +11,13 @@ import (
 )
 
 // interfaceSet is the interfaces the code of a package names, by method name,
-// and those it satisfies without naming them (see wider).
+// and those it satisfies without naming them.
 type interfaceSet struct {
 	once     sync.Once
 	byMethod map[string][]*types.Interface
-	wider    map[string][]*types.Interface
-	// near is wider without the interfaces of project packages the package
-	// does not reach through its imports.
+	// near are the interfaces the package reaches through its imports: the
+	// declared ones of the packages of the project and the exported ones of
+	// the rest.
 	near map[string][]*types.Interface
 	// embedders are the types of the package that embed a type, by the
 	// embedded type: its methods are promoted into them.
@@ -30,40 +30,48 @@ const resolutionSyntactic = "syntactic"
 // signature an interface dictates is an implementation; a function without a
 // receiver that returns a type of its package builds it.
 
-// implementation reports whether the method satisfies an interface of the
-// project or of a package the code can import, named by the package or not:
-// some candidate interface has a method of the same name and the receiver
-// type (or a pointer to it) implements the interface. far says that only an
-// interface of a package of the project that the unit's package does not import
-// does: what a request that loads the package alone does not see.
-func (u *unit) implementation(d *ast.FuncDecl) (impl, far bool) {
+// implementation reports whether the method satisfies an interface that the
+// package names or can reach through its imports: some candidate interface has
+// a method of the same name and the receiver type (or a pointer to it)
+// implements the interface. A method that none of those interfaces settles may
+// still implement one of a unit this request does not load; it is pending, and
+// the host decides it from the interfaces of the language.
+func (u *unit) implementation(d *ast.FuncDecl) (bool, *sdk.Pending) {
 	if d.Recv == nil {
-		return false, false
+		return false, nil
 	}
 	fn, ok := u.info().Defs[d.Name].(*types.Func)
 	if !ok {
-		return false, false
+		return false, nil
 	}
 	recv := fn.Type().(*types.Signature).Recv()
 	if recv == nil {
-		return false, false
+		return false, nil
 	}
 	named, ok := receiverNamed(recv.Type())
 	if !ok {
-		return false, false
+		return false, nil
 	}
 	if overridesPromoted(named, u.pkg.Types, d.Name.Name) {
-		return true, false
+		return true, nil
 	}
 	set := u.res.interfacesOf(u.pkg)
 	name := d.Name.Name
 	if satisfiesAny(named, set, slices.Concat(set.byMethod[name], set.near[name])) {
-		return true, false
+		return true, nil
 	}
-	if satisfiesAny(named, set, set.wider[name]) {
-		return true, true
+	return false, &sdk.Pending{Key: methodKey(fn), Carriers: u.carriers(named, set)}
+}
+
+// carriers are the types of the package that have the methods of named: it and
+// the types that embed it.
+func (u *unit) carriers(named *types.Named, set *interfaceSet) []string {
+	list := []string{symbolID(kindType, u.module, named.Obj().Name())}
+	for _, holder := range set.embedders[named.Obj()] {
+		list = append(list, symbolID(kindType, u.module, holder.Obj().Name()))
 	}
-	return false, false
+	slices.Sort(list)
+	return slices.Compact(list)
 }
 
 // constructs reports whether the function has no receiver and returns T, *T
@@ -288,18 +296,26 @@ func addParameters(info *types.Info, call *ast.CallExpr, add func(types.Type)) {
 // staticcheck's unused check does: types.Implements is false for an
 // uninstantiated generic type.
 func satisfies(named *types.Named, iface *types.Interface) bool {
-	if params := named.TypeParams(); params.Len() > 0 && named.TypeArgs().Len() == 0 {
-		args := make([]types.Type, params.Len())
-		for i := range args {
-			args[i] = params.At(i)
-		}
-		inst, err := types.Instantiate(nil, named, args, false)
-		if err != nil {
-			return false
-		}
-		named = inst.(*types.Named)
+	named, ok := instantiated(named)
+	return ok && (types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface))
+}
+
+// instantiated is a generic type with its own type parameters as arguments;
+// any other type is as it is.
+func instantiated(named *types.Named) (*types.Named, bool) {
+	params := named.TypeParams()
+	if params.Len() == 0 || named.TypeArgs().Len() > 0 {
+		return named, true
 	}
-	return types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface)
+	args := make([]types.Type, params.Len())
+	for i := range args {
+		args[i] = params.At(i)
+	}
+	inst, err := types.Instantiate(nil, named, args, false)
+	if err != nil {
+		return nil, false
+	}
+	return inst.(*types.Named), true
 }
 
 // overridesPromoted reports whether a struct type embeds a field that has a

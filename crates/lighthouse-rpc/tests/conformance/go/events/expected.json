@@ -498,6 +498,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 1,
+          "pending": {
+            "carriers": [
+              ".::Custom#type"
+            ],
+            "key": "Is:func(error)(bool)"
+          },
           "returns": 1,
           "signature": {
             "params": [
@@ -1208,6 +1214,10 @@
           "id": ".::Custom#type",
           "kind": "type",
           "name": "Custom",
+          "provides": [
+            "Error:func()(string)",
+            "Is:func(error)(bool)"
+          ],
           "span": {
             "end": {
               "col": 21,
@@ -2447,6 +2457,12 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Simple#type"
+            ],
+            "key": "Other:func()(int)"
+          },
           "returns": 1,
           "signature": {
             "params": [],
@@ -2621,6 +2637,9 @@
           "id": ".::Base#type",
           "kind": "type",
           "name": "Base",
+          "provides": [
+            "Close:func()(error)"
+          ],
           "span": {
             "end": {
               "col": 19,
@@ -2677,6 +2696,9 @@
           "id": ".::Shielded#type",
           "kind": "type",
           "name": "Shielded",
+          "provides": [
+            "Close:func()(error)"
+          ],
           "span": {
             "end": {
               "col": 29,
@@ -2765,6 +2787,9 @@
           "id": ".::Leaf#type",
           "kind": "type",
           "name": "Leaf",
+          "provides": [
+            "Name:func()(string)"
+          ],
           "span": {
             "end": {
               "col": 19,
@@ -2821,6 +2846,9 @@
           "id": ".::Holder#type",
           "kind": "type",
           "name": "Holder",
+          "provides": [
+            "Name:func()(string)"
+          ],
           "span": {
             "end": {
               "col": 27,
@@ -2881,6 +2909,9 @@
           "id": ".::namer#interface",
           "kind": "interface",
           "name": "namer",
+          "requires": [
+            "Name:func()(string)"
+          ],
           "span": {
             "end": {
               "col": 38,
@@ -2990,6 +3021,9 @@
           "id": ".::Simple#type",
           "kind": "type",
           "name": "Simple",
+          "provides": [
+            "Other:func()(int)"
+          ],
           "span": {
             "end": {
               "col": 21,
@@ -3046,6 +3080,14 @@
           "id": ".::entry#type",
           "kind": "type",
           "name": "entry",
+          "provides": [
+            "IsDir:func()(bool)",
+            "ModTime:func()(\"time\".Time)",
+            "Mode:func()(\"io/fs\".FileMode)",
+            "Name:func()(string)",
+            "Size:func()(int64)",
+            "Sys:func()(interface{})"
+          ],
           "span": {
             "end": {
               "col": 20,

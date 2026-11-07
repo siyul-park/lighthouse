@@ -279,6 +279,9 @@
           "id": ".::Store#type",
           "kind": "type",
           "name": "Store",
+          "provides": [
+            "Read:func()(int)"
+          ],
           "span": {
             "end": {
               "col": 41,

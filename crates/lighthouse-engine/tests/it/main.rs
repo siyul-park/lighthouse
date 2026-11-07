@@ -15,6 +15,7 @@ mod fix_load_order;
 mod fix_safety;
 mod fix_write;
 mod generated;
+mod go_implements;
 mod language_ignores;
 mod models;
 mod preview;

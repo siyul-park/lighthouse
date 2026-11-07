@@ -36,7 +36,8 @@ func TestProviderDeterminism(t *testing.T) {
 
 func TestProviderGenericImplementations(t *testing.T) {
 	// Slice satisfies cloner by value, Table by pointer, both through a type
-	// assertion; Pair satisfies the exported d.I of another package.
+	// assertion; Pair satisfies the exported d.I of another package, which it
+	// names.
 	files := map[string]string{
 		"go.mod": testModule,
 		"d/d.go": "package d\n\ntype I interface {\n\tM() int\n\tN() int\n}\n",
@@ -57,6 +58,16 @@ func TestProviderGenericImplementations(t *testing.T) {
 		got, _ := indexWith(t, provider.New("lang-go", "test"), root, nil)
 
 		require.Equal(t, 4, strings.Count(got, `"implementation":true`))
-		require.Contains(t, got, `{"from":{"symbol":"p::Pair#type"},"kind":"implements"`)
+	})
+
+	t.Run("states what the generic types provide and the interfaces require", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, files)
+
+		got, _ := indexWith(t, provider.New("lang-go", "test"), root, nil)
+
+		require.Contains(t, got, `"id":"p::Pair#type","kind":"type","name":"Pair","provides":["M:func()(int)","N:func()(int)"]`)
+		require.Contains(t, got, `"id":"d::I#interface","kind":"interface","name":"I","requires":["M:func()(int)","N:func()(int)"]`)
+		require.NotContains(t, got, `"kind":"implements"`)
 	})
 }

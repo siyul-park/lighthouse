@@ -11,6 +11,7 @@ mod glob;
 mod graph;
 mod load_order;
 mod markers;
+mod methods;
 mod model_ref;
 mod project;
 mod resource;

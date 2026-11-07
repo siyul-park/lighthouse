@@ -30,7 +30,7 @@ type answer struct {
 const testModule = "module example.com/m\n\ngo 1.22\n"
 
 const (
-	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.7.json"
+	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.8.json"
 	casesGlob  = "../../../crates/lighthouse-rpc/tests/conformance/go/*"
 )
 
