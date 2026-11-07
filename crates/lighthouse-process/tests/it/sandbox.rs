@@ -339,6 +339,33 @@ fn a_program_inherits_no_descriptor_but_the_three_standard_ones() {
 
 #[cfg(target_os = "macos")]
 #[test]
+fn a_program_blocks_no_signal_though_the_thread_that_started_it_does() {
+    let world = World::new();
+    let script = r#"exec perl -MPOSIX -e 'my $old = POSIX::SigSet->new; sigprocmask(SIG_BLOCK, POSIX::SigSet->new, $old); print $old->ismember(SIGTERM), "\n"'"#;
+
+    let ran = std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                // SAFETY: an all-zero sigset_t is valid storage for sigemptyset.
+                let mut set: libc::sigset_t = unsafe { std::mem::zeroed() };
+                // SAFETY: the set is valid; only this thread's mask changes.
+                let blocked = unsafe {
+                    libc::sigemptyset(&mut set);
+                    libc::sigaddset(&mut set, libc::SIGTERM);
+                    libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut())
+                };
+                assert_eq!(blocked, 0, "the control: this thread blocks SIGTERM");
+                world.run(script, &world.profile(&[]))
+            })
+            .join()
+            .unwrap()
+    });
+
+    assert_eq!(lines(&ran), ["0"], "{ran:?}");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
 fn a_program_cannot_reach_the_keychain_service() {
     let world = World::new();
     let script = "/usr/bin/security list-keychains >/dev/null 2>&1 && echo reached";

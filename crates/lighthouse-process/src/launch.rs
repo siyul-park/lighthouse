@@ -107,10 +107,13 @@ mod posix {
     /// macOS 10.15 and later.
     const SETSID: libc::c_int = 0x0400;
 
-    /// A session; no descriptor but those of the file actions; SIGPIPE back to
-    /// its default, which Rust ignores in its own process and `exec` keeps.
-    const FLAGS: libc::c_short =
-        (SETSID | libc::POSIX_SPAWN_CLOEXEC_DEFAULT | libc::POSIX_SPAWN_SETSIGDEF) as libc::c_short;
+    /// A session; no descriptor but those of the file actions; no signal
+    /// blocked, and SIGPIPE back to its default, which Rust ignores in its own
+    /// process and `exec` keeps.
+    const FLAGS: libc::c_short = (SETSID
+        | libc::POSIX_SPAWN_CLOEXEC_DEFAULT
+        | libc::POSIX_SPAWN_SETSIGDEF
+        | libc::POSIX_SPAWN_SETSIGMASK) as libc::c_short;
 
     /// A program started by [`spawn`], collected with `waitpid`.
     pub(super) struct Spawned {
@@ -193,40 +196,37 @@ mod posix {
         Ok((Spawned { pid, status: None }, pipes))
     }
 
-    /// Runs `posix_spawn` of the first of the non-empty `args`, giving the child `streams`
-    /// as descriptors 0, 1 and 2.
+    /// Runs `posix_spawn` of the first of `args`, giving the child `streams` as
+    /// descriptors 0, 1 and 2.
     fn spawn_with(
         args: &[CString],
         vars: &[CString],
         dir: &CString,
         streams: &[OwnedFd; 3],
     ) -> io::Result<libc::pid_t> {
+        let program = args.first().ok_or(io::ErrorKind::InvalidInput)?;
         let mut attr: libc::posix_spawnattr_t = ptr::null_mut();
         let mut actions: libc::posix_spawn_file_actions_t = ptr::null_mut();
-        // SAFETY: init fills the handles, which destroy releases below.
-        check(unsafe { libc::posix_spawnattr_init(&mut attr) })?;
-        if let Err(e) = check(unsafe { libc::posix_spawn_file_actions_init(&mut actions) }) {
-            // SAFETY: `attr` was initialized above.
-            unsafe { libc::posix_spawnattr_destroy(&mut attr) };
-            return Err(e);
-        }
-        let spawned = configure(&mut attr, &mut actions, dir, streams).and_then(|()| {
-            let mut pid = 0;
-            // SAFETY: the strings behind the pointers outlive the call, and
-            // the arrays end in a null pointer.
-            check(unsafe {
-                libc::posix_spawn(
-                    &mut pid,
-                    args[0].as_ptr(),
-                    &actions,
-                    &attr,
-                    terminated(args).as_ptr(),
-                    terminated(vars).as_ptr(),
-                )
-            })
-            .map(|()| pid)
-        });
-        // SAFETY: both handles were initialized above and are not used again.
+        // SAFETY: init fills a handle that destroy releases; a null one is refused.
+        let spawned = check(unsafe { libc::posix_spawnattr_init(&mut attr) })
+            .and_then(|()| check(unsafe { libc::posix_spawn_file_actions_init(&mut actions) }))
+            .and_then(|()| configure(&mut attr, &mut actions, dir, streams))
+            .and_then(|()| {
+                let mut pid = 0;
+                // SAFETY: the strings outlive the call; the arrays end in null.
+                check(unsafe {
+                    libc::posix_spawn(
+                        &mut pid,
+                        program.as_ptr(),
+                        &actions,
+                        &attr,
+                        terminated(args).as_ptr(),
+                        terminated(vars).as_ptr(),
+                    )
+                })
+                .map(|()| pid)
+            });
+        // SAFETY: the handles are not used again.
         unsafe {
             libc::posix_spawn_file_actions_destroy(&mut actions);
             libc::posix_spawnattr_destroy(&mut attr);
@@ -242,27 +242,33 @@ mod posix {
         dir: &CString,
         streams: &[OwnedFd; 3],
     ) -> io::Result<()> {
-        // SAFETY: an all-zero sigset_t is valid storage for sigemptyset.
-        let mut default: libc::sigset_t = unsafe { std::mem::zeroed() };
-        // SAFETY: the set is valid and the handles initialized by the caller.
+        // SAFETY: the handles were initialized by the caller.
+        let calls = unsafe {
+            [
+                libc::posix_spawnattr_setflags(attr, FLAGS),
+                libc::posix_spawnattr_setsigmask(attr, &signals(&[])),
+                libc::posix_spawnattr_setsigdefault(attr, &signals(&[libc::SIGPIPE])),
+                libc::posix_spawn_file_actions_addchdir_np(actions, dir.as_ptr()),
+            ]
+        };
+        // SAFETY: as above; the descriptors are open for the calls.
+        let dups = (0..).zip(streams).map(|(target, stream)| unsafe {
+            libc::posix_spawn_file_actions_adddup2(actions, stream.as_raw_fd(), target)
+        });
+        calls.into_iter().chain(dups).try_for_each(check)
+    }
+
+    /// The set of `members`.
+    fn signals(members: &[libc::c_int]) -> libc::sigset_t {
+        let mut set = std::mem::MaybeUninit::<libc::sigset_t>::uninit();
+        // SAFETY: sigemptyset initializes the set, which sigaddset then fills.
         unsafe {
-            libc::sigemptyset(&mut default);
-            libc::sigaddset(&mut default, libc::SIGPIPE);
-            check(libc::posix_spawnattr_setflags(attr, FLAGS))?;
-            check(libc::posix_spawnattr_setsigdefault(attr, &default))?;
-            check(libc::posix_spawn_file_actions_addchdir_np(
-                actions,
-                dir.as_ptr(),
-            ))?;
-            for (target, stream) in (0..).zip(streams) {
-                check(libc::posix_spawn_file_actions_adddup2(
-                    actions,
-                    stream.as_raw_fd(),
-                    target,
-                ))?;
-            }
+            libc::sigemptyset(set.as_mut_ptr());
+            members
+                .iter()
+                .for_each(|m| _ = libc::sigaddset(set.as_mut_ptr(), *m));
+            set.assume_init()
         }
-        Ok(())
     }
 
     /// The strings as C strings; one with a NUL byte is an error.
