@@ -1,12 +1,18 @@
 //! The verification of the fixes the run may not write. They are checked over
 //! the state the rounds left, in groups whose edits do not overlap, each group
-//! by one check of the project; a group that is not accepted whole is halved,
-//! down to one fix, which is judged by itself. A fix is applied later by itself,
-//! so a group is accepted whole only when that cannot differ from its fixes
-//! taken one at a time: none of its files is edited by two of its fixes, or
-//! all of its fixes stand applied with no safe follow-up reported.
+//! by one check of the project. A fix is applied later by itself, so a group
+//! is accepted whole only when that cannot differ from its fixes taken one at
+//! a time: none of its files is edited by two of its fixes, or all of its
+//! fixes stand applied with no safe follow-up reported. A group that is not
+//! accepted whole says what it spoiled: the fixes that did not stand and those
+//! that edit a file with a follow-up. These are judged by themselves, one fix
+//! at a time, and the others, which the trial cannot have spoiled, are tried
+//! again as a group; a group that names no fix is halved.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+};
 
 use lighthouse_model::Fingerprint;
 
@@ -63,11 +69,51 @@ impl Orchestrator<'_> {
             self.withdraw_previews(trial, shown);
             return Ok(());
         }
+        let implicated = self.implicated(&trial, &group);
         self.rewind(trial, &wanted);
-        let mut first = group;
-        let second = first.split_off(first.len() / 2);
-        self.preview_group(outcome, first, shown)?;
-        self.preview_group(outcome, second, shown)
+        // What the trial spoiled is tried by itself; the rest, which it
+        // cannot have spoiled, once more as a group. Without a culprit the
+        // group is halved.
+        if implicated.is_empty() {
+            let mut first = group;
+            let second = first.split_off(first.len() / 2);
+            self.preview_group(outcome, first, shown)?;
+            return self.preview_group(outcome, second, shown);
+        }
+        let (alone, rest): (Vec<_>, Vec<_>) = group
+            .into_iter()
+            .partition(|p| implicated.contains(&p.fingerprint));
+        if !rest.is_empty() {
+            self.preview_group(outcome, rest, shown)?;
+        }
+        for p in alone {
+            self.preview_group(outcome, vec![p], shown)?;
+        }
+        Ok(())
+    }
+
+    /// The fixes of `group` the trial since `trial` spoiled: those that did not
+    /// stand, and those that edit a file a follow-up was reported in, which
+    /// belongs to no one of the fixes that edit it.
+    fn implicated(&self, trial: &Trial, group: &[Proposal]) -> BTreeSet<Fingerprint> {
+        let since = &self.applied[trial.applied..];
+        let standing: BTreeSet<&Fingerprint> = since
+            .iter()
+            .filter(|a| !a.follow_up)
+            .map(|a| &a.fingerprint)
+            .collect();
+        let followed: BTreeSet<&PathBuf> = since
+            .iter()
+            .filter(|a| a.follow_up)
+            .flat_map(|a| &a.files)
+            .collect();
+        group
+            .iter()
+            .filter(|p| {
+                !standing.contains(&p.fingerprint) || p.files.iter().any(|f| followed.contains(f))
+            })
+            .map(|p| p.fingerprint.clone())
+            .collect()
     }
 
     /// Withdraws the fixes applied since `trial` to previews, kept in `shown`
