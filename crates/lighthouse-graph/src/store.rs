@@ -1,24 +1,22 @@
-//! `graph.db`: a table of nodes, a table of the earlier states they retain and
-//! one row of meta, in WAL mode. A node row is read when the node is pulled or
-//! validated, its value apart from the rest; writes of a run go out in one
-//! transaction.
+//! `graph.db`: a table of nodes, a table of the earlier states they retain, the
+//! values of both by hash and one row of meta, in WAL mode. A node row is read
+//! when the node is pulled or validated, its value apart from the rest; writes
+//! of a run go out in one transaction. A value is stored once, whoever has it
+//! as current or retained, so retaining a state copies no bytes.
 
 use std::{collections::HashMap, fs, path::Path, sync::Mutex};
 
 use rusqlite::{Connection, ErrorCode, OptionalExtension, params};
 
 use crate::{
-    Durability, Error,
+    Durability, Error, blob,
     node::{Hash, Locked},
+    retained::{self, Changes},
 };
 
 /// Bumped whenever a table or what a value means changes: a database of
 /// another version is replaced.
-const SCHEMA: i64 = 6;
-
-/// Pruning goes down to this part of the limit, so that a run that is just
-/// over does not prune every time.
-const PRUNE_TO: f64 = 0.9;
+const SCHEMA: i64 = 7;
 
 const TABLES: &str = "
 CREATE TABLE node(
@@ -31,31 +29,26 @@ CREATE TABLE node(
     durability INTEGER NOT NULL,
     input INTEGER NOT NULL,
     used_at INTEGER NOT NULL,
-    value BLOB,
     PRIMARY KEY(kind, key)
 ) WITHOUT ROWID;
 CREATE INDEX node_verified ON node(verified_at);
+CREATE INDEX node_hash ON node(hash);
+CREATE TABLE blob(
+    hash BLOB NOT NULL UNIQUE,
+    value BLOB NOT NULL
+);
 CREATE TABLE retained(
     kind TEXT NOT NULL,
     key BLOB NOT NULL,
-    age INTEGER NOT NULL,
     hash BLOB NOT NULL,
     deps BLOB NOT NULL,
-    durability INTEGER NOT NULL,
-    value BLOB NOT NULL
+    durability INTEGER NOT NULL
 );
-CREATE UNIQUE INDEX retained_node ON retained(kind, key, age);
+CREATE INDEX retained_node ON retained(kind, key);
+CREATE INDEX retained_hash ON retained(hash);
 CREATE TRIGGER node_gone AFTER DELETE ON node BEGIN
     DELETE FROM retained WHERE kind = old.kind AND key = old.key;
 END;
-CREATE TRIGGER value_gone AFTER UPDATE OF value ON node WHEN new.value IS NULL BEGIN
-    DELETE FROM retained WHERE kind = old.kind AND key = old.key;
-END;
-CREATE VIEW sized AS
-    SELECT kind, key, durability, used_at,
-        length(value) + COALESCE((SELECT SUM(length(r.value)) FROM retained r
-            WHERE r.kind = node.kind AND r.key = node.key), 0) AS weight
-    FROM node WHERE value IS NOT NULL;
 CREATE TABLE meta(
     id INTEGER PRIMARY KEY CHECK(id = 0),
     revision INTEGER NOT NULL,
@@ -73,16 +66,16 @@ pub(crate) struct Write {
     pub row: Row,
     pub with_value: bool,
     pub value: Option<Vec<u8>>,
-    /// The node's retained states, newest first, when they changed.
-    pub traces: Option<Vec<TraceRow>>,
+    /// What changed in the node's retained states.
+    pub traces: Option<Changes>,
 }
 
-/// A retained state as stored.
-pub(crate) struct TraceRow {
+/// A retained state as stored, without its value.
+pub(crate) struct StoredTrace {
+    pub row: i64,
     pub hash: Hash,
     pub deps: Vec<u8>,
     pub durability: Durability,
-    pub value: Vec<u8>,
 }
 
 /// What is stored of a node apart from its value.
@@ -213,7 +206,7 @@ impl Store {
     fn scan(&self) -> Result<Rows, Error> {
         let conn = self.conn.locked();
         let mut statement = conn.prepare(
-            "SELECT kind, key, hash, deps, changed_at, verified_at, durability, input, used_at, value IS NOT NULL
+            "SELECT kind, key, hash, deps, changed_at, verified_at, durability, input, used_at, EXISTS(SELECT 1 FROM blob WHERE blob.hash = node.hash)
              FROM node",
         )?;
         let mut found = Rows::new();
@@ -238,34 +231,43 @@ impl Store {
     /// The stored value of a node.
     pub(crate) fn value(&self, kind: &str, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let conn = self.conn.locked();
-        let mut statement =
-            conn.prepare_cached("SELECT value FROM node WHERE kind = ?1 AND key = ?2")?;
-        let value = statement
+        let mut statement = conn.prepare_cached(
+            "SELECT value FROM blob WHERE hash = (SELECT hash FROM node WHERE kind = ?1 AND key = ?2)",
+        )?;
+        Ok(statement
             .query_row(params![kind, key], |row| row.get(0))
-            .optional()?;
-        Ok(value.flatten())
+            .optional()?)
     }
 
-    /// The retained states of a node, newest first.
-    pub(crate) fn traces(&self, kind: &str, key: &[u8]) -> Result<Vec<TraceRow>, Error> {
+    /// The retained states of a node, newest first, without their values.
+    pub(crate) fn traces(&self, kind: &str, key: &[u8]) -> Result<Vec<StoredTrace>, Error> {
         let conn = self.conn.locked();
         let mut statement = conn.prepare_cached(
-            "SELECT hash, deps, durability, value FROM retained WHERE kind = ?1 AND key = ?2 ORDER BY age",
+            "SELECT rowid, hash, deps, durability FROM retained WHERE kind = ?1 AND key = ?2 ORDER BY rowid DESC",
         )?;
         let mut cursor = statement.query(params![kind, key])?;
         let mut found = Vec::new();
         while let Some(row) = cursor.next()? {
-            let hash: Vec<u8> = row.get(0)?;
+            let hash: Vec<u8> = row.get(1)?;
             if let Ok(hash) = Hash::try_from(hash.as_slice()) {
-                found.push(TraceRow {
+                found.push(StoredTrace {
+                    row: row.get(0)?,
                     hash,
-                    deps: row.get(1)?,
-                    durability: Durability::from_index(row.get(2)?),
-                    value: row.get(3)?,
+                    deps: row.get(2)?,
+                    durability: Durability::from_index(row.get(3)?),
                 });
             }
         }
         Ok(found)
+    }
+
+    /// The value with this hash.
+    pub(crate) fn blob(&self, hash: &Hash) -> Result<Option<Vec<u8>>, Error> {
+        let conn = self.conn.locked();
+        let mut statement = conn.prepare_cached("SELECT value FROM blob WHERE hash = ?1")?;
+        Ok(statement
+            .query_row([hash.as_slice()], |row| row.get(0))
+            .optional()?)
     }
 
     /// Writes the nodes and the meta in one transaction, deletes the rows last
@@ -281,13 +283,20 @@ impl Store {
     ) -> Result<Vec<(String, Vec<u8>)>, Error> {
         let mut conn = self.conn.locked();
         let tx = conn.transaction()?;
-        writes.iter().try_for_each(|write| put(&tx, write))?;
-        tx.execute(
+        let mut old = Vec::new();
+        writes
+            .iter()
+            .try_for_each(|write| put(&tx, write, &mut old))?;
+        let aged = tx.execute(
             "DELETE FROM node WHERE verified_at < ?1",
             [forget_before as i64],
         )?;
         put_meta(&tx, meta)?;
-        let pruned = prune(&tx, limit)?;
+        blob::collect(&tx, &old)?;
+        if aged > 0 {
+            blob::collect_all(&tx)?;
+        }
+        let pruned = blob::prune(&tx, limit)?;
         tx.commit()?;
         Ok(pruned)
     }
@@ -311,14 +320,20 @@ fn read_row(row: &rusqlite::Row<'_>, at: usize) -> rusqlite::Result<Option<Row>>
     }))
 }
 
-fn put(tx: &rusqlite::Transaction<'_>, write: &Write) -> Result<(), Error> {
+/// Writes a node. The hashes of the values it stops having are added to `old`.
+fn put(tx: &rusqlite::Transaction<'_>, write: &Write, old: &mut Vec<Vec<u8>>) -> Result<(), Error> {
+    if let Some(changes) = &write.traces {
+        retained::put(tx, &write.kind, &write.key, changes, old)?;
+    }
+    if write.with_value {
+        old.extend(blob::put(tx, write)?);
+    }
     let row = &write.row;
-    let value = write.value.as_ref().filter(|_| write.with_value);
     tx.prepare_cached(
-        "INSERT INTO node(kind, key, hash, deps, changed_at, verified_at, durability, input, used_at, value)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        "INSERT INTO node(kind, key, hash, deps, changed_at, verified_at, durability, input, used_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT(kind, key) DO UPDATE SET hash = ?3, deps = ?4, changed_at = ?5, verified_at = ?6,
-             durability = ?7, input = ?8, used_at = ?9, value = CASE WHEN ?11 THEN ?10 ELSE value END",
+             durability = ?7, input = ?8, used_at = ?9",
     )?
     .execute(params![
         write.kind,
@@ -330,36 +345,7 @@ fn put(tx: &rusqlite::Transaction<'_>, write: &Write) -> Result<(), Error> {
         row.durability.index() as i64,
         row.input,
         row.used_at as i64,
-        value,
-        write.with_value,
     ])?;
-    write
-        .traces
-        .as_deref()
-        .map_or(Ok(()), |traces| put_traces(tx, write, traces))
-}
-
-fn put_traces(
-    tx: &rusqlite::Transaction<'_>,
-    write: &Write,
-    traces: &[TraceRow],
-) -> Result<(), Error> {
-    tx.prepare_cached("DELETE FROM retained WHERE kind = ?1 AND key = ?2")?
-        .execute(params![write.kind, write.key])?;
-    for (age, trace) in traces.iter().enumerate() {
-        tx.prepare_cached(
-            "INSERT INTO retained(kind, key, age, hash, deps, durability, value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        )?
-        .execute(params![
-            write.kind,
-            write.key,
-            age as i64,
-            trace.hash.as_slice(),
-            trace.deps,
-            trace.durability.index() as i64,
-            trace.value
-        ])?;
-    }
     Ok(())
 }
 
@@ -373,24 +359,4 @@ fn put_meta(tx: &rusqlite::Transaction<'_>, meta: &Meta) -> Result<(), Error> {
         params![meta.revision as i64, volatile, stable, fixed, meta.versions, meta.marks],
     )?;
     Ok(())
-}
-
-fn prune(tx: &rusqlite::Transaction<'_>, limit: u64) -> Result<Vec<(String, Vec<u8>)>, Error> {
-    let total: i64 = tx.query_row("SELECT COALESCE(SUM(weight), 0) FROM sized", [], |row| {
-        row.get(0)
-    })?;
-    if (total as u64) <= limit {
-        return Ok(Vec::new());
-    }
-    // Each value goes while what the ones before it freed is short of the excess.
-    let excess = total - (limit as f64 * PRUNE_TO) as i64;
-    let mut statement = tx.prepare(
-        "UPDATE node SET value = NULL WHERE (kind, key) IN (
-             SELECT kind, key FROM (
-                 SELECT kind, key, COALESCE(SUM(weight) OVER (ORDER BY durability, used_at
-                     ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed FROM sized)
-             WHERE freed < ?1) RETURNING kind, key",
-    )?;
-    let pruned = statement.query_map(params![excess], |row| Ok((row.get(0)?, row.get(1)?)))?;
-    Ok(pruned.collect::<Result<_, _>>()?)
 }

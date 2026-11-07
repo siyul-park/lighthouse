@@ -20,6 +20,7 @@
 //! implemented at the size needed: Mokhov, Mitchell and Peyton Jones, *Build
 //! Systems a la Carte* (ICFP 2018).
 
+mod blob;
 mod dirty;
 mod error;
 mod explain;
@@ -29,6 +30,7 @@ mod graph;
 mod node;
 mod pull;
 mod query;
+mod retained;
 mod revision;
 mod settle;
 mod shared;

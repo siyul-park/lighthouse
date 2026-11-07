@@ -11,9 +11,10 @@ use std::{
 use crate::{
     Durability, Error,
     dirty::Dirty,
-    node::{Dep, Hash, Locked, Node, NodeId, Slot, Trace},
+    node::{Bytes, Dep, Hash, Locked, Node, NodeId, Slot, Trace},
     query::{Kind, decode, encode, hash},
-    store::{Meta, Row, Store, TraceRow, Write},
+    retained::{Changes, TraceRow},
+    store::{Meta, Row, Store, Write},
 };
 
 /// How many nodes one task frees when the graph is dropped.
@@ -195,7 +196,7 @@ impl Shared {
                     hash: row.hash,
                     deps: self.deps_of(&row.deps)?,
                     durability: row.durability,
-                    blob: row.value.into(),
+                    bytes: Bytes::Stored(row.row),
                 })
             })
             .collect();
@@ -203,17 +204,21 @@ impl Shared {
         Ok(())
     }
 
+    /// The bytes of a retained state, if they are what its hash says.
+    pub(crate) fn trace_bytes(&self, trace: &Trace) -> Result<Option<Arc<[u8]>>, Error> {
+        let bytes = match &trace.bytes {
+            Bytes::Memory(blob) => return Ok(Some(blob.clone())),
+            Bytes::Disk | Bytes::Stored(_) => self.store.blob(&trace.hash)?,
+        };
+        Ok(bytes
+            .filter(|bytes| hash(bytes) == trace.hash)
+            .map(Into::into))
+    }
+
     /// Makes the current state of a node a retained one, before it is
-    /// replaced: its bytes are read from the store if the process has not got
-    /// them.
+    /// replaced.
     pub(crate) fn retain(&self, node: &mut Node, id: &NodeId) -> Result<(), Error> {
         self.load_traces(node, id)?;
-        if node.blob.is_none() && node.on_disk {
-            let bytes = self.store.value(&id.kind, &id.key)?;
-            node.blob = bytes
-                .filter(|bytes| hash(bytes) == node.hash)
-                .map(Into::into);
-        }
         node.retain();
         Ok(())
     }
@@ -378,6 +383,7 @@ pub(crate) fn drop_value(node: &mut Node) {
     node.blob = None;
     node.on_disk = false;
     node.traces.clear();
+    node.traces_lost.clear();
     node.traces_stored = false;
     node.traces_dirty = false;
 }
@@ -411,17 +417,7 @@ pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
         row,
         with_value: node.value_dirty,
         value,
-        traces: node.traces_dirty.then(|| {
-            node.traces
-                .iter()
-                .map(|trace| TraceRow {
-                    hash: trace.hash,
-                    deps: deps_blob(&trace.deps),
-                    durability: trace.durability,
-                    value: trace.blob.to_vec(),
-                })
-                .collect()
-        }),
+        traces: node.traces_dirty.then(|| changes_of(&node)),
     }
 }
 
@@ -432,9 +428,37 @@ pub(crate) fn settle_clean(slot: &Arc<Slot>) {
     }
     node.dirty = false;
     node.value_dirty = false;
-    node.traces_dirty = false;
+    if node.traces_dirty {
+        // The store has them now; they are read again when needed.
+        node.traces.clear();
+        node.traces_lost.clear();
+        node.traces_stored = true;
+        node.traces_dirty = false;
+    }
     node.stored_verified_at = node.verified_at;
     node.synced_used_at = node.used_at;
+}
+
+/// What a commit does to the stored states of the node: the new ones are
+/// added, the lost ones go.
+fn changes_of(node: &Node) -> Changes {
+    let added = node.traces.iter().rev().filter_map(|trace| {
+        let value = match &trace.bytes {
+            Bytes::Memory(blob) => Some(blob.to_vec()),
+            Bytes::Disk => None,
+            Bytes::Stored(_) => return None,
+        };
+        Some(TraceRow {
+            hash: trace.hash,
+            deps: deps_blob(&trace.deps),
+            durability: trace.durability,
+            value,
+        })
+    });
+    Changes {
+        added: added.collect(),
+        lost: node.traces_lost.clone(),
+    }
 }
 
 fn deps_blob(deps: &[Dep]) -> Vec<u8> {

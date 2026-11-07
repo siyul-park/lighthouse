@@ -89,13 +89,16 @@ impl Graph {
             node.traces.clone()
         };
         for trace in traces {
-            let Some(value) = kind.decode(&trace.blob) else {
-                continue;
-            };
             match self.moved(&trace.deps, kind) {
                 Ok(None) => {
+                    let Some(blob) = self.shared.trace_bytes(&trace)? else {
+                        continue;
+                    };
+                    let Some(value) = kind.decode(&blob) else {
+                        continue;
+                    };
                     let expected = trace.hash;
-                    self.take(slot, trace, value)?;
+                    self.take(slot, trace, blob, value)?;
                     self.audit(slot, kind, expected)?;
                     return Ok(true);
                 }
@@ -111,6 +114,7 @@ impl Graph {
         &self,
         slot: &Arc<Slot>,
         trace: Trace,
+        blob: Arc<[u8]>,
         value: Arc<dyn Any + Send + Sync>,
     ) -> Result<(), Error> {
         let revision = self.shared.revision.load(Ordering::Acquire);
@@ -126,7 +130,7 @@ impl Graph {
         node.durability = trace.durability;
         node.verified_at = revision;
         node.value = Some(value);
-        node.blob = Some(trace.blob);
+        node.blob = Some(blob);
         node.value_dirty = !(same && node.on_disk);
         node.cause = Cause::Retained;
         node.used_at = now();

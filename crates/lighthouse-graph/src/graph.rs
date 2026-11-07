@@ -332,11 +332,12 @@ impl Graph {
         let mut node = slot.node.locked();
         self.shared.load(&mut node, &id)?;
         self.shared.load_traces(&mut node, &id)?;
-        Ok(node
-            .traces
-            .iter()
-            .filter_map(|trace| decode::<V>(&trace.blob).ok().map(Arc::new))
-            .collect())
+        let mut values = Vec::new();
+        for trace in &node.traces {
+            let bytes = self.shared.trace_bytes(trace)?;
+            values.extend(bytes.and_then(|bytes| decode::<V>(&bytes).ok().map(Arc::new)));
+        }
+        Ok(values)
     }
 
     pub(crate) fn hash_of<K: Key, V: Value>(
