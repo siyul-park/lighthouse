@@ -37,6 +37,7 @@ impl Engine {
             active: self.active.iter().cloned().collect(),
             ..Run::default()
         };
+        run.keyed.clone_from(&run.incomplete);
         let cache = self.open_cache().and_then(|opened| {
             opened
                 .map_err(|e| {
@@ -115,9 +116,9 @@ impl Engine {
         run.incomplete.sort();
         run.incomplete.dedup();
         run.reported = scopes.0.clone();
-        // A run with a gap is not the report of the project: the next one tries
-        // again.
-        if let Some(reporting) = reporting.as_ref().filter(|_| run.incomplete.is_empty()) {
+        // A run with a gap its key does not decide is not the report of the
+        // project: the next one tries again.
+        if let Some(reporting) = reporting.as_ref().filter(|_| !run.has_unkeyed_gap()) {
             self.remember(graph, reporting, reads, &run);
         }
         let started = Instant::now();

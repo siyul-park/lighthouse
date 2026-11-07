@@ -13,7 +13,7 @@ use std::{
 
 use lighthouse_engine::{Engine, Run};
 use lighthouse_model::{
-    Diagnostic, Fingerprint, Options, Position, RunScope, Severity, Span,
+    Diagnostic, Fingerprint, Incomplete, Options, Position, RunScope, Severity, Span,
     ucm::{Applicability, Fragment},
 };
 use lighthouse_plugin::{
@@ -28,6 +28,7 @@ const CONFIG: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/local\" = \"
 struct Files(
     LanguageManifest,
     Arc<AtomicUsize>,
+    Arc<AtomicBool>,
     Arc<AtomicBool>,
     Arc<AtomicBool>,
 );
@@ -50,7 +51,7 @@ impl LanguageProvider for Files {
                     } else {
                         unit.files
                     };
-                    Fragments::new(
+                    let mut answer = Fragments::new(
                         unit.id,
                         files
                             .iter()
@@ -59,7 +60,15 @@ impl LanguageProvider for Files {
                                 ..Fragment::default()
                             })
                             .collect(),
-                    )
+                    );
+                    if self.4.load(Ordering::SeqCst) {
+                        answer.incomplete.push(Incomplete {
+                            path: Some(unit.id.into()),
+                            provider: None,
+                            reason: "cannot be loaded".to_owned(),
+                        });
+                    }
+                    answer
                 })
                 .collect(),
             ..Indexed::default()
@@ -117,6 +126,8 @@ pub(crate) struct Counted {
     down: Arc<AtomicBool>,
     /// Whether the provider answers with no fragment.
     mute: Arc<AtomicBool>,
+    /// Whether the provider says of every file that it cannot be loaded.
+    gapped: Arc<AtomicBool>,
 }
 
 struct CountingPlugin {
@@ -134,6 +145,7 @@ impl Plugin for CountingPlugin {
             Arc::clone(&self.counted.indexed),
             Arc::clone(&self.counted.down),
             Arc::clone(&self.counted.mute),
+            Arc::clone(&self.counted.gapped),
         ))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
@@ -179,6 +191,7 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
         indexed: Arc::default(),
         down: Arc::default(),
         mute: Arc::default(),
+        gapped: Arc::default(),
     };
     let mut registry = Registry::default();
     registry
@@ -194,6 +207,7 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
                 indexed: Arc::clone(&counted.indexed),
                 down: Arc::clone(&counted.down),
                 mute: Arc::clone(&counted.mute),
+                gapped: Arc::clone(&counted.gapped),
             },
         })
         .unwrap();
@@ -529,6 +543,34 @@ fn a_file_the_model_does_not_state_is_a_gap_and_the_run_is_not_the_report() {
     let (again, _) = engine(dir.path());
     let again = again.with_cache(kept, u64::MAX).check(&[], &[]).unwrap();
     assert_eq!(again.incomplete, mute.incomplete);
+}
+
+#[test]
+fn a_gap_the_provider_gives_in_its_answer_is_kept_with_the_report() {
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let cached = || {
+        let (engine, counted) = engine(dir.path());
+        counted.gapped.store(true, Ordering::SeqCst);
+        (engine.with_cache(kept.clone(), u64::MAX), counted)
+    };
+
+    let (first, _) = cached();
+    let first = first.check(&[], &[]).unwrap();
+    assert_eq!(first.incomplete.len(), 2, "{:?}", first.incomplete);
+    let (second, counted) = cached();
+    let second = second.check(&[], &[]).unwrap();
+
+    assert_eq!(runs(&counted), (0, 0), "answered from the report");
+    assert_eq!(counted.indexed.load(Ordering::SeqCst), 0);
+    assert_eq!(found(&second), found(&first));
+    assert_eq!(second.incomplete, first.incomplete);
+    let (plain, counted) = engine(dir.path());
+    counted.gapped.store(true, Ordering::SeqCst);
+    let plain = plain.check(&[], &[]).unwrap();
+    assert_eq!(found(&second), found(&plain));
+    assert_eq!(second.incomplete, plain.incomplete);
 }
 
 #[test]

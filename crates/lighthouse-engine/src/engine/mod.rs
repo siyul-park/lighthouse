@@ -109,6 +109,10 @@ pub struct Run {
     /// requested paths outside the root are incomplete. A non-UTF-8 file
     /// claimed only by a fallback provider (binary data) is a notice.
     pub incomplete: Vec<Incomplete>,
+    /// The gaps of `incomplete` that the key of the run decides: those of the
+    /// startup and those a clean answer of a unit gave. Any other gap (a crash,
+    /// a timeout, a file the model does not state) is not a function of the key.
+    pub keyed: Vec<Incomplete>,
     /// The report scope: project-relative paths (a file, or a directory
     /// prefix) whose findings `diagnostics` holds. The empty path is the
     /// whole project; no entries means nothing was in scope.
@@ -153,6 +157,11 @@ pub struct Run {
 }
 
 impl Run {
+    /// Whether a gap is one that another run of the same key may not have.
+    pub(crate) fn has_unkeyed_gap(&self) -> bool {
+        self.incomplete.iter().any(|gap| !self.keyed.contains(gap))
+    }
+
     /// The findings of error or warn severity.
     pub(crate) fn loud(&self) -> impl Iterator<Item = &Diagnostic> {
         let loud = |d: &&Diagnostic| matches!(d.severity, Severity::Error | Severity::Warn);

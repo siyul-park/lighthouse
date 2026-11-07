@@ -58,6 +58,8 @@ struct Taken {
     sources: Vec<lighthouse_protocol::Source>,
     notices: Vec<String>,
     incomplete: Vec<Incomplete>,
+    /// The gaps of the clean answers, which the key of their unit decides.
+    keyed: Vec<Incomplete>,
 }
 
 impl Engine {
@@ -203,6 +205,11 @@ impl Engine {
         for lane in &lanes {
             let taken = self.fetch(graph, lane);
             run.notices.extend(taken.notices);
+            run.keyed
+                .extend(taken.keyed.into_iter().map(|gap| Incomplete {
+                    provider: Some(lane.id.clone()),
+                    ..gap
+                }));
             run.incomplete
                 .extend(taken.incomplete.into_iter().map(|gap| Incomplete {
                     provider: Some(lane.id.clone()),
@@ -246,6 +253,10 @@ impl Engine {
                 hasher.update(&stored.api);
                 hasher.update(&stored.payload);
                 hasher.update([u8::from(stored.clean)]);
+                for (path, reason) in &stored.gaps {
+                    hasher.update(path.as_deref().map_or("", |p| p.to_str().unwrap_or("")));
+                    hasher.update(reason);
+                }
                 for read in &stored.reads {
                     hasher.update(&read.path);
                     hasher.update(&read.hash);
@@ -561,13 +572,15 @@ impl Engine {
                 continue;
             }
             taken.notices.extend(stored.notices.iter().cloned());
-            taken
-                .incomplete
-                .extend(stored.gaps.iter().map(|(path, reason)| Incomplete {
-                    path: path.clone(),
-                    provider: None,
-                    reason: reason.clone(),
-                }));
+            let gaps = stored.gaps.iter().map(|(path, reason)| Incomplete {
+                path: path.clone(),
+                provider: None,
+                reason: reason.clone(),
+            });
+            taken.incomplete.extend(gaps.clone());
+            if stored.clean {
+                taken.keyed.extend(gaps);
+            }
             if stored.sources {
                 let payload = graph.input(&PAYLOAD, &lane.at(id));
                 if let Ok(Some(payload)) = payload
