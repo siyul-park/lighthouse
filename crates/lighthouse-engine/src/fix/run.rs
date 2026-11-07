@@ -3,6 +3,7 @@ mod chain;
 mod cycle;
 mod displaced;
 mod incomplete;
+mod reads;
 mod rollback;
 mod settle;
 mod withheld;
@@ -82,7 +83,7 @@ impl Orchestrator<'_> {
         let (proposals, mut declined) = proposed?;
         let (proposals, refused): (Vec<_>, Vec<_>) = proposals
             .into_iter()
-            .map(|p| (incomplete::refusal(outcome), p))
+            .map(|p| (incomplete::refusal(self.proposer.engine, outcome, &p), p))
             .partition(|(why, _)| why.is_none());
         for (why, p) in refused {
             declined.insert(

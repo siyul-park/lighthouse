@@ -17,7 +17,7 @@ use crate::{
     timings::Timings,
 };
 use ignore::gitignore::Gitignore;
-use lighthouse_graph::{Error as GraphError, Graph};
+use lighthouse_graph::{Error as GraphError, Graph, Revision};
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Options, Severity, Suppressed,
@@ -146,6 +146,10 @@ pub struct Run {
     pub read: BTreeMap<PathBuf, String>,
     /// Where the time of the run went.
     pub timings: Timings,
+    /// The revision the graph was at when the project of the run was read: a
+    /// node that changed after an earlier run's and by this one's moved
+    /// between the two.
+    pub revision: Revision,
 }
 
 impl Run {

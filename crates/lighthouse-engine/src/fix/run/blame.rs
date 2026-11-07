@@ -1,10 +1,11 @@
 //! Whom a finding that is new in a file a round did not change is charged to.
 //! A fix is judged by what it leaves in the project, but not everything that
-//! turns up in the project is its doing: a rule that reads one file alone
-//! (`local`) cannot have been moved by a change elsewhere, one that reads the
-//! symbols around its subject (`neighbors`) by a change in the files that hold
-//! them, and only a rule that reads the whole project (`global`, or one that
-//! declares nothing) by any change of the round.
+//! turns up in the project is its doing: a finding is charged to the changed
+//! files that its node in the graph read and that moved between the two
+//! checks. A rule that reads one file alone cannot have been moved by a change
+//! elsewhere; one that reads the symbols of the project is moved by the files
+//! whose symbols changed; one the graph holds no reads of, or whose reads no
+//! file explains, by any change of the round.
 
 use std::{
     cell::OnceCell,
@@ -12,12 +13,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::super::model::reach;
-use crate::Outcome;
+use super::{super::model::reach, reads};
+use crate::{Engine, Outcome};
 
 /// The charges for what the check `after` found more of than the check
 /// `before`, when the files `changed` were changed between them.
 pub(super) struct Blame<'a> {
+    engine: &'a Engine,
     before: &'a Outcome,
     after: &'a Outcome,
     changed: &'a [PathBuf],
@@ -26,8 +28,13 @@ pub(super) struct Blame<'a> {
 }
 
 impl<'a> Blame<'a> {
-    pub(super) fn new((before, after): (&'a Outcome, &'a Outcome), changed: &'a [PathBuf]) -> Self {
+    pub(super) fn new(
+        engine: &'a Engine,
+        (before, after): (&'a Outcome, &'a Outcome),
+        changed: &'a [PathBuf],
+    ) -> Self {
         Self {
+            engine,
             before,
             after,
             changed,
@@ -65,9 +72,13 @@ impl<'a> Blame<'a> {
     }
 
     /// The changed files a new finding of `rule` in the unchanged `file` is
-    /// charged to: all of them, until the findings say what they read.
-    pub(super) fn charged(&self, _file: &Path, _rule: &str) -> Vec<&'a PathBuf> {
-        self.changed.iter().collect()
+    /// charged to: those that its rule read and that moved between the checks.
+    pub(super) fn charged(&self, file: &Path, rule: &str) -> Vec<&'a PathBuf> {
+        let moved = (self.before.revision, self.after.revision);
+        match reads::files(self.engine, (rule, file), Some(moved)) {
+            Some(read) => self.changed.iter().filter(|c| read.contains(*c)).collect(),
+            None => self.changed.iter().collect(),
+        }
     }
 
     /// The changed files that have an edge to or from `file`, in either state.

@@ -186,7 +186,8 @@ impl Orchestrator<'_> {
             before.diagnostics.iter().map(|d| &d.fingerprint).collect();
         let mut seen = BTreeSet::from([self.state_hash()]);
         for _ in 0..PASSES {
-            let dependents = Blame::new((before, &after), &scope).dependents();
+            let dependents =
+                Blame::new(self.proposer.engine, (before, &after), &scope).dependents();
             let mut taken = scope.clone();
             taken.extend(dependents.keys().cloned());
             let introduced: BTreeSet<Fingerprint> = after
@@ -233,7 +234,7 @@ impl Orchestrator<'_> {
             // What this pass edited is judged like the changed files.
             let mut judged = scope.clone();
             judged.extend(prior.iter().map(|(file, _)| file.clone()));
-            let mut bad = worse(&Blame::new((&after, &next), &judged));
+            let mut bad = worse(&Blame::new(self.proposer.engine, (&after, &next), &judged));
             if !bad.is_empty() && !seen.contains(&self.state_hash()) {
                 let undone = self.undo_files(&mut prior, close_over(&kept, &dependents, bad));
                 made.retain(|f| {
@@ -245,7 +246,7 @@ impl Orchestrator<'_> {
                 bad = undone;
                 if !prior.is_empty() && !seen.contains(&self.state_hash()) {
                     next = self.recheck()?;
-                    bad = worse(&Blame::new((&after, &next), &judged));
+                    bad = worse(&Blame::new(self.proposer.engine, (&after, &next), &judged));
                 }
             }
             if bad.is_empty() && seen.insert(self.state_hash()) {

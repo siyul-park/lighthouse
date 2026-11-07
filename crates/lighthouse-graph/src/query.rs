@@ -126,6 +126,11 @@ impl<K, V> Input<K, V> {
 }
 
 impl<K: Key, V: Value> Input<K, V> {
+    /// The name the kind goes by in the graph.
+    pub const fn name(&self) -> &'static str {
+        self.name
+    }
+
     /// The values a persisted input had before its current one, newest first:
     /// at most [`RETAINED`](crate::RETAINED) of them, the store's as well. A
     /// value stays until it is set again or older ones push it out.
@@ -230,6 +235,11 @@ impl<K, V> Query<K, V> {
 }
 
 impl<K: Key, V: Value> Query<K, V> {
+    /// The name the kind goes by in the graph.
+    pub const fn name(&self) -> &'static str {
+        self.name
+    }
+
     /// The hash of the value for a key, validated like a pull but without
     /// loading the value: what a key built from the graph is made of.
     /// Recorded as read, so the reader runs again when the hash moves.

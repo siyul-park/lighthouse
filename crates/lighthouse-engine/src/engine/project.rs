@@ -86,11 +86,14 @@ impl Engine {
     }
 
     /// The run with the project it read.
-    pub(super) fn outcome(&self, run: Run) -> Result<Outcome, Error> {
-        Ok(Outcome {
-            run,
-            project: self.project()?,
-        })
+    pub(super) fn outcome(&self, mut run: Run) -> Result<Outcome, Error> {
+        let project = self.project()?;
+        run.revision = self
+            .lock_graph()
+            .as_ref()
+            .map(Graph::revision)
+            .unwrap_or_default();
+        Ok(Outcome { run, project })
     }
 
     /// Says what the host knows of each file, and which files there are.

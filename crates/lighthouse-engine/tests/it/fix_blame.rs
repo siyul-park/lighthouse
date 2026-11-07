@@ -1,6 +1,5 @@
 //! Whom a finding that turns up in a file the round did not change is charged
-//! to: by the reach of its rule, nobody, the changed files it has an edge to,
-//! or all of them.
+//! to: the changed files its rule read, the whole project or a file of it.
 
 use std::{fs, path::Path};
 
@@ -17,18 +16,39 @@ use lighthouse_spec::Config;
 
 use crate::support::*;
 
-/// Reports an error in `ghost.toy` for as long as `a.toy` declares `fn z`: a
-/// finding that appears in a file nobody edited, at the `BOO` it holds if it
-/// does.
+/// What a rule reads of the model to know whether `fn z` is declared.
+#[derive(Clone, Copy)]
+enum Reads {
+    /// The symbols of `a.toy`.
+    File,
+    /// The symbols of the project.
+    Project,
+}
+
+impl Reads {
+    fn declared(self, ctx: &Context) -> bool {
+        match self {
+            Self::File => ctx
+                .model
+                .symbols_in(Path::new("a.toy"))
+                .any(|symbol| symbol.name == "z"),
+            Self::Project => ctx.model.symbols().any(|symbol| symbol.name == "z"),
+        }
+    }
+}
+
+/// Reports an error in `ghost.toy` for as long as `fn z` is declared: a finding
+/// that appears in a file nobody edited, at the `BOO` it holds if it does.
 struct Ghost {
     manifest: RuleManifest,
+    reads: Reads,
 }
 
 impl Ghost {
-    fn new() -> Self {
+    fn new(reads: Reads) -> Self {
         let mut manifest = Word::new("fake/ghost", "GHOST").manifest().clone();
         manifest.revision = Some("0".to_owned());
-        Self { manifest }
+        Self { manifest, reads }
     }
 }
 
@@ -45,10 +65,7 @@ impl Rule for Ghost {
         let (file, text) = ctx
             .file
             .ok_or_else(|| PluginError::Failed("no file".into()))?;
-        let declared = ctx
-            .model
-            .symbols_in(Path::new("a.toy"))
-            .any(|symbol| symbol.name == "z");
+        let declared = self.reads.declared(ctx);
         if file.path != Path::new("ghost.toy") || !declared || !text.contains("BOO") {
             return Ok(Vec::new());
         }
@@ -69,10 +86,11 @@ impl Rule for Ghost {
     }
 }
 
-/// Cannot judge `ghost.toy` for as long as `a.toy` declares `fn z`: a gap that
+/// Cannot judge `ghost.toy` for as long as `fn z` is declared: a gap that
 /// appears in a file nobody edited.
 struct Murk {
     manifest: RuleManifest,
+    reads: Reads,
 }
 
 impl Rule for Murk {
@@ -88,10 +106,7 @@ impl Rule for Murk {
         let (file, _) = ctx
             .file
             .ok_or_else(|| PluginError::Failed("no file".into()))?;
-        let declared = ctx
-            .model
-            .symbols_in(Path::new("a.toy"))
-            .any(|symbol| symbol.name == "z");
+        let declared = self.reads.declared(ctx);
         if file.path == Path::new("ghost.toy") && declared {
             return Err(PluginError::Incomplete("the file is murky".to_owned()));
         }
@@ -99,9 +114,39 @@ impl Rule for Murk {
     }
 }
 
+/// Declares `z` in `a.toy` and `y` in the other files, so that what a file
+/// declares is its own.
+struct Declaring(FixerManifest);
+
+impl Fixer for Declaring {
+    fn manifest(&self) -> &FixerManifest {
+        &self.0
+    }
+
+    fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
+        let declared = if request.finding.file == Path::new("a.toy") {
+            "fn z"
+        } else {
+            "fn y"
+        };
+        Ok(FixOutcome::Proposed {
+            description: "declare".to_owned(),
+            ops: vec![EditOp::Replace {
+                file: request.finding.file.clone(),
+                span: request.finding.span,
+                text: declared.to_owned(),
+            }],
+            safety: Safety::Safe,
+        })
+    }
+}
+
 /// The toy plugin with the rule above, and a fix that declares `z`; with `murky`,
 /// the rule leaves a gap in `ghost.toy` instead of a finding.
-struct Haunted(bool);
+struct Haunted {
+    murky: bool,
+    reads: Reads,
+}
 
 impl Plugin for Haunted {
     fn manifest(&self) -> &PluginManifest {
@@ -113,12 +158,13 @@ impl Plugin for Haunted {
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        let ghost: Box<dyn Rule> = if self.0 {
+        let reads = self.reads;
+        let ghost: Box<dyn Rule> = if self.murky {
             let mut manifest = Word::new("fake/ghost", "GHOST").manifest().clone();
             manifest.revision = Some("0".to_owned());
-            Box::new(Murk { manifest })
+            Box::new(Murk { manifest, reads })
         } else {
-            Box::new(Ghost::new())
+            Box::new(Ghost::new(reads))
         };
         vec![
             Box::new(Word::new("fake/todo", "TODO")),
@@ -132,6 +178,10 @@ impl Plugin for Haunted {
             Box::new(rewrite("fake/declare", "fn z", Safety::Safe, &[])),
             Box::new(rewrite("fake/declare-bad", "fn z BAD", Safety::Safe, &[])),
             Box::new(rewrite("fake/exorcise", "", Safety::Safe, &[])),
+            Box::new(Declaring(FixerManifest {
+                id: "fake/declare-own".to_owned(),
+                requires: Vec::new(),
+            })),
         ]
     }
 }
@@ -149,10 +199,24 @@ fn ghosted(
     ghost: &str,
     (repair, murky): (bool, bool),
 ) -> (tempfile::TempDir, FixReport) {
+    haunting(fixer, ghost, (repair, murky), (Reads::File, &[]))
+}
+
+/// The same, over what `reads` of the model the rule reads and the files
+/// `also`, which hold a `TODO` that the fixer replaces too.
+fn haunting(
+    fixer: &str,
+    ghost: &str,
+    (repair, murky): (bool, bool),
+    (reads, also): (Reads, &[&str]),
+) -> (tempfile::TempDir, FixReport) {
     let dir = project("fn a\nTODO\n");
     fs::write(dir.path().join("ghost.toy"), ghost).unwrap();
+    for name in also {
+        fs::write(dir.path().join(name), "fn b\nTODO\n").unwrap();
+    }
     let mut registry = Registry::default();
-    registry.register(&Haunted(murky)).unwrap();
+    registry.register(&Haunted { murky, reads }).unwrap();
     let config = Config::parse_inline(
         "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/bad\" = \"error\"\n\"fake/ghost\" = \"error\"\n",
     )
@@ -200,7 +264,7 @@ fn is_kept(dir: &tempfile::TempDir) -> bool {
 }
 
 #[test]
-fn a_global_finding_that_turns_up_in_an_unchanged_file_charges_the_changed_files() {
+fn a_finding_that_turns_up_in_an_unchanged_file_charges_the_changed_file_its_rule_read() {
     let (dir, report) = haunted(false);
 
     assert!(!is_kept(&dir));
@@ -209,6 +273,42 @@ fn a_global_finding_that_turns_up_in_an_unchanged_file_charges_the_changed_files
         "{:?}",
         report.notes
     );
+}
+
+#[test]
+fn a_finding_is_charged_to_the_changed_files_its_rule_read_and_to_no_other() {
+    let (dir, report) = haunting(
+        "fake/declare-own",
+        "fn g\nBOO\n",
+        (false, false),
+        (Reads::File, &["b.toy"]),
+    );
+
+    assert!(!is_kept(&dir), "{:?}", report.notes);
+    assert_eq!(read(&dir, "b.toy"), "fn b\nfn y\n", "{:?}", report.notes);
+}
+
+#[test]
+fn a_finding_of_a_rule_that_reads_the_project_is_charged_to_all_the_changed_files() {
+    let (dir, report) = haunting(
+        "fake/declare-own",
+        "fn g\nBOO\n",
+        (false, false),
+        (Reads::Project, &["b.toy"]),
+    );
+
+    assert!(!is_kept(&dir), "{:?}", report.notes);
+    assert_eq!(read(&dir, "b.toy"), "fn b\nTODO\n", "{:?}", report.notes);
+}
+
+#[test]
+fn a_gap_that_turns_up_in_an_unchanged_file_charges_only_the_files_that_reach_it() {
+    let far = ghosted("fake/declare", "fn g\nBOO\n", (false, true));
+    let near = ghosted("fake/declare", "fn g\ncall z\nBOO\n", (false, true));
+
+    assert!(is_kept(&far.0), "{:?}", far.1.notes);
+    assert!(!is_kept(&near.0));
+    assert!(near.1.notes[0].contains("murky"), "{:?}", near.1.notes);
 }
 
 #[test]
