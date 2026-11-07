@@ -158,7 +158,7 @@ fn a_named_fixer_needs_the_rules_or_fingerprints_it_is_for() {
 }
 
 #[test]
-fn an_unsafe_fix_is_asked_for_in_every_run_to_be_shown() {
+fn an_unsafe_fix_is_asked_for_once_while_the_code_stands() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static ASKED: AtomicUsize = AtomicUsize::new(0);
     struct Counting(FixerManifest);
@@ -238,7 +238,99 @@ fn an_unsafe_fix_is_asked_for_in_every_run_to_be_shown() {
         ..FixRun::default()
     };
     engine.fix(&plan, &run).unwrap();
-    assert_eq!(ASKED.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        ASKED.load(Ordering::SeqCst),
+        1,
+        "the fix of the same finding over the same code is not asked for again"
+    );
+}
+
+#[test]
+fn a_change_to_one_file_asks_for_the_fixes_of_that_file_alone_and_an_undo_asks_for_none() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static ASKED: AtomicUsize = AtomicUsize::new(0);
+    struct Counting(FixerManifest);
+    impl Fixer for Counting {
+        fn manifest(&self) -> &FixerManifest {
+            &self.0
+        }
+        fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
+            ASKED.fetch_add(1, Ordering::SeqCst);
+            Ok(FixOutcome::declined(request.text.len().to_string()))
+        }
+    }
+    struct Counted(PluginManifest, FixerManifest);
+    impl Plugin for Counted {
+        fn manifest(&self) -> &PluginManifest {
+            &self.0
+        }
+        fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+            vec![Box::new(Toy(toy()))]
+        }
+        fn rules(&self) -> Vec<Box<dyn Rule>> {
+            vec![Box::new(Word::new("count/todo", "TODO"))]
+        }
+        fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+            vec![Box::new(Counting(self.1.clone()))]
+        }
+    }
+    let dir = project("TODO\n");
+    let other = dir.path().join("b.toy");
+    fs::write(&other, "TODO\n").unwrap();
+    let mut registry = Registry::default();
+    registry
+        .register(&Counted(
+            PluginManifest {
+                id: "count".to_owned(),
+                version: "0".to_owned(),
+            },
+            FixerManifest {
+                id: "count/count".to_owned(),
+                requires: Vec::new(),
+            },
+        ))
+        .unwrap();
+    let config =
+        Config::parse_inline("plugins = [\"count\"]\n[rules]\n\"count/todo\" = \"error\"\n")
+            .unwrap();
+    let engine = Engine::new(
+        registry,
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
+    let mut plan = FixPlan::default();
+    plan.insert(
+        "count/todo",
+        FixBinding {
+            fixer: FixedBy::Fixer("count/count".to_owned()),
+            cap: Safety::Safe,
+            languages: Vec::new(),
+            decision: FixDecision {
+                id: "count/todo".to_owned(),
+                requirement: String::new(),
+                context: String::new(),
+            },
+            needs: Needs::Nothing,
+        },
+    );
+    let asked = || ASKED.load(Ordering::SeqCst);
+
+    engine.fix(&plan, &FixRun::default()).unwrap();
+    assert_eq!(asked(), 2, "one fix for each file");
+
+    fs::write(&other, "TODO\nand more\n").unwrap();
+    engine.fix(&plan, &FixRun::default()).unwrap();
+    assert_eq!(
+        asked(),
+        3,
+        "the file that changed is asked again, not the other"
+    );
+
+    fs::write(&other, "TODO\n").unwrap();
+    engine.fix(&plan, &FixRun::default()).unwrap();
+    assert_eq!(asked(), 3, "the text is as it was: nothing is asked");
 }
 
 #[test]

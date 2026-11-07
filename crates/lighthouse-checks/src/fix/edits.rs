@@ -2,12 +2,11 @@
 //! constructors are the whole vocabulary, and what each means over the code
 //! model is decided here, never in a decision.
 
-use lighthouse_model::ucm::Model;
 use std::path::{Path, PathBuf};
 
 use lighthouse_model::{
     Position, Span, eol_of,
-    ucm::{Anchor, EditOp, Node, Owner, Project, SymbolId},
+    ucm::{Anchor, EditOp, Model, Node, Owner, SymbolId},
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -71,7 +70,7 @@ enum Edit {
 
 /// What the lowering reads: the project, the file of the finding and its text.
 pub(crate) struct Place<'a> {
-    pub project: &'a Project,
+    pub project: &'a dyn Model,
     pub file: &'a Path,
     pub text: &'a str,
 }

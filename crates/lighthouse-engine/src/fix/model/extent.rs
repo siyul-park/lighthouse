@@ -3,7 +3,7 @@
 //! innermost one around it, else a small file as a whole.
 
 use lighthouse_model::ucm::Model;
-use lighthouse_model::{Diagnostic, LineIndex, Position, Span, ucm::Project};
+use lighthouse_model::{Diagnostic, LineIndex, Position, Span};
 
 /// A file with this many lines or more has no extent without a symbol.
 const WHOLE_FILE_LINES: usize = 400;
@@ -11,7 +11,7 @@ const WHOLE_FILE_LINES: usize = 400;
 /// The span of the extent of `finding` in `text`, the text of its file; or
 /// why there is none.
 pub(in crate::fix) fn choose(
-    project: &Project,
+    project: &dyn Model,
     finding: &Diagnostic,
     text: &str,
 ) -> Result<Span, String> {

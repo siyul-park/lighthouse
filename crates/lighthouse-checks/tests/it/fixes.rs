@@ -154,12 +154,14 @@ fn run(
     let ws = Workspace::new(root.path());
     let options = Options::new();
     let facts = json!({});
+    let queries = lighthouse_checks::probe::queries(project, &ws);
     fixer.fix(&FixRequest {
         finding,
         facts: &facts,
         decision: &decision,
         options: &options,
         project,
+        queries: &queries,
         workspace: &ws,
         text,
         trusted,

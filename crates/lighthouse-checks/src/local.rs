@@ -9,16 +9,13 @@ use std::{
     sync::{Arc, Mutex, PoisonError},
 };
 
-use lighthouse_model::ucm::{Model, SymbolId};
+use lighthouse_model::ucm::Model;
 use lighthouse_plugin::{Error, Queries, Reads, Workspace};
 
 use crate::{
     builder::{Over, subject},
     fact::{Built, FACT, Facts, class_of, fact_of},
-    indexes::{
-        CREDITED, CYCLES, Computed, IMPORTS, Indexes, NAMES, OWNED, PARENTS, REACH, SPLIT,
-        STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
-    },
+    indexes::Computed,
 };
 
 /// The queries of a model, for the rules whose reads are known.
@@ -82,31 +79,9 @@ impl<'a> Local<'a> {
 
 impl Queries for Local<'_> {
     fn pull(&self, kind: &str, key: &str) -> Result<Arc<dyn Any + Send + Sync>, Error> {
-        let id = || {
-            SymbolId::parse(key).unwrap_or_else(|| {
-                SymbolId::new(key, &[], "", lighthouse_model::ucm::SymbolKind::Function)
-            })
-        };
-        let indexes = &self.indexes;
-        Ok(match kind {
-            FACT => self.built(key)?,
-            TAKERS => Arc::new(indexes.takers(key)),
-            USERS => Arc::new(indexes.users(&id())),
-            OWNED => Arc::new(indexes.owned(&id())),
-            NAMES => Arc::new(indexes.names(key)),
-            IMPORTS => Arc::new(indexes.imports(key)),
-            CYCLES => Arc::new(indexes.cycle(key)),
-            TYPES => Arc::new(indexes.types(key)),
-            PARENTS => Arc::new(indexes.parent(key)),
-            SPLIT => Arc::new(indexes.split(&id())),
-            REACH => Arc::new(indexes.reach(&id())),
-            STABILITY => Arc::new(indexes.stability(key)),
-            TESTED => Arc::new(indexes.tested(key)),
-            CREDITED => {
-                let (prefix, modules) = credit_of(key);
-                Arc::new(indexes.credited(prefix, &modules).as_ref().clone())
-            }
-            other => return Err(Error::Failed(format!("`{other}` is no query of a model"))),
-        })
+        match kind {
+            FACT => Ok(self.built(key)?),
+            _ => self.indexes.pull(kind, key),
+        }
     }
 }

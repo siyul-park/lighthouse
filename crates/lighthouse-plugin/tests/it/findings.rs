@@ -212,6 +212,45 @@ fn runtime_of() {
 }
 
 #[test]
+fn runtime_registry() {
+    let graph = graph();
+    let runtime = Runtime::of(&graph).unwrap();
+
+    assert!(runtime.registry().analyzer("t/count").is_some());
+}
+
+#[test]
+fn runtime_workspace() {
+    let graph = graph();
+    let runtime = Runtime::of(&graph).unwrap();
+
+    assert_eq!(runtime.workspace().root, Workspace::new("").root);
+}
+
+#[test]
+fn runtime_trusted() {
+    let graph = graph();
+    let runtime = Runtime::of(&graph).unwrap();
+
+    assert!(!runtime.trusted());
+}
+
+#[test]
+fn runtime_text() {
+    let graph = graph();
+    let runtime = Runtime::of(&graph).unwrap();
+
+    assert!(runtime.text(&graph, "a.toy").unwrap().is_none());
+}
+
+#[test]
+fn queries_answer_the_kinds_of_the_graph() {
+    let graph = graph();
+
+    assert!(lighthouse_plugin::queries(&graph).is_ok());
+}
+
+#[test]
 fn runtime_take_times() {
     let graph = graph();
     let runtime = Runtime::of(&graph).unwrap();

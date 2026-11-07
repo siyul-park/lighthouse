@@ -3,7 +3,6 @@
 //! it is bound. An import of a declaration's body (a function-local one) is no
 //! module-level import.
 
-use lighthouse_model::ucm::Model;
 use std::{ops::Range, path::Path};
 
 use lighthouse_model::{
@@ -57,8 +56,7 @@ impl Lowerer<'_> {
             .filter_map(|s| index.range(self.project.place(&s.id)?.extent?))
             .collect();
         self.project
-            .edges
-            .iter()
+            .edges()
             .enumerate()
             .filter(|(at, e)| e.kind == EdgeKind::Imports && self.project.origin(*at) == Some(file))
             .filter_map(|(_, e)| match &e.from {

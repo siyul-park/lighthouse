@@ -13,7 +13,9 @@ mod context;
 mod edits;
 mod lower;
 mod model;
+mod node;
 mod preview;
+mod program;
 mod propose;
 mod rewrite;
 mod run;
@@ -26,6 +28,7 @@ use std::{
 
 use lighthouse_model::{Fingerprint, Preview, Safety, ucm::Capability};
 use lighthouse_plugin::FixDecision;
+use lighthouse_protocol::hash;
 use lighthouse_spec::{Catalog, Decision, FixKind, FixScope, Programs, Task};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -61,6 +64,9 @@ pub struct FixPlan {
     priorities: BTreeMap<String, i32>,
     /// The safety the project gives the fixes of a rule, whoever makes them.
     configured: BTreeMap<String, Safety>,
+    /// What the fix of each rule is made of, hashed: the decision as the
+    /// catalog has it. The fix of a finding is run again when it moves.
+    revisions: BTreeMap<String, String>,
 }
 
 impl FixPlan {
@@ -92,6 +98,10 @@ impl FixPlan {
                 },
             );
             plan.prioritize(decision.id(), fix.priority);
+            plan.revisions.insert(
+                decision.id().to_owned(),
+                hash::sha256(serde_json::to_string(decision).unwrap_or_default()),
+            );
             if matches!(fix.kind, FixKind::Cel { .. }) {
                 plan.scopes.insert(
                     decision.id().to_owned(),
@@ -203,6 +213,11 @@ impl FixPlan {
     /// or `references`, as for any fixer that declares nothing.
     pub(super) fn scope(&self, rule: &str) -> FixScope {
         self.scopes.get(rule).copied().unwrap_or_default()
+    }
+
+    /// What the fix of `rule` is made of, hashed.
+    pub(super) fn revision(&self, rule: &str) -> &str {
+        self.revisions.get(rule).map_or("", String::as_str)
     }
 
     /// The command the run itself runs to fix `rule`, if its fix is one.

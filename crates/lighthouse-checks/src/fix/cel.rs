@@ -1,11 +1,7 @@
 //! A `cel` fix: one expression that returns the edits, evaluated for the
 //! subject of a finding with the variables of its check.
 
-use lighthouse_model::ucm::Model;
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex, PoisonError},
-};
+use std::sync::Arc;
 
 use cel::{Context, Program, common::value::CowVal, context::VariableResolver};
 use lighthouse_plugin::{Error as PluginError, FixRequest};
@@ -18,7 +14,7 @@ use crate::{
     builder::{Builder, Over, span},
     eval::{Var, cel_fact, compile, compile_shared, to_json},
     glob::slashed,
-    indexes::Computed,
+    indexes::Queried,
     library::{self, Needs},
     manifest::rule_options,
 };
@@ -37,16 +33,10 @@ pub(crate) struct CelFix {
     /// Per variable, whether the edits read it, directly or through another:
     /// the others are not evaluated.
     used: Vec<bool>,
-    /// What the findings of the file last asked about are judged with.
-    cached: Mutex<Option<Arc<FileValues>>>,
 }
 
-/// The file as a value and the shared variables of one file text, found once
-/// for all the findings fixed in it.
+/// The file as a value and the variables that read nothing of the finding.
 struct FileValues {
-    path: PathBuf,
-    text: String,
-    options: Map<String, Value>,
     file: Option<Var>,
     variables: Vec<(String, Var)>,
 }
@@ -134,7 +124,6 @@ impl CelFix {
             decision: decision.clone(),
             library,
             shared: shared_by_finding,
-            cached: Mutex::new(None),
         })
     }
 
@@ -147,7 +136,7 @@ impl CelFix {
         let file = project.file(&finding.file);
         let language = file.map(|f| f.lang.as_str());
         let options = rule_options(&self.decision, request.options, language)?;
-        let indexes = Computed::new(project, request.workspace);
+        let indexes = Queried::new(request.queries);
         let over = Over {
             model: project,
             indexes: &indexes,
@@ -157,7 +146,7 @@ impl CelFix {
         let needs_file = self.needs.ident("file") || self.select == Some(Select::File);
         let values = self.values(id, request, &options, &builder, needs_file)?;
         let mut scope = self.library.new_inner_scope();
-        scope.set_variable_resolver(&*values);
+        scope.set_variable_resolver(&values);
         let mut set = |name: &str, value: Value| scope.add_variable_as_val(name, cel_fact(&value));
         set(
             "finding",
@@ -216,6 +205,9 @@ impl CelFix {
         let Value::Array(list) = to_json(&returned) else {
             return Err(fail("`edits` is not a list".to_owned()));
         };
+        if let Some(error) = builder.failure() {
+            return Err(error);
+        }
         let place = Place {
             project,
             file: &finding.file,
@@ -224,8 +216,7 @@ impl CelFix {
         Ok(edits::lower(&list, &place))
     }
 
-    /// The file and the shared variables of the file of `request`: the ones the
-    /// last finding was fixed with when it is the same text, else found now.
+    /// The file and the variables that read nothing of the finding.
     fn values(
         &self,
         id: &str,
@@ -233,15 +224,8 @@ impl CelFix {
         options: &Map<String, Value>,
         builder: &Builder,
         needs_file: bool,
-    ) -> Result<Arc<FileValues>, PluginError> {
+    ) -> Result<FileValues, PluginError> {
         let finding = request.finding;
-        let mut cached = self.cached.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(found) = cached
-            .as_ref()
-            .filter(|c| c.path == finding.file && c.text == request.text && c.options == *options)
-        {
-            return Ok(Arc::clone(found));
-        }
         let file = request
             .project
             .file(&finding.file)
@@ -267,14 +251,6 @@ impl CelFix {
             }
             scope.add_variable_from_value(name, bound);
         }
-        let built = Arc::new(FileValues {
-            path: finding.file.clone(),
-            text: request.text.to_owned(),
-            options: options.clone(),
-            file,
-            variables,
-        });
-        *cached = Some(Arc::clone(&built));
-        Ok(built)
+        Ok(FileValues { file, variables })
     }
 }

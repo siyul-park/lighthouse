@@ -10,7 +10,7 @@ use std::{collections::BTreeMap, ops::Range, path::Path};
 
 use lighthouse_model::{
     LineIndex, Position, Span,
-    ucm::{LoadNeed, LoadPoint, Project, Symbol, SymbolId},
+    ucm::{LoadNeed, LoadPoint, Symbol, SymbolId},
 };
 
 use super::Lowerer;
@@ -156,7 +156,7 @@ fn is_ready(
     })
 }
 
-fn start_of(project: &Project, symbol: &Symbol) -> Position {
+fn start_of(project: &dyn Model, symbol: &Symbol) -> Position {
     project
         .place(&symbol.id)
         .map_or(Position { line: 1, col: 1 }, |place| place.whole().start)

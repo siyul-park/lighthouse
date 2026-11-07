@@ -15,8 +15,11 @@ use std::{
 
 use lighthouse_model::{
     LineIndex, Position, Span, eol_of,
-    ucm::{Anchor, EditOp, Node, Owner, Project, Symbol, SymbolId},
+    ucm::{Anchor, EditOp, Node, Owner, Symbol, SymbolId},
 };
+
+use lighthouse_graph::Graph;
+use lighthouse_plugin::Runtime;
 
 use crate::Overlays;
 
@@ -32,11 +35,22 @@ mod rename;
 mod spacing;
 
 impl<'a> Sources<'a> {
-    pub(crate) fn new(root: &Path, project: &'a Project, overlays: &'a Overlays) -> Self {
+    /// The texts of a round: the overlays, else the disk.
+    pub(crate) fn new(root: &Path, project: &'a dyn Model, overlays: &'a Overlays) -> Self {
+        Self::reading(root, project, Reading::Round(overlays))
+    }
+
+    /// The texts the graph holds, each read recorded as a dependency of the
+    /// query that asks.
+    pub(crate) fn graph(root: &Path, project: &'a dyn Model, graph: &'a Graph) -> Self {
+        Self::reading(root, project, Reading::Graph(graph))
+    }
+
+    fn reading(root: &Path, project: &'a dyn Model, reading: Reading<'a>) -> Self {
         Self {
             root: root.canonicalize().unwrap_or_else(|_| root.to_owned()),
             project,
-            overlays,
+            reading,
             texts: RefCell::default(),
             containers: RefCell::default(),
             starts: RefCell::default(),
@@ -73,16 +87,32 @@ impl<'a> Sources<'a> {
             return Ok(Rc::clone(text));
         }
         self.contain(file)?;
-        let text = match self.overlays.get(file) {
-            Some(text) => text.clone(),
-            None => fs::read_to_string(self.root.join(file))
-                .map_err(|e| format!("{}: {e}", file.display()))?,
-        };
-        let text = Rc::new(text);
+        let text = Rc::new(self.read(file)?);
         self.texts
             .borrow_mut()
             .insert(file.to_owned(), Rc::clone(&text));
         Ok(text)
+    }
+
+    fn read(&self, file: &Path) -> Result<String, String> {
+        let shown = file.display();
+        match &self.reading {
+            Reading::Round(overlays) => match overlays.get(file) {
+                Some(text) => Ok(text.clone()),
+                None => {
+                    fs::read_to_string(self.root.join(file)).map_err(|e| format!("{shown}: {e}"))
+                }
+            },
+            Reading::Graph(graph) => {
+                let runtime = Runtime::of(graph).map_err(|e| format!("{shown}: {e}"))?;
+                let text = runtime
+                    .text(graph, &lighthouse_spec::key(file))
+                    .map_err(|e| format!("{shown}: {e}"))?;
+                text.as_ref()
+                    .clone()
+                    .ok_or_else(|| format!("{shown}: is not text"))
+            }
+        }
     }
 
     pub(crate) fn containers(&self, file: &Path) -> Result<Rc<Containers>, String> {
@@ -112,7 +142,7 @@ struct Block {
 
 impl<'a> Lowerer<'a> {
     pub(crate) fn new(
-        project: &'a Project,
+        project: &'a dyn Model,
         sources: &'a Sources<'a>,
         complete: &'a dyn Fn(&str) -> bool,
     ) -> Self {
@@ -520,7 +550,7 @@ impl<'a> Lowerer<'a> {
 }
 
 pub(crate) struct Lowerer<'a> {
-    project: &'a Project,
+    project: &'a dyn Model,
     sources: &'a Sources<'a>,
     /// Whether the provider of a language declares `complete-references`.
     complete: &'a dyn Fn(&str) -> bool,
@@ -531,11 +561,19 @@ pub(crate) struct Lowerer<'a> {
 /// non-generated file of the project, and reached through no symlink.
 pub(crate) struct Sources<'a> {
     root: PathBuf,
-    project: &'a Project,
-    overlays: &'a Overlays,
+    project: &'a dyn Model,
+    reading: Reading<'a>,
     texts: RefCell<BTreeMap<PathBuf, Rc<String>>>,
     containers: RefCell<BTreeMap<PathBuf, Rc<Containers>>>,
     starts: RefCell<BTreeMap<PathBuf, Rc<Vec<usize>>>>,
+}
+
+/// Where the text of a file is read from.
+enum Reading<'a> {
+    /// The overlays of the round, else the disk.
+    Round(&'a Overlays),
+    /// The graph, which records the file as read.
+    Graph(&'a Graph),
 }
 
 /// What the specs of a `const` group after one that is removed need of it.

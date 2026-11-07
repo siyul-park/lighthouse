@@ -2,7 +2,7 @@
 //! what the facts depend on. Not part of the API.
 
 use lighthouse_model::ucm::{File, Model, Symbol};
-use lighthouse_plugin::{Context, Error};
+use lighthouse_plugin::{Context, Error, Queries, Workspace};
 use serde_json::Value;
 
 use lighthouse_spec::Env;
@@ -34,6 +34,11 @@ pub fn file_fact(
     let indexes = Computed::new(model, ctx.workspace);
     let builder = Builder::new(ctx, &indexes, &needs)?;
     Ok(builder.file(file, text)[fact].clone())
+}
+
+/// The indexes of `model` as a fixer pulls them, made from the model alone.
+pub fn queries<'a>(model: &'a (dyn Model + Sync), ws: &'a Workspace) -> impl Queries + 'a {
+    Computed::new(model, ws)
 }
 
 /// The fields every node of a list carries about a symbol.

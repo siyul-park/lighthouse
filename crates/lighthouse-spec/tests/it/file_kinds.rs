@@ -128,3 +128,16 @@ fn text() {
     assert_eq!(binary, None);
     assert_eq!(overlaid.as_deref(), Some("edited"));
 }
+
+#[test]
+fn held_set_overlays() {
+    let (mut graph, mut held) = (graph(), Held::default());
+    let overlay = BTreeMap::from([("a.txt".into(), "edit".to_owned())]);
+
+    held.set_overlays(&mut graph, &overlay).unwrap();
+    let shown = graph.query(&CONTENT, &"a.txt".to_owned()).unwrap();
+    held.set_overlays(&mut graph, &BTreeMap::new()).unwrap();
+
+    assert_eq!(shown.text.as_deref(), Some("edit"));
+    assert!(held.overlaid().is_empty());
+}

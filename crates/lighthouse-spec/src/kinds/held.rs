@@ -25,7 +25,7 @@ impl Held {
     }
 
     /// Sets the overlays, and unsets those of the last walk that are gone.
-    pub(crate) fn set_overlays(
+    pub fn set_overlays(
         &mut self,
         graph: &mut Graph,
         overlays: &BTreeMap<PathBuf, String>,

@@ -96,6 +96,27 @@ impl Runtime {
             .ok_or_else(|| Error::Encode("the graph has no registry".to_owned()))
     }
 
+    /// The analyzers, rules and fixers the graph runs.
+    pub fn registry(&self) -> &Registry {
+        &self.registry
+    }
+
+    /// The workspace the rules run in.
+    pub fn workspace(&self) -> &Workspace {
+        &self.workspace
+    }
+
+    /// Whether the user trusts the project to run the commands it names.
+    pub fn trusted(&self) -> bool {
+        self.trusted
+    }
+
+    /// The text of a file, read through `graph`: the file's content is
+    /// recorded as read, and a file that is no text reads as `None`.
+    pub fn text(&self, graph: &Graph, path: &str) -> Result<Arc<Option<String>>, Error> {
+        (self.text)(graph, path)
+    }
+
     /// The time each rule spent running since the last call.
     pub fn take_times(&self) -> BTreeMap<String, Duration> {
         std::mem::take(&mut *self.times.lock().unwrap_or_else(PoisonError::into_inner))

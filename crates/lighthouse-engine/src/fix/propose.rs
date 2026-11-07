@@ -2,7 +2,7 @@
 //! given to, and what the fixer proposes, lowered to text edits.
 //!
 //! The fixes a run leaves for a hand to apply. A fix the run was not permitted
-//! to write is kept in the result cache with the digests of the files it was
+//! to write is kept in the graph with the digests of the files it was
 //! verified over, whoever made it: a rule, a command, a plugin or an agent.
 //! Applying it later is writing exactly what was shown, if the files are still
 //! as they were, and never making the fix again.
@@ -10,33 +10,28 @@
 use lighthouse_model::ucm::Model;
 use std::{
     cell::{Cell, RefCell},
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     path::PathBuf,
-    time::Duration,
+    sync::Arc,
+    time::{Duration, Instant},
 };
 
-use lighthouse_model::{
-    Diagnostic, Fingerprint, Safety, Unavailable,
-    ucm::{Capability, EditOp, FixOutcome},
-};
-use lighthouse_plugin::{FixDecision, FixRequest, Fixer};
+use lighthouse_graph::{Durability, Graph, Input};
+use lighthouse_model::{Diagnostic, Fingerprint, Safety, Unavailable, ucm::Capability};
+use lighthouse_plugin::FixDecision;
 use lighthouse_protocol::hash;
-use lighthouse_spec::FixScope;
+use lighthouse_spec::Program;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use super::{
     DeclinedFix, FixBinding, FixPlan, FixRun, FixedBy,
-    edits::{TextEdit, apply, keeps_declarations, self_overlap},
-    lower::{Lowerer, Sources},
-    model::{Class, Event, ModelFixer, choose_extent},
-    rewrite::{Bounds, Change, Changes, World, accept},
+    edits::TextEdit,
+    lower::Sources,
+    model::{Class, Event, ModelFixer},
+    node::{Ask, FIX, FIXING, Fixed, Fixing, Made},
+    program::is_filter,
 };
-use crate::{
-    Engine, Error, Needs, Outcome, Overlays,
-    cache::{Cache, Digest, KeyBuilder},
-    engine::Scopes,
-};
+use crate::{Engine, Error, Needs, Outcome, Overlays, engine::Scopes, tools};
 
 /// Why a fix by a model is left to review when the run asks no model.
 const NO_MODELS: &str =
@@ -45,18 +40,10 @@ const NO_MODELS: &str =
 /// Why a fix to apply has no preview kept.
 pub(super) const NOT_KEPT: &str = "the preview is not kept (run without --no-cache, or fix again)";
 
-/// What one round of proposals has worked out, kept for the next finding that
-/// asks the same: findings of one file often propose the same ops, and lowering
-/// them or checking their edits against the scope costs time in the size of the
-/// file each time over.
-#[derive(Default)]
-struct Memo {
-    lowered: RefCell<HashMap<String, Lowered>>,
-    within: RefCell<HashMap<String, Result<(), String>>>,
-}
-
-/// What a fixer's ops lower to, and why not when they do not.
-type Lowered = Result<(Vec<TextEdit>, BTreeMap<PathBuf, String>), String>;
+/// The previews of the fixes a run withholds, by fingerprint, as JSON. They
+/// are what the user was shown, so the graph keeps them until they have not
+/// been read for as long as it keeps anything.
+static PREVIEW: Input<String, String> = Input::new("preview").persisted();
 
 /// A finding's fix, lowered and ready to apply.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,8 +116,10 @@ pub(super) struct Proposer<'e> {
     pub(super) run: &'e FixRun,
     /// The fixer of the model fixes; `None` when no model is to be asked.
     pub(super) models: Option<ModelFixer<'e>>,
-    /// Where the fixes a run withholds are kept; `None` keeps nothing.
-    pub(super) kept: Option<Cache>,
+    /// Whether the fixes a run withholds are kept for a later run.
+    keeping: bool,
+    /// The previews to keep when the run ends, by fingerprint.
+    pending: RefCell<Vec<(Fingerprint, String)>>,
     /// The time the programs of command fixes ran.
     pub(super) command_time: Cell<Duration>,
 }
@@ -143,15 +132,16 @@ impl<'e> Proposer<'e> {
             plan,
             run,
             models: None,
-            kept: None,
+            keeping: false,
+            pending: RefCell::default(),
             command_time: Cell::new(Duration::ZERO),
         }
     }
 
-    /// The same, keeping the fixes the run withholds in `cache`.
+    /// The same, keeping the fixes the run withholds in the graph.
     #[must_use]
-    pub(super) fn keeping(mut self, cache: Option<Cache>) -> Self {
-        self.kept = cache;
+    pub(super) fn keeping(mut self, keeping: bool) -> Self {
+        self.keeping = keeping;
         self
     }
 
@@ -180,25 +170,14 @@ impl<'e> Proposer<'e> {
         taking: Taking<'_>,
     ) -> Result<(Vec<Proposal>, BTreeMap<Fingerprint, DeclinedFix>), Error> {
         let sources = Sources::new(&self.engine.ws.root, &outcome.project, texts);
-        let engine = self.engine;
-        let complete = |language: &str| engine.provides(language, Capability::CompleteReferences);
-        let lowerer = Lowerer::new(&outcome.project, &sources, &complete);
-        let memo = Memo::default();
+        let mut slots = Vec::new();
         let (mut proposals, mut declined) = (Vec::new(), BTreeMap::new());
         let mut asked_to_edit = Vec::new();
         let mut decline = |finding: &Diagnostic, reason: String| {
-            declined.insert(
-                finding.fingerprint.clone(),
-                DeclinedFix {
-                    fingerprint: finding.fingerprint.clone(),
-                    rule_id: finding.rule_id.clone(),
-                    file: finding.file.clone(),
-                    line: finding.span.start.line,
-                    reason,
-                },
-            );
+            declined.insert(finding.fingerprint.clone(), declining(finding, reason));
         };
         let (scopes, _) = Scopes::new(&self.run.paths, &self.engine.ws.root)?;
+        let mut asks = Vec::new();
         for finding in self.select(outcome, &scopes, taking) {
             let binding = self.binding(&finding.rule_id);
             let model = binding.as_ref().is_some_and(|b| b.fixer == FixedBy::Model);
@@ -244,19 +223,17 @@ impl<'e> Proposer<'e> {
                 asked_to_edit.push((finding, binding));
                 continue;
             }
-            let made = match self
-                .plan
-                .command(self.run.fixer.as_deref().unwrap_or(&finding.rule_id))
-            {
-                Some(command) => self
-                    .propose_command(outcome, finding, (&binding, command), (&sources, texts))
-                    .map_err(|(_, reason)| reason),
-                None => self.propose_one(
-                    outcome,
-                    finding,
-                    &binding,
-                    (&lowerer, &sources, texts, &memo),
-                ),
+            let slot = self.slot(outcome, finding, &binding, (&sources, texts), &mut asks);
+            slots.push((finding, binding, slot));
+        }
+        let fixed = self.pull(outcome, texts, &asks)?;
+        for (finding, binding, made) in slots {
+            let made = match made {
+                Slot::Asked(at) => match fixed[at].as_deref() {
+                    Ok(Fixed::Made(made)) => self.assembled(finding, &binding, made),
+                    Ok(Fixed::Declined(reason)) | Err(reason) => Err(reason.clone()),
+                },
+                Slot::Done(made) => *made,
             };
             match made {
                 Ok(proposal) => proposals.push(proposal),
@@ -343,26 +320,57 @@ impl<'e> Proposer<'e> {
         })
     }
 
-    fn propose_one(
+    /// Where the fix of `finding` is made: the position of its ask among
+    /// `asks`, else what came of it without the graph.
+    fn slot(
         &self,
         outcome: &Outcome,
         finding: &Diagnostic,
         binding: &FixBinding,
-        (lowerer, sources, texts, memo): (&Lowerer, &Sources, &Overlays, &Memo),
-    ) -> Result<Proposal, String> {
+        (sources, texts): (&Sources, &Overlays),
+        asks: &mut Vec<Ask>,
+    ) -> Slot {
+        let program = self
+            .plan
+            .command(self.run.fixer.as_deref().unwrap_or(&finding.rule_id));
+        let made = match program {
+            Some(command) => self.ask_command(outcome, finding, command, sources),
+            None => self.ask_fixer(outcome, finding, binding, sources),
+        };
+        match (made, program) {
+            (Ok(Some(ask)), _) => {
+                asks.push(ask);
+                Slot::Asked(asks.len() - 1)
+            }
+            (Ok(None), Some(command)) => Slot::Done(Box::new(
+                self.propose_command(outcome, finding, (binding, command), (sources, texts))
+                    .map_err(|(_, reason)| reason),
+            )),
+            (Ok(None), None) => Slot::Done(Box::new(Err("the fix has no command".to_owned()))),
+            (Err(reason), _) => Slot::Done(Box::new(Err(reason))),
+        }
+    }
+
+    /// What a fix by a registered fixer is asked, or why it cannot be.
+    fn ask_fixer(
+        &self,
+        outcome: &Outcome,
+        finding: &Diagnostic,
+        binding: &FixBinding,
+        sources: &Sources,
+    ) -> Result<Option<Ask>, String> {
         let engine = self.engine;
         let FixedBy::Fixer(id) = &binding.fixer else {
             return Err("a fix by a model is made by an agent that edits".to_owned());
         };
-        let fixer: &dyn Fixer = engine
+        let fixer = engine
             .registry
             .fixer(id)
             .ok_or_else(|| format!("fixer `{id}` is not registered"))?;
-        let file = outcome.project.file(&finding.file);
-        let language = file.map_or("", |f| f.lang.as_str());
-        let provided = engine
-            .language(language)
-            .map(|provider| provider.manifest().capabilities.as_slice());
+        let language = outcome
+            .project
+            .file(&finding.file)
+            .map_or("", |f| f.lang.as_str());
         if let Some(gap) = self.overlay_gap(language) {
             return Err(gap);
         }
@@ -370,140 +378,169 @@ impl<'e> Proposer<'e> {
             .manifest()
             .requires
             .iter()
-            .find(|c| !provided.is_some_and(|p| p.contains(c)))
+            .find(|c| !engine.provides(language, **c))
         {
             return Err(format!(
                 "language `{language}` lacks the capability `{missing}` the fix needs"
             ));
         }
-        let text = sources.text(&finding.file)?;
-        let facts = outcome
-            .facts
-            .get(&finding.fingerprint)
-            .unwrap_or(&Value::Null);
-        let options = outcome
-            .options
-            .get(&finding.fingerprint)
-            .cloned()
-            .unwrap_or_default();
-        let request = FixRequest {
-            finding,
-            facts,
-            decision: &binding.decision,
-            options: &options,
-            project: &outcome.project,
-            workspace: &engine.ws,
-            text: &text,
-            trusted: engine.trusted,
-        };
-        match fixer
-            .fix(&request)
-            .map_err(|e| format!("the fixer failed: {e}"))?
-        {
-            FixOutcome::Declined { reason } => Err(reason),
-            FixOutcome::Proposed {
-                description,
-                ops,
-                safety,
-            } => {
-                let safety = self.plan.safety(&finding.rule_id, safety, binding.cap);
-                if safety == Safety::Unsafe && self.applies_previews() {
-                    return Err(NOT_KEPT.to_owned());
-                }
-                let key = format!("{ops:?}");
-                let lowered = memo
-                    .lowered
-                    .borrow_mut()
-                    .entry(key)
-                    .or_insert_with(|| lowered(&ops, lowerer, sources))
-                    .clone();
-                let (edits, bases) = lowered?;
-                let scope = self.plan.scope(&finding.rule_id);
-                self.within_memo(memo, scope, (outcome, finding), &edits, (sources, texts))?;
-                Ok(Proposal {
-                    fingerprint: finding.fingerprint.clone(),
-                    rule_id: finding.rule_id.clone(),
-                    file: finding.file.clone(),
-                    line: finding.span.start.line,
-                    fixer: binding.fixer.clone(),
-                    description,
-                    safety,
-                    priority: self.plan.priority(&finding.rule_id),
-                    edits,
-                    files: bases.keys().cloned().collect(),
-                    aim: Aim::Finding,
-                    chain: 0,
-                    bases,
-                    batch: vec![finding.fingerprint.clone()],
-                    moves_only: moves_only(&ops),
-                })
-            }
-        }
-    }
-}
-
-impl Proposer<'_> {
-    /// `within`, worked out once for the same edits over the same file. Under
-    /// the scope `symbol` the extents of the finding decide, so each finding
-    /// is checked for itself.
-    fn within_memo(
-        &self,
-        memo: &Memo,
-        scope: FixScope,
-        (outcome, finding): (&Outcome, &Diagnostic),
-        edits: &[TextEdit],
-        texts: (&Sources, &Overlays),
-    ) -> Result<(), String> {
-        if scope == FixScope::Symbol {
-            return self.within(scope, outcome, finding, edits, texts);
-        }
-        let key = format!("{scope:?} {} {edits:?}", finding.file.display());
-        if let Some(known) = memo.within.borrow().get(&key) {
-            return known.clone();
-        }
-        let found = self.within(scope, outcome, finding, edits, texts);
-        memo.within.borrow_mut().insert(key, found.clone());
-        found
+        sources.text(&finding.file)?;
+        Ok(Some(self.asked(outcome, finding, None)))
     }
 
-    /// Whether the edits of a fix stay within its scope, else why they do not:
-    /// the same check as for the files a command or an agent changed.
-    fn within(
+    /// What a fix by a command is asked, or why it cannot be; `None` for a
+    /// program that is not a filter, which the graph cannot stand for.
+    fn ask_command(
         &self,
-        scope: FixScope,
         outcome: &Outcome,
         finding: &Diagnostic,
-        edits: &[TextEdit],
-        (sources, texts): (&Sources, &Overlays),
-    ) -> Result<(), String> {
-        if scope == FixScope::Files {
-            return Ok(());
+        fix: &super::CommandFix,
+        sources: &Sources,
+    ) -> Result<Option<Ask>, String> {
+        let language = outcome
+            .project
+            .file(&finding.file)
+            .map_or("", |f| f.lang.as_str());
+        let program = fix.programs.of(language);
+        if !program.is_some_and(is_filter) {
+            return Ok(None);
         }
-        let mut changes = Changes::new();
-        for file in edits.iter().map(|e| &e.file).collect::<BTreeSet<_>>() {
-            let old = sources.text(file)?;
-            let of_file: Vec<&TextEdit> = edits.iter().filter(|e| &e.file == file).collect();
-            changes.insert(file.clone(), Change::Text(apply(&old, &of_file)?));
+        let program = self.program_of(language, fix)?;
+        sources.text(&finding.file)?;
+        Ok(Some(self.asked(outcome, finding, Some(program.clone()))))
+    }
+
+    fn asked(&self, outcome: &Outcome, finding: &Diagnostic, program: Option<Program>) -> Ask {
+        Ask {
+            finding: finding.clone(),
+            facts: outcome
+                .facts
+                .get(&finding.fingerprint)
+                .cloned()
+                .unwrap_or_default(),
+            options: outcome
+                .options
+                .get(&finding.fingerprint)
+                .cloned()
+                .unwrap_or_default(),
+            program,
         }
-        let extents = if scope == FixScope::Symbol {
-            vec![choose_extent(
-                &outcome.project,
-                finding,
-                sources.text(&finding.file)?.as_str(),
-            )?]
-        } else {
-            Vec::new()
-        };
-        let bounds = Bounds {
-            who: "the fix",
-            scope,
-            file: &finding.file,
-            extents: &extents,
-        };
-        let world = World::new(&self.engine.files, outcome, texts);
-        accept(changes, &bounds, &world)
-            .map(|_| ())
-            .map_err(|(_, why)| why)
+    }
+
+    /// The fixes the graph holds for `asks`, in order, made over `texts`
+    /// where they are not held. The fixes by a command are pulled first, and
+    /// their time is the time of the commands.
+    fn pull(
+        &self,
+        outcome: &Outcome,
+        texts: &Overlays,
+        asks: &[Ask],
+    ) -> Result<Vec<Result<Arc<Fixed>, String>>, Error> {
+        let mut guard = self.engine.lock_graph();
+        let graph = guard.as_mut().ok_or_else(not_open)?;
+        // The nodes read the texts of the graph: they are those of the round.
+        self.engine
+            .held
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_overlays(graph, texts)?;
+        let rules: BTreeSet<&str> = asks.iter().map(|a| a.finding.rule_id.as_str()).collect();
+        for rule in rules {
+            if let Some(fixing) = self.fixing(rule) {
+                graph.set_input(&FIXING, &rule.to_owned(), fixing, Durability::Stable)?;
+            }
+        }
+        let programs: Vec<String> = asks
+            .iter()
+            .filter_map(|a| a.program.as_ref()?.command.first().cloned())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        for (tool, identity) in
+            tools::identities(&self.engine.ws.root, &outcome.project.files, &programs)
+        {
+            graph.set_input(
+                &lighthouse_plugin::TOOL,
+                &tool,
+                identity,
+                Durability::Stable,
+            )?;
+        }
+        let graph: &Graph = graph;
+        let mut fixed: Vec<Option<Result<Arc<Fixed>, String>>> = vec![None; asks.len()];
+        for commands in [true, false] {
+            let at: Vec<usize> = (0..asks.len())
+                .filter(|&n| asks[n].program.is_some() == commands)
+                .collect();
+            let keys: Vec<(String, String)> = at.iter().map(|&n| asks[n].key()).collect();
+            let started = Instant::now();
+            let pulled = crate::engine::in_pool(|| {
+                graph.par_map(keys, |graph, key| {
+                    graph
+                        .query(&FIX, key)
+                        .map_err(|e| format!("the fixer failed: {e}"))
+                })
+            });
+            if commands {
+                self.command_time
+                    .set(self.command_time.get() + started.elapsed());
+            }
+            for (n, made) in at.into_iter().zip(pulled) {
+                fixed[n] = Some(made);
+            }
+        }
+        Ok(fixed.into_iter().flatten().collect())
+    }
+
+    /// How the fix of `rule` is declared to the graph.
+    fn fixing(&self, rule: &str) -> Option<Fixing> {
+        let name = self.run.fixer.as_deref().unwrap_or(rule);
+        let binding = self.binding(rule)?;
+        let command = self.plan.command(name);
+        let mut hasher = hash::Hasher::new();
+        hasher.update(self.engine.setting());
+        hasher.update(self.plan.revision(name));
+        Some(Fixing {
+            fixer: match (&binding.fixer, command) {
+                (FixedBy::Fixer(id), None) => id.clone(),
+                _ => String::new(),
+            },
+            scope: command.map_or_else(|| self.plan.scope(name), |c| c.scope),
+            description: command.map(|c| c.description.clone()).unwrap_or_default(),
+            requirement: binding.decision.requirement.clone(),
+            context: binding.decision.context.clone(),
+            revision: hasher.hex(),
+        })
+    }
+
+    /// The proposal a fix is, else why there is none.
+    pub(super) fn assembled(
+        &self,
+        finding: &Diagnostic,
+        binding: &FixBinding,
+        made: &Made,
+    ) -> Result<Proposal, String> {
+        let safety = self.plan.safety(&finding.rule_id, made.safety, binding.cap);
+        if safety == Safety::Unsafe && self.applies_previews() {
+            return Err(NOT_KEPT.to_owned());
+        }
+        Ok(Proposal {
+            fingerprint: finding.fingerprint.clone(),
+            rule_id: finding.rule_id.clone(),
+            file: finding.file.clone(),
+            line: finding.span.start.line,
+            fixer: binding.fixer.clone(),
+            description: made.description.clone(),
+            safety,
+            priority: self.plan.priority(&finding.rule_id),
+            edits: made.edits.clone(),
+            files: made.bases.keys().cloned().collect(),
+            aim: Aim::Finding,
+            chain: 0,
+            bases: made.bases.clone(),
+            batch: vec![finding.fingerprint.clone()],
+            moves_only: made.moves_only,
+        })
     }
 }
 
@@ -542,23 +579,31 @@ impl Proposer<'_> {
 
     /// Keeps `proposal`, which the run withholds, for an application.
     pub(super) fn keep(&self, proposal: &Proposal) {
-        if let Some(cache) = &self.kept {
-            cache.put(key(&proposal.fingerprint), proposal);
+        if let (true, Ok(shown)) = (self.keeping, serde_json::to_string(proposal)) {
+            self.pending
+                .borrow_mut()
+                .push((proposal.fingerprint.clone(), shown));
         }
     }
 
     /// The preview kept for the finding `fingerprint`: `None` when none was
-    /// made or the cache keeps nothing, and why not when a file it changes is
+    /// made or the graph keeps nothing, and why not when a file it changes is
     /// not as it was verified over.
     pub(super) fn kept(
         &self,
         fingerprint: &Fingerprint,
         sources: &Sources,
     ) -> Result<Option<Proposal>, String> {
-        let Some(proposal) = self
-            .kept
-            .as_ref()
-            .and_then(|cache| cache.get::<Proposal>(&key(fingerprint)))
+        let shown = self.keeping.then(|| {
+            let guard = self.engine.lock_graph();
+            let graph = guard.as_ref()?;
+            graph
+                .input(&PREVIEW, &fingerprint.as_str().to_owned())
+                .ok()?
+        });
+        let Some(proposal) = shown
+            .flatten()
+            .and_then(|shown| serde_json::from_str::<Proposal>(&shown).ok())
         else {
             return Ok(None);
         };
@@ -576,75 +621,48 @@ impl Proposer<'_> {
         }
     }
 
-    /// Writes what the run kept; why it could not, if it could not.
+    /// Writes what the run kept, and the graph with it; why it could not, if
+    /// it could not.
     pub(super) fn finish_kept(&self) -> Option<String> {
-        self.kept
-            .as_ref()?
-            .finish()
+        let mut guard = self.engine.lock_graph();
+        let graph = guard.as_mut()?;
+        let kept = self.pending.take();
+        let written = kept.into_iter().try_for_each(|(fingerprint, shown)| {
+            graph.set_input(
+                &PREVIEW,
+                &fingerprint.as_str().to_owned(),
+                shown,
+                Durability::Stable,
+            )
+        });
+        written
+            .and_then(|()| graph.commit())
             .err()
             .map(|e| format!("the previews were not kept: {e}"))
     }
 }
 
-/// The text edits of `ops`, and the digest of each file they are in as the fix
-/// is made over it.
-fn lowered(
-    ops: &[EditOp],
-    lowerer: &Lowerer,
-    sources: &Sources,
-) -> Result<(Vec<TextEdit>, BTreeMap<PathBuf, String>), String> {
-    let mut edits = Vec::new();
-    for op in ops {
-        edits.extend(
-            lowerer
-                .lower(op)
-                .map_err(|why| format!("{}: {why}", op_name(op)))?,
-        );
-    }
-    if edits.is_empty() {
-        return Err("the fix changes nothing".to_owned());
-    }
-    if self_overlap(&edits) {
-        return Err("the edits of the fix overlap each other".to_owned());
-    }
-    if moves_only(ops) {
-        for file in edits.iter().map(|e| &e.file).collect::<BTreeSet<_>>() {
-            let of_file: Vec<&TextEdit> = edits.iter().filter(|e| &e.file == file).collect();
-            keeps_declarations(&sources.text(file)?, &of_file)?;
-        }
-    }
-    let mut bases = BTreeMap::new();
-    for edit in &edits {
-        if !bases.contains_key(&edit.file) {
-            bases.insert(
-                edit.file.clone(),
-                hash::sha256(sources.text(&edit.file)?.as_str()),
-            );
-        }
-    }
-    Ok((edits, bases))
+/// Where the fix of a finding is made.
+enum Slot {
+    /// In the graph: the position of its ask.
+    Asked(usize),
+    /// Without it, or not at all.
+    Done(Box<Result<Proposal, String>>),
 }
 
-/// Whether `ops` only move declarations.
-fn moves_only(ops: &[EditOp]) -> bool {
-    ops.iter()
-        .all(|op| matches!(op, EditOp::Move { .. } | EditOp::Reorder { .. }))
-}
-
-fn op_name(op: &EditOp) -> &'static str {
-    match op {
-        EditOp::Move { .. } => "move",
-        EditOp::Delete { .. } => "delete",
-        EditOp::Reorder { .. } => "reorder",
-        EditOp::Rename { .. } => "rename",
-        EditOp::DeleteRange { .. } => "delete_range",
-        EditOp::Replace { .. } => "replace",
+/// The finding left without a fix, and why.
+fn declining(finding: &Diagnostic, reason: String) -> DeclinedFix {
+    DeclinedFix {
+        fingerprint: finding.fingerprint.clone(),
+        rule_id: finding.rule_id.clone(),
+        file: finding.file.clone(),
+        line: finding.span.start.line,
+        reason,
     }
 }
 
-/// What a preview is kept under.
-fn key(fingerprint: &Fingerprint) -> Digest {
-    let mut key = KeyBuilder::new();
-    key.part("fix-preview").part(fingerprint.as_str());
-    key.finish()
+fn not_open() -> Error {
+    Error::Graph(lighthouse_graph::Error::Encode(
+        "the graph is not open".to_owned(),
+    ))
 }

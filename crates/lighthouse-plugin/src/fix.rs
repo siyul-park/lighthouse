@@ -4,11 +4,11 @@
 
 use lighthouse_model::{
     Diagnostic, Options,
-    ucm::{Capability, FixOutcome, Project},
+    ucm::{Capability, FixOutcome, Model},
 };
 use serde_json::Value;
 
-use crate::{Error, Workspace};
+use crate::{Error, Queries, Workspace};
 
 /// Static description of a fixer: its identity and what the provider of the
 /// file it fixes must offer. A missing capability makes the orchestrator
@@ -22,7 +22,9 @@ pub struct FixerManifest {
 }
 
 /// Everything a fixer may read to answer for one finding. The project is the
-/// analysis the finding came from, read-only.
+/// code model as the graph holds it, and the indexes over it are pulled from
+/// the graph: what the fixer reads of them is recorded as what its answer
+/// depends on.
 pub struct FixRequest<'a> {
     pub finding: &'a Diagnostic,
     /// What the analysis knew about the finding's subject.
@@ -30,7 +32,8 @@ pub struct FixRequest<'a> {
     pub decision: &'a FixDecision,
     /// The options the finding's rule ran with.
     pub options: &'a Options,
-    pub project: &'a Project,
+    pub project: &'a dyn Model,
+    pub queries: &'a dyn Queries,
     pub workspace: &'a Workspace,
     /// The text of `finding.file`.
     pub text: &'a str,

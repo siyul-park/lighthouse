@@ -339,6 +339,12 @@ pub fn run_batches(graph: &Graph, wanted: Vec<Key>) -> Result<(), Error> {
     Ok(())
 }
 
+/// What a fixer pulls from `graph`: the kinds of the plugin that owns the
+/// facts, as a rule pulls them.
+pub fn queries<'g>(graph: &'g Graph) -> Result<impl Queries + 'g, Error> {
+    Ok(queries_of(graph, Runtime::of(graph)?))
+}
+
 fn findings(
     graph: &Graph,
     (rule, file, variant): &(String, String, String),

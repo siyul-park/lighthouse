@@ -1,4 +1,4 @@
-//! `results.db`: one table of what models answered and fixes proposed, by key, in WAL mode,
+//! `results.db`: one table of what models answered, by key, in WAL mode,
 //! `auto_vacuum = INCREMENTAL`. Lookups are answered
 //! while the run goes, each from a read-only connection of a small pool so that
 //! threads do not queue; stores and the use of what was found are written once,

@@ -337,12 +337,7 @@ pub(crate) fn fix(engine: &Engine, plan: &FixPlan, run: &FixRun) -> Result<FixRe
             ));
         }
     }
-    let (cache, kept) = match engine.open_cache() {
-        Some(Ok(cache)) => (Some(cache), None),
-        Some(Err(e)) => (None, Some(format!("the previews are not kept: {e}"))),
-        None => (None, None),
-    };
-    let proposer = Proposer::new(engine, plan, run).keeping(cache);
+    let proposer = Proposer::new(engine, plan, run).keeping(engine.cache.is_some());
     let mut orchestrator = Orchestrator {
         proposer: proposer.asking_models(),
         texts: Overlays::new(),
@@ -350,7 +345,7 @@ pub(crate) fn fix(engine: &Engine, plan: &FixPlan, run: &FixRun) -> Result<FixRe
         trail: Trail::default(),
         applied: Vec::new(),
         declined: BTreeMap::new(),
-        notes: kept.into_iter().collect(),
+        notes: Vec::new(),
         rounds: 0,
         previewable: BTreeMap::new(),
         previews: Vec::new(),

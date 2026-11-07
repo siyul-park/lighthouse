@@ -1,6 +1,6 @@
-//! The host result cache: what models answered and what fixes proposed, kept
-//! between runs under a key of everything they depend on. The findings of the
-//! rules are nodes of the graph, not rows here. The cache is local and derived:
+//! The host result cache: what models answered, kept between runs under a key
+//! of everything they depend on. The findings of the rules and the fixes are
+//! nodes of the graph, not rows here. The cache is local and derived:
 //! it is never committed, a run can bypass it, `clean` deletes it, and its size
 //! is kept under one size limit, see [`fit`]. Any doubt is a miss.
 

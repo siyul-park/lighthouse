@@ -26,7 +26,7 @@ use crate::{
         split::splits,
         tested,
     },
-    fact::{Fact, subject_key},
+    fact::{Fact, subject_key, subject_of},
     layout::contains,
     metrics::{
         MEASURES, Measures, measure,
@@ -219,6 +219,65 @@ impl Indexes for Computed<'_> {
                 .entry(key)
                 .or_insert_with(|| Arc::new(credited(self.model, prefix, modules))),
         )
+    }
+}
+
+/// The indexes as queries, for what pulls them by name over a model alone.
+impl Queries for Computed<'_> {
+    fn pull(&self, kind: &str, key: &str) -> Result<Arc<dyn Any + Send + Sync>, Error> {
+        if let Some(answer) = self.of_symbol(kind, key) {
+            return Ok(answer);
+        }
+        if let Some(answer) = self.of_name(kind, key) {
+            return Ok(answer);
+        }
+        match kind {
+            CREDITED => {
+                let (prefix, modules) = credit_of(key);
+                Ok(Arc::new(self.credited(prefix, &modules).as_ref().clone()))
+            }
+            MEASURES => {
+                let (_, file) = subject_of(key);
+                let measured: BTreeMap<SymbolId, Measures> = self
+                    .model
+                    .symbols_in(std::path::Path::new(file))
+                    .filter_map(|symbol| Some((symbol.id.clone(), self.measured(symbol)?)))
+                    .collect();
+                Ok(Arc::new(measured))
+            }
+            other => Err(Error::Failed(format!("`{other}` is no query of a model"))),
+        }
+    }
+}
+
+impl Computed<'_> {
+    /// The indexes whose key is a symbol.
+    fn of_symbol(&self, kind: &str, key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
+        let id = SymbolId::parse(key).unwrap_or_else(|| {
+            SymbolId::new(key, &[], "", lighthouse_model::ucm::SymbolKind::Function)
+        });
+        Some(match kind {
+            USERS => Arc::new(self.users(&id)),
+            OWNED => Arc::new(self.owned(&id)),
+            SPLIT => Arc::new(self.split(&id)),
+            REACH => Arc::new(self.reach(&id)),
+            _ => return None,
+        })
+    }
+
+    /// The indexes whose key is a name.
+    fn of_name(&self, kind: &str, key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
+        Some(match kind {
+            TAKERS => Arc::new(self.takers(key)),
+            NAMES => Arc::new(self.names(key)),
+            IMPORTS => Arc::new(self.imports(key)),
+            CYCLES => Arc::new(self.cycle(key)),
+            TYPES => Arc::new(self.types(key)),
+            PARENTS => Arc::new(self.parent(key)),
+            STABILITY => Arc::new(self.stability(key)),
+            TESTED => Arc::new(self.tested(key)),
+            _ => return None,
+        })
     }
 }
 

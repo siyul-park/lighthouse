@@ -35,6 +35,13 @@ use crate::{
     cache::{Digest, digest_of},
 };
 
+/// What the scope of a fix is checked against: the project and the text a path
+/// has before the change.
+pub(in crate::fix) trait Standing {
+    fn project(&self) -> &dyn Model;
+    fn text(&self, path: &Path) -> Option<String>;
+}
+
 /// What a program works over, which is also all it may read.
 pub(in crate::fix) struct World<'a> {
     pub(in crate::fix) files: &'a ProjectFiles,
@@ -106,6 +113,16 @@ impl<'a> World<'a> {
     }
 }
 
+impl Standing for World<'_> {
+    fn project(&self) -> &dyn Model {
+        &self.outcome.project
+    }
+
+    fn text(&self, path: &Path) -> Option<String> {
+        World::text(self, path)
+    }
+}
+
 /// How far the change of one attempt may go: the scope of its fix, the file
 /// its findings are in and, for the scope `symbol`, the extent of each.
 pub(in crate::fix) struct Bounds<'a> {
@@ -146,9 +163,12 @@ pub(in crate::fix) fn collect(
 pub(in crate::fix) fn accept(
     changes: Changes,
     bounds: &Bounds<'_>,
-    world: &World<'_>,
+    world: &dyn Standing,
 ) -> Result<BTreeMap<PathBuf, String>, (Class, String)> {
-    let reach = (bounds.scope == FixScope::References).then(|| {
+    // The file of the findings is always reached: the others are looked for
+    // only when the change is in some.
+    let wide = changes.keys().any(|path| path != bounds.file);
+    let reach = (bounds.scope == FixScope::References && wide).then(|| {
         let texts: BTreeMap<PathBuf, (String, String)> = changes
             .iter()
             .filter_map(|(path, change)| match change {
@@ -156,7 +176,7 @@ pub(in crate::fix) fn accept(
                 _ => None,
             })
             .collect();
-        reached(&world.outcome.project, bounds.file, &texts)
+        reached(world.project(), bounds.file, &texts)
     });
     if let Some(offence) = changes
         .iter()
@@ -192,7 +212,7 @@ fn offence(
     path: &Path,
     change: &Change,
     (bounds, reach): (&Bounds<'_>, Option<&BTreeSet<PathBuf>>),
-    world: &World<'_>,
+    world: &dyn Standing,
 ) -> Option<String> {
     let shown = path.display();
     let who = bounds.who;
@@ -203,7 +223,7 @@ fn offence(
             _ => format!("{who} changed `{shown}`, which is not text"),
         });
     };
-    if world.outcome.project.file(path).is_none() {
+    if world.project().file(path).is_none() {
         return Some(format!(
             "{who} changed `{shown}`, which Lighthouse does not index"
         ));
@@ -212,12 +232,14 @@ fn offence(
     if scope == FixScope::Files {
         return None;
     }
-    if let Some(reach) = reach {
-        return (!reach.contains(path)).then(|| {
-            format!(
-                "{who} changed `{shown}`, which refers to nothing changed in the file of the findings or in the files it reaches (scope `references`)"
-            )
-        });
+    if scope == FixScope::References {
+        return (path != bounds.file && !reach.is_some_and(|reach| reach.contains(path))).then(
+            || {
+                format!(
+                    "{who} changed `{shown}`, which refers to nothing changed in the file of the findings or in the files it reaches (scope `references`)"
+                )
+            },
+        );
     }
     if path != bounds.file {
         return Some(format!(

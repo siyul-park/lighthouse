@@ -198,6 +198,15 @@ impl Engine {
     /// build is the `binary` version, which every node reads.
     pub(super) fn environment(&self, rule: &dyn Rule) -> String {
         let mut hasher = Hasher::new();
+        hasher.update(self.setting());
+        hasher.update(rule.manifest().revision.as_deref().unwrap_or_default());
+        hasher.hex()
+    }
+
+    /// What every rule and fix depends on besides the code: the plugins and
+    /// how the languages are configured.
+    pub(crate) fn setting(&self) -> String {
+        let mut hasher = Hasher::new();
         for plugin in self.registry.manifests() {
             hasher.update(&plugin.id);
             hasher.update(&plugin.version);
@@ -211,7 +220,6 @@ impl Engine {
         for map in maps {
             hasher.update(map.unwrap_or_default());
         }
-        hasher.update(rule.manifest().revision.as_deref().unwrap_or_default());
         hasher.hex()
     }
 

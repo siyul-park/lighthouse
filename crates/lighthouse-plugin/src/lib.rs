@@ -38,7 +38,7 @@ pub use cel::{
 pub use error::Error;
 pub use findings::{
     BATCH, BATCHED, Batched, COMMAND, FINDINGS, Findings, JUDGED, Judged, Judging, Key, PATHS,
-    TOOL, judge, run_batches, set_judged,
+    TOOL, judge, queries, run_batches, set_judged,
 };
 pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
 pub use lighthouse_protocol::{

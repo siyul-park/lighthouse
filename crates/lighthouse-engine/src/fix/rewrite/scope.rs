@@ -11,10 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{
-    Span,
-    ucm::{Project, Symbol},
-};
+use lighthouse_model::{Span, ucm::Symbol};
 use similar::{DiffTag, TextDiff};
 
 /// The line, counted from 1 in `old`, of the first change to `old` that
@@ -53,7 +50,7 @@ pub(super) fn first_outside(old: &str, new: &str, extents: &[Span]) -> Option<us
 /// own signature changes, with its callers. `changes` holds the old and the
 /// new text of each file the change makes.
 pub(in crate::fix) fn reached(
-    project: &Project,
+    project: &dyn Model,
     file: &Path,
     changes: &BTreeMap<PathBuf, (String, String)>,
 ) -> BTreeSet<PathBuf> {
@@ -85,7 +82,12 @@ fn lines_of(extent: &Span) -> (usize, usize) {
 }
 
 /// The symbols of `path` whose lines change from `old` to `new`.
-fn changed_symbols<'a>(project: &'a Project, path: &Path, old: &str, new: &str) -> Vec<&'a Symbol> {
+fn changed_symbols<'a>(
+    project: &'a dyn Model,
+    path: &Path,
+    old: &str,
+    new: &str,
+) -> Vec<&'a Symbol> {
     let changed: Vec<Range<usize>> = TextDiff::from_lines(old, new)
         .ops()
         .iter()
@@ -113,7 +115,7 @@ fn changed_symbols<'a>(project: &'a Project, path: &Path, old: &str, new: &str) 
 /// The files that refer to `symbol`: those of its callers, of the symbols that
 /// refer to it, and of its sites, which also name the places outside any
 /// function.
-fn holders(project: &Project, symbol: &Symbol) -> BTreeSet<PathBuf> {
+fn holders(project: &dyn Model, symbol: &Symbol) -> BTreeSet<PathBuf> {
     project
         .callers(&symbol.id)
         .iter()

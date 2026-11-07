@@ -4,7 +4,9 @@ use std::fs;
 
 use lighthouse_model::{
     Position, Span,
-    ucm::{Edge, EdgeKind, File, Fragment, Place, Resolution, SymbolKind, Target, Visibility},
+    ucm::{
+        Edge, EdgeKind, File, Fragment, Place, Project, Resolution, SymbolKind, Target, Visibility,
+    },
 };
 
 use super::{rename::name_in, *};

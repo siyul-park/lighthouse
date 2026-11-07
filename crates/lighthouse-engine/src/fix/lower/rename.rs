@@ -1,7 +1,6 @@
 //! Renames: a symbol and every site that refers to it, when the names the
 //! edit would make cannot capture or shadow another.
 
-use lighthouse_model::ucm::Model;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -79,7 +78,7 @@ impl Lowerer<'_> {
             .symbol(id)
             .ok_or_else(|| format!("`{}` is not in the project", id.as_str()))?;
         self.rename_allowed(symbol, name)?;
-        let blocked = self.project.edges.iter().find(|e| {
+        let blocked = self.project.edges().find(|e| {
             e.kind != EdgeKind::Contains
                 && e.to == Target::Resolved(Node::Symbol(id.clone()))
                 && (e.resolution != Resolution::Semantic || e.site.is_none())
@@ -186,7 +185,7 @@ impl Lowerer<'_> {
                     .map(|s| s.id.module().to_owned()),
             );
         }
-        let taken = self.project.symbols.iter().find(|other| {
+        let taken = self.project.symbols().find(|other| {
             other.id != symbol.id
                 && other.name == name
                 && other.owner.is_none()
@@ -233,7 +232,7 @@ impl Lowerer<'_> {
         if name == symbol.name {
             return Err("the new name is the old one".to_owned());
         }
-        let taken = self.project.symbols.iter().any(|other| {
+        let taken = self.project.symbols().any(|other| {
             other.id != symbol.id
                 && other.name == name
                 && other.id.module() == symbol.id.module()
