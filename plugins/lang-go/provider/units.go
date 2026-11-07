@@ -88,23 +88,6 @@ var goEnvVars = []string{
 	"GOTOOLCHAIN", "GOAMD64", "GOARM", "GOARM64", "GO386", "GOMIPS", "GOMIPS64", "GOPPC64", "GORISCV64", "GOFIPS140",
 }
 
-// importsOf are the directories d imports, sorted.
-func (s *shape) importsOf(d *directory) []string {
-	seen := map[string]bool{}
-	for _, dep := range d.deps {
-		seen[dep.rel] = true
-	}
-	delete(seen, d.rel)
-	out := make([]string, 0, len(seen))
-	for rel := range seen {
-		if !filepath.IsAbs(rel) {
-			out = append(out, rel)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
 // moduleRoots are the modules of the project, one for each batch: what turns
 // an import path into a directory.
 func (pl *planner) moduleRoots(batches []*batch) bool {
@@ -319,7 +302,7 @@ func (r *run) directoryResult(s *shape, u sdk.UnitRef, found answer) sdk.UnitRes
 	res.Api = res.Body
 	if d := s.asked[u.ID]; d != nil {
 		res.Body, res.Api = d.content, apiOf(d)
-		res.Imports = s.importsOf(d)
+		res.Imports = importedUnits(d)
 		res.Reads = s.pl.reads
 	}
 	return res
@@ -352,6 +335,20 @@ func (r *run) regionsResult(u sdk.UnitRef, snippets []*snippet) sdk.UnitResult {
 		res.Incomplete = []sdk.Incomplete{}
 	}
 	return res
+}
+
+// importedUnits are the directories d imports, directly or not, sorted: the ones
+// whose `api` the `api` of d covers, so that a unit is asked again in the round
+// after one of them moved and not one round per level of imports.
+func importedUnits(d *directory) []string {
+	out := []string{}
+	for _, dep := range closure(d) {
+		if !filepath.IsAbs(dep.rel) {
+			out = append(out, dep.rel)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func joinRel(dir, name string) string {

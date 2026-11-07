@@ -57,6 +57,16 @@ func TestProviderUnits(t *testing.T) {
 		require.NotEmpty(t, units["a"].Body)
 	})
 
+	t.Run("a unit imports the directories its imports import", func(t *testing.T) {
+		root := t.TempDir()
+		writeTree(t, root, unitFixture)
+		writeFile(t, root, "c/c.go", "package c\n\nimport \"example.com/m/b\"\n\nfunc C() int { return b.B() }\n")
+
+		units := byID(unitsAt(t, root))
+
+		require.Equal(t, []string{"a", "b"}, units["c"].Imports, "a is covered by the api of b")
+	})
+
 	t.Run("a body edit moves the body of its unit and no api", func(t *testing.T) {
 		root := t.TempDir()
 		writeTree(t, root, unitFixture)

@@ -649,8 +649,9 @@ type-checks with `go/types`.
   its text without function and method bodies and the `api` of every project directory it
   imports, directly or not, so a body edit leaves every other unit's results alone (early
   cutoff, as in rustc's incremental compilation and Go's build action IDs, which hash the
-  export data of dependencies rather than their sources). Only the directories asked for
-  are loaded. A type that satisfies an interface of a package its unit does not import is
+  export data of dependencies rather than their sources), and the unit lists every one of
+  them as imported, so an edit of an `api` is settled in one round. Only the directories
+  asked for are loaded. A type that satisfies an interface of a package its unit does not import is
   settled by the host from the method sets the unit states (see "Method sets").
   `go.mod`, `go.sum`, `go.work`,
   `go.work.sum` and the `go env` values that decide a build are the settings of every unit.
