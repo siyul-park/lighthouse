@@ -8,6 +8,7 @@
 //! control calls of `lighthouse-session`, and test support.
 
 mod copy;
+mod launch;
 mod program;
 mod sandbox;
 
@@ -21,11 +22,13 @@ pub use sandbox::{
     simulate_unavailable,
 };
 
+use launch::{Running, start};
 use sandbox::{Started, ended, runnable, wrap};
 use std::{
-    io::{self, Read, Write},
+    collections::BTreeMap,
+    io::{Read, Write},
     path::Path,
-    process::{Child, Command, Stdio},
+    process::Child,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -180,6 +183,10 @@ pub fn run_lines(invocation: &Invocation, lines: Lines) -> Result<Ran, String> {
 /// then collects it. A program that already exited is only collected: its
 /// group id may have been reused.
 pub fn reap(child: &mut Child) {
+    reap_running(child);
+}
+
+fn reap_running(child: &mut dyn Running) {
     if !matches!(child.try_wait(), Ok(None)) {
         let _ = child.wait();
         return;
@@ -204,58 +211,56 @@ fn run_with(invocation: &Invocation, lines: Option<Lines>) -> Result<Ran, String
         || invocation.argv.to_vec(),
         |s| wrap(&s.plan, invocation.argv),
     );
-    let (launcher, args) = argv.split_first().ok_or("no program")?;
-    let mut command = Command::new(launcher);
-    command
-        .args(args)
-        .current_dir(invocation.dir)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let Some(env) = invocation.env {
-        command.env_clear().envs(env.iter().map(|(k, v)| (k, v)));
-    }
+    let mut env: BTreeMap<_, _> = match invocation.env {
+        Some(env) => env.iter().map(|(k, v)| (k.into(), v.into())).collect(),
+        None => std::env::vars_os().collect(),
+    };
     if let Some(sandboxed) = &sandboxed {
-        command.envs(sandboxed.env());
+        env.extend(
+            sandboxed
+                .env()
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into())),
+        );
     }
-    detach(
-        &mut command,
+    let (mut child, pipes) = start(
+        &argv,
+        invocation.dir,
+        &env,
         sandboxed.is_some() && cfg!(target_os = "macos"),
-    );
-    let mut child = command
-        .spawn()
-        .map_err(|e| format!("cannot start `{program}`: {e}"))?;
-    let mut input = child.stdin.take().ok_or("no stdin")?;
+    )
+    .map_err(|e| format!("cannot start `{program}`: {e}"))?;
+    let mut input = pipes.stdin;
     let payload = invocation.stdin.to_vec();
     let writer = thread::spawn(move || {
         let _ = input.write_all(&payload);
     });
     let stdout = match lines {
-        Some(lines) => capture_lines(child.stdout.take(), lines),
-        None => capture(child.stdout.take(), invocation.max_output),
+        Some(lines) => capture_lines(Some(pipes.stdout), lines),
+        None => capture(Some(pipes.stdout), invocation.max_output),
     };
-    let stderr = capture(child.stderr.take(), invocation.max_output);
+    let stderr = capture(Some(pipes.stderr), invocation.max_output);
     let started = Instant::now();
     let status = loop {
-        match exited(&mut child) {
+        match exited(&mut *child) {
             Ok(Some(())) => {
                 // The leader has exited but is not yet collected, so its group
                 // id is still ours: take down whatever it left running before
                 // collecting it, so a daemon holding the pipes cannot hang the
                 // run.
-                signal_group(&child, true);
+                signal_group(&*child, true);
                 match child.wait() {
                     Ok(status) => break status,
                     Err(e) => return Err(e.to_string()),
                 }
             }
             Ok(None) if started.elapsed() >= invocation.limit => {
-                stop(&mut child, invocation.grace);
+                stop(&mut *child, invocation.grace);
                 return Err(format!("timed out after {}s", invocation.limit.as_secs()));
             }
             Ok(None) => thread::sleep(POLL),
             Err(e) => {
-                reap(&mut child);
+                reap_running(&mut *child);
                 return Err(e.to_string());
             }
         }
@@ -293,35 +298,9 @@ fn refusals(hosts: &[String]) -> Vec<u8> {
     .into_bytes()
 }
 
-/// Puts the program in a process group of its own, which is how its whole tree
-/// is stopped; with `session`, in a session of its own as well, so that it has
-/// no terminal to write to. A session leader leads its group, so both are
-/// stopped the same way. (Bubblewrap makes the session itself.)
-#[cfg(unix)]
-fn detach(command: &mut Command, session: bool) {
-    use std::os::unix::process::CommandExt;
-    if session {
-        // SAFETY: `setsid` only changes the session of the child, between fork
-        // and exec, and is safe to call there.
-        unsafe {
-            command.pre_exec(|| {
-                if libc::setsid() < 0 {
-                    return Err(io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-    } else {
-        command.process_group(0);
-    }
-}
-
-#[cfg(not(unix))]
-fn detach(_command: &mut Command, _session: bool) {}
-
 /// Asks the program's process group to stop, then kills the whole group after
 /// `grace` whether or not the leader obeyed, and collects the leader.
-fn stop(child: &mut Child, grace: Duration) {
+fn stop(child: &mut dyn Running, grace: Duration) {
     signal_group(child, false);
     let asked = Instant::now();
     while asked.elapsed() < grace {
@@ -333,12 +312,12 @@ fn stop(child: &mut Child, grace: Duration) {
     // Whether or not the leader obeyed, what it left running is killed. A
     // leader that exited is not collected yet, so the group id is still ours.
     signal_group(child, true);
-    reap(child);
+    reap_running(child);
 }
 
 /// Signals the process group the program led: SIGKILL when `kill`, else
 /// SIGTERM.
-fn signal_group(child: &Child, kill: bool) {
+fn signal_group(child: &dyn Running, kill: bool) {
     #[cfg(unix)]
     if let Ok(pid) = i32::try_from(child.id()) {
         let signal = if kill { libc::SIGKILL } else { libc::SIGTERM };
@@ -353,7 +332,7 @@ fn signal_group(child: &Child, kill: bool) {
 
 /// Whether the program has exited, without collecting it: its process group
 /// stays ours until it is waited for.
-fn exited(child: &mut Child) -> std::io::Result<Option<()>> {
+fn exited(child: &mut dyn Running) -> std::io::Result<Option<()>> {
     #[cfg(unix)]
     {
         let pid: libc::id_t = child.id();

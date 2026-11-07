@@ -3,7 +3,10 @@
 
 use std::{
     fs,
-    os::unix::net::{UnixListener, UnixStream},
+    os::{
+        fd::AsRawFd,
+        unix::net::{UnixListener, UnixStream},
+    },
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -297,6 +300,41 @@ fn a_program_leads_its_group_in_a_session_of_its_own_and_has_no_terminal() {
     let ran = world.run(script, &world.profile(&[]));
 
     assert_eq!(lines(&ran), ["leader", "no terminal"], "{ran:?}");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn a_program_is_the_leader_of_a_session_of_its_own_and_cannot_open_a_terminal() {
+    let world = World::new();
+    let script = r#"exec python3 -I -c 'import os
+print(os.getsid(0) == os.getpid())
+try:
+    open("/dev/tty", "w")
+    print("terminal")
+except OSError:
+    print("no terminal")'"#;
+
+    let ran = world.run(script, &world.profile(&[]));
+
+    assert_eq!(lines(&ran), ["True", "no terminal"], "{ran:?}");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn a_program_inherits_no_descriptor_but_the_three_standard_ones() {
+    let world = World::new();
+    let leaked = fs::File::open("/dev/null").unwrap();
+    // SAFETY: fcntl only clears the close-on-exec flag of a descriptor we own.
+    let cleared = unsafe { libc::fcntl(leaked.as_raw_fd(), libc::F_SETFD, 0) };
+    assert_eq!(
+        cleared, 0,
+        "the control: a descriptor that would be inherited"
+    );
+    let script = r#"exec perl -e 'print join(",", grep { -e "/dev/fd/$_" } 0..255), "\n"'"#;
+
+    let ran = world.run(script, &world.profile(&[]));
+
+    assert_eq!(lines(&ran), ["0,1,2"], "{ran:?}");
 }
 
 #[cfg(target_os = "macos")]
