@@ -90,7 +90,7 @@ fn a_function_is_not_moved_into_a_class() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("rolled back").not())
-        .stderr(predicate::str::contains("not in the same block"));
+        .stderr(predicate::str::contains("the fix changes nothing"));
 
     assert_eq!(read(&dir, "test_shapes.py"), FIXTURE_AFTER_CLASS);
 }
@@ -129,7 +129,7 @@ fn fixtures_move_above_the_tests_below_the_imports_and_the_second_fix_is_a_no_op
 }
 
 #[test]
-fn a_constant_is_not_moved_above_a_late_import() {
+fn a_late_import_stays_above_the_constant_that_reads_it() {
     let Some(dir) = python(&[("test_width.py", LATE_IMPORT)]) else {
         return;
     };
@@ -137,10 +137,18 @@ fn a_constant_is_not_moved_above_a_late_import() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--decision", "testing/file-layout"])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("above the imports"));
+        .success()
+        .stderr(predicate::str::contains("rolled back").not());
 
-    assert_eq!(read(&dir, "test_width.py"), LATE_IMPORT);
+    let fixed = read(&dir, "test_width.py");
+    assert!(
+        fixed.find("import os").unwrap() < fixed.find("WIDTH =").unwrap(),
+        "{fixed}"
+    );
+    assert!(
+        fixed.find("WIDTH =").unwrap() < fixed.find("def test_area").unwrap(),
+        "{fixed}"
+    );
 }
 
 const TS_SOURCE: &str = "export function area(n: number): number {\n  return n * n;\n}\n";
@@ -149,7 +157,7 @@ const TS_SOURCE: &str = "export function area(n: number): number {\n  return n *
 const TS_LATE_IMPORT: &str = "import { it, expect } from \"vitest\";\nimport { area } from \"./svc\";\n\nit(\"squares\", () => {\n  expect(area(WIDTH)).toBe(4);\n});\n\nimport { two } from \"./two\";\n\nexport const WIDTH = two;\n";
 
 #[test]
-fn a_typescript_fixture_is_not_moved_above_an_import() {
+fn a_typescript_import_stays_above_the_fixture_that_reads_it() {
     let Some(dir) = project(
         "lang-typescript",
         lighthouse_test_support::lang_typescript(),
@@ -169,9 +177,17 @@ fn a_typescript_fixture_is_not_moved_above_an_import() {
     lighthouse(dir.path())
         .args(["check", "--fix", "--decision", "testing/file-layout"])
         .assert()
-        .stderr(predicate::str::contains("above the imports"));
+        .stderr(predicate::str::contains("rolled back").not());
 
-    assert_eq!(read(&dir, "svc.test.ts"), TS_LATE_IMPORT);
+    let fixed = read(&dir, "svc.test.ts");
+    assert!(
+        fixed.find("import { two }").unwrap() < fixed.find("const WIDTH").unwrap(),
+        "{fixed}"
+    );
+    assert!(
+        fixed.find("const WIDTH").unwrap() < fixed.find("it(\"squares\"").unwrap(),
+        "{fixed}"
+    );
 }
 
 const RUST_LATE_USE: &str = "/// A.\npub fn a() -> i32 {\n    1\n}\n\nuse std::cmp::max;\n\n/// B.\npub fn b() -> i32 {\n    max(a(), LIMIT)\n}\n\n/// The limit.\nconst LIMIT: i32 = 3;\n";

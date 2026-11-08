@@ -444,6 +444,9 @@ impl<'a> Builder<'a> {
         self.api_facts(map, symbol, summary);
         self.role_facts(map, symbol, summary);
         self.tie_facts(map, symbol, needs);
+        if needs.field("file_users") {
+            map.insert("file_users".to_owned(), self.file_users(symbol));
+        }
         if needs.field("touched_by_tests") {
             map.insert(
                 "touched_by_tests".to_owned(),

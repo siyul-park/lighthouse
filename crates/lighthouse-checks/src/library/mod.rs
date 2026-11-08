@@ -9,4 +9,4 @@ mod needs;
 mod variables;
 pub(crate) use functions::{check_calls, libraries_called};
 pub(crate) use needs::Needs;
-pub(crate) use variables::{check_scope, declare as declare_variables, reached};
+pub(crate) use variables::{check_scope, declare as declare_variables, reached, read_by};

@@ -110,8 +110,10 @@ impl CelRule {
             read.iter().copied(),
         )?;
         let roots: Vec<&Program> = read[variables.len() + bodies.len()..].to_vec();
-        let used = library::reached(&variables, &declared.functions, &bodies, &roots);
-        let needs = Needs::reading(read.iter().copied());
+        let (used, called) = library::reached(&variables, &declared.functions, &bodies, &roots);
+        let needs = Needs::reading(library::read_by(
+            &roots, &variables, &used, &bodies, &called,
+        ));
         if needs.reads_file_annotations() && select != Select::Annotation {
             return Err(Error::invalid(
                 id,

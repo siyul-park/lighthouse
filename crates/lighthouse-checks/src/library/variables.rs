@@ -88,14 +88,15 @@ pub(crate) fn check_scope(
 }
 
 /// Per value variable, whether `roots` read it: by name, through another
-/// variable it is read by, or through a function variable they call. A
-/// variable that nothing reads is not evaluated.
+/// variable it is read by, or through a function variable they call; and per
+/// function variable, whether they call it. A variable that nothing reads is
+/// not evaluated, and what only it reads is not asked of the code.
 pub(crate) fn reached(
     values: &[(String, Arc<Program>)],
     functions: &[&Variable],
     bodies: &[Arc<Program>],
     roots: &[&Program],
-) -> Vec<bool> {
+) -> (Vec<bool>, Vec<bool>) {
     let mut used = vec![false; values.len()];
     let mut called = vec![false; functions.len()];
     let mut pending: Vec<&Program> = roots.to_vec();
@@ -113,7 +114,36 @@ pub(crate) fn reached(
             }
         }
     }
-    used
+    (used, called)
+}
+
+/// The programs the code reads: `roots`, the value variables `used` and the
+/// function bodies `called`.
+pub(crate) fn read_by<'p>(
+    roots: &[&'p Program],
+    values: &'p [(String, Arc<Program>)],
+    used: &[bool],
+    bodies: &'p [Arc<Program>],
+    called: &[bool],
+) -> Vec<&'p Program> {
+    let values = values.iter().map(|(_, program)| program);
+    roots
+        .iter()
+        .copied()
+        .chain(
+            values
+                .zip(used)
+                .filter(|(_, used)| **used)
+                .map(|(p, _)| p.as_ref()),
+        )
+        .chain(
+            bodies
+                .iter()
+                .zip(called)
+                .filter(|(_, called)| **called)
+                .map(|(body, _)| body.as_ref()),
+        )
+        .collect()
 }
 
 fn call(

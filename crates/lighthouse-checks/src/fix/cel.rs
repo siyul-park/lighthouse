@@ -114,9 +114,16 @@ impl CelFix {
             &declared.functions,
             read.iter().copied(),
         )?;
-        let used = library::reached(&variables, &declared.functions, &bodies, &[&edits]);
+        let (used, called) = library::reached(&variables, &declared.functions, &bodies, &[&edits]);
+        let needs = Needs::reading(library::read_by(
+            &[&edits],
+            &variables,
+            &used,
+            &bodies,
+            &called,
+        ));
         Ok(Self {
-            needs: Needs::reading(read.iter().copied()),
+            needs,
             used,
             edits,
             variables,

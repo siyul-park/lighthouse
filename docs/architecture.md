@@ -815,7 +815,7 @@ The run that ends the fixing resolves the findings the fixes removed.
 
 Bundled fixes: `design/declaration-groups` (a `move` of a declaration before the first one it
 must precede, or a `reorder` of the file in the order of the declarations' places) and
-`testing/file-layout` (a `move` of a fixture above, or a helper below, the tests) are safe;
+`testing/file-layout` (a `reorder` of the file that puts the fixtures above, and the helpers below, the tests) are safe;
 `design/vertical-distance` (a `move` next to the related symbol or the caller),
 `design/no-noise-comment` and `core/no-unused-allow` (a `delete` of the comment or the
 annotation line) are unsafe. An `impl` block is not a symbol, so

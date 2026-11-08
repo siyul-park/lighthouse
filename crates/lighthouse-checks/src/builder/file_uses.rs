@@ -1,7 +1,7 @@
 //! The facts of what a symbol is tied to: who calls it and what it calls or
-//! references in its own file.
+//! references in its own file, and which declarations of the file use it.
 
-use std::rc::Rc;
+use std::{collections::BTreeSet, rc::Rc};
 
 use lighthouse_model::ucm::{LoadNeed, LoadPoint, Symbol, SymbolId};
 use serde_json::{Map, Value, json};
@@ -10,7 +10,7 @@ use super::Builder;
 use crate::library::Needs;
 
 impl Builder<'_> {
-    /// `local_callers` and `file_uses`, each when `needs` asks for it.
+    /// The facts of what `symbol` is tied to, each when `needs` asks for it.
     pub(super) fn tie_facts(&self, map: &mut Map<String, Value>, symbol: &Symbol, needs: &Needs) {
         if needs.field("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));
@@ -24,6 +24,20 @@ impl Builder<'_> {
         if needs.field("file_uses") {
             map.insert("file_uses".to_owned(), self.file_uses(symbol));
         }
+    }
+
+    /// The ids of the declarations of the same file that use `symbol`, tests too.
+    pub(super) fn file_users(&self, symbol: &Symbol) -> Value {
+        let project = self.project;
+        let users = (project.callers(&symbol.id).iter()).chain(project.references(&symbol.id));
+        let same = |s: &&Symbol| s.id != symbol.id && s.file == symbol.file;
+        json!(
+            users
+                .filter_map(|id| project.symbol(id))
+                .filter(same)
+                .map(|s| s.id.as_str())
+                .collect::<BTreeSet<_>>()
+        )
     }
 
     /// The ids of the symbols of the same file that `symbol` calls or

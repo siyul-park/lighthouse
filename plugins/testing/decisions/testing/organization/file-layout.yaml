@@ -71,13 +71,21 @@ spec:
             : s.kind == 'const' ? 1 : s.kind == 'var' ? 2 : 3
       # The fixture is put before the first declaration of a later group, or
       # the first test; below the declarations it needs as the file loads.
-      - name: floor
-        expression: "size(symbol.load_after) > 0 ? symbol.load_after[size(symbol.load_after) - 1].pos : 0"
-      - name: anchor
+      - name: floor_of
+        params: [s]
+        expression: "size(s.load_after) > 0 ? s.load_after[size(s.load_after) - 1].pos : 0"
+      - name: anchor_after
+        params: [s, below]
         expression: >-
-          cel.bind(c, file.symbols.filter(d, d.id != symbol.id && d.pos > floor
-              && (d.kind == 'test' || d.declaration && group_rank(d) > group_rank(symbol))).sortBy(d, d.pos),
+          cel.bind(c, file.symbols.filter(d, d.id != s.id && 1000 * d.pos > below
+              && (d.kind == 'test' || d.declaration && group_rank(d) > group_rank(s))).sortBy(d, d.pos),
             size(c) > 0 ? c[0] : first)
+      - name: anchor_of
+        params: [s]
+        expression: "anchor_after(s, 1000 * floor_of(s))"
+      - name: anchor
+        expression: "anchor_of(symbol)"
+      # The first use of the helper below it, for the message.
       - name: user
         expression: >-
           cel.bind(c, (symbol.callers + symbol.references).filter(u, u.file == symbol.file && u.pos > symbol.pos),
@@ -86,14 +94,25 @@ spec:
       # written: `load_after` are the declarations a declaration needs bound
       # above it as the file loads, `load_before` the code that needs it bound
       # above that. A move that breaks one is not asked for.
+      - name: late_fixture
+        params: [s]
+        expression: >-
+          s.test_role == 'fixture' && size(first) > 0 && first.pos < s.pos
+            && s.load_after.all(b, b.pos < first.pos)
+      # The uses a helper can go below: the first is the one it is reported
+      # for, the last the one it is moved after.
+      - name: sinks
+        params: [s]
+        expression: >-
+          file.symbols.filter(u, u.id in s.file_users && u.pos > s.pos
+              && s.load_before.all(x, x.pos > u.pos)).sortBy(u, u.pos)
+      - name: late_helper
+        params: [s]
+        expression: "s.test_role == 'test-helper' && size(sinks(s)) > 0"
       - name: misplaced_fixture
-        expression: >-
-          symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
-            && symbol.load_after.all(b, b.pos < first.pos)
+        expression: "late_fixture(symbol)"
       - name: misplaced_helper
-        expression: >-
-          symbol.test_role == 'test-helper' && size(user) > 0
-            && symbol.load_before.all(x, x.pos > user.pos)
+        expression: "late_helper(symbol)"
       - name: owner_tests
         expression: "tests.filter(t, has(t.owned) && t.owned != null && t.owned.file != '')"
       - name: homes
@@ -120,6 +139,79 @@ spec:
         expression: "misplaced_order ? comparable.filter(u, u.pos > mine.pos && u.owned.pos < mine.owned.pos) : []"
       - name: sorted_tests
         expression: "comparable.sortBy(t, t.owned.pos).map(t, t.id)"
+      # The order of the file that fixes every finding of it at once: what the
+      # file-layout does not touch keeps its place, a fixture goes before its
+      # anchor, a helper after the last use it can go below and the owner tests
+      # take the places of the owner tests in the order of their targets. A
+      # place is a number of thousandths of a position; a helper that is used
+      # by a helper is placed after that one (chains of three are placed in one
+      # step, longer ones in the next round).
+      - name: slots
+        expression: "comparable.map(t, t.pos).sortBy(p, p)"
+      - name: base
+        params: [s]
+        expression: >-
+          1000 * (s.kind == 'test' && s.id in sorted_tests && comparable.all(t, size(t.load_after) == 0)
+            ? slots[sorted_tests.indexOf(s.id)] : s.pos)
+      - name: sink_of
+        params: [s]
+        expression: "sinks(s)[size(sinks(s)) - 1]"
+      - name: below_1
+        params: [s]
+        expression: "late_helper(s) ? base(sink_of(s)) + 1 : base(s)"
+      - name: below_2
+        params: [s]
+        expression: "late_helper(s) ? below_1(sink_of(s)) + 1 : base(s)"
+      - name: below_3
+        params: [s]
+        expression: "late_helper(s) ? below_2(sink_of(s)) + 1 : base(s)"
+      # A fixture goes before its anchor, the fixtures of one anchor in the
+      # order of their groups. One that needs a fixture below the tests goes
+      # after it: the fixtures that move are found step by step (a fixture
+      # whose needs are above the tests, then one whose needs are those, and so
+      # on to three steps; a longer chain is met in the next round).
+      - name: below_tests
+        params: [s]
+        expression: "s.test_role == 'fixture' && size(first) > 0 && first.pos < s.pos"
+      - name: top
+        params: [places]
+        expression: "size(places) > 0 ? places.sort()[size(places) - 1] : 0"
+      - name: lift
+        params: [s]
+        expression: >-
+          1000 * anchor_after(s, 1000 * top(s.load_after.filter(c, c.pos < first.pos).map(c, c.pos))).pos
+            - 500 + group_rank(s)
+      - name: step_1
+        expression: "file.symbols.filter(d, late_fixture(d))"
+      - name: step_2
+        expression: >-
+          file.symbols.filter(d, below_tests(d)
+            && d.load_after.all(c, c.pos < first.pos || c.id in step_1.map(e, e.id)))
+      - name: step_3
+        expression: >-
+          file.symbols.filter(d, below_tests(d)
+            && d.load_after.all(c, c.pos < first.pos || c.id in step_2.map(e, e.id)))
+      # The place of each fixture of a step, as [id, place].
+      - name: places_1
+        expression: "step_1.map(d, [d.id, lift(d)])"
+      - name: places_2
+        expression: >-
+          step_2.map(d, [d.id, top([lift(d)]
+            + d.load_after.filter(c, places_1.exists(p, p[0] == c.id))
+                .map(c, places_1.filter(p, p[0] == c.id)[0][1] + 1))])
+      - name: places_3
+        expression: >-
+          step_3.map(d, [d.id, top([lift(d)]
+            + d.load_after.filter(c, places_2.exists(p, p[0] == c.id))
+                .map(c, places_2.filter(p, p[0] == c.id)[0][1] + 1))])
+      - name: place
+        params: [s]
+        expression: >-
+          cel.bind(f, places_3.filter(p, p[0] == s.id), size(f) > 0 ? f[0][1] : below_3(s))
+      - name: ordered
+        expression: >-
+          file.symbols.filter(s, s.declaration || s.kind == 'test').sortBy(s, s.pos)
+            .sortBy(s, place(s)).map(s, s.id)
     where: >-
       (misplaced_fixture || misplaced_helper || misplaced_order)
     message: >-
@@ -142,11 +234,7 @@ spec:
   fix:
     safety: safe
     type: cel
-    edits: >-
-      misplaced_fixture ? [move(symbol, before(anchor))]
-      : misplaced_helper ? [move(symbol, after(user))]
-      : misplaced_order ? [reorder(sorted_tests)]
-      : []
+    edits: "[reorder(ordered)]"
   provenance:
     wasDerivedFrom:
       - "Martin, Clean Code (2008), ch. 5 Vertical size and ordering"
@@ -349,6 +437,174 @@ spec:
             func TestGet(t *testing.T) { checkGet(t) }
       expect:
         - line: 9
+    - name: fixtures-and-helpers-out-of-place-fixed-in-one-reorder
+      language: go
+      kind: invalid
+      fixed:
+        - path: store_test.go
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            const want = 1
+
+            var limit = want + 1
+
+            func TestGet(t *testing.T) { checkGet(t) }
+
+            func checkGet(t *testing.T) {
+            	t.Helper()
+            	if store.Get() != want {
+            		t.Fatal("get")
+            	}
+            }
+
+            func TestLimit(t *testing.T) { checkLimit(t) }
+
+            func checkLimit(t *testing.T) {
+            	t.Helper()
+            	if limit != 2 {
+            		t.Fatal("limit")
+            	}
+            }
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            // Get is part of the example.
+            func Get() int { return 1 }
+        - path: store_test.go
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            func checkGet(t *testing.T) {
+            	t.Helper()
+            	if store.Get() != want {
+            		t.Fatal("get")
+            	}
+            }
+
+            func TestGet(t *testing.T) { checkGet(t) }
+
+            const want = 1
+
+            var limit = want + 1
+
+            func TestLimit(t *testing.T) { checkLimit(t) }
+
+            func checkLimit(t *testing.T) {
+            	t.Helper()
+            	if limit != 2 {
+            		t.Fatal("limit")
+            	}
+            }
+      expect:
+        - line: 9
+        - line: 18
+        - line: 20
+    - name: helper-and-fixtures-of-every-group-fixed-in-one-reorder
+      language: go
+      kind: invalid
+      fixed:
+        - path: store_test.go
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            type row struct{ n int }
+
+            const want = 1
+
+            var limit = want + 1
+
+            func newRow() row { return row{n: limit} }
+
+            func TestGet(t *testing.T) { checkGet(t) }
+
+            func checkGet(t *testing.T) {
+            	t.Helper()
+            	if store.Get() != want {
+            		t.Fatal("get")
+            	}
+            }
+
+            func TestRow(t *testing.T) {
+            	if newRow().n != limit {
+            		t.Fatal("row")
+            	}
+            }
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            // Get is part of the example.
+            func Get() int { return 1 }
+        - path: store_test.go
+          body: |-
+            package store_test
+
+            import (
+            	"testing"
+
+            	"example.com/store"
+            )
+
+            func checkGet(t *testing.T) {
+            	t.Helper()
+            	if store.Get() != want {
+            		t.Fatal("get")
+            	}
+            }
+
+            func TestGet(t *testing.T) { checkGet(t) }
+
+            func newRow() row { return row{n: limit} }
+
+            var limit = want + 1
+
+            type row struct{ n int }
+
+            const want = 1
+
+            func TestRow(t *testing.T) {
+            	if newRow().n != limit {
+            		t.Fatal("row")
+            	}
+            }
+      expect:
+        - line: 9
+        - line: 18
+        - line: 20
+        - line: 22
+        - line: 24
     - name: fixtures-tests-helpers
       language: go
       kind: valid
@@ -531,7 +787,6 @@ spec:
           import { get } from "./store";
 
           const base = 1;
-
           const want = base + 1;
 
           it("returns the wanted value", () => {
@@ -564,8 +819,6 @@ spec:
       - path: test_limits.py
         body: |-
           _BASE = 2
-
-
           MAX = _BASE * 2
 
 
@@ -587,8 +840,16 @@ spec:
       kind: invalid
       fixed:
       - path: test_rows.py
-        body: |-
+        body: |
+          class Base:
+              pass
+
+
           LIMIT = 4
+
+
+          class Row(Base):
+              pass
 
 
           def register(limit: int):
@@ -596,14 +857,6 @@ spec:
                   return function
 
               return wrap
-
-
-          class Base:
-              pass
-
-
-          class Row(Base):
-              pass
 
 
           @register(LIMIT)
@@ -615,7 +868,7 @@ spec:
               assert make() == 4
       files:
       - path: test_rows.py
-        body: |-
+        body: |
           def test_make() -> None:
               assert make() == 4
 
