@@ -377,6 +377,9 @@ type Event struct {
 type Flow struct {
 	// `switch`: arms other than the default arm.
 	Arms int `json:"arms,omitempty"`
+	// `if`: no `else`, and a body that only jumps (`return`, `break`,
+	// `continue`, `panic`).
+	Guard bool `json:"guard,omitempty"`
 	// Normalized control-flow construct, the same for every language. One of "if", "else-if", "else", "switch", "loop", "catch", "jump", "logic", "recursion".
 	Kind    string `json:"kind"`
 	Nesting int    `json:"nesting"`

@@ -4,10 +4,17 @@ use super::*;
 
 impl Walker<'_> {
     pub(super) fn if_expr(&mut self, i: &ExprIf, chained: bool) {
-        self.event(if chained {
-            FlowKind::ElseIf
-        } else {
-            FlowKind::If
+        self.flow.push(Flow {
+            kind: if chained {
+                FlowKind::ElseIf
+            } else {
+                FlowKind::If
+            },
+            nesting: self.nesting,
+            arms: 0,
+            operators: 0,
+            returning: false,
+            guard: !chained && i.else_branch.is_none() && only_jumps(&i.then_branch),
         });
         self.scoped(|w| {
             w.visit_expr(&i.cond);
@@ -38,6 +45,7 @@ impl Walker<'_> {
             arms: u32::try_from(arms).unwrap_or(u32::MAX),
             operators: 0,
             returning: self.match_returning(m),
+            guard: false,
         });
         self.visit_expr(&m.expr);
         self.nested_in(|w| {
@@ -94,6 +102,7 @@ impl Walker<'_> {
                 arms: 0,
                 operators: u32::try_from(run).unwrap_or(u32::MAX),
                 returning: false,
+                guard: false,
             });
             at += run;
         }
@@ -164,6 +173,18 @@ fn is_return(body: &Expr) -> bool {
     match body {
         Expr::Return(_) => true,
         Expr::Block(b) => matches!(b.block.stmts.as_slice(), [Stmt::Expr(e, _)] if is_return(e)),
+        _ => false,
+    }
+}
+
+/// A block of one `return`, `break`, `continue` or `panic!`.
+fn only_jumps(block: &syn::Block) -> bool {
+    match block.stmts.as_slice() {
+        [Stmt::Expr(e, _)] => {
+            matches!(e, Expr::Return(_) | Expr::Break(_) | Expr::Continue(_))
+                || matches!(e, Expr::Macro(m) if m.mac.path.is_ident("panic"))
+        }
+        [Stmt::Macro(m)] => m.mac.path.is_ident("panic"),
         _ => false,
     }
 }

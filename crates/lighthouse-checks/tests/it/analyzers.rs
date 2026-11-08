@@ -173,7 +173,7 @@ fn dispatchers_are_single_switches_whose_arms_only_return() {
 }
 
 #[test]
-fn flat_dispatch_is_one_top_level_switch_nested_at_most_two_levels() {
+fn flat_dispatch_is_one_top_level_switch_nested_at_most_two_levels_among_guards() {
     use FlowKind::*;
     let flat = |nesting: u32, flow: &[Flow]| {
         let f = symbol("m", "f", SymbolKind::Function, FILE, (1, 1));
@@ -187,6 +187,13 @@ fn flat_dispatch_is_one_top_level_switch_nested_at_most_two_levels() {
     assert!(!flat(0, &[at(Switch, 0), at(Loop, 0)]));
     assert!(!flat(0, &[at(Switch, 0), at(Switch, 0)]));
     assert!(!flat(0, &[at(If, 1)]));
+    let guard = Flow {
+        guard: true,
+        ..at(If, 0)
+    };
+    assert!(flat(0, &[guard, at(Switch, 0), guard]));
+    assert!(!flat(0, &[guard, at(If, 0), at(Switch, 0)]));
+    assert!(!flat(0, &[guard]));
 }
 
 #[test]

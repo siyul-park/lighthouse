@@ -350,6 +350,7 @@
           ],
           "flow": [
             {
+              "guard": true,
               "kind": "if",
               "nesting": 0
             }

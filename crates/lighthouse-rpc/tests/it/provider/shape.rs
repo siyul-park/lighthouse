@@ -149,7 +149,7 @@ done:
             flow(FlowKind::Else, 2),
             switch(1, false),
             flow(FlowKind::If, 1),
-            flow(FlowKind::If, 0),
+            guard(),
             flow(FlowKind::Jump, 1),
             flow(FlowKind::Recursion, 0),
         ]

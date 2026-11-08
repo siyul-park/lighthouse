@@ -83,7 +83,7 @@ func (f *flow) ifStmt(n *ast.IfStmt, chained bool) {
 	if chained {
 		f.event(flowElseIf)
 	} else {
-		f.event(flowIf)
+		f.events = append(f.events, sdk.Flow{Kind: flowIf, Nesting: f.nesting, Guard: n.Else == nil && f.onlyJumps(n.Body)})
 	}
 	f.walk(n.Init, n.Cond)
 	f.nested(func() { f.walk(n.Body) })
@@ -188,6 +188,29 @@ func (f *flow) walk(nodes ...ast.Node) {
 
 func (f *flow) event(kind string) {
 	f.events = append(f.events, sdk.Flow{Kind: kind, Nesting: f.nesting})
+}
+
+// onlyJumps reports a block of one return, break, continue, goto or panic.
+func (f *flow) onlyJumps(b *ast.BlockStmt) bool {
+	if len(b.List) != 1 {
+		return false
+	}
+	switch s := b.List[0].(type) {
+	case *ast.ReturnStmt, *ast.BranchStmt:
+		return true
+	case *ast.ExprStmt:
+		call, ok := s.X.(*ast.CallExpr)
+		if !ok {
+			return false
+		}
+		id, ok := call.Fun.(*ast.Ident)
+		if !ok {
+			return false
+		}
+		builtin, ok := f.info.Uses[id].(*types.Builtin)
+		return ok && builtin.Name() == "panic"
+	}
+	return false
 }
 
 // switchArms counts the non-default arms of a switch or select; a switch

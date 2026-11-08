@@ -798,6 +798,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "guard": {
+          "description": "`if`: no `else`, and a body that only jumps (`return`, `break`,\n`continue`, `panic`).",
+          "type": "boolean"
+        },
         "kind": {
           "$ref": "#/$defs/FlowKind"
         },

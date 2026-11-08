@@ -596,6 +596,7 @@
           ],
           "flow": [
             {
+              "guard": true,
               "kind": "if",
               "nesting": 0
             }
@@ -803,6 +804,7 @@
           ],
           "flow": [
             {
+              "guard": true,
               "kind": "if",
               "nesting": 0
             }
@@ -2594,6 +2596,7 @@
         {
           "flow": [
             {
+              "guard": true,
               "kind": "if",
               "nesting": 0
             }

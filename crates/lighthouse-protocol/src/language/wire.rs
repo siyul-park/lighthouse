@@ -789,6 +789,10 @@ pub struct Flow {
     /// `switch`: every arm, default included, is a single return.
     #[serde(default, skip_serializing_if = "is_false")]
     pub returning: bool,
+    /// `if`: no `else`, and a body that only jumps (`return`, `break`,
+    /// `continue`, `panic`).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub guard: bool,
 }
 
 /// Normalized control-flow construct, the same for every language.

@@ -373,6 +373,7 @@ impl<'i> Walker<'i> {
             arms: 0,
             operators: 0,
             returning: false,
+            guard: false,
         });
     }
 

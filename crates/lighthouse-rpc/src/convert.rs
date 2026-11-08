@@ -426,6 +426,7 @@ fn flow(f: wire::Flow) -> core::Flow {
         arms: f.arms,
         operators: f.operators,
         returning: f.returning,
+        guard: f.guard,
     }
 }
 

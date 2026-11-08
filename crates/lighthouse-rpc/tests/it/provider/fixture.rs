@@ -177,6 +177,13 @@ pub(super) fn flow(kind: FlowKind, nesting: u32) -> Flow {
     Flow::new(kind, nesting)
 }
 
+pub(super) fn guard() -> Flow {
+    Flow {
+        guard: true,
+        ..Flow::new(FlowKind::If, 0)
+    }
+}
+
 pub(super) fn switch(arms: u32, returning: bool) -> Flow {
     Flow {
         arms,

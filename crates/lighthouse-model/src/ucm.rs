@@ -115,10 +115,14 @@ pub struct Flow {
     /// `Switch`: every arm, default included, is a single return.
     #[serde(default)]
     pub returning: bool,
+    /// `If`: no `else`, and a body that only jumps (`return`, `break`,
+    /// `continue`, `panic`).
+    #[serde(default)]
+    pub guard: bool,
 }
 
 impl Flow {
-    /// A construct with no arms, operators or returning arms; set those directly.
+    /// A construct with no arms, operators, returning arms or guard; set those directly.
     pub fn new(kind: FlowKind, nesting: u32) -> Self {
         Self {
             kind,
@@ -126,6 +130,7 @@ impl Flow {
             arms: 0,
             operators: 0,
             returning: false,
+            guard: false,
         }
     }
 }

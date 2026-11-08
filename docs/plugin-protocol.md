@@ -524,7 +524,7 @@ map syntax onto these kinds:
 
 | kind | maps |
 | --- | --- |
-| `if`, `else-if`, `else` | conditional, chained conditional, final branch; an `else if` is `else-if` at the nesting of its `if` |
+| `if`, `else-if`, `else` | conditional, chained conditional, final branch; an `else if` is `else-if` at the nesting of its `if`; an `if` with no `else` whose body is one `return`, `break`, `continue`, `goto` or `panic` is a `guard` |
 | `switch` | `switch`, type switch, `match`, `select`: one event; `arms` counts arms other than the default; `returning` when every arm, default included, is a single return |
 | `loop` | every loop form |
 | `catch` | one per exception handler |

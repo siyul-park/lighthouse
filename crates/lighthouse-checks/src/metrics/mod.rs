@@ -163,12 +163,14 @@ fn is_dispatcher(summary: &FunctionSummary) -> bool {
 }
 
 /// A body whose only top-level branching is one multi-way branch, whatever
-/// its arms do, nested at most two levels: many paths, one shape. Its
+/// its arms do, nested at most two levels: many paths, one shape. Statements
+/// around the branch and guards (an `if` that only jumps) do not branch. Its
 /// cyclomatic complexity overstates how hard it is to follow; only cognitive
 /// complexity can still mark it.
 fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
     let mut top_level = summary.flow.iter().filter(|f| {
         f.nesting == 0
+            && !f.guard
             && matches!(
                 f.kind,
                 FlowKind::If

@@ -63,7 +63,8 @@ spec:
          && m.statements >= options.hub.statements)
         ? 'a dependency hub' : (m.fan_out >= options.hub.coordinatorFanOut
            && m.fan_in <= options.hub.coordinatorMaxFanIn
-           && m.statements >= options.hub.coordinatorStatements)
+           && m.statements >= options.hub.coordinatorStatements
+           && !m.flat_dispatch)
         ? 'a high fan-out coordinator' : ''
     - name: found
       expression: 'm.measured && !m.dispatcher && hub_role != '''' ? [{''kind'':''hub'',''what'':hub_role,''own'':m.fan_in,''max'':options.hub.fanIn,''hint'':'''',''value'':m.fan_in}]
@@ -144,6 +145,40 @@ spec:
         one()   {}\nfunc two()   {}\nfunc three() {}"
     expect:
     - line: 3
+  - name: hub-dispatch-with-branching
+    language: go
+    kind: invalid
+    options:
+      hub:
+        fanIn: 8
+        fanOut: 6
+        statements: 20
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
+    files:
+    - path: sample.go
+      body: "package sample\n\nfunc route(kind int, ready bool) int {\n\tif ready {\n\t\tone()\n\t}\n\tswitch
+        kind {\n\tcase 1:\n\t\tone()\n\tcase 2:\n\t\ttwo()\n\tdefault:\n\t\tthree()\n\t}\n\treturn
+        0\n}\n\nfunc one()   {}\nfunc two()   {}\nfunc three() {}"
+    expect:
+    - line: 3
+  - name: hub-dispatch-with-guard
+    language: go
+    kind: valid
+    options:
+      hub:
+        fanIn: 8
+        fanOut: 6
+        statements: 20
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
+    files:
+    - path: sample.go
+      body: "package sample\n\nfunc route(kind int, ready bool) int {\n\tbase := 1\n\tif !ready
+        {\n\t\treturn 0\n\t}\n\tswitch kind {\n\tcase 1:\n\t\tone()\n\tcase 2:\n\t\ttwo()\n\tdefault:\n\t\tthree()\n\t}\n\treturn
+        base\n}\n\nfunc one()   {}\nfunc two()   {}\nfunc three() {}"
   - name: hub-ordinary-fan
     language: go
     kind: valid
@@ -201,6 +236,68 @@ spec:
         pub fn first() { hub(); }
         pub fn second() { hub(); }
     expect: [{ line: 1 }]
+  - name: rust-dispatch-with-branching
+    language: rust
+    kind: invalid
+    options:
+      hub:
+        fanIn: 8
+        fanOut: 6
+        statements: 20
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn route(kind: u8, ready: bool) -> u8 {
+            if ready {
+                one();
+            }
+            match kind {
+                1 => one(),
+                2 => two(),
+                _ => three(),
+            }
+            0
+        }
+        pub fn one() {}
+        pub fn two() {}
+        pub fn three() {}
+    expect: [{ line: 1 }]
+  - name: rust-dispatch-with-guard
+    language: rust
+    kind: valid
+    options:
+      hub:
+        fanIn: 8
+        fanOut: 6
+        statements: 20
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Part of the example.
+        pub fn route(kind: u8, ready: bool) -> u8 {
+            let base = 1;
+            if !ready {
+                return 0;
+            }
+            match kind {
+                1 => one(),
+                2 => two(),
+                _ => three(),
+            }
+            base
+        }
+        /// Part of the example.
+        pub fn one() {}
+        /// Part of the example.
+        pub fn two() {}
+        /// Part of the example.
+        pub fn three() {}
   - name: hub-typescript-hub
     language: typescript
     kind: invalid

@@ -524,6 +524,7 @@
               "nesting": 1
             },
             {
+              "guard": true,
               "kind": "if",
               "nesting": 2
             },

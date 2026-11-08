@@ -375,6 +375,7 @@ Flow = TypedDict(
     "Flow",
     {
         "arms": int,
+        "guard": bool,
         "kind": Required[FlowKind],
         "nesting": Required[int],
         "operators": int,
