@@ -1,7 +1,11 @@
 //! Fixes compiled from decisions: the edits a CEL expression returns for a
 //! finding, lowered to the edit IR. A command fix is run by the fix run itself, which the engine tests.
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use lighthouse_checks::Checks;
 use lighthouse_model::{
@@ -11,7 +15,7 @@ use lighthouse_model::{
         SymbolKind, Visibility,
     },
 };
-use lighthouse_plugin::{Error, FixDecision, FixRequest, Fixer, Plugin, Workspace};
+use lighthouse_plugin::{Error, FixDecision, FixRequest, Fixer, Plugin, ValuesRequest, Workspace};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
@@ -155,6 +159,14 @@ fn run(
     let options = Options::new();
     let facts = json!({});
     let queries = lighthouse_checks::probe::queries(project, &ws);
+    let values = fixer.values(&ValuesRequest {
+        file: Path::new(FILE),
+        options: &options,
+        project,
+        queries: &queries,
+        workspace: &ws,
+        text,
+    })?;
     fixer.fix(&FixRequest {
         finding,
         facts: &facts,
@@ -165,7 +177,7 @@ fn run(
         workspace: &ws,
         text,
         trusted,
-        values: None,
+        values: &Arc::new(values),
     })
 }
 

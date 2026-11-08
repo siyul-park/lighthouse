@@ -246,7 +246,7 @@ fn proposed(
         workspace: runtime.workspace(),
         text: &text,
         trusted: runtime.trusted(),
-        values: Some(&shared).filter(|v| !v.is_null()),
+        values: &shared,
     };
     match fixer
         .fix(&request)

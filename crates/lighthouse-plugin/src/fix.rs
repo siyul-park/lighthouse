@@ -43,8 +43,8 @@ pub struct FixRequest<'a> {
     /// `LIGHTHOUSE_TRUST=1`); the repository cannot grant it itself.
     pub trusted: bool,
     /// What the fixer built for the file of the finding with
-    /// [`Fixer::values`], once for all its findings; `None` when it builds none.
-    pub values: Option<&'a Arc<Value>>,
+    /// [`Fixer::values`], once for all its findings; `Null` when it builds none.
+    pub values: &'a Arc<Value>,
 }
 
 /// Everything a fixer may read to build what its fixes of one file share,
