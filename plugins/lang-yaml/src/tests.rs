@@ -124,6 +124,29 @@ fn block_scalars_map_each_decoded_byte_to_its_line() {
 }
 
 #[test]
+fn a_block_scalar_whose_text_is_quoted_is_still_a_block_scalar() {
+    // The text of the folded scalar starts and ends with a quote; its header
+    // decides the style, not the first and last character of its span.
+    for host in [
+        "where: >-\n  'move' in kinds && level != 'owner'\nnext: 1\n",
+        "where: |\n  \"move\" in kinds && level != \"owner\"\nnext: 1\n",
+    ] {
+        let tree = tree_of(host);
+        let entry = &tree.mapping["/documents/0/where"];
+        let first = entry.text_map.as_ref().unwrap()[0];
+        let at = first.source_range[0] as usize;
+        let value = tree.ast["documents"][0]["where"].as_str().unwrap();
+        assert_eq!(&host[at..at + 6], &value[..6], "{host}");
+        let source = Source {
+            path: "quoted.yaml".to_owned(),
+            ast: tree.ast.clone(),
+            mapping: tree.mapping.clone(),
+        };
+        source.validate(host).unwrap();
+    }
+}
+
+#[test]
 fn a_quoted_scalar_with_escapes_is_mapped_in_several_segments() {
     let host = "name: \"a\\u00e9b\\n\"\n";
     let tree = tree_of(host);

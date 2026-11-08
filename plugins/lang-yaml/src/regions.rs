@@ -17,6 +17,11 @@ pub(crate) fn map_scalar(
     let leading = raw.len() - raw.trim_start().len();
     let trim = quoted_extent(raw.trim());
     let at = start + leading;
+    // The span of a block scalar starts at its text, after the header: its
+    // style is the header's, whatever the first character of the text is.
+    if follows_block_header(host, at) {
+        return body_map(raw, start, value);
+    }
     if trim == value {
         let mut offsets = TextOffsets::with_capacity(value.len());
         for (offset, ch) in trim.char_indices() {
@@ -29,9 +34,6 @@ pub(crate) fn map_scalar(
     {
         return quoted_map(trim, at, value);
     }
-    if trim.starts_with('|') || trim.starts_with('>') {
-        return block_map(host, trim, at, value);
-    }
     if value.contains('\n') || raw.contains('\n') {
         return body_map(raw, start, value);
     }
@@ -39,6 +41,24 @@ pub(crate) fn map_scalar(
         "cannot map decoded scalar to exact host bytes: raw={trim:?}, value={value:?}, span={start}..{}",
         start + raw.len()
     ))
+}
+
+/// Whether the text at `at` is the body of a block scalar: it starts its line,
+/// and the line before ends with a block header (`|`, `>-`, `|2+`, optionally
+/// followed by a comment).
+fn follows_block_header(host: &str, at: usize) -> bool {
+    let line = host[..at].rfind('\n').map_or(0, |newline| newline + 1);
+    if !host[line..at].trim().is_empty() || line == 0 {
+        return false;
+    }
+    let before = host[..line - 1].rsplit('\n').next().unwrap_or_default();
+    let code = before.split(" #").next().unwrap_or(before).trim();
+    let token = code.rsplit(char::is_whitespace).next().unwrap_or(code);
+    token.starts_with(['|', '>'])
+        && token.len() <= 3
+        && token[1..]
+            .chars()
+            .all(|ch| ch.is_ascii_digit() || matches!(ch, '+' | '-'))
 }
 
 /// A quoted scalar up to its closing quote: the parser ends the span of one
@@ -195,89 +215,4 @@ fn body_map(raw: &str, start: usize, value: &str) -> Result<MappedScalar, String
         cursor = to;
     }
     Ok(mapped(value, offsets))
-}
-
-/// A literal (`|`) or folded (`>`) block scalar.
-fn block_map(host: &str, raw: &str, start: usize, value: &str) -> Result<MappedScalar, String> {
-    let newline = raw
-        .find('\n')
-        .ok_or_else(|| "block scalar has no body".to_owned())?;
-    let header = &raw[..newline];
-    let style = header
-        .chars()
-        .next()
-        .ok_or_else(|| "empty block scalar header".to_owned())?;
-    let explicit_indent = header
-        .chars()
-        .find(char::is_ascii_digit)
-        .and_then(|ch| ch.to_digit(10))
-        .map(|n| n as usize);
-    let header_indent = host[..start]
-        .rsplit_once('\n')
-        .map_or(host.len() - host.trim_start().len(), |(_, line)| {
-            line.bytes().take_while(|byte| *byte == b' ').count()
-        });
-    let body_at = start + newline + 1;
-    let body = host
-        .get(body_at..start + raw.len())
-        .ok_or_else(|| "block scalar body is outside the host text".to_owned())?;
-    let lines: Vec<(usize, &str)> = body
-        .split_inclusive('\n')
-        .scan(body_at, |at, line| {
-            let current = *at;
-            *at += line.len();
-            Some((current, line.trim_end_matches(['\n', '\r'])))
-        })
-        .collect();
-    let indent = explicit_indent
-        .map(|n| header_indent + n)
-        .unwrap_or_else(|| {
-            lines
-                .iter()
-                .filter(|(_, line)| !line.trim().is_empty())
-                .map(|(_, line)| line.bytes().take_while(|byte| *byte == b' ').count())
-                .min()
-                .unwrap_or(header_indent + 1)
-        });
-    let mut offsets = TextOffsets::with_capacity(value.len());
-    let mut text = String::new();
-    for (index, (line_start, line)) in lines.iter().enumerate() {
-        let leading = line
-            .bytes()
-            .take_while(|byte| *byte == b' ')
-            .count()
-            .min(indent);
-        let content = &line[leading..];
-        text.push_str(content);
-        for (offset, ch) in content.char_indices() {
-            let from = line_start + leading + offset;
-            offsets.push(ch, from, from + ch.len_utf8());
-        }
-        let has_newline = body
-            .get((line_start + line.len()).saturating_sub(body_at)..)
-            .is_some_and(|tail| tail.starts_with('\n') || tail.starts_with("\r\n"));
-        if has_newline && index + 1 < lines.len() {
-            let next = lines[index + 1].1;
-            let separator = if style == '>' && !content.is_empty() && !next.trim().is_empty() {
-                ' '
-            } else {
-                '\n'
-            };
-            let newline_at = line_start + line.len();
-            text.push(separator);
-            offsets.push(separator, newline_at, newline_at + 1);
-        }
-    }
-    while text.len() > value.len() || !value.starts_with(&text) {
-        if text.ends_with('\n') && !value.ends_with('\n') {
-            text.pop();
-            offsets.pop();
-        } else {
-            return Err("block scalar source map does not match YAML-decoded value".to_owned());
-        }
-    }
-    if text != value {
-        return Err("block scalar source map is incomplete".to_owned());
-    }
-    Ok(mapped(&text, offsets))
 }
