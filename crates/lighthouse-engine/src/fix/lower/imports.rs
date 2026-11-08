@@ -48,7 +48,7 @@ impl Lowerer<'_> {
     /// The whole lines of the module-level imports of `file`: the sites of its
     /// `imports` edges from a module that no declaration of the file holds, with
     /// the module each binds names in.
-    fn imports(&self, file: &Path, text: &str) -> Vec<(Range<usize>, String)> {
+    pub(super) fn imports(&self, file: &Path, text: &str) -> Vec<(Range<usize>, String)> {
         let index = LineIndex::new(text);
         let held: Vec<Range<usize>> = self
             .project

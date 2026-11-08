@@ -15,7 +15,7 @@ use std::{
 
 use lighthouse_model::{
     LineIndex, Position, Span, eol_of,
-    ucm::{Anchor, EditOp, Node, Owner, Symbol, SymbolId},
+    ucm::{Anchor, EditOp, Node, Owner, Symbol, SymbolId, SymbolKind},
 };
 
 use lighthouse_graph::Graph;
@@ -341,6 +341,7 @@ impl<'a> Lowerer<'a> {
         }
         let text = self.sources.text(&file)?;
         let blocks = self.units(blocks)?;
+        let imports = self.imports(&file, &text);
         let mut containers: BTreeMap<(Option<usize>, Option<&SymbolId>), Vec<&Block>> =
             BTreeMap::new();
         for block in &blocks {
@@ -366,7 +367,21 @@ impl<'a> Lowerer<'a> {
                 .into_iter()
                 .map(|n| group[n])
                 .collect();
-            let (moved, placed) = moves(&text, &current, &wanted);
+            // A test stays where it is before a declaration does, the tests
+            // being the spec the file reads, unless an import follows it: the
+            // declarations cannot go above that import, so the test goes below.
+            let weights: Vec<usize> = current
+                .iter()
+                .map(|b| {
+                    let followed = imports.iter().any(|(site, _)| site.start >= b.lines.end);
+                    if b.symbol.kind == SymbolKind::Test && !followed {
+                        current.len() + 1
+                    } else {
+                        1
+                    }
+                })
+                .collect();
+            let (moved, placed) = moves(&text, (&current, &wanted), &weights);
             edits.extend(moved);
             places.extend(placed);
         }
@@ -655,14 +670,18 @@ fn code_follows(rest: &str) -> bool {
 /// after the block that precedes it in `wanted`, or before the first block
 /// that stays when none does.
 /// Also the offsets each moved block comes from and goes to, with its module.
-fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> (Vec<TextEdit>, Vec<Placed>) {
+fn moves(
+    text: &str,
+    (current, wanted): (&[&Block], &[&Block]),
+    weights: &[usize],
+) -> (Vec<TextEdit>, Vec<Placed>) {
     let rank: BTreeMap<&SymbolId, usize> = wanted
         .iter()
         .enumerate()
         .map(|(n, b)| (&b.symbol.id, n))
         .collect();
     let ranks: Vec<usize> = current.iter().map(|b| rank[&b.symbol.id]).collect();
-    let stays = longest_run(&ranks);
+    let stays = heaviest_run(&ranks, weights);
     if stays.len() == current.len() {
         return (Vec::new(), Vec::new());
     }
@@ -783,23 +802,34 @@ fn carried(text: &str, block: &Block) -> Range<usize> {
     }
 }
 
-/// The indices of a longest strictly increasing subsequence of `ranks`.
-fn longest_run(ranks: &[usize]) -> Vec<usize> {
-    // Patience sorting: `tails[k]` is the index ending the best increasing run
-    // of length k + 1, and `back[n]` the index before `n` in its run.
-    let mut tails: Vec<usize> = Vec::new();
+/// The indices of a strictly increasing subsequence of `ranks` that weighs the
+/// most by `weights`, the last when several do.
+fn heaviest_run(ranks: &[usize], weights: &[usize]) -> Vec<usize> {
+    // A Fenwick tree over the ranks holds, per prefix, the heaviest run that
+    // ends in it as (weight, index); `back[n]` is the index before `n` in its run.
+    let mut tree: Vec<Option<(usize, usize)>> = vec![None; ranks.iter().max().map_or(0, |m| m + 2)];
     let mut back: Vec<Option<usize>> = Vec::with_capacity(ranks.len());
-    for (n, rank) in ranks.iter().enumerate() {
-        let at = tails.partition_point(|&t| ranks[t] < *rank);
-        back.push(at.checked_sub(1).map(|k| tails[k]));
-        if at == tails.len() {
-            tails.push(n);
-        } else {
-            tails[at] = n;
+    let mut total: Vec<usize> = Vec::with_capacity(ranks.len());
+    for (n, &rank) in ranks.iter().enumerate() {
+        let mut best: Option<(usize, usize)> = None;
+        let mut at = rank;
+        while at > 0 {
+            best = best.max(tree[at]);
+            at &= at - 1;
+        }
+        let (below, from) = best.map_or((0, None), |(w, i)| (w, Some(i)));
+        back.push(from);
+        total.push(below + weights[n].max(1));
+        let mut at = rank + 1;
+        while at < tree.len() {
+            if tree[at].is_none_or(|(w, _)| w <= total[n]) {
+                tree[at] = Some((total[n], n));
+            }
+            at += at.isolate_lowest_one();
         }
     }
-    let mut run = Vec::with_capacity(tails.len());
-    let mut at = tails.last().copied();
+    let mut run = Vec::new();
+    let mut at = (0..ranks.len()).max_by_key(|&n| (total[n], n));
     while let Some(n) = at {
         run.push(n);
         at = back[n];

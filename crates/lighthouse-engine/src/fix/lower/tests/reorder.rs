@@ -182,19 +182,29 @@ fn reorder_puts_several_blocks_after_a_last_line_without_an_end_of_line() {
     );
 }
 
+fn run(ranks: &[usize]) -> Vec<usize> {
+    heaviest_run(ranks, &vec![1; ranks.len()])
+}
+
 #[test]
 fn the_run_that_stays_is_the_longest_in_order() {
-    assert_eq!(longest_run(&[]), Vec::<usize>::new());
-    assert_eq!(longest_run(&[0, 1, 2]), vec![0, 1, 2]);
-    assert_eq!(longest_run(&[3, 2, 1, 0]).len(), 1);
-    assert_eq!(longest_run(&[2, 0, 1, 4, 3, 5]).len(), 4);
+    assert_eq!(run(&[]), Vec::<usize>::new());
+    assert_eq!(run(&[0, 1, 2]), vec![0, 1, 2]);
+    assert_eq!(run(&[3, 2, 1, 0]).len(), 1);
+    assert_eq!(run(&[2, 0, 1, 4, 3, 5]).len(), 4);
+}
+
+#[test]
+fn the_run_that_stays_is_the_one_with_the_most_text() {
+    assert_eq!(heaviest_run(&[2, 0, 1], &[100, 1, 1]), vec![0]);
+    assert_eq!(heaviest_run(&[2, 0, 1], &[1, 1, 1]), vec![1, 2]);
 }
 
 #[test]
 fn a_run_of_a_hundred_thousand_ranks_is_found_at_once() {
     let ranks: Vec<usize> = (0..100_000).rev().collect();
 
-    assert_eq!(longest_run(&ranks).len(), 1);
+    assert_eq!(run(&ranks).len(), 1);
 }
 
 #[test]

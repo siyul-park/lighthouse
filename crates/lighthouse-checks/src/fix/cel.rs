@@ -66,6 +66,23 @@ impl VariableResolver for FileValues {
     }
 }
 
+impl FileValues {
+    /// The values of [`CelFix::values`] as the CEL runtime reads them.
+    fn of(values: &Value) -> Self {
+        let file = values.get("file").filter(|f| !f.is_null()).map(cel_fact);
+        let variables = values
+            .get("variables")
+            .and_then(Value::as_object)
+            .map(|vars| {
+                vars.iter()
+                    .map(|(name, value)| (name.clone(), cel_fact(value)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Self { file, variables }
+    }
+}
+
 impl CelFix {
     pub(crate) fn new(comp: &Composition, decision: &Decision, edits: &str) -> Result<Self, Error> {
         let cel = comp.cel();
@@ -311,22 +328,5 @@ impl CelFix {
             return Err(error);
         }
         Ok(json!({ "file": file, "variables": variables }))
-    }
-}
-
-impl FileValues {
-    /// The values of [`CelFix::values`] as the CEL runtime reads them.
-    fn of(values: &Value) -> Self {
-        let file = values.get("file").filter(|f| !f.is_null()).map(cel_fact);
-        let variables = values
-            .get("variables")
-            .and_then(Value::as_object)
-            .map(|vars| {
-                vars.iter()
-                    .map(|(name, value)| (name.clone(), cel_fact(value)))
-                    .collect()
-            })
-            .unwrap_or_default();
-        Self { file, variables }
     }
 }
