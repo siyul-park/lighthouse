@@ -188,6 +188,50 @@ mod eviction_order {
 
         assert_eq!(graph.take_executed(), ["volatile-big(())"]);
     }
+
+    static SMALL: Query<(), String> = Query::new("small", |graph, _| {
+        Ok(format!("s{}", graph.input(&SEED, &())?.unwrap_or_default()))
+    });
+
+    #[test]
+    fn of_one_durability_the_most_bytes_for_the_time_go_first_whatever_was_used_last() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let options = Options {
+            verify: 0,
+            ..Options::default()
+        };
+        let mut graph = Graph::open(&path, options.clone()).expect("open");
+        graph
+            .set_input(&SEED, &(), 1, Durability::Volatile)
+            .expect("set");
+        graph.query(&SMALL, &()).expect("pull");
+        graph.query(&VOLATILE_BIG, &()).expect("pull");
+        graph.commit().expect("commit");
+        drop(graph);
+        rusqlite::Connection::open(&path)
+            .expect("open the file")
+            .execute_batch(
+                "UPDATE node SET used_at = 1, cost = 1000000 WHERE kind = 'small';
+                 UPDATE node SET cost = 1000 WHERE kind = 'volatile-big'",
+            )
+            .expect("age");
+        let mut graph = Graph::open(&path, options.clone()).expect("open");
+        graph
+            .set_input(&SEED, &(), 1, Durability::Volatile)
+            .expect("set");
+        lighthouse_graph::trim(&mut graph, 1).expect("trim");
+        drop(graph);
+
+        let mut graph = Graph::open(&path, options).expect("open");
+        graph
+            .set_input(&SEED, &(), 1, Durability::Volatile)
+            .expect("set");
+        graph.query(&SMALL, &()).expect("pull");
+        graph.query(&VOLATILE_BIG, &()).expect("pull");
+
+        assert_eq!(graph.take_executed(), ["volatile-big(())"]);
+    }
 }
 
 fn rows(path: &std::path::Path) -> i64 {

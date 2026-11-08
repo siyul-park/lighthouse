@@ -157,6 +157,7 @@ impl Shared {
         node.durability = row.durability;
         node.used_at = row.used_at;
         node.synced_used_at = row.used_at;
+        node.cost = row.cost;
         node.on_disk = row.has_value;
         node.traces_stored = row.has_traces;
     }
@@ -404,6 +405,7 @@ pub(crate) fn write_of(slot: &Arc<Slot>, revision: u64) -> Write {
         durability: node.durability,
         input: node.input,
         used_at: node.used_at,
+        cost: node.cost,
         has_value: false,
         has_traces: false,
     };

@@ -3,7 +3,7 @@
 //! pays one pass over the directory's sizes; one over it gives back, in this
 //! order, the free pages of the databases, what plugins left that no run reads,
 //! the states and values of the graph (retained states first, then the values
-//! of lower durability first, the least recently used first), and last the
+//! of lower durability first, the most bytes for the time first), and last the
 //! answers of models, which cost money to get again. What goes is derived:
 //! a result is the same with or without it.
 

@@ -31,6 +31,7 @@ struct Files(
     Arc<AtomicBool>,
     Arc<AtomicBool>,
     Arc<AtomicBool>,
+    Arc<AtomicUsize>,
 );
 
 impl LanguageProvider for Files {
@@ -55,9 +56,16 @@ impl LanguageProvider for Files {
                         unit.id,
                         files
                             .iter()
-                            .map(|source| Fragment {
-                                files: vec![source.file.clone()],
-                                ..Fragment::default()
+                            .map(|source| {
+                                let mut file = source.file.clone();
+                                let bulk = self.5.load(Ordering::SeqCst);
+                                if bulk > 0 {
+                                    file.facts.insert("bulk".to_owned(), "x".repeat(bulk));
+                                }
+                                Fragment {
+                                    files: vec![file],
+                                    ..Fragment::default()
+                                }
                             })
                             .collect(),
                     );
@@ -80,6 +88,8 @@ impl LanguageProvider for Files {
 struct Counting {
     meta: RuleManifest,
     runs: Arc<AtomicUsize>,
+    /// Whether a run takes a while, as a rule's does.
+    slow: Arc<AtomicBool>,
 }
 
 impl Rule for Counting {
@@ -91,6 +101,9 @@ impl Rule for Counting {
     }
     fn check(&self, ctx: &Context, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
         self.runs.fetch_add(1, Ordering::SeqCst);
+        if self.slow.load(Ordering::SeqCst) {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
         ctx.notices.push(format!("{} ran", self.meta.id));
         let (file, message) = match ctx.file {
             Some((file, text)) => (file.path.clone(), format!("{} bytes", text.len())),
@@ -128,6 +141,11 @@ pub(crate) struct Counted {
     mute: Arc<AtomicBool>,
     /// Whether the provider says of every file that it cannot be loaded.
     gapped: Arc<AtomicBool>,
+    /// The bytes of a fact the provider gives every file, which the model
+    /// carries and no rule reads.
+    bulk: Arc<AtomicUsize>,
+    /// Whether the rules take a while to run.
+    slow: Arc<AtomicBool>,
 }
 
 struct CountingPlugin {
@@ -146,6 +164,7 @@ impl Plugin for CountingPlugin {
             Arc::clone(&self.counted.down),
             Arc::clone(&self.counted.mute),
             Arc::clone(&self.counted.gapped),
+            Arc::clone(&self.counted.bulk),
         ))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
@@ -166,14 +185,17 @@ impl Plugin for CountingPlugin {
             Box::new(Counting {
                 meta: meta("counting/local", RunScope::File),
                 runs: Arc::clone(&self.counted.local),
+                slow: Arc::clone(&self.counted.slow),
             }),
             Box::new(Counting {
                 meta: meta("counting/global", RunScope::Project),
                 runs: Arc::clone(&self.counted.global),
+                slow: Arc::clone(&self.counted.slow),
             }),
             Box::new(Counting {
                 meta: meta("counting/rows", RunScope::File),
                 runs: Arc::clone(&self.counted.rows),
+                slow: Arc::clone(&self.counted.slow),
             }),
         ]
     }
@@ -192,6 +214,8 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
         down: Arc::default(),
         mute: Arc::default(),
         gapped: Arc::default(),
+        bulk: Arc::default(),
+        slow: Arc::default(),
     };
     let mut registry = Registry::default();
     registry
@@ -208,6 +232,8 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
                 down: Arc::clone(&counted.down),
                 mute: Arc::clone(&counted.mute),
                 gapped: Arc::clone(&counted.gapped),
+                bulk: Arc::clone(&counted.bulk),
+                slow: Arc::clone(&counted.slow),
             },
         })
         .unwrap();
@@ -594,4 +620,42 @@ fn a_run_the_graph_answers_still_brings_the_directory_under_its_limit() {
     assert_eq!(runs(&counted), (0, 0), "answered from the report");
     assert_eq!(found(&warm), found(&first));
     assert!(tree(&kept) < before, "{} -> {}", before, tree(&kept));
+}
+
+#[test]
+fn edits_and_reverts_under_a_limit_the_graph_keeps_to_run_only_the_rules_of_what_changed() {
+    const FILES: usize = 24;
+    let dir = tempfile::tempdir().unwrap();
+    let text = |file: usize, version: usize| format!("{file}/{version}\n");
+    for file in 0..FILES {
+        fs::write(dir.path().join(format!("f{file}.txt")), text(file, 0)).unwrap();
+    }
+    let cache = tempfile::tempdir().unwrap();
+    let kept = cache.path().join("cache");
+    let cached = |limit| {
+        let (engine, counted) = engine(dir.path());
+        counted.bulk.store(40_000, Ordering::SeqCst);
+        counted.slow.store(true, Ordering::SeqCst);
+        engine.with_cache(kept.clone(), limit)
+    };
+    cached(u64::MAX).check(&[], &[]).unwrap();
+    let limit = tree(&kept) * 9 / 10;
+
+    // Each step edits one file, or puts one back: only that file's findings
+    // are made again, however full the directory is. What a trim takes is what
+    // is big and quick to make, never the findings that cost a rule to make.
+    let steps = [(3, 1), (3, 0), (11, 1), (11, 0), (3, 2), (20, 1), (3, 0)];
+    for (file, version) in steps {
+        fs::write(dir.path().join(format!("f{file}.txt")), text(file, version)).unwrap();
+        let run = cached(limit).check(&[], &[]).unwrap();
+        let (plain, _) = engine(dir.path());
+        assert_eq!(found(&run), found(&plain.check(&[], &[]).unwrap()));
+        let ran = run.timings.findings_run;
+        assert!(ran <= 1, "file {file} v{version}: {ran} findings run");
+        let again = cached(limit).check(&[], &[]).unwrap();
+        assert_eq!(
+            again.timings.findings_run, 0,
+            "file {file} v{version}: warm"
+        );
+    }
 }

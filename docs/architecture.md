@@ -374,7 +374,7 @@ file shrinks as rows go. The whole directory, plugins' kept answers included, st
 under 256 MB (`LIGHTHOUSE_CACHE_LIMIT_MB`), kept by one function (`cache::fit`) that
 a run calls at its end: under the limit it only sums file sizes; over it, it returns
 free pages, deletes what plugins left that no run reads, then trims the graph
-(retained states, then values of lower durability and least recently used first) and
+(retained states, then values of lower durability and the most bytes for the time first) and
 last the model answers. `check --no-cache` (MCP `noCache`) bypasses it; `lighthouse cache
 clean` deletes the whole directory, providers' subdirectories included.
 

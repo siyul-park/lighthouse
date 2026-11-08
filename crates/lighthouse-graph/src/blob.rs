@@ -55,7 +55,7 @@ pub(crate) fn collect_all(tx: &Transaction<'_>) -> Result<(), Error> {
 /// Frees at least `bytes` of the stored values of `graph`, fewer when there are
 /// not so many, and returns the free pages of its file to the system: the
 /// states nodes retain first, oldest first, then the values of nodes, those of
-/// lower durability first and the least recently used first. A node whose value
+/// lower durability first and the biggest first. A node whose value
 /// went is run again when it is pulled; nothing else changes. With `0` only the
 /// free pages go. Call it with no pull running, after a [`Graph::commit`].
 pub fn trim(graph: &mut Graph, bytes: u64) -> Result<(), Error> {
@@ -66,8 +66,8 @@ pub fn trim(graph: &mut Graph, bytes: u64) -> Result<(), Error> {
 
 /// Frees at least `bytes` of values: those of retained states that no node
 /// has as current, oldest first, then those of nodes (and the states they
-/// retained), those of lower durability first and the least recently used
-/// first. Returns the nodes whose value went.
+/// retained), those of lower durability first and the most bytes for the time first.
+/// Returns the nodes whose value went.
 pub(crate) fn free(tx: &Transaction<'_>, bytes: u64) -> Result<Vec<(String, Vec<u8>)>, Error> {
     if bytes == 0 {
         return Ok(Vec::new());
@@ -88,7 +88,7 @@ pub(crate) fn free(tx: &Transaction<'_>, bytes: u64) -> Result<Vec<(String, Vec<
 }
 
 /// Deletes the rows of nodes that can be computed again, those of lower
-/// durability first and the least recently used first, while what the ones
+/// durability first and the most bytes for the time first, while what the ones
 /// before them freed is short of `excess`: the last thing to go, when no value
 /// is left to drop. A node without a row is run when it is pulled. Returns the
 /// nodes.
@@ -96,7 +96,7 @@ fn node_rows(tx: &Transaction<'_>, excess: i64) -> Result<Vec<(String, Vec<u8>)>
     let mut statement = tx.prepare(
         "SELECT kind, key FROM (
              SELECT kind, key, COALESCE(SUM(length(key) + length(deps) + ?2) OVER (
-                 ORDER BY durability, used_at ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed
+                 ORDER BY durability, (length(key) + length(deps) + ?2) * 1.0 / (cost + 1) DESC, used_at ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed
              FROM node WHERE input = 0)
          WHERE freed < ?1",
     )?;
@@ -142,11 +142,16 @@ fn retained_values(tx: &Transaction<'_>, excess: i64) -> Result<(), Error> {
 /// value is all there is of it), and the states they retained, while what the
 /// ones before them freed is short of `excess`. A value an input has too
 /// stays. Returns the nodes.
+///
+/// Of one durability the values that free the most bytes for the time the
+/// node took to run go first: what is big and quick to make, not a finding,
+/// which is a few bytes and the time of a rule. When a node was used last
+/// cannot tell them apart: it is stored once a day at most.
 fn node_values(tx: &Transaction<'_>, excess: i64) -> Result<Vec<(String, Vec<u8>)>, Error> {
     let mut statement = tx.prepare(
         "SELECT kind, key, hash FROM (
              SELECT n.kind, n.key, n.hash, COALESCE(SUM(length(b.value)) OVER (
-                 ORDER BY n.durability, n.used_at ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed
+                 ORDER BY n.durability, length(b.value) * 1.0 / (n.cost + 1) DESC, n.used_at ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS freed
              FROM node n JOIN blob b ON b.hash = n.hash WHERE n.input = 0)
          WHERE freed < ?1",
     )?;

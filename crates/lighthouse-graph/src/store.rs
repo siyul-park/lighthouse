@@ -18,7 +18,7 @@ use crate::{
 
 /// Bumped whenever a table or what a value means changes: a database of
 /// another version is replaced.
-const SCHEMA: i64 = 7;
+const SCHEMA: i64 = 8;
 
 /// `PRAGMA auto_vacuum` value of `INCREMENTAL`.
 const INCREMENTAL: i64 = 2;
@@ -41,6 +41,7 @@ CREATE TABLE node(
     durability INTEGER NOT NULL,
     input INTEGER NOT NULL,
     used_at INTEGER NOT NULL,
+    cost INTEGER NOT NULL,
     PRIMARY KEY(kind, key)
 ) WITHOUT ROWID;
 CREATE INDEX node_verified ON node(verified_at);
@@ -99,6 +100,8 @@ pub(crate) struct Row {
     pub durability: Durability,
     pub input: bool,
     pub used_at: u64,
+    /// Microseconds the last run of the node took.
+    pub cost: u64,
     pub has_value: bool,
     /// The store retains earlier states of the node.
     pub has_traces: bool,
@@ -221,7 +224,7 @@ impl Store {
     fn scan(&self, kind: &str) -> Result<Rows, Error> {
         let conn = self.conn.locked();
         let mut statement = conn.prepare_cached(
-            "SELECT key, hash, deps, changed_at, verified_at, durability, input, used_at, EXISTS(SELECT 1 FROM blob WHERE blob.hash = node.hash)
+            "SELECT key, hash, deps, changed_at, verified_at, durability, input, used_at, cost, EXISTS(SELECT 1 FROM blob WHERE blob.hash = node.hash)
              FROM node WHERE kind = ?1",
         )?;
         let mut found = Rows::new();
@@ -314,7 +317,7 @@ impl Store {
 
     /// Frees at least `bytes` of stored values, fewer when there are not so
     /// many: the states nodes retain, oldest first, then the values of nodes,
-    /// those of lower durability first and the least recently used first.
+    /// those of lower durability first and the most bytes for the time first.
     /// Every free page goes back to the system and the log is emptied, so the
     /// file is as small as what it holds. Returns the nodes whose value went.
     pub(crate) fn trim(&self, bytes: u64) -> Result<Vec<(String, Vec<u8>)>, Error> {
@@ -382,7 +385,8 @@ fn read_row(row: &rusqlite::Row<'_>, at: usize) -> rusqlite::Result<Option<Row>>
         durability: Durability::from_index(row.get(at + 4)?),
         input: row.get(at + 5)?,
         used_at: row.get::<_, i64>(at + 6)? as u64,
-        has_value: row.get(at + 7)?,
+        cost: row.get::<_, i64>(at + 7)? as u64,
+        has_value: row.get(at + 8)?,
         has_traces: false,
     }))
 }
@@ -397,10 +401,10 @@ fn put(tx: &rusqlite::Transaction<'_>, write: &Write, old: &mut Vec<Vec<u8>>) ->
     }
     let row = &write.row;
     tx.prepare_cached(
-        "INSERT INTO node(kind, key, hash, deps, changed_at, verified_at, durability, input, used_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        "INSERT INTO node(kind, key, hash, deps, changed_at, verified_at, durability, input, used_at, cost)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
          ON CONFLICT(kind, key) DO UPDATE SET hash = ?3, deps = ?4, changed_at = ?5, verified_at = ?6,
-             durability = ?7, input = ?8, used_at = ?9",
+             durability = ?7, input = ?8, used_at = ?9, cost = ?10",
     )?
     .execute(params![
         write.kind,
@@ -412,6 +416,7 @@ fn put(tx: &rusqlite::Transaction<'_>, write: &Write, old: &mut Vec<Vec<u8>>) ->
         row.durability.index() as i64,
         row.input,
         row.used_at as i64,
+        row.cost as i64,
     ])?;
     Ok(())
 }

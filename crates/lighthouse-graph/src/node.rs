@@ -41,6 +41,8 @@ pub(crate) struct Node {
     pub durability: Durability,
     pub used_at: u64,
     pub synced_used_at: u64,
+    /// Microseconds the last run of the node took.
+    pub cost: u64,
     pub value: Option<Arc<dyn Any + Send + Sync>>,
     pub blob: Option<Arc<[u8]>>,
     pub on_disk: bool,
@@ -125,6 +127,7 @@ impl Node {
             durability: Durability::Static,
             used_at: 0,
             synced_used_at: 0,
+            cost: 0,
             value: None,
             blob: None,
             on_disk: false,

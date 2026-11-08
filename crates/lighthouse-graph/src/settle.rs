@@ -3,6 +3,7 @@
 use std::{
     any::Any,
     sync::{Arc, atomic::Ordering},
+    time::Instant,
 };
 
 use crate::{
@@ -210,7 +211,9 @@ impl Graph {
         let Some(frame) = &self.frame else {
             return Ok(());
         };
+        let started = Instant::now();
         let output = kind.execute(self, &slot.id.key)?;
+        let cost = started.elapsed();
         let new_hash = hash(&output.blob);
         let (deps, durability) = frame.take_reads();
         let revision = self.shared.revision.load(Ordering::Acquire);
@@ -230,6 +233,7 @@ impl Graph {
         node.deps = deps;
         node.durability = durability;
         node.verified_at = revision;
+        node.cost = u64::try_from(cost.as_micros()).unwrap_or(u64::MAX);
         node.value = Some(output.value);
         let kept = !kind.transient();
         node.blob = kept.then_some(output.blob);
