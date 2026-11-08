@@ -408,6 +408,7 @@ command check is global too, and a rule that reports at another symbol):
 | `param_structs` | `design/signature-size` |
 | `types` | `design/single-responsibility` |
 | `local_callers` | `design/top-down-order` |
+| `placement` | `design/module-placement`, `design/file-placement`, `design/top-down-order`, `design/declaration-groups` |
 | `owned` | `testing/file-layout`, `testing/owner-file` |
 | `pair` | `testing/owner-file` |
 | `tests` | `testing/no-duplicate-owner`, `testing/no-missing-owner` |

@@ -28,9 +28,9 @@ spec:
     a GOOS or GOARCH suffix), and a Rust inherent impl in a submodule of the
     module that declares the type (`fix/run/settle.rs` beside `fix/run.rs`; the
     owner file's path without `.rs`, or its directory for `lib.rs`, `main.rs`
-    and `mod.rs`, is the submodule's prefix). A private free function used only
-    by one type's methods is a judgment: it is a review task when it lives away
-    from that type. The finding has no fix; moving methods across files changes
+    and `mod.rs`, is the submodule's prefix). A private free function that belongs with one type is reported by
+    `design/prefer-method`, and one that lives in the wrong file of its module by
+    `design/file-placement`. The finding has no fix; moving methods across files changes
     the roles of files, which a reviewer decides.
 
     The severity follows the measured precision. A sample of 51 (type, file)
@@ -70,18 +70,13 @@ spec:
       && func.file_stem != home.owner_stem && !submodule
       && !(size(split) > 0
            && (split.share >= 0.5 || (split.home_methods >= 1 && split.home_methods * 5 < split.methods)))
-    abstain: >-
-      !func.test && !func.generated && func.kind == 'function'
-      && size(func.owner_home) > 0 && func.owner_home.owner_file != func.file
     message: >-
-      {{ func.kind == 'method'
-         ? home.owner_name + '.' + func.name + ' is declared in ' + func.file + ', away from ' + home.owner_name
-           + ' in ' + home.owner_file + ': move it to ' + home.owner_file + ', or make ' + func.file
-           + " a file of " + home.owner_name + "'s own concern"
-         : 'review whether ' + func.name + ' should live with its owner in ' + func.owner_home.owner_file }}
+      {{ home.owner_name + '.' + func.name + ' is declared in ' + func.file + ', away from ' + home.owner_name
+         + ' in ' + home.owner_file + ': move it to ' + home.owner_file + ', or make ' + func.file
+         + " a file of " + home.owner_name + "'s own concern" }}
     evidence:
       kind: "'owner-file'"
-      owner_file: "size(home) > 0 ? home.owner_file : func.owner_home.owner_file"
+      owner_file: home.owner_file
       file: func.file
       share: "size(split) > 0 ? split.share : 0.0"
       home_methods: "size(split) > 0 ? split.home_methods : 0"

@@ -23,6 +23,7 @@ use crate::{
         imports::imports,
         owned::owned,
         parent::{Used, Uses, parents},
+        placement::placements,
         split::splits,
         tested,
     },
@@ -45,6 +46,7 @@ pub const CYCLES: &str = "cycles";
 pub const TYPES: &str = "types";
 pub const PARENTS: &str = "parents";
 pub const SPLIT: &str = "split";
+pub const PLACEMENT: &str = "placement";
 pub const REACH: &str = "reach";
 pub const STABILITY: &str = "stability";
 pub const TESTED: &str = "tested";
@@ -87,6 +89,8 @@ pub trait Indexes {
     fn parent(&self, module: &str) -> Used;
     /// The split of a method.
     fn split(&self, id: &SymbolId) -> Option<Fact>;
+    /// Where a free function belongs, by module, owner and file.
+    fn placement(&self, id: &SymbolId) -> Option<Fact>;
     /// What a symbol reaches in the graph of symbols.
     fn reach(&self, id: &SymbolId) -> Option<Reached>;
     /// What a module reaches in the graph of modules.
@@ -116,6 +120,7 @@ pub struct Computed<'a> {
     types: OnceLock<BTreeMap<String, Vec<Fact>>>,
     parents: OnceLock<Uses>,
     splits: OnceLock<BTreeMap<SymbolId, Fact>>,
+    placements: OnceLock<BTreeMap<SymbolId, Fact>>,
     modules: OnceLock<System>,
     symbols: OnceLock<System>,
     tested: OnceLock<BTreeSet<String>>,
@@ -135,6 +140,7 @@ impl<'a> Computed<'a> {
             types: OnceLock::new(),
             parents: OnceLock::new(),
             splits: OnceLock::new(),
+            placements: OnceLock::new(),
             modules: OnceLock::new(),
             symbols: OnceLock::new(),
             tested: OnceLock::new(),
@@ -189,6 +195,13 @@ impl Indexes for Computed<'_> {
 
     fn split(&self, id: &SymbolId) -> Option<Fact> {
         let index = self.splits.get_or_init(|| splits(self.model));
+        index.get(id).cloned()
+    }
+
+    fn placement(&self, id: &SymbolId) -> Option<Fact> {
+        let index = self
+            .placements
+            .get_or_init(|| placements(self.model, self, self.ws));
         index.get(id).cloned()
     }
 
@@ -260,6 +273,7 @@ impl Computed<'_> {
             USERS => Arc::new(self.users(&id)),
             OWNED => Arc::new(self.owned(&id)),
             SPLIT => Arc::new(self.split(&id)),
+            PLACEMENT => Arc::new(self.placement(&id)),
             REACH => Arc::new(self.reach(&id)),
             _ => return None,
         })
@@ -374,6 +388,10 @@ impl Indexes for Queried<'_> {
 
     fn split(&self, id: &SymbolId) -> Option<Fact> {
         self.pull(SPLIT, id.as_str())
+    }
+
+    fn placement(&self, id: &SymbolId) -> Option<Fact> {
+        self.pull(PLACEMENT, id.as_str())
     }
 
     fn reach(&self, id: &SymbolId) -> Option<Reached> {

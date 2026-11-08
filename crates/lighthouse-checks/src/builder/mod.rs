@@ -40,6 +40,7 @@ pub(crate) mod imports;
 pub(crate) mod owned;
 mod ownership;
 pub(crate) mod parent;
+pub(crate) mod placement;
 mod role;
 pub(crate) mod split;
 mod stability;
@@ -469,6 +470,9 @@ impl<'a> Builder<'a> {
         let needs = self.needs;
         if needs.field("envy") {
             map.insert("envy".to_owned(), self.envy(symbol));
+        }
+        if needs.field("placement") {
+            map.insert("placement".to_owned(), self.placement(symbol));
         }
         if needs.field("owner_home") {
             map.insert("owner_home".to_owned(), self.owner_home(symbol));

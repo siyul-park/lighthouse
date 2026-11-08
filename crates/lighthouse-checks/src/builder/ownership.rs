@@ -64,8 +64,8 @@ impl Builder<'_> {
         })
     }
 
-    /// What a free function uses of the project, by type and by module: the
-    /// members of each type it uses, and the modules its uses lie in.
+    /// What a free function uses of the project, by type: the members of each
+    /// type it uses.
     pub(super) fn envy(&self, symbol: &Symbol) -> Value {
         let project = self.project;
         let used = project.uses(&symbol.id);
@@ -73,8 +73,6 @@ impl Builder<'_> {
             return json!({});
         }
         let mut members: BTreeMap<&SymbolId, BTreeSet<&str>> = BTreeMap::new();
-        let mut modules: BTreeMap<&str, BTreeSet<&SymbolId>> = BTreeMap::new();
-        let mut own = 0;
         // A function that names a type itself (a literal, `var x T`) builds
         // or holds an instance of it: its members are the function's own.
         let named: BTreeSet<&SymbolId> = used
@@ -93,35 +91,11 @@ impl Builder<'_> {
             {
                 members.entry(&owner.id).or_default().insert(&member.name);
             }
-            // A submodule uses its parent's types as a matter of course, so
-            // that use says nothing about where a function belongs.
-            if id.module() == symbol.id.module() {
-                own += 1;
-            } else if !layout::contains(id.module(), symbol.id.module()) && !generated(project, id)
-            {
-                modules.entry(id.module()).or_default().insert(id);
-            }
         }
         let target = members
             .iter()
             .max_by_key(|(id, names)| (names.len(), std::cmp::Reverse(*id)))
             .map(|(id, names)| (*id, names));
-        let outside = (modules.len() == 1)
-            .then(|| modules.iter().next())
-            .flatten();
-        // Behavior ties a function to a module: calling its functions and
-        // methods, reading its fields. Naming its constants and types does not.
-        let behavior = |ids: &BTreeSet<&SymbolId>| -> Vec<&Symbol> {
-            ids.iter()
-                .filter_map(|id| project.symbol(id))
-                .filter(|s| {
-                    matches!(
-                        s.kind,
-                        SymbolKind::Function | SymbolKind::Method | SymbolKind::Field
-                    )
-                })
-                .collect()
-        };
         json!({
             "target": target.map_or("", |(id, _)| id.as_str()),
             "target_name": target.and_then(|(id, _)| project.symbol(id)).map_or("", |t| t.name.as_str()),
@@ -129,10 +103,6 @@ impl Builder<'_> {
             "member_names": target.map(|(_, names)| names.iter().collect::<Vec<_>>()).unwrap_or_default(),
             "others": members.keys().filter(|id| Some(**id) != target.map(|(t, _)| t)).map(|id| id.as_str()).collect::<Vec<_>>(),
             "same_module": target.is_some_and(|(id, _)| id.module() == symbol.id.module()),
-            "module_target": outside.map_or("", |(module, _)| *module),
-            "module_uses": outside.map(|(_, ids)| behavior(ids).iter().map(|s| s.id.as_str()).collect::<Vec<_>>()).unwrap_or_default(),
-            "module_use_names": outside.map(|(_, ids)| behavior(ids).iter().map(|s| s.name.as_str()).collect::<Vec<_>>()).unwrap_or_default(),
-            "own_uses": own,
             "entry": self.is_entry(symbol),
         })
     }
@@ -150,7 +120,7 @@ impl Builder<'_> {
     /// in a Go `main` package or at the root of a Rust binary, or an `init`
     /// function or a package variable's initializer uses it. Moving such a
     /// function says nothing about its design.
-    fn is_entry(&self, symbol: &Symbol) -> bool {
+    pub(super) fn is_entry(&self, symbol: &Symbol) -> bool {
         let project = self.project;
         let in_binary = project.module(symbol.id.module()).is_some_and(|m| {
             m.name.as_deref() == Some("main") || (m.path.contains("[bin:") && !m.path.contains('/'))
@@ -167,7 +137,7 @@ impl Builder<'_> {
                 })
     }
 
-    fn production_callers(&self, symbol: &Symbol) -> Vec<&Symbol> {
+    pub(super) fn production_callers(&self, symbol: &Symbol) -> Vec<&Symbol> {
         let project = self.project;
         project
             .callers(&symbol.id)
@@ -190,15 +160,6 @@ fn sole_owner(callers: &[&Symbol]) -> Option<String> {
     owners
         .all(|o| o.as_deref() == Some(first.as_str()))
         .then_some(first)
-}
-
-/// Whether `id` is declared in a generated file: a function cannot be moved
-/// next to code that is rewritten by a tool.
-fn generated(project: &dyn Model, id: &SymbolId) -> bool {
-    project
-        .symbol(id)
-        .and_then(|s| project.file(&s.file))
-        .is_some_and(|f| f.generated)
 }
 
 /// The type whose member `id` is: not an interface, whose methods any type

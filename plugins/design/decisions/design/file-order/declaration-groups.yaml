@@ -257,7 +257,8 @@ spec:
         expression: >-
           options.blocks == 'kind' ? words[1] + ' come ' + words[2]
           : 'it goes in ' + owner_name + "'s block " + words[2]
-    where: size(report) > 0
+    # `design/prefer-method` reports a method in all but name; its order waits.
+    where: size(report) > 0 && !(symbol.func != null && symbol.func.placement.level == 'owner')
     message: >-
       {{ (report[0][4]
          ? 'constructor ' + symbol.name + ' must precede the other methods of its type, such as '

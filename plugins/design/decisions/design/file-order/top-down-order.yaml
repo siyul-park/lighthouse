@@ -83,7 +83,9 @@ spec:
              && lead.kind == 'method' && lead.implementation)
     - name: matched
       expression: 'used_first ? [''callers-first''] : []'
-    where: size(matched)>0
+    # A function that is a method of a type in all but name is reported by
+    # `design/prefer-method`; its order says nothing until its place agrees.
+    where: size(matched)>0 && !(symbol.func != null && symbol.func.placement.level == 'owner')
     message: "{{ symbol.kind == 'type' ? 'type ' + symbol.name + ' is declared above ' + lead.name + ' (line ' + string(lead.line) + '), which holds it; holders come first'
       : 'private ' + symbol.kind + ' ' + symbol.name + ' is declared above its ' + (options.sharedAfterLastCaller ? 'last' : 'first') + ' caller ' + lead.name + ' (line ' + string(lead.line) + '); callers come first' }}"
     evidence:

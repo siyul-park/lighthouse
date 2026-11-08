@@ -444,6 +444,8 @@ Function structure should make meaningful behavior reusable and readable, not me
 | [`design/narrow-inputs`](#public-inputs-use-narrow-abstractions) | Public inputs use narrow abstractions | warn · model |  |  |
 | [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel | unsafe |  |
 | [`design/feature-envy`](#functions-belong-with-the-behavior-they-use) | Functions belong with the behavior they use | info · cel | unsafe |  |
+| [`design/module-placement`](#a-function-lives-in-the-module-of-what-it-depends-on) | A function lives in the module of what it depends on | info · model | unsafe |  |
+| [`design/file-placement`](#a-function-lives-in-the-file-of-what-it-uses) | A function lives in the file of what it uses | info · model | unsafe |  |
 | [`design/no-unused-symbol`](#unused-private-symbols-are-removed) | Unused private symbols are removed | error · cel |  |  |
 | [`design/no-redundant-symbol`](#redundant-symbols-are-removed-or-consolidated) | Redundant symbols are removed or consolidated | warn · cel | unsafe |  |
 | [`design/no-speculative-generality`](#abstractions-are-not-speculative) | Abstractions are not speculative | warn · model |  |  |
@@ -745,17 +747,16 @@ Also: rust, typescript, python
 
 `design/feature-envy` · symbol · info · cel · fix: unsafe · go, python, rust, typescript
 
-*A free function that uses several members of one type may be that type's behavior, and a function that uses only one other module may be misplaced. These are low-precision review candidates, not deterministic findings. Constructors and entry points are excluded; exported functions are excluded unless a project explicitly opts them in.*
+*A free function that uses several members of one type may be that type's behavior. This is a low-precision review candidate, not a deterministic finding. Constructors and entry points are excluded; exported functions are excluded unless a project explicitly opts them in.*
 
-A function SHOULD live with the type or module whose behavior it principally uses; a function SHOULD NOT be placed elsewhere merely by historical accident.
+A function SHOULD live with the type whose behavior it principally uses; a function SHOULD NOT be placed elsewhere merely by historical accident.
 
 Derived from: Fowler, Refactoring 2nd ed., Feature Envy; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006, Feature Envy detection strategy; Fowler, Refactoring 2nd ed., Move Function; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006; Martin, Clean Code (2008), G14 Feature Envy; Martin, Clean Code (2008), G17 Misplaced Responsibility; Martin, Clean Code (2008), G18 Inappropriate Static
 
 | option | default | meaning |
 | --- | --- | --- |
 | `envy` | `{"includeExported":false,"minMembers":3,"minStatements":3}` | What makes a function a candidate for `envy`. `minMembers`: Fewest distinct members of the type the function must use. `minStatements`: Fewest statements a function must have to be judged. `includeExported`: Also judge exported functions, whose callers outside the module would have to change. |
-| `kinds` | `[]` | Review feature envy against a type (`type`) or placement in another module (`module`). |
-| `module` | `{"includeExported":false,"minStatements":3,"minUses":3}` | What makes a function a candidate for `module`. `minUses`: Fewest distinct symbols of the other module the function must use. `minStatements`: Fewest statements a function must have to be judged. `includeExported`: Also judge exported functions, whose callers would have to change. |
+| `kinds` | `[]` | Review feature envy against a type (`type`). |
 
 ```go invalid
 package sample
@@ -798,6 +799,138 @@ func summary(s *Store, c *Cache) int {
 ```
 
 Also: rust, typescript, python
+
+### A function lives in the module of what it depends on
+
+`design/module-placement` · symbol · info · model · fix: unsafe · go, rust
+
+*A private free function that uses nothing of its own module but the symbols of one other module may be that module's behavior under a foreign roof. The candidate is chosen by the placement fact: the target is the module that holds most of the symbols the function uses (the containment form of the entity distance of Tsantalis and Chatzigeorgiou, IEEE TSE 35(3), 2009), it is admissible (the move adds no import cycle, by Martin's acyclic dependencies principle; every caller can still import it; it is no program, test or example module), and the function's signature names types of the target and of no other module. A function that uses symbols of its own module, is an entry point, a constructor or used as a value is not a candidate, and a method of a type in all but name is `design/prefer-method`'s. A model judges the candidates. The deterministic check measured below the precision a rule needs. A sample of 40 findings drawn from the 58 of minivm, cel, qlbridge and this repository was labelled by whether a maintainer would move the function into the target: 9 are right (23%, Wilson lower bound 12%); all 58 labelled, 16 are right (28%). So the facts select candidates and do not decide, and the decision is bound to no default project. What the facts cannot express is a policy that a consumer keeps over a lower layer's API (cel's folding predicates over `common/ast`, a pass's `hoistable` over `ssa`): they are the same as those of the helpers that do belong (`ssa` `entry`, `types` `box`). The conceptual similarity of the function and the module (Bavota et al.'s Methodbook, the embeddings of the model roadmap) is what would make the check deterministic. Extract package for a group of such functions (Bavota et al., EMSE 2014) was tried and found one case in four projects, wrong.*
+
+A function SHOULD live in the module whose symbols it principally uses; it SHOULD NOT stay in a module it uses nothing of merely by historical accident.
+
+Derived from: Tsantalis and Chatzigeorgiou, Identification of Move Method Refactoring Opportunities, IEEE TSE 35(3), 2009; Fowler, Refactoring 2nd ed., Move Function; Martin, Clean Architecture (2017), the acyclic dependencies principle; Martin, Clean Code (2008), G17 Misplaced Responsibility
+
+```go invalid app/app.go
+package app
+
+import "example.com/app/store"
+
+func Run() int { return load(store.Item{}) }
+
+func load(i store.Item) int {
+	a := i.Read()
+	b := i.Count()
+	c := i.Scan()
+	return a + b + c
+}
+```
+
+```go invalid store/store.go
+package store
+
+type Item struct{}
+
+func (Item) Read() int { return 1 }
+
+func (Item) Count() int { return 2 }
+
+func (Item) Scan() int { return 3 }
+```
+
+```go valid app/app.go
+package app
+
+import "example.com/app/store"
+
+// Run is part of the example.
+func Run() int { return load(store.Item{}) + local() }
+
+func load(i store.Item) int {
+	a := i.Read()
+	b := i.Count() + i.Scan()
+	return a + b + local()
+}
+
+func local() int { return 0 }
+```
+
+```go valid store/store.go
+package store
+
+// Item is part of the example.
+type Item struct{}
+
+// Read is part of the example.
+func (Item) Read() int { return 1 }
+
+// Count is part of the example.
+func (Item) Count() int { return 2 }
+
+// Scan is part of the example.
+func (Item) Scan() int { return 3 }
+```
+
+Also: rust
+
+### A function lives in the file of what it uses
+
+`design/file-placement` · symbol · info · model · fix: unsafe · go, rust
+
+*A private free function whose uses lie mostly in one other file of its own module may be misfiled: a helper lives with what it serves, in a file that already exists (a new file would be a split for order). The candidate is chosen by the placement fact: the file of the module whose symbols the function uses most, which has to hold at least three of them and more than the function's own file. A function whose module is wrong or that is a method of a type in the module is the coarser decisions' (`design/module-placement`, `design/prefer-method`). A model judges the candidates. The deterministic check measured far below the precision a rule needs: all 25 findings of minivm, cel, qlbridge and this repository were labelled and none is right (0%). A file of a module is named for a concern (`decorators.go`, `numeric.go`, `compare.go`), which the symbols a function uses do not say, and a helper whose callers sit in its file is kept there already. So the facts select candidates and do not decide, and the decision is bound to no default project. The conceptual similarity of the function and the file (Bavota et al.'s Methodbook, the embeddings of the model roadmap) is what would make the check deterministic. A misfiled function keeps its order findings.*
+
+A function SHOULD live in the file of the declarations it principally uses.
+
+Derived from: Martin, Clean Code (2008), G17 Misplaced Responsibility; Tsantalis and Chatzigeorgiou, Identification of Move Method Refactoring Opportunities, IEEE TSE 35(3), 2009; Lighthouse, coding-patterns#physical-cohesion-547f3a8e
+
+```go invalid a.go
+package sample
+
+func total() int {
+	a := first()
+	b := second()
+	c := third()
+	return a + b + c
+}
+```
+
+```go invalid b.go
+package sample
+
+func first() int { return 1 }
+
+func second() int { return 2 }
+
+func third() int { return 3 }
+```
+
+```go invalid c.go
+package sample
+
+// Run is part of the example.
+func Run() int { return total() }
+```
+
+```go valid
+package sample
+
+// Run is part of the example.
+func Run() int { return total() }
+
+func total() int {
+	a := first()
+	b := second()
+	c := third()
+	return a + b + c
+}
+
+func first() int { return 1 }
+
+func second() int { return 2 }
+
+func third() int { return 3 }
+```
+
+Also: rust
 
 ### Unused private symbols are removed
 
@@ -1845,7 +1978,7 @@ Also: rust
 
 `design/owner-file` · symbol · info · cel · go, rust
 
-*Files are navigational boundaries. Splitting an owner from its closely related methods adds indirection unless the split expresses a meaningful boundary; physical separation corresponds to a real responsibility, ownership, or abstraction boundary. A method declared in a file other than its type's is a finding, unless the type is split by concern or the file is dedicated to the type. Two facts of the `split` fact say so. A type split by concern keeps few of its methods at home: it has methods in its home file, and fewer than a fifth of all its methods (go/types' `Checker` has 19 of 203 in `check.go`). A file is dedicated to the type when the type's methods in it and the helpers only they reach (private functions and types that only the file uses) are at least half of the functions of the file (`share`). A stray file of a type that keeps its methods at home (minivm's `transform/fact.go`) is neither. Exempt as well: methods an interface or trait fixes (`implementation`), generated code (also a type declared in generated code, whose file cannot take methods), tests, a platform sibling (Go `machine_arm64.go` beside `machine.go`: the stem of a file name leaves out a GOOS or GOARCH suffix), and a Rust inherent impl in a submodule of the module that declares the type (`fix/run/settle.rs` beside `fix/run.rs`; the owner file's path without `.rs`, or its directory for `lib.rs`, `main.rs` and `mod.rs`, is the submodule's prefix). A private free function used only by one type's methods is a judgment: it is a review task when it lives away from that type. The finding has no fix; moving methods across files changes the roles of files, which a reviewer decides. The severity follows the measured precision. A sample of 51 (type, file) cases (208 methods) from cel (none: its split methods all implement interfaces), qlbridge, minivm, this repository and go/types was labelled by whether a reviewer following the requirement would move the method or make the file the type's own concern; a file of one concern across several types (go/types iter.go) is such a concern file. The rule flags 16 cases and 10 are right (62%; 67% held out by corpus), below 80%, so `info`. Share alone flagged 21 cases at 48%; connectedness and narrow entry, which go/types' own concern files fail, lowered precision and are not used. No mainstream linter enforces this.*
+*Files are navigational boundaries. Splitting an owner from its closely related methods adds indirection unless the split expresses a meaningful boundary; physical separation corresponds to a real responsibility, ownership, or abstraction boundary. A method declared in a file other than its type's is a finding, unless the type is split by concern or the file is dedicated to the type. Two facts of the `split` fact say so. A type split by concern keeps few of its methods at home: it has methods in its home file, and fewer than a fifth of all its methods (go/types' `Checker` has 19 of 203 in `check.go`). A file is dedicated to the type when the type's methods in it and the helpers only they reach (private functions and types that only the file uses) are at least half of the functions of the file (`share`). A stray file of a type that keeps its methods at home (minivm's `transform/fact.go`) is neither. Exempt as well: methods an interface or trait fixes (`implementation`), generated code (also a type declared in generated code, whose file cannot take methods), tests, a platform sibling (Go `machine_arm64.go` beside `machine.go`: the stem of a file name leaves out a GOOS or GOARCH suffix), and a Rust inherent impl in a submodule of the module that declares the type (`fix/run/settle.rs` beside `fix/run.rs`; the owner file's path without `.rs`, or its directory for `lib.rs`, `main.rs` and `mod.rs`, is the submodule's prefix). A private free function that belongs with one type is reported by `design/prefer-method`, and one that lives in the wrong file of its module by `design/file-placement`. The finding has no fix; moving methods across files changes the roles of files, which a reviewer decides. The severity follows the measured precision. A sample of 51 (type, file) cases (208 methods) from cel (none: its split methods all implement interfaces), qlbridge, minivm, this repository and go/types was labelled by whether a reviewer following the requirement would move the method or make the file the type's own concern; a file of one concern across several types (go/types iter.go) is such a concern file. The rule flags 16 cases and 10 are right (62%; 67% held out by corpus), below 80%, so `info`. Share alone flagged 21 cases at 48%; connectedness and narrow entry, which go/types' own concern files fail, lowered precision and are not used. No mainstream linter enforces this.*
 
 Symbols with one owner and a cohesive responsibility SHOULD share a file.
 

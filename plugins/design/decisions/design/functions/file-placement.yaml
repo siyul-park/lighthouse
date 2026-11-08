@@ -1,0 +1,165 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/file-placement
+  uid: 0d2c4f7a-91b3-4c58-8e6f-3b5a9d1c7e22
+spec:
+  title: A function lives in the file of what it uses
+  context: >-
+    A private free function whose uses lie mostly in one other file of its own
+    module may be misfiled: a helper lives with what it serves, in a file that
+    already exists (a new file would be a split for order). The candidate is chosen
+    by the placement fact: the file of the module whose symbols the function uses
+    most, which has to hold at least three of them and more than the function's own
+    file. A function whose module is wrong or that is a method of a type in the
+    module is the coarser decisions' (`design/module-placement`,
+    `design/prefer-method`). A model judges the candidates.
+
+    The deterministic check measured far below the precision a rule needs: all 25
+    findings of minivm, cel, qlbridge and this repository were labelled and none is
+    right (0%). A file of a module is named for a concern (`decorators.go`,
+    `numeric.go`, `compare.go`), which the symbols a function uses do not say, and
+    a helper whose callers sit in its file is kept there already. So the facts
+    select candidates and do not decide, and the decision is bound to no default
+    project. The conceptual similarity of the function and the file (Bavota et
+    al.'s Methodbook, the embeddings of the model roadmap) is what would make the
+    check deterministic. A misfiled function keeps its order findings.
+  scope:
+    subject: symbol
+  languages:
+    go: {}
+    rust: {}
+  requirement: A function SHOULD live in the file of the declarations it principally
+    uses.
+  severity: info
+  check:
+    type: model
+    select: >-
+      symbol.func != null && size(symbol.func.placement.file) > 0 && symbol.func.placement.file.misfiled && symbol.func.placement.file.uses >= 3
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), G17 Misplaced Responsibility
+    - Tsantalis and Chatzigeorgiou, Identification of Move Method Refactoring Opportunities,
+      IEEE TSE 35(3), 2009
+    - Lighthouse, coding-patterns#physical-cohesion-547f3a8e
+  fix:
+    type: model
+    safety: unsafe
+  examples:
+  - name: go-uses-another-file-of-its-package
+    language: go
+    kind: invalid
+    files:
+    - path: a.go
+      body: |
+        package sample
+
+        func total() int {
+        	a := first()
+        	b := second()
+        	c := third()
+        	return a + b + c
+        }
+    - path: b.go
+      body: |
+        package sample
+
+        func first() int { return 1 }
+
+        func second() int { return 2 }
+
+        func third() int { return 3 }
+    - path: c.go
+      body: |
+        package sample
+
+        // Run is part of the example.
+        func Run() int { return total() }
+  - name: go-uses-its-own-file
+    language: go
+    kind: valid
+    files:
+    - path: a.go
+      body: |
+        package sample
+
+        // Run is part of the example.
+        func Run() int { return total() }
+
+        func total() int {
+        	a := first()
+        	b := second()
+        	c := third()
+        	return a + b + c
+        }
+
+        func first() int { return 1 }
+
+        func second() int { return 2 }
+
+        func third() int { return 3 }
+    canonical: true
+  - name: go-helper-beside-its-callers
+    language: go
+    kind: valid
+    files:
+    - path: a.go
+      body: |
+        package sample
+
+        // Run is part of the example.
+        func Run() int { return total() }
+
+        func total() int {
+        	a := first()
+        	b := second()
+        	c := third()
+        	return a + b + c
+        }
+    - path: b.go
+      body: |
+        package sample
+
+        func first() int { return 1 }
+
+        func second() int { return 2 }
+
+        func third() int { return 3 }
+    canonical: false
+  - name: rust-uses-another-file-of-its-module
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod other;
+
+        /// Part of the example.
+        pub fn run() -> i32 {
+            total()
+        }
+
+        fn total() -> i32 {
+            let a = other::first();
+            let b = other::second();
+            let c = other::third();
+            a + b + c
+        }
+    - path: src/other.rs
+      body: |-
+        /// Part of the example.
+        pub fn first() -> i32 {
+            1
+        }
+
+        /// Part of the example.
+        pub fn second() -> i32 {
+            2
+        }
+
+        /// Part of the example.
+        pub fn third() -> i32 {
+            3
+        }
+    canonical: true

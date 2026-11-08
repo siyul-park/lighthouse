@@ -1,12 +1,16 @@
-//! The decisions about where functions live: feature envy and misplaced
-//! symbols, the `envy` and `module` kinds of `design/prefer-method`. Both are
-//! review candidates, so the tests read the `abstain` of the check.
+//! The decisions about where functions live: feature envy (a review candidate,
+//! so these tests read the `abstain` of the check) and the placement model of
+//! `design/module-placement`, `design/prefer-method` and
+//! `design/file-placement`, one answer per function.
 
 use std::collections::BTreeMap;
 
-use crate::support::{Subject, World};
+use crate::{
+    model_selects::selected,
+    support::{Subject, World},
+};
 use lighthouse_checks::Checks;
-use lighthouse_model::ucm::{EdgeKind, Symbol, SymbolKind, Visibility};
+use lighthouse_model::ucm::{EdgeKind, Symbol, SymbolKind, TypeRef, Visibility};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
@@ -15,11 +19,8 @@ const RULE: &str = "design/feature-envy";
 /// The limits of the kind `kind` (`envy` or `module`) as `overrides` change
 /// them from the defaults of the decision.
 fn limits(kind: &str, overrides: Value) -> Value {
-    let mut base = if kind == "type" {
-        json!({ "minMembers": 3, "minStatements": 3, "includeExported": false })
-    } else {
-        json!({ "minUses": 3, "minStatements": 3, "includeExported": false })
-    };
+    let mut base = json!({ "minMembers": 3, "minStatements": 3, "includeExported": false });
+    let _ = kind;
     for (key, value) in overrides.as_object().unwrap() {
         base[key] = value.clone();
     }
@@ -55,8 +56,7 @@ fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)>
     )
     .unwrap();
     let plugin = Checks::new(&lighthouse_test_support::composition(), "local", &catalog).unwrap();
-    let key = if kind == "type" { "envy" } else { "module" };
-    let options = json!({ "kinds": [kind], key: limits(kind, overrides) });
+    let options = json!({ "kinds": [kind], "envy": limits(kind, overrides) });
     world
         .diagnose_with(
             &catalog,
@@ -76,10 +76,6 @@ fn envy(world: &World, overrides: Value) -> Vec<(String, u32)> {
     candidates(world, "type", overrides)
 }
 
-fn misplaced(world: &World, overrides: Value) -> Vec<(String, u32)> {
-    candidates(world, "module", overrides)
-}
-
 /// A type `Store` with fields `items`, `total` and `extra` in module `m`, and a
 /// private function `summary` of four statements that references the fields in
 /// `uses`.
@@ -96,20 +92,6 @@ fn envious(uses: &[&str]) -> (World, Symbol) {
         }
     }
     (w, summary)
-}
-
-/// A private function `load` of module `app` that calls `names`, one function
-/// each, of module `module`.
-fn loader(module: &str, names: &[&str]) -> (World, Symbol) {
-    let mut w = World::default();
-    let load = w.func("app", "load", "app/a.ucm");
-    w.summarize(&load, 4, &[]);
-    w.private(&load);
-    for name in names {
-        let used = w.func(module, name, &format!("{module}/a.ucm"));
-        w.edge(EdgeKind::Calls, &load, &used);
-    }
-    (w, load)
 }
 
 #[test]
@@ -172,33 +154,6 @@ fn feature_envy_leaves_a_function_of_another_module_alone() {
 }
 
 #[test]
-fn misplaced_symbol_offers_a_function_that_uses_one_other_module_only() {
-    let (mut w, load) = loader("store", &["read", "count", "scan"]);
-    assert_eq!(w.names(&misplaced(&w, json!({}))), ["load"]);
-    assert!(misplaced(&w, json!({ "minUses": 4 })).is_empty());
-
-    let local = w.func("app", "local", "app/a.ucm");
-    w.edge(EdgeKind::Calls, &load, &local);
-    assert!(misplaced(&w, json!({})).is_empty(), "uses its own module");
-}
-
-#[test]
-fn misplaced_symbol_does_not_move_a_function_into_generated_code() {
-    let (mut w, _) = loader("gen", &["read", "count", "scan"]);
-    assert_eq!(w.names(&misplaced(&w, json!({}))), ["load"]);
-    w.files.insert("gen/a.ucm".to_owned(), true);
-    assert!(misplaced(&w, json!({})).is_empty());
-}
-
-#[test]
-fn misplaced_symbol_leaves_a_function_that_uses_two_other_modules_alone() {
-    let (mut w, load) = loader("store", &["read"]);
-    let used = w.func("log", "write", "log/a.ucm");
-    w.edge(EdgeKind::Calls, &load, &used);
-    assert!(misplaced(&w, json!({})).is_empty());
-}
-
-#[test]
 fn feature_envy_does_not_count_the_variants_of_an_enum() {
     let mut w = World::default();
     let level = w.symbol("m", "Level", SymbolKind::Type, "m/a.ucm");
@@ -213,20 +168,15 @@ fn feature_envy_does_not_count_the_variants_of_an_enum() {
 }
 
 #[test]
-fn feature_envy_and_misplaced_symbol_skip_short_functions() {
+fn feature_envy_skips_short_functions() {
     let (mut w, summary) = envious(&["items", "total", "extra"]);
     w.summarize(&summary, 2, &[]);
     assert!(envy(&w, json!({})).is_empty());
     assert_eq!(envy(&w, json!({ "minStatements": 2 })).len(), 1);
-
-    let (mut w, load) = loader("store", &["read", "count", "scan"]);
-    w.summarize(&load, 2, &[]);
-    assert!(misplaced(&w, json!({})).is_empty());
-    assert_eq!(misplaced(&w, json!({ "minStatements": 2 })).len(), 1);
 }
 
 #[test]
-fn feature_envy_and_misplaced_symbol_skip_entry_points_and_wiring() {
+fn feature_envy_skips_entry_points_and_wiring() {
     let (mut w, _) = envious(&["items", "total", "extra"]);
     w.modules.clear();
     w.module("m", Some("main"), None);
@@ -241,4 +191,145 @@ fn feature_envy_and_misplaced_symbol_skip_entry_points_and_wiring() {
     let init = w.func("m", "init", "m/a.ucm");
     w.edge(EdgeKind::Calls, &init, &summary);
     assert!(envy(&w, json!({})).is_empty(), "init");
+}
+
+const MODULE: &str = "design/module-placement";
+const FILE: &str = "design/file-placement";
+const METHOD: &str = "design/prefer-method";
+
+/// The functions `design/module-placement` puts to a model.
+fn moves(w: &World) -> Vec<String> {
+    selected(w, MODULE, "symbol")
+}
+
+/// The functions `design/file-placement` puts to a model.
+fn misfiled(w: &World) -> Vec<String> {
+    selected(w, FILE, "symbol")
+}
+
+/// Gives `f` parameters of the types in `modules` (`module::Name`).
+fn takes(w: &mut World, f: &Symbol, types: &[&str]) {
+    let summary = w.summaries.iter_mut().find(|s| s.symbol == f.id).unwrap();
+    summary.signature.params = types
+        .iter()
+        .map(|id| TypeRef {
+            text: (*id).to_owned(),
+            symbol: Some((*id).to_owned()),
+            exported: Some(true),
+        })
+        .collect();
+}
+
+/// A private `clone` of module `interp` that takes a `types.Value` and calls
+/// the functions `names` of module `types`; `load` of `interp` calls it.
+fn cloner(names: &[&str]) -> (World, Symbol) {
+    let mut w = World::default();
+    w.symbol("types", "Value", SymbolKind::Type, "types/value.ucm");
+    let clone = w.func("interp", "clone", "interp/a.ucm");
+    w.summarize(&clone, 4, &[]);
+    w.private(&clone);
+    takes(&mut w, &clone, &["types::Value"]);
+    for name in names {
+        let used = w.func("types", name, "types/value.ucm");
+        w.edge(EdgeKind::Calls, &clone, &used);
+    }
+    let load = w.func("interp", "load", "interp/b.ucm");
+    w.edge(EdgeKind::Calls, &load, &clone);
+    w.import("interp", "types");
+    (w, clone)
+}
+
+#[test]
+fn placement_moves_a_function_that_uses_only_one_other_module() {
+    let (w, _) = cloner(&["array", "map", "struct"]);
+    assert_eq!(moves(&w), ["clone"]);
+    // One finding for the symbol: every finer decision is silent.
+    assert!(misfiled(&w).is_empty());
+    assert!(w.check(METHOD, json!({})).is_empty());
+    assert!(w.check("design/top-down-order", json!({})).is_empty());
+}
+
+#[test]
+fn placement_keeps_a_helper_that_uses_its_own_module() {
+    let (mut w, clone) = cloner(&["array", "map", "struct"]);
+    let state = w.symbol("interp", "state", SymbolKind::Var, "interp/a.ucm");
+    w.edge(EdgeKind::References, &clone, &state);
+    assert!(moves(&w).is_empty());
+}
+
+#[test]
+fn placement_keeps_a_function_the_target_cannot_import() {
+    // `log` imports `types`: a `clone` in `types` would import `log` back.
+    let (mut w, clone) = cloner(&["array", "map", "struct"]);
+    let write = w.func("log", "write", "log/a.ucm");
+    w.edge(EdgeKind::Calls, &clone, &write);
+    w.import("log", "types");
+    assert!(moves(&w).is_empty(), "types would import log");
+}
+
+#[test]
+fn placement_needs_a_clear_winner_among_several_modules() {
+    // Three symbols of `types` and one of `log`: `types` wins and is admissible.
+    let (mut w, clone) = cloner(&["array", "map", "struct"]);
+    let write = w.func("log", "write", "log/a.ucm");
+    w.edge(EdgeKind::Calls, &clone, &write);
+    assert_eq!(moves(&w), ["clone"]);
+
+    // Two and two: moving to either would be moved back, so no move.
+    let (mut w, clone) = cloner(&["array", "map"]);
+    for name in ["write", "flush"] {
+        let used = w.func("log", name, "log/a.ucm");
+        w.edge(EdgeKind::Calls, &clone, &used);
+    }
+    assert!(moves(&w).is_empty());
+}
+
+#[test]
+fn placement_leaves_the_order_of_a_function_that_is_a_method_in_all_but_name() {
+    // Called only by methods of `Store`, which it takes: `design/prefer-method`
+    // reports it, a model is not asked to move it, and its order waits.
+    let mut w = World::default();
+    let store = w.symbol("m", "Store", SymbolKind::Type, "m/a.ucm");
+    let total = w.member(&store, "Total", SymbolKind::Method, "m/a.ucm");
+    let sum = w.func("m", "sum", "m/a.ucm");
+    w.summarize(&sum, 4, &[]);
+    w.private(&sum);
+    w.edge(EdgeKind::Calls, &total, &sum);
+    takes(&mut w, &sum, &["m::Store"]);
+    assert_eq!(w.names(&w.check(METHOD, json!({}))), ["sum"]);
+    assert!(moves(&w).is_empty());
+}
+
+#[test]
+fn placement_keeps_a_function_whose_signature_names_its_own_type() {
+    // It takes `Store` and a `types.Value`: its signature is not the
+    // vocabulary of `types` alone, so it stays in `interp`.
+    let (mut w, clone) = cloner(&["array", "map", "struct"]);
+    let store = w.symbol("interp", "Store", SymbolKind::Type, "interp/a.ucm");
+    let total = w.member(&store, "Total", SymbolKind::Method, "interp/a.ucm");
+    w.edge(EdgeKind::Calls, &total, &clone);
+    takes(&mut w, &clone, &["interp::Store", "types::Value"]);
+    assert!(moves(&w).is_empty());
+}
+
+#[test]
+fn placement_selects_a_misfiled_helper_by_file_only() {
+    let mut w = World::default();
+    let total = w.func("m", "total", "m/a.ucm");
+    w.summarize(&total, 4, &[]);
+    w.private(&total);
+    for name in ["first", "second", "third"] {
+        let used = w.func("m", name, "m/b.ucm");
+        w.edge(EdgeKind::Calls, &total, &used);
+    }
+    let run = w.func("m", "run", "m/c.ucm");
+    w.edge(EdgeKind::Calls, &run, &total);
+    assert_eq!(misfiled(&w), ["total"]);
+    assert!(moves(&w).is_empty());
+    // A wrong file is no level: the order of the function is still judged.
+    assert!(w.check("design/top-down-order", json!({})).is_empty());
+
+    // Every caller sits beside it: it lives with what it serves.
+    w.symbols.iter_mut().find(|s| s.id == run.id).unwrap().file = "m/a.ucm".into();
+    assert!(misfiled(&w).is_empty());
 }

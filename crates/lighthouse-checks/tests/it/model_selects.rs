@@ -62,7 +62,7 @@ fn selecting(spec: &Value, id: &str, subject: &str) -> String {
 
 /// What the model decision `id` selects in `world`, sorted: the names of its
 /// subjects (`symbol.name`, or `module.path` for a module decision).
-fn selected(world: &World, id: &str, subject: &str) -> Vec<String> {
+pub(crate) fn selected(world: &World, id: &str, subject: &str) -> Vec<String> {
     let bundled = lighthouse_test_support::bundled()
         .decision(id)
         .expect("a bundled decision");
@@ -164,21 +164,4 @@ fn meaningful_separation_asks_about_a_small_module_with_one_user() {
         selected(&w, "design/meaningful-separation", "module"),
         ["app", "tiny"]
     );
-}
-
-#[test]
-fn owner_file_asks_about_a_helper_of_one_type_declared_away_from_it() {
-    let mut w = World::default();
-    let store = w.symbol("m", "Store", SymbolKind::Type, "m/store.ucm");
-    let near = w.member(&store, "Near", SymbolKind::Method, "m/store.ucm");
-    let field = w.member(&store, "items", SymbolKind::Field, "m/store.ucm");
-    let far = w.func("m", "far", "m/total.ucm");
-    w.private(&far);
-    w.edge(EdgeKind::Calls, &near, &far);
-    w.edge(EdgeKind::References, &far, &field);
-    let home = w.func("m", "home", "m/store.ucm");
-    w.private(&home);
-    w.edge(EdgeKind::Calls, &near, &home);
-    w.edge(EdgeKind::References, &home, &field);
-    assert_eq!(selected(&w, "design/owner-file", "symbol"), ["far"]);
 }

@@ -31,13 +31,14 @@ use crate::{
         imports::imports,
         owned::owned,
         parent::{Used, Uses, parents},
+        placement::placements,
         split::splits,
         subjects, tested,
     },
     fact::{Built, COMMENT, FACT, Fact, Facts, class_of, fact_of, subject_of},
     indexes::{
-        CREDITED, CYCLES, IMPORTS, NAMES, OWNED, PARENTS, Queried, REACH, Reached, SPLIT,
-        STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
+        CREDITED, CYCLES, IMPORTS, Indexes, NAMES, OWNED, PARENTS, PLACEMENT, Queried, REACH,
+        Reached, SPLIT, STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
     },
     metrics::{MEASURES, Measures, propagation},
     naming::{Credited, credited},
@@ -71,6 +72,7 @@ pub enum Aggregate {
     Types(BTreeMap<String, Vec<Fact>>),
     Parents(Uses),
     Splits(BTreeMap<SymbolId, Fact>),
+    Placements(BTreeMap<SymbolId, Fact>),
     Modules(propagation::System),
     Symbols(propagation::System),
     Tested(BTreeSet<String>),
@@ -100,6 +102,7 @@ pub enum Sort {
     Types,
     Parents,
     Splits,
+    Placements,
     Modules,
     Symbols,
     Tested,
@@ -117,6 +120,7 @@ impl Sort {
             TYPES => Self::Types,
             PARENTS => Self::Parents,
             SPLIT => Self::Splits,
+            PLACEMENT => Self::Placements,
             STABILITY => Self::Modules,
             REACH => Self::Symbols,
             TESTED => Self::Tested,
@@ -224,6 +228,16 @@ fn aggregate(graph: &Graph, sort: &Sort) -> Result<Aggregate, Error> {
         Sort::Types => Aggregate::Types(types(model)),
         Sort::Parents => Aggregate::Parents(parents(model)),
         Sort::Splits => Aggregate::Splits(splits(model)),
+        Sort::Placements => {
+            let ws = workspace(graph)?;
+            let pull = Pull::new(graph);
+            let indexes = Queried::new(&pull);
+            let found = Aggregate::Placements(placements(model, &indexes, &ws));
+            match indexes.failure() {
+                Some(error) => return Err(failed(error.to_string())),
+                None => found,
+            }
+        }
         Sort::Modules => Aggregate::Modules(propagation::modules(model)),
         Sort::Symbols => Aggregate::Symbols(propagation::symbols(model)),
         Sort::Tested => Aggregate::Tested(tested(model)),
@@ -267,6 +281,9 @@ fn index(graph: &Graph, (name, key): &(String, String)) -> Result<Entry, Error> 
         }
         (PARENTS, Aggregate::Parents(uses)) => Entry::Used(uses.of(key)),
         (SPLIT, Aggregate::Splits(map)) => Entry::Fact(id().and_then(|id| map.get(&id).cloned())),
+        (PLACEMENT, Aggregate::Placements(map)) => {
+            Entry::Fact(id().and_then(|id| map.get(&id).cloned()))
+        }
         (STABILITY, Aggregate::Modules(system)) => Entry::Reached(Reached::of(system, key)),
         (REACH, Aggregate::Symbols(system)) => Entry::Reached(Reached::of(system, key)),
         (TESTED, Aggregate::Tested(roots)) => {

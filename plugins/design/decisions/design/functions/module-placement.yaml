@@ -1,0 +1,263 @@
+---
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/module-placement
+  uid: 6b0f5a1e-3c52-4a56-9d0e-7a1d2c6e8b41
+spec:
+  title: A function lives in the module of what it depends on
+  context: >-
+    A private free function that uses nothing of its own module but the symbols
+    of one other module may be that module's behavior under a foreign roof. The
+    candidate is chosen by the placement fact: the target is the module that holds
+    most of the symbols the function uses (the containment form of the entity
+    distance of Tsantalis and Chatzigeorgiou, IEEE TSE 35(3), 2009), it is
+    admissible (the move adds no import cycle, by Martin's acyclic dependencies
+    principle; every caller can still import it; it is no program, test or example
+    module), and the function's signature names types of the target and of no other
+    module. A function that uses symbols of its own module, is an entry point, a
+    constructor or used as a value is not a candidate, and a method of a type in
+    all but name is `design/prefer-method`'s. A model judges the candidates.
+
+    The deterministic check measured below the precision a rule needs. A sample of
+    40 findings drawn from the 58 of minivm, cel, qlbridge and this repository was
+    labelled by whether a maintainer would move the function into the target: 9 are
+    right (23%, Wilson lower bound 12%); all 58 labelled, 16 are right (28%). So the
+    facts select candidates and do not decide, and the decision is bound to no
+    default project. What the facts cannot express is a policy that a consumer
+    keeps over a lower layer's API (cel's folding predicates over `common/ast`, a
+    pass's `hoistable` over `ssa`): they are the same as those of the helpers that
+    do belong (`ssa` `entry`, `types` `box`). The conceptual similarity of the
+    function and the module (Bavota et al.'s Methodbook, the embeddings of the
+    model roadmap) is what would make the check deterministic. Extract package for
+    a group of such functions (Bavota et al., EMSE 2014) was tried and found one
+    case in four projects, wrong.
+  scope:
+    subject: symbol
+  languages:
+    go: {}
+    rust: {}
+  requirement: A function SHOULD live in the module whose symbols it principally
+    uses; it SHOULD NOT stay in a module it uses nothing of merely by historical
+    accident.
+  severity: info
+  check:
+    type: model
+    select: >-
+      symbol.func != null && symbol.func.placement.move && symbol.func.placement.level != 'owner'
+  provenance:
+    wasDerivedFrom:
+    - Tsantalis and Chatzigeorgiou, Identification of Move Method Refactoring Opportunities,
+      IEEE TSE 35(3), 2009
+    - Fowler, Refactoring 2nd ed., Move Function
+    - Martin, Clean Architecture (2017), the acyclic dependencies principle
+    - Martin, Clean Code (2008), G17 Misplaced Responsibility
+  fix:
+    type: model
+    safety: unsafe
+  examples:
+  - name: go-uses-only-another-package
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: |
+        package app
+
+        import "example.com/app/store"
+
+        func Run() int { return load(store.Item{}) }
+
+        func load(i store.Item) int {
+        	a := i.Read()
+        	b := i.Count()
+        	c := i.Scan()
+        	return a + b + c
+        }
+    - path: store/store.go
+      body: |
+        package store
+
+        type Item struct{}
+
+        func (Item) Read() int { return 1 }
+
+        func (Item) Count() int { return 2 }
+
+        func (Item) Scan() int { return 3 }
+  - name: go-uses-its-own-package-too
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: |
+        package app
+
+        import "example.com/app/store"
+
+        // Run is part of the example.
+        func Run() int { return load(store.Item{}) + local() }
+
+        func load(i store.Item) int {
+        	a := i.Read()
+        	b := i.Count() + i.Scan()
+        	return a + b + local()
+        }
+
+        func local() int { return 0 }
+    - path: store/store.go
+      body: |
+        package store
+
+        // Item is part of the example.
+        type Item struct{}
+
+        // Read is part of the example.
+        func (Item) Read() int { return 1 }
+
+        // Count is part of the example.
+        func (Item) Count() int { return 2 }
+
+        // Scan is part of the example.
+        func (Item) Scan() int { return 3 }
+    canonical: true
+  - name: go-names-a-type-of-the-module-only-in-a-constant
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: |
+        package app
+
+        import "example.com/app/store"
+
+        // Run is part of the example.
+        func Run() int { return load(7) }
+
+        func load(n int) int {
+        	a := store.Read(n)
+        	b := store.Count(n)
+        	c := store.Scan(n)
+        	return a + b + c
+        }
+    - path: store/store.go
+      body: |
+        package store
+
+        // Read is part of the example.
+        func Read(n int) int { return n }
+
+        // Count is part of the example.
+        func Count(n int) int { return n }
+
+        // Scan is part of the example.
+        func Scan(n int) int { return n }
+    canonical: false
+  - name: rust-uses-only-another-module
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod store;
+
+        use crate::store::Item;
+
+        pub fn run() -> i32 {
+            load(&Item::new())
+        }
+
+        fn load(item: &Item) -> i32 {
+            let a = item.read();
+            let b = item.count();
+            let c = item.scan();
+            a + b + c
+        }
+    - path: src/store.rs
+      body: |-
+        pub struct Item;
+
+        impl Item {
+            pub fn new() -> Item {
+                Item
+            }
+
+            pub fn read(&self) -> i32 {
+                1
+            }
+
+            pub fn count(&self) -> i32 {
+                2
+            }
+
+            pub fn scan(&self) -> i32 {
+                3
+            }
+        }
+  - name: rust-uses-its-own-module-too
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod store;
+
+        use crate::store::Item;
+
+        /// Part of the example.
+        pub fn run() -> i32 {
+            load(&Item::new()) + local()
+        }
+
+        fn load(item: &Item) -> i32 {
+            let a = item.read();
+            let b = item.count();
+            let c = item.scan();
+            a + b + c + local()
+        }
+
+        fn local() -> i32 {
+            0
+        }
+    - path: src/store.rs
+      body: |-
+        /// Part of the example.
+        pub struct Item;
+
+        impl Item {
+            /// Part of the example.
+            pub fn new() -> Item {
+                Item
+            }
+
+            /// Part of the example.
+            pub fn read(&self) -> i32 {
+                1
+            }
+
+            /// Part of the example.
+            pub fn count(&self) -> i32 {
+                2
+            }
+
+            /// Part of the example.
+            pub fn scan(&self) -> i32 {
+                3
+            }
+        }
+    canonical: true
