@@ -1,10 +1,13 @@
 //! A `cel` fix: one expression that returns the edits, evaluated for the
 //! subject of a finding with the variables of its check.
 
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use cel::{Context, Program, common::value::CowVal, context::VariableResolver};
-use lighthouse_plugin::{Error as PluginError, FixRequest};
+use lighthouse_plugin::{Error as PluginError, FixRequest, ValuesRequest};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Map, Value, json};
 
@@ -33,7 +36,14 @@ pub(crate) struct CelFix {
     /// Per variable, whether the edits read it, directly or through another:
     /// the others are not evaluated.
     used: Vec<bool>,
+    /// The values the graph holds, as CEL variables: one conversion for all the
+    /// findings that pull the same [`Arc`]. An entry goes when the graph lets
+    /// its values go.
+    converted: Mutex<HashMap<usize, Converted>>,
 }
+
+/// The values the graph holds, with the same as CEL variables.
+type Converted = (Arc<Value>, Arc<FileValues>);
 
 /// The file as a value and the variables that read nothing of the finding.
 struct FileValues {
@@ -131,6 +141,7 @@ impl CelFix {
             decision: decision.clone(),
             library,
             shared: shared_by_finding,
+            converted: Mutex::default(),
         })
     }
 
@@ -150,8 +161,7 @@ impl CelFix {
             ws: request.workspace,
         };
         let builder = Builder::over(over, &self.needs, language.unwrap_or_default());
-        let needs_file = self.needs.ident("file") || self.select == Some(Select::File);
-        let values = self.values(id, request, &options, &builder, needs_file)?;
+        let values = self.converted_values(id, request)?;
         let mut scope = self.library.new_inner_scope();
         scope.set_variable_resolver(&values);
         let mut set = |name: &str, value: Value| scope.add_variable_as_val(name, cel_fact(&value));
@@ -223,27 +233,68 @@ impl CelFix {
         Ok(edits::lower(&list, &place))
     }
 
-    /// The file and the variables that read nothing of the finding.
-    fn values(
+    /// The values of the file of `request`, as CEL reads them.
+    fn converted_values(
         &self,
         id: &str,
         request: &FixRequest,
-        options: &Map<String, Value>,
-        builder: &Builder,
-        needs_file: bool,
-    ) -> Result<FileValues, PluginError> {
-        let finding = request.finding;
+    ) -> Result<Arc<FileValues>, PluginError> {
+        let Some(held) = request.values else {
+            let built = self.values(
+                id,
+                &ValuesRequest {
+                    file: &request.finding.file,
+                    options: request.options,
+                    project: request.project,
+                    queries: request.queries,
+                    workspace: request.workspace,
+                    text: request.text,
+                },
+            )?;
+            return Ok(Arc::new(FileValues::of(&built)));
+        };
+        let key = Arc::as_ptr(held) as usize;
+        let mut converted = self
+            .converted
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((_, found)) = converted.get(&key) {
+            return Ok(found.clone());
+        }
+        converted.retain(|_, (kept, _)| Arc::strong_count(kept) > 1);
+        let built = Arc::new(FileValues::of(held));
+        converted.insert(key, (held.clone(), built.clone()));
+        Ok(built)
+    }
+
+    /// The file and the variables that read nothing of the finding, as JSON:
+    /// `{"file": ..., "variables": {name: value}}`.
+    pub(crate) fn values(&self, id: &str, request: &ValuesRequest) -> Result<Value, PluginError> {
+        let language = request
+            .project
+            .file(request.file)
+            .map(|f| f.lang.as_str())
+            .unwrap_or_default();
+        let options = rule_options(&self.decision, request.options, Some(language))?;
+        let indexes = Queried::new(request.queries);
+        let over = Over {
+            model: request.project,
+            indexes: &indexes,
+            ws: request.workspace,
+        };
+        let builder = Builder::over(over, &self.needs, language);
+        let needs_file = self.needs.ident("file") || self.select == Some(Select::File);
         let file = request
             .project
-            .file(&finding.file)
+            .file(request.file)
             .filter(|_| needs_file)
-            .map(|f| cel_fact(&builder.file(f, request.text)));
+            .map(|f| builder.file(f, request.text));
         let mut scope = self.library.new_inner_scope();
-        scope.add_variable_as_val("options", cel_fact(&Value::Object(options.clone())));
+        scope.add_variable_as_val("options", cel_fact(&Value::Object(options)));
         if let Some(file) = &file {
-            scope.add_variable_as_val("file", file.clone_as_boxed());
+            scope.add_variable_as_val("file", cel_fact(file));
         }
-        let mut variables = Vec::new();
+        let mut variables = Map::new();
         for (((name, program), shared), used) in
             self.variables.iter().zip(&self.shared).zip(&self.used)
         {
@@ -253,11 +304,29 @@ impl CelFix {
             let bound = program
                 .execute(&scope)
                 .map_err(|e| PluginError::Failed(format!("{id}: fix: variable `{name}`: {e}")))?;
-            if let Ok(fact) = Var::try_from(bound.clone()) {
-                variables.push((name.clone(), fact));
-            }
+            variables.insert(name.clone(), to_json(&bound));
             scope.add_variable_from_value(name, bound);
         }
-        Ok(FileValues { file, variables })
+        if let Some(error) = builder.failure() {
+            return Err(error);
+        }
+        Ok(json!({ "file": file, "variables": variables }))
+    }
+}
+
+impl FileValues {
+    /// The values of [`CelFix::values`] as the CEL runtime reads them.
+    fn of(values: &Value) -> Self {
+        let file = values.get("file").filter(|f| !f.is_null()).map(cel_fact);
+        let variables = values
+            .get("variables")
+            .and_then(Value::as_object)
+            .map(|vars| {
+                vars.iter()
+                    .map(|(name, value)| (name.clone(), cel_fact(value)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Self { file, variables }
     }
 }

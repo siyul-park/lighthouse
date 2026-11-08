@@ -165,6 +165,7 @@ fn run(
         workspace: &ws,
         text,
         trusted,
+        values: None,
     })
 }
 

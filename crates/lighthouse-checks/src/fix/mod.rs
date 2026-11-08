@@ -10,7 +10,7 @@ mod edits;
 use std::sync::Arc;
 
 use lighthouse_model::{Safety, ucm::FixOutcome};
-use lighthouse_plugin::{Error as PluginError, FixRequest, FixerManifest};
+use lighthouse_plugin::{Error as PluginError, FixRequest, FixerManifest, ValuesRequest};
 use lighthouse_spec::{Decision, FixKind};
 
 use crate::{Composition, Error};
@@ -70,5 +70,9 @@ impl lighthouse_plugin::Fixer for Fixer {
             },
             Err(reason) => FixOutcome::declined(reason),
         })
+    }
+
+    fn values(&self, request: &ValuesRequest) -> Result<serde_json::Value, PluginError> {
+        self.fix.values(&self.meta.id, request)
     }
 }

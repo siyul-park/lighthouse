@@ -40,7 +40,7 @@ pub use findings::{
     BATCH, BATCHED, Batched, COMMAND, FINDINGS, Findings, JUDGED, Judged, Judging, Key, PATHS,
     TOOL, judge, queries, run_batches, set_judged,
 };
-pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest};
+pub use fix::{FixDecision, FixRequest, Fixer, FixerManifest, ValuesRequest};
 pub use lighthouse_protocol::{
     Conventions, EmbeddedRegion, Mapping, TestNaming, TextMapSegment, Units, UnitsBy,
 };

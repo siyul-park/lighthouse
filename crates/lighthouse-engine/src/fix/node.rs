@@ -23,7 +23,7 @@ use lighthouse_model::{
     Diagnostic, Options, Safety,
     ucm::{Capability, EditOp, FixOutcome, Held, Model, View},
 };
-use lighthouse_plugin::{FixDecision, FixRequest, Runtime};
+use lighthouse_plugin::{FixDecision, FixRequest, Runtime, ValuesRequest};
 use lighthouse_protocol::hash;
 use lighthouse_spec::{FixScope, Program};
 use serde::{Deserialize, Serialize};
@@ -45,6 +45,29 @@ pub(super) static FIXING: Input<String, Fixing> = Input::new("fixing");
 /// JSON.
 pub(super) static FIX: Query<(String, String), Fixed> =
     Query::new("fix", fix).starting_program(runs_program);
+
+/// What the fixes of a rule share on one file, as its fixer builds it, by the
+/// rule and the file with the options it ran with as [`Where`] states them in
+/// JSON: built once, whatever the findings, and pulled by the node of each.
+/// `Null` when the fixer shares nothing.
+pub(super) static VALUES: Query<(String, String), Value> = Query::new("values", values).transient();
+
+/// The file the values of a rule are of, and the options the rule ran with.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct Where {
+    pub(super) file: PathBuf,
+    pub(super) options: Options,
+}
+
+impl Where {
+    /// The key of the node that answers this for the rule `rule`.
+    pub(super) fn key(&self, rule: &str) -> (String, String) {
+        (
+            rule.to_owned(),
+            serde_json::to_string(self).unwrap_or_default(),
+        )
+    }
+}
 
 /// How the fix of one rule is made.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +148,36 @@ fn runs_program(_: &Graph, (_, ask): &(String, String)) -> bool {
     serde_json::from_str::<Ask>(ask).is_ok_and(|ask| ask.program.is_some())
 }
 
+fn values(graph: &Graph, (rule, at): &(String, String)) -> Result<Value, Error> {
+    graph.input(&VERSION, &"binary".to_owned())?;
+    let fixing = graph
+        .input(&FIXING, rule)?
+        .ok_or_else(|| Error::Encode(format!("{rule}: the fix is not declared")))?;
+    let at: Where = serde_json::from_str(at)
+        .map_err(|e| Error::Encode(format!("{rule}: the file cannot be read: {e}")))?;
+    let runtime = Runtime::of(graph)?;
+    let Some(fixer) = runtime.registry().fixer(&fixing.fixer) else {
+        return Ok(Value::Null);
+    };
+    let held = Held::default();
+    let view = View::new(graph, &held)?;
+    let sources = Sources::graph(&runtime.workspace().root, &view, graph);
+    let text = sources.text(&at.file).map_err(Error::Encode)?;
+    let queries = lighthouse_plugin::queries(graph).map_err(|e| Error::Encode(format!("{e}")))?;
+    let made = fixer.values(&ValuesRequest {
+        file: &at.file,
+        options: &at.options,
+        project: &view,
+        queries: &queries,
+        workspace: runtime.workspace(),
+        text: &text,
+    });
+    if let Some(error) = view.failure() {
+        return Err(error);
+    }
+    made.map_err(|e| Error::Encode(format!("{rule}: the fixer failed: {e}")))
+}
+
 fn fix(graph: &Graph, (rule, ask): &(String, String)) -> Result<Fixed, Error> {
     graph.input(&VERSION, &"binary".to_owned())?;
     let fixing = graph
@@ -173,6 +226,16 @@ fn proposed(
         context: fixing.context.clone(),
     };
     let queries = lighthouse_plugin::queries(graph).map_err(|e| format!("{e}"))?;
+    let shared = graph
+        .query(
+            &VALUES,
+            &Where {
+                file: finding.file.clone(),
+                options: ask.options.clone(),
+            }
+            .key(&finding.rule_id),
+        )
+        .map_err(|e| format!("{e}"))?;
     let request = FixRequest {
         finding,
         facts: &ask.facts,
@@ -183,6 +246,7 @@ fn proposed(
         workspace: runtime.workspace(),
         text: &text,
         trusted: runtime.trusted(),
+        values: Some(&shared).filter(|v| !v.is_null()),
     };
     match fixer
         .fix(&request)
